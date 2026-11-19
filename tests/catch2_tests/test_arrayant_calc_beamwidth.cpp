@@ -195,9 +195,9 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and mult
     CHECK(std::abs(p_el[2] - 20.0) < 0.1);
 
     const arma::uvec empty, sel = {2, 0, 2};
-    quadriga_lib::arrayant_calc_directivity(a, d_all);
-    quadriga_lib::arrayant_calc_directivity(a, d_empty, empty);
-    quadriga_lib::arrayant_calc_directivity(a, d, sel);
+    d_all = quadriga_lib::arrayant_calc_directivity(a);
+    d_empty = quadriga_lib::arrayant_calc_directivity(a, empty);
+    d = quadriga_lib::arrayant_calc_directivity(a, sel);
     REQUIRE(d_all.n_elem == 3);
     CHECK(arma::approx_equal(d_all, d_empty, "absdiff", tol));
     REQUIRE(d.n_elem == 3);
@@ -216,7 +216,7 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and mult
     const std::vector<quadriga_lib::arrayant<double>> v = {a, b};
     arma::mat m_az, m_el, m_paz, m_pel, m_d;
     quadriga_lib::arrayant_calc_beamwidth_multi(v, sel, 6.0, &m_az, &m_el, &m_paz, &m_pel);
-    quadriga_lib::arrayant_calc_directivity_multi(v, m_d, sel);
+    m_d = quadriga_lib::arrayant_calc_directivity_multi(v, sel);
     REQUIRE(m_az.n_rows == 3);
     REQUIRE(m_az.n_cols == 2);
     REQUIRE(m_pel.n_rows == 3);
@@ -225,7 +225,7 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and mult
     {
         arma::vec s_az, s_el, s_paz, s_pel, s_d;
         quadriga_lib::arrayant_calc_beamwidth(v[f], sel, 6.0, &s_az, &s_el, &s_paz, &s_pel);
-        quadriga_lib::arrayant_calc_directivity(v[f], s_d, sel);
+        s_d = quadriga_lib::arrayant_calc_directivity(v[f], sel);
         CHECK(arma::approx_equal(m_az.col(f), s_az, "absdiff", tol));
         CHECK(arma::approx_equal(m_el.col(f), s_el, "absdiff", tol));
         CHECK(arma::approx_equal(m_paz.col(f), s_paz, "absdiff", tol));
@@ -246,9 +246,9 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and mult
     arma::fvec f_az, f_d;
     arma::fmat fm_az, fm_d;
     quadriga_lib::arrayant_calc_beamwidth(af, {}, 3.0f, &f_az);
-    quadriga_lib::arrayant_calc_directivity(af, f_d);
+    f_d = quadriga_lib::arrayant_calc_directivity(af);
     quadriga_lib::arrayant_calc_beamwidth_multi(std::vector<quadriga_lib::arrayant<float>>{af, af}, {}, 3.0f, &fm_az);
-    quadriga_lib::arrayant_calc_directivity_multi(std::vector<quadriga_lib::arrayant<float>>{af, af}, fm_d);
+    fm_d = quadriga_lib::arrayant_calc_directivity_multi(std::vector<quadriga_lib::arrayant<float>>{af, af});
     REQUIRE(fm_az.n_cols == 2);
     CHECK(arma::approx_equal(fm_az.col(1), f_az, "absdiff", 1.0e-4f));
     CHECK(arma::approx_equal(fm_d.col(0), f_d, "absdiff", 1.0e-4f));
@@ -268,22 +268,22 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Input validation")
         auto broken = a;
         broken.azimuth_grid.resize(2);
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(broken, {}, 3.0, &bw), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity(broken, d), std::invalid_argument);
+        CHECK_THROWS_AS(d = quadriga_lib::arrayant_calc_directivity(broken), std::invalid_argument);
 
         const std::vector<quadriga_lib::arrayant<double>> v_empty, v_bad = {a, quadriga_lib::generate_arrayant_omni<double>()};
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v_empty, {}, 3.0, &m), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity_multi(v_empty, m), std::invalid_argument);
+        CHECK_THROWS_AS(m = quadriga_lib::arrayant_calc_directivity_multi(v_empty), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v_bad, {}, 3.0, &m), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity_multi(v_bad, m), std::invalid_argument);
+        CHECK_THROWS_AS(m = quadriga_lib::arrayant_calc_directivity_multi(v_bad), std::invalid_argument);
     }
 
     SECTION("i_element")
     {
         const arma::uvec bad = {0, 3};
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, bad, 3.0, &bw), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity(a, d, bad), std::invalid_argument);
+        CHECK_THROWS_AS(d = quadriga_lib::arrayant_calc_directivity(a, bad), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v, bad, 3.0, &m), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity_multi(v, m, bad), std::invalid_argument);
+        CHECK_THROWS_AS(m = quadriga_lib::arrayant_calc_directivity_multi(v, bad), std::invalid_argument);
     }
 
     SECTION("threshold_dB")

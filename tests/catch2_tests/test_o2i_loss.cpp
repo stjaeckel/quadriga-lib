@@ -10,7 +10,7 @@
 //
 // Pins down: the building penetration loss of the low-loss, high-loss and low-loss A models, the backward
 // compatible model, the car penetration losses, the model choice by the cumulative weights, the indoor distance
-// as the minimum of two uniforms, the optional outputs, pre-sized outputs, the empty input and the input
+// as the minimum of two uniforms, the optional outputs, pre-sized optional outputs, the empty input and the input
 // validation.
 // Oracles, independent of the function:
 //  - TR 38.901 v19.5.0 Table 7.4.3-1 (material losses, f in GHz: glass 2 + 0.2 f, IRR glass 25.4 + 0.11 f,
@@ -90,7 +90,7 @@ TEST_CASE("o2i_loss - wall and indoor losses follow Tables 7.4.3-1 and 7.4.3-2")
             arma::mat loss;
             arma::vec d2d_in;
             arma::uvec idx;
-            quadriga_lib::o2i_loss(fc, rnd5, models, w, loss, d_max, &d2d_in, &idx);
+            loss = quadriga_lib::o2i_loss(fc, rnd5, models, w, d_max, &d2d_in, &idx);
             REQUIRE(loss.n_rows == 5);
             REQUIRE(loss.n_cols == 3);
             REQUIRE(d2d_in.n_elem == 5);
@@ -117,7 +117,7 @@ TEST_CASE("o2i_loss - the backward compatible model of Table 7.4.3-3")
     const arma::vec fc = {2.0e9, 3.5e9, 5.9e9};
     arma::mat loss, loss2;
     arma::vec d2d_in;
-    quadriga_lib::o2i_loss(fc, rnd5, {"legacy_6GHz"}, arma::vec{1.0}, loss, 25.0, &d2d_in);
+    loss = quadriga_lib::o2i_loss(fc, rnd5, {"legacy_6GHz"}, arma::vec{1.0}, 25.0, &d2d_in);
     REQUIRE(loss.n_rows == 5);
     REQUIRE(loss.n_cols == 3);
     for (arma::uword u = 0; u < 5; ++u)
@@ -133,7 +133,7 @@ TEST_CASE("o2i_loss - the backward compatible model of Table 7.4.3-3")
     r.col(2) = arma::vec{0.9, 0.0, 0.3, 0.6, 0.1};
     r.col(3) = arma::vec{-2.0, 3.0, 0.1, 1.0, -1.0};
     arma::vec d2d_in2;
-    quadriga_lib::o2i_loss(fc, r, {"legacy_6GHz"}, arma::vec{1.0}, loss2, 25.0, &d2d_in2);
+    loss2 = quadriga_lib::o2i_loss(fc, r, {"legacy_6GHz"}, arma::vec{1.0}, 25.0, &d2d_in2);
     CHECK(arma::all(arma::vectorise(loss2 == loss)));
     CHECK(arma::all(d2d_in2 == d2d_in));
 }
@@ -146,7 +146,7 @@ TEST_CASE("o2i_loss - car penetration loss")
         const double mu = std::string(m) == "car" ? 9.0 : 20.0;
         arma::mat loss;
         arma::vec d2d_in;
-        quadriga_lib::o2i_loss(fc, rnd5, {m}, arma::vec{1.0}, loss, 25.0, &d2d_in);
+        loss = quadriga_lib::o2i_loss(fc, rnd5, {m}, arma::vec{1.0}, 25.0, &d2d_in);
         REQUIRE(loss.n_rows == 5);
         REQUIRE(loss.n_cols == 4);
         for (arma::uword u = 0; u < 5; ++u)
@@ -172,7 +172,7 @@ TEST_CASE("o2i_loss - the model is chosen by the cumulative weights")
         r(k, 0) = (double(k) + 0.5) / double(n);
     arma::mat loss;
     arma::uvec idx;
-    quadriga_lib::o2i_loss(fc, r, models, arma::vec{0.2, 0.0, 0.5, 0.3}, loss, 25.0, nullptr, &idx);
+    loss = quadriga_lib::o2i_loss(fc, r, models, arma::vec{0.2, 0.0, 0.5, 0.3}, 25.0, nullptr, &idx);
     REQUIRE(idx.n_elem == n);
     arma::uvec cnt(4, arma::fill::zeros);
     for (arma::uword k = 0; k < n; ++k)
@@ -192,18 +192,18 @@ TEST_CASE("o2i_loss - the model is chosen by the cumulative weights")
 
     // u = 1 picks the last non-zero weight; u = 0 never picks a zero weight
     const arma::mat r1 = {{1.0, 0.5, 0.5, 0.0}}, r0 = {{0.0, 0.5, 0.5, 0.0}};
-    quadriga_lib::o2i_loss(fc, r1, models, arma::vec{0.5, 0.5, 0.0, 0.0}, loss, 25.0, nullptr, &idx);
+    loss = quadriga_lib::o2i_loss(fc, r1, models, arma::vec{0.5, 0.5, 0.0, 0.0}, 25.0, nullptr, &idx);
     CHECK(idx(0) == 1);
-    quadriga_lib::o2i_loss(fc, r1, models, arma::vec{0.25, 0.25, 0.25, 0.25}, loss, 25.0, nullptr, &idx);
+    loss = quadriga_lib::o2i_loss(fc, r1, models, arma::vec{0.25, 0.25, 0.25, 0.25}, 25.0, nullptr, &idx);
     CHECK(idx(0) == 3);
-    quadriga_lib::o2i_loss(fc, r0, models, arma::vec{0.0, 0.0, 0.6, 0.4}, loss, 25.0, nullptr, &idx);
+    loss = quadriga_lib::o2i_loss(fc, r0, models, arma::vec{0.0, 0.0, 0.6, 0.4}, 25.0, nullptr, &idx);
     CHECK(idx(0) == 2);
-    quadriga_lib::o2i_loss(fc, r0, models, arma::vec{0.0, 1.0, 0.0, 0.0}, loss, 25.0, nullptr, &idx);
+    loss = quadriga_lib::o2i_loss(fc, r0, models, arma::vec{0.0, 1.0, 0.0, 0.0}, 25.0, nullptr, &idx);
     CHECK(idx(0) == 1);
 
     // Weights that sum to 1 within 1e-6 are normalized by their sum
     const arma::mat rh = {{0.4999999, 0.5, 0.5, 0.0}, {0.5000001, 0.5, 0.5, 0.0}};
-    quadriga_lib::o2i_loss(fc, rh, {"low", "high"}, arma::vec{0.5000004, 0.5000004}, loss, 25.0, nullptr, &idx);
+    loss = quadriga_lib::o2i_loss(fc, rh, {"low", "high"}, arma::vec{0.5000004, 0.5000004}, 25.0, nullptr, &idx);
     CHECK(idx(0) == 0);
     CHECK(idx(1) == 1);
 }
@@ -223,7 +223,7 @@ TEST_CASE("o2i_loss - indoor distance is the minimum of two uniforms")
         }
     arma::mat loss;
     arma::vec d2d_in;
-    quadriga_lib::o2i_loss(fc, r, {"low", "high"}, arma::vec{0.4, 0.6}, loss, d_max, &d2d_in);
+    loss = quadriga_lib::o2i_loss(fc, r, {"low", "high"}, arma::vec{0.4, 0.6}, d_max, &d2d_in);
     REQUIRE(d2d_in.n_elem == n * n);
 
     double max_err = 0.0;
@@ -251,7 +251,7 @@ TEST_CASE("o2i_loss - optional outputs and sizes")
     arma::mat L_ref;
     arma::vec d_ref;
     arma::uvec i_ref;
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, L_ref, 20.0, &d_ref, &i_ref);
+    L_ref = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0, &d_ref, &i_ref);
     REQUIRE(L_ref.n_rows == 5);
     REQUIRE(L_ref.n_cols == 2);
     REQUIRE(d_ref.n_elem == 5);
@@ -261,23 +261,21 @@ TEST_CASE("o2i_loss - optional outputs and sizes")
     arma::mat L1, L2, L3;
     arma::vec d1;
     arma::uvec i1;
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, L1, 20.0);
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, L2, 20.0, &d1);
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, L3, 20.0, nullptr, &i1);
+    L1 = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0);
+    L2 = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0, &d1);
+    L3 = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0, nullptr, &i1);
     CHECK(arma::all(arma::vectorise(L1 == L_ref)));
     CHECK(arma::all(arma::vectorise(L2 == L_ref)));
     CHECK(arma::all(arma::vectorise(L3 == L_ref)));
     CHECK(arma::all(d1 == d_ref));
     CHECK(arma::all(i1 == i_ref));
 
-    // Pre-sized outputs with stale content are overwritten in place
-    arma::mat Lp(5, 2, arma::fill::value(7.0));
+    // Pre-sized optional outputs with stale content are overwritten in place
     arma::vec dp(5, arma::fill::value(7.0));
     arma::uvec ip(5, arma::fill::value(7));
-    const double *pL = Lp.memptr(), *pd = dp.memptr();
+    const double *pd = dp.memptr();
     const arma::uword *pi = ip.memptr();
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, Lp, 20.0, &dp, &ip);
-    CHECK(Lp.memptr() == pL);
+    const arma::mat Lp = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0, &dp, &ip);
     CHECK(dp.memptr() == pd);
     CHECK(ip.memptr() == pi);
     CHECK(arma::all(arma::vectorise(Lp == L_ref)));
@@ -288,7 +286,7 @@ TEST_CASE("o2i_loss - optional outputs and sizes")
     arma::mat Lw(2, 7, arma::fill::value(7.0));
     arma::vec dw(1, arma::fill::value(7.0));
     arma::uvec iw(9, arma::fill::value(7));
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, Lw, 20.0, &dw, &iw);
+    Lw = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0, &dw, &iw);
     REQUIRE(Lw.n_rows == 5);
     REQUIRE(Lw.n_cols == 2);
     CHECK(arma::all(arma::vectorise(Lw == L_ref)));
@@ -297,7 +295,7 @@ TEST_CASE("o2i_loss - optional outputs and sizes")
 
     // Repeated call: identical (Lw, dw, iw were computed by an earlier call)
     arma::mat Lr;
-    quadriga_lib::o2i_loss(fc, rnd5, models, w, Lr, 20.0);
+    Lr = quadriga_lib::o2i_loss(fc, rnd5, models, w, 20.0);
     CHECK(arma::all(arma::vectorise(Lr == Lw)));
 
     // No UTs
@@ -305,7 +303,7 @@ TEST_CASE("o2i_loss - optional outputs and sizes")
     arma::mat L0(3, 3, arma::fill::ones);
     arma::vec d0(3, arma::fill::ones);
     arma::uvec i0(3, arma::fill::ones);
-    CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, r0, models, w, L0, 20.0, &d0, &i0));
+    CHECK_NOTHROW(L0 = quadriga_lib::o2i_loss(fc, r0, models, w, 20.0, &d0, &i0));
     CHECK(L0.n_rows == 0);
     CHECK(L0.n_cols == 2);
     CHECK(d0.n_elem == 0);
@@ -321,19 +319,14 @@ TEST_CASE("o2i_loss - input validation")
 
     auto call = [&](const arma::vec &f, const arma::mat &r, const std::vector<std::string> &m, const arma::vec &ww,
                     double d_max)
-    { quadriga_lib::o2i_loss(f, r, m, ww, loss, d_max); };
+    { loss = quadriga_lib::o2i_loss(f, r, m, ww, d_max); };
 
     SECTION("outputs that alias inputs")
     {
-        arma::mat r = rnd5;
         arma::vec f = fc, ww = w;
-        CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, r, models, w, r), std::invalid_argument);                // loss is 'rnd'
-        CHECK_THROWS_AS(quadriga_lib::o2i_loss(f, rnd5, models, w, loss, 25.0, &f), std::invalid_argument); // d2d_in is 'center_freq'
-        CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, rnd5, models, ww, loss, 25.0, &ww), std::invalid_argument); // d2d_in is 'weights'
-        CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss));
-        arma::vec on_loss(loss.memptr(), 5, false, true);
-        CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss, 25.0, &on_loss), std::invalid_argument); // d2d_in on the memory of 'loss'
-        CHECK(arma::approx_equal(r, rnd5, "absdiff", 0.0));
+        CHECK_THROWS_AS(loss = quadriga_lib::o2i_loss(f, rnd5, models, w, 25.0, &f), std::invalid_argument);    // d2d_in is 'center_freq'
+        CHECK_THROWS_AS(loss = quadriga_lib::o2i_loss(fc, rnd5, models, ww, 25.0, &ww), std::invalid_argument); // d2d_in is 'weights'
+        CHECK(arma::approx_equal(f, fc, "absdiff", 0.0));
     }
 
     SECTION("valid baseline")
@@ -344,8 +337,8 @@ TEST_CASE("o2i_loss - input validation")
         CHECK_NOTHROW(call(fc, arma::mat(0, 4), models, w, 25.0));
         arma::vec d2d_in;
         arma::uvec idx;
-        CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss, 25.0, &d2d_in, &idx));
-        CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss));
+        CHECK_NOTHROW(loss = quadriga_lib::o2i_loss(fc, rnd5, models, w, 25.0, &d2d_in, &idx));
+        CHECK_NOTHROW(loss = quadriga_lib::o2i_loss(fc, rnd5, models, w));
     }
     SECTION("fc")
     {

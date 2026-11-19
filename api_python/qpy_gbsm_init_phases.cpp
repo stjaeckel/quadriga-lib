@@ -3,7 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
-#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -72,30 +71,9 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
     const bool remove_bias_b = qd_python_flag(remove_bias, true, "remove_bias");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    // Output allocation in numpy memory: n_coeff of the preset, n_gen of the set from a completed copy of 'scenpar';
-    // with an unknown preset or set type or an invalid 'scenpar' the call throws before any output is needed
-    arma::cube phase;
-    py::array_t<double> phase_py;
-    const bool lsf = set_type == "lsf";
-    const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
-    bool known = n_coeff > 0 && (lsf || set_type == "cluster" || set_type == "ray");
-    auto sp = scenpar_a;
-    try
-    {
-        if (known)
-            quadriga_lib::scenpar_validate(sp);
-    }
-    catch (const std::exception &)
-    {
-        known = false;
-    }
-    if (known)
-        phase_py = qd_python_init_output(n_coeff, qd_gbsm_n_gen(sp, set_type, (arma::sword)set_id), (arma::uword)2,
-                                         &phase);
-
     // Call library function
-    quadriga_lib::gbsm_init_phases(scenpar_a, set_type, phase, (arma::sword)seed, (arma::sword)set_id, preset, tx_pos_a,
-                                   rx_pos_a, dual_mobility_b, remove_bias_b, horizontal_b);
-
-    return phase_py;
+    const arma::cube phase = quadriga_lib::gbsm_init_phases(scenpar_a, set_type, (arma::sword)seed, (arma::sword)set_id,
+                                                            preset, tx_pos_a, rx_pos_a, dual_mobility_b, remove_bias_b,
+                                                            horizontal_b);
+    return qd_python_copy2numpy(&phase);
 }

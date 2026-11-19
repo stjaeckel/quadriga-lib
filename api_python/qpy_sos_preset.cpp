@@ -53,13 +53,12 @@ py::tuple sos_preset(const std::string &name,
                      double dist_decorr)
 {
     // Output allocation; the number of sinusoids is known only after the call
-    arma::mat spatial_freq;
     arma::vec acf, dist;
     auto acf_py = qd_python_init_output((arma::uword)200, &acf);
     auto dist_py = qd_python_init_output((arma::uword)200, &dist);
 
     // Call library function
-    quadriga_lib::sos_preset<double>(name, spatial_freq, &acf, &dist, dist_decorr);
+    const arma::mat spatial_freq = quadriga_lib::sos_preset<double>(name, &acf, &dist, dist_decorr);
 
     // Copy to python
     auto freq_py = qd_python_copy2numpy(&spatial_freq);

@@ -75,7 +75,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat loss_dB;
     arma::vec d2d_in;
     arma::uvec model_ind;
-    plhs[0] = qd_mex_init_output(&loss_dB, rnd.n_rows, center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&d2d_in, rnd.n_rows);
     if (nlhs > 2)
@@ -86,7 +85,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec *p_model_index = (nlhs > 2) ? &model_ind : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::o2i_loss(center_freq, rnd, models, weights, loss_dB, d2d_in_max, p_d2d_in, p_model_index));
+    CALL_QD(loss_dB = quadriga_lib::o2i_loss(center_freq, rnd, models, weights, d2d_in_max, p_d2d_in, p_model_index));
+    plhs[0] = qd_mex_copy2matlab(&loss_dB);
 
     // Model index: 0-based (C++) -> 1-based (MATLAB)
     if (nlhs > 2)

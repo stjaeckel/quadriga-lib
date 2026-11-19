@@ -43,12 +43,7 @@ py::array_t<double> sos_acfi(const py::array_t<double> &acf,
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
     const auto d_a = qd_python_numpy2arma_Col<double>(d, true);
 
-    // Output allocation
-    arma::vec val;
-    auto val_py = qd_python_init_output(d_a.n_elem, &val);
-
     // Call library function
-    quadriga_lib::sos_acfi<double>(acf_a, dist_a, d_a, val);
-
-    return val_py;
+    const arma::vec val = quadriga_lib::sos_acfi<double>(acf_a, dist_a, d_a);
+    return qd_python_copy2numpy(&val);
 }

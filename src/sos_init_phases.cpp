@@ -31,10 +31,9 @@ Draw random phases for a set of sum-of-sinusoids generators
 
 ## Declaration:
 ```
-void quadriga_lib::sos_init_phases(
+arma::Mat<dtype> quadriga_lib::sos_init_phases(
     arma::uword n_coeff,
     arma::uword n_gen,
-    arma::Mat<dtype> &phase,
     arma::sword seed = -1);
 ```
 
@@ -44,8 +43,8 @@ void quadriga_lib::sos_init_phases(
 - **`seed`** *(optional)* — Seed of the random stream; must be >= -1; `-1` seeds from the system random
   device and gives different phases on each call
 
-## Output:
-- **`phase`** — Phases in [rad]; `[n_coeff, n_gen]`
+## Returns:
+- Phases `phase` in [rad]; `[n_coeff, n_gen]`
 
 ## See also:
 - [[sos_val]] (evaluates the generators)
@@ -53,10 +52,9 @@ void quadriga_lib::sos_init_phases(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_init_phases(arma::uword n_coeff,
-                                   arma::uword n_gen,
-                                   arma::Mat<dtype> &phase,
-                                   arma::sword seed)
+arma::Mat<dtype> quadriga_lib::sos_init_phases(arma::uword n_coeff,
+                                               arma::uword n_gen,
+                                               arma::sword seed)
 {
     if (n_coeff == 0)
         throw std::invalid_argument("Input 'n_coeff' cannot be 0.");
@@ -65,8 +63,7 @@ void quadriga_lib::sos_init_phases(arma::uword n_coeff,
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
 
-    if (phase.n_rows != n_coeff || phase.n_cols != n_gen)
-        phase.set_size(n_coeff, n_gen);
+    arma::Mat<dtype> phase(n_coeff, n_gen, arma::fill::none);
 
     const double two_pi = 6.283185307179586;
     const dtype pi = (dtype)3.141592653589793;
@@ -78,7 +75,8 @@ void quadriga_lib::sos_init_phases(arma::uword n_coeff,
         dtype v = (dtype)(two_pi * (qd_rng_uniform(rng) - 0.5));
         p[i] = (v >= pi) ? -pi : v; // A double just below pi can round up to pi in single precision
     }
+    return phase;
 }
 
-template void quadriga_lib::sos_init_phases(arma::uword n_coeff, arma::uword n_gen, arma::Mat<float> &phase, arma::sword seed);
-template void quadriga_lib::sos_init_phases(arma::uword n_coeff, arma::uword n_gen, arma::Mat<double> &phase, arma::sword seed);
+template arma::Mat<float> quadriga_lib::sos_init_phases(arma::uword n_coeff, arma::uword n_gen, arma::sword seed);
+template arma::Mat<double> quadriga_lib::sos_init_phases(arma::uword n_coeff, arma::uword n_gen, arma::sword seed);

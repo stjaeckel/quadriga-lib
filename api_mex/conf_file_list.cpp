@@ -74,7 +74,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_file_dirs = (nlhs > 2) ? &file_dirs : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::conf_file_list(dirs, scenarios, p_file_names, p_file_dirs, parse_shortnames));
+    CALL_QD(scenarios = quadriga_lib::conf_file_list(dirs, p_file_names, p_file_dirs, parse_shortnames));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&scenarios);

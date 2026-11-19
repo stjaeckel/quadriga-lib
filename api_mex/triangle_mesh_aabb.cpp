@@ -55,7 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat aabb;
 
     // Call library function
-    CALL_QD(quadriga_lib::triangle_mesh_aabb<double>(mesh, aabb, sub_mesh_ind, vec_size));
+    CALL_QD(aabb = quadriga_lib::triangle_mesh_aabb<double>(mesh, sub_mesh_ind, vec_size));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&aabb);

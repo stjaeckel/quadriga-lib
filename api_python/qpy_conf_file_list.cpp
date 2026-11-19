@@ -64,10 +64,10 @@ py::tuple conf_file_list(py::handle dirs,
     const bool parse_shortnames_b = qd_python_flag(parse_shortnames, true, "parse_shortnames");
 
     // Output allocation
-    std::vector<std::string> scenarios, file_names, file_dirs;
+    std::vector<std::string> file_names, file_dirs;
 
     // Call library function
-    quadriga_lib::conf_file_list(dirs_v, scenarios, &file_names, &file_dirs, parse_shortnames_b);
+    const auto scenarios = quadriga_lib::conf_file_list(dirs_v, &file_names, &file_dirs, parse_shortnames_b);
 
     // Copy to python
     auto scenarios_py = qd_python_copy2list(scenarios);

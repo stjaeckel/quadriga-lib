@@ -74,10 +74,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_gen = qd_mex_sos_count(prhs[1], "n_gen", 0.0);
     const arma::sword seed = (nrhs < 3) ? -1 : qd_mex_get_seed(prhs[2]);
 
-    // Output allocation
-    arma::mat phase;
-    plhs[0] = qd_mex_init_output(&phase, n_coeff, n_gen);
-
     // Call library function
-    CALL_QD(quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, phase, seed));
+    arma::mat phase;
+    CALL_QD(phase = quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, seed));
+    plhs[0] = qd_mex_copy2matlab(&phase);
 }

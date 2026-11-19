@@ -157,8 +157,7 @@ int main()
 {
     auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.7e9);
     std::cout << quadriga_lib::quadriga_lib_version() << "\n";
-    arma::vec directivity_dBi;
-    quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi);
+    arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant);
     std::cout << directivity_dBi(0) << " dBi\n";
 }
 ```

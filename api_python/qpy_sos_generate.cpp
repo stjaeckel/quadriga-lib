@@ -95,12 +95,13 @@ py::tuple sos_generate(const py::array_t<double> &acf,
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
     // Outputs; the number of passes and the size of test_dir are known only after the call
-    arma::mat spatial_freq, test_dir;
+    arma::mat test_dir;
     arma::vec ase;
 
     // Call library function
-    quadriga_lib::sos_generate<double>(acf_a, dist_a, n_coeff, spatial_freq, &ase, &test_dir, n_dim, uniform_smp_b,
-                                       n_dir, random_init_b, spatial_freq_min, spatial_freq_max, seed);
+    const arma::mat spatial_freq = quadriga_lib::sos_generate<double>(acf_a, dist_a, n_coeff, &ase, &test_dir, n_dim,
+                                                                      uniform_smp_b, n_dir, random_init_b,
+                                                                      spatial_freq_min, spatial_freq_max, seed);
 
     // Copy to python
     auto freq_py = qd_python_copy2numpy(&spatial_freq);

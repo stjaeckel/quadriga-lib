@@ -38,7 +38,7 @@ namespace
     spmap umi_nlos()
     {
         spmap sp;
-        quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_UMi_NLOS.conf", sp);
+        sp = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_UMi_NLOS.conf");
         return sp;
     }
 
@@ -132,9 +132,9 @@ namespace
     void init(const spmap &sp, const golden_set &g, arma::sword seed, arma::cube &ph)
     {
         if (g.bias)
-            quadriga_lib::gbsm_init_phases(sp, g.type, ph, seed, g.set_id, "Comb256", TX5, RX5);
+            ph = quadriga_lib::gbsm_init_phases(sp, g.type, seed, g.set_id, "Comb256", TX5, RX5);
         else
-            quadriga_lib::gbsm_init_phases(sp, g.type, ph, seed, g.set_id);
+            ph = quadriga_lib::gbsm_init_phases(sp, g.type, seed, g.set_id);
     }
 
     void check_phases(bool lsf)

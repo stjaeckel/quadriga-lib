@@ -47,13 +47,11 @@ py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,
 
     if (ant_multi.size() == 1) // Single frequency: 1D output (n_out,)
     {
-        arma::vec directivity_dBi;
-        quadriga_lib::arrayant_calc_directivity(ant_multi[0], directivity_dBi, i_el);
+        const arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant_multi[0], i_el);
         return qd_python_copy2numpy(&directivity_dBi);
     }
 
     // Multi-frequency: 2D output (n_out, n_freq)
-    arma::mat directivity_dBi;
-    quadriga_lib::arrayant_calc_directivity_multi(ant_multi, directivity_dBi, i_el);
+    const arma::mat directivity_dBi = quadriga_lib::arrayant_calc_directivity_multi(ant_multi, i_el);
     return qd_python_copy2numpy(&directivity_dBi);
 }

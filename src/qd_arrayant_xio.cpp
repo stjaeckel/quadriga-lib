@@ -1144,9 +1144,8 @@ Calculate the directivity in dBi for each entry of a multi-frequency arrayant ve
 
 ## Declaration:
 ```
-void quadriga_lib::arrayant_calc_directivity_multi(
+arma::Mat<dtype> quadriga_lib::arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
-        arma::Mat<dtype> &directivity_dBi,
         const arma::uvec &i_element = arma::uvec());
 ```
 
@@ -1154,8 +1153,8 @@ void quadriga_lib::arrayant_calc_directivity_multi(
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [[arrayant_is_valid_multi]]
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
-## Outputs:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
+## Returns:
+- Directivity in dBi; `[n_out, n_freq]`
 
 ## See also:
 - [[arrayant_calc_directivity]] (single-frequency counterpart)
@@ -1163,8 +1162,8 @@ void quadriga_lib::arrayant_calc_directivity_multi(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
-                                                   arma::Mat<dtype> &directivity_dBi, const arma::uvec &i_element)
+arma::Mat<dtype> quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
+                                                               const arma::uvec &i_element)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
@@ -1172,19 +1171,14 @@ void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dt
     if (!error_message.empty())
         throw std::invalid_argument("Input 'arrayant_vec' is not valid: " + error_message);
 
-    const arma::Mat<dtype> *outs[] = {&directivity_dBi};
-    const char *names[] = {"directivity_dBi"};
-    qd_check_alias_list(outs, names, &i_element);
-    for (const auto &a : arrayant_vec)
-        qd_check_alias_arrayant(outs, names, a);
-
     const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, arrayant_vec[0].e_theta_re.n_slices);
     const arma::uword n_out = i_out.n_elem, n_freq = (arma::uword)arrayant_vec.size();
-    directivity_dBi.set_size(n_out, n_freq);
+    arma::Mat<dtype> directivity_dBi(n_out, n_freq, arma::fill::none);
     for (arma::uword f = 0; f < n_freq; ++f)
         for (arma::uword i = 0; i < n_out; ++i)
             directivity_dBi.at(i, f) = qd_arrayant_calc_directivity_element(arrayant_vec[f], i_out[i]);
+    return directivity_dBi;
 }
 
-template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<float>> &, arma::Mat<float> &, const arma::uvec &);
-template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<double>> &, arma::Mat<double> &, const arma::uvec &);
+template arma::Mat<float> quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<float>> &, const arma::uvec &);
+template arma::Mat<double> quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<double>> &, const arma::uvec &);

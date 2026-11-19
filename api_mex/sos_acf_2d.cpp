@@ -53,12 +53,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec acf = qd_mex_get_Col<double>(prhs[0], false, "acf");
     const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
 
-    // Output allocation (a table with fewer than 2 samples is left to the library to reject)
+    // Output allocation of the optional output (a table with fewer than 2 samples is left to the library to reject)
     const arma::uword n_grid = (acf.n_elem < 2) ? 0 : 4 * acf.n_elem - 3;
     arma::mat acf_2d;
     arma::vec dist_2d;
-    if (n_grid != 0)
-        plhs[0] = qd_mex_init_output(&acf_2d, n_grid, n_grid);
     if (nlhs > 1 && n_grid != 0)
         plhs[1] = qd_mex_init_output(&dist_2d, n_grid);
 
@@ -66,5 +64,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_dist_2d = dist_2d.empty() ? nullptr : &dist_2d;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_acf_2d<double>(acf, dist, acf_2d, p_dist_2d));
+    CALL_QD(acf_2d = quadriga_lib::sos_acf_2d<double>(acf, dist, p_dist_2d));
+    plhs[0] = qd_mex_copy2matlab(&acf_2d);
 }

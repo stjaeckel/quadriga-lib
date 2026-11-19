@@ -63,7 +63,7 @@ namespace
                    std::string *pl_model = nullptr)
     {
         spmap sp;
-        quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp, pl_model, pl);
+        sp = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", pl_model, pl);
         return sp;
     }
 
@@ -168,8 +168,8 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
 {
     // The folder holds exactly the 23 files
     std::vector<std::string> scen;
-    arma::uword n = quadriga_lib::conf_file_list({"data/config"}, scen);
-    CHECK(n == 23);
+    scen = quadriga_lib::conf_file_list({"data/config"});
+    CHECK(scen.size() == 23);
     REQUIRE(scen.size() == v19_names().size());
     for (size_t i = 0; i < scen.size(); ++i)
         CHECK(scen[i] == "3GPP_38.901_v19_" + v19_names()[i]);
@@ -186,8 +186,8 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
         std::unordered_map<std::string, std::vector<double>> pl;
         std::vector<std::string> short_names, ignored;
         bool ok = false;
-        REQUIRE_NOTHROW(ok = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp,
-                                                          &pl_model, &pl, nullptr, nullptr, nullptr, &short_names,
+        REQUIRE_NOTHROW(sp = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf",
+                                                     &pl_model, &pl, nullptr, &ok, nullptr, nullptr, &short_names,
                                                           &ignored));
         int n_changed = 0;
         for (const auto &e : sp)

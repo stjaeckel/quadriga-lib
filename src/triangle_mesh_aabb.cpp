@@ -20,9 +20,8 @@ Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-me
 
 ## Declaration:
 ```
-void quadriga_lib::triangle_mesh_aabb(
+arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> &mesh,
-    arma::Mat<dtype> &aabb,
     const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
@@ -32,17 +31,17 @@ void quadriga_lib::triangle_mesh_aabb(
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
-## Output:
-- **`aabb`** — Bounding boxes, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+## Returns:
+- Bounding boxes `aabb`, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ## See also:
 - [[ray_triangle_intersect]] (consumer of the output)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh, arma::Mat<dtype> &aabb,
-                                      const arma::u32_vec &sub_mesh_ind,
-                                      arma::uword vec_size)
+arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh,
+                                                  const arma::u32_vec &sub_mesh_ind,
+                                                  arma::uword vec_size)
 {
     // Input validation
     if (mesh.n_cols < 9)
@@ -51,7 +50,6 @@ void quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh, arma::Mat<dt
         throw std::invalid_argument("Input 'mesh' must have at least one face.");
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
-    qd_check_alias(&aabb, "aabb", &mesh, &sub_mesh_ind);
 
     arma::uword n_face = mesh.n_rows;
     arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored
@@ -77,11 +75,9 @@ void quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh, arma::Mat<dt
             throw std::invalid_argument("Sub-mesh indices cannot exceed number of faces.");
     }
 
-    // Write into the output in place, resized only if needed; padding rows stay zero
+    // Padding rows stay zero
     arma::uword n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
-    if (aabb.n_rows != n_out || aabb.n_cols != 6)
-        aabb.set_size(n_out, 6);
-    aabb.zeros();
+    arma::Mat<dtype> aabb(n_out, 6, arma::fill::zeros);
 
     dtype *x_min = aabb.colptr(0), *x_max = aabb.colptr(1),
           *y_min = aabb.colptr(2), *y_max = aabb.colptr(3),
@@ -128,12 +124,13 @@ void quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh, arma::Mat<dt
             z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
         }
     }
+    return aabb;
 }
 
-template void quadriga_lib::triangle_mesh_aabb(const arma::Mat<float> &mesh, arma::Mat<float> &aabb,
-                                               const arma::u32_vec &sub_mesh_ind,
-                                               arma::uword vec_size);
+template arma::Mat<float> quadriga_lib::triangle_mesh_aabb(const arma::Mat<float> &mesh,
+                                                           const arma::u32_vec &sub_mesh_ind,
+                                                           arma::uword vec_size);
 
-template void quadriga_lib::triangle_mesh_aabb(const arma::Mat<double> &mesh, arma::Mat<double> &aabb,
-                                               const arma::u32_vec &sub_mesh_ind,
-                                               arma::uword vec_size);
+template arma::Mat<double> quadriga_lib::triangle_mesh_aabb(const arma::Mat<double> &mesh,
+                                                            const arma::u32_vec &sub_mesh_ind,
+                                                            arma::uword vec_size);

@@ -19,9 +19,8 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 ## Declaration:
 ```
-void quadriga_lib::point_cloud_aabb(
+arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> &points,
-    arma::Mat<dtype> &aabb,
     const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
@@ -31,8 +30,8 @@ void quadriga_lib::point_cloud_aabb(
 - **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
-## Output:
-- **`aabb`** — Bounding boxes, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+## Returns:
+- Bounding boxes `aabb`, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ## See also:
 - [[point_cloud_segmentation]] (generate sub-cloud indices)
@@ -41,9 +40,9 @@ void quadriga_lib::point_cloud_aabb(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dtype> &aabb,
-                                    const arma::u32_vec &sub_cloud_ind,
-                                    arma::uword vec_size)
+arma::Mat<dtype> quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points,
+                                                const arma::u32_vec &sub_cloud_ind,
+                                                arma::uword vec_size)
 {
     // Input validation
     if (points.n_cols != 3)
@@ -52,7 +51,6 @@ void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dt
         throw std::invalid_argument("Input 'points' must have at least one entry.");
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
-    qd_check_alias(&aabb, "aabb", &points, &sub_cloud_ind);
 
     arma::uword n_points = (arma::uword)points.n_rows;
     arma::uword n_values = (arma::uword)points.n_elem;
@@ -78,11 +76,9 @@ void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dt
             throw std::invalid_argument("Sub-cloud indices cannot exceed number of points.");
     }
 
-    // Write into the output in place, resized only if needed; padding rows stay zero
+    // Padding rows stay zero
     arma::uword n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
-    if (aabb.n_rows != n_out || aabb.n_cols != 6)
-        aabb.set_size(n_out, 6);
-    aabb.zeros();
+    arma::Mat<dtype> aabb(n_out, 6, arma::fill::zeros);
 
     dtype *x_min = aabb.colptr(0), *x_max = aabb.colptr(1),
           *y_min = aabb.colptr(2), *y_max = aabb.colptr(3),
@@ -129,12 +125,13 @@ void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dt
             z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
         }
     }
+    return aabb;
 }
 
-template void quadriga_lib::point_cloud_aabb(const arma::Mat<float> &points, arma::Mat<float> &aabb,
-                                             const arma::u32_vec &sub_cloud_ind,
-                                             arma::uword vec_size);
+template arma::Mat<float> quadriga_lib::point_cloud_aabb(const arma::Mat<float> &points,
+                                                         const arma::u32_vec &sub_cloud_ind,
+                                                         arma::uword vec_size);
 
-template void quadriga_lib::point_cloud_aabb(const arma::Mat<double> &points, arma::Mat<double> &aabb,
-                                             const arma::u32_vec &sub_cloud_ind,
-                                             arma::uword vec_size);
+template arma::Mat<double> quadriga_lib::point_cloud_aabb(const arma::Mat<double> &points,
+                                                          const arma::u32_vec &sub_cloud_ind,
+                                                          arma::uword vec_size);

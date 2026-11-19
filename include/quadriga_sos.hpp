@@ -27,31 +27,31 @@ namespace quadriga_lib
 
     // Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
     // - Presets: Exp, Gauss or Comb followed by the number of sinusoids 128, 256, 512 or 1024, e.g. "Comb256"
-    template <typename dtype>
-    void sos_preset(
+    // - Returns the spatial frequencies in [1/m], [n_coeff, 3]
+    template <typename dtype = double>
+    arma::Mat<dtype> sos_preset(
         const std::string &name,          // Name of the preset, e.g. "Comb256"
-        arma::Mat<dtype> &spatial_freq,   // Output: Spatial frequencies in [1/m], [n_coeff, 3]
         arma::Col<dtype> *acf = nullptr,  // Optional output: Target ACF, [200]
         arma::Col<dtype> *dist = nullptr, // Optional output: Sample points of the ACF in [m], [200]
         dtype dist_decorr = 10.0);        // Decorrelation distance in [m], must be > 0
 
     // Draw random phases for a set of sum-of-sinusoids generators
     // - Uniform in [-pi, pi); for the same seed, column g does not depend on n_gen
-    template <typename dtype>
-    void sos_init_phases(
+    // - Returns the phases in [rad], [n_coeff, n_gen]
+    template <typename dtype = double>
+    arma::Mat<dtype> sos_init_phases(
         arma::uword n_coeff,     // Number of sinusoids, must be > 0
         arma::uword n_gen,       // Number of generators, must be > 0
-        arma::Mat<dtype> &phase, // Output: Phases in [rad], [n_coeff, n_gen]
         arma::sword seed = -1);  // Seed, -1 = system random device
 
     // Target ACF at given distances
     // - Linear interpolation of the ACF table; distances beyond the last sample point return the last value
+    // - Returns the ACF at d, [n_d]
     template <typename dtype>
-    void sos_acfi(
+    arma::Col<dtype> sos_acfi(
         const arma::Col<dtype> &acf,  // Target ACF, [n_acf]
         const arma::Col<dtype> &dist, // Sample points of the ACF in [m], [n_acf]
-        const arma::Col<dtype> &d,    // Distances in [m], must be >= 0, [n_d]
-        arma::Col<dtype> &val);       // Output: ACF at d, [n_d]
+        const arma::Col<dtype> &d);   // Distances in [m], must be >= 0, [n_d]
 
     // Spatially correlated random values at given positions
     // - One device (pos_b omitted), two devices on the same map (pos_b given, phase_b omitted; needs acf and dist)
@@ -134,20 +134,20 @@ namespace quadriga_lib
 
     // Target ACF on a 2-D grid
     // - Grid axis from -2·Dmax to 2·Dmax with the spacing of 'dist', Dmax = last sample point, n_grid = 4·n_acf - 3
+    // - Returns the 2-D ACF, [n_grid, n_grid]
     template <typename dtype>
-    void sos_acf_2d(
+    arma::Mat<dtype> sos_acf_2d(
         const arma::Col<dtype> &acf,          // Target ACF, [n_acf]
         const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], [n_acf]
-        arma::Mat<dtype> &acf_2d,             // Output: 2-D ACF, [n_grid, n_grid]
         arma::Col<dtype> *dist_2d = nullptr); // Optional output: Grid axis in [m], [n_grid]
 
     // ACF produced by a set of sinusoids, on the grid axis of sos_acf_2d
     // - n_dim = 1: along the axis; n_dim = 2: x-y plane; n_dim = 3: x-y, x-z and y-z plane (slices 0, 1, 2)
+    // - Returns the approximated ACF, see above
     template <typename dtype>
-    void sos_acf_approx(
+    arma::Cube<dtype> sos_acf_approx(
         const arma::Mat<dtype> &spatial_freq, // Spatial frequencies in [1/m], [n_coeff, n_dim]
         const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], [n_acf]
-        arma::Cube<dtype> &acf_approx,        // Output: Approximated ACF, see above
         arma::Col<dtype> *dist_2d = nullptr); // Optional output: Grid axis in [m], [n_grid]
 
     // Approximation error of the ACF of a set of sinusoids
@@ -166,13 +166,13 @@ namespace quadriga_lib
 
     // Monte-Carlo estimate of the ACF of one generator
     // - Correlates the values at 2·n_pos random positions for all position pairs whose distance falls into a bin
+    // - Returns the estimated ACF, [n_bin]
     template <typename dtype>
-    void sos_acf_estimate(
+    arma::Col<dtype> sos_acf_estimate(
         const arma::Mat<dtype> &spatial_freq,              // Spatial frequencies in [1/m], [n_coeff, 3]
         const arma::Col<dtype> &phase,                     // Phases of the generator in [rad], [n_coeff]
         const arma::Col<dtype> &bins,                      // Bin centers in [m], >= 0, increasing, finite, [n_bin]
         arma::uword n_pos,                                 // Number of random positions per device, must be > 1
-        arma::Col<dtype> &acf_est,                         // Output: Estimated ACF, [n_bin]
         arma::Col<dtype> *dist_est = nullptr,              // Optional output: Mean distance of the pairs in each bin in [m], [n_bin]
         arma::Col<dtype> *acf_est_dual = nullptr,          // Optional output: Estimated ACF for two devices, [n_bin]
         const arma::Col<dtype> &acf = arma::Col<dtype>(),  // Optional: Target ACF, required for acf_est_dual, [n_acf]
@@ -181,12 +181,12 @@ namespace quadriga_lib
 
     // Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
     // - Iterative fit, one sinusoid at a time; computation in double precision for both instantiations
+    // - Returns the spatial frequencies in [1/m], [n_coeff, n_dim]
     template <typename dtype>
-    void sos_generate(
+    arma::Mat<dtype> sos_generate(
         const arma::Col<dtype> &acf,          // Target ACF, [n_acf]
         const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], [n_acf]
         arma::uword n_coeff,                  // Number of sinusoids, must be > 0
-        arma::Mat<dtype> &spatial_freq,       // Output: Spatial frequencies in [1/m], [n_coeff, n_dim]
         arma::Col<dtype> *ase = nullptr,      // Optional output: Mean squared error after each pass, linear, [n_pass]
         arma::Mat<dtype> *test_dir = nullptr, // Optional output: Test directions in [rad], as in sos_calc_mse
         arma::uword n_dim = 3,                // Number of dimensions, 1, 2 or 3

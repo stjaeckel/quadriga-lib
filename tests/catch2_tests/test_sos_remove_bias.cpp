@@ -243,7 +243,7 @@ TEST_CASE("sos_remove_bias - the variance after the correction is that of a fiel
     // c(x) = mean_p R( x - x_p ) and v = mean_pq R( x_p - x_q ). Here that removes almost half the variance.
     const arma::uword n_coeff = 256, n_gen = 4000, n_pos = 30;
     arma::mat spatial_freq;
-    quadriga_lib::sos_preset("Comb256", spatial_freq);
+    spatial_freq = quadriga_lib::sos_preset("Comb256");
     REQUIRE(spatial_freq.n_rows == n_coeff);
     arma::mat phase = rnd(n_coeff, n_gen, -pi, pi, 17), pos = positions(n_pos, 20.0, 18), val0, val1;
 

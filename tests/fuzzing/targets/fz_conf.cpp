@@ -24,7 +24,8 @@ void fuzz_one(const uint8_t *data, size_t size)
             std::string pl_model;
             std::unordered_map<std::string, std::vector<double>> plpar;
             arma::mat lsp_xcorr;
+            bool lsp_xcorr_pd = false;
             std::vector<std::string> key_order, pl_order, short_names, ignored_keys;
-            quadriga_lib::conf_file_read(fn, scenpar, &pl_model, &plpar, &lsp_xcorr, &key_order, &pl_order,
-                                         &short_names, &ignored_keys, validate); });
+            scenpar = quadriga_lib::conf_file_read(fn, &pl_model, &plpar, &lsp_xcorr, &lsp_xcorr_pd, &key_order, &pl_order,
+                                                   &short_names, &ignored_keys, validate); });
 }

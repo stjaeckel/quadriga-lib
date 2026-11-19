@@ -47,15 +47,13 @@ py::tuple sos_acf_2d(const py::array_t<double> &acf,
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
-    // Output allocation (a table with fewer than 2 samples is left to the library to reject)
+    // Output allocation of the optional output (a table with fewer than 2 samples is left to the library to reject)
     const arma::uword n_grid = (acf_a.n_elem < 2) ? 0 : 4 * acf_a.n_elem - 3;
-    arma::mat acf_2d;
     arma::vec dist_2d;
-    auto acf_2d_py = qd_python_init_output(n_grid, n_grid, &acf_2d);
     auto dist_2d_py = qd_python_init_output(n_grid, &dist_2d);
 
     // Call library function
-    quadriga_lib::sos_acf_2d<double>(acf_a, dist_a, acf_2d, &dist_2d);
+    const arma::mat acf_2d = quadriga_lib::sos_acf_2d<double>(acf_a, dist_a, &dist_2d);
 
-    return py::make_tuple(acf_2d_py, dist_2d_py);
+    return py::make_tuple(qd_python_copy2numpy(&acf_2d), dist_2d_py);
 }

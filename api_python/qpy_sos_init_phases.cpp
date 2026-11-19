@@ -48,12 +48,7 @@ py::array_t<double> sos_init_phases(arma::uword n_coeff,
                                     arma::uword n_gen,
                                     arma::sword seed)
 {
-    // Output allocation
-    arma::mat phase;
-    auto phase_py = qd_python_init_output(n_coeff, n_gen, &phase);
-
-    // Call library function
-    quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, phase, seed);
-
-    return phase_py;
+    qd_python_check_output_size({n_coeff, n_gen}, sizeof(double)); // ValueError before the C++ allocation
+    const arma::mat phase = quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, seed);
+    return qd_python_copy2numpy(&phase);
 }

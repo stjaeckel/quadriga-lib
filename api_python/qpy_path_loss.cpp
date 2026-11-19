@@ -104,14 +104,13 @@ py::tuple path_loss(py::handle plpar,
     const auto d2d_in_a = qd_python_numpy2arma_Col<double>(d2d_in, true);
     const auto rnd_he_a = qd_python_numpy2arma_Col<double>(rnd_he, true);
 
-    // Output allocation
-    arma::mat pl_dB, sf_sigma_dB;
-    auto pl_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &pl_dB);
+    // Output allocation of the optional output
+    arma::mat sf_sigma_dB;
     auto sf_sigma_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &sf_sigma_dB);
 
     // Call library function
-    quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, pl_dB, &sf_sigma_dB, d2d_in_a,
-                            rnd_he_a);
+    const arma::mat pl_dB = quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a,
+                                                    &sf_sigma_dB, d2d_in_a, rnd_he_a);
 
-    return py::make_tuple(pl_py, sf_sigma_py);
+    return py::make_tuple(qd_python_copy2numpy(&pl_dB), sf_sigma_py);
 }

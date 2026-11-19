@@ -274,7 +274,7 @@ namespace quadriga_lib
     //   files with tools/hdf5_convert_v2.py
     // - Optional 'i_snap': only these snapshots are read (0-based, any order, repeats allowed); fields with one entry per
     //   snapshot are sliced; throws std::invalid_argument for an index >= n_snap of a non-empty slot
-    template <typename dtype>                                                  // Read as float or double
+    template <typename dtype = double>                                                  // Read as float or double
     channel<dtype> hdf5_read_channel(const std::string &fn,                    // Filename of the HDF5 file
                                      unsigned ix = 0,                          // x-Index in the HDF file
                                      unsigned iy = 0,                          // y-Index in the HDF file
@@ -284,7 +284,7 @@ namespace quadriga_lib
 
     // Read several channels from HDF5 file, one per column of 'slots', opening the file once
     // - Empty slots or slots outside the layout give empty channels; 'i_snap' as in hdf5_read_channel, for every slot
-    template <typename dtype>                                                                   // Read as float or double
+    template <typename dtype = double>                                                                   // Read as float or double
     std::vector<channel<dtype>> hdf5_read_channel_vec(const std::string &fn,                    // Filename of the HDF5 file
                                                       const arma::Mat<unsigned> &slots,         // Slot indices (ix, iy, iz, iw), 0-based, [4, n_slot]
                                                       const arma::uvec &i_snap = arma::uvec()); // Snapshot indices, 0-based; empty = all
@@ -497,7 +497,7 @@ namespace quadriga_lib
     // normalize_polmat options:
     //  0 : polmat as in QRT file, path_gain is -FSPL
     //  1 : polmat has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
-    template <typename dtype>
+    template <typename dtype = double>
     void qrt_file_read(
         const std::string &fn,                               // Path to the QRT file
         arma::uword i_cir = 0,                               // Snapshot index

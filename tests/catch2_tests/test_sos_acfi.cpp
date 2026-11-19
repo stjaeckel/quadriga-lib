@@ -31,7 +31,7 @@ TEST_CASE("sos_acfi - linear interpolation and clipping match the hand-computed 
     arma::vec ref = {1.0, 0.75, 0.5, 0.35, 0.275, 0.2, 0.2, 0.2, 0.2};
 
     arma::vec val;
-    quadriga_lib::sos_acfi(acf, dist, d, val);
+    val = quadriga_lib::sos_acfi(acf, dist, d);
     REQUIRE(val.n_elem == d.n_elem);
 
     QD_DIAG("\n# diag: sos_acfi hand table\n");
@@ -42,30 +42,25 @@ TEST_CASE("sos_acfi - linear interpolation and clipping match the hand-computed 
     CHECK(arma::approx_equal(val, ref, "absdiff", 1e-14));
 }
 
-TEST_CASE("sos_acfi - sizes, empty query and pre-sized output")
+TEST_CASE("sos_acfi - sizes and empty query")
 {
     arma::vec acf = {1.0, 0.5, 0.2}, dist = {0.0, 1.0, 3.0};
 
-    arma::vec val(4);
-    val.fill(9.0);
     arma::vec none;
-    quadriga_lib::sos_acfi(acf, dist, none, val);
-    CHECK(val.n_elem == 0);
+    const arma::vec empty = quadriga_lib::sos_acfi(acf, dist, none);
+    CHECK(empty.n_elem == 0);
 
     arma::vec d = {2.0, 0.5};
-    arma::vec sized(2);
-    sized.fill(9.0);
-    const double *ptr = sized.memptr();
-    quadriga_lib::sos_acfi(acf, dist, d, sized);
-    CHECK(sized.memptr() == ptr);
-    CHECK(std::abs(sized(0) - 0.35) < 1e-14);
-    CHECK(std::abs(sized(1) - 0.75) < 1e-14);
+    const arma::vec val = quadriga_lib::sos_acfi(acf, dist, d);
+    REQUIRE(val.n_elem == 2);
+    CHECK(std::abs(val(0) - 0.35) < 1e-14);
+    CHECK(std::abs(val(1) - 0.75) < 1e-14);
 }
 
 TEST_CASE("sos_acfi - float agrees with double")
 {
     arma::fvec acf = {1.0f, 0.5f, 0.2f}, dist = {0.0f, 1.0f, 3.0f}, d = {0.0f, 0.5f, 2.0f, 7.0f}, val;
-    quadriga_lib::sos_acfi(acf, dist, d, val);
+    val = quadriga_lib::sos_acfi(acf, dist, d);
     REQUIRE(val.n_elem == 4);
     arma::fvec ref = {1.0f, 0.75f, 0.35f, 0.2f};
     CHECK(arma::approx_equal(val, ref, "absdiff", 1e-6f));
@@ -77,54 +72,37 @@ TEST_CASE("sos_acfi - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_acfi(acf, dist, d, val));
+        CHECK_NOTHROW(val = quadriga_lib::sos_acfi(acf, dist, d));
     }
     SECTION("acf")
     {
         arma::vec bad = {1.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(bad, dist, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(bad, dist, d), std::invalid_argument);
         arma::vec empty;
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(empty, dist, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(empty, dist, d), std::invalid_argument);
     }
     SECTION("dist")
     {
         arma::vec size = {0.0, 1.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, size, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, size, d), std::invalid_argument);
         arma::vec start = {0.5, 1.0, 3.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, start, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, start, d), std::invalid_argument);
         arma::vec order = {0.0, 3.0, 1.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, order, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, order, d), std::invalid_argument);
         arma::vec twice = {0.0, 1.0, 1.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, twice, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, twice, d), std::invalid_argument);
     }
     SECTION("d")
     {
         arma::vec neg = {0.5, -0.1}, nan = {0.5, std::nan("")};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, dist, neg, val), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, dist, nan, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, dist, neg), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, dist, nan), std::invalid_argument);
     }
     SECTION("non-finite table")
     {
         arma::vec inf_dist = {0.0, 1.0, arma::datum::inf}, nan_dist = {0.0, std::nan(""), 3.0}, nan_acf = {1.0, std::nan(""), 0.2};
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, inf_dist, d, val), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, nan_dist, d, val), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acfi(nan_acf, dist, d, val), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, inf_dist, d), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(acf, nan_dist, d), std::invalid_argument);
+        CHECK_THROWS_AS(val = quadriga_lib::sos_acfi(nan_acf, dist, d), std::invalid_argument);
     }
-}
-
-TEST_CASE("sos_acfi - outputs that alias inputs")
-{
-    // The output is resized and written while the table and the distances are still read
-    arma::vec dist = arma::regspace(0.0, 0.5, 19.5), acf = arma::exp(-dist / 4.0);
-    arma::vec d = arma::regspace(0.0, 0.6, 24.0), val;
-    CHECK_NOTHROW(quadriga_lib::sos_acfi(acf, dist, d, val));
-
-    arma::vec a = acf, b = dist, c = d;
-    CHECK_THROWS_AS(quadriga_lib::sos_acfi(a, dist, d, a), std::invalid_argument);   // val is 'acf'
-    CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, b, d, b), std::invalid_argument);    // val is 'dist'
-    CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, dist, c, c), std::invalid_argument); // val is 'd'
-
-    // A vector on the memory of 'd'
-    arma::vec v(c.memptr(), c.n_elem, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, dist, c, v), std::invalid_argument);
 }

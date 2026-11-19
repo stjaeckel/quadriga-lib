@@ -177,7 +177,6 @@ py::tuple conf_file_read(const py::handle &fn,
     const bool validate_b = qd_python_flag(validate, true, "validate");
 
     // Output allocation
-    std::unordered_map<std::string, double> scenpar;
     std::unordered_map<std::string, std::vector<double>> plpar;
     std::string pl_model;
     std::vector<std::string> key_order, pl_order, short_names, ignored_keys;
@@ -186,9 +185,9 @@ py::tuple conf_file_read(const py::handle &fn,
     auto lsp_xcorr_py = qd_python_init_output((arma::uword)8, (arma::uword)8, &lsp_xcorr);
 
     // Call library function
-    const bool lsp_xcorr_chk = quadriga_lib::conf_file_read(fn_s, scenpar, &pl_model, &plpar,
-                                                            &lsp_xcorr, &key_order, &pl_order, &short_names,
-                                                            &ignored_keys, validate_b);
+    bool lsp_xcorr_chk = false;
+    const auto scenpar = quadriga_lib::conf_file_read(fn_s, &pl_model, &plpar, &lsp_xcorr, &lsp_xcorr_chk, &key_order,
+                                                      &pl_order, &short_names, &ignored_keys, validate_b);
 
     // Scenario parameters: numeric keys in canonical order
     auto scenpar_py = qd_python_scenpar2dict(scenpar, key_order);

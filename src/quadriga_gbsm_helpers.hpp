@@ -17,11 +17,7 @@
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
 //                                                                  o2i_loss.cpp, ssf_rays.cpp, qd_gbsm_phases.cpp
 //   qd_gbsm_check_gr      validation of the ground permittivity    ssf_clusters.cpp, ssf_rays.cpp
-//   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
-//                                                                  gbsm_init_phases
-//   qd_gbsm_n_gen         number of generators of a random set     qd_gbsm_phases.cpp, MEX and Python wrappers of
-//                                                                  gbsm_init_phases
-//   qd_gbsm_ray_layout    ray and generator counts of a scenario   qd_gbsm_n_gen, qd_gbsm_phases.cpp, ssf_rays.cpp,
+//   qd_gbsm_ray_layout    ray and generator counts of a scenario   qd_gbsm_phases.cpp, ssf_rays.cpp,
 //                                                                  MEX and Python wrappers of ssf_rays
 //   qd_gbsm_cds           cluster delay spread c_DS at a frequency qd_gbsm_phases.cpp, ssf_rays.cpp
 //   qd_gbsm_fresnel       reflection coefficients of the ground    ssf_rays.cpp, ssf_paths.cpp
@@ -116,15 +112,6 @@ static inline void qd_gbsm_check_gr(const arma::mat &gr_eps_re, const arma::mat 
         throw std::invalid_argument("Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
 }
 
-// Number of sinusoids of a preset of sos_preset; 0 for a name that is not a preset, so that the caller throws its
-// own message in its order of checks
-static inline arma::uword qd_gbsm_n_coeff(const std::string &preset)
-{
-    int type = 0;
-    arma::uword n_coeff = 0;
-    return qd_sos_preset_lookup(preset, type, n_coeff) ? n_coeff : 0;
-}
-
 // Counts of the ray level of a completed scenpar (output of scenpar_validate; a missing key throws
 // std::out_of_range): N = NumClusters - 1 NLOS clusters, M = NumSubPaths rays per cluster, G = 1 if GR_enabled > 0
 // else 0, n_ray = 1 + G + N·M rays per link (LOS, GR, then ray m of cluster n at 1 + G + n·M + m) and
@@ -137,21 +124,6 @@ static inline void qd_gbsm_ray_layout(const std::unordered_map<std::string, doub
     G = (sp.at("GR_enabled") > 0.0) ? 1 : 0;
     n_ray = 1 + G + N * M;
     n_gen = 14 * N * M + N;
-}
-
-// Number of generators n_gen of a random set of a completed scenpar: "lsf" 11; "cluster" 9·N for set_id -1 and N
-// for set_id >= 0; "ray" 14·N·M + N for any set_id; 0 for an unknown set type, so that the caller throws its own
-// message in its order of checks
-static inline arma::uword qd_gbsm_n_gen(const std::unordered_map<std::string, double> &sp,
-                                        const std::string &set_type, arma::sword set_id)
-{
-    if (set_type == "lsf")
-        return 11;
-    arma::uword N, M, G, n_ray, n_gen;
-    qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
-    if (set_type == "cluster")
-        return (set_id < 0) ? 9 * N : N;
-    return (set_type == "ray") ? n_gen : 0;
 }
 
 // Cluster delay spread c_DS in [s] of a completed scenpar at the frequency 'fc' in [Hz] (TR 38.901 Table 7.5-6):

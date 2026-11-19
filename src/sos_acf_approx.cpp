@@ -32,10 +32,9 @@ ACF produced by a set of sinusoids
 
 ## Declaration:
 ```
-void quadriga_lib::sos_acf_approx(
+arma::Cube<dtype> quadriga_lib::sos_acf_approx(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &dist,
-    arma::Cube<dtype> &acf_approx,
     arma::Col<dtype> *dist_2d = nullptr);
 ```
 
@@ -44,9 +43,11 @@ void quadriga_lib::sos_acf_approx(
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; at least
   2 elements; `[n_acf]`
 
-## Outputs:
-- **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above
+## Output:
 - **`dist_2d`** *(optional)* — Grid axis in [m]; `[n_grid]`
+
+## Returns:
+- Approximated ACF `acf_approx`; size depends on `n_dim`, see above
 
 ## See also:
 - [[sos_acf_2d]] (target ACF on the same grid)
@@ -54,10 +55,9 @@ void quadriga_lib::sos_acf_approx(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &spatial_freq,
-                                  const arma::Col<dtype> &dist,
-                                  arma::Cube<dtype> &acf_approx,
-                                  arma::Col<dtype> *dist_2d)
+arma::Cube<dtype> quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &spatial_freq,
+                                               const arma::Col<dtype> &dist,
+                                               arma::Col<dtype> *dist_2d)
 {
     if (spatial_freq.n_elem == 0)
         throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
@@ -80,12 +80,9 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &spatial_freq,
     const double two_pi = 6.283185307179586, step = (double)dist.at(dist.n_elem - 1) / (double)(dist.n_elem - 1);
     const long long half = 2 * (long long)dist.n_elem - 2;
 
-    qd_check_alias(&acf_approx, "acf_approx", &spatial_freq, &dist);
     qd_check_alias(dist_2d, "dist_2d", &spatial_freq, &dist);
-    qd_check_alias_outputs(&acf_approx, "acf_approx", dist_2d, "dist_2d");
 
-    if (acf_approx.n_rows != n_rows || acf_approx.n_cols != n_cols || acf_approx.n_slices != n_slices)
-        acf_approx.set_size(n_rows, n_cols, n_slices);
+    arma::Cube<dtype> acf_approx(n_rows, n_cols, n_slices, arma::fill::none);
 
     // Cosine and sine of each sinusoid at each grid point of each axis, Size [n_coeff, n_grid] per axis.
     // With cos(a + b) = cos(a)·cos(b) - sin(a)·sin(b) a plane is the difference of two matrix products.
@@ -161,7 +158,8 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &spatial_freq,
         for (long long i = -half; i <= half; ++i)
             dist_2d->at((arma::uword)(i + half)) = (dtype)((double)i * step);
     }
+    return acf_approx;
 }
 
-template void quadriga_lib::sos_acf_approx(const arma::Mat<float> &spatial_freq, const arma::Col<float> &dist, arma::Cube<float> &acf_approx, arma::Col<float> *dist_2d);
-template void quadriga_lib::sos_acf_approx(const arma::Mat<double> &spatial_freq, const arma::Col<double> &dist, arma::Cube<double> &acf_approx, arma::Col<double> *dist_2d);
+template arma::Cube<float> quadriga_lib::sos_acf_approx(const arma::Mat<float> &spatial_freq, const arma::Col<float> &dist, arma::Col<float> *dist_2d);
+template arma::Cube<double> quadriga_lib::sos_acf_approx(const arma::Mat<double> &spatial_freq, const arma::Col<double> &dist, arma::Col<double> *dist_2d);

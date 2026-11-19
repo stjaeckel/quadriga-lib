@@ -43,7 +43,7 @@ namespace
 TEST_CASE("sos_init_phases - phases follow the documented random stream")
 {
     arma::mat phase;
-    quadriga_lib::sos_init_phases(7, 3, phase, 42);
+    phase = quadriga_lib::sos_init_phases(7, 3, 42);
     REQUIRE(phase.n_rows == 7);
     REQUIRE(phase.n_cols == 3);
 
@@ -61,8 +61,8 @@ TEST_CASE("sos_init_phases - phases follow the documented random stream")
 TEST_CASE("sos_init_phases - the first columns do not depend on the number of generators")
 {
     arma::mat a, b;
-    quadriga_lib::sos_init_phases(11, 3, a, 7);
-    quadriga_lib::sos_init_phases(11, 5, b, 7);
+    a = quadriga_lib::sos_init_phases(11, 3, 7);
+    b = quadriga_lib::sos_init_phases(11, 5, 7);
     REQUIRE(b.n_cols == 5);
     CHECK(arma::approx_equal(a, b.cols(0, 2), "absdiff", 0.0));
     CHECK(arma::abs(b.col(3) - b.col(0)).max() > 0.1); // Later columns are new values
@@ -71,23 +71,23 @@ TEST_CASE("sos_init_phases - the first columns do not depend on the number of ge
 TEST_CASE("sos_init_phases - a seed is reproducible and different seeds differ")
 {
     arma::mat a, b, c;
-    quadriga_lib::sos_init_phases(50, 4, a, 1);
-    quadriga_lib::sos_init_phases(50, 4, b, 1);
-    quadriga_lib::sos_init_phases(50, 4, c, 2);
+    a = quadriga_lib::sos_init_phases(50, 4, 1);
+    b = quadriga_lib::sos_init_phases(50, 4, 1);
+    c = quadriga_lib::sos_init_phases(50, 4, 2);
     CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
     CHECK(arma::abs(a - c).max() > 0.1);
 
     // Seed 0 is a regular seed
     arma::mat z;
-    quadriga_lib::sos_init_phases(50, 4, z, 0);
+    z = quadriga_lib::sos_init_phases(50, 4, 0);
     CHECK(arma::approx_equal(z, ref_phases(50, 4, 0), "absdiff", 1e-15));
 }
 
 TEST_CASE("sos_init_phases - seed -1 draws from the system random device")
 {
     arma::mat a, b;
-    quadriga_lib::sos_init_phases(64, 2, a);
-    quadriga_lib::sos_init_phases(64, 2, b);
+    a = quadriga_lib::sos_init_phases(64, 2);
+    b = quadriga_lib::sos_init_phases(64, 2);
     REQUIRE(a.n_elem == 128);
     CHECK(arma::abs(a - b).max() > 1e-3);
     CHECK(a.min() >= -pi);
@@ -98,7 +98,7 @@ TEST_CASE("sos_init_phases - values are uniform in [-pi, pi)")
 {
     const arma::uword n = 200000;
     arma::mat phase;
-    quadriga_lib::sos_init_phases(1000, 200, phase, 3);
+    phase = quadriga_lib::sos_init_phases(1000, 200, 3);
     REQUIRE(phase.n_elem == n);
 
     CHECK(phase.min() >= -pi);
@@ -134,31 +134,12 @@ TEST_CASE("sos_init_phases - values are uniform in [-pi, pi)")
     }
 }
 
-TEST_CASE("sos_init_phases - a pre-sized output is filled and a wrong size is replaced")
-{
-    arma::mat ref = ref_phases(5, 2, 9);
-
-    arma::mat sized(5, 2);
-    sized.fill(99.0);
-    const double *ptr = sized.memptr();
-    quadriga_lib::sos_init_phases(5, 2, sized, 9);
-    CHECK(sized.memptr() == ptr); // Written in place
-    CHECK(arma::approx_equal(sized, ref, "absdiff", 1e-15));
-
-    arma::mat wrong(3, 7);
-    wrong.fill(99.0);
-    quadriga_lib::sos_init_phases(5, 2, wrong, 9);
-    REQUIRE(wrong.n_rows == 5);
-    REQUIRE(wrong.n_cols == 2);
-    CHECK(arma::approx_equal(wrong, ref, "absdiff", 1e-15));
-}
-
 TEST_CASE("sos_init_phases - float values are the rounded double values and stay below pi")
 {
     arma::fmat pf;
     arma::mat pd;
-    quadriga_lib::sos_init_phases(1000, 100, pf, 5);
-    quadriga_lib::sos_init_phases(1000, 100, pd, 5);
+    pf = quadriga_lib::sos_init_phases<float>(1000, 100, 5);
+    pd = quadriga_lib::sos_init_phases(1000, 100, 5);
     REQUIRE(pf.n_rows == 1000);
     REQUIRE(pf.n_cols == 100);
 
@@ -175,20 +156,20 @@ TEST_CASE("sos_init_phases - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_init_phases(1, 1, phase, 0));
+        CHECK_NOTHROW(phase = quadriga_lib::sos_init_phases(1, 1, 0));
         CHECK(phase.n_elem == 1);
-        CHECK_NOTHROW(quadriga_lib::sos_init_phases(4, 2, phase));
+        CHECK_NOTHROW(phase = quadriga_lib::sos_init_phases(4, 2));
     }
     SECTION("n_coeff")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_init_phases(0, 1, phase, 0), std::invalid_argument);
+        CHECK_THROWS_AS(phase = quadriga_lib::sos_init_phases(0, 1, 0), std::invalid_argument);
     }
     SECTION("n_gen")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_init_phases(4, 0, phase, 0), std::invalid_argument);
+        CHECK_THROWS_AS(phase = quadriga_lib::sos_init_phases(4, 0, 0), std::invalid_argument);
     }
     SECTION("seed")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_init_phases(4, 2, phase, -2), std::invalid_argument);
+        CHECK_THROWS_AS(phase = quadriga_lib::sos_init_phases(4, 2, -2), std::invalid_argument);
     }
 }

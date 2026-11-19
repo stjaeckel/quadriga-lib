@@ -41,14 +41,14 @@ struct qd_preset_tab
 static inline qd_preset_tab qd_preset(const std::string &preset, double d)
 {
     qd_preset_tab t;
-    quadriga_lib::sos_preset<double>(preset, t.F, &t.acf, &t.dist, d);
+    t.F = quadriga_lib::sos_preset<double>(preset, &t.acf, &t.dist, d);
     return t;
 }
 
 static inline double qd_acf_at(const qd_preset_tab &t, double D)
 {
     arma::vec v;
-    quadriga_lib::sos_acfi<double>(t.acf, t.dist, arma::vec{D}, v);
+    v = quadriga_lib::sos_acfi<double>(t.acf, t.dist, arma::vec{D});
     return v(0);
 }
 

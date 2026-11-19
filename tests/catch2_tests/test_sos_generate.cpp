@@ -105,7 +105,7 @@ TEST_CASE("sos_generate - a 1-D target made of two sinusoids is recovered")
         {
             arma::mat spatial_freq, test_dir(2, 2);
             arma::vec ase;
-            quadriga_lib::sos_generate(acf, dist, 2, spatial_freq, &ase, &test_dir, 1, true, 10, random_init, 0.0, 0.0, seed);
+            spatial_freq = quadriga_lib::sos_generate(acf, dist, 2, &ase, &test_dir, 1, true, 10, random_init, 0.0, 0.0, seed);
             REQUIRE(spatial_freq.n_rows == 2);
             REQUIRE(spatial_freq.n_cols == 1);
             REQUIRE(ase.n_elem >= 1);
@@ -135,7 +135,7 @@ TEST_CASE("sos_generate - the reported error is the error of the returned table 
             {
                 arma::mat spatial_freq, test_dir;
                 arma::vec ase;
-                quadriga_lib::sos_generate(acf, dist, 24, spatial_freq, &ase, &test_dir, n_dim, uniform_smp, 7, random_init, 0.0, 0.0, 3);
+                spatial_freq = quadriga_lib::sos_generate(acf, dist, 24, &ase, &test_dir, n_dim, uniform_smp, 7, random_init, 0.0, 0.0, 3);
                 REQUIRE(spatial_freq.n_rows == 24);
                 REQUIRE(spatial_freq.n_cols == n_dim);
                 REQUIRE(ase.n_elem >= 1);
@@ -172,7 +172,7 @@ TEST_CASE("sos_generate - regular directions are the documented lattice")
     for (arma::uword n_dim = 2; n_dim <= 3; ++n_dim)
     {
         arma::mat spatial_freq;
-        quadriga_lib::sos_generate(acf, dist, 16, spatial_freq, (arma::vec *)nullptr, (arma::mat *)nullptr, n_dim, true, 5, true, 0.0, 0.0, 1);
+        spatial_freq = quadriga_lib::sos_generate(acf, dist, 16, (arma::vec *)nullptr, (arma::mat *)nullptr, n_dim, true, 5, true, 0.0, 0.0, 1);
         REQUIRE(spatial_freq.n_rows == 16);
         arma::mat u = ref_dirs(16, n_dim);
         double max_err = 0.0, min_len = 1e9;
@@ -199,8 +199,8 @@ TEST_CASE("sos_generate - frequency limits are respected")
     for (bool random_init : {true, false})
     {
         arma::mat spatial_freq, def;
-        quadriga_lib::sos_generate(acf, dist, 32, spatial_freq, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 7, random_init, f_min, f_max, 2);
-        quadriga_lib::sos_generate(acf, dist, 32, def, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 7, random_init, 0.0, 0.0, 2);
+        spatial_freq = quadriga_lib::sos_generate(acf, dist, 32, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 7, random_init, f_min, f_max, 2);
+        def = quadriga_lib::sos_generate(acf, dist, 32, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 7, random_init, 0.0, 0.0, 2);
         REQUIRE(spatial_freq.n_rows == 32);
         REQUIRE(def.n_rows == 32);
         double lo = 1e9, hi = 0.0, def_lo = 1e9, def_hi = 0.0;
@@ -226,26 +226,19 @@ TEST_CASE("sos_generate - a seed is reproducible, outputs are sized, float agree
 
     arma::mat a, b, c;
     arma::vec ase_a, ase_b(7);
-    quadriga_lib::sos_generate(acf, dist, 20, a, &ase_a, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 11);
-    quadriga_lib::sos_generate(acf, dist, 20, b, &ase_b, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 11);
-    quadriga_lib::sos_generate(acf, dist, 20, c, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 12);
+    a = quadriga_lib::sos_generate(acf, dist, 20, &ase_a, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 11);
+    b = quadriga_lib::sos_generate(acf, dist, 20, &ase_b, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 11);
+    c = quadriga_lib::sos_generate(acf, dist, 20, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 12);
     REQUIRE(a.n_rows == 20);
     CHECK(arma::abs(a).max() > 1e-3);
     CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
     CHECK(arma::approx_equal(ase_a, ase_b, "absdiff", 0.0));
     CHECK(arma::abs(a - c).max() > 1e-4);
 
-    arma::mat sized(20, 3);
-    sized.fill(9.0);
-    const double *ptr = sized.memptr();
-    quadriga_lib::sos_generate(acf, dist, 20, sized, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, false, 7, true, 0.0, 0.0, 11);
-    CHECK(sized.memptr() == ptr);
-    CHECK(arma::approx_equal(sized, a, "absdiff", 0.0));
-
     // The computation is done in double for both types: the float result is the rounded double result
     arma::fvec af = arma::conv_to<arma::fvec>::from(acf), df = arma::conv_to<arma::fvec>::from(dist), asf;
     arma::fmat ff, tdf;
-    quadriga_lib::sos_generate(af, df, 20, ff, &asf, &tdf, 3, false, 7, true, 0.0f, 0.0f, 11);
+    ff = quadriga_lib::sos_generate(af, df, 20, &asf, &tdf, 3, false, 7, true, 0.0f, 0.0f, 11);
     REQUIRE(ff.n_rows == 20);
     REQUIRE(ff.n_cols == 3);
     REQUIRE(tdf.n_rows == 7);
@@ -268,9 +261,9 @@ TEST_CASE("sos_generate - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.0, 0.0, 1));
-        CHECK_NOTHROW(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 1, true, 5, true, 0.01, 0.3, 1));
-        CHECK_NOTHROW(quadriga_lib::sos_generate(acf, dist, 2, spatial_freq)); // Defaults, random seed
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 3, true, 5, true, 0.0, 0.0, 1));
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 1, true, 5, true, 0.01, 0.3, 1));
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_generate(acf, dist, 2)); // Defaults, random seed
         CHECK(spatial_freq.n_rows == 2);
         CHECK(spatial_freq.n_cols == 3);
     }
@@ -278,63 +271,63 @@ TEST_CASE("sos_generate - input validation")
     {
         arma::vec one = {1.0}, start = dist + 1.0, order = dist;
         order(5) = order(4);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(one, dist, 4, spatial_freq), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, start, 4, spatial_freq), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, order, 4, spatial_freq), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(one, dist, 4), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, start, 4), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, order, 4), std::invalid_argument);
         // Non-finite table: before the fix an Inf sample point ended in std::length_error
         arma::vec inf_dist = dist, nan_acf = acf;
         inf_dist(20) = arma::datum::inf, nan_acf(3) = std::nan("");
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, inf_dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.0, 1.0, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, inf_dist, 4, spatial_freq), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(nan_acf, dist, 4, spatial_freq), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, inf_dist, 4, no_vec, no_mat, 3, true, 5, true, 0.0, 1.0, 1), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, inf_dist, 4), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(nan_acf, dist, 4), std::invalid_argument);
     }
     SECTION("n_coeff")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 0, spatial_freq), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 0), std::invalid_argument);
     }
     SECTION("n_dim")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 4), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 0), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 4), std::invalid_argument);
     }
     SECTION("n_dir")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 0), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 3, true, 0), std::invalid_argument);
     }
     SECTION("spatial_freq_min and spatial_freq_max")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, -0.1, 0.0, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.2, 0.1, 1), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 3, true, 5, true, -0.1, 0.0, 1), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 3, true, 5, true, 0.2, 0.1, 1), std::invalid_argument);
         // The lower limit must also stay below the default upper limit of 15 / 20 = 0.75 / m
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.8, 0.0, 1), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 3, true, 5, true, 0.8, 0.0, 1), std::invalid_argument);
     }
     SECTION("spatial_freq_max: NaN or <= 0 selects 15 / max(dist); infinite values throw")
     {
         // max(dist) = 20 m: the default is 0.75 / m
         const double nan = std::numeric_limits<double>::quiet_NaN(), inf = std::numeric_limits<double>::infinity();
         arma::mat ref, f;
-        quadriga_lib::sos_generate(acf, dist, 4, ref, no_vec, no_mat, 2, true, 5, true, 0.0, 0.75, 1);
+        ref = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 2, true, 5, true, 0.0, 0.75, 1);
         for (double v : {nan, 0.0, -0.1})
         {
-            quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.0, v, 1);
+            f = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 2, true, 5, true, 0.0, v, 1);
             CHECK(arma::approx_equal(f, ref, "absdiff", 0.0));
         }
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.0, inf, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.0, -inf, 1), std::invalid_argument);
+        CHECK_THROWS_AS(f = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 2, true, 5, true, 0.0, inf, 1), std::invalid_argument);
+        CHECK_THROWS_AS(f = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 2, true, 5, true, 0.0, -inf, 1), std::invalid_argument);
         // The lower limit must stay below the default also when NaN selects it
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.8, nan, 1), std::invalid_argument);
+        CHECK_THROWS_AS(f = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 2, true, 5, true, 0.8, nan, 1), std::invalid_argument);
     }
     SECTION("spatial_freq_max: the search grid is limited to 100000 points")
     {
         // The grid has ( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1 points; max(dist) = 20 m.
         // 499.99 / m gives 99999 points and is accepted (one sinusoid in 1-D keeps it short), 500.01 / m is rejected.
         arma::vec d3 = {0.0, 10.0, 20.0}, a3 = {1.0, 0.5, 0.2};
-        CHECK_NOTHROW(quadriga_lib::sos_generate(a3, d3, 1, spatial_freq, no_vec, no_mat, 1, true, 1, true, 0.0, 499.99, 1));
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(a3, d3, 1, spatial_freq, no_vec, no_mat, 1, true, 1, true, 0.0, 500.01, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(a3, d3, 1, spatial_freq, no_vec, no_mat, 1, true, 1, true, 0.0, 1.0e6, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(a3, d3, 1, spatial_freq, no_vec, no_mat, 1, true, 1, true, 0.0, 1.0e300, 1), std::invalid_argument);
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_generate(a3, d3, 1, no_vec, no_mat, 1, true, 1, true, 0.0, 499.99, 1));
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(a3, d3, 1, no_vec, no_mat, 1, true, 1, true, 0.0, 500.01, 1), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(a3, d3, 1, no_vec, no_mat, 1, true, 1, true, 0.0, 1.0e6, 1), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(a3, d3, 1, no_vec, no_mat, 1, true, 1, true, 0.0, 1.0e300, 1), std::invalid_argument);
         // The lower limit counts: 600 / m is fine with a lower limit of 200 / m
-        CHECK_NOTHROW(quadriga_lib::sos_generate(a3, d3, 1, spatial_freq, no_vec, no_mat, 1, true, 1, true, 200.0, 600.0, 1));
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_generate(a3, d3, 1, no_vec, no_mat, 1, true, 1, true, 200.0, 600.0, 1));
     }
     SECTION("a failed call leaves the outputs untouched")
     {
@@ -342,14 +335,14 @@ TEST_CASE("sos_generate - input validation")
         keep.fill(7.0);
         arma::vec ase(3);
         ase.fill(7.0);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 0, keep, &ase), std::invalid_argument);
+        CHECK_THROWS_AS(keep = quadriga_lib::sos_generate(acf, dist, 0, &ase), std::invalid_argument);
         CHECK(keep.n_rows == 2);
         CHECK(keep(1, 1) == 7.0);
         CHECK(ase.n_elem == 3);
     }
     SECTION("seed")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.0, 0.0, -2), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, no_vec, no_mat, 3, true, 5, true, 0.0, 0.0, -2), std::invalid_argument);
     }
 }
 
@@ -368,7 +361,7 @@ TEST_CASE("sos_generate - with unequal sample spacing the reported error is the 
         {
             arma::mat spatial_freq;
             arma::vec ase;
-            quadriga_lib::sos_generate(acf, dist, 16, spatial_freq, &ase, (arma::mat *)nullptr, n_dim, true, 7, random_init, 0.0, 0.0, 4);
+            spatial_freq = quadriga_lib::sos_generate(acf, dist, 16, &ase, (arma::mat *)nullptr, n_dim, true, 7, random_init, 0.0, 0.0, 4);
             REQUIRE(spatial_freq.n_rows == 16);
             REQUIRE(spatial_freq.n_cols == n_dim);
             REQUIRE(ase.n_elem >= 1);
@@ -400,7 +393,7 @@ TEST_CASE("sos_generate - the iteration stops by the documented rules")
             {
                 arma::mat spatial_freq;
                 arma::vec ase;
-                quadriga_lib::sos_generate(acf, dist, n_coeff, spatial_freq, &ase, (arma::mat *)nullptr, n_dim, true, 7, random_init, 0.0, 0.0, 3);
+                spatial_freq = quadriga_lib::sos_generate(acf, dist, n_coeff, &ase, (arma::mat *)nullptr, n_dim, true, 7, random_init, 0.0, 0.0, 3);
                 const arma::uword n = ase.n_elem;
                 REQUIRE(n >= 1);
                 INFO("n_dim " << n_dim << ", random_init " << random_init << ", n_coeff " << n_coeff << ", passes " << n);
@@ -426,7 +419,7 @@ TEST_CASE("sos_generate - the smallest problem runs: one sinusoid, two samples, 
 {
     arma::vec acf = {1.0, 0.5}, dist = {0.0, 10.0}, ase;
     arma::mat spatial_freq, test_dir;
-    quadriga_lib::sos_generate(acf, dist, 1, spatial_freq, &ase, &test_dir, 3, true, 1, true, 0.0, 0.0, 1);
+    spatial_freq = quadriga_lib::sos_generate(acf, dist, 1, &ase, &test_dir, 3, true, 1, true, 0.0, 0.0, 1);
     REQUIRE(spatial_freq.n_rows == 1);
     REQUIRE(spatial_freq.n_cols == 3);
     REQUIRE(ase.n_elem >= 1);
@@ -451,7 +444,7 @@ TEST_CASE("sos_generate - with few test directions the result fits those directi
     {
         arma::mat spatial_freq;
         arma::vec ase;
-        quadriga_lib::sos_generate(acf, dist, 24, spatial_freq, &ase, (arma::mat *)nullptr, 3, true, 3, true, 0.0, 0.0, seed);
+        spatial_freq = quadriga_lib::sos_generate(acf, dist, 24, &ase, (arma::mat *)nullptr, 3, true, 3, true, 0.0, 0.0, seed);
         REQUIRE(spatial_freq.n_rows == 24);
         double fit = ref_mse_dir(spatial_freq, acf, dist, 3), other = ref_mse_dir(spatial_freq, acf, dist, 101);
         QD_DIAG("%lld,%.3e,%.3e,%.2f\n", (long long)seed, fit, other, other / fit);
@@ -465,12 +458,9 @@ TEST_CASE("sos_generate - outputs that alias inputs")
 {
     arma::vec dist = arma::regspace(0.0, 1.0, 40.0), acf = arma::exp(-dist / 10.0), ase;
     arma::mat spatial_freq, td;
-    CHECK_NOTHROW(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, &ase, &td, 3, true, 3, true, 0.0, 0.0, 5));
+    CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_generate(acf, dist, 4, &ase, &td, 3, true, 3, true, 0.0, 0.0, 5));
 
     arma::vec a = acf, d = dist;
-    CHECK_THROWS_AS(quadriga_lib::sos_generate(a, dist, 4, spatial_freq, &a, &td, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // ase is 'acf'
-    CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, d, 4, spatial_freq, &ase, &d, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // test_dir is 'dist'
-    arma::mat fd(d.memptr(), 4, 3, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, d, 4, fd, &ase, &td, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // spatial_freq on the memory of 'dist'
-    CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, &ase, &spatial_freq, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // test_dir is 'spatial_freq'
+    CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(a, dist, 4, &a, &td, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // ase is 'acf'
+    CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, d, 4, &ase, &d, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // test_dir is 'dist'
 }

@@ -346,8 +346,8 @@ TEST_CASE("ssf_clusters - quadriga delay spread equals the input at one frequenc
                     ps[l](0) -= ps[l](1);
             }
             arma::vec ds, ds_split;
-            quadriga_lib::calc_delay_spread(d, p, ds, 1000.0);
-            quadriga_lib::calc_delay_spread(d, ps, ds_split, 1000.0);
+            ds = quadriga_lib::calc_delay_spread(d, p, 1000.0);
+            ds_split = quadriga_lib::calc_delay_spread(d, ps, 1000.0);
             int n_clamped = 0;
             double e_max = 0.0;
             arma::vec ratio(n_link);
@@ -695,7 +695,7 @@ TEST_CASE("ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields"
             f.use_eps = f.use_toa = true;
             f.tx.row(2).fill(h), f.rx.row(2).fill(1.5);
             arma::cube ph;
-            quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
+            ph = quadriga_lib::gbsm_init_phases(sp, "cluster", 23);
             quadriga_lib::gbsm_draw(sp, "cluster", ph, f.tx, f.rx, f.rnd, -1, "Comb256", {}, {}, true);
             fix_t s = f;
             s.tx = f.rx, s.rx = f.tx;

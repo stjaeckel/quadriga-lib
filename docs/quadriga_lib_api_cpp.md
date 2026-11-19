@@ -11,10 +11,10 @@ lang: en-US
 - Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
-- Template parameter `dtype` is `float` or `double` unless stated.
+- Template parameter `dtype` is `float` or `double` unless stated; where no mandatory argument fixes it, it defaults to `double`.
 - Mandatory arguments are references. Optional inputs are references with an empty default; an empty container (`{}`) means "not given". Optional outputs are pointers with a `nullptr` default (not computed). The few optional inputs whose empty value has its own meaning are pointers with a `nullptr` default; their documentation says so. `ray_mesh_interact` and `ray_state_update` still take mandatory arguments by pointer and throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
-- An output cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation.
+- An output argument cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation. A returned result is a new object and may be assigned to an input.
 - Invalid inputs (shape/domain, an index outside the layout of a file) cause a `std::invalid_argument`; a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) a `std::runtime_error`.
 - Conventions and the names of shared quantities: see the [Glossary](#glossary).
 
@@ -40,7 +40,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Not given / all: an omitted optional input (C++ an empty container, or `nullptr` for an input passed by pointer, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
 - Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity is a setting for which <= 0 means "not set" (a size, an angle range, a frequency limit), values <= 0 select it too. A physical model parameter (a ratio, a distance, a spread) throws for values outside its range instead. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
 - Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_polmat`, `fix_taps`, `axis`) or strings, each documented by its function.
-- Results (C++): a computed array goes into an output argument, so that the wrappers can write into MATLAB / numpy memory without a copy. Returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
+- Results (C++): a function with one mandatory result returns it, e.g. `arma::vec ds = calc_delay_spread(delays, powers);`; its optional results are pointer arguments. Large results (e.g. `gbsm_draw`, `sos_val`, the `get_channels_*` functions) and the results of functions with several mandatory results are output arguments, so that the wrappers can write into MATLAB / numpy memory without a copy. Also returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
 
 **Frequencies**
 
@@ -439,9 +439,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python]
 
 ### Declaration:
 ```cpp
-void quadriga_lib::arrayant_calc_directivity(
+arma::Col<dtype> quadriga_lib::arrayant_calc_directivity(
     const arrayant<dtype> &ant,
-    arma::Col<dtype> &directivity_dBi,
     const arma::uvec &i_element = arma::uvec());
 ```
 
@@ -449,14 +448,13 @@ void quadriga_lib::arrayant_calc_directivity(
 - **`ant`** — Valid arrayant
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
-### Outputs:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out]`
+### Returns:
+- Directivity in dBi; `[n_out]`
 
 ### Example:
 ```cpp
 auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-arma::vec directivity_dBi;
-quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi); // about 1.76 dBi
+arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant); // about 1.76 dBi
 ```
 
 ### See also:
@@ -477,9 +475,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python]
 
 ### Declaration:
 ```cpp
-void quadriga_lib::arrayant_calc_directivity_multi(
+arma::Mat<dtype> quadriga_lib::arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
-        arma::Mat<dtype> &directivity_dBi,
         const arma::uvec &i_element = arma::uvec());
 ```
 
@@ -487,8 +484,8 @@ void quadriga_lib::arrayant_calc_directivity_multi(
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
-### Outputs:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
+### Returns:
+- Directivity in dBi; `[n_out, n_freq]`
 
 ### See also:
 - [arrayant_calc_directivity](#arrayant_calc_directivity) (single-frequency counterpart)
@@ -3757,10 +3754,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-void quadriga_lib::calc_delay_spread(
+arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
-    arma::Col<dtype> &ds,
     dtype threshold_dB = 100.0,
     dtype granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
@@ -3773,9 +3769,11 @@ void quadriga_lib::calc_delay_spread(
 - **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping; must be finite
   and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw `std::invalid_argument`
 
-### Outputs:
-- **`ds`** — RMS delay spread in [s] for each CIR; `[n_cir]`
+### Output:
 - **`mean_delay`** *(optional)* — Mean delay in [s] per CIR; `[n_cir]`
+
+### Returns:
+- RMS delay spread in [s] for each CIR; `[n_cir]`
 
 ### See also:
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed tap grid)
@@ -3937,9 +3935,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#conf_file_list) · [Python](quadriga_l
 
 ### Declaration:
 ```cpp
-arma::uword quadriga_lib::conf_file_list(
+std::vector<std::string> quadriga_lib::conf_file_list(
     const std::vector<std::string> &dirs,
-    std::vector<std::string> &scenarios,
     std::vector<std::string> *file_names = nullptr,
     std::vector<std::string> *file_dirs = nullptr,
     bool parse_shortnames = true);
@@ -3951,12 +3948,11 @@ arma::uword quadriga_lib::conf_file_list(
   files only, which is faster
 
 ### Outputs:
-- **`scenarios`** — Scenario names and short names; previous content is discarded; `[n_scen]`
 - **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
 - **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
 
 ### Returns:
-- Number of entries, `n_scen`
+- Scenario names and short names; `[n_scen]`
 
 ### See also:
 - [conf_file_read](#conf_file_read) (read one of the files)
@@ -3991,12 +3987,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#conf_file_read) · [Python](quadriga_l
 
 ### Declaration:
 ```cpp
-bool quadriga_lib::conf_file_read(
+std::unordered_map<std::string, double> quadriga_lib::conf_file_read(
     const std::string &fn,
-    std::unordered_map<std::string, double> &scenpar,
     std::string *pl_model = nullptr,
     std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
     arma::mat *lsp_xcorr = nullptr,
+    bool *lsp_xcorr_pd = nullptr,
     std::vector<std::string> *key_order = nullptr,
     std::vector<std::string> *pl_order = nullptr,
     std::vector<std::string> *short_names = nullptr,
@@ -4010,18 +4006,19 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ### Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key` entries
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
 - **`plpar`** *(optional)* — Path-loss parameters: the `PL_` keys other than `PL_model`, without the prefix, with
   one or more values each; `n_pl` entries
 - **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix, see [scenpar_validate](#scenpar_validate); `[8, 8]`
+- **`lsp_xcorr_pd`** *(optional)* — `true` if `lsp_xcorr` is positive definite; `false` is no error here, but
+  [lsp_generate](#lsp_generate) throws for the scenario
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`, see [scenpar_validate](#scenpar_validate); `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
 - **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
 - **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ### Returns:
-- `true` if `lsp_xcorr` is positive definite; `false` is no error here, but [lsp_generate](#lsp_generate) throws for the scenario
+- Numeric scenario parameters; `n_key` entries
 
 ### See also:
 - [scenpar_validate](#scenpar_validate) (value checks and defaults)
@@ -4190,10 +4187,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_init_phases) · [Python](quadriga
 
 ### Declaration:
 ```cpp
-void quadriga_lib::gbsm_init_phases(
+arma::cube quadriga_lib::gbsm_init_phases(
     const std::unordered_map<std::string, double> &scenpar,
     const std::string &set_type,
-    arma::cube &phase,
     arma::sword seed = -1,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
@@ -4216,9 +4212,9 @@ void quadriga_lib::gbsm_init_phases(
   least 3 columns, else no effect
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D, `false` 3D mode; as in [gbsm_draw](#gbsm_draw)
 
-### Output:
-- **`phase`** — SOS phases in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 =
-  Tx side; `[n_coeff, n_gen, 2]`
+### Returns:
+- SOS phases `phase` in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 = Tx
+  side; `[n_coeff, n_gen, 2]`
 
 ### See also:
 - [gbsm_draw](#gbsm_draw) (evaluates the SOS phases at the links)
@@ -4451,12 +4447,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#los_probability) · [Python](quadriga_
 
 ### Declaration:
 ```cpp
-void quadriga_lib::los_probability(
+arma::vec quadriga_lib::los_probability(
     const std::string &model,
     const arma::vec &d2d_out,
     const arma::vec &h_bs,
     const arma::vec &h_ut,
-    arma::vec &p_los,
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
@@ -4483,10 +4478,12 @@ void quadriga_lib::los_probability(
 - **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`;
   `[n_freq]`
 
-### Outputs:
-- **`p_los`** — LOS probability in [0, 1]; `[n_link]`
+### Output:
 - **`los_soft`** *(optional)* — Soft LOS state in [0, 1]; `> 0.5` exactly when `rnd_g > -F(p_los)` of eq. (7.6-18),
   which has the probability `p_los`; `[n_link, n_freq]`
+
+### Returns:
+- LOS probability `p_los` in [0, 1]; `[n_link]`
 
 ### See also:
 - [o2i_loss](#o2i_loss) (indoor distance for `d2d_out`)
@@ -4602,12 +4599,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#o2i_loss) · [Python](quadriga_lib_api
 
 ### Declaration:
 ```cpp
-void quadriga_lib::o2i_loss(
+arma::mat quadriga_lib::o2i_loss(
     const arma::vec &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
-    arma::mat &loss_dB,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -4623,9 +4619,11 @@ void quadriga_lib::o2i_loss(
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)
 
 ### Outputs:
-- **`loss_dB`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
 - **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+
+### Returns:
+- Penetration loss `loss_dB` in [dB]; `[n_ut, n_freq]`
 
 ### See also:
 - [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)
@@ -4685,14 +4683,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#path_loss) · [Python](quadriga_lib_ap
 
 ### Declaration:
 ```cpp
-void quadriga_lib::path_loss(
+arma::mat quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    arma::mat &pl_dB,
     arma::mat *sf_sigma_dB = nullptr,
     const arma::vec &d2d_in = arma::vec(),
     const arma::vec &rnd_he = arma::vec());
@@ -4710,9 +4707,11 @@ void quadriga_lib::path_loss(
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
   [gbsm_draw](#gbsm_draw) (`"lsf"`); `[n_link]`
 
-### Outputs:
-- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+### Output:
 - **`sf_sigma_dB`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+
+### Returns:
+- Path loss `pl_dB` in [dB]; `[n_link, n_freq]`
 
 ### See also:
 - [lsp_generate](#lsp_generate) (takes `sf_sigma_dB`)
@@ -6120,10 +6119,9 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-void quadriga_lib::obj_overlap_test(
+arma::uvec quadriga_lib::obj_overlap_test(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind,
-    arma::uvec &overlap_ind,
     std::vector<std::string> *reason = nullptr,
     dtype tolerance = 0.0005);
 ```
@@ -6133,10 +6131,12 @@ void quadriga_lib::obj_overlap_test(
 - **`obj_ind`** — Object ID of each triangle; any values, e.g. the 0-based `obj_ind` output of [obj_file_read](#obj_file_read); `[n_mesh]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
-### Outputs:
-- **`overlap_ind`** — IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+### Output:
 - **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
   overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
+
+### Returns:
+- IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (reads mesh data from files and generates `obj_ind` input)
@@ -6228,9 +6228,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_aabb) · [Python](quadriga
 
 ### Declaration:
 ```cpp
-void quadriga_lib::point_cloud_aabb(
+arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> &points,
-    arma::Mat<dtype> &aabb,
     const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
@@ -6240,8 +6239,8 @@ void quadriga_lib::point_cloud_aabb(
 - **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
-### Output:
-- **`aabb`** — Bounding boxes, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+### Returns:
+- Bounding boxes `aabb`, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [point_cloud_segmentation](#point_cloud_segmentation) (generate sub-cloud indices)
@@ -6348,10 +6347,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_inside_mesh) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-void quadriga_lib::point_inside_mesh(
+arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
-    arma::uvec &result,
     const arma::uvec &obj_ind = arma::uvec(),
     dtype distance = 0.0);
 ```
@@ -6364,8 +6362,8 @@ void quadriga_lib::point_inside_mesh(
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m (default: 0)
 
-### Output:
-- **`result`** — `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
+### Returns:
+- `result`: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
@@ -7511,9 +7509,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_aabb) · [Python](quadri
 
 ### Declaration:
 ```cpp
-void quadriga_lib::triangle_mesh_aabb(
+arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> &mesh,
-    arma::Mat<dtype> &aabb,
     const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
@@ -7523,8 +7520,8 @@ void quadriga_lib::triangle_mesh_aabb(
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
-### Output:
-- **`aabb`** — Bounding boxes, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+### Returns:
+- Bounding boxes `aabb`, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [ray_triangle_intersect](#ray_triangle_intersect) (consumer of the output)
@@ -7703,13 +7700,11 @@ positions are shared: 20 generators take less than twice as long as one.
 
 ```cpp
 // Frequencies of a predefined generator for a decorrelation distance of 10 m
-arma::mat spatial_freq;
 arma::vec acf, dist;
-quadriga_lib::sos_preset<double>("Comb256", spatial_freq, &acf, &dist, 10.0);
+arma::mat spatial_freq = quadriga_lib::sos_preset<double>("Comb256", &acf, &dist, 10.0);
 
 // Phases of 20 generators; each column is one independent random field
-arma::mat phase;
-quadriga_lib::sos_init_phases<double>(spatial_freq.n_rows, 20, phase, 42);
+arma::mat phase = quadriga_lib::sos_init_phases<double>(spatial_freq.n_rows, 20, 42);
 
 // Values of all 20 generators at the positions, size [1000, 20]
 arma::mat val_all;
@@ -7773,9 +7768,8 @@ arma::vec dist_own = arma::regspace(0.0, 0.125, 24.875);
 arma::vec acf_own = arma::exp(-arma::square(dist_own / 5.0));
 
 // 256 sinusoids in 3-D, 300 test directions, wavelengths up to 20 decorrelation distances (100 m)
-arma::mat freq_own;
-quadriga_lib::sos_generate<double>(acf_own, dist_own, 256, freq_own, nullptr, nullptr, 3, true, 300, true,
-                                   0.01, 0.0, 1);
+arma::mat freq_own = quadriga_lib::sos_generate<double>(acf_own, dist_own, 256, nullptr, nullptr, 3, true, 300, true,
+                                                        0.01, 0.0, 1);
 
 // Approximation error in dB, larger is better; about 35 dB for this example
 double mse = quadriga_lib::sos_calc_mse(freq_own, acf_own, dist_own);
@@ -7810,10 +7804,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acf_2d) · [Python](quadriga_lib_a
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_acf_2d(
+arma::Mat<dtype> quadriga_lib::sos_acf_2d(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    arma::Mat<dtype> &acf_2d,
     arma::Col<dtype> *dist_2d = nullptr);
 ```
 
@@ -7821,9 +7814,11 @@ void quadriga_lib::sos_acf_2d(
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; `[n_acf]`
 
-### Outputs:
-- **`acf_2d`** — ACF on the grid; `[n_grid, n_grid]`
+### Output:
 - **`dist_2d`** *(optional)* — Grid axis in [m]; `[n_grid]`
+
+### Returns:
+- ACF `acf_2d` on the grid; `[n_grid, n_grid]`
 
 ### See also:
 - [sos_acf_approx](#sos_acf_approx) (ACF produced by a set of sinusoids on the same grid)
@@ -7851,10 +7846,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acf_approx) · [Python](quadriga_l
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_acf_approx(
+arma::Cube<dtype> quadriga_lib::sos_acf_approx(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &dist,
-    arma::Cube<dtype> &acf_approx,
     arma::Col<dtype> *dist_2d = nullptr);
 ```
 
@@ -7863,9 +7857,11 @@ void quadriga_lib::sos_acf_approx(
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; at least
   2 elements; `[n_acf]`
 
-### Outputs:
-- **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above
+### Output:
 - **`dist_2d`** *(optional)* — Grid axis in [m]; `[n_grid]`
+
+### Returns:
+- Approximated ACF `acf_approx`; size depends on `n_dim`, see above
 
 ### See also:
 - [sos_acf_2d](#sos_acf_2d) (target ACF on the same grid)
@@ -7900,12 +7896,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acf_estimate) · [Python](quadriga
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_acf_estimate(
+arma::Col<dtype> quadriga_lib::sos_acf_estimate(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &phase,
     const arma::Col<dtype> &bins,
     arma::uword n_pos,
-    arma::Col<dtype> &acf_est,
     arma::Col<dtype> *dist_est = nullptr,
     arma::Col<dtype> *acf_est_dual = nullptr,
     const arma::Col<dtype> &acf = arma::Col<dtype>(),
@@ -7925,9 +7920,11 @@ void quadriga_lib::sos_acf_estimate(
 - **`seed`** *(optional)* — Seed for the positions; must be >= -1; `-1` seeds from the system random device
 
 ### Outputs:
-- **`acf_est`** — Estimated ACF; `[n_bin]`
 - **`dist_est`** *(optional)* — Mean distance of the pairs in each bin in [m]; `[n_bin]`
 - **`acf_est_dual`** *(optional)* — Estimated ACF for two devices on the same map; `[n_bin]`
+
+### Returns:
+- Estimated ACF `acf_est`; `[n_bin]`
 
 ### See also:
 - [sos_acf_approx](#sos_acf_approx) (ACF of the sinusoids in closed form)
@@ -7947,11 +7944,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acfi) · [Python](quadriga_lib_api
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_acfi(
+arma::Col<dtype> quadriga_lib::sos_acfi(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    const arma::Col<dtype> &d,
-    arma::Col<dtype> &val);
+    const arma::Col<dtype> &d);
 ```
 
 ### Inputs:
@@ -7959,8 +7955,8 @@ void quadriga_lib::sos_acfi(
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; `[n_acf]`
 - **`d`** — Distances in [m]; must be >= 0; `[n_d]`
 
-### Output:
-- **`val`** — ACF at the distances `d`; `[n_d]`
+### Returns:
+- ACF `val` at the distances `d`; `[n_d]`
 
 ### See also:
 - [sos_preset](#sos_preset) (ACF tables of the predefined models)
@@ -8070,11 +8066,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_generate) · [Python](quadriga_lib
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_generate(
+arma::Mat<dtype> quadriga_lib::sos_generate(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
     arma::uword n_coeff,
-    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *ase = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dim = 3,
@@ -8101,11 +8096,13 @@ void quadriga_lib::sos_generate(
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ### Outputs:
-- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, n_dim]`
 - **`ase`** *(optional)* — Mean squared error over the test directions after each pass, linear scale;
   `[n_pass]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
   for `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
+
+### Returns:
+- Spatial frequencies `spatial_freq` in [1/m]; `[n_coeff, n_dim]`
 
 ### See also:
 - [sos_calc_mse](#sos_calc_mse) (error of a frequency table)
@@ -8133,10 +8130,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_init_phases) · [Python](quadriga_
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_init_phases(
+arma::Mat<dtype> quadriga_lib::sos_init_phases(
     arma::uword n_coeff,
     arma::uword n_gen,
-    arma::Mat<dtype> &phase,
     arma::sword seed = -1);
 ```
 
@@ -8146,8 +8142,8 @@ void quadriga_lib::sos_init_phases(
 - **`seed`** *(optional)* — Seed of the random stream; must be >= -1; `-1` seeds from the system random
   device and gives different phases on each call
 
-### Output:
-- **`phase`** — Phases in [rad]; `[n_coeff, n_gen]`
+### Returns:
+- Phases `phase` in [rad]; `[n_coeff, n_gen]`
 
 ### See also:
 - [sos_val](#sos_val) (evaluates the generators)
@@ -8232,9 +8228,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_preset) · [Python](quadriga_lib_a
 
 ### Declaration:
 ```cpp
-void quadriga_lib::sos_preset(
+arma::Mat<dtype> quadriga_lib::sos_preset(
     const std::string &name,
-    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
     dtype dist_decorr = 10.0);
@@ -8245,9 +8240,11 @@ void quadriga_lib::sos_preset(
 - **`dist_decorr`** *(optional)* — Decorrelation distance in [m]; must be > 0
 
 ### Outputs:
-- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, 3]`
 - **`acf`** *(optional)* — Target ACF; `[200]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; `[200]`
+
+### Returns:
+- Spatial frequencies `spatial_freq` in [1/m]; `[n_coeff, 3]`
 
 ### See also:
 - [sos_init_phases](#sos_init_phases) (random phases for the generator)

@@ -169,13 +169,11 @@ positions are shared: 20 generators take less than twice as long as one.
 
 ```
 // Frequencies of a predefined generator for a decorrelation distance of 10 m
-arma::mat spatial_freq;
 arma::vec acf, dist;
-quadriga_lib::sos_preset<double>("Comb256", spatial_freq, &acf, &dist, 10.0);
+arma::mat spatial_freq = quadriga_lib::sos_preset<double>("Comb256", &acf, &dist, 10.0);
 
 // Phases of 20 generators; each column is one independent random field
-arma::mat phase;
-quadriga_lib::sos_init_phases<double>(spatial_freq.n_rows, 20, phase, 42);
+arma::mat phase = quadriga_lib::sos_init_phases<double>(spatial_freq.n_rows, 20, 42);
 
 // Values of all 20 generators at the positions, size [1000, 20]
 arma::mat val_all;
@@ -239,9 +237,8 @@ arma::vec dist_own = arma::regspace(0.0, 0.125, 24.875);
 arma::vec acf_own = arma::exp(-arma::square(dist_own / 5.0));
 
 // 256 sinusoids in 3-D, 300 test directions, wavelengths up to 20 decorrelation distances (100 m)
-arma::mat freq_own;
-quadriga_lib::sos_generate<double>(acf_own, dist_own, 256, freq_own, nullptr, nullptr, 3, true, 300, true,
-                                   0.01, 0.0, 1);
+arma::mat freq_own = quadriga_lib::sos_generate<double>(acf_own, dist_own, 256, nullptr, nullptr, 3, true, 300, true,
+                                                        0.01, 0.0, 1);
 
 // Approximation error in dB, larger is better; about 35 dB for this example
 double mse = quadriga_lib::sos_calc_mse(freq_own, acf_own, dist_own);

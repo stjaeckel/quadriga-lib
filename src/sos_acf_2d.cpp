@@ -27,10 +27,9 @@ Target ACF on a 2-D grid
 
 ## Declaration:
 ```
-void quadriga_lib::sos_acf_2d(
+arma::Mat<dtype> quadriga_lib::sos_acf_2d(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    arma::Mat<dtype> &acf_2d,
     arma::Col<dtype> *dist_2d = nullptr);
 ```
 
@@ -38,9 +37,11 @@ void quadriga_lib::sos_acf_2d(
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; `[n_acf]`
 
-## Outputs:
-- **`acf_2d`** — ACF on the grid; `[n_grid, n_grid]`
+## Output:
 - **`dist_2d`** *(optional)* — Grid axis in [m]; `[n_grid]`
+
+## Returns:
+- ACF `acf_2d` on the grid; `[n_grid, n_grid]`
 
 ## See also:
 - [[sos_acf_approx]] (ACF produced by a set of sinusoids on the same grid)
@@ -48,15 +49,12 @@ void quadriga_lib::sos_acf_2d(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
-                              const arma::Col<dtype> &dist,
-                              arma::Mat<dtype> &acf_2d,
-                              arma::Col<dtype> *dist_2d)
+arma::Mat<dtype> quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
+                                          const arma::Col<dtype> &dist,
+                                          arma::Col<dtype> *dist_2d)
 {
     qd_sos_check_acf(acf, dist);
-    qd_check_alias(&acf_2d, "acf_2d", &acf, &dist);
     qd_check_alias(dist_2d, "dist_2d", &acf, &dist);
-    qd_check_alias_outputs(&acf_2d, "acf_2d", dist_2d, "dist_2d");
     if (!qd_sos_equally_spaced(dist))
         throw std::invalid_argument("Input 'dist' must be equally spaced.");
 
@@ -68,8 +66,7 @@ void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
     const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf);
     const double *pa = acf_d.memptr();
 
-    if (acf_2d.n_rows != n_grid || acf_2d.n_cols != n_grid)
-        acf_2d.set_size(n_grid, n_grid);
+    arma::Mat<dtype> acf_2d(n_grid, n_grid, arma::fill::none);
 
     // Radial distance in grid steps; the table is equally spaced, so the step index is the table index
     for (long long ic = -half; ic <= half; ++ic)
@@ -97,7 +94,8 @@ void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
         for (long long i = -half; i <= half; ++i)
             dist_2d->at((arma::uword)(i + half)) = (dtype)((double)i * step);
     }
+    return acf_2d;
 }
 
-template void quadriga_lib::sos_acf_2d(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::Mat<float> &acf_2d, arma::Col<float> *dist_2d);
-template void quadriga_lib::sos_acf_2d(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::Mat<double> &acf_2d, arma::Col<double> *dist_2d);
+template arma::Mat<float> quadriga_lib::sos_acf_2d(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::Col<float> *dist_2d);
+template arma::Mat<double> quadriga_lib::sos_acf_2d(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::Col<double> *dist_2d);

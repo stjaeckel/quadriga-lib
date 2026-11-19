@@ -662,10 +662,9 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-void quadriga_lib::obj_overlap_test(
+arma::uvec quadriga_lib::obj_overlap_test(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind,
-    arma::uvec &overlap_ind,
     std::vector<std::string> *reason = nullptr,
     dtype tolerance = 0.0005);
 ```
@@ -675,10 +674,12 @@ void quadriga_lib::obj_overlap_test(
 - **`obj_ind`** — Object ID of each triangle; any values, e.g. the 0-based `obj_ind` output of [obj_file_read](#obj_file_read); `[n_mesh]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
-### Outputs:
-- **`overlap_ind`** — IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+### Output:
 - **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
   overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
+
+### Returns:
+- IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (reads mesh data from files and generates `obj_ind` input)
@@ -770,9 +771,8 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_cloud_aabb) · 
 
 ### Declaration:
 ```cpp
-void quadriga_lib::point_cloud_aabb(
+arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> &points,
-    arma::Mat<dtype> &aabb,
     const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
@@ -782,8 +782,8 @@ void quadriga_lib::point_cloud_aabb(
 - **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
-### Output:
-- **`aabb`** — Bounding boxes, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+### Returns:
+- Bounding boxes `aabb`, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [point_cloud_segmentation](#point_cloud_segmentation) (generate sub-cloud indices)
@@ -890,10 +890,9 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_inside_mesh) ·
 
 ### Declaration:
 ```cpp
-void quadriga_lib::point_inside_mesh(
+arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
-    arma::uvec &result,
     const arma::uvec &obj_ind = arma::uvec(),
     dtype distance = 0.0);
 ```
@@ -906,8 +905,8 @@ void quadriga_lib::point_inside_mesh(
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m (default: 0)
 
-### Output:
-- **`result`** — `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
+### Returns:
+- `result`: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
@@ -2053,9 +2052,8 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#triangle_mesh_aabb) �
 
 ### Declaration:
 ```cpp
-void quadriga_lib::triangle_mesh_aabb(
+arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> &mesh,
-    arma::Mat<dtype> &aabb,
     const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
@@ -2065,8 +2063,8 @@ void quadriga_lib::triangle_mesh_aabb(
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
-### Output:
-- **`aabb`** — Bounding boxes, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+### Returns:
+- Bounding boxes `aabb`, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [ray_triangle_intersect](#ray_triangle_intersect) (consumer of the output)

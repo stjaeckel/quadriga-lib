@@ -1534,9 +1534,8 @@ Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 ## Declaration:
 ```
-void quadriga_lib::sos_preset(
+arma::Mat<dtype> quadriga_lib::sos_preset(
     const std::string &name,
-    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
     dtype dist_decorr = 10.0);
@@ -1547,9 +1546,11 @@ void quadriga_lib::sos_preset(
 - **`dist_decorr`** *(optional)* — Decorrelation distance in [m]; must be > 0
 
 ## Outputs:
-- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, 3]`
 - **`acf`** *(optional)* — Target ACF; `[200]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; `[200]`
+
+## Returns:
+- Spatial frequencies `spatial_freq` in [1/m]; `[n_coeff, 3]`
 
 ## See also:
 - [[sos_init_phases]] (random phases for the generator)
@@ -1558,11 +1559,10 @@ void quadriga_lib::sos_preset(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_preset(const std::string &name,
-                              arma::Mat<dtype> &spatial_freq,
-                              arma::Col<dtype> *acf,
-                              arma::Col<dtype> *dist,
-                              dtype dist_decorr)
+arma::Mat<dtype> quadriga_lib::sos_preset(const std::string &name,
+                                          arma::Col<dtype> *acf,
+                                          arma::Col<dtype> *dist,
+                                          dtype dist_decorr)
 {
     // ACF type: 0 = Exp, 1 = Gauss, 2 = Comb
     int type = -1;
@@ -1572,8 +1572,6 @@ void quadriga_lib::sos_preset(const std::string &name,
     if (!(dist_decorr > (dtype)0.0) || !std::isfinite((double)dist_decorr))
         throw std::invalid_argument("Input 'dist_decorr' must be > 0.");
 
-    qd_check_alias_outputs(&spatial_freq, "spatial_freq", acf, "acf");
-    qd_check_alias_outputs(&spatial_freq, "spatial_freq", dist, "dist");
     qd_check_alias_outputs(acf, "acf", dist, "dist");
 
     const double *tables[3][4] = {
@@ -1588,8 +1586,7 @@ void quadriga_lib::sos_preset(const std::string &name,
     std::vector<double> ux(n_coeff), uy(n_coeff), uz(n_coeff);
     qd_sos_directions(n_coeff, 3, ux.data(), uy.data(), uz.data());
 
-    if (spatial_freq.n_rows != n_coeff || spatial_freq.n_cols != 3)
-        spatial_freq.set_size(n_coeff, 3);
+    arma::Mat<dtype> spatial_freq(n_coeff, 3, arma::fill::none);
     for (arma::uword n = 0; n < n_coeff; ++n)
     {
         double f = table[n] / scale;
@@ -1615,7 +1612,8 @@ void quadriga_lib::sos_preset(const std::string &name,
         for (arma::uword i = 0; i < 200; ++i)
             dist->at(i) = (dtype)(0.25 * (double)i * scale);
     }
+    return spatial_freq;
 }
 
-template void quadriga_lib::sos_preset(const std::string &name, arma::Mat<float> &spatial_freq, arma::Col<float> *acf, arma::Col<float> *dist, float dist_decorr);
-template void quadriga_lib::sos_preset(const std::string &name, arma::Mat<double> &spatial_freq, arma::Col<double> *acf, arma::Col<double> *dist, double dist_decorr);
+template arma::Mat<float> quadriga_lib::sos_preset(const std::string &name, arma::Col<float> *acf, arma::Col<float> *dist, float dist_decorr);
+template arma::Mat<double> quadriga_lib::sos_preset(const std::string &name, arma::Col<double> *acf, arma::Col<double> *dist, double dist_decorr);

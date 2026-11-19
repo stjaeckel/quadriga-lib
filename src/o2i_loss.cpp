@@ -36,12 +36,11 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Declaration:
 ```
-void quadriga_lib::o2i_loss(
+arma::mat quadriga_lib::o2i_loss(
     const arma::vec &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
-    arma::mat &loss_dB,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -57,23 +56,24 @@ void quadriga_lib::o2i_loss(
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)
 
 ## Outputs:
-- **`loss_dB`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
 - **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+
+## Returns:
+- Penetration loss `loss_dB` in [dB]; `[n_ut, n_freq]`
 
 ## See also:
 - [[los_probability]] (uses the outdoor distance `d2D - d2d_in`)
 - [[path_loss]] (basic path loss, legacy outdoor distance from `d2d_in`)
 MD!*/
 
-void quadriga_lib::o2i_loss(const arma::vec &center_freq,
-                            const arma::mat &rnd,
-                            const std::vector<std::string> &models,
-                            const arma::vec &weights,
-                            arma::mat &loss_dB,
-                            double d2d_in_max,
-                            arma::vec *d2d_in,
-                            arma::uvec *model_ind)
+arma::mat quadriga_lib::o2i_loss(const arma::vec &center_freq,
+                                 const arma::mat &rnd,
+                                 const std::vector<std::string> &models,
+                                 const arma::vec &weights,
+                                 double d2d_in_max,
+                                 arma::vec *d2d_in,
+                                 arma::uvec *model_ind)
 {
     // Carrier frequencies
     qd_gbsm_check_fc(center_freq);
@@ -120,9 +120,7 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
 
     if (!std::isfinite(d2d_in_max) || d2d_in_max < 0.0)
         throw std::invalid_argument("Input 'd2d_in_max' must be finite and >= 0.");
-    qd_check_alias(&loss_dB, "loss_dB", &center_freq, &rnd, &weights);
     qd_check_alias(d2d_in, "d2d_in", &center_freq, &rnd, &weights);
-    qd_check_alias_outputs(&loss_dB, "loss_dB", d2d_in, "d2d_in");
 
     // Cumulative weights and the fallback model (last non-zero weight)
     std::vector<double> c_cum(n_model);
@@ -152,8 +150,7 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
     const double sigma_P[3] = {4.4, 6.5, 4.4};
 
     // Outputs
-    if (loss_dB.n_rows != n_ut || loss_dB.n_cols != n_freq)
-        loss_dB.set_size(n_ut, n_freq);
+    arma::mat loss_dB(n_ut, n_freq, arma::fill::none);
     if (d2d_in != nullptr && d2d_in->n_elem != n_ut)
         d2d_in->set_size(n_ut);
     if (model_ind != nullptr && model_ind->n_elem != n_ut)
@@ -198,4 +195,5 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
         if (model_ind != nullptr)
             model_ind->at(u) = j;
     }
+    return loss_dB;
 }

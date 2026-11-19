@@ -94,9 +94,7 @@ py::tuple los_probability(const std::string &model,
 
     // Output allocation; the soft LOS state needs both 'rnd_g' and 'center_freq', else it is returned as None
     const bool soft = !rnd_g.is_none() && !center_freq.is_none();
-    arma::vec p_los;
     arma::mat los_soft;
-    auto p_los_py = qd_python_init_output(d2d_out_a.n_elem, &p_los);
     py::object los_soft_py = py::none();
     if (soft)
         los_soft_py = qd_python_init_output(d2d_out_a.n_elem, center_freq_a.n_elem, &los_soft);
@@ -105,8 +103,8 @@ py::tuple los_probability(const std::string &model,
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
     // Call library function
-    quadriga_lib::los_probability(model, d2d_out_a, h_bs_a, h_ut_a, p_los, d_clutter_d, r_clutter_d, h_clutter_d,
-                                  rnd_g_a, center_freq_a, p_los_soft);
+    const arma::vec p_los = quadriga_lib::los_probability(model, d2d_out_a, h_bs_a, h_ut_a, d_clutter_d, r_clutter_d,
+                                                          h_clutter_d, rnd_g_a, center_freq_a, p_los_soft);
 
-    return py::make_tuple(p_los_py, los_soft_py);
+    return py::make_tuple(qd_python_copy2numpy(&p_los), los_soft_py);
 }

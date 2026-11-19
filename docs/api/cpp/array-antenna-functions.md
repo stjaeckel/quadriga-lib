@@ -140,9 +140,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity) �
 
 ### Declaration:
 ```cpp
-void quadriga_lib::arrayant_calc_directivity(
+arma::Col<dtype> quadriga_lib::arrayant_calc_directivity(
     const arrayant<dtype> &ant,
-    arma::Col<dtype> &directivity_dBi,
     const arma::uvec &i_element = arma::uvec());
 ```
 
@@ -150,14 +149,13 @@ void quadriga_lib::arrayant_calc_directivity(
 - **`ant`** — Valid arrayant
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
-### Outputs:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out]`
+### Returns:
+- Directivity in dBi; `[n_out]`
 
 ### Example:
 ```cpp
 auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-arma::vec directivity_dBi;
-quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi); // about 1.76 dBi
+arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant); // about 1.76 dBi
 ```
 
 ### See also:
@@ -178,9 +176,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity) �
 
 ### Declaration:
 ```cpp
-void quadriga_lib::arrayant_calc_directivity_multi(
+arma::Mat<dtype> quadriga_lib::arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
-        arma::Mat<dtype> &directivity_dBi,
         const arma::uvec &i_element = arma::uvec());
 ```
 
@@ -188,8 +185,8 @@ void quadriga_lib::arrayant_calc_directivity_multi(
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
-### Outputs:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
+### Returns:
+- Directivity in dBi; `[n_out, n_freq]`
 
 ### See also:
 - [arrayant_calc_directivity](#arrayant_calc_directivity) (single-frequency counterpart)

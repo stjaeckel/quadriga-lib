@@ -423,15 +423,15 @@ TEST_CASE("ssf_rays - both polarisation models are swap-reciprocal for mirrored 
         fix_t b = swapped(a);
         arma::cube ph, ra, rb;
         arma::mat x;
-        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
+        ph = quadriga_lib::gbsm_init_phases(sp, "cluster", 23);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, a.tx, a.rx, a.rnd, -1, "Comb256", {}, {}, true);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, b.tx, b.rx, b.rnd, -1, "Comb256", {}, {}, true);
-        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23, 0);
+        ph = quadriga_lib::gbsm_init_phases(sp, "cluster", 23, 0);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, a.tx, a.rx, x, 0, "Comb256", {}, {}, true);
         a.rnd_freq.slice(0) = x;
         quadriga_lib::gbsm_draw(sp, "cluster", ph, b.tx, b.rx, x, 0, "Comb256", {}, {}, true);
         b.rnd_freq.slice(0) = x;
-        quadriga_lib::gbsm_init_phases(sp, "ray", ph, 23, qd ? -1 : 0);
+        ph = quadriga_lib::gbsm_init_phases(sp, "ray", 23, qd ? -1 : 0);
         quadriga_lib::gbsm_draw(sp, "ray", ph, a.tx, a.rx, x, qd ? -1 : 0, "Comb256", {}, fc, true);
         ra = arma::cube(x.memptr(), x.n_rows, x.n_cols, 1);
         quadriga_lib::gbsm_draw(sp, "ray", ph, b.tx, b.rx, x, qd ? -1 : 0, "Comb256", {}, fc, true);
@@ -522,7 +522,7 @@ TEST_CASE("Diagnostic - ssf_rays quadriga ray delay spread relative to the slot 
                                {}, {}, in.eod, in.toa);
     arma::cube ph;
     arma::mat x;
-    quadriga_lib::gbsm_init_phases(sp, "ray", ph, 282);
+    ph = quadriga_lib::gbsm_init_phases(sp, "ray", 282);
     quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, -1, "Comb256", {}, fc);
     const arma::cube rnd(x.memptr(), x.n_rows, x.n_cols, 1);
     arma::cube mu(200, 1, 8, arma::fill::value(1.0)), sigma(200, 1, 8, arma::fill::value(3.0));
@@ -534,8 +534,8 @@ TEST_CASE("Diagnostic - ssf_rays quadriga ray delay spread relative to the slot 
     for (arma::uword l = 0; l < 200; ++l)
         d_slot[l] = rv(o.delay, l), p_slot[l] = rv(o.power, l), d_ray[l] = rays[l].delay, p_ray[l] = rays[l].power;
     arma::vec ds_ray, ds_slot;
-    quadriga_lib::calc_delay_spread(d_ray, p_ray, ds_ray);
-    quadriga_lib::calc_delay_spread(d_slot, p_slot, ds_slot);
+    ds_ray = quadriga_lib::calc_delay_spread(d_ray, p_ray);
+    ds_slot = quadriga_lib::calc_delay_spread(d_slot, p_slot);
     const arma::vec ratio = ds_ray / ds_slot;
     const arma::vec q = arma::quantile(ratio, arma::vec{0.5, 0.9});
     QD_DIAG("\n# diag: quadriga ray DS / slot DS over 200 links: p50 %.4f, p90 %.4f\n", q(0), q(1));

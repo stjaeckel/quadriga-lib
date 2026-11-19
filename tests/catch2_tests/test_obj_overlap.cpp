@@ -33,7 +33,7 @@ TEST_CASE("Test OBJ Overlap - Identical objects")
 
     std::vector<std::string> reason;
     arma::uvec overlap;
-    quadriga_lib::obj_overlap_test(mesh, obj_ind, overlap, &reason);
+    overlap = quadriga_lib::obj_overlap_test(mesh, obj_ind, &reason);
 
     arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
@@ -59,7 +59,7 @@ TEST_CASE("Test OBJ Overlap - Touching cubes")
     arma::uvec obj_ind = arma::join_cols(cube_ind, tmp_ind);
 
     arma::uvec overlap;
-    quadriga_lib::obj_overlap_test(mesh, obj_ind, overlap);
+    overlap = quadriga_lib::obj_overlap_test(mesh, obj_ind);
     CHECK(overlap.n_elem == 0ULL);
 }
 
@@ -87,7 +87,7 @@ TEST_CASE("Test OBJ Overlap - 3D overlap")
 
     std::vector<std::string> reason;
     arma::uvec overlap;
-    quadriga_lib::obj_overlap_test(mesh, obj_ind, overlap, &reason);
+    overlap = quadriga_lib::obj_overlap_test(mesh, obj_ind, &reason);
 
     arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
@@ -114,7 +114,7 @@ TEST_CASE("Test OBJ Overlap - Overlapping Edges")
 
     std::vector<std::string> reason;
     arma::uvec overlap;
-    quadriga_lib::obj_overlap_test(mesh, obj_ind, overlap, &reason);
+    overlap = quadriga_lib::obj_overlap_test(mesh, obj_ind, &reason);
 
     arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
@@ -146,7 +146,7 @@ TEST_CASE("Test OBJ Overlap - Overlapping Faces")
 
     std::vector<std::string> reason;
     arma::uvec overlap;
-    quadriga_lib::obj_overlap_test(mesh, obj_ind, overlap, &reason);
+    overlap = quadriga_lib::obj_overlap_test(mesh, obj_ind, &reason);
 
     arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
@@ -173,7 +173,7 @@ TEST_CASE("Test OBJ Overlap - Vertices on the planes of the other object's faces
         arma::uvec obj = arma::join_cols(arma::uvec(12, arma::fill::value(1)), arma::uvec(4, arma::fill::value(2)));
         std::vector<std::string> reason;
         arma::uvec res;
-        quadriga_lib::obj_overlap_test(mesh, obj, res, &reason);
+        res = quadriga_lib::obj_overlap_test(mesh, obj, &reason);
         REQUIRE(res.n_elem == 2);
         CHECK(res(0) == 1);
         CHECK(res(1) == 2);
@@ -203,7 +203,7 @@ TEST_CASE("Test OBJ Overlap - Touching boxes with offset and larger faces")
         arma::mat mesh = arma::join_cols(A, B);
         std::vector<std::string> reason;
         arma::uvec res;
-        quadriga_lib::obj_overlap_test(mesh, obj, res, &reason);
+        res = quadriga_lib::obj_overlap_test(mesh, obj, &reason);
         CHECK(res.n_elem == 0);
         if (res.n_elem != 0)
             UNSCOPED_INFO(reason[0]);
@@ -216,14 +216,11 @@ TEST_CASE("Test OBJ Overlap - Empty mesh")
     arma::uvec obj;
     std::vector<std::string> reason = {"old"};
     arma::uvec res = {5}; // An old result is cleared
-    REQUIRE_NOTHROW(quadriga_lib::obj_overlap_test(mesh, obj, res, &reason));
+    REQUIRE_NOTHROW(res = quadriga_lib::obj_overlap_test(mesh, obj, &reason));
     CHECK(res.n_elem == 0);
     CHECK(reason.empty());
-    REQUIRE_NOTHROW(quadriga_lib::obj_overlap_test(mesh, obj, res));
+    REQUIRE_NOTHROW(res = quadriga_lib::obj_overlap_test(mesh, obj));
     CHECK(res.n_elem == 0);
-
-    // The output cannot be the object index
-    CHECK_THROWS_AS(quadriga_lib::obj_overlap_test(mesh, obj, obj), std::invalid_argument);
 }
 
 TEST_CASE("Test OBJ Overlap - Object IDs are returned as given")
@@ -235,7 +232,7 @@ TEST_CASE("Test OBJ Overlap - Object IDs are returned as given")
     {
         arma::uvec obj = arma::join_cols(arma::uvec(12, arma::fill::value(id0)), arma::uvec(12, arma::fill::value(id0 + 1)));
         arma::uvec res;
-        quadriga_lib::obj_overlap_test(mesh, obj, res);
+        res = quadriga_lib::obj_overlap_test(mesh, obj);
         REQUIRE(res.n_elem == 2);
         CHECK(res(0) == id0);
         CHECK(res(1) == id0 + 1);
@@ -261,7 +258,7 @@ TEST_CASE("Test OBJ Overlap - Reasons do not depend on the call or the thread co
         omp_set_num_threads(nt);
         std::vector<std::string> why;
         arma::uvec res;
-        quadriga_lib::obj_overlap_test(mesh, obj, res, &why);
+        res = quadriga_lib::obj_overlap_test(mesh, obj, &why);
         if (ref.empty())
         {
             ref = why, ref_ids = res;

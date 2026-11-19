@@ -82,13 +82,13 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
             {
                 arma::Col<T> d;
-                fz::clean([&] { quadriga_lib::arrayant_calc_directivity(a, d, i_el); });
+                fz::clean([&] { d = quadriga_lib::arrayant_calc_directivity(a, i_el); });
             }
             else
             {
                 auto vec = fuzzed_vector<T>(in, a);
                 arma::Mat<T> d;
-                fz::clean([&] { quadriga_lib::arrayant_calc_directivity_multi(vec, d, i_el); });
+                fz::clean([&] { d = quadriga_lib::arrayant_calc_directivity_multi(vec, i_el); });
             }
             break;
         }

@@ -421,7 +421,7 @@ TEST_CASE("ray_init - Sub-mesh acceleration does not change the launch sphere")
     REQUIRE(smi.n_elem > 1); // a single sub-mesh would make the comparison vacuous
 
     arma::fmat boxes;
-    quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, boxes, smi);
+    boxes = quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, smi);
     REQUIRE(boxes.n_rows == smi.n_elem);
     REQUIRE(boxes.n_cols == 6);
 
@@ -447,7 +447,7 @@ TEST_CASE("ray_init - Sub-mesh acceleration alongside receive points")
     arma::u32_vec smi;
     quadriga_lib::triangle_mesh_segmentation<float>(mesh, mesh_seg, smi, 64, 8);
     arma::fmat boxes;
-    quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, boxes, smi);
+    boxes = quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, smi);
 
     const float r_mesh = launch_radius(180, maxpath, mesh_seg, {}, smi, boxes);
 

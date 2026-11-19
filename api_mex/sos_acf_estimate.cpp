@@ -98,7 +98,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::vec acf_est, dist_est, acf_est_dual;
-    plhs[0] = qd_mex_init_output(&acf_est, bins.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&dist_est, bins.n_elem);
     if (nlhs > 2)
@@ -109,5 +108,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_acf_est_dual = acf_est_dual.empty() ? nullptr : &acf_est_dual;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_acf_estimate<double>(spatial_freq, phase, bins, n_pos, acf_est, p_dist_est, p_acf_est_dual, acf, dist, seed));
+    CALL_QD(acf_est = quadriga_lib::sos_acf_estimate<double>(spatial_freq, phase, bins, n_pos, p_dist_est, p_acf_est_dual, acf, dist, seed));
+    plhs[0] = qd_mex_copy2matlab(&acf_est);
 }

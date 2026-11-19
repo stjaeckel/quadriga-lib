@@ -840,7 +840,7 @@ TEST_CASE("Diagnostic - ssf_paths fallback share and b_med on a library drop")
                                    qd ? arma::cube() : in.rnd_freq, {}, in.eod, qd ? in.toa : arma::vec());
         arma::cube ph;
         arma::mat x;
-        quadriga_lib::gbsm_init_phases(sp, "ray", ph, 292, qd ? -1 : 0);
+        ph = quadriga_lib::gbsm_init_phases(sp, "ray", 292, qd ? -1 : 0);
         quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, qd ? -1 : 0, "Comb256", {}, fc);
         const arma::cube rnd(x.memptr(), x.n_rows, x.n_cols, 1);
         std::vector<rays_t> rays;

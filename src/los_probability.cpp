@@ -118,12 +118,11 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 
 ## Declaration:
 ```
-void quadriga_lib::los_probability(
+arma::vec quadriga_lib::los_probability(
     const std::string &model,
     const arma::vec &d2d_out,
     const arma::vec &h_bs,
     const arma::vec &h_ut,
-    arma::vec &p_los,
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
@@ -150,27 +149,28 @@ void quadriga_lib::los_probability(
 - **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`;
   `[n_freq]`
 
-## Outputs:
-- **`p_los`** — LOS probability in [0, 1]; `[n_link]`
+## Output:
 - **`los_soft`** *(optional)* — Soft LOS state in [0, 1]; `> 0.5` exactly when `rnd_g > -F(p_los)` of eq. (7.6-18),
   which has the probability `p_los`; `[n_link, n_freq]`
+
+## Returns:
+- LOS probability `p_los` in [0, 1]; `[n_link]`
 
 ## See also:
 - [[o2i_loss]] (indoor distance for `d2d_out`)
 - [[sos_rand]], [[sos_randn]] (spatially consistent LOS-state draw and `rnd_g`)
 MD!*/
 
-void quadriga_lib::los_probability(const std::string &model,
-                                   const arma::vec &d2d_out,
-                                   const arma::vec &h_bs,
-                                   const arma::vec &h_ut,
-                                   arma::vec &p_los,
-                                   double d_clutter,
-                                   double r_clutter,
-                                   double h_clutter,
-                                   const arma::vec &rnd_g,
-                                   const arma::vec &center_freq,
-                                   arma::mat *los_soft)
+arma::vec quadriga_lib::los_probability(const std::string &model,
+                                        const arma::vec &d2d_out,
+                                        const arma::vec &h_bs,
+                                        const arma::vec &h_ut,
+                                        double d_clutter,
+                                        double r_clutter,
+                                        double h_clutter,
+                                        const arma::vec &rnd_g,
+                                        const arma::vec &center_freq,
+                                        arma::mat *los_soft)
 {
     // Model name
     int m = -1;
@@ -215,9 +215,7 @@ void quadriga_lib::los_probability(const std::string &model,
             throw std::invalid_argument("Input 'rnd_g' must be finite.");
         qd_gbsm_check_fc(center_freq);
     }
-    qd_check_alias(&p_los, "p_los", &d2d_out, &h_bs, &h_ut, &rnd_g, &center_freq);
     qd_check_alias(los_soft, "los_soft", &d2d_out, &h_bs, &h_ut, &rnd_g, &center_freq);
-    qd_check_alias_outputs(&p_los, "p_los", los_soft, "los_soft");
 
     // Model parameters with their defaults
     double kinv0 = 0.0, hc = 0.0;    // InF: -ln(1 - r)/d_clutter, clutter height
@@ -248,8 +246,7 @@ void quadriga_lib::los_probability(const std::string &model,
         tab = qd_los_811_suburban_rural;
 
     // Outputs
-    if (p_los.n_elem != n_link)
-        p_los.set_size(n_link);
+    arma::vec p_los(n_link, arma::fill::none);
 
     // Clutter attenuation exp(-d·k), 1 at d = 0 also for k = +Inf (a subnormal 'd_clutter')
     auto clutter = [](double d, double k)
@@ -356,4 +353,5 @@ void quadriga_lib::los_probability(const std::string &model,
                 ps[l] = 0.5 + std::atan(kk * G[l]) / arma::datum::pi;
         }
     }
+    return p_los;
 }

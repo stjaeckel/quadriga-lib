@@ -101,7 +101,7 @@ namespace
     arma::mat raw_phases(arma::uword n_coeff, arma::sword seed)
     {
         arma::mat P;
-        quadriga_lib::sos_init_phases<double>(n_coeff, 11, P, seed);
+        P = quadriga_lib::sos_init_phases<double>(n_coeff, 11, seed);
         return P;
     }
 
@@ -151,33 +151,25 @@ TEST_CASE("gbsm_init_phases - lsf: output size follows the preset")
     {
         INFO("preset " << presets[i]);
         arma::cube phase;
-        quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 3, -1, presets[i]);
+        phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 3, -1, presets[i]);
         CHECK(phase.n_rows == n_coeff[i]);
         CHECK(phase.n_cols == 11);
         CHECK(phase.n_slices == 2);
     }
 
-    // A pre-sized output with stale content is written in place and completely
-    arma::cube ref, pre(256, 11, 2);
-    pre.fill(99.0);
-    const double *mem = pre.memptr();
-    quadriga_lib::gbsm_init_phases(sp, "lsf", ref, 3);
-    quadriga_lib::gbsm_init_phases(sp, "lsf", pre, 3);
-    CHECK(pre.memptr() == mem);
-    CHECK(arma::all(arma::vectorise(pre == ref)));
 }
 
 TEST_CASE("gbsm_init_phases - lsf: slice 0 equals sos_init_phases with the same seed")
 {
     const auto sp = scen_distinct();
     arma::cube phase;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 42);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 42);
     REQUIRE(phase.n_rows == 256);
     REQUIRE(phase.n_cols == 11);
     REQUIRE(phase.n_slices == 2);
     CHECK(arma::all(arma::vectorise(phase.slice(0) == raw_phases(256, 42))));
 
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 42, -1, "Exp128");
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 42, -1, "Exp128");
     REQUIRE(phase.n_rows == 128);
     CHECK(arma::all(arma::vectorise(phase.slice(0) == raw_phases(128, 42))));
 }
@@ -191,17 +183,17 @@ TEST_CASE("gbsm_init_phases - lsf: slice 1 is the mirror of slice 0")
     const arma::mat tx1 = arma::vec{5.0, -7.0, 25.0};
 
     arma::cube phase;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 5);
     CHECK(is_mirror(phase)); // no bias removal (no positions)
 
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5, -1, "Comb256", tx1, rx); // single mobility, bias removal
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 5, -1, "Comb256", tx1, rx); // single mobility, bias removal
     CHECK(is_mirror(phase));
     CHECK(arma::any(arma::vectorise(phase.slice(0) != raw_phases(256, 5)))); // the correction did act
 
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5, -1, "Comb256", tx, rx, true); // dual mobility, bias removal
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 5, -1, "Comb256", tx, rx, true); // dual mobility, bias removal
     CHECK(is_mirror(phase));
 
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5, -1, "Comb256", tx, rx, true, false); // dual mobility, no bias removal
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 5, -1, "Comb256", tx, rx, true, false); // dual mobility, no bias removal
     CHECK(is_mirror(phase));
 }
 
@@ -210,9 +202,9 @@ TEST_CASE("gbsm_init_phases - lsf: the same seed gives the same phases")
     const auto sp = scen_distinct();
     const arma::mat rx = drop(30, 100.0, 21);
     arma::cube a, b, c;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", a, 7, -1, "Comb256", {}, rx);
-    quadriga_lib::gbsm_init_phases(sp, "lsf", b, 7, -1, "Comb256", {}, rx);
-    quadriga_lib::gbsm_init_phases(sp, "lsf", c, 8, -1, "Comb256", {}, rx);
+    a = quadriga_lib::gbsm_init_phases(sp, "lsf", 7, -1, "Comb256", {}, rx);
+    b = quadriga_lib::gbsm_init_phases(sp, "lsf", 7, -1, "Comb256", {}, rx);
+    c = quadriga_lib::gbsm_init_phases(sp, "lsf", 8, -1, "Comb256", {}, rx);
     CHECK(arma::all(arma::vectorise(a == b))); // determinism: repeated call, identical result
     CHECK(arma::any(arma::vectorise(a != c)));
 }
@@ -224,8 +216,8 @@ TEST_CASE("gbsm_init_phases - lsf: bias removal zeroes the drop mean in single m
     const arma::mat tx = arma::vec{50.0, 50.0, 25.0};
 
     arma::cube phase, phase_raw;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 9, -1, "Comb256", tx, rx);
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase_raw, 9, -1, "Comb256", tx, rx, false, false);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 9, -1, "Comb256", tx, rx);
+    phase_raw = quadriga_lib::gbsm_init_phases(sp, "lsf", 9, -1, "Comb256", tx, rx, false, false);
     REQUIRE(phase.n_rows == 256);
 
     // Closed-form correction: the mean is zero up to the rounding of 200 O(1) values, 1e-12
@@ -255,7 +247,7 @@ TEST_CASE("gbsm_init_phases - lsf: bias removal in 3D mode uses the z coordinate
     const arma::mat tx = arma::vec{50.0, 50.0, 25.0};
 
     arma::cube phase;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 10, -1, "Comb256", tx, rx, false, true, false);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 10, -1, "Comb256", tx, rx, false, true, false);
 
     double max_2d = 0.0;
     QD_DIAG("\n# diag: gbsm_init_phases lsf 3D mode, mean of ref_sos with and without z\n");
@@ -281,8 +273,8 @@ TEST_CASE("gbsm_init_phases - lsf: bias removal with dual mobility uses the Rx a
     tx.row(0) += 30.0, tx.row(1) -= 20.0, tx.row(2) += 5.0; // equal separation for every link
 
     arma::cube phase, phase_sw;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 12, -1, "Comb256", tx, rx, true);
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase_sw, 12, -1, "Comb256", rx, tx, true); // swapped roles
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 12, -1, "Comb256", tx, rx, true);
+    phase_sw = quadriga_lib::gbsm_init_phases(sp, "lsf", 12, -1, "Comb256", rx, tx, true); // swapped roles
     REQUIRE(phase.n_rows == 256);
 
     // Mean over the union [R; T] of the field of every Normal generator (2D: z = 0), closed form: 1e-12
@@ -335,13 +327,13 @@ TEST_CASE("gbsm_init_phases - lsf: no bias removal for fewer than 3 positions, w
     const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
     arma::cube phase;
 
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13, -1, "Comb256", tx, rx2);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 13, -1, "Comb256", tx, rx2);
     CHECK(equals_raw(phase));
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 13);
     CHECK(equals_raw(phase));
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13, -1, "Comb256", tx, rx200, false, false);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 13, -1, "Comb256", tx, rx200, false, false);
     CHECK(equals_raw(phase));
-    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13, -1, "Comb256", tx, rx0));
+    CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 13, -1, "Comb256", tx, rx0));
     CHECK(equals_raw(phase));
 }
 
@@ -353,7 +345,7 @@ TEST_CASE("gbsm_init_phases - lsf: a decorrelation distance of 0 is used as 0.1 
     // 1e-12 tolerance of the closed-form correction
     const arma::mat rx = drop(200, 10.0, 71);
     arma::cube phase;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 14, -1, "Comb256", {}, rx);
+    phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 14, -1, "Comb256", {}, rx);
 
     const arma::mat F = qd_preset("Comb256", 0.1).F;
     double m = mean_ref(F, phase.slice(0).colptr(0), rx, false);
@@ -370,68 +362,62 @@ TEST_CASE("gbsm_init_phases - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", tx, rx));
-        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase));
-        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases({}, "lsf", phase, 1)); // empty scenpar: all defaults
-        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", {}, rx, true, false)); // dual mobility without tx_pos, no bias removal
+        CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", tx, rx));
+        CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases(sp, "lsf"));
+        CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases({}, "lsf", 1)); // empty scenpar: all defaults
+        CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", {}, rx, true, false)); // dual mobility without tx_pos, no bias removal
     }
-    SECTION("outputs that alias inputs")
-    {
-        arma::mat r = rx;
-        arma::cube on_rx(r.memptr(), 5, 3, 1, false, true);
-        CHECK_THROWS_AS(quadriga_lib::gbsm_init_phases(sp, "lsf", on_rx, 1, -1, "Comb256", tx, r), std::invalid_argument);
-        CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
-    }
+
     SECTION("seed")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, -2, -1, "Comb256", tx, rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", -2, -1, "Comb256", tx, rx), std::invalid_argument,
                              Message("Input 'seed' must be >= -1."));
     }
     SECTION("preset")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb999", tx, rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb999", tx, rx), std::invalid_argument,
                              Message("Input 'preset' is not a known preset."));
     }
     SECTION("scenpar value")
     {
         auto bad = sp;
         bad["DS_lambda"] = -1.0;
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(bad, "lsf", phase, 1), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(bad, "lsf", 1), std::invalid_argument,
                              Message("Value of 'DS_lambda' must be finite and >= 0."));
         bad = sp;
         bad["SC_lambda"] = INFINITY;
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(bad, "lsf", phase, 1), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(bad, "lsf", 1), std::invalid_argument,
                              Message("Value of 'SC_lambda' must be finite and >= 0."));
     }
     SECTION("scenpar unknown key")
     {
         auto bad = sp;
         bad["DS_lambdaX"] = 1.0;
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(bad, "lsf", phase, 1), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(bad, "lsf", 1), std::invalid_argument,
                              Message("Unknown key 'DS_lambdaX' in 'scenpar'."));
     }
     SECTION("rx_pos")
     {
         arma::mat bad(2, 5, arma::fill::zeros);
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", tx, bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", tx, bad), std::invalid_argument,
                              Message("Input 'rx_pos' must have 3 rows."));
         bad = rx;
         bad(1, 2) = NAN;
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", tx, bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", tx, bad), std::invalid_argument,
                              Message("Input 'rx_pos' must be finite."));
     }
     SECTION("tx_pos")
     {
         arma::mat bad(2, 1, arma::fill::zeros);
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", bad, rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", bad, rx), std::invalid_argument,
                              Message("Input 'tx_pos' must have 3 rows."));
         bad.zeros(3, 2);
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", bad, rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", bad, rx), std::invalid_argument,
                              Message("Number of columns in 'tx_pos' must be 1 or match the number of columns in 'rx_pos'."));
     }
     SECTION("dual mobility without tx_pos")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", {}, rx, true), std::invalid_argument,
+        CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 1, -1, "Comb256", {}, rx, true), std::invalid_argument,
                              Message("Input 'tx_pos' is required for the bias removal with dual mobility."));
     }
     SECTION("set_type, checked first; the output is untouched on error")
@@ -440,7 +426,7 @@ TEST_CASE("gbsm_init_phases - input validation")
         for (const char *t : {"LSF", "", "clusters", "rays"})
         {
             INFO("set_type " << t);
-            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, keep, -2, -5, "Comb999", tx, rx), std::invalid_argument,
+            CHECK_THROWS_MATCHES(keep = quadriga_lib::gbsm_init_phases(sp, t, -2, -5, "Comb999", tx, rx), std::invalid_argument,
                                  Message("Input 'set_type' must be 'lsf', 'cluster' or 'ray'."));
         }
         CHECK(keep.n_rows == 2);
@@ -449,8 +435,8 @@ TEST_CASE("gbsm_init_phases - input validation")
     SECTION("set_id is ignored for lsf")
     {
         arma::cube a, b;
-        quadriga_lib::gbsm_init_phases(sp, "lsf", a, 7, -1);
-        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", b, 7, -5));
+        a = quadriga_lib::gbsm_init_phases(sp, "lsf", 7, -1);
+        CHECK_NOTHROW(b = quadriga_lib::gbsm_init_phases(sp, "lsf", 7, -5));
         CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
     }
     SECTION("positions with another set type")
@@ -458,11 +444,11 @@ TEST_CASE("gbsm_init_phases - input validation")
         for (const char *t : {"cluster", "ray"})
         {
             INFO("set_type " << t);
-            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, phase, 1, -1, "Comb256", tx, rx), std::invalid_argument,
+            CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, t, 1, -1, "Comb256", tx, rx), std::invalid_argument,
                                  Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
-            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, phase, 1, -1, "Comb256", {}, rx), std::invalid_argument,
+            CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, t, 1, -1, "Comb256", {}, rx), std::invalid_argument,
                                  Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
-            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, phase, 1, -1, "Comb256", tx), std::invalid_argument,
+            CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, t, 1, -1, "Comb256", tx), std::invalid_argument,
                                  Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
         }
     }
@@ -704,8 +690,8 @@ TEST_CASE("gbsm_draw - lsf: swapping Tx and Rx swaps ASD with ASA and ESD with E
     B.row(2).fill(25.0);
 
     arma::cube ph_bias, ph_raw;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", ph_bias, 29, -1, "Comb256", B, A, true); // computed once from the original positions
-    quadriga_lib::gbsm_init_phases(sp, "lsf", ph_raw, 29, -1, "Comb256", B, A, true, false);
+    ph_bias = quadriga_lib::gbsm_init_phases(sp, "lsf", 29, -1, "Comb256", B, A, true); // computed once from the original positions
+    ph_raw = quadriga_lib::gbsm_init_phases(sp, "lsf", 29, -1, "Comb256", B, A, true, false);
 
     const arma::cube *phases[2] = {&ph_raw, &ph_bias};
     for (int i = 0; i < 2; ++i)

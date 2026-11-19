@@ -5,7 +5,6 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "mex_quadriga_lib_functions.hpp"
-#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -81,26 +80,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
     const arma::sword set_id = lsf ? -1 : (arma::sword)set_id_in - 1;
 
-    // Output allocation in MATLAB memory: n_coeff of the preset, n_gen of the set from a completed copy of
-    // 'scenpar'; with an unknown preset or set type or an invalid 'scenpar' the call throws before any output
-    arma::cube phase;
-    const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
-    bool known = n_coeff > 0 && (lsf || set_type == "cluster" || set_type == "ray");
-    auto sp = scenpar;
-    try
-    {
-        if (known)
-            quadriga_lib::scenpar_validate(sp);
-    }
-    catch (const std::exception &)
-    {
-        known = false;
-    }
-    if (known)
-        plhs[0] = qd_mex_init_output(&phase, n_coeff, qd_gbsm_n_gen(sp, set_type, set_id), 2);
-
     // Call library function
-    CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, tx_pos, rx_pos,
-                                           dual_mobility, remove_bias, horizontal));
-
+    arma::cube phase;
+    CALL_QD(phase = quadriga_lib::gbsm_init_phases(scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos,
+                                                   dual_mobility, remove_bias, horizontal));
+    plhs[0] = qd_mex_copy2matlab(&phase);
 }

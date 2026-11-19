@@ -50,8 +50,8 @@ py::tuple calc_delay_spread(py::list delays,
     std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
 
     // Declare outputs
-    arma::vec ds, mean_delay;
-    quadriga_lib::calc_delay_spread<double>(delays_a, powers_a, ds, threshold_dB, granularity, &mean_delay);
+    arma::vec mean_delay;
+    const arma::vec ds = quadriga_lib::calc_delay_spread<double>(delays_a, powers_a, threshold_dB, granularity, &mean_delay);
 
     auto ds_py = qd_python_copy2numpy(&ds);
     auto mean_delay_py = qd_python_copy2numpy(&mean_delay);

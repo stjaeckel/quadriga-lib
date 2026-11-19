@@ -66,15 +66,14 @@ py::tuple o2i_loss(const py::array_t<double> &center_freq,
     const auto weights_a = qd_python_numpy2arma_Col<double>(weights, true);
 
     // Output allocation
-    arma::mat loss_dB;
     arma::vec d2d_in;
     arma::uvec model_ind;
-    auto loss_py = qd_python_init_output(rnd_a.n_rows, center_freq_a.n_elem, &loss_dB);
     auto d2d_in_py = qd_python_init_output(rnd_a.n_rows, &d2d_in);
     auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_ind);
 
     // Call library function
-    quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, loss_dB, d2d_in_max, &d2d_in, &model_ind);
+    const arma::mat loss_dB = quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, d2d_in_max, &d2d_in,
+                                                     &model_ind);
 
-    return py::make_tuple(loss_py, d2d_in_py, model_index_py);
+    return py::make_tuple(qd_python_copy2numpy(&loss_dB), d2d_in_py, model_index_py);
 }

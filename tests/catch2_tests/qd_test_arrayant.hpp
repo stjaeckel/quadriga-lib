@@ -59,7 +59,7 @@ static inline dtype qd_directivity(const quadriga_lib::arrayant<dtype> &ant, arm
 {
     const arma::uvec i_element = {element};
     arma::Col<dtype> directivity_dBi;
-    quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi, i_element);
+    directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant, i_element);
     return directivity_dBi[0];
 }
 

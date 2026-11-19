@@ -24,10 +24,9 @@ Test whether 3D points are inside a triangle mesh using raycasting
 
 ## Declaration:
 ```
-void quadriga_lib::point_inside_mesh(
+arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
-    arma::uvec &result,
     const arma::uvec &obj_ind = arma::uvec(),
     dtype distance = 0.0);
 ```
@@ -40,19 +39,18 @@ void quadriga_lib::point_inside_mesh(
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m (default: 0)
 
-## Output:
-- **`result`** — `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
+## Returns:
+- `result`: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
 
 ## See also:
 - [[obj_file_read]] (for reading `mesh` and `obj_ind` from an .obj file)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
-                                     const arma::Mat<dtype> &mesh,
-                                     arma::uvec &result,
-                                     const arma::uvec &obj_ind,
-                                     dtype distance)
+arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
+                                           const arma::Mat<dtype> &mesh,
+                                           const arma::uvec &obj_ind,
+                                           dtype distance)
 {
     if (points.n_cols != 3)
         throw std::invalid_argument("Input 'points' must have 3 columns.");
@@ -66,13 +64,8 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
     if (!(distance >= 0.0 && distance <= 20.0)) // Also rejects NaN
         throw std::invalid_argument("Distance must be in between 0 and 20 meters.");
 
-    qd_check_alias(&result, "result", &points, &mesh, &obj_ind);
-
     if (points.n_rows == 0)
-    {
-        result.set_size(0);
-        return;
-    }
+        return arma::uvec();
 
     arma::uword n_points = points.n_rows;
     arma::uword n_mesh = mesh.n_rows;
@@ -167,10 +160,8 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
                                            nullptr, nullptr,                   // out_typeN, path_dirN
                                            true);                              // Compact output
 
-    // Check inside condition; the output is written only now, after all calls that can throw
-    if (result.n_elem != n_points)
-        result.set_size(n_points);
-    result.zeros();
+    // Check inside condition
+    arma::uvec result(n_points, arma::fill::zeros);
     arma::uword *p_out = result.memptr();
     unsigned *p_fbs_ind = fbs_ind.memptr();
     const arma::uword *p_obj_R = have_obj ? obj_ind_R.memptr() : nullptr;
@@ -196,16 +187,15 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
             }
             ++i_ang;
         }
+    return result;
 }
 
-template void quadriga_lib::point_inside_mesh(const arma::Mat<float> &points,
-                                              const arma::Mat<float> &mesh,
-                                              arma::uvec &result,
-                                              const arma::uvec &obj_ind,
-                                              float distance);
+template arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<float> &points,
+                                                    const arma::Mat<float> &mesh,
+                                                    const arma::uvec &obj_ind,
+                                                    float distance);
 
-template void quadriga_lib::point_inside_mesh(const arma::Mat<double> &points,
-                                              const arma::Mat<double> &mesh,
-                                              arma::uvec &result,
-                                              const arma::uvec &obj_ind,
-                                              double distance);
+template arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<double> &points,
+                                                    const arma::Mat<double> &mesh,
+                                                    const arma::uvec &obj_ind,
+                                                    double distance);

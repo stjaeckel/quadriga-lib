@@ -363,11 +363,9 @@ TEST_CASE("Arrayant calc_beamwidth - outputs that are the same variable")
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_az), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth<double>(a, {}, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &a.azimuth_grid), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity(a, a.elevation_grid), std::invalid_argument);
 
     std::vector<quadriga_lib::arrayant<double>> v = {a, a};
     arma::mat m1, m2;
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v, {}, 3.0, &m1, &m1), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi<double>(v, {}, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity_multi(v, v[0].coupling_re), std::invalid_argument);
 }

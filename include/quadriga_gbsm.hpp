@@ -25,14 +25,13 @@ namespace quadriga_lib
     // ---- Scenario parameters ----
 
     // Read and validate a QuaDRiGa scenario configuration file
-    // - Returns true if the LSP cross-correlation matrix is positive definite
-    // - 'scenpar' always holds all n_key numeric keys; keys not in the file have their default value
-    bool conf_file_read(
+    // - Returns the numeric scenario parameters 'scenpar', always all n_key keys; keys not in the file have their default value
+    std::unordered_map<std::string, double> conf_file_read(
         const std::string &fn,                                                 // Path to the .conf file
-        std::unordered_map<std::string, double> &scenpar,                      // Output: Numeric scenario parameters, n_key entries
         std::string *pl_model = nullptr,                                       // Optional output: Value of 'PL_model', empty if not in file
         std::unordered_map<std::string, std::vector<double>> *plpar = nullptr, // Optional output: Path-loss parameters, keys without "PL_"
         arma::mat *lsp_xcorr = nullptr,                                        // Optional output: LSP cross-correlation matrix, [8, 8]
+        bool *lsp_xcorr_pd = nullptr,                                          // Optional output: true if 'lsp_xcorr' is positive definite
         std::vector<std::string> *key_order = nullptr,                         // Optional output: Canonical order of the scenpar keys, [n_key]
         std::vector<std::string> *pl_order = nullptr,                          // Optional output: plpar keys in file order
         std::vector<std::string> *short_names = nullptr,                       // Optional output: Values of 'ShortName' in file order
@@ -49,10 +48,9 @@ namespace quadriga_lib
         bool validate = true);                            // false: only complete with defaults, no value checks
 
     // List the scenarios defined by the conf files in a set of directories
-    // - Returns the number of entries, n_scen
-    arma::uword conf_file_list(
+    // - Returns the scenario names and short names, [n_scen]
+    std::vector<std::string> conf_file_list(
         const std::vector<std::string> &dirs,           // Directories, searched in this order, not recursive
-        std::vector<std::string> &scenarios,            // Output: Scenario names and short names, [n_scen]
         std::vector<std::string> *file_names = nullptr, // Optional output: File name incl. ".conf" per entry, [n_scen]
         std::vector<std::string> *file_dirs = nullptr,  // Optional output: Directory per entry, as given in 'dirs', [n_scen]
         bool parse_shortnames = true);                  // Read the files and add their short names
@@ -82,10 +80,10 @@ namespace quadriga_lib
     //   and columns: see gbsm_draw
     // - The SOS phases are a fixed function of seed, set_type and set_id, equal on all platforms; the sets are independent
     // - "lsf": bias removal over the positions in 'rx_pos' (and 'tx_pos' for dual mobility) when given and n_link > 2
-    void gbsm_init_phases(
+    // - Returns the SOS phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
+    arma::cube gbsm_init_phases(
         const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances; NumClusters; NumSubPaths for "ray")
         const std::string &set_type,                            // "lsf", "cluster" or "ray"
-        arma::cube &phase,                                      // Output: SOS phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
         arma::sword seed = -1,                                  // Seed of the site and scenario, the same for all set types; -1 = system random device
         arma::sword set_id = -1,                                // "cluster", "ray": -1 = shared set, k >= 0 = set of frequency k (0-based); ignored for "lsf"
         const std::string &preset = "Comb256",                  // SOS preset, see sos_preset
@@ -120,14 +118,14 @@ namespace quadriga_lib
     // - Models: logdist, logdist_simple, constant, winner_los, winner_nlos, winner_pathloss, dual_slope,
     //   tripple_slope, nlos, satellite; parameters in 'plpar' as in the conf files (keys without "PL_")
     // - An empty 'pl_model' gives zero loss
-    void path_loss(
+    // - Returns the path loss in [dB], [n_link, n_freq]
+    arma::mat path_loss(
         const std::string &pl_model,                                       // Path-loss model, value of 'PL_model'
         const std::unordered_map<std::string, std::vector<double>> &plpar, // Path-loss parameters
         const std::unordered_map<std::string, double> &scenpar,            // Scenario parameters (SF std, LSP_fc_min)
         const arma::vec &center_freq,                                      // Carrier frequencies in [Hz], [n_freq]
         const arma::mat &tx_pos,                                           // Tx positions, [3, 1] or [3, n_link]
         const arma::mat &rx_pos,                                           // Rx positions, [3, n_link]
-        arma::mat &pl_dB,                                                  // Output: Path loss in [dB], [n_link, n_freq]
         arma::mat *sf_sigma_dB = nullptr,                                  // Optional output: SF standard deviation in [dB], [n_link, n_freq]
         const arma::vec &d2d_in = arma::vec(),                             // Optional: Indoor 2D distance in [m], [n_link]; given = outdoor distance only (legacy); 0 = outdoor link, geometric distance
         const arma::vec &rnd_he = arma::vec());                            // Optional: Uniform(0,1) per link for the random hE, column 10 of gbsm_draw ("lsf"), [n_link]
@@ -159,12 +157,12 @@ namespace quadriga_lib
     //   "38.811_DenseUrban", "38.811_Urban", "38.811_Suburban", "38.811_Rural", "QuaDRiGa_Industrial",
     //   "LOS" (always 1), "NLOS" (always 0)
     // - Soft LOS (7.6-18) when 'rnd_g', 'center_freq' and 'los_soft' are given
-    void los_probability(
+    // - Returns the LOS probability, [n_link]
+    arma::vec los_probability(
         const std::string &model,                   // Model name
         const arma::vec &d2d_out,                   // 2D outdoor distance in [m] (indoor scenarios: 2D distance), [n_link]
         const arma::vec &h_bs,                      // BS height in [m], [n_link] or [1]
         const arma::vec &h_ut,                      // UT height in [m], [n_link] or [1]
-        arma::vec &p_los,                           // Output: LOS probability, [n_link]
         double d_clutter = NAN,                     // InF, SMa: clutter size in [m]; NaN or <= 0 = TR default of the model
         double r_clutter = NAN,                     // InF: clutter density; SMa: vegetation density r_vegetation; NaN = default
         double h_clutter = NAN,                     // InF SH, DH: clutter height in [m]; NaN = default
@@ -175,12 +173,12 @@ namespace quadriga_lib
     // O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
     // - Models: "low", "high", "low_A" (Table 7.4.3-2), "legacy_6GHz" (Table 7.4.3-3), "car", "car_metal" (7.4.3.2)
     // - The model of each UT is chosen by comparing column 0 of 'rnd' with the cumulative 'weights'
-    void o2i_loss(
+    // - Returns the penetration loss in [dB], [n_ut, n_freq]
+    arma::mat o2i_loss(
         const arma::vec &center_freq,           // Carrier frequencies in [Hz], [n_freq]
         const arma::mat &rnd,                   // Random values per UT, [n_ut, 4]: U model, U d2D-in 1, U d2D-in 2, N deviation
         const std::vector<std::string> &models, // Models to mix, [n_model]
         const arma::vec &weights,               // Probability of each model, sum 1, [n_model]
-        arma::mat &loss_dB,                     // Output: Penetration loss in [dB], [n_ut, n_freq]
         double d2d_in_max = 25.0,               // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
         arma::vec *d2d_in = nullptr,            // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
         arma::uvec *model_ind = nullptr);       // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]

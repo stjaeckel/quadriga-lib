@@ -44,7 +44,7 @@ static void run(fz::input &in)
     arma::Mat<T> spatial_freq;
     arma::Col<T> acf, dist;
     if (in.ConsumeBool())
-        fz::clean([&] { quadriga_lib::sos_preset<T>(preset_name(in), spatial_freq, &acf, &dist, in.value<T>()); });
+        fz::clean([&] { spatial_freq = quadriga_lib::sos_preset<T>(preset_name(in), &acf, &dist, in.value<T>()); });
     else
         spatial_freq = in.mat<T>(in.size(16), in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.size(4) : in.ConsumeIntegralInRange<arma::uword>(1, 3)),
         acf_table<T>(in, acf, dist);
@@ -57,7 +57,7 @@ static void run(fz::input &in)
     arma::Mat<T> phase, phase_b;
     const arma::uword n_gen = in.size(4);
     if (in.ConsumeBool())
-        fz::clean([&] { quadriga_lib::sos_init_phases<T>(spatial_freq.n_rows, n_gen, phase, seed(in)); });
+        fz::clean([&] { phase = quadriga_lib::sos_init_phases<T>(spatial_freq.n_rows, n_gen, seed(in)); });
     else
         phase = in.mat<T>(in.ConsumeBool() ? spatial_freq.n_rows : in.size(17), n_gen);
     phase_b = in.ConsumeBool() ? phase : in.mat<T>(phase.n_rows, in.ConsumeBool() ? phase.n_cols : in.size(4));
@@ -82,7 +82,7 @@ static void run(fz::input &in)
         arma::Col<T> d = arma::abs(in.col<T>(in.size(16))), v;
         if (in.ConsumeBool() && d.n_elem != 0)
             d(0) = -d(0);
-        fz::clean([&] { quadriga_lib::sos_acfi(acf, dist, d, in.ConsumeBool() ? v : d); });
+        fz::clean([&] { v = quadriga_lib::sos_acfi(acf, dist, d); });
         break;
     }
     case 1:
@@ -136,14 +136,14 @@ static void run(fz::input &in)
     {
         arma::Mat<T> a2;
         arma::Col<T> d2;
-        fz::clean([&] { quadriga_lib::sos_acf_2d(acf, dist, a2, in.ConsumeBool() ? &d2 : nullptr); });
+        fz::clean([&] { a2 = quadriga_lib::sos_acf_2d(acf, dist, in.ConsumeBool() ? &d2 : nullptr); });
         break;
     }
     case 6:
     {
         arma::Cube<T> approx;
         arma::Col<T> d2;
-        fz::clean([&] { quadriga_lib::sos_acf_approx(spatial_freq, dist, approx, in.ConsumeBool() ? (in.ConsumeBool() ? &d2 : &dist) : nullptr); });
+        fz::clean([&] { approx = quadriga_lib::sos_acf_approx(spatial_freq, dist, in.ConsumeBool() ? (in.ConsumeBool() ? &d2 : &dist) : nullptr); });
         break;
     }
     case 7:
@@ -165,9 +165,9 @@ static void run(fz::input &in)
         arma::Col<T> ph = phase.n_elem ? arma::Col<T>(phase.col(0)) : in.col<T>(in.size(17));
         const arma::uword n_pos = in.size(32);
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
-        fz::clean([&] { quadriga_lib::sos_acf_estimate(spatial_freq, ph, bins, n_pos, outs & 8 ? bins : est, outs & 1 ? &d_est : nullptr,
-                                                       outs & 2 ? &dual : nullptr, fz::opt(outs & 4, acf),
-                                                       fz::opt(outs & 4, dist), seed(in)); });
+        fz::clean([&] { est = quadriga_lib::sos_acf_estimate(spatial_freq, ph, bins, n_pos, outs & 1 ? &d_est : nullptr,
+                                                             outs & 2 ? &dual : nullptr, fz::opt(outs & 4, acf),
+                                                             fz::opt(outs & 4, dist), seed(in)); });
         break;
     }
     case 9:
@@ -185,9 +185,9 @@ static void run(fz::input &in)
         if (in.ConsumeIntegralInRange<int>(0, 7) == 0)
             f_min = in.value<T>(), f_max = f_min;
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
-        fz::clean([&] { quadriga_lib::sos_generate(acf, dist, n_coeff, f_out, outs & 1 ? (outs & 4 ? &acf : &ase) : nullptr,
-                                                   outs & 2 ? &dir : nullptr, n_dim, uniform_smp, n_dir, random_init, f_min, f_max,
-                                                   seed(in)); });
+        fz::clean([&] { f_out = quadriga_lib::sos_generate(acf, dist, n_coeff, outs & 1 ? (outs & 4 ? &acf : &ase) : nullptr,
+                                                           outs & 2 ? &dir : nullptr, n_dim, uniform_smp, n_dir, random_init, f_min, f_max,
+                                                           seed(in)); });
         break;
     }
     default:
@@ -195,9 +195,9 @@ static void run(fz::input &in)
         arma::Mat<T> f;
         arma::Col<T> a, d;
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
-        fz::clean([&] { quadriga_lib::sos_preset<T>(preset_name(in), outs & 4 ? spatial_freq : f, outs & 1 ? &a : nullptr,
-                                                    outs & 2 ? &d : nullptr, in.value<T>()); });
-        fz::clean([&] { quadriga_lib::sos_init_phases<T>(in.size(1100), in.size(5), phase, seed(in)); });
+        fz::clean([&] { f = quadriga_lib::sos_preset<T>(preset_name(in), outs & 1 ? &a : nullptr, outs & 2 ? &d : nullptr,
+                                                        in.value<T>()); });
+        fz::clean([&] { phase = quadriga_lib::sos_init_phases<T>(in.size(1100), in.size(5), seed(in)); });
     }
     }
 }

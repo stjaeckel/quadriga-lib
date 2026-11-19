@@ -199,8 +199,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_ignored_keys = (nlhs > 5) ? &ignored_keys : nullptr;
 
     // Call library function
-    CALL_QD(lsp_xcorr_chk = quadriga_lib::conf_file_read(fn, scenpar, &pl_model, &plpar, p_lsp_xcorr,
-                                                         &key_order, &pl_order, p_short_names, p_ignored_keys, validate));
+    CALL_QD(scenpar = quadriga_lib::conf_file_read(fn, &pl_model, &plpar, p_lsp_xcorr, &lsp_xcorr_chk,
+                                                   &key_order, &pl_order, p_short_names, p_ignored_keys, validate));
 
     // Scenario parameters: numeric keys in canonical order
     plhs[0] = qd_mex_scenpar2struct(scenpar, key_order);

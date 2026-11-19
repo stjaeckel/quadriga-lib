@@ -91,9 +91,9 @@ The conventions a declaration follows, for writing one in the plan or the spec a
   - **Optional outputs** and optional in/out arguments are passed by **pointer**, default-initialized to `nullptr`: `arma::Mat<dtype> *output = nullptr`. A `nullptr` output is not allocated and not computed.
   - Strings and Armadillo containers are never passed by value. A string option with a literal default stays a reference (`const std::string &colormap = "jet"`). `std::string_view` is not used for arguments of public functions.
   - `ray_mesh_interact` and `ray_state_update` still pass mandatory arguments by pointer (older style, kept until the planned engine rework). Declare the mandatory arguments of every other function, new or changed, by reference.
-- Results are returned through output arguments; a computed array is never returned. The return value is used for an object from a reader, generator or factory (`arrayant`, `channel`, a mesh, a colormap, a path list), a count, status or read object (also next to output arguments), or a single computed scalar, and is documented under "Returns". See the glossary entry "Results".
+- Results: one mandatory result is returned, optional ones stay pointers. Output arguments serve several mandatory results used together and large results that a wrapper copy would cost (e.g. `gbsm_draw`, `sos_val`, `get_channels_*`). Readers and factories return objects; counts, status and scalars may be returned.
 - Default values exist only in the header, never in the definition.
-- Functions that are not templates use fixed types (e.g. the `float`-only ray-tracing pipeline).
+- Functions that are not templates use fixed types (e.g. the `float`-only ray-tracing pipeline). A `dtype` no mandatory argument fixes defaults to `double`.
 - A new function fits the existing API (`docs/quadriga_lib_api_cpp.md`): the names, units and layouts of the glossary (see "Names, units and layouts"), the same argument types and patterns as its neighbours, and no new public function or argument for what is an implementation detail. Expose only what a caller needs.
 
 ## Names, units and layouts

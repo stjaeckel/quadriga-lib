@@ -75,7 +75,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_dist = dist.empty() ? nullptr : &dist;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_preset<double>(name, spatial_freq, p_acf, p_dist, dist_decorr));
+    CALL_QD(spatial_freq = quadriga_lib::sos_preset<double>(name, p_acf, p_dist, dist_decorr));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&spatial_freq);

@@ -55,7 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat aabb;
 
     // Call library function
-    CALL_QD(quadriga_lib::point_cloud_aabb<double>(points, aabb, sub_cloud_ind, vec_size));
+    CALL_QD(aabb = quadriga_lib::point_cloud_aabb<double>(points, sub_cloud_ind, vec_size));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&aabb);

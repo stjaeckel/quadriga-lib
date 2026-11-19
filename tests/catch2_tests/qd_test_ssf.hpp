@@ -41,7 +41,7 @@ namespace
     spmap read_v19(const std::string &name)
     {
         spmap sp;
-        quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp);
+        sp = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf");
         return sp;
     }
 
@@ -240,12 +240,12 @@ namespace
         lib_t r;
         arma::cube ph;
         arma::mat rnd_l;
-        quadriga_lib::gbsm_init_phases(sp, "lsf", ph, seed);
+        ph = quadriga_lib::gbsm_init_phases(sp, "lsf", seed);
         quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, rnd_l);
         quadriga_lib::lsp_generate(sp, arma::vec{fc}, tx, rx, rnd_l, r.lsp, {}, &r.toa, nullptr, nullptr, &r.eod);
-        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed);
+        ph = quadriga_lib::gbsm_init_phases(sp, "cluster", seed);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd);
-        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed, 0);
+        ph = quadriga_lib::gbsm_init_phases(sp, "cluster", seed, 0);
         r.rnd_freq.set_size(rx.n_cols, (arma::uword)sp.at("NumClusters") - 1, 1);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd_freq.slice(0), 0);
         return r;
@@ -277,7 +277,7 @@ namespace
             az_a[i] = rv(o.aoa, i), el_a[i] = rv(o.eoa, i);
         }
         arma::vec ds, as[4];
-        quadriga_lib::calc_delay_spread(d, p, ds);
+        ds = quadriga_lib::calc_delay_spread(d, p);
         quadriga_lib::calc_angular_spread(az_d, el_d, p, &as[0], &as[2]);
         quadriga_lib::calc_angular_spread(az_a, el_a, p, &as[1], &as[3]);
         for (arma::uword i = 0; i < n; ++i)

@@ -60,10 +60,10 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
     const arma::uword n_gen = dist_decorr.n_elem, n_pos = pos.n_rows;
 
     // Preset for 10 m and the phases of the first device
-    arma::mat freq10, phase, phase_b;
+    arma::mat phase_b;
     arma::vec acf, dist10;
-    quadriga_lib::sos_preset<double>(preset, freq10, &acf, &dist10, 10.0);
-    quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, phase, seed);
+    const arma::mat freq10 = quadriga_lib::sos_preset<double>(preset, &acf, &dist10, 10.0);
+    const arma::mat phase = quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, seed);
 
     const arma::mat pos_d = arma::conv_to<arma::mat>::from(pos);
     arma::mat pos_b_d;
@@ -88,7 +88,7 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
     if (any_two_maps)
     {
         const arma::sword seed_b = (seed < 0) ? -1 : (arma::sword)((unsigned long long)seed ^ (1ULL << 62));
-        quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, phase_b, seed_b);
+        phase_b = quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, seed_b);
     }
 
     if (val.n_rows != n_pos || val.n_cols != n_gen)

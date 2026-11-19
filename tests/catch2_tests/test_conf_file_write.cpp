@@ -130,8 +130,8 @@ namespace
     conf_data read_back(const std::string &fn)
     {
         conf_data d;
-        quadriga_lib::conf_file_read(fn, d.scenpar, &d.pl_model, &d.plpar, nullptr, nullptr,
-                                     &d.pl_order, &d.short_names, &d.ignored_keys, true);
+        d.scenpar = quadriga_lib::conf_file_read(fn, &d.pl_model, &d.plpar, nullptr, nullptr, nullptr,
+                                                 &d.pl_order, &d.short_names, &d.ignored_keys, true);
         return d;
     }
 
@@ -1062,7 +1062,7 @@ TEST_CASE("conf_file_write - the new keys land in their section and paragraph an
 
         // The file reads back with the same values
         std::unordered_map<std::string, double> back;
-        quadriga_lib::conf_file_read(f.fn, back);
+        back = quadriga_lib::conf_file_read(f.fn);
         CHECK(back.at("LOS_state_lambda") == 50.0);
         CHECK(back.at("IO_state_lambda") == 50.0);
         CHECK(back.at("O2I_d2D_in_max") == 25.0);

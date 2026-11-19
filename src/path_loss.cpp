@@ -143,14 +143,13 @@ Path loss and shadow-fading standard deviation of a set of links
 
 ## Declaration:
 ```
-void quadriga_lib::path_loss(
+arma::mat quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    arma::mat &pl_dB,
     arma::mat *sf_sigma_dB = nullptr,
     const arma::vec &d2d_in = arma::vec(),
     const arma::vec &rnd_he = arma::vec());
@@ -168,25 +167,26 @@ void quadriga_lib::path_loss(
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
   [[gbsm_draw]] (`"lsf"`); `[n_link]`
 
-## Outputs:
-- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+## Output:
 - **`sf_sigma_dB`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+
+## Returns:
+- Path loss `pl_dB` in [dB]; `[n_link, n_freq]`
 
 ## See also:
 - [[lsp_generate]] (takes `sf_sigma_dB`)
 - [[o2i_loss]] (penetration loss and indoor distance)
 MD!*/
 
-void quadriga_lib::path_loss(const std::string &pl_model,
-                             const std::unordered_map<std::string, std::vector<double>> &plpar,
-                             const std::unordered_map<std::string, double> &scenpar,
-                             const arma::vec &center_freq,
-                             const arma::mat &tx_pos,
-                             const arma::mat &rx_pos,
-                             arma::mat &pl_dB,
-                             arma::mat *sf_sigma_dB,
-                             const arma::vec &d2d_in,
-                             const arma::vec &rnd_he)
+arma::mat quadriga_lib::path_loss(const std::string &pl_model,
+                                  const std::unordered_map<std::string, std::vector<double>> &plpar,
+                                  const std::unordered_map<std::string, double> &scenpar,
+                                  const arma::vec &center_freq,
+                                  const arma::mat &tx_pos,
+                                  const arma::mat &rx_pos,
+                                  arma::mat *sf_sigma_dB,
+                                  const arma::vec &d2d_in,
+                                  const arma::vec &rnd_he)
 {
     // Validation, before any output is touched
     const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
@@ -203,9 +203,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         for (arma::uword l = 0; l < n_link; ++l)
             if (!(rnd_he(l) >= 0.0 && rnd_he(l) <= 1.0))
                 throw std::invalid_argument("Input 'rnd_he' must be in the range from 0 to 1.");
-    qd_check_alias(&pl_dB, "pl_dB", &center_freq, &tx_pos, &rx_pos, &d2d_in, &rnd_he);
     qd_check_alias(sf_sigma_dB, "sf_sigma_dB", &center_freq, &tx_pos, &rx_pos, &d2d_in, &rnd_he);
-    qd_check_alias_outputs(&pl_dB, "pl_dB", sf_sigma_dB, "sf_sigma_dB");
 
     // Model, index into 'names'; the empty name is "no model"
     enum model_t
@@ -401,8 +399,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     };
 
     // Outputs
-    if (pl_dB.n_rows != n_link || pl_dB.n_cols != n_freq)
-        pl_dB.set_size(n_link, n_freq);
+    arma::mat pl_dB(n_link, n_freq, arma::fill::none);
     if (sf_sigma_dB != nullptr && (sf_sigma_dB->n_rows != n_link || sf_sigma_dB->n_cols != n_freq))
         sf_sigma_dB->set_size(n_link, n_freq);
 
@@ -568,4 +565,5 @@ void quadriga_lib::path_loss(const std::string &pl_model,
             }
         }
     }
+    return pl_dB;
 }

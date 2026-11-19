@@ -80,7 +80,7 @@ TEST_CASE("sos_preset - all presets return the documented sizes and the ACF form
     {
         arma::mat spatial_freq;
         arma::vec acf, dist;
-        quadriga_lib::sos_preset(p.name, spatial_freq, &acf, &dist);
+        spatial_freq = quadriga_lib::sos_preset(p.name, &acf, &dist);
         INFO(p.name);
         REQUIRE(spatial_freq.n_rows == p.n_coeff);
         REQUIRE(spatial_freq.n_cols == 3);
@@ -106,9 +106,9 @@ TEST_CASE("sos_preset - the decorrelation distance scales distances and frequenc
 {
     arma::mat f10, f25, f04;
     arma::vec a10, d10, a25, d25, a04, d04;
-    quadriga_lib::sos_preset("Comb256", f10, &a10, &d10, 10.0);
-    quadriga_lib::sos_preset("Comb256", f25, &a25, &d25, 25.0);
-    quadriga_lib::sos_preset("Comb256", f04, &a04, &d04, 0.4);
+    f10 = quadriga_lib::sos_preset("Comb256", &a10, &d10, 10.0);
+    f25 = quadriga_lib::sos_preset("Comb256", &a25, &d25, 25.0);
+    f04 = quadriga_lib::sos_preset("Comb256", &a04, &d04, 0.4);
     REQUIRE(f25.n_rows == 256);
     REQUIRE(d25.n_elem == 200);
     CHECK(arma::abs(f10).max() > 0.01);
@@ -130,7 +130,7 @@ TEST_CASE("sos_preset - the tables reach the fit of the reference tables and hav
     {
         arma::mat spatial_freq;
         arma::vec acf, dist, tail;
-        quadriga_lib::sos_preset(p.name, spatial_freq, &acf, &dist);
+        spatial_freq = quadriga_lib::sos_preset(p.name, &acf, &dist);
         REQUIRE(spatial_freq.n_rows == p.n_coeff);
 
         double core = 0.0, all = 0.0;
@@ -183,7 +183,7 @@ TEST_CASE("sos_preset - the correlation of the generated values follows the targ
     {
         int type = name[0] == 'E' ? 0 : (name[0] == 'G' ? 1 : 2);
         arma::mat spatial_freq, pos(16, 3), val;
-        quadriga_lib::sos_preset(name, spatial_freq);
+        spatial_freq = quadriga_lib::sos_preset(name);
         REQUIRE(spatial_freq.n_rows == 256);
         pos.row(0) = arma::rowvec({123.0, -45.0, 6.0});
         for (arma::uword k = 0; k < 3; ++k)
@@ -225,9 +225,9 @@ TEST_CASE("sos_preset - the documented generation gives tables of the same quali
         const Preset &p = presets[i];
         arma::mat spatial_freq, regen;
         arma::vec acf, dist;
-        quadriga_lib::sos_preset(p.name, spatial_freq, &acf, &dist);
+        spatial_freq = quadriga_lib::sos_preset(p.name, &acf, &dist);
         REQUIRE(spatial_freq.n_rows == p.n_coeff);
-        quadriga_lib::sos_generate(acf, dist, p.n_coeff, regen, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 300, true, 0.005, 15.0 / 49.75, p.seed);
+        regen = quadriga_lib::sos_generate(acf, dist, p.n_coeff, (arma::vec *)nullptr, (arma::mat *)nullptr, 3, true, 300, true, 0.005, 15.0 / 49.75, p.seed);
         REQUIRE(regen.n_rows == p.n_coeff);
 
         double mse_ship = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, 100);
@@ -249,31 +249,29 @@ TEST_CASE("sos_preset - the documented generation gives tables of the same quali
     }
 }
 
-TEST_CASE("sos_preset - optional outputs, pre-sized outputs and float")
+TEST_CASE("sos_preset - optional outputs, pre-sized optional outputs and float")
 {
     arma::mat ref;
     arma::vec acf, dist;
-    quadriga_lib::sos_preset("Gauss128", ref, &acf, &dist, 7.0);
+    ref = quadriga_lib::sos_preset("Gauss128", &acf, &dist, 7.0);
     REQUIRE(ref.n_rows == 128);
     CHECK(arma::abs(ref).max() > 0.01);
 
     arma::mat only;
-    quadriga_lib::sos_preset("Gauss128", only, (arma::vec *)nullptr, (arma::vec *)nullptr, 7.0);
+    only = quadriga_lib::sos_preset("Gauss128", (arma::vec *)nullptr, (arma::vec *)nullptr, 7.0);
     CHECK(arma::approx_equal(only, ref, "absdiff", 0.0));
 
-    arma::mat sized(128, 3);
-    sized.fill(9.0);
-    const double *ptr = sized.memptr();
     arma::vec a2(3), d2(200);
-    quadriga_lib::sos_preset("Gauss128", sized, &a2, &d2, 7.0);
-    CHECK(sized.memptr() == ptr);
+    const double *ptr = d2.memptr();
+    const arma::mat sized = quadriga_lib::sos_preset("Gauss128", &a2, &d2, 7.0);
+    CHECK(d2.memptr() == ptr);
     CHECK(arma::approx_equal(sized, ref, "absdiff", 0.0));
     CHECK(arma::approx_equal(a2, acf, "absdiff", 0.0));
     CHECK(arma::approx_equal(d2, dist, "absdiff", 0.0));
 
     arma::fmat ff;
     arma::fvec af, df;
-    quadriga_lib::sos_preset("Gauss128", ff, &af, &df, 7.0f);
+    ff = quadriga_lib::sos_preset("Gauss128", &af, &df, 7.0f);
     REQUIRE(ff.n_rows == 128);
     REQUIRE(af.n_elem == 200);
     CHECK(arma::abs(arma::conv_to<arma::mat>::from(ff) - ref).max() < 1e-7);
@@ -287,21 +285,21 @@ TEST_CASE("sos_preset - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_preset("Comb256", spatial_freq));
-        CHECK_NOTHROW(quadriga_lib::sos_preset("Exp1024", spatial_freq, (arma::vec *)nullptr, (arma::vec *)nullptr, 0.1));
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_preset("Comb256"));
+        CHECK_NOTHROW(spatial_freq = quadriga_lib::sos_preset("Exp1024", (arma::vec *)nullptr, (arma::vec *)nullptr, 0.1));
     }
     SECTION("name")
     {
         for (const char *bad : {"", "Comb", "Comb300", "comb256", "Comb256 ", "Gaus256", "Exp12", "256"})
         {
             INFO("name '" << bad << "'");
-            CHECK_THROWS_AS(quadriga_lib::sos_preset(bad, spatial_freq), std::invalid_argument);
+            CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_preset(bad), std::invalid_argument);
         }
     }
     SECTION("dist_decorr")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_preset("Comb256", spatial_freq, (arma::vec *)nullptr, (arma::vec *)nullptr, 0.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_preset("Comb256", spatial_freq, (arma::vec *)nullptr, (arma::vec *)nullptr, -10.0), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_preset("Comb256", (arma::vec *)nullptr, (arma::vec *)nullptr, 0.0), std::invalid_argument);
+        CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_preset("Comb256", (arma::vec *)nullptr, (arma::vec *)nullptr, -10.0), std::invalid_argument);
     }
 }
 
@@ -337,7 +335,7 @@ TEST_CASE("sos_preset - the stored tables have the recorded checksums")
     for (const Checksum &c : checksums)
     {
         arma::mat spatial_freq;
-        quadriga_lib::sos_preset(c.name, spatial_freq);
+        spatial_freq = quadriga_lib::sos_preset(c.name);
         const arma::uword n_coeff = spatial_freq.n_rows;
         double sum = 0.0, sum_sq = 0.0, sum_abs = 0.0;
         for (arma::uword n = 0; n < n_coeff; ++n)
@@ -361,13 +359,13 @@ TEST_CASE("sos_preset - outputs that share memory with each other throw")
     // object) would overwrite it. Such calls throw before anything is written.
     arma::mat spatial_freq;
     arma::vec acf, dist;
-    quadriga_lib::sos_preset<double>("Exp128", spatial_freq, &acf, &dist);
+    spatial_freq = quadriga_lib::sos_preset<double>("Exp128", &acf, &dist);
 
     auto message = [](arma::mat &f, arma::vec *a, arma::vec *d) -> std::string
     {
         try
         {
-            quadriga_lib::sos_preset<double>("Exp128", f, a, d);
+            f = quadriga_lib::sos_preset<double>("Exp128", a, d);
         }
         catch (const std::invalid_argument &e)
         {
@@ -382,12 +380,6 @@ TEST_CASE("sos_preset - outputs that share memory with each other throw")
     CHECK(arma::all(same == 7.0));
     CHECK(f1.n_elem == 0); // nothing written
 
-    // 'acf' on part of the memory of 'spatial_freq'
-    arma::mat f2(128, 3, arma::fill::value(5.0));
-    arma::vec a2(f2.memptr() + 100, 200, false, true), d2;
-    CHECK(message(f2, &a2, &d2) == "Outputs 'spatial_freq' and 'acf' cannot be the same object or share memory.");
-    CHECK(arma::all(arma::vectorise(f2) == 5.0));
-
     // 'dist' overlaps the end of 'acf'
     arma::vec block(300, arma::fill::value(3.0));
     arma::vec a3(block.memptr(), 200, false, true), d3(block.memptr() + 150, 150, false, true);
@@ -399,7 +391,7 @@ TEST_CASE("sos_preset - outputs that share memory with each other throw")
     arma::vec block4(400);
     arma::vec a4(block4.memptr(), 200, false, true), d4(block4.memptr() + 200, 200, false, true);
     arma::mat f4;
-    quadriga_lib::sos_preset<double>("Exp128", f4, &a4, &d4);
+    f4 = quadriga_lib::sos_preset<double>("Exp128", &a4, &d4);
     CHECK(arma::approx_equal(a4, acf, "absdiff", 0.0));
     CHECK(arma::approx_equal(d4, dist, "absdiff", 0.0));
 }

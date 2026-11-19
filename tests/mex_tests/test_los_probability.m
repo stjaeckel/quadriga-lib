@@ -65,7 +65,7 @@ assertElementsAlmostEqual( s4(3:4, :), ref, 'absolute', 1e-8 );
 assertEqual( s5, s4 );
 assertEqual( quadriga_lib.los_probability( '38.901_UMi', d, 10, 1.5, [], [], [], rnd_g, fc ), p );
 [ p6, s6 ] = quadriga_lib.los_probability( '38.901_UMi', zeros(0, 1), 10, 1.5, [], [], [], zeros(0, 1), fc );
-assertEqual( size(p6), [0, 1] );
+assertTrue( isempty(p6) );
 assertEqual( size(s6), [0, 2] );                                               % no link: [0, n_freq]
 
 %% Outputs: none
@@ -78,7 +78,7 @@ assertEqual( size(p_t), [4, 1] );
 assertElementsAlmostEqual( p_t, p, 'absolute', 1e-14 );                       % values exact in single
 p_t2 = quadriga_lib.los_probability( '38.901_InF_SL', d, 8, 1.5, int32(20), single(0.2) );
 assertElementsAlmostEqual( p_t2, p_d, 'absolute', 1e-7 );                     % r = 0.2 rounded to single
-assertEqual( quadriga_lib.los_probability( '38.901_UMi', zeros(0, 1), 10, 1.5 ), zeros(0, 1) );   % no link
+assertTrue( isempty( quadriga_lib.los_probability( '38.901_UMi', zeros(0, 1), 10, 1.5 ) ) );   % no link
 
 %% Errors
 assert_throws( @() quadriga_lib.los_probability( '38.901_UMi', d, 10 ), 'Wrong number of input arguments.' );

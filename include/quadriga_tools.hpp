@@ -39,11 +39,11 @@ namespace quadriga_lib
               arma::uword n_bins = 201);               // Number of auto-generated bins
 
     // Calculate the RMS delay spread in [s]
+    // - Returns the RMS delay spread in [s], [n_cir]
     template <typename dtype>
-    void calc_delay_spread(
+    arma::Col<dtype> calc_delay_spread(
         const std::vector<arma::Col<dtype>> &delays, // Delays in [s], Vector (n_cir) of vectors of length [n_path]
         const std::vector<arma::Col<dtype>> &powers, // Path powers, linear scale, Vector (n_cir) of vectors of length [n_path]
-        arma::Col<dtype> &ds,                        // Output: RMS delay spread in [s], Length [n_cir]
         dtype threshold_dB = 100.0,                  // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold_dB are excluded
         dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
         arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
@@ -167,7 +167,7 @@ namespace quadriga_lib
         const std::vector<bool> &active_path = std::vector<bool>()); // List of active paths, vector of length [n_path_1 * n_path_2]
 
     // Make a (default) cube
-    template <typename dtype>
+    template <typename dtype = double>
     arma::Mat<dtype> cube(
         const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales all axes; length [3] scales {x,y,z} independently
         const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
@@ -175,7 +175,7 @@ namespace quadriga_lib
         const arma::uword n_div = 1);                // Number of divisions
 
     // Make a (default) plane
-    template <typename dtype>
+    template <typename dtype = double>
     arma::Mat<dtype> plane(
         const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales x and y; length [2] or [3] scales {x,y} independently, z is ignored
         const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
@@ -229,7 +229,7 @@ namespace quadriga_lib
         bool map_to_itu_materials = false);                // Optional mapping to ITU default materials used by Sionna
 
     // Read Wavefront .obj file — see obj_file_read documentation block for details
-    template <typename dtype>
+    template <typename dtype = double>
     arma::uword obj_file_read(
         const std::string &fn,                                                   // File name, must end with .obj
         arma::Mat<dtype> *mesh = nullptr,                                        // Triangle vertices, Size: [n_mesh, 9]
@@ -268,11 +268,11 @@ namespace quadriga_lib
         bool split_loose_parts = false);                                                                                             // If `true`, split each object into connected components
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
+    // - Returns the IDs of the overlapping objects (as in obj_ind), unique, ascending, Length [ n_overlap ]
     template <typename dtype> // Supported types: float or double
-    void obj_overlap_test(
+    arma::uvec obj_overlap_test(
         const arma::Mat<dtype> &mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
         const arma::uvec &obj_ind,                  // Object ID per triangle (any values, e.g. 0-based from obj_file_read), Size: [ n_mesh ]
-        arma::uvec &overlap_ind,                    // Output: IDs of the overlapping objects (as in obj_ind), unique, ascending, Length [ n_overlap ]
         std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
         dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
 
@@ -292,11 +292,11 @@ namespace quadriga_lib
 
     // Calculate the axis-aligned bounding box (AABB) of a point cloud
     // - The point cloud can be composed of sub-clouds, where each new sub-cloud is indicated by an index (= starting row number in points list)
-    // - The number of rows of aabb is n_sub padded to a multiple of vec_size; padding rows are zeros
+    // - Returns the bounding boxes {x_min, x_max, y_min, y_max, z_min, z_max}, Size: [ n_sub padded to vec_size, 6 ];
+    //   padding rows are zeros
     template <typename dtype>
-    void point_cloud_aabb(
+    arma::Mat<dtype> point_cloud_aabb(
         const arma::Mat<dtype> &points,                       // Points in 3D Space, Size: [ n_points, 3 ]
-        arma::Mat<dtype> &aabb,                               // Output: Bounding boxes {x_min, x_max, y_min, y_max, z_min, z_max}, Size: [ n_sub padded to vec_size, 6 ]
         const arma::u32_vec &sub_cloud_ind = arma::u32_vec(), // Sub-cloud index, Length: [ n_sub ]
         arma::uword vec_size = 1);                            // Vector size for SIMD processing (e.g. 8 for AVX2)
 
@@ -333,12 +333,11 @@ namespace quadriga_lib
         arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = pointsA, 2 = pointsB, 0 = Error, Length: [ n_points ]
 
     // Tests whether points are inside a triangle mesh using raycasting
-    // - 0 = outside, 1 = inside any object (no obj_ind), or 1-based object index (with obj_ind)
+    // - Returns 0 = outside, 1 = inside any object (no obj_ind), or 1-based object index (with obj_ind), size: [n_points]
     template <typename dtype>
-    void point_inside_mesh(
+    arma::uvec point_inside_mesh(
         const arma::Mat<dtype> &points,           // Points in 3D space, size: [n_points, 3]
         const arma::Mat<dtype> &mesh,             // Triangular mesh faces, size: [n_mesh, 9]
-        arma::uvec &result,                       // Output: 0 = outside, 1 = inside (or 1-based object index with obj_ind), size: [n_points]
         const arma::uvec &obj_ind = arma::uvec(), // Optional object indices, 0-based, size: [n_mesh]
         dtype distance = 0.0);                    // Optional minimum distance from objects in [m]
 
@@ -501,11 +500,11 @@ namespace quadriga_lib
 
     // Calculate the axis-aligned bounding box (AABB) of a 3D mesh
     // - The mesh can be composed of sub-meshes, where each new sub_mesh is indicated by an index (=row number)
-    // - The number of rows of aabb is n_sub padded to a multiple of vec_size; padding rows are zeros
+    // - Returns the bounding boxes {x_min, x_max, y_min, y_max, z_min, z_max}, Size: [ n_sub padded to vec_size, 6 ];
+    //   padding rows are zeros
     template <typename dtype>
-    void triangle_mesh_aabb(
+    arma::Mat<dtype> triangle_mesh_aabb(
         const arma::Mat<dtype> &mesh,                        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-        arma::Mat<dtype> &aabb,                              // Output: Bounding boxes {x_min, x_max, y_min, y_max, z_min, z_max}, Size: [ n_sub padded to vec_size, 6 ]
         const arma::u32_vec &sub_mesh_ind = arma::u32_vec(), // Sub-mesh index, Length: [ n_sub ]
         arma::uword vec_size = 1);                           // Vector size for SIMD processing (e.g. 8 for AVX2)
 

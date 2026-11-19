@@ -227,8 +227,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     dtype *p_weight = weight.memptr();
 
     // Pre-compute the AABB of the mesh
-    arma::Mat<dtype> aabb;
-    quadriga_lib::triangle_mesh_aabb<dtype>(mesh, aabb, sub_mesh_ind);
+    const arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb<dtype>(mesh, sub_mesh_ind);
 
     // Lambda for vector normalization
     auto NORMALIZE = [](double &x, double &y, double &z) -> double

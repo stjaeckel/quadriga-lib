@@ -54,11 +54,10 @@ Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 ## Declaration:
 ```
-void quadriga_lib::sos_generate(
+arma::Mat<dtype> quadriga_lib::sos_generate(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
     arma::uword n_coeff,
-    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *ase = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dim = 3,
@@ -85,11 +84,13 @@ void quadriga_lib::sos_generate(
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ## Outputs:
-- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, n_dim]`
 - **`ase`** *(optional)* — Mean squared error over the test directions after each pass, linear scale;
   `[n_pass]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
   for `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
+
+## Returns:
+- Spatial frequencies `spatial_freq` in [1/m]; `[n_coeff, n_dim]`
 
 ## See also:
 - [[sos_calc_mse]] (error of a frequency table)
@@ -97,26 +98,22 @@ void quadriga_lib::sos_generate(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
-                                const arma::Col<dtype> &dist,
-                                arma::uword n_coeff,
-                                arma::Mat<dtype> &spatial_freq,
-                                arma::Col<dtype> *ase,
-                                arma::Mat<dtype> *test_dir,
-                                arma::uword n_dim,
-                                bool uniform_smp,
-                                arma::uword n_dir,
-                                bool random_init,
-                                dtype spatial_freq_min,
-                                dtype spatial_freq_max,
-                                arma::sword seed)
+arma::Mat<dtype> quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
+                                            const arma::Col<dtype> &dist,
+                                            arma::uword n_coeff,
+                                            arma::Col<dtype> *ase,
+                                            arma::Mat<dtype> *test_dir,
+                                            arma::uword n_dim,
+                                            bool uniform_smp,
+                                            arma::uword n_dir,
+                                            bool random_init,
+                                            dtype spatial_freq_min,
+                                            dtype spatial_freq_max,
+                                            arma::sword seed)
 {
     qd_sos_check_acf(acf, dist);
-    qd_check_alias(&spatial_freq, "spatial_freq", &acf, &dist);
     qd_check_alias(ase, "ase", &acf, &dist);
     qd_check_alias(test_dir, "test_dir", &acf, &dist);
-    qd_check_alias_outputs(&spatial_freq, "spatial_freq", ase, "ase");
-    qd_check_alias_outputs(&spatial_freq, "spatial_freq", test_dir, "test_dir");
     qd_check_alias_outputs(ase, "ase", test_dir, "test_dir");
     if (n_coeff == 0)
         throw std::invalid_argument("Input 'n_coeff' cannot be 0.");
@@ -339,8 +336,7 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
         converged = cost_start - cost < 1.0e-6 * cost_start;
     }
 
-    if (spatial_freq.n_rows != n_coeff || spatial_freq.n_cols != n_dim)
-        spatial_freq.set_size(n_coeff, n_dim);
+    arma::Mat<dtype> spatial_freq(n_coeff, n_dim, arma::fill::none);
     for (arma::uword n = 0; n < n_coeff; ++n)
     {
         spatial_freq.at(n, 0) = (dtype)(fn[n] * ux[n] / d_max);
@@ -370,11 +366,12 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
                 test_dir->at(t, 1) = (dtype)el[t];
         }
     }
+    return spatial_freq;
 }
 
-template void quadriga_lib::sos_generate(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::uword n_coeff, arma::Mat<float> &spatial_freq, arma::Col<float> *ase,
-                                         arma::Mat<float> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
-                                         float spatial_freq_min, float spatial_freq_max, arma::sword seed);
-template void quadriga_lib::sos_generate(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::uword n_coeff, arma::Mat<double> &spatial_freq, arma::Col<double> *ase,
-                                         arma::Mat<double> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
-                                         double spatial_freq_min, double spatial_freq_max, arma::sword seed);
+template arma::Mat<float> quadriga_lib::sos_generate(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::uword n_coeff, arma::Col<float> *ase,
+                                                     arma::Mat<float> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
+                                                     float spatial_freq_min, float spatial_freq_max, arma::sword seed);
+template arma::Mat<double> quadriga_lib::sos_generate(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::uword n_coeff, arma::Col<double> *ase,
+                                                      arma::Mat<double> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
+                                                      double spatial_freq_min, double spatial_freq_max, arma::sword seed);

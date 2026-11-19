@@ -112,9 +112,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec d2d_in = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "d2d_in");
     const arma::vec rnd_he = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "rnd_he");
 
-    // Output allocation
+    // Output allocation of the optional output
     arma::mat pl_dB, sf_sigma_dB;
-    plhs[0] = qd_mex_init_output(&pl_dB, qd_gbsm_n_link(rx_pos), center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&sf_sigma_dB, qd_gbsm_n_link(rx_pos), center_freq.n_elem);
 
@@ -122,5 +121,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_sf_sigma = (nlhs > 1) ? &sf_sigma_dB : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, pl_dB, p_sf_sigma, d2d_in, rnd_he));
+    CALL_QD(pl_dB = quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, p_sf_sigma, d2d_in, rnd_he));
+    plhs[0] = qd_mex_copy2matlab(&pl_dB);
 }

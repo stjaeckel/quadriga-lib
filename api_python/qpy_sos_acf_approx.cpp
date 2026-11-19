@@ -52,15 +52,13 @@ py::tuple sos_acf_approx(const py::array_t<double> &spatial_freq,
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
-    // Output allocation (invalid sizes are left to the library to reject)
-    const arma::uword n_dim = freq_a.n_cols, n_grid = (dist_a.n_elem < 2) ? 0 : 4 * dist_a.n_elem - 3;
-    arma::cube acf_approx;
+    // Output allocation of the optional output (invalid sizes are left to the library to reject)
+    const arma::uword n_grid = (dist_a.n_elem < 2) ? 0 : 4 * dist_a.n_elem - 3;
     arma::vec dist_2d;
-    auto acf_approx_py = qd_python_init_output(n_grid, (n_dim == 1) ? 1 : n_grid, (n_dim == 3) ? 3 : 1, &acf_approx);
     auto dist_2d_py = qd_python_init_output(n_grid, &dist_2d);
 
     // Call library function
-    quadriga_lib::sos_acf_approx<double>(freq_a, dist_a, acf_approx, &dist_2d);
+    const arma::cube acf_approx = quadriga_lib::sos_acf_approx<double>(freq_a, dist_a, &dist_2d);
 
-    return py::make_tuple(acf_approx_py, dist_2d_py);
+    return py::make_tuple(qd_python_copy2numpy(&acf_approx), dist_2d_py);
 }

@@ -359,9 +359,8 @@ Calculate the directivity in dBi of array antenna elements
 
 ## Declaration:
 ```
-void quadriga_lib::arrayant_calc_directivity(
+arma::Col<dtype> quadriga_lib::arrayant_calc_directivity(
     const arrayant<dtype> &ant,
-    arma::Col<dtype> &directivity_dBi,
     const arma::uvec &i_element = arma::uvec());
 ```
 
@@ -369,14 +368,13 @@ void quadriga_lib::arrayant_calc_directivity(
 - **`ant`** — Valid arrayant
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
-## Outputs:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out]`
+## Returns:
+- Directivity in dBi; `[n_out]`
 
 ## Example:
 ```
 auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-arma::vec directivity_dBi;
-quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi); // about 1.76 dBi
+arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant); // about 1.76 dBi
 ```
 
 ## See also:
@@ -386,26 +384,21 @@ quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi); // about 1.76 dBi
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::arrayant_calc_directivity(const arrayant<dtype> &ant, arma::Col<dtype> &directivity_dBi,
-                                             const arma::uvec &i_element)
+arma::Col<dtype> quadriga_lib::arrayant_calc_directivity(const arrayant<dtype> &ant, const arma::uvec &i_element)
 {
     const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
         throw std::invalid_argument(error_message);
 
-    const arma::Col<dtype> *outs[] = {&directivity_dBi};
-    const char *names[] = {"directivity_dBi"};
-    qd_check_alias_list(outs, names, &i_element);
-    qd_check_alias_arrayant(outs, names, ant);
-
     const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, ant.e_theta_re.n_slices);
-    directivity_dBi.set_size(i_out.n_elem);
+    arma::Col<dtype> directivity_dBi(i_out.n_elem, arma::fill::none);
     for (arma::uword i = 0; i < i_out.n_elem; ++i)
         directivity_dBi[i] = qd_arrayant_calc_directivity_element(ant, i_out[i]);
+    return directivity_dBi;
 }
 
-template void quadriga_lib::arrayant_calc_directivity(const arrayant<float> &, arma::Col<float> &, const arma::uvec &);
-template void quadriga_lib::arrayant_calc_directivity(const arrayant<double> &, arma::Col<double> &, const arma::uvec &);
+template arma::Col<float> quadriga_lib::arrayant_calc_directivity(const arrayant<float> &, const arma::uvec &);
+template arma::Col<double> quadriga_lib::arrayant_calc_directivity(const arrayant<double> &, const arma::uvec &);
 
 /*!MD
 # arrayant_combine_pattern

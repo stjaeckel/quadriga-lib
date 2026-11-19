@@ -88,7 +88,7 @@ namespace
     {
         const arma::uword n_gen = n_gen_of(N, M);
         arma::mat P0;
-        quadriga_lib::sos_init_phases<double>(256, n_gen, P0, seed);
+        P0 = quadriga_lib::sos_init_phases<double>(256, n_gen, seed);
         arma::cube phase(256, n_gen, 2);
         phase.slice(0) = P0;
         for (arma::uword g = 0; g < n_gen; ++g)
@@ -147,7 +147,7 @@ TEST_CASE("gbsm_init_phases - ray: n_gen is 14·N·M + N, empty for N = 0")
         for (arma::sword set : {-1, 3})
         {
             arma::cube phase;
-            quadriga_lib::gbsm_init_phases(scen(NM[i][0], NM[i][1], 10.0), "ray", phase, 5, set);
+            phase = quadriga_lib::gbsm_init_phases(scen(NM[i][0], NM[i][1], 10.0), "ray", 5, set);
             INFO("N " << NM[i][0] << ", M " << NM[i][1] << ", set " << set);
             CHECK(n_gen_of((arma::uword)NM[i][0], (arma::uword)NM[i][1]) == n_gen[i]);
             CHECK(phase.n_rows == 256);
@@ -155,19 +155,10 @@ TEST_CASE("gbsm_init_phases - ray: n_gen is 14·N·M + N, empty for N = 0")
             CHECK(phase.n_slices == 2);
         }
     arma::cube p512;
-    quadriga_lib::gbsm_init_phases(scen(3.0, 7.0, 10.0), "ray", p512, 5, -1, "Exp512");
+    p512 = quadriga_lib::gbsm_init_phases(scen(3.0, 7.0, 10.0), "ray", 5, -1, "Exp512");
     CHECK(p512.n_rows == 512);
     CHECK(p512.n_cols == 297);
 
-    // A pre-sized output with stale content is written in place and completely
-    const auto sp = scen(3.0, 7.0, 10.0);
-    arma::cube ref, pre(256, 297, 2);
-    pre.fill(99.0);
-    const double *mem = pre.memptr();
-    quadriga_lib::gbsm_init_phases(sp, "ray", ref, 3);
-    quadriga_lib::gbsm_init_phases(sp, "ray", pre, 3);
-    CHECK(pre.memptr() == mem);
-    CHECK(qd_equal(pre, ref));
 }
 
 TEST_CASE("gbsm_init_phases - ray: slice 0 equals sos_init_phases with the derived seed")
@@ -184,9 +175,9 @@ TEST_CASE("gbsm_init_phases - ray: slice 0 equals sos_init_phases with the deriv
         for (arma::sword set : {-1, 0, 3})
         {
             arma::cube phase;
-            quadriga_lib::gbsm_init_phases(sp, "ray", phase, seed, set);
+            phase = quadriga_lib::gbsm_init_phases(sp, "ray", seed, set);
             arma::mat P0;
-            quadriga_lib::sos_init_phases<double>(256, n_gen_of(3, 4), P0, seed_set(seed, set));
+            P0 = quadriga_lib::sos_init_phases<double>(256, n_gen_of(3, 4), seed_set(seed, set));
             INFO("seed " << seed << ", set " << set);
             CHECK(qd_equal(arma::mat(phase.slice(0)), P0));
         }
@@ -198,7 +189,7 @@ TEST_CASE("gbsm_init_phases - ray: slice 1 is the mirror of slice 0")
     for (arma::sword set : {-1, 2})
     {
         arma::cube phase;
-        quadriga_lib::gbsm_init_phases(scen(3.0, 2.0, 10.0), "ray", phase, 17, set);
+        phase = quadriga_lib::gbsm_init_phases(scen(3.0, 2.0, 10.0), "ray", 17, set);
         REQUIRE(phase.n_cols == n_gen_of(N, M));
         for (arma::uword g = 0; g < phase.n_cols; ++g)
         {
@@ -213,11 +204,11 @@ TEST_CASE("gbsm_init_phases - ray sets are distinct from each other and from the
 {
     const auto sp = scen(2.0, 3.0, 10.0);
     arma::cube r_shared, r0, r1, c_shared, c0;
-    quadriga_lib::gbsm_init_phases(sp, "ray", r_shared, 42);
-    quadriga_lib::gbsm_init_phases(sp, "ray", r0, 42, 0);
-    quadriga_lib::gbsm_init_phases(sp, "ray", r1, 42, 1);
-    quadriga_lib::gbsm_init_phases(sp, "cluster", c_shared, 42);
-    quadriga_lib::gbsm_init_phases(sp, "cluster", c0, 42, 0);
+    r_shared = quadriga_lib::gbsm_init_phases(sp, "ray", 42);
+    r0 = quadriga_lib::gbsm_init_phases(sp, "ray", 42, 0);
+    r1 = quadriga_lib::gbsm_init_phases(sp, "ray", 42, 1);
+    c_shared = quadriga_lib::gbsm_init_phases(sp, "cluster", 42);
+    c0 = quadriga_lib::gbsm_init_phases(sp, "cluster", 42, 0);
 
     auto any_equal_col = [](const arma::cube &a, const arma::cube &b)
     {
@@ -243,24 +234,24 @@ TEST_CASE("gbsm_init_phases - ray: input validation")
     const auto sp = scen(2.0, 3.0, 10.0);
     const arma::mat pos = arma::vec{1.0, 2.0, 1.5};
     arma::cube phase;
-    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, 4, "Exp512"));
-    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases({}, "ray", phase, 1)); // empty scenpar: all defaults
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -2), std::invalid_argument,
+    CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases(sp, "ray", 1, 4, "Exp512"));
+    CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases({}, "ray", 1)); // empty scenpar: all defaults
+    CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "ray", 1, -2), std::invalid_argument,
                          Message("Input 'set_id' must be >= -1."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb999"), std::invalid_argument,
+    CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "ray", 1, -1, "Comb999"), std::invalid_argument,
                          Message("Input 'preset' is not a known preset."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", pos), std::invalid_argument,
+    CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "ray", 1, -1, "Comb256", pos), std::invalid_argument,
                          Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", {}, pos), std::invalid_argument,
+    CHECK_THROWS_MATCHES(phase = quadriga_lib::gbsm_init_phases(sp, "ray", 1, -1, "Comb256", {}, pos), std::invalid_argument,
                          Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
     const arma::mat empty_pos; // empty = omitted
-    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", empty_pos, empty_pos));
+    CHECK_NOTHROW(phase = quadriga_lib::gbsm_init_phases(sp, "ray", 1, -1, "Comb256", empty_pos, empty_pos));
     auto bad = sp;
     bad["NumSubPaths"] = 0.0;
-    CHECK_THROWS_AS(quadriga_lib::gbsm_init_phases(bad, "ray", phase, 1), std::invalid_argument);
+    CHECK_THROWS_AS(phase = quadriga_lib::gbsm_init_phases(bad, "ray", 1), std::invalid_argument);
 
     arma::cube keep(2, 2, 2, arma::fill::ones);
-    CHECK_THROWS_AS(quadriga_lib::gbsm_init_phases(sp, "ray", keep, -2), std::invalid_argument);
+    CHECK_THROWS_AS(keep = quadriga_lib::gbsm_init_phases(sp, "ray", -2), std::invalid_argument);
     CHECK(keep.n_rows == 2);
     CHECK(arma::all(arma::vectorise(keep) == 1.0));
 }
@@ -327,7 +318,7 @@ TEST_CASE("gbsm_draw - ray: block 14 of the shared set uses lambda_tau")
     for (int i = 0; i < 3; ++i)
     {
         std::unordered_map<std::string, double> sp;
-        quadriga_lib::conf_file_read(std::string("data/config/3GPP_38.901_v19_") + files[i] + ".conf", sp);
+        sp = quadriga_lib::conf_file_read(std::string("data/config/3GPP_38.901_v19_") + files[i] + ".conf");
         sp["NumClusters"] = 3.0, sp["NumClusters_min"] = 1.0, sp["NumSubPaths"] = 2.0;
         if (i == 2)
             sp["PerClusterDS_fc_min"] = 0.0;
@@ -378,7 +369,7 @@ TEST_CASE("gbsm_draw - ray: swapping Tx and Rx exchanges the mirror blocks")
         for (int f = 0; f < 2; ++f)
         {
             arma::cube phase;
-            quadriga_lib::gbsm_init_phases(sp, "ray", phase, 61, set);
+            phase = quadriga_lib::gbsm_init_phases(sp, "ray", 61, set);
             arma::mat ab, ba;
             quadriga_lib::gbsm_draw(sp, "ray", phase, B, A, ab, set, "Comb256", f ? fl : arma::u32_vec(), fc, true);
             quadriga_lib::gbsm_draw(sp, "ray", phase, A, B, ba, set, "Comb256", f ? fl : arma::u32_vec(), fc, true);
@@ -406,7 +397,7 @@ TEST_CASE("gbsm_draw - ray: marginal distributions")
     for (arma::sword set : {-1, 0})
     {
         arma::cube phase;
-        quadriga_lib::gbsm_init_phases(sp, "ray", phase, 68, set);
+        phase = quadriga_lib::gbsm_init_phases(sp, "ray", 68, set);
         arma::mat rnd;
         quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", {}, fc);
         REQUIRE(rnd.n_cols == n_gen_of(N, M));
@@ -483,7 +474,7 @@ TEST_CASE("gbsm_draw - ray: n_link = 0 and N = 0")
     // N = 0: empty sets; the shared set still requires center_freq
     const auto sp0 = scen(0.0, 3.0, 12.0);
     arma::cube ph0, empty;
-    quadriga_lib::gbsm_init_phases(sp0, "ray", ph0, 3);
+    ph0 = quadriga_lib::gbsm_init_phases(sp0, "ray", 3);
     for (const arma::cube *p : {&ph0, &empty})
     {
         rnd.ones(4, 4);

@@ -23,11 +23,10 @@ Target ACF at given distances
 
 ## Declaration:
 ```
-void quadriga_lib::sos_acfi(
+arma::Col<dtype> quadriga_lib::sos_acfi(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    const arma::Col<dtype> &d,
-    arma::Col<dtype> &val);
+    const arma::Col<dtype> &d);
 ```
 
 ## Inputs:
@@ -35,33 +34,30 @@ void quadriga_lib::sos_acfi(
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, increase strictly and be finite; `[n_acf]`
 - **`d`** — Distances in [m]; must be >= 0; `[n_d]`
 
-## Output:
-- **`val`** — ACF at the distances `d`; `[n_d]`
+## Returns:
+- ACF `val` at the distances `d`; `[n_d]`
 
 ## See also:
 - [[sos_preset]] (ACF tables of the predefined models)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
-                            const arma::Col<dtype> &dist,
-                            const arma::Col<dtype> &d,
-                            arma::Col<dtype> &val)
+arma::Col<dtype> quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
+                                        const arma::Col<dtype> &dist,
+                                        const arma::Col<dtype> &d)
 {
     qd_sos_check_acf(acf, dist);
-    qd_check_alias(&val, "val", &acf, &dist, &d);
     for (arma::uword i = 0; i < d.n_elem; ++i)
         if (!(d.at(i) >= (dtype)0.0))
             throw std::invalid_argument("Input 'd' must be >= 0.");
 
     const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
 
-    if (val.n_elem != d.n_elem)
-        val.set_size(d.n_elem);
-
+    arma::Col<dtype> val(d.n_elem, arma::fill::none);
     for (arma::uword i = 0; i < d.n_elem; ++i)
         val.at(i) = (dtype)qd_interp_linear(acf_d.memptr(), dist_d.memptr(), acf_d.n_elem, (double)d.at(i));
+    return val;
 }
 
-template void quadriga_lib::sos_acfi(const arma::Col<float> &acf, const arma::Col<float> &dist, const arma::Col<float> &d, arma::Col<float> &val);
-template void quadriga_lib::sos_acfi(const arma::Col<double> &acf, const arma::Col<double> &dist, const arma::Col<double> &d, arma::Col<double> &val);
+template arma::Col<float> quadriga_lib::sos_acfi(const arma::Col<float> &acf, const arma::Col<float> &dist, const arma::Col<float> &d);
+template arma::Col<double> quadriga_lib::sos_acfi(const arma::Col<double> &acf, const arma::Col<double> &dist, const arma::Col<double> &d);

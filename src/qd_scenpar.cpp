@@ -823,12 +823,12 @@ Read and validate a QuaDRiGa scenario configuration file
 
 ## Declaration:
 ```
-bool quadriga_lib::conf_file_read(
+std::unordered_map<std::string, double> quadriga_lib::conf_file_read(
     const std::string &fn,
-    std::unordered_map<std::string, double> &scenpar,
     std::string *pl_model = nullptr,
     std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
     arma::mat *lsp_xcorr = nullptr,
+    bool *lsp_xcorr_pd = nullptr,
     std::vector<std::string> *key_order = nullptr,
     std::vector<std::string> *pl_order = nullptr,
     std::vector<std::string> *short_names = nullptr,
@@ -842,18 +842,19 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ## Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key` entries
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
 - **`plpar`** *(optional)* — Path-loss parameters: the `PL_` keys other than `PL_model`, without the prefix, with
   one or more values each; `n_pl` entries
 - **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix, see [[scenpar_validate]]; `[8, 8]`
+- **`lsp_xcorr_pd`** *(optional)* — `true` if `lsp_xcorr` is positive definite; `false` is no error here, but
+  [[lsp_generate]] throws for the scenario
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`, see [[scenpar_validate]]; `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
 - **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
 - **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ## Returns:
-- `true` if `lsp_xcorr` is positive definite; `false` is no error here, but [[lsp_generate]] throws for the scenario
+- Numeric scenario parameters; `n_key` entries
 
 ## See also:
 - [[scenpar_validate]] (value checks and defaults)
@@ -861,16 +862,16 @@ bool quadriga_lib::conf_file_read(
 - [[conf_file_write]] (write a conf file)
 MD!*/
 
-bool quadriga_lib::conf_file_read(const std::string &fn,
-                                  std::unordered_map<std::string, double> &scenpar,
-                                  std::string *pl_model,
-                                  std::unordered_map<std::string, std::vector<double>> *plpar,
-                                  arma::mat *lsp_xcorr,
-                                  std::vector<std::string> *key_order,
-                                  std::vector<std::string> *pl_order,
-                                  std::vector<std::string> *short_names,
-                                  std::vector<std::string> *ignored_keys,
-                                  bool validate)
+std::unordered_map<std::string, double> quadriga_lib::conf_file_read(const std::string &fn,
+                                                                     std::string *pl_model,
+                                                                     std::unordered_map<std::string, std::vector<double>> *plpar,
+                                                                     arma::mat *lsp_xcorr,
+                                                                     bool *lsp_xcorr_pd,
+                                                                     std::vector<std::string> *key_order,
+                                                                     std::vector<std::string> *pl_order,
+                                                                     std::vector<std::string> *short_names,
+                                                                     std::vector<std::string> *ignored_keys,
+                                                                     bool validate)
 {
     qd_check_alias(pl_model, "pl_model", &fn);
     qd_check_alias_outputs(key_order, "key_order", pl_order, "pl_order");
@@ -979,7 +980,7 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
     const bool positive_definite = qd_scenpar_xcorr(val.data(), X);
 
     // All checks passed, write the outputs
-    scenpar.clear();
+    std::unordered_map<std::string, double> scenpar;
     for (arma::uword i = 0; i < qd_scenpar_n_key; ++i)
         scenpar[qd_scenpar_keys[i].name] = val[i];
 
@@ -995,8 +996,10 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
         *ignored_keys = l_ignored_keys;
 
     qd_scenpar_write(X, lsp_xcorr, key_order);
+    if (lsp_xcorr_pd != nullptr)
+        *lsp_xcorr_pd = positive_definite;
 
-    return positive_definite;
+    return scenpar;
 }
 
 /*!MD
@@ -1097,9 +1100,8 @@ List the scenarios defined by the conf files in a set of directories
 
 ## Declaration:
 ```
-arma::uword quadriga_lib::conf_file_list(
+std::vector<std::string> quadriga_lib::conf_file_list(
     const std::vector<std::string> &dirs,
-    std::vector<std::string> &scenarios,
     std::vector<std::string> *file_names = nullptr,
     std::vector<std::string> *file_dirs = nullptr,
     bool parse_shortnames = true);
@@ -1111,28 +1113,23 @@ arma::uword quadriga_lib::conf_file_list(
   files only, which is faster
 
 ## Outputs:
-- **`scenarios`** — Scenario names and short names; previous content is discarded; `[n_scen]`
 - **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
 - **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
 
 ## Returns:
-- Number of entries, `n_scen`
+- Scenario names and short names; `[n_scen]`
 
 ## See also:
 - [[conf_file_read]] (read one of the files)
 MD!*/
 
-arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
-                                         std::vector<std::string> &scenarios,
-                                         std::vector<std::string> *file_names,
-                                         std::vector<std::string> *file_dirs,
-                                         bool parse_shortnames)
+std::vector<std::string> quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
+                                                      std::vector<std::string> *file_names,
+                                                      std::vector<std::string> *file_dirs,
+                                                      bool parse_shortnames)
 {
-    qd_check_alias(&scenarios, "scenarios", &dirs);
     qd_check_alias(file_names, "file_names", &dirs);
     qd_check_alias(file_dirs, "file_dirs", &dirs);
-    qd_check_alias_outputs(&scenarios, "scenarios", file_names, "file_names");
-    qd_check_alias_outputs(&scenarios, "scenarios", file_dirs, "file_dirs");
     qd_check_alias_outputs(file_names, "file_names", file_dirs, "file_dirs");
 
     std::vector<std::string> l_scenarios, l_file_names, l_file_dirs;
@@ -1198,13 +1195,12 @@ arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
         }
     }
 
-    scenarios = l_scenarios;
     if (file_names != nullptr)
-        *file_names = l_file_names;
+        *file_names = std::move(l_file_names);
     if (file_dirs != nullptr)
-        *file_dirs = l_file_dirs;
+        *file_dirs = std::move(l_file_dirs);
 
-    return (arma::uword)scenarios.size();
+    return l_scenarios;
 }
 
 /*!MD

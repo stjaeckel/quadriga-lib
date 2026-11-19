@@ -53,8 +53,7 @@ py::array_t<py::ssize_t> point_inside_mesh(const py::array_t<double> &points,
     const auto obj_ind_arma = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true, false, "obj_ind");
 
 
-    arma::uvec res;
-    quadriga_lib::point_inside_mesh(points_arma, mesh_arma, res, obj_ind_arma, distance);
+    const arma::uvec res = quadriga_lib::point_inside_mesh(points_arma, mesh_arma, obj_ind_arma, distance);
 
     return qd_python_copy2numpy<arma::uword, py::ssize_t>(&res);
 }

@@ -28,7 +28,7 @@ TEST_CASE("sos_acf_2d - grid values match the hand-computed radial interpolation
     arma::vec acf = {1.0, 0.5, 0.25}, dist = {0.0, 1.0, 2.0};
     arma::mat a2;
     arma::vec axis;
-    quadriga_lib::sos_acf_2d(acf, dist, a2, &axis);
+    a2 = quadriga_lib::sos_acf_2d(acf, dist, &axis);
     REQUIRE(a2.n_rows == 9);
     REQUIRE(a2.n_cols == 9);
     REQUIRE(axis.n_elem == 9);
@@ -63,27 +63,23 @@ TEST_CASE("sos_acf_2d - grid values match the hand-computed radial interpolation
     CHECK(arma::approx_equal(a2, arma::fliplr(a2), "absdiff", 1e-14));
 }
 
-TEST_CASE("sos_acf_2d - optional axis, pre-sized output and float")
+TEST_CASE("sos_acf_2d - optional axis and float")
 {
     arma::vec acf = {1.0, 0.5, 0.25}, dist = {0.0, 1.0, 2.0};
     arma::mat ref;
-    quadriga_lib::sos_acf_2d(acf, dist, ref);
+    ref = quadriga_lib::sos_acf_2d(acf, dist);
     REQUIRE(ref.n_rows == 9);
     CHECK(std::abs(ref(4, 5) - 0.5) < 1e-14);
 
-    arma::mat sized(9, 9);
-    sized.fill(9.0);
-    const double *ptr = sized.memptr();
     arma::vec axis(3);
-    quadriga_lib::sos_acf_2d(acf, dist, sized, &axis);
-    CHECK(sized.memptr() == ptr);
-    CHECK(arma::approx_equal(sized, ref, "absdiff", 0.0));
+    const arma::mat with_axis = quadriga_lib::sos_acf_2d(acf, dist, &axis);
+    CHECK(arma::approx_equal(with_axis, ref, "absdiff", 0.0));
     CHECK(axis.n_elem == 9);
 
     // Spacing other than 1: the axis scales, the values do not
     arma::fvec af = {1.0f, 0.5f, 0.25f}, df = {0.0f, 2.5f, 5.0f}, axf;
     arma::fmat a2f;
-    quadriga_lib::sos_acf_2d(af, df, a2f, &axf);
+    a2f = quadriga_lib::sos_acf_2d(af, df, &axf);
     REQUIRE(a2f.n_rows == 9);
     CHECK(std::abs(axf(0) + 10.0f) < 1e-5f);
     CHECK(std::abs(axf(8) - 10.0f) < 1e-5f);
@@ -97,26 +93,26 @@ TEST_CASE("sos_acf_2d - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_acf_2d(acf, dist, a2));
+        CHECK_NOTHROW(a2 = quadriga_lib::sos_acf_2d(acf, dist));
     }
     SECTION("acf")
     {
         arma::vec one = {1.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(one, dist, a2), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(one, dist), std::invalid_argument);
     }
     SECTION("dist")
     {
         arma::vec size = {0.0, 1.0}, start = {1.0, 2.0, 3.0}, uneven = {0.0, 1.0, 3.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, size, a2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, start, a2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, uneven, a2), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(acf, size), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(acf, start), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(acf, uneven), std::invalid_argument);
     }
     SECTION("non-finite table")
     {
         arma::vec inf_dist = {0.0, 1.0, arma::datum::inf}, nan_dist = {0.0, std::nan(""), 2.0}, nan_acf = {1.0, std::nan(""), 0.25};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, inf_dist, a2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, nan_dist, a2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(nan_acf, dist, a2), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(acf, inf_dist), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(acf, nan_dist), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(nan_acf, dist), std::invalid_argument);
     }
     SECTION("a failed call leaves the outputs untouched")
     {
@@ -124,7 +120,7 @@ TEST_CASE("sos_acf_2d - input validation")
         axis.fill(7.0);
         a2.set_size(2, 2);
         a2.fill(7.0);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, uneven, a2, &axis), std::invalid_argument);
+        CHECK_THROWS_AS(a2 = quadriga_lib::sos_acf_2d(acf, uneven, &axis), std::invalid_argument);
         CHECK(a2.n_rows == 2);
         CHECK(a2(1, 1) == 7.0);
         CHECK(axis.n_elem == 2);
@@ -156,13 +152,13 @@ TEST_CASE("sos_acf_2d - long tables in single precision count as equally spaced"
         double mse_d = quadriga_lib::sos_calc_mse(freq_d, acf_d, dist_d);
         CHECK(std::abs((double)mse - mse_d) < 1e-3);
         arma::fcube approx;
-        CHECK_NOTHROW(quadriga_lib::sos_acf_approx(spatial_freq, dist, approx));
+        CHECK_NOTHROW(approx = quadriga_lib::sos_acf_approx(spatial_freq, dist));
         CHECK(approx.n_rows == 4 * n - 3);
         if (n == 501)
         {
             arma::fmat a2;
             arma::fvec axis;
-            CHECK_NOTHROW(quadriga_lib::sos_acf_2d(acf, dist, a2, &axis));
+            CHECK_NOTHROW(a2 = quadriga_lib::sos_acf_2d(acf, dist, &axis));
             REQUIRE(a2.n_rows == 2001);
             CHECK(std::abs(a2(1000, 1500) - acf(500)) < 1e-6f);
             CHECK(std::abs(axis(2000) - 10.0f) < 1e-5f);
@@ -182,16 +178,9 @@ TEST_CASE("sos_acf_2d - outputs that alias inputs")
 {
     arma::vec acf = {1.0, 0.5, 0.25}, dist = {0.0, 1.5, 3.0}, axis;
     arma::mat a;
-    CHECK_NOTHROW(quadriga_lib::sos_acf_2d(acf, dist, a, &axis));
+    CHECK_NOTHROW(a = quadriga_lib::sos_acf_2d(acf, dist, &axis));
 
     arma::vec d = dist, c = acf;
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, d, a, &d), std::invalid_argument); // dist_2d is 'dist'
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(c, dist, a, &c), std::invalid_argument); // dist_2d is 'acf'
-
-    // acf_2d on the memory of 'acf', dist_2d on the memory of acf_2d
-    arma::mat m(c.memptr(), 3, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(c, dist, m, &axis), std::invalid_argument);
-    arma::mat g(9, 9);
-    arma::vec v(g.memptr(), 9, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, dist, g, &v), std::invalid_argument);
+    CHECK_THROWS_AS(a = quadriga_lib::sos_acf_2d(acf, d, &d), std::invalid_argument); // dist_2d is 'dist'
+    CHECK_THROWS_AS(a = quadriga_lib::sos_acf_2d(c, dist, &c), std::invalid_argument); // dist_2d is 'acf'
 }

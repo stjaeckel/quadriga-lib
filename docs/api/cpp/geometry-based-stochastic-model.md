@@ -139,9 +139,8 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#conf_file_list) · [
 
 ### Declaration:
 ```cpp
-arma::uword quadriga_lib::conf_file_list(
+std::vector<std::string> quadriga_lib::conf_file_list(
     const std::vector<std::string> &dirs,
-    std::vector<std::string> &scenarios,
     std::vector<std::string> *file_names = nullptr,
     std::vector<std::string> *file_dirs = nullptr,
     bool parse_shortnames = true);
@@ -153,12 +152,11 @@ arma::uword quadriga_lib::conf_file_list(
   files only, which is faster
 
 ### Outputs:
-- **`scenarios`** — Scenario names and short names; previous content is discarded; `[n_scen]`
 - **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
 - **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
 
 ### Returns:
-- Number of entries, `n_scen`
+- Scenario names and short names; `[n_scen]`
 
 ### See also:
 - [conf_file_read](#conf_file_read) (read one of the files)
@@ -193,12 +191,12 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#conf_file_read) · [
 
 ### Declaration:
 ```cpp
-bool quadriga_lib::conf_file_read(
+std::unordered_map<std::string, double> quadriga_lib::conf_file_read(
     const std::string &fn,
-    std::unordered_map<std::string, double> &scenpar,
     std::string *pl_model = nullptr,
     std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
     arma::mat *lsp_xcorr = nullptr,
+    bool *lsp_xcorr_pd = nullptr,
     std::vector<std::string> *key_order = nullptr,
     std::vector<std::string> *pl_order = nullptr,
     std::vector<std::string> *short_names = nullptr,
@@ -212,18 +210,19 @@ bool quadriga_lib::conf_file_read(
   grammar is checked
 
 ### Outputs:
-- **`scenpar`** — Numeric scenario parameters; previous content is discarded; `n_key` entries
 - **`pl_model`** *(optional)* — Value of `PL_model`; empty if not in the file
 - **`plpar`** *(optional)* — Path-loss parameters: the `PL_` keys other than `PL_model`, without the prefix, with
   one or more values each; `n_pl` entries
 - **`lsp_xcorr`** *(optional)* — LSP cross-correlation matrix, see [scenpar_validate](#scenpar_validate); `[8, 8]`
+- **`lsp_xcorr_pd`** *(optional)* — `true` if `lsp_xcorr` is positive definite; `false` is no error here, but
+  [lsp_generate](#lsp_generate) throws for the scenario
 - **`key_order`** *(optional)* — Canonical order of the keys in `scenpar`, see [scenpar_validate](#scenpar_validate); `[n_key]`
 - **`pl_order`** *(optional)* — Keys of `plpar` in the order of their first occurrence in the file; `[n_pl]`
 - **`short_names`** *(optional)* — Values of all `ShortName` lines in file order; `[n_short]`
 - **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ### Returns:
-- `true` if `lsp_xcorr` is positive definite; `false` is no error here, but [lsp_generate](#lsp_generate) throws for the scenario
+- Numeric scenario parameters; `n_key` entries
 
 ### See also:
 - [scenpar_validate](#scenpar_validate) (value checks and defaults)
@@ -392,10 +391,9 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_init_phases) ·
 
 ### Declaration:
 ```cpp
-void quadriga_lib::gbsm_init_phases(
+arma::cube quadriga_lib::gbsm_init_phases(
     const std::unordered_map<std::string, double> &scenpar,
     const std::string &set_type,
-    arma::cube &phase,
     arma::sword seed = -1,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
@@ -418,9 +416,9 @@ void quadriga_lib::gbsm_init_phases(
   least 3 columns, else no effect
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D, `false` 3D mode; as in [gbsm_draw](#gbsm_draw)
 
-### Output:
-- **`phase`** — SOS phases in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 =
-  Tx side; `[n_coeff, n_gen, 2]`
+### Returns:
+- SOS phases `phase` in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 = Tx
+  side; `[n_coeff, n_gen, 2]`
 
 ### See also:
 - [gbsm_draw](#gbsm_draw) (evaluates the SOS phases at the links)
@@ -653,12 +651,11 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#los_probability) · 
 
 ### Declaration:
 ```cpp
-void quadriga_lib::los_probability(
+arma::vec quadriga_lib::los_probability(
     const std::string &model,
     const arma::vec &d2d_out,
     const arma::vec &h_bs,
     const arma::vec &h_ut,
-    arma::vec &p_los,
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
@@ -685,10 +682,12 @@ void quadriga_lib::los_probability(
 - **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`;
   `[n_freq]`
 
-### Outputs:
-- **`p_los`** — LOS probability in [0, 1]; `[n_link]`
+### Output:
 - **`los_soft`** *(optional)* — Soft LOS state in [0, 1]; `> 0.5` exactly when `rnd_g > -F(p_los)` of eq. (7.6-18),
   which has the probability `p_los`; `[n_link, n_freq]`
+
+### Returns:
+- LOS probability `p_los` in [0, 1]; `[n_link]`
 
 ### See also:
 - [o2i_loss](#o2i_loss) (indoor distance for `d2d_out`)
@@ -804,12 +803,11 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#o2i_loss) · [Python
 
 ### Declaration:
 ```cpp
-void quadriga_lib::o2i_loss(
+arma::mat quadriga_lib::o2i_loss(
     const arma::vec &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
-    arma::mat &loss_dB,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -825,9 +823,11 @@ void quadriga_lib::o2i_loss(
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)
 
 ### Outputs:
-- **`loss_dB`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
 - **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+
+### Returns:
+- Penetration loss `loss_dB` in [dB]; `[n_ut, n_freq]`
 
 ### See also:
 - [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)
@@ -887,14 +887,13 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#path_loss) · [Pytho
 
 ### Declaration:
 ```cpp
-void quadriga_lib::path_loss(
+arma::mat quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    arma::mat &pl_dB,
     arma::mat *sf_sigma_dB = nullptr,
     const arma::vec &d2d_in = arma::vec(),
     const arma::vec &rnd_he = arma::vec());
@@ -912,9 +911,11 @@ void quadriga_lib::path_loss(
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
   [gbsm_draw](#gbsm_draw) (`"lsf"`); `[n_link]`
 
-### Outputs:
-- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+### Output:
 - **`sf_sigma_dB`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+
+### Returns:
+- Path loss `pl_dB` in [dB]; `[n_link, n_freq]`
 
 ### See also:
 - [lsp_generate](#lsp_generate) (takes `sf_sigma_dB`)

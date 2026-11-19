@@ -85,7 +85,7 @@ namespace
     scen_t conf(const std::string &name)
     {
         scen_t sp;
-        quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp);
+        sp = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf");
         return sp;
     }
 

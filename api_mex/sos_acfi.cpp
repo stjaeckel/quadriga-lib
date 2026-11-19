@@ -48,10 +48,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
     const arma::vec d = qd_mex_get_Col<double>(prhs[2], false, "d");
 
-    // Output allocation
-    arma::vec val;
-    plhs[0] = qd_mex_init_output(&val, d.n_elem);
-
     // Call library function
-    CALL_QD(quadriga_lib::sos_acfi<double>(acf, dist, d, val));
+    arma::vec val;
+    CALL_QD(val = quadriga_lib::sos_acfi<double>(acf, dist, d));
+    plhs[0] = qd_mex_copy2matlab(&val);
 }

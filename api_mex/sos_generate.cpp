@@ -120,7 +120,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_test_dir = (nlhs > 2) ? &test_dir : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_generate<double>(acf, dist, n_coeff, spatial_freq, p_ase, p_test_dir, n_dim, uniform_smp, n_dir, random_init, spatial_freq_min, spatial_freq_max, seed));
+    CALL_QD(spatial_freq = quadriga_lib::sos_generate<double>(acf, dist, n_coeff, p_ase, p_test_dir, n_dim, uniform_smp, n_dir, random_init, spatial_freq_min, spatial_freq_max, seed));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&spatial_freq);

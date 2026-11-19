@@ -170,8 +170,8 @@ namespace
     conf_out read_all(const std::string &fn, bool validate = true)
     {
         conf_out r;
-        r.ok = quadriga_lib::conf_file_read(fn, r.scenpar, &r.pl_model, &r.plpar, &r.lsp_xcorr,
-                                            &r.key_order, &r.pl_order, &r.short_names, &r.ignored_keys, validate);
+        r.scenpar = quadriga_lib::conf_file_read(fn, &r.pl_model, &r.plpar, &r.lsp_xcorr, &r.ok,
+                                                 &r.key_order, &r.pl_order, &r.short_names, &r.ignored_keys, validate);
         return r;
     }
 
@@ -707,13 +707,13 @@ TEST_CASE("conf_file_read - input validation")
     SECTION("file cannot be opened")
     {
         std::unordered_map<std::string, double> sp;
-        CHECK_THROWS_AS(quadriga_lib::conf_file_read("test_conf_file_read_missing.conf", sp), std::runtime_error);
+        CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read("test_conf_file_read_missing.conf"), std::runtime_error);
 
         // A directory is not a file, also when its name ends in '.conf'
         const std::string dir = "test_conf_file_read_dir.conf";
         std::filesystem::remove_all(dir);
         std::filesystem::create_directory(dir);
-        CHECK_THROWS_AS(quadriga_lib::conf_file_read(dir, sp), std::runtime_error);
+        CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(dir), std::runtime_error);
         std::filesystem::remove_all(dir);
     }
 
@@ -801,7 +801,7 @@ TEST_CASE("conf_file_read - error messages name the file and the line")
         std::unordered_map<std::string, double> sp;
         try
         {
-            quadriga_lib::conf_file_read(f.fn, sp);
+            sp = quadriga_lib::conf_file_read(f.fn);
         }
         catch (const std::runtime_error &e)
         {
@@ -845,8 +845,8 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
     auto call = [&r](const std::string &content)
     {
         tmp_file f("test_conf_file_read_untouched.conf", content);
-        quadriga_lib::conf_file_read(f.fn, r.scenpar, &r.pl_model, &r.plpar, &r.lsp_xcorr,
-                                     &r.key_order, &r.pl_order, &r.short_names, &r.ignored_keys);
+        r.scenpar = quadriga_lib::conf_file_read(f.fn, &r.pl_model, &r.plpar, &r.lsp_xcorr, nullptr,
+                                                 &r.key_order, &r.pl_order, &r.short_names, &r.ignored_keys);
     };
 
     SECTION("grammar error in the last line")
@@ -861,9 +861,9 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
     }
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::conf_file_read("test_conf_file_read_missing.conf", r.scenpar,
-                                                     &r.pl_model, &r.plpar, &r.lsp_xcorr, &r.key_order, &r.pl_order,
-                                                     &r.short_names, &r.ignored_keys),
+        CHECK_THROWS_AS(r.scenpar = quadriga_lib::conf_file_read("test_conf_file_read_missing.conf",
+                                                                 &r.pl_model, &r.plpar, &r.lsp_xcorr, nullptr, &r.key_order, &r.pl_order,
+                                                                 &r.short_names, &r.ignored_keys),
                         std::runtime_error);
     }
 
@@ -896,50 +896,47 @@ TEST_CASE("conf_file_read - optional outputs alone and together, stale content i
     CHECK(all.lsp_xcorr(6, 2) == -0.8);  // esA_sf: SF vs ESA
     CHECK(all.lsp_xcorr(1, 4) == -0.2);  // asA_kf: KF vs ASA
 
-    // Mandatory output only; previous content of scenpar is discarded
-    std::unordered_map<std::string, double> sp;
-    sp["marker"] = 42.0;
-    sp["DS_sigma"] = 99.0;
-    CHECK(quadriga_lib::conf_file_read(f.fn, sp) == all.ok);
+    // Without optional outputs
+    std::unordered_map<std::string, double> sp = quadriga_lib::conf_file_read(f.fn);
     CHECK(sp == all.scenpar);
 
     // Each optional output alone, starting from stale content
     std::string s = "stale";
-    quadriga_lib::conf_file_read(f.fn, sp, &s);
+    sp = quadriga_lib::conf_file_read(f.fn, &s);
     CHECK(s == all.pl_model);
 
     std::unordered_map<std::string, std::vector<double>> pl;
     pl["stale"] = {1.0};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, &pl);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, &pl);
     CHECK(pl == all.plpar);
 
     std::vector<std::string> v = {"stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, &v);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.key_order);
 
     v = {"stale", "stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, &v);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.pl_order);
 
     v = {"stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.short_names);
 
     v = {"stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.ignored_keys);
 
     // lsp_xcorr: a correctly sized output is written in place, a wrong size is resized
     arma::mat X(8, 8);
     X.fill(7.0);
     const double *mem = X.memptr();
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, &X);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, nullptr, &X);
     CHECK(X.memptr() == mem);
     CHECK(arma::approx_equal(X, all.lsp_xcorr, "absdiff", 0.0));
 
     arma::mat Y(3, 5);
     Y.fill(7.0);
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, &Y);
+    sp = quadriga_lib::conf_file_read(f.fn, nullptr, nullptr, &Y);
     REQUIRE((Y.n_rows == 8 && Y.n_cols == 8));
     CHECK(arma::approx_equal(Y, all.lsp_xcorr, "absdiff", 0.0));
 
@@ -1066,11 +1063,11 @@ TEST_CASE("conf_file_read - outputs that alias inputs")
     std::unordered_map<std::string, double> sp;
     std::string name = f.fn, pl;
     std::vector<std::string> ko, po, sn, ik;
-    CHECK_NOTHROW(quadriga_lib::conf_file_read(name, sp, &pl, nullptr, nullptr, &ko, &po, &sn, &ik));
+    CHECK_NOTHROW(sp = quadriga_lib::conf_file_read(name, &pl, nullptr, nullptr, nullptr, &ko, &po, &sn, &ik));
 
     std::string fn = f.fn;
-    CHECK_THROWS_AS(quadriga_lib::conf_file_read(fn, sp, &fn), std::invalid_argument); // pl_model is 'fn'
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(fn, &fn), std::invalid_argument); // pl_model is 'fn'
     CHECK(fn == f.fn);
-    CHECK_THROWS_AS(quadriga_lib::conf_file_read(name, sp, &pl, nullptr, nullptr, &ko, &po, &po, &ik), std::invalid_argument); // short_names is 'pl_order'
-    CHECK_THROWS_AS(quadriga_lib::conf_file_read(name, sp, &pl, nullptr, nullptr, &ik, &po, &sn, &ik), std::invalid_argument); // ignored_keys is 'key_order'
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(name, &pl, nullptr, nullptr, nullptr, &ko, &po, &po, &ik), std::invalid_argument); // short_names is 'pl_order'
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(name, &pl, nullptr, nullptr, nullptr, &ik, &po, &sn, &ik), std::invalid_argument); // ignored_keys is 'key_order'
 }

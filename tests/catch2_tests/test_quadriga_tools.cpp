@@ -272,7 +272,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
 
     // Calculate bounding box
     arma::fmat aabb;
-    quadriga_lib::point_cloud_aabb(points, aabb);
+    aabb = quadriga_lib::point_cloud_aabb(points);
 
     arma::fmat T;
     T = {{0.0f, 40.3f, -50.0f, 50.0f, 1.0f, 1.0f}};
@@ -323,7 +323,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
     CHECK(arma::all(reverse_ind == I));
 
     // Test AABB of sub-clouds
-    quadriga_lib::point_cloud_aabb(pointsR, aabb, sub_cloud_ind);
+    aabb = quadriga_lib::point_cloud_aabb(pointsR, sub_cloud_ind);
 
     T = {{0.0f, 0.3f, -5.0f, -5.0f, 1.0f, 1.0f},
          {0.0f, 0.3f, 5.0f, 5.0f, 1.0f, 1.0f},

@@ -471,7 +471,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             throw std::invalid_argument("Input 'aabb' must have size [n_sub, 6].");
     }
     else if (n_sub)
-        quadriga_lib::triangle_mesh_aabb(mesh, aabb_local, sub_mesh_ind);
+        aabb_local = quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_ind);
     const arma::fmat &aabb_use = has_aabb ? aabb : aabb_local;
 
     if (!std::isfinite(min_gain_dB))

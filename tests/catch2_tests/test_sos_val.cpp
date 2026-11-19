@@ -925,7 +925,7 @@ TEST_CASE("sos_val - the AVX2 kernel stays within its bound for the largest pres
     for (double d : {10.0, 1.0})
     {
         arma::mat spatial_freq, phase = rnd(1024, 6, -pi, pi, 56), pos = rnd(200, 3, -500.0, 500.0, 57), a, b;
-        quadriga_lib::sos_preset("Comb1024", spatial_freq, (arma::vec *)nullptr, (arma::vec *)nullptr, d);
+        spatial_freq = quadriga_lib::sos_preset("Comb1024", (arma::vec *)nullptr, (arma::vec *)nullptr, d);
         quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, {}, {}, {}, 1.0, false, 1);
         quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, {}, {}, {}, 1.0, false, 2);
         REQUIRE(a.n_elem == 1200);

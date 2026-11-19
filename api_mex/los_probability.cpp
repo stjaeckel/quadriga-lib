@@ -91,7 +91,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool soft = nlhs > 1 && !rnd_g.empty() && !center_freq.empty();
     arma::vec p_los;
     arma::mat los_soft;
-    plhs[0] = qd_mex_init_output(&p_los, d2d_out.n_elem);
     if (soft)
         plhs[1] = qd_mex_init_output(&los_soft, d2d_out.n_elem, center_freq.n_elem);
     else if (nlhs > 1) // [], or [0, n_freq] for no link: an empty 'rnd_g' is then a valid input
@@ -101,6 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::los_probability(model, d2d_out, h_bs, h_ut, p_los, d_clutter, r_clutter, h_clutter,
-                                          rnd_g, center_freq, p_los_soft));
+    CALL_QD(p_los = quadriga_lib::los_probability(model, d2d_out, h_bs, h_ut, d_clutter, r_clutter, h_clutter,
+                                                  rnd_g, center_freq, p_los_soft));
+    plhs[0] = qd_mex_copy2matlab(&p_los);
 }

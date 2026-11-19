@@ -14,7 +14,7 @@ static arma::Col<dtype> q_ds(const std::vector<arma::Col<dtype>> &delays, const 
                              dtype threshold_dB = 100.0, dtype granularity = 0.0, arma::Col<dtype> *mean_delay = nullptr)
 {
     arma::Col<dtype> ds;
-    quadriga_lib::calc_delay_spread(delays, powers, ds, threshold_dB, granularity, mean_delay);
+    ds = quadriga_lib::calc_delay_spread(delays, powers, threshold_dB, granularity, mean_delay);
     return ds;
 }
 
@@ -342,12 +342,4 @@ TEST_CASE("calc_delay_spread - outputs that alias inputs")
 
     arma::vec view(powers[0].memptr(), 1, false, true);
     CHECK_THROWS_AS(q_ds(delays, powers, 100.0, 0.0, &view), std::invalid_argument);
-
-    // The mandatory output 'ds' cannot be an input or the mean delay; a correctly sized 'ds' is written in place
-    arma::vec ds(1, arma::fill::zeros);
-    const double *p_ds = ds.memptr();
-    quadriga_lib::calc_delay_spread(delays, powers, ds);
-    CHECK(ds.memptr() == p_ds);
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, delays[0]), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, ds, 100.0, 0.0, &ds), std::invalid_argument);
 }

@@ -76,10 +76,10 @@ namespace quadriga_lib
         arma::Col<dtype> *el_point_ang_deg = nullptr); // Optional output: elevation pointing angle of the main beam in degree; [n_out]
 
     // Calculate the directivity of array antenna elements in dBi
+    // - Returns the directivity in dBi; [n_out]
     template <typename dtype>
-    void arrayant_calc_directivity(
+    arma::Col<dtype> arrayant_calc_directivity(
         const arrayant<dtype> &ant,                  // Valid arrayant
-        arma::Col<dtype> &directivity_dBi,           // Output: directivity in dBi; [n_out]
         const arma::uvec &i_element = arma::uvec()); // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
 
     // Combine element patterns, positions, and coupling weights into effective radiation patterns
@@ -151,10 +151,10 @@ namespace quadriga_lib
         arma::Mat<dtype> *el_point_ang_deg = nullptr);    // Optional output: elevation pointing angle in degree; [n_out, n_freq]
 
     // Calculate the directivity in dBi for each entry of a multi-frequency vector
+    // - Returns the directivity in dBi; [n_out, n_freq]
     template <typename dtype>
-    void arrayant_calc_directivity_multi(
+    arma::Mat<dtype> arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector that passes arrayant_is_valid_multi
-        arma::Mat<dtype> &directivity_dBi,                // Output: directivity in dBi; [n_out, n_freq]
         const arma::uvec &i_element = arma::uvec());      // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
 
     // Combine element patterns, positions, and coupling weights into effective radiation patterns
@@ -261,7 +261,7 @@ namespace quadriga_lib
 
     // Read an arrayant object from a QDANT file
     // - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> qdant_read(
         const std::string &fn,            // Path to the QDANT file; must not be empty
         unsigned id = 1,                  // 1-based ID of the antenna entry to read
@@ -271,7 +271,7 @@ namespace quadriga_lib
     // - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
     // - Each unique ID is read exactly once regardless of how many times it appears in the layout.
     // - Counterpart to qdant_write_multi; primary mechanism for loading frequency-dependent models where center_freq on each entry identifies the corresponding frequency.
-    template <typename dtype>
+    template <typename dtype = double>
     std::vector<arrayant<dtype>> qdant_read_multi(
         const std::string &fn,            // Filename of the QDANT file
         arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file
@@ -290,26 +290,26 @@ namespace quadriga_lib
     // Generate isotropic radiator with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     // - Usage example: auto ant = quadriga_lib::generate_arrayant_omni<float>();
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_omni(dtype res = 1.0);
 
     // Generate cross-polarized isotropic radiator
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_xpol(dtype res = 1.0);
 
     // Generate short dipole radiating with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_dipole(dtype res = 1.0);
 
     // Generate half-wave dipole radiating with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_half_wave_dipole(dtype res = 1.0);
 
     // Generate an antenna with a custom 3dB beam with (FWHM)
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_custom(
         dtype az_3dB = 90.0,       // Azimuth 3dB beam with in degree
         dtype el_3dB = 90.0,       // Elevation 3dB beam with in degree
@@ -319,7 +319,7 @@ namespace quadriga_lib
     // Generate : Unified Linear Array
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
     // Values for coupling, element positions and center frequency of the custom pattern are ignored.
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_ula(
         arma::uword N = 1,                                  // Number of elements
         dtype center_freq = 299792458.0,                    // The center frequency in [Hz]
@@ -337,7 +337,7 @@ namespace quadriga_lib
     //   6. K=M, +/-45 degree polarized elements
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
     // Values for coupling, element positions and center frequency of the custom pattern are ignored.
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_3GPP(
         arma::uword M = 1,                                  // Number of vertical elements
         arma::uword N = 1,                                  // Number of horizontal elements
@@ -356,7 +356,7 @@ namespace quadriga_lib
     // - Generates a planar M x N array that forms mutiple beams pointing in different directions
     // - Beamforming weights are phasors only
     // - Polarization indicator: (1) Vertical polarization only, (2) H/V polarized elements, (3) +/-45 degree polarized elements
-    template <typename dtype>
+    template <typename dtype = double>
     arrayant<dtype> generate_arrayant_multibeam(
         arma::uword M = 1,               // Number of vertical elements
         arma::uword N = 1,               // Number of horizontal elements
@@ -383,7 +383,7 @@ namespace quadriga_lib
     // - Horn parameters that are NaN (the default) or <= 0: hor_coverage_deg and ver_coverage_deg default to 90 and 60 deg, horn_control_freq is derived from radius
     // - Frequency samples are in Hz; if empty, third-octave bands from lower_cutoff to upper_cutoff are used
     // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
-    template <typename dtype>
+    template <typename dtype = double>
     std::vector<arrayant<dtype>> generate_speaker(
         const std::string &driver_type = "piston",                // Driver type: "piston", "horn", "omni"
         dtype radius = 0.05,                                      // Effective radiating radius in [m] (piston: cone, horn: mouth)

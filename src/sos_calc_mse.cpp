@@ -148,8 +148,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
         const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
         const long long S = (long long)n_acf, half = 2 * S - 2;
 
-        arma::cube approx;
-        quadriga_lib::sos_acf_approx<double>(freq_d, dist_d, approx);
+        const arma::cube approx = quadriga_lib::sos_acf_approx<double>(freq_d, dist_d);
 
         double core = 0.0, all = 0.0;
         if (n_dim == 1)
@@ -167,8 +166,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
         }
         else
         {
-            arma::mat target;
-            quadriga_lib::sos_acf_2d<double>(acf_d, dist_d, target);
+            const arma::mat target = quadriga_lib::sos_acf_2d<double>(acf_d, dist_d);
             for (arma::uword pl = 0; pl < approx.n_slices; ++pl)
             {
                 double sum_core = 0.0, sum_all = 0.0, n_core = 0.0;

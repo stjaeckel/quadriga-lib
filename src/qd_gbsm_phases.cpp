@@ -41,6 +41,30 @@
 
 namespace
 {
+    // Number of sinusoids of a preset of sos_preset; 0 for a name that is not a preset, so that the caller throws its
+    // own message in its order of checks
+    arma::uword qd_gbsm_n_coeff(const std::string &preset)
+    {
+        int type = 0;
+        arma::uword n_coeff = 0;
+        return qd_sos_preset_lookup(preset, type, n_coeff) ? n_coeff : 0;
+    }
+
+    // Number of generators n_gen of a random set of a completed scenpar: "lsf" 11; "cluster" 9·N for set_id -1 and N
+    // for set_id >= 0; "ray" 14·N·M + N for any set_id; 0 for an unknown set type, so that the caller throws its own
+    // message in its order of checks
+    arma::uword qd_gbsm_n_gen(const std::unordered_map<std::string, double> &sp, const std::string &set_type,
+                              arma::sword set_id)
+    {
+        if (set_type == "lsf")
+            return 11;
+        arma::uword N, M, G, n_ray, n_gen;
+        qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
+        if (set_type == "cluster")
+            return (set_id < 0) ? 9 * N : N;
+        return (set_type == "ray") ? n_gen : 0;
+    }
+
     // One generator of a phase set: decorrelation distance in [m] (0 already replaced by 0.1 m), distribution,
     // mirror partner, bias removal on/off
     struct qd_gbsm_gen
@@ -119,7 +143,7 @@ namespace
     }
 
     // Frequency tables, one per distinct decorrelation distance of 'gen' (in order of first appearance):
-    // sos_preset(preset, freq[t], &acf[t], &dist[t], lambda_t); tab[g] = table index of generator g
+    // freq[t] = sos_preset(preset, &acf[t], &dist[t], lambda_t); tab[g] = table index of generator g
     // - 'preset' must be a known preset (checked by the caller with qd_gbsm_n_coeff)
     // - Distances are grouped by exact equality: equal input values give identical tables
     void qd_gbsm_freq(const std::string &preset, const std::vector<qd_gbsm_gen> &gen,
@@ -138,7 +162,7 @@ namespace
             {
                 lambda.push_back(gen[g].lambda);
                 freq.emplace_back(), acf.emplace_back(), dist.emplace_back();
-                quadriga_lib::sos_preset<double>(preset, freq[t], &acf[t], &dist[t], gen[g].lambda);
+                freq[t] = quadriga_lib::sos_preset<double>(preset, &acf[t], &dist[t], gen[g].lambda);
             }
             tab[g] = (arma::uword)t;
         }
@@ -369,10 +393,9 @@ SOS phases of one random set of a BS site and scenario
 
 ## Declaration:
 ```
-void quadriga_lib::gbsm_init_phases(
+arma::cube quadriga_lib::gbsm_init_phases(
     const std::unordered_map<std::string, double> &scenpar,
     const std::string &set_type,
-    arma::cube &phase,
     arma::sword seed = -1,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
@@ -395,28 +418,27 @@ void quadriga_lib::gbsm_init_phases(
   least 3 columns, else no effect
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D, `false` 3D mode; as in [[gbsm_draw]]
 
-## Output:
-- **`phase`** — SOS phases in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 =
-  Tx side; `[n_coeff, n_gen, 2]`
+## Returns:
+- SOS phases `phase` in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 = Tx
+  side; `[n_coeff, n_gen, 2]`
 
 ## See also:
 - [[gbsm_draw]] (evaluates the SOS phases at the links)
 - [[sos_init_phases]], [[sos_val]] (SOS phases and evaluation of one generator), [[sos_remove_bias]] (its bias removal)
 MD!*/
 
-void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double> &scenpar,
-                                    const std::string &set_type,
-                                    arma::cube &phase,
-                                    arma::sword seed,
-                                    arma::sword set_id,
-                                    const std::string &preset,
-                                    const arma::mat &tx_pos,
-                                    const arma::mat &rx_pos,
-                                    bool dual_mobility,
-                                    bool remove_bias,
-                                    bool horizontal)
+arma::cube quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double> &scenpar,
+                                          const std::string &set_type,
+                                          arma::sword seed,
+                                          arma::sword set_id,
+                                          const std::string &preset,
+                                          const arma::mat &tx_pos,
+                                          const arma::mat &rx_pos,
+                                          bool dual_mobility,
+                                          bool remove_bias,
+                                          bool horizontal)
 {
-    // Validation, before any output is touched
+    // Validation
     const bool lsf = set_type == "lsf";
     if (!lsf && set_type != "cluster" && set_type != "ray")
         throw std::invalid_argument("Input 'set_type' must be 'lsf', 'cluster' or 'ray'.");
@@ -442,17 +464,15 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
     const bool do_bias = lsf && remove_bias && n_link > 2;
     if (do_bias && dual_mobility && tx_pos.empty())
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
-    qd_check_alias(&phase, "phase", &tx_pos, &rx_pos);
 
     // The decorrelation distances of the "ray" generators are not used here (no bias removal)
     const bool ray = set_type == "ray";
     const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp)
                                              : (ray ? qd_gbsm_gen_ray(sp, 0.1) : qd_gbsm_gen_cluster(sp, set_id));
     const arma::uword n_gen = qd_gbsm_n_gen(sp, set_type, set_id);
-    if (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2)
-        phase.set_size(n_coeff, n_gen, 2);
+    arma::cube phase(n_coeff, n_gen, 2, arma::fill::none);
     if (n_gen == 0) // N = 0: empty "cluster" or "ray" set, sos_init_phases rejects zero generators
-        return;
+        return phase;
 
     // Seed of a "cluster" or "ray" set: SplitMix64 of the seed and the set tag; -1 passes on
     auto derive_seed = [ray](arma::sword seed, arma::sword set_id) -> arma::sword
@@ -472,8 +492,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
     };
 
     // Raw phases of the Rx side
-    arma::mat P0;
-    quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, P0, lsf ? seed : derive_seed(seed, set_id));
+    arma::mat P0 = quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, lsf ? seed : derive_seed(seed, set_id));
 
     // "lsf" bias removal over all positions where the fields are evaluated, before the mirroring
     // - Each Normal field is corrected once, with its own frequencies, over the union of the positions where it is
@@ -504,6 +523,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
         phase.slice(0).col(g) = P0.col(g);
         phase.slice(1).col(g) = P0.col(gen[g].mirror);
     }
+    return phase;
 }
 
 /*!MD

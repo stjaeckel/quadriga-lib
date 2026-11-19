@@ -62,8 +62,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool valid = n_grid != 0 && n_dim >= 1 && n_dim <= 3;
     arma::cube acf_approx;
     arma::vec dist_2d;
-    if (valid)
-        plhs[0] = qd_mex_init_output(&acf_approx, n_grid, (n_dim == 1) ? 1 : n_grid, (n_dim == 3) ? 3 : 1);
     if (nlhs > 1 && valid)
         plhs[1] = qd_mex_init_output(&dist_2d, n_grid);
 
@@ -71,5 +69,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_dist_2d = dist_2d.empty() ? nullptr : &dist_2d;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_acf_approx<double>(spatial_freq, dist, acf_approx, p_dist_2d));
+    CALL_QD(acf_approx = quadriga_lib::sos_acf_approx<double>(spatial_freq, dist, p_dist_2d));
+    plhs[0] = qd_mex_copy2matlab(&acf_approx);
 }
