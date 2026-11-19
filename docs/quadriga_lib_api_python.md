@@ -872,12 +872,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_create_file) · [MATLAB](quadriga_li
 - Defines a 4D storage layout `(nx, ny, nz, nw)`; each index combination maps to one channel slot
 - Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
 - The total slot count is fixed at creation; the layout can be reshaped with [hdf5_reshape_layout](#hdf5_reshape_layout)
-- Raises an error if the target file already exists; delete it first to recreate it
+- Raises an error if the target file already exists (also one that cannot be read); delete it first to recreate it
 - Files can be read by any HDF5 tool but must be modified only with quadriga-lib
 
 ### Usage:
 ```python
-storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
+quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
@@ -887,12 +887,10 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 - **`nz`** — Number of elements on the z-dimension; default: 1
 - **`nw`** — Number of elements on the w-dimension; default: 1
 
-### Outputs:
-- **`storage_space`** — Storage dimensions used by the new file, `[nx, ny, nz, nw]`; `(4,)`; int64
-
 ### See also:
 - [hdf5_write_channel](#hdf5_write_channel) (for writing channel data)
 - [hdf5_write_dset](#hdf5_write_dset) (for writing arbitrary unstructured data)
+- [hdf5_read_layout](#hdf5_read_layout) (for reading the layout)
 
 ---
 <a id="hdf5_read_channel"></a>
@@ -911,10 +909,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [MATLAB](quadriga_l
 - Structured fields are stored in single precision in the file and returned in double.
 - Unstructured datasets keep their stored type and shape.
 - `i_snap` selects a subset of snapshots; if `None`, all snapshots are read
-- Errors if the file is not a quadriga-lib channel file of version 3: files written by quadriga-lib 0.12.4 and
-  earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected.
-- Convert files of quadriga-lib 0.12.4 and earlier with `tools/hdf5_convert_v2.py` of the quadriga-lib sources
-  (needs h5py): `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5`.
+- Errors if the file does not exist or is not a quadriga-lib channel file; files modified with other HDF5 tools are
+  not supported and may be rejected.
 
 ### Usage:
 ```python
@@ -927,7 +923,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
 - **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
-- **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
+- **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Applies to every selected slot; raises an error if an index exceeds the number of snapshots of a selected slot.
 - **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
 
 ### Outputs:
@@ -952,7 +948,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
   | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
   | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int32, scalar                     | int32, scalar                        |
 
-- **`par`** — Dict (single slot) or list of dicts (multiple slots) containing the unstructured data in the file.
+- **`par`** — List of dicts with the unstructured data, one per entry of `chan` (empty dict if the slot has none).
 
 ### See also:
 - [hdf5_read_layout](#hdf5_read_layout) (for reading the layout in the file)
@@ -973,8 +969,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset) · [MATLAB](quadriga_lib_
   number, a vector a numpy array of shape `(n,)` (also with a single element), a matrix or 3D array a numpy array
   of the stored shape
 - Returns `None` if the dataset does not exist at the requested slot
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
-  [hdf5_read_channel](#hdf5_read_channel))
+- Errors if the file does not exist or is not a quadriga-lib channel file
 - Supported types: str, scalar, vector, 2D array, and 3D array
 
 ### Usage:
@@ -1010,8 +1005,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset_names) · [MATLAB](quadrig
 - Lists the datasets whose names start with `prefix` (default `par_`; `''` lists all); the returned names have the
   prefix stripped
 - Returns an empty list if no unstructured datasets are present at the slot
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
-  [hdf5_read_channel](#hdf5_read_channel))
+- Errors if the file does not exist or is not a quadriga-lib channel file
 
 ### Usage:
 ```python
@@ -1044,9 +1038,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_layout) · [MATLAB](quadriga_li
 - Returns the dimensions of the 4D channel-slot grid stored inside an HDF5 file
 - Also reports which slots already hold data, so free slots can be found without scanning the file
 - Returns `(0, 0, 0, 0)` dimensions if the file does not exist
-- Raises an error if the file exists but is not a quadriga-lib channel file of version 3 (files written by
-  quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be
-  rejected)
+- Raises an error if the file exists but is not a quadriga-lib channel file
 
 ### Usage:
 ```python
@@ -1074,9 +1066,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_reshape_layout) · [MATLAB](quadriga
 - Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
 - The total number of slots (`nx · ny · nz · nw`) must match the original layout
 - Only the dimension metadata is updated; stored channel data is not moved
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (files written by
-  quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are not supported and may be
-  rejected)
+- Errors if the file does not exist or is not a quadriga-lib channel file
 - One writer per file at a time; files are not locked
 
 ### Usage:
@@ -1101,16 +1091,17 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_channel) · [MATLAB](quadriga_
 - Writes a list of channel dicts into 4D storage slots (one slot per list entry)
 - `chan` may also be a single dict, in which case one channel is written
 - Optional unstructured data (`par`) can be passed as a matching list of dicts (or a single dict)
-- Creates the file with a default layout if it does not exist; an existing file must be a quadriga-lib channel
-  file of version 3 (files of quadriga-lib 0.12.4 and earlier are rejected, see [hdf5_read_channel](#hdf5_read_channel))
-- A warning is issued if any selected slot already contains data. That slot is replaced completely: its old
-  structured data and all its unstructured datasets (also those written with [hdf5_write_dset](#hdf5_write_dset)) are removed.
+- Creates the file if it does not exist, with the layout that just holds all slots (largest index + 1 per
+  dimension); use [hdf5_create_file](#hdf5_create_file) for another layout
+- All inputs are checked before anything is written: every slot inside the layout of an existing file, no slot
+  twice, all channels valid
+- A slot that already contains data is replaced completely: its old structured data and all its unstructured
+  datasets (also those written with [hdf5_write_dset](#hdf5_write_dset)) are removed; `code` shows which slots were replaced.
   The file does not shrink; copy the channels into a new file to reclaim the space of the removed data
 - One writer per file at a time; files are not locked
 - Structured data is stored in single precision regardless of the input precision
 - Unstructured datasets retain their numpy dtype and shape; supported types as in [hdf5_write_dset](#hdf5_write_dset)
 - Each scalar index input is broadcast to all channels; each vector index must have one entry per channel
-- If the file does not exist, the layout is `[max(len(chan), max(ix)+1), max(iy)+1, max(iz)+1, max(iw)+1]`
 - Channel dict field layout matches [hdf5_read_channel](#hdf5_read_channel)
 - Per-snapshot fields accept the list model (list of arrays) or the stack model
   (single array with the snapshot index as the last axis), detected per field
@@ -1119,7 +1110,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_channel) · [MATLAB](quadriga_
 
 ### Usage:
 ```python
-storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
+code = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 ```
 
 ### Inputs:
@@ -1133,7 +1124,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
 
 ### Outputs:
-- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `(4,)`; int64
+- **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `(len(chan),)`; int64
 
 ### See also:
 - [hdf5_create_file](#hdf5_create_file) (for creating a file with a custom storage layout)
@@ -1148,9 +1139,9 @@ Write a single unstructured dataset to an HDF5 file
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_dset) · [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset)
 
 - Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `prefix + name` must contain only alphanumeric characters and underscores
-- The file must already exist (use [hdf5_create_file](#hdf5_create_file) first) and be a quadriga-lib channel file of
-  version 3 (see [hdf5_read_channel](#hdf5_read_channel))
+- `name` must not be empty; `prefix + name` must contain only alphanumeric characters and underscores
+- Creates the file with the layout `(ix + 1, iy + 1, iz + 1, iw + 1)` if it does not exist; use [hdf5_create_file](#hdf5_create_file)
+  for another layout
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
 - The dataset is added to the slot; everything else stored there is kept. A later [hdf5_write_channel](#hdf5_write_channel) to the
   same slot replaces the slot completely, including the datasets written with this function

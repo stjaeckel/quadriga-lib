@@ -140,6 +140,7 @@ class test_case(unittest.TestCase):
         key = self.slots(name)[s]
         o = self.oracle
         chan, par = channel.hdf5_read_channel(out, *slot_index(s, o[name + '/layout']))
+        par = par[0] if par else {}  # one dict per channel
         if key + 'chan_keys' not in o:
             self.assertEqual(chan, [], key)
         else:
@@ -251,10 +252,10 @@ class test_case(unittest.TestCase):
         self.assertEqual(self.oracle[name + '/3/chan/name'].item(), 'name with data')
         chan, par = channel.hdf5_read_channel(out, 3)
         self.assertEqual(chan, [{'name': ''}])  # the name is dropped, the dataset is kept
-        self.assert_value(par['good'], self.oracle[name + '/3/par/good'], 'good')
+        self.assert_value(par[0]['good'], self.oracle[name + '/3/par/good'], 'good')
         self.assert_h5py(name, out, (0, 3, 4), skipped)
         self.assertIn('UnicodeDecodeError', self.oracle[name + '/4/error'].item())
-        par = channel.hdf5_read_channel(out, 4)[1]  # every other dataset of the slot
+        par = channel.hdf5_read_channel(out, 4)[1][0]  # every other dataset of the slot
         self.assertEqual(list(par), ['good', 'after'])
         self.assert_value(par['good'], np.arange(4), 'good')
         self.assertEqual(par['after'], 2.0)

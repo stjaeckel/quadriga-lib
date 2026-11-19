@@ -15,9 +15,9 @@ SECTION!*/
 Write a single unstructured dataset to an HDF5 file
 
 - Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `name` must contain only alphanumeric characters and underscores
-- The file must already exist (use [[hdf5_create_file]] first) and be a quadriga-lib channel file of
-  version 3 (see [[hdf5_read_channel]])
+- `name` must not be empty and must contain only alphanumeric characters and underscores
+- Creates the file with the layout `[ix, iy, iz, iw]` if it does not exist; use [[hdf5_create_file]] for another
+  layout
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
 - The dataset is added to the slot; everything else stored there is kept. A later [[hdf5_write_channel]] to the
   same slot replaces the slot completely, including the datasets written with this function
@@ -29,7 +29,7 @@ Write a single unstructured dataset to an HDF5 file
 
 ## Usage:
 ```
-storage_dims = quadriga_lib.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix );
+quadriga_lib.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix );
 ```
 
 ## Inputs:
@@ -40,10 +40,7 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, pre
 - **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
 - **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
-- **`prefix`** — Prefix prepended to `name` in the HDF5 file; string; default: `'par_'`
-
-## Outputs:
-- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
+- **`prefix`** — Prefix prepended to `name` in the HDF5 file; string; `''` stores `name` without a prefix; default (omitted or `[]`): `'par_'`
 
 ## See also:
 - [[hdf5_read_dset_names]] (for reading names of already written datasets)
@@ -52,9 +49,10 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)plhs; // No outputs
     if (nrhs < 3 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 1)
+    if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
@@ -64,7 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned iy = (nrhs < 5) ? 0U : qd_mex_get_index<unsigned>(prhs[4], "iy"); // 1-based -> 0-based
     const unsigned iz = (nrhs < 6) ? 0U : qd_mex_get_index<unsigned>(prhs[5], "iz"); // 1-based -> 0-based
     const unsigned iw = (nrhs < 7) ? 0U : qd_mex_get_index<unsigned>(prhs[6], "iw"); // 1-based -> 0-based
-    const std::string prefix = (nrhs < 8) ? std::string("par_") : qd_mex_get_string(prhs[7], "par_", "prefix");
+    const std::string prefix = (nrhs < 8) ? std::string("par_") : qd_mex_get_string_or_empty(prhs[7], "par_", "prefix");
 
     // Validate data is non-empty
     if (mxGetNumberOfElements(prhs[2]) == 0)
@@ -77,15 +75,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         data = qd_mex_anycast(prhs[2], "data", false);
 
-    // Read layout for "file exists" check and to populate storage_dims output
-    arma::Col<unsigned> storage_space;
-    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn));
-    if (storage_space.at(0) == 0U)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File does not exist (use quadriga_lib.hdf5_create_file).");
-
-    // Write dataset
+    // Write dataset (C++ creates a missing file)
     CALL_QD(quadriga_lib::hdf5_write_dset(fn, name, data, ix, iy, iz, iw, prefix));
-
-    // Return storage space
-    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 }

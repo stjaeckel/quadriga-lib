@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Channel functions
@@ -22,10 +23,8 @@ Reads channel data from HDF5 files
 - Structured fields are stored in single precision in the file and returned in double.
 - Unstructured datasets keep their stored type and shape.
 - `i_snap` selects a subset of snapshots; if `None`, all snapshots are read
-- Errors if the file is not a quadriga-lib channel file of version 3: files written by quadriga-lib 0.12.4 and
-  earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected.
-- Convert files of quadriga-lib 0.12.4 and earlier with `tools/hdf5_convert_v2.py` of the quadriga-lib sources
-  (needs h5py): `python tools/hdf5_convert_v2.py old.hdf5 new.hdf5`.
+- Errors if the file does not exist or is not a quadriga-lib channel file; files modified with other HDF5 tools are
+  not supported and may be rejected.
 
 ## Usage:
 ```
@@ -38,7 +37,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
 - **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
-- **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
+- **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Applies to every selected slot; raises an error if an index exceeds the number of snapshots of a selected slot.
 - **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
 
 ## Outputs:
@@ -63,7 +62,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
   | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
   | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int32, scalar                     | int32, scalar                        |
 
-- **`par`** — Dict (single slot) or list of dicts (multiple slots) containing the unstructured data in the file.
+- **`par`** — List of dicts with the unstructured data, one per entry of `chan` (empty dict if the slot has none).
 
 ## See also:
 - [[hdf5_read_layout]] (for reading the layout in the file)
@@ -72,103 +71,47 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
 - [[hdf5_write_dset]] (for writing individual unstructured datasets)
 MD!*/
 
-// Resolve a slot-index argument (scalar / 1-D array / list / None) to a 0-based
-// index vector. None or empty selects the full dimension (0 ... n-1).
-static arma::u32_vec parse_idx(const py::handle &h, unsigned n, const char *name)
-{
-    arma::u32_vec idx = qd_python_numpy2arma_Col<unsigned>(h, false, false, name);
-
-    if (idx.is_empty()) // None / empty -> full dimension
-    {
-        idx.set_size(n);
-        for (unsigned i = 0; i < n; ++i)
-            idx.at(i) = i;
-        return idx;
-    }
-
-    for (const auto v : idx)
-        if (v >= n)
-            throw std::invalid_argument(std::string("Slot index '") + name + "' is out of bound.");
-
-    return idx;
-}
-
 py::tuple hdf5_read_channel(const py::handle &fn,
                             py::handle ix, py::handle iy, py::handle iz, py::handle iw,
                             py::handle i_snap, py::handle stack)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
-
     const bool stack_b = qd_python_flag(stack, false, "stack");
 
-    // Read the storage layout: 4D slot grid + per-slot occupancy (channel_id == 0 -> empty)
+    // Occupied slots of the selection (None or empty selects the full extent), then their channels
     arma::u32_vec channel_id;
-    const arma::u32_vec storage = quadriga_lib::hdf5_read_layout(fn_s, &channel_id);
-
-    const unsigned nx = storage.at(0), ny = storage.at(1),
-                   nz = storage.at(2), nw = storage.at(3);
-
-    if (nx == 0)
-        throw std::runtime_error("HDF5 file does not exist or has no layout.");
-
-    if (channel_id.n_elem != (arma::uword)nx * (arma::uword)ny * (arma::uword)nz * (arma::uword)nw)
-        throw std::runtime_error("Corrupted storage index.");
-
-    // Resolve the per-dimension slot selectors (None -> full dimension, bounds-checked)
-    const auto sx = parse_idx(ix, nx, "ix");
-    const auto sy = parse_idx(iy, ny, "iy");
-    const auto sz = parse_idx(iz, nz, "iz");
-    const auto sw = parse_idx(iw, nw, "iw");
-
-    const arma::uword n_sel = sx.n_elem * sy.n_elem * sz.n_elem * sw.n_elem;
-
-    // Snapshot selection is only meaningful for a single addressed slot
+    const arma::u32_vec dims = quadriga_lib::hdf5_read_layout(fn_s, &channel_id);
+    const arma::u32_mat slots = qd_hdf5_select_slots(dims, channel_id,
+                                                     qd_python_numpy2arma_Col<unsigned>(ix, false, false, "ix"),
+                                                     qd_python_numpy2arma_Col<unsigned>(iy, false, false, "iy"),
+                                                     qd_python_numpy2arma_Col<unsigned>(iz, false, false, "iz"),
+                                                     qd_python_numpy2arma_Col<unsigned>(iw, false, false, "iw"));
     const arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, false, false, "i_snap");
-    if (!i_snap_a.is_empty() && n_sel != 1)
-        throw std::invalid_argument("'i_snap' is only allowed when a single slot is selected.");
+    const auto channels = quadriga_lib::hdf5_read_channel_vec<double>(fn_s, slots, i_snap_a);
 
-    // Visit the selected slots in column-major order (ix varies fastest); skip empty slots
     py::list chan;
     py::list par_list;
-    for (const auto w : sw)
-        for (const auto z : sz)
-            for (const auto y : sy)
-                for (const auto x : sx)
-                {
-                    const unsigned lin = x + nx * (y + ny * (z + nz * w));
-                    if (channel_id.at(lin) == 0) // empty slot -> skip
-                        continue;
+    for (const auto &channel : channels)
+    {
+        // A slot flagged occupied but holding nothing is skipped
+        if (channel.empty() && channel.par_names.empty())
+            continue;
 
-                    const auto channel = quadriga_lib::hdf5_read_channel<double>(fn_s, x, y, z, w);
+        // Validate structured data (par-only channels are not validated)
+        if (!channel.empty())
+        {
+            const std::string err = channel.is_valid();
+            if (!err.empty())
+                throw std::runtime_error(err);
+        }
 
-                    // Defensive: a slot flagged occupied but holding nothing -> skip
-                    if (channel.empty() && channel.par_names.empty())
-                        continue;
+        chan.append(qd_python_channel2dict(channel, arma::uvec(), false, stack_b));
 
-                    // Validate structured data (par-only channels are not validated)
-                    if (!channel.empty())
-                    {
-                        const std::string err = channel.is_valid();
-                        if (!err.empty())
-                            throw std::runtime_error(err);
-                    }
+        py::dict par;
+        for (size_t k = 0; k < channel.par_names.size(); ++k)
+            par[channel.par_names[k].c_str()] = qd_python_any2numpy(channel.par_data[k]);
+        par_list.append(par);
+    }
 
-                    // Structured channel data -> dict
-                    chan.append(qd_python_channel2dict(channel, i_snap_a, false, stack_b));
-
-                    // Unstructured datasets -> dict
-                    py::dict par;
-                    for (size_t k = 0; k < channel.par_names.size(); ++k)
-                        par[channel.par_names[k].c_str()] = qd_python_any2numpy(channel.par_data[k]);
-                    par_list.append(par);
-                }
-
-    // par: single dict for a single addressed slot, list of dicts otherwise
-    py::object par_out;
-    if (n_sel == 1)
-        par_out = par_list.empty() ? py::object(py::dict()) : py::object(par_list[0]);
-    else
-        par_out = par_list;
-
-    return py::make_tuple(chan, par_out);
+    return py::make_tuple(chan, par_list);
 }

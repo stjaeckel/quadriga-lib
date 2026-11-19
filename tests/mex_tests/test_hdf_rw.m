@@ -22,16 +22,20 @@ delete_files( fn, fn2, fn3, non_hdf5 );
 
 %% ===== hdf5_create_file =====
 
-% Default layout; 1x4 uint32 output
-storage_space = quadriga_lib.hdf5_create_file(fn);
-assertEqual(storage_space, uint32([65536, 1, 1, 1]));
+% Default layout; no output
+quadriga_lib.hdf5_create_file(fn);
 storage_space = quadriga_lib.hdf5_read_layout(fn);
 assertEqual(storage_space, uint32([65536, 1, 1, 1]));
 
-% Recreating an existing file errors
+% Recreating an existing file errors, also a file that is not an HDF5 file (thrown by C++)
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn), 'File already exists.' );
+fid = fopen(non_hdf5, 'w');
+fprintf(fid, 'text');
+fclose(fid);
+assert_cpp_error( @() quadriga_lib.hdf5_create_file(non_hdf5), 'File already exists.' );
+delete(non_hdf5);
 
-% Empty nx is the default; no output requested
+% Empty nx is the default
 delete(fn);
 quadriga_lib.hdf5_create_file(fn, []);
 assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([65536, 1, 1, 1]));
@@ -44,15 +48,14 @@ assertEqual(storage_space, uint32([12, 12, 1, 1]));
 
 % Non-double input, column vector
 delete(fn);
-storage_space = quadriga_lib.hdf5_create_file(fn, single(3), single(2), single(1), single(2));
-assertEqual(storage_space, uint32([3, 2, 1, 2]));
+quadriga_lib.hdf5_create_file(fn, single(3), single(2), single(1), single(2));
 assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([3, 2, 1, 2]));
 
 % Errors
 delete(fn);
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 1, 1, 1, 1, 1), 'Wrong number of input arguments.' );
-assert_cpp_error( @() out2(@quadriga_lib.hdf5_create_file, fn), 'Wrong number of output arguments.' );
+assert_cpp_error( @() out1(@quadriga_lib.hdf5_create_file, fn), 'Wrong number of output arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 0, 1), 'cannot be 0' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 2.5), 'Input ''nx'' must be an integer from 0 to 4294967295.' );
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 65536, 65536), 'too many slots' );   % thrown by C++
@@ -63,12 +66,11 @@ assertTrue( ~exist(fn, 'file') );
 
 % Reshape layout (preserve total slot count)
 quadriga_lib.hdf5_create_file(fn, 12, 12);
-s = quadriga_lib.hdf5_reshape_layout(fn, 1, 1, 18, 8);
-assertEqual(s, uint32([1, 1, 18, 8]));
+quadriga_lib.hdf5_reshape_layout(fn, 1, 1, 18, 8);
 storage_space = quadriga_lib.hdf5_read_layout(fn);
 assertEqual(storage_space, uint32([1, 1, 18, 8]));
 
-% Integer input, no output requested
+% Integer input
 quadriga_lib.hdf5_reshape_layout(fn, uint32(144), uint32(1));
 assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([144, 1, 1, 1]));
 
@@ -78,13 +80,15 @@ assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 0, 144), 'Mismatch in
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn), 'Wrong number of input arguments.' );   % nx is mandatory
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 144, 1, 1, 1, 1), 'Wrong number of input arguments.' );
-assert_cpp_error( @() out2(@quadriga_lib.hdf5_reshape_layout, fn, 144), 'Wrong number of output arguments.' );
+assert_cpp_error( @() out1(@quadriga_lib.hdf5_reshape_layout, fn, 144), 'Wrong number of output arguments.' );
 
 % Omitted ny, nz, nw are 1; an empty nx is an error
 delete(fn);
 quadriga_lib.hdf5_create_file(fn, 256, 256);
-assertEqual(quadriga_lib.hdf5_reshape_layout(fn, 65536), uint32([65536, 1, 1, 1]));
-assertEqual(quadriga_lib.hdf5_reshape_layout(fn, 256, 256, [], []), uint32([256, 256, 1, 1]));
+quadriga_lib.hdf5_reshape_layout(fn, 65536);
+assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([65536, 1, 1, 1]));
+quadriga_lib.hdf5_reshape_layout(fn, 256, 256, [], []);
+assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([256, 256, 1, 1]));
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, []), 'Mismatch in number of elements' );
 delete(fn);
 
@@ -178,8 +182,8 @@ assertEqual(storage_space, uint32([128, 8, 8, 8]));
 
 % Write par via hdf5_write_channel (requires a chan; use a minimal dummy)
 dummy_chan = struct('name', 'par_holder');
-storage_space = quadriga_lib.hdf5_write_channel(fn, dummy_chan, par, 1, 1, 1, 1);
-assertEqual(storage_space, uint32([128, 8, 8, 8]));
+code = quadriga_lib.hdf5_write_channel(fn, dummy_chan, par, 1, 1, 1, 1);
+assertEqual(code, int32(0));   % new slot
 
 % Too many outputs
 assert_cpp_error( @() out2(@quadriga_lib.hdf5_write_channel, fn, dummy_chan, par, 2), 'Wrong number of output arguments' );
@@ -248,8 +252,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, dummy_chan, parC, 8), 
 quadriga_lib.hdf5_write_dset(fn, 'loc_a', 1, [], []);
 quadriga_lib.hdf5_write_dset(fn, 'loc_b', 2, uint32(2), uint32(3));
 quadriga_lib.hdf5_write_dset(fn, 'loc_c', 3, single(4), single(5), single(6));
-storage_dims = quadriga_lib.hdf5_write_dset(fn, 'loc_d', 4, 7, 8, 2, 3);
-assertEqual(storage_dims, uint32([128, 8, 8, 8]));   % 1x4 uint32 output
+quadriga_lib.hdf5_write_dset(fn, 'loc_d', 4, 7, 8, 2, 3);
 assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_a', 1, 1, 1, 1), 1);
 assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_a'), 1);
 assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_b', 2, 3, 1, 1), 2);
@@ -258,8 +261,16 @@ assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_d', 7, 8, 2, 3), 4);
 assertEqual(quadriga_lib.hdf5_read_dset_names(fn, 7, 8, 2, 3), {'loc_d'});      % cell column
 assertEqual(quadriga_lib.hdf5_read_dset_names(fn, uint64(7), uint64(8), uint64(2), uint64(3), []), {'loc_d'});
 assertTrue(any(strcmp(quadriga_lib.hdf5_read_dset_names(fn, []), 'loc_a')));
-assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_b', 2, 3, [], [], []), 2);           % empty prefix is 'par_'
+assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_b', 2, 3, [], [], []), 2);           % [] prefix is 'par_'
 assertEqual(quadriga_lib.hdf5_read_dset(fn, 'loc_b', 2, 3, [], [], 'par_'), 2);
+
+% An empty string '' is an empty prefix: full names, also on write
+assertEqual(quadriga_lib.hdf5_read_dset_names(fn, 2, 3, [], [], ''), {'par_loc_b'});
+assertEqual(quadriga_lib.hdf5_read_dset(fn, 'par_loc_b', 2, 3, [], [], ''), 2);
+quadriga_lib.hdf5_write_dset(fn, 'raw', 6, 2, 3, [], [], '');
+assertEqual(quadriga_lib.hdf5_read_dset_names(fn, 2, 3, [], [], ''), {'par_loc_b'; 'raw'});
+assertEqual(quadriga_lib.hdf5_read_dset_names(fn, 2, 3), {'loc_b'});
+assertEqual(quadriga_lib.hdf5_read_dset(fn, 'raw', 2, 3, [], [], ''), 6);
 
 % Empty and missing results
 empty_names = quadriga_lib.hdf5_read_dset_names(fn, 5, 5, 5, 5);
@@ -271,7 +282,7 @@ assertTrue(isa(missing, 'double'));
 assertTrue(isempty(quadriga_lib.hdf5_read_dset(fn, 'loc_a', 129, 1)));         % outside the layout
 assertTrue(isempty(quadriga_lib.hdf5_read_dset_names(fn, 1, 9)));
 
-% No output requested
+% No output requested (hdf5_write_dset has none)
 quadriga_lib.hdf5_write_dset(fn, 'no_out', 5);
 quadriga_lib.hdf5_read_dset(fn, 'no_out');
 quadriga_lib.hdf5_read_dset_names(fn);
@@ -279,7 +290,7 @@ quadriga_lib.hdf5_read_dset_names(fn);
 % Errors
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x'), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, 1, 1, 1, 1, 'par_', 1), 'Wrong number of input arguments.' );
-assert_cpp_error( @() out2(@quadriga_lib.hdf5_write_dset, fn, 'x', 1), 'Wrong number of output arguments.' );
+assert_cpp_error( @() out1(@quadriga_lib.hdf5_write_dset, fn, 'x', 1), 'Wrong number of output arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset(fn), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset(fn, 'x', 1, 1, 1, 1, 'par_', 1), 'Wrong number of input arguments.' );
 assert_cpp_error( @() out2(@quadriga_lib.hdf5_read_dset, fn, 'x'), 'Wrong number of output arguments.' );
@@ -296,6 +307,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', int16(1)), 'Input ''
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', {1}), 'Input ''data'' has an unsupported data type.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1 + 2i), 'Complex datatypes are not supported.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'a-b', 1), 'Parameter name must only contain' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, '', 1), 'Dataset name not provided.' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, [], [], [], [], 'p-'), 'Parameter name must only contain' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 1, 1), 'Input ''name'' must be a string' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset(1, 'x'), 'Input ''fn'' must be a string' );
@@ -360,10 +372,12 @@ assertEqual(chanR.coeff_re, double(single(coeff_re)));
 
 % Snapshot index out of bounds
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 0), 'Entries in ''i_snap'' cannot be 0 (1-based index).' );
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 4), 'out of bounds' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 4), 'exceed the number of snapshots' );   % thrown by C++
 
-% Snap on slot with no structured data errors
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 1, 1, 1, 1, 2), 'out of bounds' );
+% i_snap does not apply to a slot without snapshots: it keeps its unstructured data
+[chanR, parR] = quadriga_lib.hdf5_read_channel(fn, 1, 1, 1, 1, 2);
+assertTrue(~isfield(chanR, 'coeff_re'));
+assertEqual(parR.string, par.string);
 
 % 2D-delay shorthand was removed; explicit reshape works
 delay_2d = rand(5, 3);
@@ -494,13 +508,11 @@ assertTrue(~isfield(chanR, 'lbs_pos'));
 assertTrue(~isfield(chanR, 'n_interact'));
 assertTrue(~isfield(chanR, 'interact_coord'));
 
-% Writing to an occupied slot replaces it and issues a warning; evalc keeps the expected warning off the console
+% Writing to an occupied slot replaces it; code is 1 there, 0 for a new slot; no warning
 lastwarn('');
-quadriga_lib.hdf5_write_channel(fn, chan, [], 7, 1, 1, 2);
+assertEqual(quadriga_lib.hdf5_write_channel(fn, chan, [], 7, 1, 1, 2), int32(0));
+assertEqual(quadriga_lib.hdf5_write_channel(fn, [chan, chan], [], [7, 6], 1, 1, 2), int32([1; 1]));
 assertTrue(isempty(lastwarn));
-txt = evalc('quadriga_lib.hdf5_write_channel(fn, chan, [], 6, 1, 1, 2);');
-assertTrue(~isempty(strfind(lastwarn, 'overwriting existing dataset')));
-assertTrue(~isempty(strfind(txt, 'overwriting existing dataset')));
 [~, parR] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 2);
 assertTrue(isempty(fieldnames(parR)));   % the datasets of the old slot are removed
 
@@ -542,8 +554,8 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 7, 1, 1, 0),
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 1.5), 'Entries in ''ix'' must be integers from 1 to 4294967295.' );
 
 % Errors from C++: index outside the layout, invalid channel, unsupported par type
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 129), 'Index out of bound.' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, struct('rx_pos', [1; 2], 'coeff_re', 1, ...
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 129), 'Entry 1: Slot is outside the storage layout.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, [chan, chan], [], 7), 'Entry 2: Slot is listed twice.' );assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, struct('rx_pos', [1; 2], 'coeff_re', 1, ...
     'coeff_im', 1, 'delay', 1), [], 7), '''rx_pos'' is missing or ill-formatted' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, struct('l', true), 7), 'Input ''par.l'' has an unsupported data type.' );
 
@@ -551,8 +563,12 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, struct('l', true
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 1, 1, 1, 1, 1), 'Wrong number of input arguments.' );
 
-% hdf5_write_dset on non-existent file errors
-assert_cpp_error( @() quadriga_lib.hdf5_write_dset('does_not_exist.hdf5', 'foo', pi, 1), 'File does not exist' );
+% hdf5_write_dset creates a missing file that just holds the slot
+delete_files(fn2);
+quadriga_lib.hdf5_write_dset(fn2, 'foo', pi, 2, 3);
+assertEqual(quadriga_lib.hdf5_read_layout(fn2), uint32([2, 3, 1, 1]));
+assertEqual(quadriga_lib.hdf5_read_dset(fn2, 'foo', 2, 3), pi);
+delete(fn2);
 
 %% ===== Multi-channel writes (struct array) =====
 
@@ -568,9 +584,10 @@ for k = 1:N
     chans(k).delay            = rand(2, 2, 4, 2);
 end
 
-% Default layout when file is created from chan array
-storage_space = quadriga_lib.hdf5_write_channel(fn2, chans);
-assertEqual(storage_space, uint32([N, 1, 1, 1]));
+% A new file just holds the slots; one code per channel
+code = quadriga_lib.hdf5_write_channel(fn2, chans);
+assertEqual(code, int32(zeros(N, 1)));
+assertEqual(quadriga_lib.hdf5_read_layout(fn2), uint32([N, 1, 1, 1]));
 
 % Read all back with no indices — vector return
 chansR = quadriga_lib.hdf5_read_channel(fn2);
@@ -594,12 +611,13 @@ chansR = quadriga_lib.hdf5_read_channel(fn2);
 assertTrue(isempty(chansR(1).fbs_pos));
 assertEqual(chansR(2).fbs_pos, double(single(mixed(2).fbs_pos)));
 
-% A new file is sized from the indices; [] is the default; no output requested
+% A new file is sized from the indices; [] is the default; non-double classes; no output requested
 delete(fn2);
 quadriga_lib.hdf5_write_channel(fn2, chans(1:2), [], [], uint32(2), [1, 3], single(2));
 [storage_space, has_data] = quadriga_lib.hdf5_read_layout(fn2);
 assertEqual(storage_space, uint32([2, 2, 3, 2]));
 assertTrue(has_data(1, 2, 1, 2) && has_data(2, 2, 3, 2));
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn2, chans(1), [], 3), 'Entry 1: Slot is outside the storage layout.' );
 assertEqual(nnz(has_data), 2);
 
 % Scalar broadcasting on iy
@@ -664,18 +682,25 @@ assertEqual(numel(chansR), 2);
 assertEqual(chansR(1).name, chans(1).name);     % column-major order: slot 3 first
 assertEqual(chansR(2).name, chans(2).name);
 
+% i_snap applies to every selected slot
+chansR = quadriga_lib.hdf5_read_channel(fn2, [], [], [], [], 2);
+assertEqual(numel(chansR), 2);
+for k = 1:2
+    assertEqual(chansR(k).coeff_re, double(single(chans(k).coeff_re(:, :, :, 2))));
+end
+
 %% ===== hdf5_read_channel: errors =====
 
-% snap rejected when more than one slot is requested
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, [], [], [], [], 1), 'single slot' );
+% An i_snap index beyond the snapshots of a selected slot (thrown by C++)
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, [], [], [], [], 3), 'exceed the number of snapshots' );
 
 % Reading a non-existent file errors
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel('does_not_exist.hdf5'), 'does not exist' );
 
 % Index out of bounds or not an integer on read
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 999), 'out of bounds' );   % nx = 10
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 999), 'outside the storage layout (10 slots)' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 0), 'Entries in ''ix'' cannot be 0 (1-based index).' );
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1, 1, 1, 2), 'Index ''iw'' out of bounds.' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1, 1, 1, 2), 'Input ''iw'' contains indices outside' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1.5), 'Entries in ''ix'' must be integers from 1 to 4294967295.' );
 
 % Argument counts
@@ -702,7 +727,11 @@ delete_files( fn, fn2, fn3, non_hdf5 );
 
 end
 
-% Request 2 or 3 outputs so that the nargout guard of a wrapper fires
+% Request 1, 2 or 3 outputs so that the nargout guard of a wrapper fires
+function out1(f, varargin)
+x = f( varargin{:} ); %#ok<NASGU>
+end
+
 function out2(f, varargin)
 [~, ~] = f( varargin{:} );
 end

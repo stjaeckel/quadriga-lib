@@ -341,7 +341,7 @@ const auto bins = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1], fal
 const auto tx_pos = qd_mex_typecast_Col<double>(prhs[7], "tx_pos", 3); // fixed length
 ```
 - A regular 4D shape `[d1, d2, d3, d4]` is read with `qd_mex_get_CubeVec` (zero-copy where possible); `qd_mex_matlab2vector_*` is only for ragged, zero-padded lists.
-- Strings: `(nrhs < 3) ? std::string("name") : qd_mex_get_string(prhs[2], "name")` (the second argument is the default); lists of strings: `qd_mex_get_strings(prhs[4], "models")`.
+- Strings: `(nrhs < 3) ? std::string("name") : qd_mex_get_string(prhs[2], "name")` (the second argument is the default); lists of strings: `qd_mex_get_strings(prhs[4], "models")`. Where an empty string is a meaningful value (e.g. a name prefix), `qd_mex_get_string_or_empty` reads `[]` as the default and `''` as the empty string.
 - Scalars state their default twice, once for an omitted input and once for `[]`; integer and bool scalars must pass a default:
 ```
 const auto n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "n_bins", 201);

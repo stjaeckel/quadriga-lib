@@ -153,7 +153,7 @@ Every function validates everything it reads; violations throw `std::invalid_arg
 - Unstructured data of foreign types (variable-length or NUL-padded strings, other numeric types, rank > 3) throw instead of returning an empty `std::any`; attributes must have exactly their documented types.
 - No file locking (one writer per file is documented); different `Malformed HDF5 file: …` texts for corrupt files; `hdf5_read_layout` without `channelID` and `hdf5_reshape_layout` validate `Order` and `ChannelRef` too.
 - Dataset names over 65000 bytes and strings of 4 GiB or more throw before the file is touched; duplicate par names throw before a missing file is created.
-- MEX/Python `hdf5_create_file`: "File already exists." for every existing file, also one that cannot be read.
+- `hdf5_create_file` (C++, MEX, Python): "File already exists." for every existing file, also one that cannot be read.
 - Docs: the `h5repack` hint is replaced by "copy the channels into a new file"; every function documents the version requirement and the single-writer rule.
 
 ## 7. Code structure and portability
@@ -247,5 +247,5 @@ Optional test dependency: `find_package(HDF5 1.12 MODULE QUIET COMPONENTS C)` in
 - Not run: libhdf5 1.8, HDFView, a full-tree comparison with h5py; MSVC/MinGW builds and the Windows paths (`_fseeki64`, `_wfsopen`, `u8path`, 1 GiB pieces); no test issues a single read or write above 1 GiB.
 - Residual gap for crafted files: a valid object header placed inside the `Order`/`ChannelRef` data of a header that the writer does not read can be overwritten by a slot update (only that crafted object is damaged).
 - Interrupted `hdf5_write_dset` on an empty slot between its last two updates leaves `Order[slot] = 0` (4.1); not repaired automatically.
-- v2 wrapper behavior kept unchanged (pinned or out of scope): Python `hdf5_write_dset` checks `ix > nx` instead of `>=` (two different messages) and accepts empty arrays; Python `hdf5_read_channel` truncates float indices and ignores `snap` on slots without structured data; a par-only channel loses its name; an empty channel without par data is not written.
+- v2 wrapper behavior kept unchanged (pinned or out of scope): Python `hdf5_write_dset` accepts empty arrays; Python `hdf5_read_channel` truncates float indices; a par-only channel loses its name; an empty channel without par data is not written.
 - `README_pip.md` lists wheels for Python 3.9–3.13, while the converter needs Python ≥ 3.10.

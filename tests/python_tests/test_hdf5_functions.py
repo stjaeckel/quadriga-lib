@@ -169,30 +169,30 @@ class test_case(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_create_file(self):
         fn = self.fn('create.hdf5')
-        dims = channel.hdf5_create_file(fn)  # default layout
-        self.assertIsInstance(dims, np.ndarray)
-        self.assertEqual(dims.dtype, np.int64)
-        npt.assert_array_equal(dims, [65536, 1, 1, 1])
+        self.assertIsNone(channel.hdf5_create_file(fn))  # default layout, no return value
         npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [65536, 1, 1, 1])
 
         # Each argument reaches its dimension, positionally and by keyword
-        dims = channel.hdf5_create_file(self.fn('create_pos.hdf5'), 2, 3, 4, 5)
-        npt.assert_array_equal(dims, [2, 3, 4, 5])
+        channel.hdf5_create_file(self.fn('create_pos.hdf5'), 2, 3, 4, 5)
         npt.assert_array_equal(channel.hdf5_read_layout(self.fn('create_pos.hdf5'))[0], [2, 3, 4, 5])
-        dims = channel.hdf5_create_file(fn=self.fn('create_kw.hdf5'), nw=5, nz=4, ny=3, nx=2)
-        npt.assert_array_equal(dims, [2, 3, 4, 5])
+        channel.hdf5_create_file(fn=self.fn('create_kw.hdf5'), nw=5, nz=4, ny=3, nx=2)
         npt.assert_array_equal(channel.hdf5_read_layout(self.fn('create_kw.hdf5'))[0], [2, 3, 4, 5])
 
         # numpy integers are accepted; omitted trailing dimensions are 1
-        dims = channel.hdf5_create_file(self.fn('create_np.hdf5'), np.uint32(3), np.int64(2))
-        self.assertEqual(dims.dtype, np.int64)
-        npt.assert_array_equal(dims, [3, 2, 1, 1])
+        channel.hdf5_create_file(self.fn('create_np.hdf5'), np.uint32(3), np.int64(2))
+        npt.assert_array_equal(channel.hdf5_read_layout(self.fn('create_np.hdf5'))[0], [3, 2, 1, 1])
 
     def test_create_file_errors(self):
         fn = self.fn('create_err.hdf5')
         channel.hdf5_create_file(fn, 2)
-        with self.assertRaises(RuntimeError) as ctx:  # thrown by the wrapper
+        with self.assertRaises(RuntimeError) as ctx:  # thrown by C++
             channel.hdf5_create_file(fn, 2)
+        self.assertIn('File already exists.', str(ctx.exception))
+        text = self.fn('not_hdf5.txt')  # any existing file, also one that is not an HDF5 file
+        with open(text, 'w') as f:
+            f.write('text')
+        with self.assertRaises(RuntimeError) as ctx:
+            channel.hdf5_create_file(text, 2)
         self.assertIn('File already exists.', str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:  # thrown by C++
@@ -290,39 +290,40 @@ class test_case(unittest.TestCase):
     # hdf5_write_channel
     # ------------------------------------------------------------------
     def test_write_channel(self):
-        # A single dict goes to slot 0 of a new file sized for it
+        # A single dict goes to slot 0 of a new file sized for it; one code per channel
         fn = self.fn('write_single.hdf5')
-        dims = channel.hdf5_write_channel(fn, minimal_channel())
-        self.assertEqual(dims.dtype, np.int64)
-        npt.assert_array_equal(dims, [1, 1, 1, 1])
+        code = channel.hdf5_write_channel(fn, minimal_channel())
+        self.assertEqual(code.dtype, np.int64)
+        npt.assert_array_equal(code, [0])
+        npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [1, 1, 1, 1])
 
         # A list goes to the slots 0 ... n-1 in x
         fn = self.fn('write_list.hdf5')
-        dims = channel.hdf5_write_channel(fn, [minimal_channel(n) for n in 'abc'])
-        npt.assert_array_equal(dims, [3, 1, 1, 1])
+        npt.assert_array_equal(channel.hdf5_write_channel(fn, [minimal_channel(n) for n in 'abc']), [0, 0, 0])
+        npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [3, 1, 1, 1])
         chan, par = channel.hdf5_read_channel(fn)
         self.assertEqual([c['name'] for c in chan], ['a', 'b', 'c'])
         self.assertEqual(par, [{}, {}, {}])
 
         # A new file is sized from the indices; vector indices of any integer type, scalars are broadcast
         fn = self.fn('write_idx.hdf5')
-        dims = channel.hdf5_write_channel(fn, [minimal_channel('a'), minimal_channel('b')], None,
-                                          [0, 3], 1, np.uint64(2), np.array([0, 1], dtype=np.int32))
-        npt.assert_array_equal(dims, [4, 2, 3, 2])
+        channel.hdf5_write_channel(fn, [minimal_channel('a'), minimal_channel('b')], None,
+                                   [0, 3], 1, np.uint64(2), np.array([0, 1], dtype=np.int32))
+        npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [4, 2, 3, 2])
         expected = np.zeros((4, 2, 3, 2), dtype=np.uint32)
         expected[0, 1, 2, 0] = expected[3, 1, 2, 1] = 1
         npt.assert_array_equal(channel.hdf5_read_layout(fn)[1], expected)
 
-        # Keyword arguments; an existing file keeps its layout, which is returned
+        # Keyword arguments; an existing file keeps its layout
         fn = self.fn('write_kw.hdf5')
         channel.hdf5_create_file(fn, 2, 3)
-        dims = channel.hdf5_write_channel(fn=fn, chan=minimal_channel('k'), par={'x': 1.0},
+        code = channel.hdf5_write_channel(fn=fn, chan=minimal_channel('k'), par={'x': 1.0},
                                           ix=1, iy=np.array([2]), iz=0, iw=None)
-        self.assertEqual(dims.dtype, np.int64)
-        npt.assert_array_equal(dims, [2, 3, 1, 1])
+        npt.assert_array_equal(code, [0])
+        npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [2, 3, 1, 1])
         chan, par = channel.hdf5_read_channel(fn, 1, 2, 0, 0)
         self.assertEqual(chan[0]['name'], 'k')
-        self.assertEqual(par, {'x': 1.0})
+        self.assertEqual(par, [{'x': 1.0}])
 
     def test_write_channel_par(self):
         fn = self.fn('write_par.hdf5')
@@ -339,9 +340,12 @@ class test_case(unittest.TestCase):
         # A par dict without structured data (a channel with only a name holds no data of its own)
         fn = self.fn('write_par_only.hdf5')
         channel.hdf5_write_channel(fn, {'name': 'par_only'}, {'v': np.int32(5)})
-        chan, par = channel.hdf5_read_channel(fn)
+        chan, par = channel.hdf5_read_channel(fn, 0)
         self.assertEqual(len(chan), 1)
-        self.assert_same(par, {'v': 5})
+        self.assert_same(par, [{'v': 5}])
+        # i_snap does not apply to a slot without snapshots: it keeps its unstructured data
+        chan, par = channel.hdf5_read_channel(fn, 0, i_snap=[3])
+        self.assert_same(par, [{'v': 5}])
 
         # All supported types, shapes and memory layouts pass through the par dict unchanged
         fn = self.fn('write_par_types.hdf5')
@@ -349,7 +353,8 @@ class test_case(unittest.TestCase):
         par_in = {name: v for name, (v, _, _) in values.items()}
         par_in.update(strided_inputs())
         channel.hdf5_write_channel(fn, minimal_channel(), par_in)
-        _, par = channel.hdf5_read_channel(fn)
+        _, par = channel.hdf5_read_channel(fn, 0)
+        par = par[0]
         self.assertEqual(list(par.keys()), list(par_in.keys()))  # creation order is kept
         for name, (_, expected, typ) in values.items():
             self.assert_value(par[name], expected, typ, name)
@@ -359,20 +364,20 @@ class test_case(unittest.TestCase):
 
     def test_write_channel_overwrite(self):
         fn = self.fn('overwrite.hdf5')
+        # The code is 1 for a replaced slot, 0 for a new one; no warning
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter('always')
+            channel.hdf5_create_file(fn, 2)
             channel.hdf5_write_channel(fn, minimal_channel('old'), {'a': 1.0})
             channel.hdf5_write_dset(fn, name='b', data=2.0)
-            self.assertEqual(len(w), 0)
-            channel.hdf5_write_channel(fn, minimal_channel('new'))
-            self.assertEqual(len(w), 1)
-            self.assertIs(w[0].category, UserWarning)
-            self.assertIn('overwriting existing dataset', str(w[0].message))
+            code = channel.hdf5_write_channel(fn, [minimal_channel('new'), minimal_channel('other')])
+            self.assertFalse([x for x in w if 'overwriting' in str(x.message)])
+        npt.assert_array_equal(code, [1, 0])
 
         # The slot is replaced completely, also the datasets written with hdf5_write_dset
         chan, par = channel.hdf5_read_channel(fn, 0, 0, 0, 0)
         self.assertEqual(chan[0]['name'], 'new')
-        self.assertEqual(par, {})
+        self.assertEqual(par, [{}])
 
     def test_write_channel_errors(self):
         fn = self.fn('write_err.hdf5')
@@ -390,9 +395,11 @@ class test_case(unittest.TestCase):
             (c, {'par': [{}, {}]}, "'par' must have the same number of entries as 'chan'."),
             (c, {'par': {'x': np.ones(2, complex)}}, "Input 'x' has an unsupported type."),
             (c, {'par': {'a-b': 1.0}}, 'Parameter name must only contain letters, numbers and the underscore'),
+            ([c, c], {'par': [{}, {'': 1.0}]}, 'Dataset name not provided.'),  # from C++
             ([c, c, c], {'ix': [0, 1]}, "Input 'ix' must be a scalar or a vector of length len(chan)."),
             ([c, c], {'ix': 0, 'iw': [0, 0, 0]}, "Input 'iw' must be a scalar or a vector of length len(chan)."),
-            (c, {'iy': 2}, 'Index out of bound.'),
+            (c, {'iy': 2}, 'outside the storage layout'),
+            ([c, c], {'ix': 1}, 'listed twice'),
         ]
         for chan, kwargs, msg in cases:
             with self.assertRaises(ValueError, msg=msg) as ctx:
@@ -424,13 +431,13 @@ class test_case(unittest.TestCase):
         channel.hdf5_write_channel(fn, chan_in)
         self.assert_same(chan_in, chan_ref)  # inputs are not modified
 
-        out = channel.hdf5_read_channel(fn)
+        out = channel.hdf5_read_channel(fn, 0)
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 2)
         chan, par = out
         self.assertIsInstance(chan, list)
         self.assertEqual(len(chan), 1)
-        self.assertEqual(par, {})  # single slot: one dict
+        self.assertEqual(par, [{}])  # one dict per channel, also for a single slot
 
         # Every key comes back with its documented type, dtype and shape and the written values
         self.assert_same(chan[0], chan_ref)
@@ -505,15 +512,16 @@ class test_case(unittest.TestCase):
         # A single slot gives one par dict; keywords reach their dimension
         chan, par = channel.hdf5_read_channel(fn=fn, ix=1, iy=1, iz=0, iw=1, i_snap=None, stack=False)
         self.assertEqual(chan[0]['name'], 'c')
-        self.assertEqual(par, {'p': 'c'})
+        self.assertEqual(par, [{'p': 'c'}])
 
         # Empty slots are skipped
-        self.assertEqual(channel.hdf5_read_channel(fn, 1, 0, 0, 0), ([], {}))
+        self.assertEqual(channel.hdf5_read_channel(fn, 1, 0, 0, 0), ([], []))
         self.assertEqual(channel.hdf5_read_channel(fn, 1, 0), ([], []))
 
     def test_read_channel_snap(self):
         fn = self.fn('snap.hdf5')
         ref = full_channel()
+        channel.hdf5_create_file(fn, 2)
         channel.hdf5_write_channel(fn, ref)
 
         chan, _ = channel.hdf5_read_channel(fn, 0, 0, 0, 0, i_snap=[1, 0])  # 0-based, reversed order
@@ -528,12 +536,19 @@ class test_case(unittest.TestCase):
             chan, _ = channel.hdf5_read_channel(fn, i_snap=snap)
             self.assert_same(chan[0]['coeff'], [ref['coeff'][1]])
 
+        # i_snap applies to every selected slot
+        channel.hdf5_write_channel(fn, ref, ix=1)
+        chan, _ = channel.hdf5_read_channel(fn, [0, 1], i_snap=[1])
+        self.assertEqual(len(chan), 2)
+        for c in chan:
+            self.assert_same(c['coeff'], [ref['coeff'][1]])
+
         chan, _ = channel.hdf5_read_channel(fn, i_snap=[1], stack=True)
         self.assertEqual(chan[0]['coeff'].shape, (2, 3, 2, 1))
 
     def test_path_fn_and_stack_flag(self):
         fn = pathlib.Path(self.fn('path.hdf5'))
-        npt.assert_array_equal(channel.hdf5_create_file(fn, 2), [2, 1, 1, 1])
+        channel.hdf5_create_file(fn, 2)
         channel.hdf5_reshape_layout(fn, 1, 2)
         npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [1, 2, 1, 1])
         channel.hdf5_write_channel(fn, minimal_channel('p'))
@@ -552,18 +567,18 @@ class test_case(unittest.TestCase):
 
     def test_read_channel_errors(self):
         fn = self.fn('read_err.hdf5')
-        with self.assertRaises(RuntimeError) as ctx:  # thrown by the wrapper
+        with self.assertRaises(RuntimeError) as ctx:  # thrown by C++
             channel.hdf5_read_channel(fn)
-        self.assertIn('HDF5 file does not exist or has no layout.', str(ctx.exception))
+        self.assertIn('File does not exist.', str(ctx.exception))
 
         channel.hdf5_create_file(fn, 3, 2, 1, 2)
         channel.hdf5_write_channel(fn, full_channel())
-        for kwargs, msg in [({'ix': 3}, "Slot index 'ix' is out of bound."),
-                            ({'iy': [0, 2]}, "Slot index 'iy' is out of bound."),
-                            ({'iz': 1}, "Slot index 'iz' is out of bound."),
-                            ({'iw': 2}, "Slot index 'iw' is out of bound."),
-                            ({'i_snap': 0}, "'i_snap' is only allowed when a single slot is selected."),
-                            ({'ix': 0, 'iy': 0, 'iw': 0, 'i_snap': 2}, 'Snapshot index out of bound.')]:
+        for kwargs, msg in [({'ix': 3}, "Input 'ix' contains indices outside the storage layout"),
+                            ({'iy': [0, 2]}, "Input 'iy' contains indices outside the storage layout"),
+                            ({'iz': 1}, "Input 'iz' contains indices outside the storage layout"),
+                            ({'iw': 2}, "Input 'iw' contains indices outside the storage layout"),
+                            ({'i_snap': 2}, 'exceed the number of snapshots'),
+                            ({'ix': 0, 'iy': 0, 'iw': 0, 'i_snap': [0, 2]}, 'exceed the number of snapshots')]:
             with self.assertRaises(ValueError, msg=msg) as ctx:
                 channel.hdf5_read_channel(fn, **kwargs)
             self.assertIn(msg, str(ctx.exception))
@@ -613,7 +628,7 @@ class test_case(unittest.TestCase):
         channel.hdf5_write_dset(fn, 'extra', np.int64(4), 1, 1)
         chan, par = channel.hdf5_read_channel(fn, 1, 1, 0, 0)
         self.assertEqual(chan[0]['name'], 'ch')
-        self.assert_same(par, {'extra': 4})
+        self.assert_same(par, [{'extra': 4}])
 
     def test_dset_prefix(self):
         fn = self.fn('dset_prefix.hdf5')
@@ -639,7 +654,7 @@ class test_case(unittest.TestCase):
         self.assertIn('Parameter name must only contain', str(ctx.exception))
 
         # hdf5_read_channel returns only the 'par_' datasets
-        self.assertEqual(list(channel.hdf5_read_channel(fn, 0)[1]), ['a', 'c'])
+        self.assertEqual(list(channel.hdf5_read_channel(fn, 0)[1][0]), ['a', 'c'])
 
     def test_dset_types(self):
         fn = self.fn('dset_types.hdf5')
@@ -681,17 +696,22 @@ class test_case(unittest.TestCase):
 
     def test_dset_errors(self):
         fn = self.fn('dset_err.hdf5')
-        for f, kwargs in [(channel.hdf5_write_dset, {'name': 'x', 'data': 1.0}),
-                          (channel.hdf5_read_dset, {'name': 'x'}), (channel.hdf5_read_dset_names, {})]:
+        for f, kwargs in [(channel.hdf5_read_dset, {'name': 'x'}), (channel.hdf5_read_dset_names, {})]:
             with self.assertRaises(RuntimeError) as ctx:
                 f(fn, **kwargs)
             self.assertIn('File does not exist.', str(ctx.exception))
 
+        # A missing file is created just large enough for the slot
+        channel.hdf5_write_dset(self.fn('dset_new.hdf5'), name='x', data=1.0, ix=2)
+        npt.assert_array_equal(channel.hdf5_read_layout(self.fn('dset_new.hdf5'))[0], [3, 1, 1, 1])
+        self.assertEqual(channel.hdf5_read_dset(self.fn('dset_new.hdf5'), 'x', 2), 1.0)
+
         channel.hdf5_create_file(fn, 2, 2)
         channel.hdf5_write_dset(fn, name='x', data=1.0)
-        for kwargs, msg in [({'name': '', 'data': 1.0}, 'Dataset name not provided.'),  # thrown by the wrapper
-                            ({'ix': 3, 'name': 'y', 'data': 1.0}, 'Location exceeds storage space in HDF file.'),
-                            ({'ix': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),  # thrown by C++
+        for kwargs, msg in [({'name': '', 'data': 1.0}, 'Dataset name not provided.'),  # all thrown by C++
+                            ({'name': '', 'data': 1.0, 'prefix': ''}, 'Dataset name not provided.'),
+                            ({'ix': 3, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
+                            ({'ix': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
                             ({'iy': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
                             ({'name': 'a b', 'data': 1.0}, 'Parameter name must only contain letters'),
                             ({'name': 'y', 'data': np.ones(2, complex)}, "Input 'y' has an unsupported type.")]:

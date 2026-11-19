@@ -19,12 +19,12 @@ Create a new HDF5 channel file with a custom storage layout
 - Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
 - Storage layout is fixed at creation and cannot be altered later, except by reshaping while
   keeping the total slot count constant
-- Errors if the target file already exists; delete it first to recreate it
+- Errors if the target file already exists (also one that cannot be read); delete it first to recreate it
 - Files can be read by any HDF5 tool but must be modified only with quadriga-lib
 
 ## Usage:
 ```
-storage_space = quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw );
+quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw );
 ```
 
 ## Inputs:
@@ -34,20 +34,19 @@ storage_space = quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw );
 - **`nz`** — Number of slots along dimension Z; default: 1
 - **`nw`** — Number of slots along dimension W; default: 1
 
-## Output:
-- **`storage_space`** — Actual storage dimensions used; `[4]`; uint32
-
 ## See also:
 - [[hdf5_write_channel]] (for writing channel data)
 - [[hdf5_write_dset]] (for writing arbitrary unstructured data)
+- [[hdf5_read_layout]] (for reading the layout)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)plhs; // No outputs
     if (nrhs < 1 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 1)
+    if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
@@ -57,23 +56,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned nz = (nrhs < 4) ? 1U : qd_mex_get_scalar<unsigned>(prhs[3], "nz", 1U);
     const unsigned nw = (nrhs < 5) ? 1U : qd_mex_get_scalar<unsigned>(prhs[4], "nw", 1U);
 
-    // Fail if the file exists: hdf5_read_layout returns zeros only for a missing file and throws for any other file
-    // it cannot read (files of older versions, other files, unreadable files)
-    bool exists = true;
-    try
-    {
-        exists = quadriga_lib::hdf5_read_layout(fn).at(0) != 0;
-    }
-    catch (const std::exception &)
-    {
-    }
-    if (exists)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File already exists.");
-
-    // Create file
+    // Create file (C++ throws if it exists)
     CALL_QD(quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw));
-
-    // Return storage space
-    arma::u32_vec storage_space = {nx, ny, nz, nw};
-    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 }

@@ -16,12 +16,12 @@ Create a new HDF5 channel file with a custom storage layout
 - Defines a 4D storage layout `(nx, ny, nz, nw)`; each index combination maps to one channel slot
 - Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
 - The total slot count is fixed at creation; the layout can be reshaped with [[hdf5_reshape_layout]]
-- Raises an error if the target file already exists; delete it first to recreate it
+- Raises an error if the target file already exists (also one that cannot be read); delete it first to recreate it
 - Files can be read by any HDF5 tool but must be modified only with quadriga-lib
 
 ## Usage:
 ```
-storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
+quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ## Inputs:
@@ -31,35 +31,14 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 - **`nz`** — Number of elements on the z-dimension; default: 1
 - **`nw`** — Number of elements on the w-dimension; default: 1
 
-## Outputs:
-- **`storage_space`** — Storage dimensions used by the new file, `[nx, ny, nz, nw]`; `(4,)`; int64
-
 ## See also:
 - [[hdf5_write_channel]] (for writing channel data)
 - [[hdf5_write_dset]] (for writing arbitrary unstructured data)
+- [[hdf5_read_layout]] (for reading the layout)
 MD!*/
 
-py::array_t<py::ssize_t> hdf5_create_file(const py::handle &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+void hdf5_create_file(const py::handle &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
-    const std::string fn_s = qd_python_path(fn, "fn");
-
-    // Fail if the file exists: hdf5_read_layout returns zeros only for a missing file and throws for any other file
-    // it cannot read (files of older versions, other files, unreadable files)
-    bool exists = true;
-    try
-    {
-        exists = quadriga_lib::hdf5_read_layout(fn_s).at(0) != 0;
-    }
-    catch (const std::exception &)
-    {
-    }
-    if (exists)
-        throw std::runtime_error("File already exists.");
-
-    // Create file with the requested storage layout
-    quadriga_lib::hdf5_create_file(fn_s, nx, ny, nz, nw);
-
-    // Return the storage layout that was used
-    arma::u32_vec storage_space = {nx, ny, nz, nw};
-    return qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
+    // C++ throws if the file exists
+    quadriga_lib::hdf5_create_file(qd_python_path(fn, "fn"), nx, ny, nz, nw);
 }

@@ -867,4 +867,42 @@ static inline double qd_qrt_freq_scale(const float *freq, size_t n_freq, int ver
     return 1.0e9;
 }
 
+// Occupied slots of an HDF5 slot selection, for hdf5_read_channel_vec (used by the MEX and Python read wrappers)
+// - dims, channel_id: layout {nx, ny, nz, nw} and channel ID per slot, as returned by hdf5_read_layout; dims = 0
+//   (missing file) throws std::runtime_error
+// - ix, iy, iz, iw: 0-based indices per dimension (any order, repeats allowed); empty = full extent; an index outside
+//   the layout throws std::invalid_argument
+// - Returns the slots with a non-zero channel ID in column-major order (ix fastest), one per column; [4, n_slot]
+static inline arma::u32_mat qd_hdf5_select_slots(const arma::u32_vec &dims, const arma::u32_vec &channel_id,
+                                                 const arma::u32_vec &ix, const arma::u32_vec &iy,
+                                                 const arma::u32_vec &iz, const arma::u32_vec &iw)
+{
+    if (dims.n_elem != 4 || dims.at(0) == 0)
+        throw std::runtime_error("File does not exist.");
+    const arma::u32_vec *given[4] = {&ix, &iy, &iz, &iw};
+    const char *names[4] = {"ix", "iy", "iz", "iw"};
+    arma::u32_vec sel[4];
+    for (int d = 0; d < 4; ++d)
+    {
+        if (given[d]->is_empty())
+            sel[d] = arma::regspace<arma::u32_vec>(0, dims.at(d) - 1);
+        else if (arma::any(*given[d] >= dims.at(d)))
+            throw std::invalid_argument("Input '" + std::string(names[d]) + "' contains indices outside the storage layout (" +
+                                        std::to_string(dims.at(d)) + " slots).");
+        else
+            sel[d] = *given[d];
+    }
+    const uint64_t nx = dims.at(0), ny = dims.at(1), nz = dims.at(2);
+    std::vector<unsigned> slots;
+    for (const unsigned w : sel[3])
+        for (const unsigned z : sel[2])
+            for (const unsigned y : sel[1])
+                for (const unsigned x : sel[0])
+                    if (channel_id.at((arma::uword)(x + nx * (y + ny * (z + nz * w)))) != 0)
+                        slots.insert(slots.end(), {x, y, z, w});
+    if (slots.empty())
+        return arma::u32_mat(4, 0);
+    return arma::u32_mat(slots.data(), 4, slots.size() / 4);
+}
+
 #endif

@@ -17,8 +17,7 @@ Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 - Finds all datasets whose HDF5 name starts with `prefix` at slot `(ix, iy, iz, iw)`
 - Returned names have the prefix stripped
 - Returns an empty cell array if no matching datasets are present at the slot
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
-  [[hdf5_read_channel]])
+- Errors if the file does not exist or is not a quadriga-lib channel file
 
 ## Usage:
 ```
@@ -31,7 +30,7 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix );
 - **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
 - **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
-- **`prefix`** — Prefix used to identify unstructured datasets; string; default: `'par_'`
+- **`prefix`** — Prefix used to identify unstructured datasets; string; `''` lists all datasets with their full names; default (omitted or `[]`): `'par_'`
 
 ## Outputs:
 - **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
@@ -54,7 +53,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned iy = (nrhs < 3) ? 0U : qd_mex_get_index<unsigned>(prhs[2], "iy"); // 1-based -> 0-based
     const unsigned iz = (nrhs < 4) ? 0U : qd_mex_get_index<unsigned>(prhs[3], "iz"); // 1-based -> 0-based
     const unsigned iw = (nrhs < 5) ? 0U : qd_mex_get_index<unsigned>(prhs[4], "iw"); // 1-based -> 0-based
-    const std::string prefix = (nrhs < 6) ? std::string("par_") : qd_mex_get_string(prhs[5], "par_", "prefix");
+    const std::string prefix = (nrhs < 6) ? std::string("par_") : qd_mex_get_string_or_empty(prhs[5], "par_", "prefix");
 
     // Read dataset names
     std::vector<std::string> names;

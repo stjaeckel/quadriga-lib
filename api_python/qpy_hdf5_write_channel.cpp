@@ -15,16 +15,17 @@ Write one or more channel objects to an HDF5 file
 - Writes a list of channel dicts into 4D storage slots (one slot per list entry)
 - `chan` may also be a single dict, in which case one channel is written
 - Optional unstructured data (`par`) can be passed as a matching list of dicts (or a single dict)
-- Creates the file with a default layout if it does not exist; an existing file must be a quadriga-lib channel
-  file of version 3 (files of quadriga-lib 0.12.4 and earlier are rejected, see [[hdf5_read_channel]])
-- A warning is issued if any selected slot already contains data. That slot is replaced completely: its old
-  structured data and all its unstructured datasets (also those written with [[hdf5_write_dset]]) are removed.
+- Creates the file if it does not exist, with the layout that just holds all slots (largest index + 1 per
+  dimension); use [[hdf5_create_file]] for another layout
+- All inputs are checked before anything is written: every slot inside the layout of an existing file, no slot
+  twice, all channels valid
+- A slot that already contains data is replaced completely: its old structured data and all its unstructured
+  datasets (also those written with [[hdf5_write_dset]]) are removed; `code` shows which slots were replaced.
   The file does not shrink; copy the channels into a new file to reclaim the space of the removed data
 - One writer per file at a time; files are not locked
 - Structured data is stored in single precision regardless of the input precision
 - Unstructured datasets retain their numpy dtype and shape; supported types as in [[hdf5_write_dset]]
 - Each scalar index input is broadcast to all channels; each vector index must have one entry per channel
-- If the file does not exist, the layout is `[max(len(chan), max(ix)+1), max(iy)+1, max(iz)+1, max(iw)+1]`
 - Channel dict field layout matches [[hdf5_read_channel]]
 - Per-snapshot fields accept the list model (list of arrays) or the stack model
   (single array with the snapshot index as the last axis), detected per field
@@ -33,7 +34,7 @@ Write one or more channel objects to an HDF5 file
 
 ## Usage:
 ```
-storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
+code = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 ```
 
 ## Inputs:
@@ -47,7 +48,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
 
 ## Outputs:
-- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `(4,)`; int64
+- **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `(len(chan),)`; int64
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)
@@ -66,7 +67,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
     const std::string fn_s = qd_python_path(fn, "fn");
 
     // Convert the channel input (single dict or list of dicts) to channel objects
-    std::vector<quadriga_lib::channel<double>> channels = qd_python_list2channel(chan, true);
+    std::vector<quadriga_lib::channel<double>> channels = qd_python_list2channel(chan, false); // C++ validates, naming the entry
     const arma::uword n_chan = (arma::uword)channels.size();
     if (n_chan == 0)
         throw std::invalid_argument("Input 'chan' must contain at least one channel.");
@@ -120,30 +121,11 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
     const arma::Col<unsigned> iz_vec = parse_idx(iz, "iz", false);
     const arma::Col<unsigned> iw_vec = parse_idx(iw, "iw", false);
 
-    // Read the storage layout (returns [0,0,0,0] if the file does not exist)
-    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn_s);
-
-    // Create the file with a default layout if it does not exist
-    if (storage_space.at(0) == 0)
-    {
-        unsigned nx = std::max((unsigned)n_chan, ix_vec.max() + 1u);
-        unsigned ny = iy_vec.max() + 1u;
-        unsigned nz = iz_vec.max() + 1u;
-        unsigned nw = iw_vec.max() + 1u;
-        quadriga_lib::hdf5_create_file(fn_s, nx, ny, nz, nw);
-        storage_space.at(0) = nx;
-        storage_space.at(1) = ny;
-        storage_space.at(2) = nz;
-        storage_space.at(3) = nw;
-    }
-
-    // Write each channel to its slot
-    bool any_overwrite = false;
+    // Attach the unstructured 'par' data and resolve the slot of each channel (scalar broadcasting)
+    arma::u32_mat slots(4, n_chan);
     for (arma::uword k = 0; k < n_chan; ++k)
     {
         quadriga_lib::channel<double> &c = channels[k];
-
-        // Attach the unstructured 'par' data for this channel
         if (!par_vec.empty())
             for (auto item : par_vec[k])
             {
@@ -154,23 +136,13 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
                 c.par_data.push_back(qd_python_anycast(item.second, field_name));
             }
 
-        // Resolve the slot location with scalar broadcasting
-        unsigned cx = ix_vec.n_elem == 1 ? ix_vec.at(0) : ix_vec.at(k);
-        unsigned cy = iy_vec.n_elem == 1 ? iy_vec.at(0) : iy_vec.at(k);
-        unsigned cz = iz_vec.n_elem == 1 ? iz_vec.at(0) : iz_vec.at(k);
-        unsigned cw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
-
-        // Write (indices are 0-based, passed through unchanged)
-        int return_code = quadriga_lib::hdf5_write_channel(fn_s, c, cx, cy, cz, cw);
-        if (return_code == 1)
-            any_overwrite = true;
+        slots.at(0, k) = ix_vec.n_elem == 1 ? ix_vec.at(0) : ix_vec.at(k);
+        slots.at(1, k) = iy_vec.n_elem == 1 ? iy_vec.at(0) : iy_vec.at(k);
+        slots.at(2, k) = iz_vec.n_elem == 1 ? iz_vec.at(0) : iz_vec.at(k);
+        slots.at(3, k) = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
     }
 
-    // Warn if existing data was overwritten
-    if (any_overwrite)
-        py::module_::import("warnings")
-            .attr("warn")("Modifying or overwriting existing dataset in file.");
-
-    // Return the storage layout (copied integer output: int64)
-    return qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
+    // Write all channels (C++ checks all inputs first and creates a missing file)
+    const arma::s32_vec code = quadriga_lib::hdf5_write_channel_vec(fn_s, channels, slots);
+    return qd_python_copy2numpy<int, py::ssize_t>(&code);
 }

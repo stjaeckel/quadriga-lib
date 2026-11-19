@@ -15,8 +15,7 @@ Read a single unstructured dataset from an HDF5 file
 - Reads a user-defined dataset stored under `prefix + name` (e.g. `"par_carrier_frequency"`)
 - Type and shape of the returned data are determined by the dataset's HDF5 dataspace
 - Returns an empty `[]` matrix if the dataset does not exist at the requested slot
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
-  [[hdf5_read_channel]])
+- Errors if the file does not exist or is not a quadriga-lib channel file
 - Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element 
   types: single, double, int32, uint32, int64, uint64
 
@@ -32,7 +31,7 @@ dset = quadriga_lib.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix );
 - **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
 - **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
-- **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; default: `'par_'`
+- **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; `''` looks up `name` as given; default (omitted or `[]`): `'par_'`
 
 ## Outputs:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; empty `[]` if the dataset is missing
@@ -57,7 +56,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned iy = (nrhs < 4) ? 0U : qd_mex_get_index<unsigned>(prhs[3], "iy"); // 1-based -> 0-based
     const unsigned iz = (nrhs < 5) ? 0U : qd_mex_get_index<unsigned>(prhs[4], "iz"); // 1-based -> 0-based
     const unsigned iw = (nrhs < 6) ? 0U : qd_mex_get_index<unsigned>(prhs[5], "iw"); // 1-based -> 0-based
-    const std::string prefix = (nrhs < 7) ? std::string("par_") : qd_mex_get_string(prhs[6], "par_", "prefix");
+    const std::string prefix = (nrhs < 7) ? std::string("par_") : qd_mex_get_string_or_empty(prhs[6], "par_", "prefix");
 
     // Read dataset
     std::any dset;

@@ -16,8 +16,7 @@ Read the names of unstructured datasets from an HDF5 file
 - Lists the datasets whose names start with `prefix` (default `par_`; `''` lists all); the returned names have the
   prefix stripped
 - Returns an empty list if no unstructured datasets are present at the slot
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (see
-  [[hdf5_read_channel]])
+- Errors if the file does not exist or is not a quadriga-lib channel file
 
 ## Usage:
 ```

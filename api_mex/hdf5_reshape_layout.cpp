@@ -17,14 +17,12 @@ Reshape the storage layout inside an existing HDF5 file
 - Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
 - The total number of slots (`nx · ny · nz · nw`) must match the original layout
 - Only the dimension metadata is updated; stored channel data is not moved
-- Errors if the file does not exist or is not a quadriga-lib channel file of version 3 (files
-  written by quadriga-lib 0.12.4 and earlier are rejected; files modified with other HDF5 tools are
-  not supported and may be rejected)
+- Errors if the file does not exist or is not a quadriga-lib channel file
 - One writer per file at a time; files are not locked
 
 ## Usage:
 ```
-storage_space = quadriga_lib.hdf5_reshape_layout( fn, nx, ny, nz, nw );
+quadriga_lib.hdf5_reshape_layout( fn, nx, ny, nz, nw );
 ```
 
 ## Inputs:
@@ -34,9 +32,6 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, nx, ny, nz, nw );
 - **`nz`** — New number of slots along dimension Z; default: 1
 - **`nw`** — New number of slots along dimension W; default: 1
 
-## Outputs:
-- **`storage_space`** — New storage dimensions `[nx, ny, nz, nw]`; `[4]`; uint32
-
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)
 - [[hdf5_read_layout]] (for reading the existing layout)
@@ -44,9 +39,10 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)plhs; // No outputs
     if (nrhs < 2 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 1)
+    if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
@@ -58,8 +54,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Reshape layout
     CALL_QD(quadriga_lib::hdf5_reshape_layout(fn, nx, ny, nz, nw));
-
-    // Return new storage space
-    arma::u32_vec storage_space = {nx, ny, nz, nw};
-    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 }

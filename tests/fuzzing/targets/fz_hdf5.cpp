@@ -52,8 +52,7 @@ void fuzz_one(const uint8_t *data, size_t size)
         }
 
     // Several slots in one call, and selected snapshots (unsorted, repeated) of each
-    const arma::Mat<unsigned> slots = {{0, 1, 0, 1, 0}, {0, 0, 1, 1, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}};
+    const arma::u32_mat slots = {{0, 1, 0, 1, 0}, {0, 0, 1, 1, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}};
     const arma::uvec i_snap = {1, 0, 1};
     fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<float>(fn, slots); });
-    fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<double>(fn, slots, i_snap); });
-}
+    fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<double>(fn, slots, i_snap); });}

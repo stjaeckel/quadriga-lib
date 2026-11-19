@@ -13,9 +13,9 @@ SECTION!*/
 Write a single unstructured dataset to an HDF5 file
 
 - Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `prefix + name` must contain only alphanumeric characters and underscores
-- The file must already exist (use [[hdf5_create_file]] first) and be a quadriga-lib channel file of
-  version 3 (see [[hdf5_read_channel]])
+- `name` must not be empty; `prefix + name` must contain only alphanumeric characters and underscores
+- Creates the file with the layout `(ix + 1, iy + 1, iz + 1, iw + 1)` if it does not exist; use [[hdf5_create_file]]
+  for another layout
 - A dataset of the same name at the same slot is not overwritten; an error is thrown instead
 - The dataset is added to the slot; everything else stored there is kept. A later [[hdf5_write_channel]] to the
   same slot replaces the slot completely, including the datasets written with this function
@@ -55,21 +55,6 @@ void hdf5_write_dset(const py::handle &fn,
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    if (name.empty())
-        throw std::invalid_argument("Dataset name not provided.");
-
-    // Convert data to a std::any
-    auto any_data = qd_python_anycast(data, name);
-
-    // Read the storage space from the file - returns [0,0,0,0] if file does not exist
-    auto storage_space = quadriga_lib::hdf5_read_layout(fn_s);
-
-    if (storage_space.at(0) == 0)
-        throw std::runtime_error("File does not exist.");
-
-    if (ix > storage_space.at(0) || iy > storage_space.at(1) || iz > storage_space.at(2) || iw > storage_space.at(3))
-        throw std::invalid_argument("Location exceeds storage space in HDF file.");
-
-    // Write to file
-    quadriga_lib::hdf5_write_dset(fn_s, name, any_data, ix, iy, iz, iw, prefix);
+    // C++ checks the name and the slot and creates a missing file
+    quadriga_lib::hdf5_write_dset(fn_s, name, qd_python_anycast(data, name), ix, iy, iz, iw, prefix);
 }

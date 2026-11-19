@@ -128,6 +128,9 @@ def read_slot(group):
                 warnings.append("dataset '%s' is not converted: the name has characters other than letters, digits "
                                 "and '_'" % link)
                 continue
+            if link == 'par_':
+                warnings.append("dataset 'par_' is not converted: the name after the prefix is empty")
+                continue
             value, reason = read_par(dset)
             if reason:
                 warnings.append("dataset '%s' is not converted: %s" % (link, reason))

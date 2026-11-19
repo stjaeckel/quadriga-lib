@@ -334,6 +334,16 @@ inline std::string qd_mex_get_string(const mxArray *input, std::string default_v
     return data;
 }
 
+// Read a string input whose empty value is meaningful (e.g. a name prefix)
+// - [] (or any empty input that is not a char array) gives default_value, '' gives an empty string
+inline std::string qd_mex_get_string_or_empty(const mxArray *input, std::string default_value,
+                                              const std::string &var_name = "")
+{
+    if (input != nullptr && mxGetNumberOfElements(input) == 0)
+        return mxIsChar(input) ? std::string() : default_value;
+    return qd_mex_get_string(input, default_value, var_name);
+}
+
 // The reinterpret functions use the MATLAB data in place. Complex arrays are rejected (qd_mex_get_dims): their
 // data is stored interleaved or in two blocks, depending on the host, and cannot be read as a real array. Sparse
 // arrays store only their non-zero values and are rejected as well.

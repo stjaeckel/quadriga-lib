@@ -14,22 +14,21 @@ Write one or more channel objects to an HDF5 file
 
 - Writes a struct array of channels into 4D slots (one slot per array element)
 - Optional unstructured data can be passed as a matching struct array
-- Creates the file with a sensible default layout if it does not yet exist; an existing file must be
-  a quadriga-lib channel file of version 3 (files of quadriga-lib 0.12.4 and earlier are rejected,
-  see [[hdf5_read_channel]])
-- A warning is issued if any selected slot already contains data. That slot is replaced completely:
-  its old structured data and all its unstructured datasets (also those written with
-  [[hdf5_write_dset]]) are removed. The file does not shrink; copy the channels into a new file to
-  reclaim the space of the removed data
+- Creates the file if it does not exist, with the layout that just holds all slots (largest index per dimension);
+  use [[hdf5_create_file]] for another layout
+- All inputs are checked before anything is written: every slot inside the layout of an existing file, no slot
+  twice, all channels valid
+- A slot that already contains data is replaced completely: its old structured data and all its unstructured
+  datasets (also those written with [[hdf5_write_dset]]) are removed; `code` shows which slots were replaced. The
+  file does not shrink; copy the channels into a new file to reclaim the space of the removed data
 - One writer per file at a time; files are not locked
 - Structured data is stored in single precision regardless of MATLAB input precision
 - Unstructured datasets retain their MATLAB type and shape (see [[hdf5_write_dset]])
 - Each scalar location input is broadcast to all `numel(chan)` channels; each vector input must have exactly `numel(chan)` elements
-- If the file does not exist, it is created with layout `[max(numel(chan), max(ix)), max(iy), max(iz), max(iw)]`
 
 ## Usage:
 ```
-storage_dims = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
+code = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 ```
 
 ## Inputs:
@@ -44,7 +43,7 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 - **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default `1`
 
 ## Outputs:
-- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
+- **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `[numel(chan), 1]`; int32
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)
@@ -66,7 +65,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'chan' must be a non-empty struct.");
 
-    auto channels = qd_mex_struct2channel(prhs[1], true, false, "chan"); // Validates; errors name 'chan'
+    auto channels = qd_mex_struct2channel(prhs[1], false, false, "chan"); // C++ validates, naming the entry
     const arma::uword n_chan = (arma::uword)channels.size();
 
     // Parse 'par' (optional, struct array of same size as 'chan', or empty)
@@ -108,24 +107,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     check_idx(iz_vec, "iz");
     check_idx(iw_vec, "iw");
 
-    // Read storage layout (returns [0,0,0,0] if file does not exist)
-    arma::Col<unsigned> storage_space;
-    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn));
-
-    // Create file with a default layout if it does not exist
-    if (storage_space.at(0) == 0)
-    {
-        unsigned nx = std::max((unsigned)n_chan, ix_vec.max() + 1);
-        unsigned ny = iy_vec.max() + 1;
-        unsigned nz = iz_vec.max() + 1;
-        unsigned nw = iw_vec.max() + 1;
-        CALL_QD(quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw));
-        storage_space.at(0) = nx;
-        storage_space.at(1) = ny;
-        storage_space.at(2) = nz;
-        storage_space.at(3) = nw;
-    }
-
     // Cache 'par' field names (struct arrays share field layout)
     std::vector<std::string> par_field_names;
     int n_par_fields = 0;
@@ -137,15 +118,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             par_field_names.emplace_back(mxGetFieldNameByNumber(prhs[2], i));
     }
 
-    // Write each channel to its slot
-    bool any_overwrite = false;
+    // Attach the unstructured 'par' data and resolve the slot of each channel (scalar broadcasting)
+    arma::u32_mat slots(4, n_chan);
     for (arma::uword k = 0; k < n_chan; ++k)
     {
         quadriga_lib::channel<double> &c = channels[k];
-
-        // Attach unstructured 'par' data for this channel
         if (has_par)
-        {
             for (int i = 0; i < n_par_fields; ++i)
             {
                 mxArray *field_data = mxGetFieldByNumber(prhs[2], (mwIndex)k, i);
@@ -160,23 +138,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 else
                     c.par_data.push_back(qd_mex_anycast(field_data, "par." + field_name, false));
             }
-        }
 
-        // Resolve location with scalar broadcasting
-        unsigned ix = ix_vec.n_elem == 1 ? ix_vec.at(0) : ix_vec.at(k);
-        unsigned iy = iy_vec.n_elem == 1 ? iy_vec.at(0) : iy_vec.at(k);
-        unsigned iz = iz_vec.n_elem == 1 ? iz_vec.at(0) : iz_vec.at(k);
-        unsigned iw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
-
-        int return_code = 0;
-        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(fn, c, ix, iy, iz, iw));
-        if (return_code == 1)
-            any_overwrite = true;
+        slots.at(0, k) = ix_vec.n_elem == 1 ? ix_vec.at(0) : ix_vec.at(k);
+        slots.at(1, k) = iy_vec.n_elem == 1 ? iy_vec.at(0) : iy_vec.at(k);
+        slots.at(2, k) = iz_vec.n_elem == 1 ? iz_vec.at(0) : iz_vec.at(k);
+        slots.at(3, k) = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
     }
 
-    if (any_overwrite)
-        mexWarnMsgIdAndTxt("quadriga_lib:CPPerror", "Modifying or overwriting existing dataset in file.");
-
-    // Return storage space
-    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
+    // Write all channels (C++ checks all inputs first and creates a missing file)
+    arma::s32_vec code;
+    CALL_QD(code = quadriga_lib::hdf5_write_channel_vec(fn, channels, slots));
+    plhs[0] = qd_mex_copy2matlab(&code);
 }

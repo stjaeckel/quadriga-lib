@@ -205,13 +205,12 @@ static void run(fz::input &in)
         for (auto &i : i_snap)
             i = in.index(c.n_snap());
         fz::clean([&] { quadriga_lib::hdf5_read_channel<T>(fn, ix, iy, iz, iw, i_snap); });
-        arma::Mat<unsigned> slots = {{ix, (unsigned)in.index(2)}, {iy, (unsigned)in.index(2)}, {iz, 0}, {iw, 0}};
+        arma::u32_mat slots = {{ix, (unsigned)in.index(2)}, {iy, (unsigned)in.index(2)}, {iz, 0}, {iw, 0}};
         if (in.ConsumeBool()) // Other shapes, also without rows
             slots.resize(in.size(5), in.size(3));
         std::vector<quadriga_lib::channel<T>> chan_vec = {c, c};
         fz::clean([&] { quadriga_lib::hdf5_write_channel_vec(fn, chan_vec, slots); });
-        fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, i_snap); });
-    }
+        fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, i_snap); });    }
     std::vector<std::string> names;
     fz::clean([&] { names = quadriga_lib::hdf5_read_dset_names(fn, ix, iy, iz, iw); });
     for (const auto &n : names)
