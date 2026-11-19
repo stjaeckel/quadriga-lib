@@ -3113,7 +3113,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [Python](quadriga_lib_a
 - Azimuth in [-pi, pi], with the special values of `atan2` (e.g. `atan2(0, -0) = pi`); NaN input gives NaN
   in `az`, `el` and `len`
 - The AVX2 kernel computes the angles in single precision; `len` and `z/len` in double precision
-- Option to provide a single `[3, n, m]` cube or separate x, y, z `[n, m]` inputs
+- `x`, `y` and `z` have the same size; the outputs have that size; empty input gives empty outputs
 
 ### Usage:
 ```matlab
@@ -3121,16 +3121,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [Python](quadriga_lib_a
 ```
 
 ### Inputs:
-- **`x`** — X-coordinates or combined input; `[n, m]` or `[3, n, m]`; 
-- **`y`** — Y-coordinates; `[n, m]` or empty; ignored for combined input
-- **`z`** — Z-coordinates; `[n, m]` or empty; ignored for combined input
+- **`x`** — X-coordinates; up to 4 dimensions
+- **`y`** — Y-coordinates; size of `x`
+- **`z`** — Z-coordinates; size of `x`
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 
   (throws if AVX2 unavailable); other values throw; default: 0
 
 ### Outputs:
-- **`az`** — Azimuth angles in radians; `[n, m]`
-- **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`
+- **`az`** — Azimuth angles in radians; size of `x`
+- **`el`** — Elevation angles in radians; size of `x`
+- **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; size of `x`
 
 ---
 <a id="fast_geo2cart"></a>
@@ -3145,34 +3145,28 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_geo2cart) · [Python](quadriga_lib_a
 - The AVX2 kernel (selected by `use_kernel=0` where available, forced by `use_kernel=2`) computes sine and
   cosine in single precision (angles reduced in double precision first; max. error about 1.3e-7 for angles up
   to 1e10), results widened back; `use_kernel=1` keeps full double precision
+- `el` and `len` have the same size as `az`; the outputs have that size; empty input gives empty outputs
 
 ### Usage:
 ```matlab
-split = true;
-[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
-
-split = false;
-cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel );
 ```
 
 ### Inputs:
-- **`az`** — Azimuth angles in radians; `[n, m]`
-- **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
+- **`az`** — Azimuth angles in radians; up to 4 dimensions
+- **`el`** — Elevation angles in radians; size of `az`
+- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); size of `az`; default: 1
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 0
-- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
-  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
 
 ### Outputs:
-- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
-  along the first dim, `[3, n, m]`
-- **`y`** — Y-coordinates; `[n, m]` or empty
-- **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sin_az`** — sin(az); `[n, m]` or empty
-- **`cos_az`** — cos(az); `[n, m]` or empty
-- **`sin_el`** — sin(el); `[n, m]` or empty
-- **`cos_el`** — cos(el); `[n, m]` or empty
+- **`x`** — X-coordinates; size of `az`
+- **`y`** — Y-coordinates; size of `az`
+- **`z`** — Z-coordinates; size of `az`
+- **`sin_az`** — sin(az); size of `az`
+- **`cos_az`** — cos(az); size of `az`
+- **`sin_el`** — sin(el); size of `az`
+- **`cos_el`** — cos(el); size of `az`
 
 ---
 <a id="fast_sincos"></a>

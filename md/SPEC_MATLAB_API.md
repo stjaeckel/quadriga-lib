@@ -190,6 +190,8 @@ mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool transpo
 mxArray *qd_mex_init_output(arma::Mat<dtype> *input, size_t n_rows, size_t n_cols); // 2D
 mxArray *qd_mex_init_output(arma::Cube<dtype> *input, size_t n_rows, size_t n_cols, size_t n_slices);  // 3D
 mxArray *qd_mex_init_output(std::vector<arma::Cube<dtype>> *input, size_t n_rows, size_t n_cols, size_t n_slices, size_t n_cubes); // 4D
+mxArray *qd_mex_init_output_like(arma::Col<dtype> *input, const mxArray *like); // flat column vector, dimensions of "like"
+bool qd_mex_same_dims(const mxArray *a, const mxArray *b); // equal dimensions, any number of dimensions
 
 // ---------- Structs ----------
 

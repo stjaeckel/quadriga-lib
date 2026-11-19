@@ -58,8 +58,7 @@ POSITIONAL_OPTIONAL = {
     "sos.map": ("y", "z"),
     "sos.generate": ("n_dim",),
     "tools.acdf": ("bins",),
-    "tools.fast_cart2geo": ("y", "z"),
-    "tools.fast_geo2cart": ("el", "len"),
+    "tools.fast_geo2cart": ("len",),
     "tools.interp": ("y_new",),
 }
 

@@ -386,7 +386,7 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 - The default stays in the registration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
 - The `## Inputs:` line states the default. The rule itself is stated once for all functions in `docs_builder/content/api_intro_python.md`; the doc blocks do not repeat it.
 - Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError` whose message names the argument (match the name, not the full sentence).
-- Plain `bool` flags remain only in `channel.baseband_freq_response`, `channel.ieee_indoor` and the `combine` flag of `tools.fast_cart2geo` / `tools.fast_geo2cart`, whose interfaces are being reworked; they predate this rule.
+- Plain `bool` flags remain only in `channel.ieee_indoor`, whose interface is being reworked; they predate this rule.
 
 ### Complex arrays
 - The C++ library represents complex data as separate `arma::Mat<dtype>` (or `arma::Cube<dtype>`) for the real and imaginary parts; `std::complex` appears only as an optional extra output of a few functions. The reason is compatibility with older Octave versions (see "Complex data" in the C++ glossary).
@@ -451,7 +451,7 @@ auto bins_out_py = qd_python_copy2numpy(&bins_out);
   - `stack=False`: return a `list` of arrays (`qd_python_copy2list`).
   - `stack=True`: return one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`).
 - Outputs whose Python type depends on the flag are held in a `py::object`.
-- Any other flag that changes the returned tuple (as `angles`, `dist`, `local_angles`, `combine` in existing wrappers) is not standard: ask before adding one.
+- Any other flag that changes the returned tuple (as `angles`, `dist`, `local_angles` in existing wrappers) is not standard: ask before adding one.
 
 ## Call the C++ function
 - Call the underlying C++ function directly with the converted inputs and output pointers:

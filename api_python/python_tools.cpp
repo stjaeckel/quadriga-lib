@@ -29,11 +29,10 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("n_bins") = 201);
 
     m.def("fast_cart2geo", &fast_cart2geo,
-          py::arg("cart").none(false),
-          py::arg("y") = py::none(),
-          py::arg("z") = py::none(),
+          py::arg("x").none(false),
+          py::arg("y").none(false),
+          py::arg("z").none(false),
           py::kw_only(),
-          py::arg("combine") = true,
           py::arg("use_kernel") = 0);
 
     m.def("write_png", &write_png,
@@ -81,10 +80,9 @@ void quadriga_lib_tools(py::module_ &m)
 
     m.def("fast_geo2cart", &fast_geo2cart,
           py::arg("az").none(false),
-          py::arg("el") = py::none(),
+          py::arg("el").none(false),
           py::arg("len") = py::none(),
           py::kw_only(),
-          py::arg("combine") = true,
           py::arg("use_kernel") = 0);
 
     m.def("calc_rotation_matrix", &calc_rotation_matrix,

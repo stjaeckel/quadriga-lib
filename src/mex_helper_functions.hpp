@@ -1212,6 +1212,29 @@ inline mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool 
     return output;
 }
 
+// Output with the dimensions of the MATLAB array "like" (any number of dimensions), mapped as a flat column vector
+template <typename dtype>
+inline mxArray *qd_mex_init_output_like(arma::Col<dtype> *input, const mxArray *like)
+{
+    mxArray *output = mxCreateNumericArray(mxGetNumberOfDimensions(like), mxGetDimensions(like), qd_mex_class_id<dtype>(), mxREAL);
+    input->~Col();
+    ::new (input) arma::Col<dtype>((dtype *)mxGetData(output), mxGetNumberOfElements(like), false, true);
+    return output;
+}
+
+// True if two MATLAB arrays have the same dimensions
+inline bool qd_mex_same_dims(const mxArray *a, const mxArray *b)
+{
+    const mwSize n_dim = mxGetNumberOfDimensions(a);
+    if (mxGetNumberOfDimensions(b) != n_dim)
+        return false;
+    const mwSize *da = mxGetDimensions(a), *db = mxGetDimensions(b);
+    for (mwSize i = 0; i < n_dim; ++i)
+        if (da[i] != db[i])
+            return false;
+    return true;
+}
+
 template <typename dtype>
 inline mxArray *qd_mex_init_output(arma::Mat<dtype> *input, size_t n_rows, size_t n_cols) // 2D
 {

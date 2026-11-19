@@ -1,22 +1,17 @@
 function test_fast_cart2geo
 
-e = rand(3,6,2);
+[x, y, z] = deal(rand(6,2), rand(6,2), rand(6,2));
 v = 1/sqrt(2);
 
 % --- Argument count errors ---
 
-try
-    quadriga_lib.fast_cart2geo;
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+assert_cpp_error( @() quadriga_lib.fast_cart2geo, 'Wrong number of input arguments.' );
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(x), 'Wrong number of input arguments.' );
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(x, y), 'Wrong number of input arguments.' );
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(x, y, z, 0, 0), 'Wrong number of input arguments.' );
 
 try
-    [~,~,~,~] = quadriga_lib.fast_cart2geo(e);
+    [~,~,~,~] = quadriga_lib.fast_cart2geo(x, y, z);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -25,128 +20,85 @@ catch ME
     end
 end
 
-% --- Input format errors ---
+% --- Shape errors, also with an equal number of elements ---
 
-try
-    quadriga_lib.fast_cart2geo(e,0,[]);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong input argument format.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(rand(4,1), rand(5,1), rand(4,1)), 'Input ''y'' must have the same size as ''x''.' );
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(rand(4,1), rand(4,1), rand(1,4)), 'Input ''z'' must have the same size as ''x''.' );
 
-try
-    quadriga_lib.fast_cart2geo(rand(2,2,2,2));
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong input argument format.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+% The combined [3, n, m] input is gone: y and z cannot be empty
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(rand(3,6,2), [], []), 'Input ''y'' must have the same size as ''x''.' );
 
-% n_rows != 3, no y/z provided -> wrong format
-try
-    quadriga_lib.fast_cart2geo(rand(2,4));
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong input argument format.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+% --- Known values ---
 
-% Size mismatch between x, y, z
-try
-    quadriga_lib.fast_cart2geo(rand(4,1), rand(5,1), rand(4,1));
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong input argument format.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+[az,el,le] = quadriga_lib.fast_cart2geo([-v;0], [-v;2*v], [0;2*v]);
+assertElementsAlmostEqual( az, [-3*pi/4; pi/2], 'absolute', 1e-5 );
+assertElementsAlmostEqual( el, [0; pi/4],       'absolute', 1e-5 );
+assertElementsAlmostEqual( le, [1; 2],          'absolute', 1e-5 );
 
-% --- Cube input path ---
+% --- Outputs preserve the input shape and type ---
 
-[az,el] = quadriga_lib.fast_cart2geo(e);
-assert( isa(az,'double') );
-assert( isa(el,'double') );
-assert( isequal(size(az), [6,2]) );
-assert( isequal(size(el), [6,2]) );
+[az,el,le] = quadriga_lib.fast_cart2geo(x, y, z);
+quadriga_lib.fast_cart2geo(x, y, z);   % no output: ans is az
+assertEqual( ans, az );
+assert( isa(az,'double') && isa(el,'double') && isa(le,'double') );
+assert( isequal(size(az), [6,2]) && isequal(size(el), [6,2]) && isequal(size(le), [6,2]) );
 
-[az,el,le] = quadriga_lib.fast_cart2geo([-v;-v;0]);
-assertElementsAlmostEqual( az, -3*pi/4, 'absolute', 1e-5 );
-assertElementsAlmostEqual( el, 0,        'absolute', 1e-5 );
-assertElementsAlmostEqual( le, 1,        'absolute', 1e-5 );
+[az1,el1,le1] = quadriga_lib.fast_cart2geo(x', y', z');
+assertEqual( az1, az' );
+assertEqual( el1, el' );
+assertEqual( le1, le' );
 
-[az,el,le] = quadriga_lib.fast_cart2geo([0;2*v;2*v]);
-assertElementsAlmostEqual( az, pi/2, 'absolute', 1e-5 );
-assertElementsAlmostEqual( el, pi/4, 'absolute', 1e-5 );
-assertElementsAlmostEqual( le, 2,    'absolute', 1e-5 );
+% A 3D input keeps its size; the values equal those of the column-vector call
+x3 = rand(2,3,4); y3 = rand(2,3,4); z3 = rand(2,3,4);
+[az1,el1,le1] = quadriga_lib.fast_cart2geo(x3, y3, z3, 1);
+[az2,el2,le2] = quadriga_lib.fast_cart2geo(x3(:), y3(:), z3(:), 1);
+assertEqual( size(az1), [2,3,4] );
+assertEqual( [az1(:),el1(:),le1(:)], [az2,el2,le2] );
+assert_cpp_error( @() quadriga_lib.fast_cart2geo(x3, reshape(y3, 2, 12), z3), 'Input ''y'' must have the same size as ''x''.' );
 
-% [3,2] matrix treated as [3,2,1] cube -> outputs [2,1]
-[az,el,le] = quadriga_lib.fast_cart2geo([0,v;1,v;1,-1]);
-assertElementsAlmostEqual( az, [pi/2;pi/4],    'absolute', 1e-5 );
-assertElementsAlmostEqual( el, pi/4*[1;-1],    'absolute', 1e-5 );
-assertElementsAlmostEqual( le, sqrt(2)*[1;1],  'absolute', 1e-5 );
-assert( isequal(size(az), [2,1]) );
+% Single precision input is converted
+[~,~,le1] = quadriga_lib.fast_cart2geo(single(x), y, z);
+assertElementsAlmostEqual( le1, sqrt(double(single(x)).^2 + y.^2 + z.^2), 'absolute', 1e-12 );
 
-% [3,3,2] cube -> outputs [3,2]
-[az2,el2,le2] = quadriga_lib.fast_cart2geo(rand(3,3,2));
-assert( isequal(size(az2), [3,2]) );
-assert( isequal(size(el2), [3,2]) );
-assert( isequal(size(le2), [3,2]) );
+% Empty input gives empty outputs, as in C++
+[az1,el1,le1] = quadriga_lib.fast_cart2geo(zeros(0,3), zeros(0,3), zeros(0,3));
+assert( isequal(size(az1), [0,3]) && isequal(size(el1), [0,3]) && isequal(size(le1), [0,3]) );
 
-% --- Separate x, y, z input path ---
+% --- Outputs equal the reference formulas element-wise (GENERIC kernel) ---
 
-xv = [0;v]; yv = [1;v]; zv = [1;-1];
-[az,el,le] = quadriga_lib.fast_cart2geo(xv, yv, zv);
-assertElementsAlmostEqual( az, [pi/2;pi/4],   'absolute', 1e-5 );
-assertElementsAlmostEqual( el, pi/4*[1;-1],   'absolute', 1e-5 );
-assertElementsAlmostEqual( le, sqrt(2)*[1;1], 'absolute', 1e-5 );
-assert( isequal(size(az), [2,1]) );
-
-% Separate [n,m] matrices -> outputs preserve shape
-xm = rand(3,4); ym = rand(3,4); zm = rand(3,4);
-[azm,elm,lem] = quadriga_lib.fast_cart2geo(xm, ym, zm);
-assert( isequal(size(azm), [3,4]) );
-assert( isequal(size(elm), [3,4]) );
-assert( isequal(size(lem), [3,4]) );
-
-% Separate path matches cube path
-c = [xv';yv';zv'];   % [3,1,2] equivalent via cube
-[az_c,el_c,le_c] = quadriga_lib.fast_cart2geo([xv,yv,zv]');  % [3,2] cube
-assertElementsAlmostEqual( az_c, az, 'absolute', 1e-5 );
-assertElementsAlmostEqual( el_c, el, 'absolute', 1e-5 );
-assertElementsAlmostEqual( le_c, le, 'absolute', 1e-5 );
+[az1,el1,le1] = quadriga_lib.fast_cart2geo(x, y, z, 1);
+le_ref = sqrt(x.^2 + y.^2 + z.^2);
+assertElementsAlmostEqual( az1, atan2(y, x),                          'absolute', 1e-12 );
+assertElementsAlmostEqual( el1, asin(min(max(z ./ le_ref, -1), 1)),   'absolute', 1e-12 );
+assertElementsAlmostEqual( le1, le_ref,                               'absolute', 1e-12 );
 
 % --- use_kernel variants ---
 
-[az1,el1,le1] = quadriga_lib.fast_cart2geo(e, [], [], 0);  % auto
-[az2,el2,le2] = quadriga_lib.fast_cart2geo(e, [], [], 1);  % GENERIC
-assertElementsAlmostEqual( az1, az2, 'absolute', 1e-5 );
-assertElementsAlmostEqual( el1, el2, 'absolute', 1e-5 );
-assertElementsAlmostEqual( le1, le2, 'absolute', 1e-5 );
+[az0,el0,le0] = quadriga_lib.fast_cart2geo(x, y, z, 0);  % auto
+assertElementsAlmostEqual( az0, az1, 'absolute', 1e-5 );
+assertElementsAlmostEqual( el0, el1, 'absolute', 1e-5 );
+assertElementsAlmostEqual( le0, le1, 'absolute', 1e-5 );
 
 % use_kernel=[] and an omitted use_kernel fall back to the default (0, auto)
-[az3,el3,le3] = quadriga_lib.fast_cart2geo(e, [], [], []);
-assertEqual( az3, az1 );
-assertEqual( quadriga_lib.fast_cart2geo(e), az1 );
+assertEqual( quadriga_lib.fast_cart2geo(x, y, z, []), az0 );
+assertEqual( quadriga_lib.fast_cart2geo(x, y, z), az0 );
 
 % Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
 for k = [3, 99]
-    try
-        [~] = quadriga_lib.fast_cart2geo(e, [], [], k);
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
-    catch ME
-        expectedErrorMessage = 'Input ''use_kernel'' must be 0, 1 or 2.';
-        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-            error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-        end
-    end
+    assert_cpp_error( @() quadriga_lib.fast_cart2geo(x, y, z, k), 'Input ''use_kernel'' must be 0, 1 or 2.' );
 end
 
+end
+
+% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
+function assert_cpp_error(fn, expected)
+try
+    [~] = fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
+            ME.identifier, ' "', ME.message, '"']);
+    end
+end
 end

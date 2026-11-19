@@ -21,7 +21,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Azimuth in [-pi, pi], with the special values of `atan2` (e.g. `atan2(0, -0) = pi`); NaN input gives NaN
   in `az`, `el` and `len`
 - The AVX2 kernel computes the angles in single precision; `len` and `z/len` in double precision
-- Option to provide a single `[3, n, m]` cube or separate x, y, z `[n, m]` inputs
+- `x`, `y` and `z` have the same size; the outputs have that size; empty input gives empty outputs
 
 ## Usage:
 ```
@@ -29,74 +29,45 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 ```
 
 ## Inputs:
-- **`x`** — X-coordinates or combined input; `[n, m]` or `[3, n, m]`; 
-- **`y`** — Y-coordinates; `[n, m]` or empty; ignored for combined input
-- **`z`** — Z-coordinates; `[n, m]` or empty; ignored for combined input
+- **`x`** — X-coordinates; up to 4 dimensions
+- **`y`** — Y-coordinates; size of `x`
+- **`z`** — Z-coordinates; size of `x`
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 
   (throws if AVX2 unavailable); other values throw; default: 0
 
 ## Outputs:
-- **`az`** — Azimuth angles in radians; `[n, m]`
-- **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`
+- **`az`** — Azimuth angles in radians; size of `x`
+- **`el`** — Elevation angles in radians; size of `x`
+- **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; size of `x`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 4)
+    if (nrhs < 3 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
-    arma::cube x = qd_mex_get_Cube<double>(prhs[0], false, "x");
-    arma::mat y = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1], false, "y");
-    arma::mat z = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2], false, "z");
+    // Read inputs as flat column vectors (column-major order)
+    const arma::vec x = qd_mex_get_Col<double>(prhs[0], false, "x");
+    const arma::vec y = qd_mex_get_Col<double>(prhs[1], false, "y");
+    const arma::vec z = qd_mex_get_Col<double>(prhs[2], false, "z");
     const int use_kernel = (nrhs < 4) ? 0 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 0);
 
-    // Split data
-    arma::uword nm = x.n_elem, n = x.n_cols, m = x.n_slices;
-    arma::vec x_vec, y_vec, z_vec;
-    if (x.n_rows == 3 && y.empty() && z.empty())
-    {
-        nm = n * m;
-        x_vec.set_size(nm), y_vec.set_size(nm), z_vec.set_size(nm);
-        const double *pd = x.memptr();
-        double *px = x_vec.memptr(), *py = y_vec.memptr(), *pz = z_vec.memptr();
-        for (arma::uword i = 0; i < nm; ++i)
-            px[i] = pd[3 * i], py[i] = pd[3 * i + 1], pz[i] = pd[3 * i + 2];
-    }
-    else if (y.n_elem == nm && z.n_elem == nm)
-    {
-        x_vec = arma::vec(x.memptr(), nm, false, true);
-        y_vec = arma::vec(y.memptr(), nm, false, true);
-        z_vec = arma::vec(z.memptr(), nm, false, true);
-        n = y.n_rows, m = y.n_cols;
-    }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong input argument format.");
+    if (!qd_mex_same_dims(prhs[1], prhs[0]))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'y' must have the same size as 'x'.");
+    if (!qd_mex_same_dims(prhs[2], prhs[0]))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'z' must have the same size as 'x'.");
 
-    // Output allocation
-    arma::mat az, el, len;
-
-    plhs[0] = qd_mex_init_output(&az, n, m);
-
+    // Outputs in the size of x
+    arma::vec az, el, len;
+    plhs[0] = qd_mex_init_output_like(&az, prhs[0]);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&el, n, m);
-    else
-        el.set_size(n, m);
-
+        plhs[1] = qd_mex_init_output_like(&el, prhs[0]);
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&len, n, m);
+        plhs[2] = qd_mex_init_output_like(&len, prhs[0]);
 
-    // Map to vectors
-    arma::vec az_vec(az.memptr(), nm, false, true);
-    arma::vec el_vec(el.memptr(), nm, false, true);
-    arma::vec len_vec = len.empty() ? arma::vec() : arma::vec(len.memptr(), nm, false, true);
-
-    arma::vec *p_len_vec = (nlhs > 2) ? &len_vec : nullptr;
-
-    // Call library function
-    CALL_QD(quadriga_lib::fast_cart2geo(x_vec, y_vec, z_vec, az_vec, el_vec, p_len_vec, use_kernel));
+    // Call library function; it sizes el when it is not an output
+    CALL_QD(quadriga_lib::fast_cart2geo(x, y, z, az, el, (nlhs > 2) ? &len : nullptr, use_kernel));
 }

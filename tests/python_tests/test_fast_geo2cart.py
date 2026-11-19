@@ -21,30 +21,18 @@ r2 = np.sqrt(2.0)
 
 class test_case(unittest.TestCase):
 
-    # --- Separate input, default (combine=True) ---
-
-    def test_separate_default(self):
+    # Separate (n, m) inputs give a tuple of three (n, m) float64 arrays
+    def test_output_shape(self):
         az = (np.random.rand(2, 6) - 0.5) * 2 * np.pi
         el = (np.random.rand(2, 6) - 0.5) * np.pi
         length = np.random.rand(2, 6) + 0.5
 
-        cart = quadriga_lib.tools.fast_geo2cart(az, el, length)
-        self.assertEqual(cart.shape, (3, 2, 6))
-        self.assertEqual(cart.dtype, np.float64)
-
-    # combine=True rows must equal the combine=False tuple
-    def test_combine_flag_consistency(self):
-        az = (np.random.rand(4, 3) - 0.5) * 2 * np.pi
-        el = (np.random.rand(4, 3) - 0.5) * np.pi
-        length = np.random.rand(4, 3) + 0.5
-
-        cart = quadriga_lib.tools.fast_geo2cart(az, el, length, combine=True)
-        x, y, z = quadriga_lib.tools.fast_geo2cart(az, el, length, combine=False)
-
-        self.assertEqual(x.shape, (4, 3))
-        np.testing.assert_allclose(cart[0], x, atol=1e-12)
-        np.testing.assert_allclose(cart[1], y, atol=1e-12)
-        np.testing.assert_allclose(cart[2], z, atol=1e-12)
+        out = quadriga_lib.tools.fast_geo2cart(az, el, length)
+        self.assertIsInstance(out, tuple)
+        self.assertEqual(len(out), 3)
+        for a in out:
+            self.assertEqual(a.shape, (2, 6))
+            self.assertEqual(a.dtype, np.float64)
 
     # --- Known values ---
 
@@ -56,83 +44,84 @@ class test_case(unittest.TestCase):
         el     = np.array([[0.0], [0.0],       [np.pi / 4]])
         length = np.array([[1.0], [r2],        [r2]])
 
-        x, y, z = quadriga_lib.tools.fast_geo2cart(az, el, length, combine=False)
+        x, y, z = quadriga_lib.tools.fast_geo2cart(az, el, length)
         np.testing.assert_allclose(x.ravel(), [1.0, 1.0, 1.0], atol=1e-5)
         np.testing.assert_allclose(y.ravel(), [0.0, 1.0, 0.0], atol=1e-5)
         np.testing.assert_allclose(z.ravel(), [0.0, 0.0, 1.0], atol=1e-5)
 
-    def test_known_values_two_points(self):
-        # (pi,    pi/4, r2) -> (-1,  0, 1)
-        # (-pi/2, pi/4, r2) -> ( 0, -1, 1)
-        az     = np.array([[np.pi], [-np.pi / 2]])
-        el     = np.array([[np.pi / 4], [np.pi / 4]])
-        length = np.array([[r2], [r2]])
-
-        cart = quadriga_lib.tools.fast_geo2cart(az, el, length)
-        self.assertEqual(cart.shape, (3, 2, 1))
-        np.testing.assert_allclose(cart[:, 0, 0], [-1.0, 0.0, 1.0], atol=1e-5)
-        np.testing.assert_allclose(cart[:, 1, 0], [0.0, -1.0, 1.0], atol=1e-5)
-
-    # Omitted len defaults to unit length
+    # Omitted len and len=None give unit length
     def test_default_unit_length(self):
         az = (np.random.rand(2, 3) - 0.5) * 2 * np.pi
         el = (np.random.rand(2, 3) - 0.5) * np.pi
 
-        x, y, z = quadriga_lib.tools.fast_geo2cart(az, el, combine=False)
+        x, y, z = quadriga_lib.tools.fast_geo2cart(az, el)
         mag = np.sqrt(x ** 2 + y ** 2 + z ** 2)
         np.testing.assert_allclose(mag, np.ones((2, 3)), atol=1e-5)
+        np.testing.assert_array_equal(quadriga_lib.tools.fast_geo2cart(az, el, None), (x, y, z))
+        np.testing.assert_array_equal(quadriga_lib.tools.fast_geo2cart(az, el, len=np.ones((2, 3))), (x, y, z))
 
-    # Row vs column orientation: a transposed input transposes the spatial axes
+    # Row vs column orientation: a transposed input transposes the outputs
     def test_orientation(self):
-        az_c     = np.array([[np.pi], [-np.pi / 2]])
-        el_c     = np.array([[np.pi / 4], [np.pi / 4]])
-        length_c = np.array([[r2], [r2]])
-        c = quadriga_lib.tools.fast_geo2cart(az_c, el_c, length_c)         # (3, 2, 1)
+        az     = np.array([[np.pi], [-np.pi / 2]])
+        el     = np.array([[np.pi / 4], [np.pi / 4]])
+        length = np.array([[r2], [r2]])
+        c = quadriga_lib.tools.fast_geo2cart(az, el, length)
+        d = quadriga_lib.tools.fast_geo2cart(az.T, el.T, length.T)
+        for a, b in zip(c, d):
+            self.assertEqual(a.shape, (2, 1))
+            self.assertEqual(b.shape, (1, 2))
+            np.testing.assert_array_equal(a.T, b)
 
-        az_r     = np.array([[np.pi, -np.pi / 2]])
-        el_r     = np.array([[np.pi / 4, np.pi / 4]])
-        length_r = np.array([[r2, r2]])
-        d = quadriga_lib.tools.fast_geo2cart(az_r, el_r, length_r)         # (3, 1, 2)
+    # Outputs have the shape of the inputs (1D to 3D), with the values of the flattened call
+    def test_shape_preserved(self):
+        az, el, length = np.random.default_rng(0).random((3, 2, 3, 4))
+        ref = quadriga_lib.tools.fast_geo2cart(az.ravel(), el.ravel(), length.ravel(), use_kernel=1)
+        for shape in ((24,), (4, 6), (2, 3, 4)):
+            out = quadriga_lib.tools.fast_geo2cart(az.reshape(shape), el.reshape(shape), length.reshape(shape),
+                                                   use_kernel=1)
+            for a, r in zip(out, ref):
+                self.assertEqual(a.shape, shape)
+                np.testing.assert_array_equal(a, r.reshape(shape))
+        with self.assertRaises(ValueError):
+            quadriga_lib.tools.fast_geo2cart(az, el.reshape(2, 12))
+        with self.assertRaises(ValueError):
+            quadriga_lib.tools.fast_geo2cart(az, el, length.reshape(6, 4))
 
-        self.assertEqual(c.shape, (3, 2, 1))
-        self.assertEqual(d.shape, (3, 1, 2))
-        np.testing.assert_allclose(np.transpose(c, (0, 2, 1)), d, atol=1e-5)
+    # Empty input gives empty outputs, as in C++
+    def test_empty_input(self):
+        e = np.zeros((0, 3))
+        for out in (quadriga_lib.tools.fast_geo2cart(e, e), quadriga_lib.tools.fast_geo2cart(e, e, e)):
+            for a in out:
+                self.assertEqual(a.shape, (0, 3))
 
-    # --- Combined geo_coords input ---
+    # Outputs equal the reference formulas element-wise, for Fortran-ordered inputs (aliased by the wrapper),
+    # C-ordered and float32 inputs (copied) and large n (formerly the separate-input branch read freed memory,
+    # wrong values for n > 16, segfault for large n)
+    def test_values_equal_reference(self):
+        rng = np.random.default_rng(0)
+        for n, m in ((5, 1), (100, 3), (100000, 1)):
+            az = rng.uniform(-3, 3, (n, m))
+            el = rng.uniform(-1.5, 1.5, (n, m))
+            ln = rng.uniform(1, 10, (n, m))
+            ref = (np.cos(el) * np.cos(az) * ln, np.cos(el) * np.sin(az) * ln, np.sin(el) * ln)
+            for order in ("F", "C"):
+                a, e, l = (np.asarray(t, order=order) for t in (az, el, ln))
+                out = quadriga_lib.tools.fast_geo2cart(a, e, l, use_kernel=1)
+                for o, r, name in zip(out, ref, ("x", "y", "z")):
+                    np.testing.assert_allclose(o, r, rtol=0, atol=1e-12, err_msg="%s, n=%d, order=%s" % (name, n, order))
+        out = quadriga_lib.tools.fast_geo2cart(az.astype(np.float32), el.astype(np.float32), ln.astype(np.float32),
+                                               use_kernel=1)
+        np.testing.assert_allclose(out[2], ref[2], atol=1e-5)
 
-    def test_combined_input_matches_separate(self):
-        geo = np.random.rand(3, 4, 2)
-        cart_comb = quadriga_lib.tools.fast_geo2cart(geo)
-        cart_sep = quadriga_lib.tools.fast_geo2cart(geo[0], geo[1], geo[2])
-        self.assertEqual(cart_comb.shape, (3, 4, 2))
-        np.testing.assert_allclose(cart_comb, cart_sep, atol=1e-12)
+    # --- Round trip against fast_cart2geo ---
 
-    # --- Round trips against fast_cart2geo ---
-
-    def test_roundtrip_combined(self):
-        cart = np.random.rand(3, 5, 4)
-        geo = quadriga_lib.tools.fast_cart2geo(cart)
-        cart_rt = quadriga_lib.tools.fast_geo2cart(geo)
-        self.assertEqual(cart_rt.shape, (3, 5, 4))
-        np.testing.assert_allclose(cart_rt, cart, atol=1e-4)
-
-    def test_roundtrip_separate(self):
-        x0 = np.random.rand(4, 3)
-        y0 = np.random.rand(4, 3)
-        z0 = np.random.rand(4, 3)
-        az, el, length = quadriga_lib.tools.fast_cart2geo(x0, y0, z0, combine=False)
-        x1, y1, z1 = quadriga_lib.tools.fast_geo2cart(az, el, length, combine=False)
+    def test_roundtrip(self):
+        x0, y0, z0 = np.random.rand(3, 4, 3)
+        az, el, length = quadriga_lib.tools.fast_cart2geo(x0, y0, z0)
+        x1, y1, z1 = quadriga_lib.tools.fast_geo2cart(az, el, length)
         np.testing.assert_allclose(x1, x0, atol=1e-4)
         np.testing.assert_allclose(y1, y0, atol=1e-4)
         np.testing.assert_allclose(z1, z0, atol=1e-4)
-
-    # --- dtype handling ---
-
-    def test_dtype_conversion(self):
-        e = ((np.random.rand(2, 6) - 0.5) * 2 * np.pi).astype(np.float32)
-        cart = quadriga_lib.tools.fast_geo2cart(e, e, e)
-        self.assertEqual(cart.shape, (3, 2, 6))
-        self.assertEqual(cart.dtype, np.float64)
 
     # --- use_kernel variants ---
 
@@ -149,64 +138,60 @@ class test_case(unittest.TestCase):
 
         try:
             g_avx2 = quadriga_lib.tools.fast_geo2cart(az, el, length, use_kernel=2)
-            np.testing.assert_allclose(g_avx2, g_gen, atol=1e-4)
-        except (ValueError, RuntimeError):
-            pass
+        except ValueError as err:
+            self.assertIn("AVX2", str(err))
+        else:
+            np.testing.assert_allclose(g_avx2, g_gen, atol=1e-4, rtol=0)
+
+    # Keyword names as in the Usage line; a non-contiguous view gives the same result
+    def test_keyword_arguments(self):
+        az, el, length = np.random.default_rng(0).random((3, 4, 2))
+        ref = quadriga_lib.tools.fast_geo2cart(az, el, length, use_kernel=1)
+        np.testing.assert_array_equal(quadriga_lib.tools.fast_geo2cart(az=az, el=el, len=length, use_kernel=1), ref)
+        a, e, l = (np.repeat(t, 2, axis=0)[::2] for t in (az, el, length))
+        np.testing.assert_array_equal(quadriga_lib.tools.fast_geo2cart(a, e, l, use_kernel=1), ref)
 
     # Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
     def test_invalid_use_kernel(self):
-        e = np.random.rand(3, 2, 2)
+        e = np.random.rand(2, 2)
         for k in (3, 99, -1):
             with self.assertRaises(ValueError, msg="use_kernel=%d" % k):
-                quadriga_lib.tools.fast_geo2cart(e, use_kernel=k)
+                quadriga_lib.tools.fast_geo2cart(e, e, use_kernel=k)
 
     # --- Error paths ---
 
     def test_errors(self):
         e = (np.random.rand(2, 6) - 0.5) * 2 * np.pi
 
-        # Empty az (separate mode, el provided)
+        # az / el shape mismatch, also with an equal number of elements
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.tools.fast_geo2cart(e[0:1, :], e)
+        self.assertIn("'el'", str(ctx.exception))
         with self.assertRaises(ValueError):
-            quadriga_lib.tools.fast_geo2cart(np.array([]), e)
-
-        # Empty el
+            quadriga_lib.tools.fast_geo2cart(e, e.reshape(6, 2))
         with self.assertRaises(ValueError):
             quadriga_lib.tools.fast_geo2cart(e, np.array([]))
-
-        # az / el shape mismatch
-        with self.assertRaises(ValueError):
-            quadriga_lib.tools.fast_geo2cart(e[0:1, :], e)
-        with self.assertRaises(ValueError):
-            quadriga_lib.tools.fast_geo2cart(e, e[0:1, :])
 
         # len shape mismatch
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.tools.fast_geo2cart(e, e, e[0:1, :])
-        self.assertIn("len", str(ctx.exception))
+        self.assertIn("'len'", str(ctx.exception))
 
-        # Combined input without 3 rows
-        with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.tools.fast_geo2cart(np.random.rand(2, 4))
-        self.assertIn("(3, n, m)", str(ctx.exception))
-
-        # None for the mandatory input is rejected by pybind11
+        # az and el are mandatory; None is rejected by pybind11
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.fast_geo2cart(e)
         with self.assertRaises(TypeError):
             quadriga_lib.tools.fast_geo2cart(None, e)
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.fast_geo2cart(e, None)
 
-    # Separate inputs must give the same values as the combined input, also for large n (formerly
-    # the separate-input branch read freed memory, wrong values for n > 16, segfault for large n)
-    def test_separate_inputs_equal_combined(self):
-        rng = np.random.default_rng(0)
-        for n in (5, 100, 1000, 100000):
-            az = rng.uniform(-3, 3, n)
-            el = rng.uniform(-1.5, 1.5, n)
-            ln = rng.uniform(1, 10, n)
-            ref = quadriga_lib.tools.fast_geo2cart(np.stack([az, el, ln]).reshape(3, n, 1))
-            cart = quadriga_lib.tools.fast_geo2cart(az, el, ln)
-            np.testing.assert_array_equal(cart, ref, err_msg="combine=True, n=%d" % n)
-            x, y, z = quadriga_lib.tools.fast_geo2cart(az, el, ln, combine=False)
-            np.testing.assert_array_equal(np.stack([x.ravel(), y.ravel(), z.ravel()]), ref.reshape(3, n),
-                                          err_msg="combine=False, n=%d" % n)
+    # The combined (3, n, m) form is gone: no combine flag, and a stacked array is no single input
+    def test_combined_form_removed(self):
+        geo = np.random.rand(3, 4, 2)
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.fast_geo2cart(geo)
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.fast_geo2cart(geo[0], geo[1], geo[2], combine=True)
 
 
 if __name__ == '__main__':

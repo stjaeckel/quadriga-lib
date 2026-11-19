@@ -20,129 +20,56 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 - The AVX2 kernel (selected by `use_kernel=0` where available, forced by `use_kernel=2`) computes sine and
   cosine in single precision (angles reduced in double precision first; max. error about 1.3e-7 for angles up
   to 1e10), results widened back; `use_kernel=1` keeps full double precision
+- `el` and `len` have the same size as `az`; the outputs have that size; empty input gives empty outputs
 
 ## Usage:
 ```
-split = true;
-[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
-
-split = false;
-cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel );
 ```
 
 ## Inputs:
-- **`az`** — Azimuth angles in radians; `[n, m]`
-- **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
+- **`az`** — Azimuth angles in radians; up to 4 dimensions
+- **`el`** — Elevation angles in radians; size of `az`
+- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); size of `az`; default: 1
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 0
-- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
-  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
 
 ## Outputs:
-- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
-  along the first dim, `[3, n, m]`
-- **`y`** — Y-coordinates; `[n, m]` or empty
-- **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sin_az`** — sin(az); `[n, m]` or empty
-- **`cos_az`** — cos(az); `[n, m]` or empty
-- **`sin_el`** — sin(el); `[n, m]` or empty
-- **`cos_el`** — cos(el); `[n, m]` or empty
+- **`x`** — X-coordinates; size of `az`
+- **`y`** — Y-coordinates; size of `az`
+- **`z`** — Z-coordinates; size of `az`
+- **`sin_az`** — sin(az); size of `az`
+- **`cos_az`** — cos(az); size of `az`
+- **`sin_el`** — sin(el); size of `az`
+- **`cos_el`** — cos(el); size of `az`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
-    if (nrhs < 2 || nrhs > 5)
+    if (nrhs < 2 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    // Read input data
-    arma::mat az = qd_mex_get_Mat<double>(prhs[0], false, "az");
-    arma::mat el = qd_mex_get_Mat<double>(prhs[1], false, "el");
-    arma::mat len = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2], false, "len");
+    if (nlhs > 7)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+
+    // Read inputs as flat column vectors (column-major order); len empty = unit length
+    const arma::vec az = qd_mex_get_Col<double>(prhs[0], false, "az");
+    const arma::vec el = qd_mex_get_Col<double>(prhs[1], false, "el");
+    const arma::vec len = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2], false, "len");
     const int use_kernel = (nrhs < 4) ? 0 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 0);
-    const bool split = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "split", false);
 
-    if (split && nlhs > 7)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
-    else if (!split && nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+    if (!qd_mex_same_dims(prhs[1], prhs[0]))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'el' must have the same size as 'az'.");
+    if (!len.empty() && !qd_mex_same_dims(prhs[2], prhs[0]))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'len' must have the same size as 'az'.");
 
-    const arma::uword nm = az.n_elem, n = az.n_rows, m = az.n_cols;
+    // Outputs in the size of az; C++ sizes x, y, z when they are not requested, sin / cos are computed only on request
+    arma::vec out[7];
+    for (int i = 0; i < std::max(nlhs, 1); ++i)
+        plhs[i] = qd_mex_init_output_like(&out[i], prhs[0]);
 
-    if (el.n_rows != n || el.n_cols != m)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "az and el must have the same shape.");
-    if (!len.empty() && (len.n_rows != n || len.n_cols != m))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "len must have the same shape as az.");
-
-    // Output allocation
-    arma::cube cart;
-    arma::mat x, y, z, sin_az, cos_az, sin_el, cos_el;
-
-    if (split)
-    {
-        plhs[0] = qd_mex_init_output(&x, n, m);
-
-        if (nlhs > 1)
-            plhs[1] = qd_mex_init_output(&y, n, m);
-        else
-            y.set_size(n, m);
-
-        if (nlhs > 2)
-            plhs[2] = qd_mex_init_output(&z, n, m);
-        else
-            z.set_size(n, m);
-
-        if (nlhs > 3)
-            plhs[3] = qd_mex_init_output(&sin_az, n, m);
-        if (nlhs > 4)
-            plhs[4] = qd_mex_init_output(&cos_az, n, m);
-        if (nlhs > 5)
-            plhs[5] = qd_mex_init_output(&sin_el, n, m);
-        if (nlhs > 6)
-            plhs[6] = qd_mex_init_output(&cos_el, n, m);
-    }
-    else
-    {
-        x.set_size(n, m);
-        y.set_size(n, m);
-        z.set_size(n, m);
-        plhs[0] = qd_mex_init_output(&cart, 3, n, m);
-    }
-
-    // Map to vectors
-    const arma::vec az_vec(az.memptr(), nm, false, true);
-    const arma::vec el_vec(el.memptr(), nm, false, true);
-    const arma::vec len_vec = len.empty() ? arma::vec() : arma::vec(len.memptr(), nm, false, true);
-    arma::vec x_vec(x.memptr(), nm, false, true);
-    arma::vec y_vec(y.memptr(), nm, false, true);
-    arma::vec z_vec(z.memptr(), nm, false, true);
-    arma::vec sin_az_vec = sin_az.empty() ? arma::vec() : arma::vec(sin_az.memptr(), nm, false, true);
-    arma::vec cos_az_vec = cos_az.empty() ? arma::vec() : arma::vec(cos_az.memptr(), nm, false, true);
-    arma::vec sin_el_vec = sin_el.empty() ? arma::vec() : arma::vec(sin_el.memptr(), nm, false, true);
-    arma::vec cos_el_vec = cos_el.empty() ? arma::vec() : arma::vec(cos_el.memptr(), nm, false, true);
-
-    // Wrap optional pointers
-    const arma::vec *p_len = len_vec.empty() ? nullptr : &len_vec;
-    arma::vec *p_sin_az = sin_az_vec.empty() ? nullptr : &sin_az_vec;
-    arma::vec *p_cos_az = cos_az_vec.empty() ? nullptr : &cos_az_vec;
-    arma::vec *p_sin_el = sin_el_vec.empty() ? nullptr : &sin_el_vec;
-    arma::vec *p_cos_el = cos_el_vec.empty() ? nullptr : &cos_el_vec;
-
-    // Call library function
-    CALL_QD(quadriga_lib::fast_geo2cart<double>(az_vec, el_vec, x_vec, y_vec, z_vec,
-                                                p_sin_az, p_cos_az, p_sin_el, p_cos_el, p_len, use_kernel));
-
-    // Combine outputs
-    if (!split)
-    {
-        double *pd = cart.memptr();
-        const double *px = x.memptr(), *py = y.memptr(), *pz = z.memptr();
-        for (arma::uword i = 0; i < nm; ++i)
-        {
-            pd[3 * i] = px[i];
-            pd[3 * i + 1] = py[i];
-            pd[3 * i + 2] = pz[i];
-        }
-    }
+    CALL_QD(quadriga_lib::fast_geo2cart<double>(az, el, out[0], out[1], out[2],
+                                                (nlhs > 3) ? &out[3] : nullptr, (nlhs > 4) ? &out[4] : nullptr,
+                                                (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr,
+                                                len.empty() ? nullptr : &len, use_kernel));
 }

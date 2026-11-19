@@ -18,98 +18,52 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts
 - Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon
 - Special values of atan2 as in numpy (e.g. atan2(0, -0) = pi); NaN input gives NaN in az, el and length
-- Two mutually exclusive input forms: a combined array `cart` of shape (3, n, m), or separate `x`, `y`, `z` of shape (n, m)
+- `x`, `y` and `z` have the same shape (up to 3 dimensions); the outputs have that shape; empty input gives empty outputs
 - The AVX2 kernel computes the angles in single precision (length and z / length in double precision); use
   `use_kernel = 1` for full double precision
 
 ## Usage:
 ```
-geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, *, combine, use_kernel )
-az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
+az, el, length = quadriga_lib.tools.fast_cart2geo( x, y, z, *, use_kernel )
 ```
 
 ## Inputs:
-- **`cart`** — Combined Cartesian coordinates `(3, n, m)`; or, when `y` and `z` are given, the x-coordinates `(n, m)`
-- **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
-- **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
-- **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
+- **`x`** — X-coordinates; up to 3 dimensions
+- **`y`** — Y-coordinates; shape of `x`
+- **`z`** — Z-coordinates; shape of `x`
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 0
 
 ## Outputs:
-- **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True
-- **`az`** — Azimuth angles `(n, m)`; returned when `combine` is False
-- **`el`** — Elevation angles `(n, m)`; returned when `combine` is False
-- **`length`** — Vector length `(n, m)`; returned when `combine` is False
+- **`az`** — Azimuth angles; shape of `x`
+- **`el`** — Elevation angles; shape of `x`
+- **`length`** — Vector length; shape of `x`
 MD!*/
 
-py::object fast_cart2geo(const py::array_t<double> &cart,
-                         py::handle y,
-                         py::handle z,
-                         bool combine,
-                         int use_kernel)
+py::tuple fast_cart2geo(const py::array_t<double> &x,
+                        const py::array_t<double> &y,
+                        const py::array_t<double> &z,
+                        int use_kernel)
 {
-    // Read inputs into flat coordinate vectors; in separate mode these alias x_a, y_a, z_a, which must
-    // therefore live in function scope
-    arma::vec cx, cy, cz;
-    arma::mat x_a, y_a, z_a;
-    arma::uword n = 0, m = 0, n_val = 0;
+    const auto shape = x.attr("shape");
+    if (!shape.equal(y.attr("shape")))
+        throw std::invalid_argument("Input 'y' must have the same shape as 'x'.");
+    if (!shape.equal(z.attr("shape")))
+        throw std::invalid_argument("Input 'z' must have the same shape as 'x'.");
 
-    if (y.is_none() && z.is_none()) // Combined input: cart is (3, n, m)
-    {
-        const auto cart_a = qd_python_numpy2arma_Cube<double>(cart, true);
-        if (cart_a.n_elem == 0 || cart_a.n_rows != 3)
-            throw std::invalid_argument("Combined input 'cart' must have shape (3, n, m).");
+    // Flat views of the inputs in column-major order where the memory layout allows it, else copies
+    const auto x_a = qd_python_numpy2arma_Col(x, true);
+    const auto y_a = qd_python_numpy2arma_Col(y, true);
+    const auto z_a = qd_python_numpy2arma_Col(z, true);
 
-        n = cart_a.n_cols, m = cart_a.n_slices, n_val = n * m;
-        cx.set_size(n_val), cy.set_size(n_val), cz.set_size(n_val);
+    arma::vec az, el, length;
+    auto az_py = qd_python_init_output(x_a.n_elem, &az);
+    auto el_py = qd_python_init_output(x_a.n_elem, &el);
+    auto length_py = qd_python_init_output(x_a.n_elem, &length);
 
-        const double *pc = cart_a.memptr();
-        double *wx = cx.memptr(), *wy = cy.memptr(), *wz = cz.memptr();
-        for (arma::uword i = 0; i < n_val; ++i)
-            wx[i] = pc[3 * i], wy[i] = pc[3 * i + 1], wz[i] = pc[3 * i + 2];
-    }
-    else // Separate inputs: cart is x, plus y and z
-    {
-        x_a = qd_python_numpy2arma_Mat<double>(cart, true);
-        y_a = qd_python_numpy2arma_Mat<double>(y, true);
-        z_a = qd_python_numpy2arma_Mat<double>(z, true);
+    quadriga_lib::fast_cart2geo<double>(x_a, y_a, z_a, az, el, &length, use_kernel);
 
-        if (x_a.n_elem == 0 || y_a.n_elem != x_a.n_elem || z_a.n_elem != x_a.n_elem)
-            throw std::invalid_argument("Separate inputs 'x', 'y', 'z' must be non-empty and equal in size.");
-
-        n = x_a.n_rows, m = x_a.n_cols, n_val = x_a.n_elem;
-        cx = arma::vec(x_a.memptr(), n_val, false, true);
-        cy = arma::vec(y_a.memptr(), n_val, false, true);
-        cz = arma::vec(z_a.memptr(), n_val, false, true);
-    }
-
-    if (combine) // Single (3, n, m) output
-    {
-        arma::vec az, el, length;
-        quadriga_lib::fast_cart2geo<double>(cx, cy, cz, az, el, &length, use_kernel);
-
-        arma::cube geo_coords;
-        auto geo_coords_py = qd_python_init_output(3, n, m, &geo_coords);
-
-        const double *pa = az.memptr(), *pe = el.memptr(), *pl = length.memptr();
-        double *pg = geo_coords.memptr();
-        for (arma::uword i = 0; i < n_val; ++i)
-            pg[3 * i] = pa[i], pg[3 * i + 1] = pe[i], pg[3 * i + 2] = pl[i];
-
-        return geo_coords_py;
-    }
-
-    // Separate (n, m) outputs — written in place via strict views (zero-copy)
-    arma::mat az, el, length;
-    auto az_py = qd_python_init_output(n, m, &az);
-    auto el_py = qd_python_init_output(n, m, &el);
-    auto length_py = qd_python_init_output(n, m, &length);
-
-    arma::vec az_v(az.memptr(), n_val, false, true);
-    arma::vec el_v(el.memptr(), n_val, false, true);
-    arma::vec length_v(length.memptr(), n_val, false, true);
-
-    quadriga_lib::fast_cart2geo<double>(cx, cy, cz, az_v, el_v, &length_v, use_kernel);
-
-    return py::make_tuple(az_py, el_py, length_py);
+    // Outputs in the shape of x; a column-major reshape of a 1D array is a view
+    return py::make_tuple(az_py.attr("reshape")(shape, py::arg("order") = "F"),
+                          el_py.attr("reshape")(shape, py::arg("order") = "F"),
+                          length_py.attr("reshape")(shape, py::arg("order") = "F"));
 }
