@@ -272,8 +272,8 @@ TEST_CASE("calc_delay_spread - Granularity: sparse binning equals the dense refe
             arma::vec ds = q_ds<double>(d, p, th, g, &md);
             arma::vec ds_ref = ds_dense_reference<double>(d, p, th, g, &md_ref);
             INFO("granularity " << g << ", threshold " << th);
-            CHECK(arma::approx_equal(ds, ds_ref, "absdiff", 0.0));
-            CHECK(arma::approx_equal(md, md_ref, "absdiff", 0.0));
+            CHECK(arma::approx_equal(ds, ds_ref, "reldiff", 1e-12)); // the two bin axes may round differently (FMA)
+            CHECK(arma::approx_equal(md, md_ref, "reldiff", 1e-12));
         }
 
     // Float, and delays with a negative offset
@@ -283,8 +283,8 @@ TEST_CASE("calc_delay_spread - Granularity: sparse binning equals the dense refe
     arma::fvec mdf, mdf_ref;
     arma::fvec dsf = q_ds<float>(df, pf, 100.0f, 5.0e-9f, &mdf);
     arma::fvec dsf_ref = ds_dense_reference<float>(df, pf, 100.0f, 5.0e-9f, &mdf_ref);
-    CHECK(arma::approx_equal(dsf, dsf_ref, "absdiff", 0.0f));
-    CHECK(arma::approx_equal(mdf, mdf_ref, "absdiff", 0.0f));
+    CHECK(arma::approx_equal(dsf, dsf_ref, "reldiff", 1e-6f));
+    CHECK(arma::approx_equal(mdf, mdf_ref, "reldiff", 1e-6f));
 }
 
 TEST_CASE("calc_delay_spread - Granularity: a 10 s delay span at 1 ns needs no dense bin axis")

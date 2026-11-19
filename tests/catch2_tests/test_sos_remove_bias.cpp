@@ -574,10 +574,10 @@ TEST_CASE("sos_remove_bias - devices with different numbers of position columns 
                 INFO("mode " << mode << ", columns " << ca << " and " << cb);
                 REQUIRE(off.n_cols == (arma::uword)mode);
                 CHECK(arma::abs(ph - phase0).max() > 1e-3);
-                CHECK(arma::approx_equal(ph, ph_ref, "absdiff", 0.0));
-                CHECK(arma::approx_equal(phb, phb_ref, "absdiff", 0.0));
-                CHECK(arma::approx_equal(off, off_ref, "absdiff", 0.0));
-                CHECK(arma::approx_equal(mean, mean_ref, "absdiff", 0.0));
+                CHECK(arma::approx_equal(ph, ph_ref, "absdiff", 1e-14)); // as for two columns above
+                CHECK(arma::approx_equal(phb, phb_ref, "absdiff", 1e-14));
+                CHECK(arma::approx_equal(off, off_ref, "absdiff", 1e-14));
+                CHECK(arma::approx_equal(mean, mean_ref, "absdiff", 1e-14));
             }
 }
 
