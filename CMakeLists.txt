@@ -388,7 +388,7 @@ if (BUILD_SHARED_LIB)
     set_target_properties(quadriga_shared PROPERTIES
         OUTPUT_NAME quadriga
         VERSION ${QUADRIGA_VERSION}
-        SOVERSION ${QUADRIGA_VERSION_MAJOR}
+        SOVERSION ${QUADRIGA_VERSION_MAJOR}.${QUADRIGA_VERSION_MINOR}
     )
     add_dependencies(quadriga_shared pugixml_lib)
     target_compile_definitions(quadriga_shared PRIVATE
