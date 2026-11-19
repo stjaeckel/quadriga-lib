@@ -8,11 +8,11 @@
 // "phase" (TR 38.901 eq. (7.5-22) phase rotation, delays and angles of the ray data) and "drift" (fixed scatterers,
 // geometry recomputed, ground reflection recomputed at moved ends), the K-factor rescale, the link gain, the oxygen
 // absorption of TR 38.901 clause 7.6.1, optional outputs, edge cases and validation. The scatterer solver is tested in
-// test_gbsm_rays_solve_scatterers.cpp; channel coefficients of a segment in test_gbsm_single_link_channel.cpp.
+// test_ssf_scatterers.cpp; channel coefficients of a segment in test_gbsm_single_link_channel.cpp.
 // Oracles: make_rays and the geometry of qd_test_rays.hpp (polyline, specular point, Fresnel coefficients of TR eqs.
 // (7.6-38) to (7.6-40)), and in this file: the displacement phase exp(j·2·pi·f/c·(r_rx·dr_rx + r_tx·dr_tx)), its
 // second-order error bound against the exact polyline phase, the K-factor form of the rescale and the oxygen
-// coefficients of TR Table 7.6.1-1 at the test frequencies. Supporting tasks: gbsm_rays::solve_scatterers,
+// coefficients of TR Table 7.6.1-1 at the test frequencies. Supporting tasks: ssf_scatterers,
 // gbsm_rays_from_paths, get_channels_planar, get_channels_spherical, ssf_clusters, gbsm_draw and ssf_rays.
 // Fixture: make_rays (Tx (3, -4, 25), Rx (120, 45, 1.5); frequencies 3.5 + 4.5·k GHz). Units: [m], [s], [rad], [Hz].
 // Tolerances: values formed by the same operations exactly; transcribed products and phases 1e-12 (relative for
@@ -271,7 +271,7 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
 TEST_CASE("ssf_paths - drift at the ray-data positions reproduces the drop geometry")
 {
     rays_t r = make_rays(13, true, true, 6, 2, "38.901");
-    r.solve_scatterers(2.0);
+    quadriga_lib::ssf_scatterers(r, 2.0);
     const arma::vec lg = {-90.0, -95.5}, &T = r.tx_pos, &R = r.rx_pos;
     const double d3D = len3(R - T);
     const po_t o = pth(r, "drift", {}, {}, {}, false, &lg);
@@ -323,7 +323,7 @@ TEST_CASE("ssf_paths - drift at the ray-data positions reproduces the drop geome
     // rule "towards the next point" would flip the sign of the departure elevation)
     rays_t g = make_rays(14, true, true, 0, 1, "38.901");
     g.tx_pos = arma::vec{0.0, 0.0, 0.0}, g.rx_pos = arma::vec{80.0, -30.0, 1.5};
-    g.solve_scatterers();
+    quadriga_lib::ssf_scatterers(g);
     const po_t og = pth(g, "drift");
     REQUIRE(og.ind.n_elem == 2);
     const double d2D = std::hypot(80.0, 30.0), el = std::atan2(-1.5, d2D);
@@ -438,7 +438,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
 TEST_CASE("ssf_paths - drift path lengths change by at most the displacement")
 {
     rays_t r = make_rays(17, true, true, 8, 1, "quadriga");
-    r.solve_scatterers(2.0);
+    quadriga_lib::ssf_scatterers(r, 2.0);
     const po_t o0 = pth(r, "drift");
     qd_uniform U(171);
     for (int t = 0; t < 30; ++t)
@@ -506,7 +506,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
     r.center_freq = {52.5e9, 60.0e9, 60.5e9, 63.5e9, 67.5e9, 70.0e9};
     const double alpha[6] = {0.5, 15.0, 14.8, 8.65, 0.5, 0.0};
     rays_t s = r;
-    s.solve_scatterers();
+    quadriga_lib::ssf_scatterers(s);
     const arma::vec R = r.rx_pos + arma::vec{2.0, -1.0, 0.5};
     for (int mode = 0; mode < 2; ++mode)
     {
@@ -558,7 +558,7 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
     for (const char *method : {"38.901", "38.901_MF", "quadriga"})
     {
         rays_t r = make_rays(20, true, true, 6, 2, method);
-        r.solve_scatterers();
+        quadriga_lib::ssf_scatterers(r);
         const arma::vec R = r.rx_pos + dR;
         const bool qd = std::string(method) == "quadriga";
         const po_t a = pth(r, "auto", {}, R, {}, false, &lg);
@@ -674,7 +674,7 @@ TEST_CASE("ssf_paths - n_ray = 0, NLOS scenario and data-from-paths rays")
     for (int solved = 0; solved < 2; ++solved)
     {
         if (solved == 1)
-            e.solve_scatterers();
+            quadriga_lib::ssf_scatterers(e);
         for (const char *mob : {"phase", "drift"})
         {
             po_t o;
@@ -689,7 +689,7 @@ TEST_CASE("ssf_paths - n_ray = 0, NLOS scenario and data-from-paths rays")
     // NLOS scenario: LOS and GR at power 0 are kept with gain 0; a ray with power 0 at frequency 0 only is kept
     rays_t n = make_rays(23, true, true, 6, 2, "38.901");
     n.power.row(0).zeros(), n.power.row(1).zeros(), n.power(6, 0) = 0.0;
-    n.solve_scatterers();
+    quadriga_lib::ssf_scatterers(n);
     const arma::vec kf = {2.0, 0.5};
     for (const char *mob : {"phase", "drift"})
     {
@@ -705,7 +705,7 @@ TEST_CASE("ssf_paths - n_ray = 0, NLOS scenario and data-from-paths rays")
     // Data from paths: the drift outputs of a solved object back through gbsm_rays_from_paths, with link gain 0 dB,
     // give the same paths
     rays_t s = make_rays(24, true, true, 6, 2, "quadriga");
-    s.solve_scatterers();
+    quadriga_lib::ssf_scatterers(s);
     const po_t o = pth(s, "drift");
     rays_t d;
     quadriga_lib::gbsm_rays_from_paths(s.center_freq, s.tx_pos, s.rx_pos, o.fbs, o.lbs, o.gain, o.len, o.M, d,
@@ -723,7 +723,7 @@ TEST_CASE("ssf_paths - input validation")
 {
     rays_t r = make_rays(25, true, true, 4, 2, "38.901");
     rays_t s = r;
-    s.solve_scatterers();
+    quadriga_lib::ssf_scatterers(s);
     const arma::vec lg = {-80.0, -90.0}, kf = {1.0, 2.0};
     arma::mat g(1, 1, arma::fill::value(-3.0));
     arma::vec l;
@@ -822,7 +822,7 @@ TEST_CASE("Diagnostic - ssf_paths fallback share and b_med on a library drop")
     // has zero excess delay) and "quadriga" (absolute TOA), scatterers with d_min = 2 m, paths in drift at the drop
     // positions. Columns: share of fallback rays among the NLOS rays with power, median and p99 of the delay added
     // by the fallback in [ns], p50 of b_med (Tx, Rx) in [m], largest residual of the solved polylines in [m].
-    // Read against the solver numbers in the docs of solve_scatterers (fallback 5.5 to 9.6 % for the TR methods
+    // Read against the solver numbers in the docs of ssf_scatterers (fallback 5.5 to 9.6 % for the TR methods
     // without absolute TOA, at most 2.3 % otherwise) and 0.2·b_med as the drift validity scale.
     const spmap sp = read_v19("UMi_NLOS");
     const arma::mat tx = arma::vec{0.0, 0.0, 10.0}, rx = drop_rx(291, 200);
@@ -850,7 +850,7 @@ TEST_CASE("Diagnostic - ssf_paths fallback share and b_med on a library drop")
         double n_on = 0.0, res = 0.0;
         for (rays_t &r : rays)
         {
-            r.solve_scatterers(2.0);
+            quadriga_lib::ssf_scatterers(r, 2.0);
             const po_t p = pth(r, "drift");
             const double d3D = len3(r.rx_pos - r.tx_pos);
             for (arma::uword q = 0; q < p.ind.n_elem; ++q)

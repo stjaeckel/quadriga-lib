@@ -71,27 +71,29 @@ namespace quadriga_lib
                        const arma::Mat<dtype> *path_angles_add = nullptr,    // Departure and arrival angles, Matrix of size [n_path_add, 4], {AOD, EOD, AOA, EOA}
                        const arma::Mat<dtype> *fbs_pos_add = nullptr,        // First-bounce scatterer positions, Matrix of size [3, n_path_add]
                        const arma::Mat<dtype> *lbs_pos_add = nullptr);       // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
-
-        // Calculate the the effective path gain (linear scale)
-        // - sum up the power of all paths and over all transmit and receive antenna pairs
-        // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
-        // - throws an error if neither coeff_re/im nor polmat is available
-        // - returns one value for each snapshot (vector with n_snap elements)
-        arma::Col<dtype> calc_effective_path_gain() const;
-
-        // Write propagation paths to a Wavefront OBJ file
-        // - e.g. for visualization in Blender
-        void write_paths_to_obj_file(
-            const std::string &fn,                   // Filename of the OBJ file
-            arma::uword max_paths = 0,               // Maximum number of paths to be shown, Default: all
-            dtype gain_max_dB = -60.0,               // Maximum path gain in dB (only for color-coding)
-            dtype gain_min_dB = -140.0,              // Minimum path gain in dB (only for color-coding and path selection)
-            const std::string &colormap = "jet",     // Colormap for the visualization
-            const arma::uvec &i_snap = arma::uvec(), // Snapshot indices, 0-based; empty = export all
-            dtype radius_max = 0.05,                 // Maximum tube radius in meters
-            dtype radius_min = 0.01,                 // Minimum tube radius in meters
-            arma::uword n_edges = 5) const;          // Number of vertices in the circle building the tube, must be >= 3
     };
+
+    // Effective path gain (linear scale) per snapshot, [n_snap]
+    // - sum up the power of all paths and over all transmit and receive antenna pairs
+    // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
+    // - throws an error if neither coeff_re/im nor polmat is available
+    template <typename dtype>
+    arma::Col<dtype> channel_calc_effective_path_gain(const channel<dtype> &chan);
+
+    // Write propagation paths to a Wavefront OBJ file
+    // - e.g. for visualization in Blender
+    template <typename dtype>
+    void channel_export_obj_file(
+        const std::string &fn,                   // Filename of the OBJ file
+        const channel<dtype> &chan,              // Channel with ray tracing data (n_interact, interact_coord)
+        arma::uword max_paths = 0,               // Maximum number of paths to be shown, Default: all
+        dtype gain_max_dB = -60.0,               // Maximum path gain in dB (only for color-coding)
+        dtype gain_min_dB = -140.0,              // Minimum path gain in dB (only for color-coding and path selection)
+        const std::string &colormap = "jet",     // Colormap for the visualization
+        const arma::uvec &i_snap = arma::uvec(), // Snapshot indices, 0-based; empty = export all
+        dtype radius_max = 0.05,                 // Maximum tube radius in meters
+        dtype radius_min = 0.01,                 // Minimum tube radius in meters
+        arma::uword n_edges = 5);                // Number of vertices in the circle building the tube, must be >= 3
 
     // Class for storing and managing path data
     class path

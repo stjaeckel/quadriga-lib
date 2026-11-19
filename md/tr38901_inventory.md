@@ -299,7 +299,7 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Near-field LOS (element-wise phase and patterns) | 7.6.13, eq. 7.6-50, 7.6-51 | Yes | `get_channels_spherical` (`src/get_channels_spherical.cpp:118`; elements `:302`, paths `:331`) | Exact distance and angles per element pair. Through `gbsm_single_link_channel` only with mobility `drift` (non-TR for the TR methods, D11). |
-| Near-field NLOS (s_TRP, s_UE) | 7.6.13, eq. 7.6-47 to 7.6-49, Table 7.6.13-1 | No | – | `NF_*` keys are in the files and match the table but are not read (`src/qd_scenpar.cpp:1024`). `solve_scatterers` places scatterers by a different rule (D16). |
+| Near-field NLOS (s_TRP, s_UE) | 7.6.13, eq. 7.6-47 to 7.6-49, Table 7.6.13-1 | No | – | `NF_*` keys are in the files and match the table but are not read (`src/qd_scenpar.cpp:1024`). `ssf_scatterers` places scatterers by a different rule (D16). |
 
 #### 3.6.14 Spatial non-stationarity channel model (7.6.14)
 

@@ -84,7 +84,7 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
 
 - Splits the clusters of [[ssf_clusters]] into rays and writes one [[gbsm_rays]] object per link: delays, coefficient
   powers, angles, polarization transfer matrices with initial phases, path types and tap indices; `fbs_pos`, `lbs_pos`
-  and `fallback` stay empty (see .[[solve_scatterers]])
+  and `fallback` stay empty (see [[ssf_scatterers]])
 - A pure function of the clusters, the LSPs and the random values, without a seed: a link does not depend on the other
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at

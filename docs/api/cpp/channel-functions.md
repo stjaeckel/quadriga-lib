@@ -9,6 +9,8 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) | Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
+| [channel_calc_effective_path_gain](#channel_calc_effective_path_gain) | Calculate the effective path gain per snapshot in linear scale |
+| [channel_export_obj_file](#channel_export_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [hdf5_create_file](#hdf5_create_file) | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_channel_vec](#hdf5_read_channel_vec) | Read the channels of several slots of an HDF5 file |
@@ -273,6 +275,73 @@ void quadriga_lib::baseband_freq_response_vec(
 ### See also:
 - [baseband_freq_response](#baseband_freq_response) (single-snapshot variant)
 - [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) (multi-freq counterpart)
+
+---
+<a id="channel_calc_effective_path_gain"></a>
+## channel_calc_effective_path_gain
+Calculate the effective path gain per snapshot in linear scale
+
+Not in: MATLAB, Python
+
+- Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
+- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
+- Throws if neither coefficients nor polarization data are present, or with the `is_valid()` message of an invalid
+  channel
+
+### Declaration:
+```cpp
+arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dtype> &chan);
+```
+
+### Input:
+- **`chan`** — Channel object, see [channel](channel-class.md#channel)
+
+### Returns:
+- Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
+
+---
+<a id="channel_export_obj_file"></a>
+## channel_export_obj_file
+Export propagation paths to a Wavefront OBJ file for 3D visualization
+
+Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Python](../python/channel-functions.md#channel.export_obj_file)
+
+- Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
+- Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
+- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
+- Paths with non-finite coordinates are skipped
+- Throws with the `is_valid()` message of an invalid channel
+
+### Declaration:
+```cpp
+void quadriga_lib::channel_export_obj_file(
+    const std::string &fn,
+    const channel<dtype> &chan,
+    arma::uword max_paths = 0,
+    dtype gain_max_dB = -60.0,
+    dtype gain_min_dB = -140.0,
+    const std::string &colormap = "jet",
+    const arma::uvec &i_snap = arma::uvec(),
+    dtype radius_max = 0.05,
+    dtype radius_min = 0.01,
+    arma::uword n_edges = 5);
+```
+
+### Inputs:
+- **`fn`** — Output `.obj` file path
+- **`chan`** — Channel with ray tracing data (`n_interact`, `interact_coord`), `center_freq` and coefficients or `polmat`; see [channel](channel-class.md#channel)
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
+- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
+- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
+- **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
+- **`radius_max`** *(optional)* — Tube radius at maximum gain
+- **`radius_min`** *(optional)* — Tube radius at minimum gain
+- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
+
+### See also:
+- [path_to_tube](site-specific-simulation-tools.md#path_to_tube) (generates tube geometry from path data)
+- [colormap](site-specific-simulation-tools.md#colormap) (colormap lookup used for coloring)
 
 ---
 <a id="hdf5_create_file"></a>

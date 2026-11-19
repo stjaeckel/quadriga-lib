@@ -85,48 +85,32 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, *, bandwidth, 
 ## channel.export_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../mex/channel-functions.md#channel_export_obj_file)
+Also in: [C++](../cpp/channel-functions.md#channel_export_obj_file) · [MATLAB](../mex/channel-functions.md#channel_export_obj_file)
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g. for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
 - Paths below `gain_min_dB` are excluded; `max_paths` caps the total number of exported paths
 - Paths with non-finite coordinates are skipped
-- Takes raw channel data fields directly; no channel dict is required
-- The per-snapshot fields `n_interact`, `interact_coord` and `coeff` each accept either a `list`
-  (one entry per snapshot, ragged) or a single padded `ndarray` (MATLAB-style nD layout)
 
 ### Usage:
 ```python
-quadriga_lib.channel.export_obj_file( fn, *, max_paths, gain_max_dB, gain_min_dB, colormap, \
-    radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
-    coeff_re, coeff_im, i_snap )
+quadriga_lib.channel.export_obj_file( fn, chan, *, max_paths, gain_max_dB, gain_min_dB, colormap, i_snap, \
+    radius_max, radius_min, n_edges )
 ```
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
+- **`chan`** — Channel; dict with the keys of [hdf5_read_channel](#hdf5_read_channel), list or stacked layout; needs `rx_pos`,
+  `tx_pos`, `center_freq`, `n_interact`, `interact_coord` and `coeff` with `delay`, or `polmat`; in the stacked
+  layout, columns of `interact_coord` beyond `sum(n_interact)` are ignored
 - **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
+- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: `None`
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
-- **`rx_pos`** — Receiver positions; ndarray `(3, n_snap)` or `(3, 1)`
-- **`tx_pos`** — Transmitter positions; ndarray `(3, n_snap)` or `(3, 1)`
-- **`n_interact`** — Number of interaction points of each path with the environment; uint32;
-  either a `list` of `n_snap` arrays of shape `(n_path,)`, or an ndarray `(n_path, n_snap)`
-- **`interact_coord`** — Interaction coordinates; either a `list` of `n_snap` arrays of shape
-  `(3, sum(n_interact))`, or an ndarray `(3, max(sum(n_interact)), n_snap)`; fewer than `sum(n_interact)`
-  columns in a snapshot raise an error
-- **`center_freq`** — Center frequency in Hz; ndarray `(n_snap,)` or scalar
-- **`coeff`** — Channel coefficients, complex valued; either a `list` of `n_snap` arrays of shape
-  `(n_rx, n_tx, n_path)`, or an ndarray `(n_rx, n_tx, n_path, n_snap)`; provide this or
-  `coeff_re`/`coeff_im`, not both; default: None
-- **`coeff_re`** — Real part of the channel coefficients; same format as `coeff` but real-valued;
-  must be paired with `coeff_im`; default: None
-- **`coeff_im`** — Imaginary part of the channel coefficients; same format as `coeff_re`;
-  must be paired with `coeff_re`; default: None
-- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: `None`
 
 ### Outputs:
 - None; the OBJ file is written directly to disk

@@ -11,7 +11,7 @@
 // powers; b_med (lower weighted median) and b_eff = (sum P / sum (P / b²))^(1/2) from the scatterers; the limits
 // sqrt(lambda·b_eff / 8) and 0.2·b_med and the displacement ratios. Fixture: make_rays of qd_test_rays.hpp (Tx (3,
 // -4, 25), Rx (120, 45, 1.5)). Supporting tasks: ssf_paths, get_channels_planar, get_channels_spherical,
-// generate_arrayant_*, gbsm_rays::solve_scatterers, gbsm_rays_from_paths, qrt_paths_from_scatterers, qrt_file_*.
+// generate_arrayant_*, ssf_scatterers, gbsm_rays_from_paths, qrt_paths_from_scatterers, qrt_file_*.
 // Units: [m], [s], [rad], [Hz].
 // Tolerances: coefficients 1e-12 relative to the largest coefficient of the snapshot (sums over rays can cancel);
 // delays 1e-12 relative to the largest delay; displacements up to 1 m, so that different evaluation orders of the
@@ -569,7 +569,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
     SECTION("phase without scatterers: from a solved copy")
     {
         rays_t u = make_rays(59, true, true, 6, 1, "38.901"), v = u;
-        v.solve_scatterers();
+        quadriga_lib::ssf_scatterers(v);
         ref_b(v, 0, bm, be);
         a.r = &u, a.mob = "phase";
         check(a.run(), bm, be, false);
@@ -590,7 +590,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
                 // GR ray is its image-method length); the solver rejects the GR ray, so it is solved as an NLOS ray
                 rays_t v = u;
                 v.path_type.replace(1, 2);
-                v.solve_scatterers();
+                quadriga_lib::ssf_scatterers(v);
                 v.path_type = u.path_type;
                 ref_b(v, 0, bm, be);
                 REQUIRE((std::isfinite(bm[e]) && std::isfinite(be[e])));
@@ -710,7 +710,7 @@ TEST_CASE("gbsm_single_link_channel - the snapshot count follows the positions a
 TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in drift")
 {
     rays_t r = make_rays(62, true, true, 6, 1, "quadriga");
-    r.solve_scatterers();
+    quadriga_lib::ssf_scatterers(r);
     const arr_t a2 = panel(3.5e9);
     args_t a{&a2, &a2, &r};
     a.mob = "drift", a.out = "rays", a.lg = {-3.0};

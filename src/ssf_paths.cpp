@@ -28,7 +28,7 @@ Antenna-free paths of one link at one position
   phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer
   identified and the displacement phase counts twice, without an error
 - `"drift"`: use the outputs at the new positions with [[get_channels_spherical]] or [[get_channels_multifreq]], or
-  pass them to [[qrt_paths_from_scatterers]]; needs the scatterers of .[[solve_scatterers]]
+  pass them to [[qrt_paths_from_scatterers]]; needs the scatterers of [[ssf_scatterers]]
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
@@ -96,7 +96,7 @@ void quadriga_lib::ssf_paths(
 - [[gbsm_rays]] (input data, validity scales `b_eff` and `b_med`)
 - [[gbsm_single_link_channel]] (channel coefficients of one link over a segment)
 - [[gbsm_rays_from_paths]] (ray data from path data, e.g. of a QRT file)
-- .[[solve_scatterers]] (scatterers for `"drift"`)
+- [[ssf_scatterers]] (scatterers for `"drift"`)
 MD!*/
 
 void quadriga_lib::ssf_paths(const gbsm_rays &rays,

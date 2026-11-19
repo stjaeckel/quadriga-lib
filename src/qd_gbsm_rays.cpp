@@ -47,11 +47,11 @@ Class for the ray data of one link (geometry-based stochastic model)
 
 - Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
   positions the data refer to; written by [[ssf_rays]] and [[gbsm_rays_from_paths]], completed by
-  .[[solve_scatterers]], read by [[ssf_paths]] and [[gbsm_single_link_channel]], which call `is_valid()` first
+  [[ssf_scatterers]], read by [[ssf_paths]] and [[gbsm_single_link_channel]], which call `is_valid()` first
 - Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
 - An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
 - Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
-  `is_valid()`) and one `method` for all rays. `.solve_scatterers` overwrites given scatterers, so solve rays without
+  `is_valid()`) and one `method` for all rays. [[ssf_scatterers]] overwrites given scatterers, so solve rays without
   scatterers in a separate object and concatenate the attributes
 - Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
   non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
@@ -69,8 +69,8 @@ Class for the ray data of one link (geometry-based stochastic model)
 | `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
 | `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [[ssf_rays]], [[gbsm_rays_from_paths]] |
-| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | .[[solve_scatterers]], [[gbsm_rays_from_paths]] |
-| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | .[[solve_scatterers]] |
+| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [[ssf_scatterers]], [[gbsm_rays_from_paths]] |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [[ssf_scatterers]] |
 
 ## Member functions:
 | Member | Returns |
@@ -81,14 +81,13 @@ Class for the ray data of one link (geometry-based stochastic model)
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
 | `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
 | `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
-| `solve_scatterers(d_min = 2.0)` | `void`; writes `fbs_pos`, `lbs_pos` and `fallback`, see .[[solve_scatterers]] |
 
 - `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
 
 ## See also:
 - [[ssf_rays]] (ray data of a set of links)
 - [[gbsm_rays_from_paths]] (ray data from path data)
-- .[[solve_scatterers]] (scatterers for the mobility `drift`)
+- [[ssf_scatterers]] (scatterers for the mobility `drift`)
 - [[ssf_paths]] (paths of one link at one position)
 - [[gbsm_single_link_channel]] (channel of the link)
 MD!*/
@@ -235,10 +234,10 @@ arma::vec quadriga_lib::gbsm_rays::b_eff(arma::uword i_freq) const
 }
 
 /*!MD
-# .solve_scatterers
+# ssf_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
-- Member of [[gbsm_rays]]: places the scatterers that the mobility `drift` needs, in place
+- Places the scatterers of a [[gbsm_rays]] object that the mobility `drift` needs, in place
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
   distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
   distance) and the angles are exact
@@ -255,10 +254,11 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 ## Declaration:
 ```
-void quadriga_lib::gbsm_rays::solve_scatterers(double d_min = 2.0);
+void quadriga_lib::ssf_scatterers(gbsm_rays &rays, double d_min = 2.0);
 ```
 
-## Input:
+## Inputs:
+- **`rays`** — Ray data of one link, see [[gbsm_rays]]; `fbs_pos`, `lbs_pos` and `fallback` are written
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0
 
 ## See also:
@@ -266,25 +266,25 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min = 2.0);
 - [[ssf_paths]] (mobility `drift` needs the scatterers)
 MD!*/
 
-void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
+void quadriga_lib::ssf_scatterers(gbsm_rays &rays, double d_min)
 {
-    const std::string err = is_valid();
+    const std::string err = rays.is_valid();
     if (!err.empty())
         throw std::invalid_argument(err);
     if (!std::isfinite(d_min) || d_min <= 0.0)
         throw std::invalid_argument("Input 'd_min' must be finite and > 0.");
-    if (arma::any(path_type == 1) && (tx_pos(2) < 0.0 || rx_pos(2) < 0.0))
+    if (arma::any(rays.path_type == 1) && (rays.tx_pos(2) < 0.0 || rays.rx_pos(2) < 0.0))
         throw std::invalid_argument("Ground reflection requires z >= 0 in 'rays.tx_pos' and 'rays.rx_pos'.");
 
-    const arma::uword n = n_ray();
-    if (fbs_pos.n_rows != 3 || fbs_pos.n_cols != n)
-        fbs_pos.set_size(3, n);
-    if (lbs_pos.n_rows != 3 || lbs_pos.n_cols != n)
-        lbs_pos.set_size(3, n);
-    if (fallback.n_elem != n)
-        fallback.set_size(n);
+    const arma::uword n = rays.n_ray();
+    if (rays.fbs_pos.n_rows != 3 || rays.fbs_pos.n_cols != n)
+        rays.fbs_pos.set_size(3, n);
+    if (rays.lbs_pos.n_rows != 3 || rays.lbs_pos.n_cols != n)
+        rays.lbs_pos.set_size(3, n);
+    if (rays.fallback.n_elem != n)
+        rays.fallback.set_size(n);
 
-    const double *T = tx_pos.memptr(), *R = rx_pos.memptr();
+    const double *T = rays.tx_pos.memptr(), *R = rays.rx_pos.memptr();
     const double D[3] = {T[0] - R[0], T[1] - R[1], T[2] - R[2]};
     const double DD = D[0] * D[0] + D[1] * D[1] + D[2] * D[2], d3D = std::sqrt(DD);
     const double mid[3] = {0.5 * (T[0] + R[0]), 0.5 * (T[1] + R[1]), 0.5 * (T[2] + R[2])};
@@ -294,18 +294,18 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
 
     for (arma::uword i = 0; i < n; ++i)
     {
-        double *F = fbs_pos.colptr(i), *B = lbs_pos.colptr(i);
-        fallback(i) = 0;
-        if (path_type(i) == 1)
+        double *F = rays.fbs_pos.colptr(i), *B = rays.lbs_pos.colptr(i);
+        rays.fallback(i) = 0;
+        if (rays.path_type(i) == 1)
         {
             for (int j = 0; j < 3; ++j)
                 F[j] = G[j], B[j] = G[j];
             continue;
         }
         bool on = false; // power > 0 at some frequency
-        for (arma::uword k = 0; k < power.n_cols; ++k)
-            on = on || power(i, k) > 0.0;
-        if (path_type(i) == 0 || !on)
+        for (arma::uword k = 0; k < rays.power.n_cols; ++k)
+            on = on || rays.power(i, k) > 0.0;
+        if (rays.path_type(i) == 0 || !on)
         {
             for (int j = 0; j < 3; ++j)
                 F[j] = mid[j], B[j] = mid[j];
@@ -317,11 +317,11 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
         // abs(D + s·w) is non-decreasing (abs(w) <= 2), and so is a + b + abs(D + a·u_d - b·u_a) in a and b: a
         // solution with both distances >= d_min exists iff s >= d_min. Otherwise (also for L <= abs(D)) both
         // scatterers go to d_min along the ray's own directions, which lengthens the ray.
-        const double ce = std::cos(eod(i)), ca = std::cos(eoa(i));
-        const double ud[3] = {ce * std::cos(aod(i)), ce * std::sin(aod(i)), std::sin(eod(i))};
-        const double ua[3] = {ca * std::cos(aoa(i)), ca * std::sin(aoa(i)), std::sin(eoa(i))};
+        const double ce = std::cos(rays.eod(i)), ca = std::cos(rays.eoa(i));
+        const double ud[3] = {ce * std::cos(rays.aod(i)), ce * std::sin(rays.aod(i)), std::sin(rays.eod(i))};
+        const double ua[3] = {ca * std::cos(rays.aoa(i)), ca * std::sin(rays.aoa(i)), std::sin(rays.eoa(i))};
         const double w[3] = {ud[0] - ua[0], ud[1] - ua[1], ud[2] - ua[2]};
-        const double L = d3D + 299792458.0 * delay(i);
+        const double L = d3D + 299792458.0 * rays.delay(i);
         double s = 0.0;
         if (L > d3D) // zero or negative excess length: fallback (also avoids the 0 / 0 of L = -d3D)
         {
@@ -331,7 +331,7 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
             s = std::isfinite(s) ? s : 0.0;
         }
         if (s < d_min)
-            s = d_min, fallback(i) = 1;
+            s = d_min, rays.fallback(i) = 1;
         for (int j = 0; j < 3; ++j)
             F[j] = T[j] + s * ud[j], B[j] = R[j] + s * ua[j];
     }

@@ -346,9 +346,9 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (c.n_interact.size() == n_snap && c.interact_coord.size() == n_snap)
             for (size_t s = 0; s < n_snap; ++s)
             {
-                unsigned cnt = 0;
+                arma::uword cnt = 0; // 64-bit sum, a 32-bit sum can wrap
                 for (auto v : c.n_interact[s])
-                    cnt += v;
+                    cnt += (arma::uword)v;
                 if (c.interact_coord[s].n_cols > (arma::uword)cnt)
                     c.interact_coord[s].resize(c.interact_coord[s].n_rows, (arma::uword)cnt);
             }

@@ -1,7 +1,7 @@
 function test_ssf_scatterers
 % MEX interface test for quadriga_lib.ssf_scatterers.
 % Scope: argument and output handling, struct copy rules, validity scales, error paths.
-% Physics validation lives in the Catch2 suite (test_gbsm_rays_solve_scatterers.cpp, test_gbsm_rays.cpp).
+% Physics validation lives in the Catch2 suite (test_ssf_scatterers.cpp, test_gbsm_rays.cpp).
 
 %% Setup: UMi LOS, 'quadriga' rays of 2 links at two frequencies
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );

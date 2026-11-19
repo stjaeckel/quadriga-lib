@@ -6,8 +6,6 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | --- | --- |
 | [channel](#channel) | Class for storing and managing MIMO channel data and metadata across multiple snapshots |
 | [.add_paths](#.add_paths) | Append new propagation paths to an existing channel snapshot |
-| [.calc_effective_path_gain](#.calc_effective_path_gain) | Calculate the effective path gain per snapshot in linear scale |
-| [.write_paths_to_obj_file](#.write_paths_to_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 
 ---
 <a id="channel"></a>
@@ -56,8 +54,9 @@ Not in: MATLAB, Python
 
 ### Complex member functions:
 - [.add_paths](#.add_paths)
-- [.calc_effective_path_gain](#.calc_effective_path_gain)
-- [.write_paths_to_obj_file](#.write_paths_to_obj_file)
+
+Computations and file I/O on a channel are free functions, see section "Channel functions"
+(e.g. [channel_calc_effective_path_gain](channel-functions.md#channel_calc_effective_path_gain), [channel_export_obj_file](channel-functions.md#channel_export_obj_file), [hdf5_write_channel](channel-functions.md#hdf5_write_channel), [quantize_delays](channel-functions.md#quantize_delays)).
 
 ---
 <a id=".add_paths"></a>
@@ -100,63 +99,3 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
 - **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
 - **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
-
----
-<a id=".calc_effective_path_gain"></a>
-## .calc_effective_path_gain
-Calculate the effective path gain per snapshot in linear scale
-
-Not in: MATLAB, Python
-
-- Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
-- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
-- Throws if neither coefficients nor polarization data are present
-
-### Declaration:
-```cpp
-arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
-```
-
-### Returns:
-- Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
-
----
-<a id=".write_paths_to_obj_file"></a>
-## .write_paths_to_obj_file
-Export propagation paths to a Wavefront OBJ file for 3D visualization
-
-Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Python](../python/channel-functions.md#channel.export_obj_file)
-
-- Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
-- Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
-- Paths with non-finite coordinates are skipped
-
-### Declaration:
-```cpp
-void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
-    const std::string &fn,
-    arma::uword max_paths = 0,
-    dtype gain_max_dB = -60.0,
-    dtype gain_min_dB = -140.0,
-    const std::string &colormap = "jet",
-    const arma::uvec &i_snap = arma::uvec(),
-    dtype radius_max = 0.05,
-    dtype radius_min = 0.01,
-    arma::uword n_edges = 5) const;
-```
-
-### Inputs:
-- **`fn`** — Output `.obj` file path
-- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
-- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
-- **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
-- **`radius_max`** *(optional)* — Tube radius at maximum gain
-- **`radius_min`** *(optional)* — Tube radius at minimum gain
-- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
-
-### See also:
-- [path_to_tube](site-specific-simulation-tools.md#path_to_tube) (generates tube geometry from path data)
-- [colormap](site-specific-simulation-tools.md#colormap) (colormap lookup used for coloring)

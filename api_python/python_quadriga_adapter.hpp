@@ -519,6 +519,17 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
     load("n_interact", c.n_interact);
     load("interact_coord", c.interact_coord);
 
+    // Prune zero-padded trailing columns in interact_coord (stacked layout, as in the MEX struct reader)
+    const size_t n_snap = (size_t)c.n_snap();
+    if (has("interact_coord") && !py::isinstance<py::list>(dict["interact_coord"]) &&
+        c.n_interact.size() == n_snap && c.interact_coord.size() == n_snap)
+        for (size_t s = 0; s < n_snap; ++s)
+        {
+            const arma::uword cnt = (arma::uword)arma::accu(arma::conv_to<arma::uvec>::from(c.n_interact[s]));
+            if (c.interact_coord[s].n_cols > cnt)
+                c.interact_coord[s].resize(c.interact_coord[s].n_rows, cnt);
+        }
+
     if (validate && !c.empty())
     {
         const std::string err = c.is_valid();

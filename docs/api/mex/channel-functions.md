@@ -99,39 +99,32 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [Python](.
 ## channel_export_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../python/channel-functions.md#channel.export_obj_file)
+Also in: [C++](../cpp/channel-functions.md#channel_export_obj_file) · [Python](../python/channel-functions.md#channel.export_obj_file)
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
 - Paths below `gain_min_dB` are excluded; `max_paths` limits the total number of exported paths
 - Paths with non-finite coordinates are skipped
-- The function takes raw channel data fields directly; no MATLAB channel struct is needed
 
 ### Usage:
 ```matlab
-quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, colormap, radius_max, ...
-     radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff_re, ...
-    coeff_im, i_snap );
+quadriga_lib.channel_export_obj_file( fn, chan, max_paths, gain_max_dB, gain_min_dB, colormap, i_snap, ...
+    radius_max, radius_min, n_edges );
 ```
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
+- **`chan`** — Channel; 1x1 struct with the fields of [hdf5_read_channel](#hdf5_read_channel); needs `rx_pos`, `tx_pos`,
+  `center_freq`, `n_interact`, `interact_coord` and `coeff_re` / `coeff_im` with `delay`, or `polmat`;
+  columns of `interact_coord` beyond `sum(n_interact)` are ignored
 - **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
+- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; empty exports all
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
-- **`rx_pos`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
-- **`tx_pos`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
-- **`n_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
-- **`interact_coord`** — Interaction coordinates; `[3, max(sum(n_interact)), n_snap]`; fewer than `sum(n_interact)`
-  columns in a snapshot raise an error
-- **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
-- **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
-- **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
-- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; empty exports all
 
 ### Outputs:
 - This function writes the OBJ file directly to disk and does not return any data

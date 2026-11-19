@@ -215,7 +215,7 @@ namespace quadriga_lib
         arma::u32_vec *n_active = nullptr);                     // Optional output: Number of NLOS clusters with power > 0, [n_link]
 
     // Ray data of one link (geometry-based stochastic model)
-    // - Output of ssf_rays and gbsm_rays_from_paths; solve_scatterers adds the scatterer positions
+    // - Output of ssf_rays and gbsm_rays_from_paths; ssf_scatterers adds the scatterer positions
     // - Input of ssf_paths and gbsm_single_link_channel, which call is_valid() first
     // - Set the attributes by name: later versions append attributes
     class gbsm_rays
@@ -236,9 +236,9 @@ namespace quadriga_lib
         arma::u32_vec tap;             // Tap index, rays with equal index form one tap, [n_ray]
         arma::vec gr_eps_re;           // Ground permittivity, real part, [n_freq] or empty; needed where a GR ray is recomputed
         arma::vec gr_eps_im;           // Ground permittivity, imaginary part, [n_freq] or empty; needed where a GR ray is recomputed
-        arma::mat fbs_pos;             // First-bounce scatterer positions in [m], [3, n_ray]; empty until solve_scatterers
-        arma::mat lbs_pos;             // Last-bounce scatterer positions in [m], [3, n_ray]; empty until solve_scatterers
-        arma::u32_vec fallback;        // 1 = lengthened by the solver fallback, [n_ray]; empty until solve_scatterers
+        arma::mat fbs_pos;             // First-bounce scatterer positions in [m], [3, n_ray]; empty until ssf_scatterers
+        arma::mat lbs_pos;             // Last-bounce scatterer positions in [m], [3, n_ray]; empty until ssf_scatterers
+        arma::u32_vec fallback;        // 1 = lengthened by the solver fallback, [n_ray]; empty until ssf_scatterers
         gbsm_rays() {};                // Default constructor
 
         arma::uword n_ray() const;                     // Number of rays, length of 'delay'
@@ -247,8 +247,12 @@ namespace quadriga_lib
         std::string is_valid() const;                  // Empty string if the object is valid, else an error message
         arma::vec b_med(arma::uword i_freq = 0) const; // b_med of the Tx (to FBS) and the Rx (to LBS) in [m], [2]; NaN without scatterers or NLOS power
         arma::vec b_eff(arma::uword i_freq = 0) const; // b_eff of the Tx and the Rx in [m], [2]; NaN without scatterers or power
-        void solve_scatterers(double d_min = 2.0);     // Two-bounce solver: writes fbs_pos, lbs_pos and fallback; d_min in [m], > 0
     };
+
+    // First- and last-bounce scatterers of the rays of one link (two-bounce solver), in place
+    // - Writes fbs_pos, lbs_pos and fallback; nothing else changes
+    void ssf_scatterers(gbsm_rays &rays,       // Ray data of one link
+                        double d_min = 2.0);   // Minimum distance of the scatterers to both ends in [m], > 0
 
     // Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16)
     // - One geometry per call: "38.901" and "38.901_MF" compute frequency 'i_freq' (with slice i_freq of 'rnd_ray');

@@ -61,7 +61,7 @@ py::tuple ssf_scatterers(const py::dict &rays, double d_min)
     auto fallback_py = qd_python_init_output(n_ray, &rays_a.fallback);
     rays_a.fbs_pos.zeros(), rays_a.lbs_pos.zeros(), rays_a.fallback.zeros(); // numpy memory is not initialised
 
-    rays_a.solve_scatterers(d_min);
+    quadriga_lib::ssf_scatterers(rays_a, d_min);
 
     // Validity scales per frequency
     arma::mat b_med, b_eff;

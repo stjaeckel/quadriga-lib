@@ -774,7 +774,7 @@ void quadriga_lib::arrayant_export_obj_file(
 ## See also:
 - [[colormap]] (Used for setting the colormap)
 - [[icosphere]] (Used internally to generate icosphere primitive)
-- .[[write_paths_to_obj_file]] (function of Channel class to export propagation paths to OBJ 3D visualization)
+- [[channel_export_obj_file]] (exports propagation paths to OBJ 3D visualization)
 MD!*/
 
 template <typename dtype>

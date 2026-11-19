@@ -109,7 +109,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ## See also:
 - [[ssf_paths]] (paths of one link at one position, validity limits)
 - [[gbsm_rays]] (input data, `b_med` and `b_eff`)
-- .[[solve_scatterers]] (scatterers for `"drift"`)
+- [[ssf_scatterers]] (scatterers for `"drift"`)
 - [[gbsm_rays_from_paths]] (ray data from path data)
 - [[channel]] (the returned object)
 MD!*/
@@ -431,7 +431,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         const arma::u32_vec type = rr.path_type;
         if (rr.tx_pos(2) < 0.0 || rr.rx_pos(2) < 0.0)
             rr.path_type.replace(1, 2);
-        rr.solve_scatterers();
+        quadriga_lib::ssf_scatterers(rr);
         rr.path_type = type;
     }
     const arma::vec b_med = rr.b_med(0), b_eff = rr.b_eff(0);

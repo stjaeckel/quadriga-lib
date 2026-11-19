@@ -96,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mxSetField(plhs[0], 0, f.c_str(), a);
     }
 
-    CALL_QD(rays.solve_scatterers(d_min));
+    CALL_QD(quadriga_lib::ssf_scatterers(rays, d_min));
 
     // Validity scales per frequency
     arma::mat b_med, b_eff;

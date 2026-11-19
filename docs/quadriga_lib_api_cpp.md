@@ -106,13 +106,13 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [qdant_write_multi](#qdant_write_multi) | Array antenna functions | Write a vector of arrayant objects to a single QDANT file |
 | [channel](#channel) | Channel class | Class for storing and managing MIMO channel data and metadata across multiple snapshots |
 | [.add_paths](#.add_paths) | Channel class | Append new propagation paths to an existing channel snapshot |
-| [.calc_effective_path_gain](#.calc_effective_path_gain) | Channel class | Calculate the effective path gain per snapshot in linear scale |
-| [.write_paths_to_obj_file](#.write_paths_to_obj_file) | Channel class | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [any_type_id](#any_type_id) | Channel functions | Get the type ID and the shape of the value in a `std::any` object |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) | Channel functions | Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | Compute the baseband frequency response of multiple MIMO channels |
+| [channel_calc_effective_path_gain](#channel_calc_effective_path_gain) | Channel functions | Calculate the effective path gain per snapshot in linear scale |
+| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_channel_vec](#hdf5_read_channel_vec) | Channel functions | Read the channels of several slots of an HDF5 file |
@@ -160,7 +160,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [ssf_clusters](#ssf_clusters) | Geometry-based stochastic model | Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7) |
 | [ssf_paths](#ssf_paths) | Geometry-based stochastic model | Antenna-free paths of one link at one position |
 | [ssf_rays](#ssf_rays) | Geometry-based stochastic model | Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16) |
-| [.solve_scatterers](#.solve_scatterers) | Geometry-based stochastic model | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
+| [ssf_scatterers](#ssf_scatterers) | Geometry-based stochastic model | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | Calculate rotation matrices from Euler angles |
 | [fast_acos](#fast_acos) | Math functions | Compute elementwise approximate arc-cosine of a vector |
 | [fast_asin](#fast_asin) | Math functions | Compute elementwise approximate arc-sine of a vector |
@@ -745,7 +745,7 @@ void quadriga_lib::arrayant_export_obj_file(
 ### See also:
 - [colormap](#colormap) (Used for setting the colormap)
 - [icosphere](#icosphere) (Used internally to generate icosphere primitive)
-- [.write_paths_to_obj_file](#.write_paths_to_obj_file) (function of Channel class to export propagation paths to OBJ 3D visualization)
+- [channel_export_obj_file](#channel_export_obj_file) (exports propagation paths to OBJ 3D visualization)
 
 ---
 <a id="arrayant_interpolate"></a>
@@ -1593,8 +1593,9 @@ Not in: MATLAB, Python
 
 ### Complex member functions:
 - [.add_paths](#.add_paths)
-- [.calc_effective_path_gain](#.calc_effective_path_gain)
-- [.write_paths_to_obj_file](#.write_paths_to_obj_file)
+
+Computations and file I/O on a channel are free functions, see section "Channel functions"
+(e.g. [channel_calc_effective_path_gain](#channel_calc_effective_path_gain), [channel_export_obj_file](#channel_export_obj_file), [hdf5_write_channel](#hdf5_write_channel), [quantize_delays](#quantize_delays)).
 
 ---
 <a id=".add_paths"></a>
@@ -1637,66 +1638,6 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
 - **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
 - **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
-
----
-<a id=".calc_effective_path_gain"></a>
-## .calc_effective_path_gain
-Calculate the effective path gain per snapshot in linear scale
-
-Not in: MATLAB, Python
-
-- Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
-- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
-- Throws if neither coefficients nor polarization data are present
-
-### Declaration:
-```cpp
-arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
-```
-
-### Returns:
-- Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
-
----
-<a id=".write_paths_to_obj_file"></a>
-## .write_paths_to_obj_file
-Export propagation paths to a Wavefront OBJ file for 3D visualization
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](quadriga_lib_api_python.md#channel.export_obj_file)
-
-- Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
-- Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
-- Paths with non-finite coordinates are skipped
-
-### Declaration:
-```cpp
-void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
-    const std::string &fn,
-    arma::uword max_paths = 0,
-    dtype gain_max_dB = -60.0,
-    dtype gain_min_dB = -140.0,
-    const std::string &colormap = "jet",
-    const arma::uvec &i_snap = arma::uvec(),
-    dtype radius_max = 0.05,
-    dtype radius_min = 0.01,
-    arma::uword n_edges = 5) const;
-```
-
-### Inputs:
-- **`fn`** — Output `.obj` file path
-- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
-- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
-- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
-- **`radius_max`** *(optional)* — Tube radius at maximum gain
-- **`radius_min`** *(optional)* — Tube radius at minimum gain
-- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
-
-### See also:
-- [path_to_tube](#path_to_tube) (generates tube geometry from path data)
-- [colormap](#colormap) (colormap lookup used for coloring)
 
 ---
 
@@ -1947,6 +1888,73 @@ void quadriga_lib::baseband_freq_response_vec(
 ### See also:
 - [baseband_freq_response](#baseband_freq_response) (single-snapshot variant)
 - [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) (multi-freq counterpart)
+
+---
+<a id="channel_calc_effective_path_gain"></a>
+## channel_calc_effective_path_gain
+Calculate the effective path gain per snapshot in linear scale
+
+Not in: MATLAB, Python
+
+- Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
+- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
+- Throws if neither coefficients nor polarization data are present, or with the `is_valid()` message of an invalid
+  channel
+
+### Declaration:
+```cpp
+arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dtype> &chan);
+```
+
+### Input:
+- **`chan`** — Channel object, see [channel](#channel)
+
+### Returns:
+- Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
+
+---
+<a id="channel_export_obj_file"></a>
+## channel_export_obj_file
+Export propagation paths to a Wavefront OBJ file for 3D visualization
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](quadriga_lib_api_python.md#channel.export_obj_file)
+
+- Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
+- Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
+- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
+- Paths with non-finite coordinates are skipped
+- Throws with the `is_valid()` message of an invalid channel
+
+### Declaration:
+```cpp
+void quadriga_lib::channel_export_obj_file(
+    const std::string &fn,
+    const channel<dtype> &chan,
+    arma::uword max_paths = 0,
+    dtype gain_max_dB = -60.0,
+    dtype gain_min_dB = -140.0,
+    const std::string &colormap = "jet",
+    const arma::uvec &i_snap = arma::uvec(),
+    dtype radius_max = 0.05,
+    dtype radius_min = 0.01,
+    arma::uword n_edges = 5);
+```
+
+### Inputs:
+- **`fn`** — Output `.obj` file path
+- **`chan`** — Channel with ray tracing data (`n_interact`, `interact_coord`), `center_freq` and coefficients or `polmat`; see [channel](#channel)
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
+- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
+- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
+- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
+- **`radius_max`** *(optional)* — Tube radius at maximum gain
+- **`radius_min`** *(optional)* — Tube radius at minimum gain
+- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
+
+### See also:
+- [path_to_tube](#path_to_tube) (generates tube geometry from path data)
+- [colormap](#colormap) (colormap lookup used for coloring)
 
 ---
 <a id="hdf5_create_file"></a>
@@ -3857,7 +3865,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
    with `sf_sigma_dB` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [ssf_clusters](#ssf_clusters) (`n_cluster` is the caller's choice) and [ssf_rays](#ssf_rays) (one [gbsm_rays](#gbsm_rays) object per link), called
    as in the table below
-6. Per link and segment: [.solve_scatterers](#.solve_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
+6. Per link and segment: [ssf_scatterers](#ssf_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
    link gain (see Terms) as `link_gain_dB` (TR methods: once per object, which holds one frequency; `"quadriga"`:
    once per `i_freq`), or [ssf_paths](#ssf_paths) for other channel functions and the QRT route ([qrt_paths_from_scatterers](#qrt_paths_from_scatterers),
    [qrt_file_append](#qrt_file_append))
@@ -4235,11 +4243,11 @@ Not in: MATLAB, Python
 
 - Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
   positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
-  [.solve_scatterers](#.solve_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
+  [ssf_scatterers](#ssf_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
 - Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
 - An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
 - Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
-  `is_valid()`) and one `method` for all rays. `.solve_scatterers` overwrites given scatterers, so solve rays without
+  `is_valid()`) and one `method` for all rays. [ssf_scatterers](#ssf_scatterers) overwrites given scatterers, so solve rays without
   scatterers in a separate object and concatenate the attributes
 - Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
   non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
@@ -4257,8 +4265,8 @@ Not in: MATLAB, Python
 | `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
 | `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [.solve_scatterers](#.solve_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [.solve_scatterers](#.solve_scatterers) |
+| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [ssf_scatterers](#ssf_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [ssf_scatterers](#ssf_scatterers) |
 
 ### Member functions:
 | Member | Returns |
@@ -4269,14 +4277,13 @@ Not in: MATLAB, Python
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
 | `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
 | `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
-| `solve_scatterers(d_min = 2.0)` | `void`; writes `fbs_pos`, `lbs_pos` and `fallback`, see [.solve_scatterers](#.solve_scatterers) |
 
 - `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
 
 ### See also:
 - [ssf_rays](#ssf_rays) (ray data of a set of links)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
-- [.solve_scatterers](#.solve_scatterers) (scatterers for the mobility `drift`)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for the mobility `drift`)
 - [ssf_paths](#ssf_paths) (paths of one link at one position)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
@@ -4427,7 +4434,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ### See also:
 - [ssf_paths](#ssf_paths) (paths of one link at one position, validity limits)
 - [gbsm_rays](#gbsm_rays) (input data, `b_med` and `b_eff`)
-- [.solve_scatterers](#.solve_scatterers) (scatterers for `"drift"`)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for `"drift"`)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
 - [channel](#channel) (the returned object)
 
@@ -4904,7 +4911,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_paths) · [Python](quadriga_lib_ap
   phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer
   identified and the displacement phase counts twice, without an error
 - `"drift"`: use the outputs at the new positions with [get_channels_spherical](#get_channels_spherical) or [get_channels_multifreq](#get_channels_multifreq), or
-  pass them to [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); needs the scatterers of [.solve_scatterers](#.solve_scatterers)
+  pass them to [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); needs the scatterers of [ssf_scatterers](#ssf_scatterers)
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
@@ -4972,7 +4979,7 @@ void quadriga_lib::ssf_paths(
 - [gbsm_rays](#gbsm_rays) (input data, validity scales `b_eff` and `b_med`)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel coefficients of one link over a segment)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data, e.g. of a QRT file)
-- [.solve_scatterers](#.solve_scatterers) (scatterers for `"drift"`)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for `"drift"`)
 
 ---
 <a id="ssf_rays"></a>
@@ -4983,7 +4990,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_rays) · [Python](quadriga_lib_api
 
 - Splits the clusters of [ssf_clusters](#ssf_clusters) into rays and writes one [gbsm_rays](#gbsm_rays) object per link: delays, coefficient
   powers, angles, polarization transfer matrices with initial phases, path types and tap indices; `fbs_pos`, `lbs_pos`
-  and `fallback` stay empty (see [.solve_scatterers](#.solve_scatterers))
+  and `fallback` stay empty (see [ssf_scatterers](#ssf_scatterers))
 - A pure function of the clusters, the LSPs and the random values, without a seed: a link does not depend on the other
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at
@@ -5076,13 +5083,13 @@ void quadriga_lib::ssf_rays(
 - [ssf_paths](#ssf_paths) (paths of one link)
 
 ---
-<a id=".solve_scatterers"></a>
-## .solve_scatterers
+<a id="ssf_scatterers"></a>
+## ssf_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_scatterers) · [Python](quadriga_lib_api_python.md#ssf_scatterers)
 
-- Member of [gbsm_rays](#gbsm_rays): places the scatterers that the mobility `drift` needs, in place
+- Places the scatterers of a [gbsm_rays](#gbsm_rays) object that the mobility `drift` needs, in place
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
   distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
   distance) and the angles are exact
@@ -5099,10 +5106,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_scatterers) · [Python](quadriga_l
 
 ### Declaration:
 ```cpp
-void quadriga_lib::gbsm_rays::solve_scatterers(double d_min = 2.0);
+void quadriga_lib::ssf_scatterers(gbsm_rays &rays, double d_min = 2.0);
 ```
 
-### Input:
+### Inputs:
+- **`rays`** — Ray data of one link, see [gbsm_rays](#gbsm_rays); `fbs_pos`, `lbs_pos` and `fallback` are written
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0
 
 ### See also:

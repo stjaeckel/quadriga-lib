@@ -731,7 +731,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
    with `sf_sigma_dB` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [[ssf_clusters]] (`n_cluster` is the caller's choice) and [[ssf_rays]] (one [[gbsm_rays]] object per link), called
    as in the table below
-6. Per link and segment: .[[solve_scatterers]] if the mobility is `drift`; then [[gbsm_single_link_channel]] with the
+6. Per link and segment: [[ssf_scatterers]] if the mobility is `drift`; then [[gbsm_single_link_channel]] with the
    link gain (see Terms) as `link_gain_dB` (TR methods: once per object, which holds one frequency; `"quadriga"`:
    once per `i_freq`), or [[ssf_paths]] for other channel functions and the QRT route ([[qrt_paths_from_scatterers]],
    [[qrt_file_append]])

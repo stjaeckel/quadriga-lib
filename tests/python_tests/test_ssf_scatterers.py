@@ -4,7 +4,7 @@
 
 # Python interface test for quadriga_lib.gbsm.ssf_scatterers.
 # Scope: argument and output handling, dict sharing rules, validity scales, error paths.
-# Physics validation lives in the Catch2 suite (test_gbsm_rays_solve_scatterers.cpp, test_gbsm_rays.cpp).
+# Physics validation lives in the Catch2 suite (test_ssf_scatterers.cpp, test_gbsm_rays.cpp).
 
 import sys
 import os

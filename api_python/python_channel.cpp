@@ -44,23 +44,16 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("export_obj_file", &channel_export_obj_file,
           py::arg("fn"),
+          py::arg("chan").none(false),
           py::kw_only(),
           py::arg("max_paths") = 0,
           py::arg("gain_max_dB") = -60.0,
           py::arg("gain_min_dB") = -140.0,
           py::arg("colormap") = "jet",
+          py::arg("i_snap") = py::none(),
           py::arg("radius_max") = 0.05,
           py::arg("radius_min") = 0.01,
-          py::arg("n_edges") = 5,
-          py::arg("rx_pos") = py::none(),
-          py::arg("tx_pos") = py::none(),
-          py::arg("n_interact") = py::none(),
-          py::arg("interact_coord") = py::none(),
-          py::arg("center_freq") = py::none(),
-          py::arg("coeff") = py::none(),
-          py::arg("coeff_re") = py::none(),
-          py::arg("coeff_im") = py::none(),
-          py::arg("i_snap") = py::none());
+          py::arg("n_edges") = 5);
 
     m.def("hdf5_create_file", &hdf5_create_file, py::arg("fn"),
           py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);

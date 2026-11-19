@@ -1111,7 +1111,7 @@ rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu,
 ## ssf_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
-Also in: [C++](../cpp/geometry-based-stochastic-model.md#.solve_scatterers) · [Python](../python/geometry-based-stochastic-model.md#ssf_scatterers)
+Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_scatterers) · [Python](../python/geometry-based-stochastic-model.md#ssf_scatterers)
 
 - Places the scatterers that the mobility `drift` needs and returns the validity scales of [ssf_paths](#ssf_paths)
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal distances

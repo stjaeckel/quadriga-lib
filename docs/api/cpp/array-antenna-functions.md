@@ -446,7 +446,7 @@ void quadriga_lib::arrayant_export_obj_file(
 ### See also:
 - [colormap](site-specific-simulation-tools.md#colormap) (Used for setting the colormap)
 - [icosphere](site-specific-simulation-tools.md#icosphere) (Used internally to generate icosphere primitive)
-- [.write_paths_to_obj_file](channel-class.md#.write_paths_to_obj_file) (function of Channel class to export propagation paths to OBJ 3D visualization)
+- [channel_export_obj_file](channel-functions.md#channel_export_obj_file) (exports propagation paths to OBJ 3D visualization)
 
 ---
 <a id="arrayant_interpolate"></a>

@@ -5,7 +5,7 @@
 // Tests of the class gbsm_rays: sizes, validation with one message per failed check, the scatterer distance scales
 // b_med and b_eff, and the self-tests of the shared ray fixtures of qd_test_rays.hpp (make_rays, tr_offsets), which
 // the tests of ssf_rays, ssf_paths, gbsm_rays_from_paths, qrt_paths_from_scatterers and gbsm_single_link_channel
-// build on. The scatterer solver is tested in test_gbsm_rays_solve_scatterers.cpp.
+// build on. The scatterer solver is tested in test_ssf_scatterers.cpp.
 // Oracles: the hand-made objects of make_rays, the TR 38.901 Table 7.5-3 values and the 6-decimal offsets for
 // M != 20 (rule of tr_offsets) computed independently with NumPy, a sorted cumulative sum (weighted median) and the
 // closed form of b_eff in this file.

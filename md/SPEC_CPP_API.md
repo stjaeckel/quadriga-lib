@@ -113,7 +113,7 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 # IMPLEMENTATION GUIDELINES
 
 ## Source file
-- One public function per file, named after the function: `quadriga_lib::function_name` is implemented in `src/function_name.cpp`. Several public functions may share one file when they belong together, share helpers, or are easier to document together, e.g. the variants of one function (`_multi`, `_vec`) or the read and write functions of one file type; the file is then named after the group. Member functions of the `arrayant`, `channel` and `path` classes go into the existing `qd_arrayant*.cpp`, `qd_channel*.cpp`, `qd_path.cpp` files.
+- One public function per file, named after the function: `quadriga_lib::function_name` is implemented in `src/function_name.cpp`. Several public functions may share one file when they belong together, share helpers, or are easier to document together, e.g. the variants of one function (`_multi`, `_vec`) or the read and write functions of one file type; the file is then named after the group. Member functions of the `arrayant`, `channel` and `path` classes go into the existing `qd_arrayant*.cpp`, `qd_channel*.cpp`, `qd_path.cpp` files. Free functions that operate on one class may stay in that class's `qd_*.cpp` file when they belong to the same documentation section (e.g. `ssf_scatterers` in `qd_gbsm_rays.cpp`); the docs builder accepts one section per file.
 - File layout, in this order:
   1. License statement
   2. Includes: the public header that declares the function first, then internal headers, then standard headers

@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Tests of gbsm_rays::solve_scatterers (two-bounce solver): scatterers with exact angles and equal distances from
+// Tests of ssf_scatterers (two-bounce solver): scatterers with exact angles and equal distances from
 // both ends, the fallback along the ray's own directions with both scatterers at d_min, LOS, GR and zero-power rays,
 // degenerate geometry, in-place writing and validation. b_med and b_eff are tested in test_gbsm_rays.cpp.
 // Oracles: the polyline geometry of qd_test_rays.hpp (length, angles, specular point by the image method) and a
@@ -89,7 +89,7 @@ namespace
     }
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - solved rays keep their delay and angles exactly")
+TEST_CASE("ssf_scatterers - solved rays keep their delay and angles exactly")
 {
     QD_DIAG("\n# diag: solved rays, d_min = 2 m\nray,L,poly_minus_L,b_tx_minus_b_rx\n");
     for (unsigned seed : {1u, 2u, 3u})
@@ -98,7 +98,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - solved rays keep their delay and angles
             INFO("seed " << seed << ", method " << method);
             rays_t r = make_rays(seed, true, true, 8, 2, method);
             const rays_t r0 = r;
-            r.solve_scatterers();
+            quadriga_lib::ssf_scatterers(r);
             REQUIRE(r.fbs_pos.n_cols == r.n_ray());
             REQUIRE(r.fallback.n_elem == r.n_ray());
             int n_solved = 0;
@@ -117,7 +117,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - solved rays keep their delay and angles
     // Scatterers at equal distances from both ends are restored (the 2 m pair of the fixture, d_min below 2 m)
     rays_t s = make_rays(4, true, true, 6, 1, "38.901", true);
     const arma::mat fbs = s.fbs_pos, lbs = s.lbs_pos;
-    s.solve_scatterers(1.0);
+    quadriga_lib::ssf_scatterers(s, 1.0);
     const arma::uword i2 = 2 + 3; // NLOS ray j = 3
     REQUIRE(std::abs(len3(fbs.col(i2) - s.tx_pos) - 2.0) < 1e-12);
     check_solved(s, i2);
@@ -125,7 +125,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - solved rays keep their delay and angles
     CHECK(arma::approx_equal(s.lbs_pos.col(i2), lbs.col(i2), "absdiff", 1e-9));
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - rays without a solution take the minimum-distance fallback")
+TEST_CASE("ssf_scatterers - rays without a solution take the minimum-distance fallback")
 {
     for (double d_min : {0.5, 2.0, 5.0})
     {
@@ -133,7 +133,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - rays without a solution take the minimu
         rays_t r = make_rays(5, false, false, 6, 1, "38.901");
         // Ray 3: zero excess (fixture); rays 0, 1, 4: small excess (3 mm, 3 cm, 1.5 m); ray 5 keeps its delay
         r.delay(0) = 1e-11, r.delay(1) = 1e-10, r.delay(4) = 5e-9;
-        r.solve_scatterers(d_min);
+        quadriga_lib::ssf_scatterers(r, d_min);
         int n_fb = 0;
         for (arma::uword i : {0, 1, 3, 4, 5})
         {
@@ -148,7 +148,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - rays without a solution take the minimu
     }
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - the closed form agrees with a bisection of the polyline")
+TEST_CASE("ssf_scatterers - the closed form agrees with a bisection of the polyline")
 {
     // Random ends (every tenth geometry with d3D = 0), random directions (every seventh ray with u_a = -u_d, where
     // the quadratic degenerates), excess lengths 0.1 mm to 1 km; d_min = 1 mm, so that nearly all rays are solved.
@@ -170,7 +170,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - the closed form agrees with a bisection
             r.delay(i) = std::pow(10.0, U(-4.0, 3.0)) / c0;
             r.power(i, 0) = 1.0;
         }
-        r.solve_scatterers(1e-3);
+        quadriga_lib::ssf_scatterers(r, 1e-3);
         const double scale = len3(r.tx_pos) + len3(r.rx_pos);
         for (arma::uword i = 0; i < r.n_ray(); ++i)
         {
@@ -189,7 +189,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - the closed form agrees with a bisection
     QD_DIAG("\n# diag: closed form vs bisection: %d rays, max relative difference %.2e\n", n_cmp, w_max);
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - LOS, GR and zero-power rays")
+TEST_CASE("ssf_scatterers - LOS, GR and zero-power rays")
 {
     for (double z : {-1.0, 25.0, 0.0}) // Tx height; -1: both ends on the ground (h_t + h_r = 0)
     {
@@ -199,7 +199,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - LOS, GR and zero-power rays")
             r.tx_pos(2) = 0.0, r.rx_pos(2) = 0.0;
         else
             r.tx_pos(2) = z;
-        r.solve_scatterers();
+        quadriga_lib::ssf_scatterers(r);
         const arma::vec mid = 0.5 * (r.tx_pos + r.rx_pos), G = specular_point(r.tx_pos, r.rx_pos);
         for (arma::uword i : {0, 4}) // LOS, zero-power NLOS
         {
@@ -219,12 +219,12 @@ TEST_CASE("gbsm_rays::solve_scatterers - LOS, GR and zero-power rays")
     }
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - only the scatterer attributes change and given scatterers are overwritten")
+TEST_CASE("ssf_scatterers - only the scatterer attributes change and given scatterers are overwritten")
 {
     rays_t r = make_rays(8, true, true, 7, 3, "quadriga", true);
     r.fallback.ones(r.n_ray());
     const rays_t r0 = r;
-    r.solve_scatterers(1.0);
+    quadriga_lib::ssf_scatterers(r, 1.0);
     CHECK(same(r, r0, false));
     CHECK(arma::all(r.fallback == 0));
     // NLOS rays with power and unequal end distances move to the balanced points
@@ -236,17 +236,17 @@ TEST_CASE("gbsm_rays::solve_scatterers - only the scatterer attributes change an
     CHECK(n_moved == 5);
     // A second call with the same d_min gives the same result
     rays_t r2 = r;
-    r2.solve_scatterers(1.0);
+    quadriga_lib::ssf_scatterers(r2, 1.0);
     CHECK(same(r2, r, true));
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - d3D = 0, negative excess and n_ray = 0")
+TEST_CASE("ssf_scatterers - d3D = 0, negative excess and n_ray = 0")
 {
     rays_t r = make_rays(9, false, false, 5, 1, "38.901");
     r.rx_pos = r.tx_pos;                                                          // d3D = 0
     r.delay(3) = 30e-9, r.aoa(3) = wrap_rad(r.aod(3) + pi), r.eoa(3) = -r.eod(3); // u_a = -u_d, abs(w) = 2
     r.delay(4) = -2e-9, r.aoa(4) = wrap_rad(r.aod(4) + pi), r.eoa(4) = -r.eod(4); // negative L, u_a = -u_d
-    r.solve_scatterers(0.1);
+    quadriga_lib::ssf_scatterers(r, 0.1);
     for (arma::uword i : {0, 1, 3})
     {
         INFO("ray " << i);
@@ -263,12 +263,12 @@ TEST_CASE("gbsm_rays::solve_scatterers - d3D = 0, negative excess and n_ray = 0"
     // Negative excess with d3D > 0
     rays_t q = make_rays(9, false, false, 2, 1, "38.901");
     q.delay(1) = -1e-9;
-    q.solve_scatterers(0.5);
+    quadriga_lib::ssf_scatterers(q, 0.5);
     CHECK(q.fbs_pos.is_finite());
     check_fallback(q, 1, 0.5);
 
     rays_t e = make_rays(9, false, false, 0, 2, "quadriga");
-    e.solve_scatterers();
+    quadriga_lib::ssf_scatterers(e);
     CHECK(e.fbs_pos.n_rows == 3);
     CHECK(e.fbs_pos.n_cols == 0);
     CHECK(e.lbs_pos.n_rows == 3);
@@ -277,7 +277,7 @@ TEST_CASE("gbsm_rays::solve_scatterers - d3D = 0, negative excess and n_ray = 0"
     CHECK(e.is_valid().empty());
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - pre-sized scatterer attributes are written in place and the object is unchanged after a throw")
+TEST_CASE("ssf_scatterers - pre-sized scatterer attributes are written in place and the object is unchanged after a throw")
 {
     rays_t r = make_rays(10, true, true, 5, 2, "38.901_MF");
     const arma::uword n = r.n_ray();
@@ -286,37 +286,37 @@ TEST_CASE("gbsm_rays::solve_scatterers - pre-sized scatterer attributes are writ
     r.fbs_pos.~Mat(), ::new (&r.fbs_pos) arma::mat(F.memptr(), 3, n, false, true); // strict external memory
     r.lbs_pos.~Mat(), ::new (&r.lbs_pos) arma::mat(B.memptr(), 3, n, false, true);
     r.fallback.~Col(), ::new (&r.fallback) arma::u32_vec(fb.memptr(), n, false, true);
-    r.solve_scatterers();
+    quadriga_lib::ssf_scatterers(r);
     CHECK(r.fbs_pos.memptr() == F.memptr());
     CHECK(r.lbs_pos.memptr() == B.memptr());
     CHECK(r.fallback.memptr() == fb.memptr());
     rays_t ref = make_rays(10, true, true, 5, 2, "38.901_MF");
-    ref.solve_scatterers();
+    quadriga_lib::ssf_scatterers(ref);
     CHECK(same(r, ref, true));
 
     // Throws leave the object unchanged: invalid d_min, invalid attribute, GR with an end below ground
     rays_t a = ref;
-    CHECK_THROWS_AS(a.solve_scatterers(0.0), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ssf_scatterers(a, 0.0), std::invalid_argument);
     CHECK(same(a, ref, true));
     a.power(2, 1) = -1.0;
     const rays_t a0 = a;
-    CHECK_THROWS_AS(a.solve_scatterers(), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ssf_scatterers(a), std::invalid_argument);
     CHECK(same(a, a0, true));
     rays_t g = ref;
     g.tx_pos(2) = -0.5;
     const rays_t g0 = g;
-    CHECK_THROWS_AS(g.solve_scatterers(), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ssf_scatterers(g), std::invalid_argument);
     CHECK(same(g, g0, true));
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - a ray with power 0 at frequency 0 and > 0 at another is solved")
+TEST_CASE("ssf_scatterers - a ray with power 0 at frequency 0 and > 0 at another is solved")
 {
     rays_t r = make_rays(11, false, false, 4, 2, "38.901_MF");
     r.power(1, 0) = 0.0;
     REQUIRE(r.power(1, 1) > 0.0);
     r.power(0, 1) = 0.0; // and the reverse: > 0 at frequency 0, 0 at the last
     REQUIRE(r.power(0, 0) > 0.0);
-    r.solve_scatterers();
+    quadriga_lib::ssf_scatterers(r);
     for (arma::uword i : {0, 1})
     {
         CHECK(len3(r.fbs_pos.col(i) - 0.5 * (r.tx_pos + r.rx_pos)) > 1.0);
@@ -324,17 +324,17 @@ TEST_CASE("gbsm_rays::solve_scatterers - a ray with power 0 at frequency 0 and >
     }
 }
 
-TEST_CASE("gbsm_rays::solve_scatterers - input validation")
+TEST_CASE("ssf_scatterers - input validation")
 {
     const rays_t base = make_rays(12, true, true, 5, 2, "38.901");
     rays_t ok = base;
-    CHECK_NOTHROW(ok.solve_scatterers(2.0));
+    CHECK_NOTHROW(quadriga_lib::ssf_scatterers(ok, 2.0));
 
     auto msg = [](rays_t r, double d_min)
     {
         try
         {
-            r.solve_scatterers(d_min);
+            quadriga_lib::ssf_scatterers(r, d_min);
         }
         catch (const std::invalid_argument &e)
         {

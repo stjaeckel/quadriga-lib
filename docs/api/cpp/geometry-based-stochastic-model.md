@@ -20,7 +20,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-geomet
 | [ssf_clusters](#ssf_clusters) | Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7) |
 | [ssf_paths](#ssf_paths) | Antenna-free paths of one link at one position |
 | [ssf_rays](#ssf_rays) | Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16) |
-| [.solve_scatterers](#.solve_scatterers) | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
+| [ssf_scatterers](#ssf_scatterers) | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
 
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
 *scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
@@ -55,7 +55,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
    with `sf_sigma_dB` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [ssf_clusters](#ssf_clusters) (`n_cluster` is the caller's choice) and [ssf_rays](#ssf_rays) (one [gbsm_rays](#gbsm_rays) object per link), called
    as in the table below
-6. Per link and segment: [.solve_scatterers](#.solve_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
+6. Per link and segment: [ssf_scatterers](#ssf_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
    link gain (see Terms) as `link_gain_dB` (TR methods: once per object, which holds one frequency; `"quadriga"`:
    once per `i_freq`), or [ssf_paths](#ssf_paths) for other channel functions and the QRT route ([qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers),
    [qrt_file_append](channel-functions.md#qrt_file_append))
@@ -433,11 +433,11 @@ Not in: MATLAB, Python
 
 - Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
   positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
-  [.solve_scatterers](#.solve_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
+  [ssf_scatterers](#ssf_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
 - Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
 - An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
 - Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
-  `is_valid()`) and one `method` for all rays. `.solve_scatterers` overwrites given scatterers, so solve rays without
+  `is_valid()`) and one `method` for all rays. [ssf_scatterers](#ssf_scatterers) overwrites given scatterers, so solve rays without
   scatterers in a separate object and concatenate the attributes
 - Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
   non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
@@ -455,8 +455,8 @@ Not in: MATLAB, Python
 | `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
 | `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [.solve_scatterers](#.solve_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [.solve_scatterers](#.solve_scatterers) |
+| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [ssf_scatterers](#ssf_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [ssf_scatterers](#ssf_scatterers) |
 
 ### Member functions:
 | Member | Returns |
@@ -467,14 +467,13 @@ Not in: MATLAB, Python
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
 | `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
 | `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
-| `solve_scatterers(d_min = 2.0)` | `void`; writes `fbs_pos`, `lbs_pos` and `fallback`, see [.solve_scatterers](#.solve_scatterers) |
 
 - `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
 
 ### See also:
 - [ssf_rays](#ssf_rays) (ray data of a set of links)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
-- [.solve_scatterers](#.solve_scatterers) (scatterers for the mobility `drift`)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for the mobility `drift`)
 - [ssf_paths](#ssf_paths) (paths of one link at one position)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
@@ -625,7 +624,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ### See also:
 - [ssf_paths](#ssf_paths) (paths of one link at one position, validity limits)
 - [gbsm_rays](#gbsm_rays) (input data, `b_med` and `b_eff`)
-- [.solve_scatterers](#.solve_scatterers) (scatterers for `"drift"`)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for `"drift"`)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
 - [channel](channel-class.md#channel) (the returned object)
 
@@ -1102,7 +1101,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_paths) · [Pytho
   phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer
   identified and the displacement phase counts twice, without an error
 - `"drift"`: use the outputs at the new positions with [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) or [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq), or
-  pass them to [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers); needs the scatterers of [.solve_scatterers](#.solve_scatterers)
+  pass them to [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers); needs the scatterers of [ssf_scatterers](#ssf_scatterers)
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
@@ -1170,7 +1169,7 @@ void quadriga_lib::ssf_paths(
 - [gbsm_rays](#gbsm_rays) (input data, validity scales `b_eff` and `b_med`)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel coefficients of one link over a segment)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data, e.g. of a QRT file)
-- [.solve_scatterers](#.solve_scatterers) (scatterers for `"drift"`)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for `"drift"`)
 
 ---
 <a id="ssf_rays"></a>
@@ -1181,7 +1180,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_rays) · [Python
 
 - Splits the clusters of [ssf_clusters](#ssf_clusters) into rays and writes one [gbsm_rays](#gbsm_rays) object per link: delays, coefficient
   powers, angles, polarization transfer matrices with initial phases, path types and tap indices; `fbs_pos`, `lbs_pos`
-  and `fallback` stay empty (see [.solve_scatterers](#.solve_scatterers))
+  and `fallback` stay empty (see [ssf_scatterers](#ssf_scatterers))
 - A pure function of the clusters, the LSPs and the random values, without a seed: a link does not depend on the other
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at
@@ -1274,13 +1273,13 @@ void quadriga_lib::ssf_rays(
 - [ssf_paths](#ssf_paths) (paths of one link)
 
 ---
-<a id=".solve_scatterers"></a>
-## .solve_scatterers
+<a id="ssf_scatterers"></a>
+## ssf_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_scatterers) · [Python](../python/geometry-based-stochastic-model.md#ssf_scatterers)
 
-- Member of [gbsm_rays](#gbsm_rays): places the scatterers that the mobility `drift` needs, in place
+- Places the scatterers of a [gbsm_rays](#gbsm_rays) object that the mobility `drift` needs, in place
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
   distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
   distance) and the angles are exact
@@ -1297,10 +1296,11 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_scatterers) · [
 
 ### Declaration:
 ```cpp
-void quadriga_lib::gbsm_rays::solve_scatterers(double d_min = 2.0);
+void quadriga_lib::ssf_scatterers(gbsm_rays &rays, double d_min = 2.0);
 ```
 
-### Input:
+### Inputs:
+- **`rays`** — Ray data of one link, see [gbsm_rays](#gbsm_rays); `fbs_pos`, `lbs_pos` and `fallback` are written
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0
 
 ### See also:
