@@ -6,6 +6,7 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include "qd_qrt_chunk_reader.hpp"
 
 /*!SECTION
 Channel functions
@@ -17,6 +18,7 @@ Read ray-tracing CIR data from a QRT file
 
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
+- Reads in chunks of 16 snapshots; besides the output, at most two chunks are held in memory
 - If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
   of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
@@ -88,179 +90,77 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
-    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_cir"); // 1-based -> 0-based
+    const arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_cir"); // 1-based -> 0-based
     const arma::uword i_orig = (nrhs < 3) ? 0 : qd_mex_get_index(prhs[2], "i_orig"); // 1-based -> 0-based
     const bool uplink = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "uplink", false);
     const int normalize_polmat = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_polmat", 1);
 
-    // Initialize cache and file access
-    std::ifstream stream(fn, std::ios::in | std::ios::binary);
-    quadriga_lib::qrt_read_cache cache;
-    CALL_QD(cache = quadriga_lib::qrt_read_cache_init(fn, &stream));
-
-    if (i_cir.empty()) // Default: read all CIRs (none for a file without CIRs: empty outputs)
-    {
-        if (cache.n_cir != 0)
-            i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.n_cir) - 1);
-    }
-    else
-    {
-        if (arma::any(i_cir >= (arma::uword)cache.n_cir))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "CIR index exceeds number of CIRs in file.");
-    }
-
-    // Flag to enable reading mutiple entries at once
-    arma::uword no_out = i_cir.n_elem;
-
-    // Return frequencies in Hz
-    arma::vec center_freq;
-    plhs[0] = qd_mex_init_output(&center_freq, cache.n_freq);
-    for (unsigned i_freq = 0; i_freq < cache.n_freq; ++i_freq)
-        center_freq[i_freq] = (double)cache.freq[i_freq];
-
-    // Initialize output data structures
+    // Reads in chunks: a reader thread reads the next chunk while this thread copies the previous one to MATLAB
+    std::vector<arma::mat *> pos(4);
     arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;
+    pos[0] = &tx_pos, pos[1] = &tx_orientation, pos[2] = &rx_pos, pos[3] = &rx_orientation;
 
-    if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&tx_pos, 3, no_out);
-
-    if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&tx_orientation, 3, no_out);
-
-    if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&rx_pos, 3, no_out);
-
-    if (nlhs > 4)
-        plhs[4] = qd_mex_init_output(&rx_orientation, 3, no_out);
-
-    if (nlhs > 5)
-        plhs[5] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 6)
-        plhs[6] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 7)
-        plhs[7] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 8)
-        plhs[8] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 9)
-        plhs[9] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 10)
-        plhs[10] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 11)
-        plhs[11] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 12)
-        plhs[12] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 13)
-        plhs[13] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 14)
-        plhs[14] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 15)
-        plhs[15] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 16)
-        plhs[16] = mxCreateCellMatrix(no_out, 1);
-
-    if (nlhs > 17)
-        plhs[17] = mxCreateCellMatrix(no_out, 1);
-
-    // Temporary read buffers
-    arma::vec tx_pos_buff, tx_orientation_buff, rx_pos_buff, rx_orientation_buff;
-    arma::mat fbs_pos, lbs_pos, path_gain;
-    arma::vec path_length, aod, eod, aoa, eoa;
-    arma::cube polmat;
-    std::vector<arma::mat> path_coord;
-    arma::u32_vec n_interact;
-    arma::fmat coord;
-    std::vector<uint8_t> interact_type;
-
-    // Wrap optional output pointers based on nlhs
-    arma::vec *p_tx_pos = (nlhs > 1) ? &tx_pos_buff : nullptr;
-    arma::vec *p_tx_orientation = (nlhs > 2) ? &tx_orientation_buff : nullptr;
-    arma::vec *p_rx_pos = (nlhs > 3) ? &rx_pos_buff : nullptr;
-    arma::vec *p_rx_orientation = (nlhs > 4) ? &rx_orientation_buff : nullptr;
-    arma::mat *p_fbs_pos = (nlhs > 5) ? &fbs_pos : nullptr;
-    arma::mat *p_lbs_pos = (nlhs > 6) ? &lbs_pos : nullptr;
-    arma::mat *p_path_gain = (nlhs > 7) ? &path_gain : nullptr;
-    arma::vec *p_path_length = (nlhs > 8) ? &path_length : nullptr;
-    arma::cube *p_polmat = (nlhs > 9) ? &polmat : nullptr;
-    arma::vec *p_aod = (nlhs > 10) ? &aod : nullptr;
-    arma::vec *p_eod = (nlhs > 11) ? &eod : nullptr;
-    arma::vec *p_aoa = (nlhs > 12) ? &aoa : nullptr;
-    arma::vec *p_eoa = (nlhs > 13) ? &eoa : nullptr;
-    std::vector<arma::mat> *p_path_coord = (nlhs > 14) ? &path_coord : nullptr;
-    arma::u32_vec *p_no_int = (nlhs > 15) ? &n_interact : nullptr;
-    arma::fmat *p_coord = (nlhs > 16) ? &coord : nullptr;
-    std::vector<uint8_t> *p_interact_type = (nlhs > 17) ? &interact_type : nullptr;
-
-    // Iterate over all CIRs
-    for (arma::uword i_out = 0; i_out < no_out; ++i_out)
+    auto init = [&](const arma::vec &center_freq, arma::uword n_out)
     {
-        // Call library function
-        CALL_QD(quadriga_lib::qrt_file_read<double>(fn, i_cir[i_out], i_orig, uplink, nullptr,
-                                                    p_tx_pos, p_tx_orientation, p_rx_pos, p_rx_orientation,
-                                                    p_fbs_pos, p_lbs_pos, p_path_gain, p_path_length, p_polmat,
-                                                    p_aod, p_eod, p_aoa, p_eoa,
-                                                    p_path_coord, normalize_polmat,
-                                                    p_no_int, p_coord, p_interact_type, &stream, &cache));
-        // Copy to MATLAB
-        if (nlhs > 1)
-            tx_pos.col(i_out) = tx_pos_buff;
-        if (nlhs > 2)
-            tx_orientation.col(i_out) = tx_orientation_buff;
-        if (nlhs > 3)
-            rx_pos.col(i_out) = rx_pos_buff;
-        if (nlhs > 4)
-            rx_orientation.col(i_out) = rx_orientation_buff;
-        if (nlhs > 5)
-            mxSetCell(plhs[5], i_out, qd_mex_copy2matlab(&fbs_pos));
-        if (nlhs > 6)
-            mxSetCell(plhs[6], i_out, qd_mex_copy2matlab(&lbs_pos));
-        if (nlhs > 7)
-            mxSetCell(plhs[7], i_out, qd_mex_copy2matlab(&path_gain));
-        if (nlhs > 8)
-            mxSetCell(plhs[8], i_out, qd_mex_copy2matlab(&path_length));
-        if (nlhs > 9)
-            mxSetCell(plhs[9], i_out, qd_mex_copy2matlab(&polmat));
-        if (nlhs > 10)
-            mxSetCell(plhs[10], i_out, qd_mex_copy2matlab(&aod));
-        if (nlhs > 11)
-            mxSetCell(plhs[11], i_out, qd_mex_copy2matlab(&eod));
-        if (nlhs > 12)
-            mxSetCell(plhs[12], i_out, qd_mex_copy2matlab(&aoa));
-        if (nlhs > 13)
-            mxSetCell(plhs[13], i_out, qd_mex_copy2matlab(&eoa));
-        if (nlhs > 14)
-        {
-            // Variable column count per path - cell array preserves per-path structure
-            const mwSize n_path = (mwSize)path_coord.size();
-            auto out = mxCreateCellMatrix(n_path, 1);
-            for (mwSize i = 0; i < n_path; ++i)
-                mxSetCell(out, i, qd_mex_copy2matlab(&path_coord[i]));
-            mxSetCell(plhs[14], i_out, out);
-        }
-        if (nlhs > 15)
-            mxSetCell(plhs[15], i_out, qd_mex_copy2matlab(&n_interact));
-        if (nlhs > 16)
-            mxSetCell(plhs[16], i_out, qd_mex_copy2matlab(&coord));
-        if (nlhs > 17)
-        {
-            const mwSize n_it = (mwSize)interact_type.size();
-            mxArray *it_out = mxCreateNumericMatrix(n_it, 1, mxUINT8_CLASS, mxREAL);
-            if (n_it != 0)
-                std::memcpy(mxGetData(it_out), interact_type.data(), n_it * sizeof(uint8_t));
-            mxSetCell(plhs[17], i_out, it_out);
-        }
-    }
+        plhs[0] = qd_mex_copy2matlab(&center_freq);
+        for (int i = 1; i < 5 && i < nlhs; ++i)
+            plhs[i] = qd_mex_init_output(pos[i - 1], 3, n_out);
+        for (int i = 5; i < nlhs; ++i)
+            plhs[i] = mxCreateCellMatrix(n_out, 1);
+    };
 
-    // Close stream
-    stream.close();
+    auto consume = [&](const qd_qrt_chunk &b, arma::uword offset)
+    {
+        const arma::uword n = b.i_cir.n_elem;
+        for (int i = 1; i < 5 && i < nlhs; ++i)
+        {
+            const arma::mat &src = (i == 1) ? b.tx_pos : (i == 2) ? b.tx_orientation : (i == 3) ? b.rx_pos : b.rx_orientation;
+            pos[i - 1]->cols(offset, offset + n - 1) = src;
+        }
+        for (arma::uword j = 0; j < n; ++j)
+        {
+            const mwIndex o = (mwIndex)(offset + j);
+            if (nlhs > 5)
+                mxSetCell(plhs[5], o, qd_mex_copy2matlab(&b.fbs_pos[j]));
+            if (nlhs > 6)
+                mxSetCell(plhs[6], o, qd_mex_copy2matlab(&b.lbs_pos[j]));
+            if (nlhs > 7)
+                mxSetCell(plhs[7], o, qd_mex_copy2matlab(&b.path_gain[j]));
+            if (nlhs > 8)
+                mxSetCell(plhs[8], o, qd_mex_copy2matlab(&b.path_length[j]));
+            if (nlhs > 9)
+                mxSetCell(plhs[9], o, qd_mex_copy2matlab(&b.polmat[j]));
+            if (nlhs > 10)
+                mxSetCell(plhs[10], o, qd_mex_copy2matlab(&b.aod[j]));
+            if (nlhs > 11)
+                mxSetCell(plhs[11], o, qd_mex_copy2matlab(&b.eod[j]));
+            if (nlhs > 12)
+                mxSetCell(plhs[12], o, qd_mex_copy2matlab(&b.aoa[j]));
+            if (nlhs > 13)
+                mxSetCell(plhs[13], o, qd_mex_copy2matlab(&b.eoa[j]));
+            if (nlhs > 14)
+            {
+                // Variable column count per path - cell array preserves per-path structure
+                const std::vector<arma::mat> &pc = b.path_coord[j];
+                mxArray *out = mxCreateCellMatrix((mwSize)pc.size(), 1);
+                for (size_t i = 0; i < pc.size(); ++i)
+                    mxSetCell(out, (mwIndex)i, qd_mex_copy2matlab(&pc[i]));
+                mxSetCell(plhs[14], o, out);
+            }
+            if (nlhs > 15)
+                mxSetCell(plhs[15], o, qd_mex_copy2matlab(&b.n_interact[j]));
+            if (nlhs > 16)
+                mxSetCell(plhs[16], o, qd_mex_copy2matlab(&b.coord[j]));
+            if (nlhs > 17)
+            {
+                const std::vector<uint8_t> &it = b.interact_type[j];
+                mxArray *it_out = mxCreateNumericMatrix((mwSize)it.size(), 1, mxUINT8_CLASS, mxREAL);
+                if (!it.empty())
+                    std::memcpy(mxGetData(it_out), it.data(), it.size() * sizeof(uint8_t));
+                mxSetCell(plhs[17], o, it_out);
+            }
+        }
+    };
+
+    CALL_QD(qd_qrt_read_chunked<qd_qrt_no_unlock>(fn, i_cir, i_orig, uplink, normalize_polmat, nlhs < 1 ? 1 : nlhs, init, consume));
 }

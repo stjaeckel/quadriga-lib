@@ -443,7 +443,7 @@ The deterministic part of clause 8 maps onto the library's ray tracer: `obj_file
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Coordinate system | 8.1 | Yes | `get_channels_spherical` (`src/get_channels_spherical.cpp:118`); `qrt_file_read` (`src/qd_channel_qrt.cpp:1097`) | As clause 7. |
+| Coordinate system | 8.1 | Yes | `get_channels_spherical` (`src/get_channels_spherical.cpp:118`); `qrt_file_read` (`src/qd_channel_qrt.cpp:1439`) | As clause 7. |
 | Scenarios | 8.2 | n/a | – | No maps are shipped; the caller supplies the scene. |
 | Antenna modelling | 8.3 | Yes | `get_channels_spherical`; `get_channels_multifreq` (`src/get_channels_multifreq.cpp:204`) | Same `arrayant` model; frequency-dependent patterns per bin. |
 | Step 1: digital map import | 8.4 step 1 | Yes | `obj_file_read` (`src/obj_file_read.cpp:526`); `mitsuba_xml_file_write` (`src/mitsuba_xml_file_write.cpp:130`) | Wavefront OBJ with a material name per face; thickness from solid geometry or a sheet `thk` value. Random small objects are the caller's. |
@@ -455,11 +455,11 @@ The deterministic part of clause 8 maps onto the library's ray tracer: `obj_file
 | Step 3: penetration | 8.4 step 3 | Yes | `ray_progress` (transmission pass `src/ray_progress.cpp:1141`); `ray_mesh_interact` | Solids with refraction or thin sheets with the internal reflection series; order configurable (default 10, TR recommends 5). |
 | Step 3: diffraction | 8.4 step 3 | Partial | `calc_diffraction_gain` (`src/calc_diffraction_gain.cpp:125`); `generate_diffraction_paths` (`src/generate_diffraction_paths.cpp:62`) | **Drift:** Fresnel-ellipsoid obstruction with knife-edge weights calibrated to 2D UTD, applied to the direct path only; no explicit edge paths, no reflection + diffraction paths, so values differ from a UTD tracer (from reading, not measured). |
 | Step 3: scattering on small objects | 8.4 step 3 | No | – | "Scattering is not implemented" (`src/ray_mesh_interact.cpp:3380`). |
-| Step 3: outputs | 8.4 step 3 | Partial | `qrt_file_append` (`src/qd_channel_qrt.cpp:487`), `qrt_file_read` (`:1097`); `coord2path` (`src/coord2path.cpp:52`) | Interaction points, length, per-frequency gain and Jones matrix, angles, interaction count. Missing: −25 dB relative pruning (`min_gain_dB` is absolute), per-path XPR κ_RT, path IDs across positions. Delays are relative to d3D/c, not to the first arrival (from reading, not measured). |
+| Step 3: outputs | 8.4 step 3 | Partial | `qrt_file_append` (`src/qd_channel_qrt.cpp:499`), `qrt_file_read` (`:1439`); `coord2path` (`src/coord2path.cpp:52`) | Interaction points, length, per-frequency gain and Jones matrix, angles, interaction count. Missing: −25 dB relative pruning (`min_gain_dB` is absolute), per-path XPR κ_RT, path IDs across positions. Delays are relative to d3D/c, not to the first arrival (from reading, not measured). |
 | Step 4: LSPs for random clusters | 8.4 step 4 | No | – | |
 | Steps 5–6: random-cluster delays and powers | 8.4 steps 5–6, eq. 8.4-4 to 8.4-9 | No | – | |
 | Step 7: random-cluster angles | 8.4 step 7, eq. 8.4-10 to 8.4-18 | No | – | |
-| Step 8: merging of clusters | 8.4 step 8 | No | – | `qrt_paths_from_scatterers` (`src/qd_channel_qrt.cpp:2000`) can write GBSM paths next to traced paths, without the 8.4 rules (ssf_notes D25). |
+| Step 8: merging of clusters | 8.4 step 8 | No | – | `qrt_paths_from_scatterers` (`src/qd_channel_qrt.cpp:1787`) can write GBSM paths next to traced paths, without the 8.4 rules (ssf_notes D25). |
 | Steps 9–10: rays in deterministic and random clusters | 8.4 steps 9–10, eq. 8.4-19 to 8.4-25 | No | – | `gbsm_rays_from_paths` (`src/gbsm_rays_from_paths.cpp:74`) makes one ray per traced path. |
 | Step 11: XPR of deterministic clusters | 8.4 step 11, eq. 8.4-26 | No | – | Traced paths keep their Jones matrix. |
 | Step 12: initial phases | 8.4 step 12 | Partial | `get_channels_spherical` | Propagation phases of the traced paths; no random clusters. |

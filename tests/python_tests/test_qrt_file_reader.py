@@ -287,13 +287,36 @@ class test_case(unittest.TestCase):
     # qrt_file_read - error handling
     # ------------------------------------------------------------------
     def test_read_errors(self):
-        # CIR index out of range -> IndexError from the wrapper bounds check
-        with self.assertRaisesRegex(IndexError, "CIR index exceeds"):
-            channel.qrt_file_read(FN_V4, [999], 0, uplink=False, normalize_polmat=1)
+        # CIR index out of range, checked before any CIR is read
+        with self.assertRaisesRegex(ValueError, "^Snapshot 1: CIR index exceeds"):
+            channel.qrt_file_read(FN_V4, [0, 999], 0, uplink=False, normalize_polmat=1)
 
-        # normalize_polmat other than 0 or 1 (raised by the reader thread)
-        with self.assertRaisesRegex(RuntimeError, "'normalize_polmat' must be 0 or 1"):
+        # normalize_polmat other than 0 or 1
+        with self.assertRaisesRegex(ValueError, "'normalize_polmat' must be 0 or 1"):
             channel.qrt_file_read(FN_V5, [0], 0, uplink=False, normalize_polmat=5)
+
+    def test_chunks(self):
+        # 40 snapshots are read in three chunks by the reader thread; each entry equals a single-snapshot read
+        n_cir = channel.qrt_file_parse(FN_V4)[0]
+        idx = [k % n_cir for k in range(40)]
+        out = channel.qrt_file_read(FN_V4, idx, 1, uplink=True)
+        self.assertEqual(out[1].shape, (3, 40))
+        for n in (16, 32):  # whole chunks only
+            part = channel.qrt_file_read(FN_V4, idx[:n], 1, uplink=True)
+            self.assertEqual(len(part[7]), n)
+            npt.assert_array_equal(part[1], out[1][:, :n])
+            for k in range(n):
+                npt.assert_array_equal(part[9][k], out[9][k])
+        for k in range(40):
+            one = channel.qrt_file_read(FN_V4, [idx[k]], 1, uplink=True)
+            for i in range(1, 5):
+                npt.assert_array_equal(out[i][:, k], one[i][:, 0])
+            for i in range(5, 18):
+                if i == 14:
+                    for a, b in zip(out[i][k], one[i][0]):
+                        npt.assert_array_equal(a, b)
+                else:
+                    npt.assert_array_equal(out[i][k], one[i][0])
 
     def test_truncated_file(self):
         # A truncated file raises an error instead of returning wrong data
@@ -306,6 +329,8 @@ class test_case(unittest.TestCase):
                 f.write(data[:-10])
             with self.assertRaisesRegex(RuntimeError, "truncated or corrupt"):
                 channel.qrt_file_read(fn, [1], 0)
+            with self.assertRaisesRegex(RuntimeError, "^Snapshot 40: .*truncated or corrupt"):  # in the third chunk
+                channel.qrt_file_read(fn, [0] * 40 + [1], 0)
             with open(fn, 'wb') as f:
                 f.write(data[:40])
             with self.assertRaisesRegex(RuntimeError, "truncated or corrupt"):
@@ -326,7 +351,7 @@ class test_zero_cir(unittest.TestCase):
             self.assertEqual(out[k].shape, (3, 0))
         for k in range(5, 18):
             self.assertEqual(len(out[k]), 0)
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             channel.qrt_file_read(fn, [0])
 
     # A v4 file without origins stores no frequency: one frequency of 0 Hz, empty outputs

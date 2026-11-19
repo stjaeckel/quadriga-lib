@@ -485,6 +485,7 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [Python](../python/
 
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
+- Reads in chunks of 16 snapshots; besides the output, at most two chunks are held in memory
 - If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
   of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe

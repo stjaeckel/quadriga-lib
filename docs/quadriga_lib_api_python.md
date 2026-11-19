@@ -1216,10 +1216,7 @@ Read ray-tracing CIR data from a QRT file
 Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [MATLAB](quadriga_lib_api_mex.md#qrt_file_read)
 
 - Reads channel impulse response data from QRT files
-- A file read cache is initialized once and reused across all requested snapshots, which
-  significantly speeds up multi-snapshot reads
-- File reading and the conversion to numpy arrays are overlapped: a background thread reads the
-  next snapshot into a double buffer while the main thread converts the previous one
+- Reads in chunks of 16 snapshots; besides the output, at most two chunks are held in memory
 - If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `polmat` is the transpose
   of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe

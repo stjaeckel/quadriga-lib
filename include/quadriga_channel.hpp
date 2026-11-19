@@ -447,6 +447,7 @@ namespace quadriga_lib
         arma::fmat orig_orientation;    // Origin orientations (Euler), size [n_orig, 3]
         arma::u64_vec orig_index;       // Byte offsets from BOF to each origin data block, length [n_orig]
         arma::u64_vec path_data_offset; // Pre-computed absolute offset to path_data_index array per origin, length [n_orig]
+        arma::fvec orig_freq;           // Version 4 only: frequency of each origin in Hz (0 for an unwritten origin), [n_orig]; empty otherwise
     };
 
     // Initialize a QRT read cache from a file
@@ -492,37 +493,38 @@ namespace quadriga_lib
         arma::fmat *orig_orientation = nullptr,         // Origin (TX) orientations, Euler angels in rad, size [n_orig, 3]
         std::ifstream *file = nullptr);                 // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
 
-    // Read ray-tracing data from QRT file
+    // Read ray-tracing data of a list of CIRs from a QRT file
+    // - Per-CIR outputs are vectors with one entry per requested CIR, positions and orientations are [3, n_out]
     // normalize_polmat options:
     //  0 : polmat as in QRT file, path_gain is -FSPL
     //  1 : polmat has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
     template <typename dtype = double>
     void qrt_file_read(
-        const std::string &fn,                               // Path to the QRT file
-        arma::uword i_cir = 0,                               // Snapshot index
-        arma::uword i_orig = 0,                              // Origin index (for downlink Origin = TX)
-        bool uplink = false,                                 // Reverse direction: origin = RX, destination = TX
-        arma::Col<dtype> *center_freq = nullptr,             // Center frequency in [Hz], Size [n_freq]
-        arma::Mat<dtype> *tx_pos = nullptr,                  // Transmitter position in Cartesian coordinates in [m], [3, 1]
-        arma::Mat<dtype> *tx_orientation = nullptr,          // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1]
-        arma::Mat<dtype> *rx_pos = nullptr,                  // Receiver position in Cartesian coordinates in [m], [3, 1]
-        arma::Mat<dtype> *rx_orientation = nullptr,          // Receiver orientation (bank, tilt, heading) in [rad], [3, 1]
-        arma::Mat<dtype> *fbs_pos = nullptr,                 // First-bounce scatterer positions, matrix of size [3, n_path]
-        arma::Mat<dtype> *lbs_pos = nullptr,                 // Last-bounce scatterer positions, matrix of size [3, n_path]
-        arma::Mat<dtype> *path_gain = nullptr,               // Path gain (linear scale), vector of length [n_path, n_freq]
-        arma::Col<dtype> *path_length = nullptr,             // Absolute path length from TX to RX phase center, vector of length [n_path]
-        arma::Cube<dtype> *polmat = nullptr,                 // Polarization transfer matrix, matrix of size [8, n_path, n_freq] or [2, n_path, n_freq] for v6 files
-        arma::Col<dtype> *aod = nullptr,                     // Departure azimuth angles in [rad], vector of length 'n_path'
-        arma::Col<dtype> *eod = nullptr,                     // Departure elevation angles in [rad], vector of length 'n_path'
-        arma::Col<dtype> *aoa = nullptr,                     // Arrival azimuth angles in [rad], vector of length 'n_path'
-        arma::Col<dtype> *eoa = nullptr,                     // Arrival elevation angles in [rad], vector of length 'n_path'
-        std::vector<arma::Mat<dtype>> *path_coord = nullptr, // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
-        int normalize_polmat = 1,                            // Normalize polmat options
-        arma::u32_vec *n_interact = nullptr,                 // Number of mesh interactions per path of current RX, vector of length [n_path], 0=LOS
-        arma::fmat *coord = nullptr,                         // Interaction coordinates, size [3, sum(n_interact)]
-        std::vector<uint8_t> *interact_type = nullptr,       // Interaction type codes, length [ sum(n_interact) ]
-        std::ifstream *file = nullptr,                       // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
-        const qrt_read_cache *cache = nullptr);              // Optional pre-parsed metadata cache for maximum performance in tight loops
+        const std::string &fn,                                            // Path to the QRT file
+        const arma::uvec &i_cir = {},                                     // CIR indices, 0-based, [n_out]; empty = all CIRs
+        arma::uword i_orig = 0,                                           // Origin index (for downlink Origin = TX)
+        bool uplink = false,                                              // Reverse direction: origin = RX, destination = TX
+        arma::Col<dtype> *center_freq = nullptr,                          // Center frequency in [Hz], Size [n_freq]
+        arma::Mat<dtype> *tx_pos = nullptr,                               // Transmitter positions in Cartesian coordinates in [m], [3, n_out]
+        arma::Mat<dtype> *tx_orientation = nullptr,                       // Transmitter orientations (bank, tilt, heading) in [rad], [3, n_out]
+        arma::Mat<dtype> *rx_pos = nullptr,                               // Receiver positions in Cartesian coordinates in [m], [3, n_out]
+        arma::Mat<dtype> *rx_orientation = nullptr,                       // Receiver orientations (bank, tilt, heading) in [rad], [3, n_out]
+        std::vector<arma::Mat<dtype>> *fbs_pos = nullptr,                 // First-bounce scatterer positions, [n_out] of [3, n_path]
+        std::vector<arma::Mat<dtype>> *lbs_pos = nullptr,                 // Last-bounce scatterer positions, [n_out] of [3, n_path]
+        std::vector<arma::Mat<dtype>> *path_gain = nullptr,               // Path gain (linear scale), [n_out] of [n_path, n_freq]
+        std::vector<arma::Col<dtype>> *path_length = nullptr,             // Absolute path length from TX to RX phase center, [n_out] of [n_path]
+        std::vector<arma::Cube<dtype>> *polmat = nullptr,                 // Polarization transfer matrix, [n_out] of [8, n_path, n_freq] or [2, n_path, n_freq] for v6 files
+        std::vector<arma::Col<dtype>> *aod = nullptr,                     // Departure azimuth angles in [rad], [n_out] of [n_path]
+        std::vector<arma::Col<dtype>> *eod = nullptr,                     // Departure elevation angles in [rad], [n_out] of [n_path]
+        std::vector<arma::Col<dtype>> *aoa = nullptr,                     // Arrival azimuth angles in [rad], [n_out] of [n_path]
+        std::vector<arma::Col<dtype>> *eoa = nullptr,                     // Arrival elevation angles in [rad], [n_out] of [n_path]
+        std::vector<std::vector<arma::Mat<dtype>>> *path_coord = nullptr, // Interaction coordinates, [n_out] of [n_path] of [3, n_interact + 2]
+        int normalize_polmat = 1,                                         // Normalize polmat options
+        std::vector<arma::u32_vec> *n_interact = nullptr,                 // Number of mesh interactions per path, [n_out] of [n_path], 0=LOS
+        std::vector<arma::fmat> *coord = nullptr,                         // Interaction coordinates, [n_out] of [3, sum(n_interact)]
+        std::vector<std::vector<uint8_t>> *interact_type = nullptr,       // Interaction type codes, [n_out] of [sum(n_interact)]
+        std::ifstream *file = nullptr,                                    // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
+        const qrt_read_cache *cache = nullptr);                           // Optional pre-parsed metadata cache; without one, the whole header is read
 
     // Read raw ray-tracing data from QRT file
     std::vector<quadriga_lib::path> qrt_file_read_raw(

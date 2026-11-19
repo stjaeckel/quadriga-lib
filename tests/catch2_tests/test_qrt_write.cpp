@@ -187,16 +187,16 @@ TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
         CHECK(arma::approx_equal(cache.freq, arma::conv_to<arma::fvec>::from(expected_Hz), "reldiff", 1.0e-7f)); // Hz in the cache
 
         arma::vec read_freq, read_freq_cached;
-        arma::mat path_gain, path_gain_cached;
-        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &read_freq, nullptr, nullptr, nullptr, nullptr, nullptr,
+        std::vector<arma::mat> path_gain, path_gain_cached;
+        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &read_freq, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, &path_gain);
-        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &read_freq_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &read_freq_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, &path_gain_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, nullptr, 1, nullptr, nullptr, nullptr, &stream, &cache);
         CHECK(arma::approx_equal(read_freq, expected_Hz, "reldiff", 1.0e-6));
         CHECK(arma::approx_equal(read_freq_cached, expected_Hz, "reldiff", 1.0e-6));
-        CHECK(arma::approx_equal(path_gain_cached, path_gain, "absdiff", 0.0));
-        return path_gain;
+        CHECK(arma::approx_equal(path_gain_cached.at(0), path_gain.at(0), "absdiff", 0.0));
+        return path_gain[0];
     };
 
     CHECK(arma::approx_equal(stored(), freq, "absdiff", 0.0f));
@@ -441,15 +441,16 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     CHECK(got[0].i_cir == 0);
 
     // qrt_file_read on the unwritten origin returns empty outputs (no throw).
-    arma::Col<double> tx_pos_out, path_length;
-    arma::Mat<double> path_gain;
-    arma::u32_vec n_interact;
-    quadriga_lib::qrt_file_read<double>(fn, 0, 1, false, nullptr, &tx_pos_out, nullptr,
+    arma::Mat<double> tx_pos_out;
+    std::vector<arma::Col<double>> path_length;
+    std::vector<arma::Mat<double>> path_gain;
+    std::vector<arma::u32_vec> n_interact;
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 1, false, nullptr, &tx_pos_out, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &path_gain,
                                         &path_length, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, 0, &n_interact, nullptr, nullptr);
-    CHECK(n_interact.n_elem == 0);
-    CHECK(path_length.n_elem == 0);
+    CHECK(n_interact.at(0).n_elem == 0);
+    CHECK(path_length.at(0).n_elem == 0);
 
     // Out-of-range origin still throws.
     CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, 3), std::invalid_argument);
@@ -612,13 +613,13 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         // qrt_file_read returns the CIR positions and the path count of each CIR
         for (unsigned c = 0; c < 3; ++c)
         {
-            arma::vec rx_pos, rx_ori;
-            arma::u32_vec n_interact;
-            quadriga_lib::qrt_file_read<double>(fn, c, 0, false, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
+            arma::mat rx_pos, rx_ori;
+            std::vector<arma::u32_vec> n_interact;
+            quadriga_lib::qrt_file_read<double>(fn, {c}, 0, false, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
                                                 nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
             CHECK(arma::approx_equal(rx_pos, cir_pos.row(c).t(), "absdiff", 0.0));
             CHECK(rx_ori(2) == (c == 1 ? 0.25 : 0.0));
-            CHECK(n_interact.n_elem == (c == 0 ? 2u : c == 2 ? 1u : 0u));
+            CHECK(n_interact.at(0).n_elem == (c == 0 ? 2u : c == 2 ? 1u : 0u));
         }
         std::remove(fn.c_str());
     }
@@ -643,12 +644,14 @@ TEST_CASE("QRT Write - uplink read returns the transposed M")
 
         for (int normalize_polmat : {0, 1})
         {
-            arma::mat pg_dl, pg_ul;
-            arma::cube M_dl, M_ul;
-            quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &pg_dl, nullptr, &M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
-            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &pg_ul, nullptr, &M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
+            std::vector<arma::mat> v_pg_dl, v_pg_ul;
+            std::vector<arma::cube> v_M_dl, v_M_ul;
+            quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &v_pg_dl, nullptr, &v_M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
+            quadriga_lib::qrt_file_read<double>(fn, {0}, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &v_pg_ul, nullptr, &v_M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
+            const arma::mat pg_dl = v_pg_dl.at(0), pg_ul = v_pg_ul.at(0);
+            const arma::cube M_dl = v_M_dl.at(0), M_ul = v_M_ul.at(0);
             REQUIRE(M_dl.n_rows == (scalar ? 2u : 8u));
             REQUIRE(M_dl.n_cols == 2);
             REQUIRE(M_dl.n_slices == 2);
@@ -717,7 +720,7 @@ TEST_CASE("QRT Write - origin position and orientation shapes")
     {
         INFO("origin " << i_orig);
         arma::fmat tx_pos(1, 7), tx_ori(1, 7); // any previous size: outputs are set to [3, 1]
-        quadriga_lib::qrt_file_read<float>(fn, 0, i_orig, false, nullptr, &tx_pos, &tx_ori);
+        quadriga_lib::qrt_file_read<float>(fn, {0}, i_orig, false, nullptr, &tx_pos, &tx_ori);
         CHECK(arma::approx_equal(tx_pos, col_pos, "absdiff", 0.0f));
         CHECK(arma::approx_equal(tx_ori, i_orig < 2 ? col_ori : zeros, "absdiff", 0.0f));
     }

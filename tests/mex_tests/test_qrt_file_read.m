@@ -310,10 +310,20 @@ fn_trunc = [tempname, '.qrt'];
 fid = fopen(fn_trunc, 'w'); fwrite(fid, bytes(1:numel(bytes)-10), 'uint8'); fclose(fid);
 expectedErrorMessage = 'truncated or corrupt';
 try
-    c = quadriga_lib.qrt_file_read(fn_trunc, 2, 1);
+    [~, ~, ~, ~, ~, c] = quadriga_lib.qrt_file_read(fn_trunc, 2, 1); % path data is read only for path outputs
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        delete(fn_trunc);
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+try % a read error in the third chunk of the reader thread; the prefix names entry 41 (1-based)
+    [~, ~, ~, ~, ~, c] = quadriga_lib.qrt_file_read(fn_trunc, [ones(1, 40), 2], 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage)) || ...
+            isempty(strfind(ME.message, 'Snapshot 41: '))
         delete(fn_trunc);
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end
@@ -329,6 +339,26 @@ catch ME
     end
 end
 delete(fn_trunc);
+
+% ---------- qrt_file_read: 40 CIRs are read in three chunks; each equals a single-CIR read ----------
+n_cir = quadriga_lib.qrt_file_parse(fn);
+idx = mod(0:39, double(n_cir)) + 1;
+out = cell(1, 18);
+[out{:}] = quadriga_lib.qrt_file_read(fn, idx, 2, true);
+assertEqual(size(out{2}), [3, 40]);
+[~, tx_only, ~, rx_only] = quadriga_lib.qrt_file_read(fn, idx, 2, true); % positions only, no path data
+assertEqual(tx_only, out{2});
+assertEqual(rx_only, out{4});
+for k = 1:40
+    one = cell(1, 18);
+    [one{:}] = quadriga_lib.qrt_file_read(fn, idx(k), 2, true);
+    for i = 2:5
+        assertEqual(out{i}(:, k), one{i});
+    end
+    for i = 6:18
+        assertEqual(out{i}{k}, one{i}{1});
+    end
+end
 
 % ---------- qrt_file_read: a valid file with 0 CIRs gives empty outputs ----------
 % (written by qrt_file_init with cir_pos of size [0, 3] and one appended origin without paths)

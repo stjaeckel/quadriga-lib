@@ -140,13 +140,20 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
     for (int norm : {0, 1})
     {
         INFO("normalize_polmat " << norm);
-        arma::vec cf, tx, rx, pl;
-        arma::mat fbs, lbs, pg;
-        arma::cube M;
-        arma::u32_vec n_interact;
-        std::vector<uint8_t> itype;
-        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &cf, &tx, nullptr, &rx, nullptr, &fbs, &lbs, &pg, &pl, &M,
-                                            nullptr, nullptr, nullptr, nullptr, nullptr, norm, &n_interact, nullptr, &itype);
+        arma::vec cf;
+        arma::mat tx, rx;
+        std::vector<arma::mat> v_fbs, v_lbs, v_pg;
+        std::vector<arma::vec> v_pl;
+        std::vector<arma::cube> v_M;
+        std::vector<arma::u32_vec> v_ni;
+        std::vector<std::vector<uint8_t>> v_it;
+        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &cf, &tx, nullptr, &rx, nullptr, &v_fbs, &v_lbs, &v_pg,
+                                            &v_pl, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, norm, &v_ni, nullptr, &v_it);
+        const arma::mat fbs = v_fbs[0], lbs = v_lbs[0], pg = v_pg[0];
+        const arma::vec pl = v_pl[0];
+        const arma::cube M = v_M[0];
+        const arma::u32_vec n_interact = v_ni[0];
+        const std::vector<uint8_t> itype = v_it[0];
         REQUIRE(pg.n_rows == n_path);
         REQUIRE(pg.n_cols == n_freq);
         REQUIRE(M.n_rows == 8);

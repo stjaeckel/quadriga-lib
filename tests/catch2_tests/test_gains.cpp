@@ -101,11 +101,15 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
 
     for (arma::uword ic = 0; ic < rx_pos.n_rows; ++ic)
     {
-        arma::vec cf, txp, rxp, pl;
-        arma::mat pg;
-        quadriga_lib::qrt_file_read<double>(fn, ic, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
-                                            nullptr, nullptr, &pg, &pl, nullptr,
+        arma::vec cf;
+        arma::mat txp, rxp;
+        std::vector<arma::mat> v_pg;
+        std::vector<arma::vec> v_pl;
+        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
+                                            nullptr, nullptr, &v_pg, &v_pl, nullptr,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+        const arma::mat pg = v_pg[0];
+        const arma::vec pl = v_pl[0];
 
         REQUIRE(pg.n_rows == 1);
         REQUIRE(pg.n_cols == freq_Hz.n_elem);
@@ -168,11 +172,15 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
 
     for (arma::uword ic = 0; ic < rx_pos.n_rows; ++ic)
     {
-        arma::vec cf, txp, rxp, pl;
-        arma::mat pg;
-        quadriga_lib::qrt_file_read<double>(fn, ic, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
-                                            nullptr, nullptr, &pg, &pl, nullptr,
+        arma::vec cf;
+        arma::mat txp, rxp;
+        std::vector<arma::mat> v_pg;
+        std::vector<arma::vec> v_pl;
+        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
+                                            nullptr, nullptr, &v_pg, &v_pl, nullptr,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+        const arma::mat pg = v_pg[0];
+        const arma::vec pl = v_pl[0];
 
         REQUIRE(pg.n_rows == 1);
         REQUIRE(pg.n_cols == freq_Hz.n_elem);
@@ -208,11 +216,11 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
     // match calc_diffraction_gain.
     auto excess_dB = [&](arma::uword ic) -> double
     {
-        arma::mat pg;
-        quadriga_lib::qrt_file_read<double>(fn, ic, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
+        std::vector<arma::mat> pg;
+        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, nullptr, &pg, nullptr, nullptr,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
-        return -10.0 * std::log10(pg(0, 2) / pg(0, 0));
+        return -10.0 * std::log10(pg[0](0, 2) / pg[0](0, 0));
     };
     CHECK(std::abs(excess_dB(0) / excess_dB(2) - 8.0) < 1e-6);
 

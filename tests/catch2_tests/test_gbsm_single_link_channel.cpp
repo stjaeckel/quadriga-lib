@@ -740,12 +740,18 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
     for (arma::uword t = 0; t < 3; ++t)
     {
         INFO("snapshot " << t);
-        arma::vec cf, T, R, pl;
-        arma::mat fbs, lbs, pg;
-        arma::cube M;
-        arma::u32_vec n_interact;
-        quadriga_lib::qrt_file_read<double>(fn, t, 0, false, &cf, &T, nullptr, &R, nullptr, &fbs, &lbs, &pg, &pl, &M,
-                                            nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
+        arma::vec cf;
+        arma::mat T, R;
+        std::vector<arma::mat> v_fbs, v_lbs, v_pg;
+        std::vector<arma::vec> v_pl;
+        std::vector<arma::cube> v_M;
+        std::vector<arma::u32_vec> v_ni;
+        quadriga_lib::qrt_file_read<double>(fn, {t}, 0, false, &cf, &T, nullptr, &R, nullptr, &v_fbs, &v_lbs, &v_pg,
+                                            &v_pl, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &v_ni);
+        const arma::mat fbs = v_fbs[0], lbs = v_lbs[0], pg = v_pg[0];
+        const arma::vec pl = v_pl[0];
+        const arma::cube M = v_M[0];
+        const arma::u32_vec n_interact = v_ni[0];
         const arma::u32_vec tap = r.tap.elem(e[t].ind);
         rays_t q;
         quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, q, "quadriga", n_interact, tap, r.gr_eps_re,

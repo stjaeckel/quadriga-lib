@@ -2,8 +2,9 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// QRT ray-tracing files: qrt_file_parse, qrt_read_cache_init, then qrt_file_read with all outputs (up to two origins
-// and two CIRs, both directions, both normalizations of M, one index past the end) and qrt_file_read_raw
+// QRT ray-tracing files: qrt_file_parse, qrt_read_cache_init, then qrt_file_read with all outputs (up to two origins;
+// CIR lists of one CIR each, one index past the end, two CIRs with a cache, all CIRs; both directions, both
+// normalizations of M) and qrt_file_read_raw
 
 #include "fuzz_target.hpp"
 
@@ -77,21 +78,42 @@ void fuzz_one(const uint8_t *data, size_t size)
     arma::uword n_orig_try = std::min(n_orig, (arma::uword)2), n_cir_try = std::min(n_cir, (arma::uword)2);
     for (arma::uword i_orig = 0; i_orig <= n_orig_try; ++i_orig) // i_orig == n_orig_try: past the end if the file has one or two
     {
+        // Lists: each CIR alone, one index past the end, the first two together (with and without a cache), all CIRs
+        std::vector<arma::uvec> lists;
         for (arma::uword i_cir = 0; i_cir <= n_cir_try; ++i_cir)
+            lists.push_back({i_cir});
+        lists.push_back(arma::uvec{1, 0});
+        if (n_cir <= 8) // All CIRs; crafted CIRs can all point to the same path block (see qrt_file_read_raw)
+            lists.push_back(arma::uvec());
+        for (size_t il = 0; il < lists.size(); ++il)
             for (bool uplink : {false, true})
                 fz::clean([&]
                           {
-                    arma::vec center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, path_length, aod, eod, aoa, eoa;
-                    arma::mat fbs_pos, lbs_pos, path_gain;
-                    arma::cube M;
-                    std::vector<arma::mat> path_coord;
-                    arma::u32_vec n_interact;
-                    arma::fmat coord;
-                    std::vector<uint8_t> interact_type;
-                    quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &center_freq, &tx_pos,
-                                                        &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
-                                                        &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
-                                                        &path_coord, uplink ? 0 : 1, &n_interact, &coord, &interact_type); });
+                    arma::vec center_freq;
+                    arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;
+                    std::vector<arma::vec> path_length, aod, eod, aoa, eoa;
+                    std::vector<arma::mat> fbs_pos, lbs_pos, path_gain;
+                    std::vector<arma::cube> M;
+                    std::vector<std::vector<arma::mat>> path_coord;
+                    std::vector<arma::u32_vec> n_interact;
+                    std::vector<arma::fmat> coord;
+                    std::vector<std::vector<uint8_t>> interact_type;
+                    const arma::uvec &i_cir = lists[il];
+                    if (il == (arma::uword)n_cir_try + 1) // {1, 0} with a cache
+                    {
+                        std::ifstream f(fn, std::ios::binary);
+                        auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);
+                        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &center_freq, &tx_pos,
+                                                            &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
+                                                            &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
+                                                            &path_coord, uplink ? 0 : 1, &n_interact, &coord, &interact_type,
+                                                            &f, &cache);
+                    }
+                    else
+                        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &center_freq, &tx_pos,
+                                                            &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
+                                                            &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
+                                                            &path_coord, uplink ? 0 : 1, &n_interact, &coord, &interact_type); });
         fz::clean([&] { quadriga_lib::qrt_file_read_raw(fn, i_orig); });
     }
 }

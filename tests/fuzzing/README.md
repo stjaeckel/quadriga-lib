@@ -111,7 +111,7 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_mtl` | MTL file | `obj_file_read` of a fixed OBJ file that uses the fuzzed MTL file |
 | `fz_material_csv` | Material table (CSV) | `obj_file_read` of a fixed OBJ file with the fuzzed table, lenient and strict; `medium_gain`, `interface_gain`, `refractive_index` of each material it reads, EM and scalar mode |
 | `fz_conf` | Scenario parameter file | `conf_file_read` with all outputs, with and without the value checks |
-| `fz_qrt` | QRT file | `qrt_file_parse`, `qrt_read_cache_init`, `qrt_file_read` for several origins and CIRs in both directions, `qrt_file_read_raw` |
+| `fz_qrt` | QRT file | `qrt_file_parse`, `qrt_read_cache_init`, `qrt_file_read` for several origins and CIR lists (single CIRs, past the end, two CIRs with a cache, all CIRs of small files) in both directions, `qrt_file_read_raw` |
 | `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel` (also with `i_snap`), `hdf5_read_channel_vec`, `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
 | `fz_arrayant_generate` | Parameters | The `generate_arrayant_*` functions and `generate_speaker` |
 | `fz_arrayant_interpolate` | Array antenna, angles | `arrayant_interpolate`, `arrayant_interpolate_multi` |
