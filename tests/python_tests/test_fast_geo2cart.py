@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.tools.fast_geo2cart.
+
 import sys
 import os
 import unittest
@@ -13,7 +15,6 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-# Now you can import your package
 import quadriga_lib
 
 r2 = np.sqrt(2.0)
@@ -34,7 +35,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(a.shape, (2, 6))
             self.assertEqual(a.dtype, np.float64)
 
-    # --- Known values ---
+    # ---- Known values ----
 
     def test_known_values(self):
         # (0,    0,    1)  -> (1, 0, 0)
@@ -95,8 +96,7 @@ class test_case(unittest.TestCase):
                 self.assertEqual(a.shape, (0, 3))
 
     # Outputs equal the reference formulas element-wise, for Fortran-ordered inputs (aliased by the wrapper),
-    # C-ordered and float32 inputs (copied) and large n (formerly the separate-input branch read freed memory,
-    # wrong values for n > 16, segfault for large n)
+    # C-ordered and float32 inputs (copied), and for n > 16 up to large n
     def test_values_equal_reference(self):
         rng = np.random.default_rng(0)
         for n, m in ((5, 1), (100, 3), (100000, 1)):
@@ -113,7 +113,7 @@ class test_case(unittest.TestCase):
                                                use_kernel=1)
         np.testing.assert_allclose(out[2], ref[2], atol=1e-5)
 
-    # --- Round trip against fast_cart2geo ---
+    # ---- Round trip against fast_cart2geo ----
 
     def test_roundtrip(self):
         x0, y0, z0 = np.random.rand(3, 4, 3)
@@ -123,7 +123,7 @@ class test_case(unittest.TestCase):
         np.testing.assert_allclose(y1, y0, atol=1e-4)
         np.testing.assert_allclose(z1, z0, atol=1e-4)
 
-    # --- use_kernel variants ---
+    # ---- use_kernel variants ----
 
     def test_use_kernel(self):
         np.random.seed(0)
@@ -151,14 +151,14 @@ class test_case(unittest.TestCase):
         a, e, l = (np.repeat(t, 2, axis=0)[::2] for t in (az, el, length))
         np.testing.assert_array_equal(quadriga_lib.tools.fast_geo2cart(a, e, l, use_kernel=1), ref)
 
-    # Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
+    # Kernel values outside 0, 1, 2 are rejected
     def test_invalid_use_kernel(self):
         e = np.random.rand(2, 2)
         for k in (3, 99, -1):
             with self.assertRaises(ValueError, msg="use_kernel=%d" % k):
                 quadriga_lib.tools.fast_geo2cart(e, e, use_kernel=k)
 
-    # --- Error paths ---
+    # ---- Error paths ----
 
     def test_errors(self):
         e = (np.random.rand(2, 6) - 0.5) * 2 * np.pi
@@ -185,7 +185,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.tools.fast_geo2cart(e, None)
 
-    # The combined (3, n, m) form is gone: no combine flag, and a stacked array is no single input
+    # There is no combined (3, n, m) form: no combine flag, and a stacked array is not a single input
     def test_combined_form_removed(self):
         geo = np.random.rand(3, 4, 2)
         with self.assertRaises(TypeError):

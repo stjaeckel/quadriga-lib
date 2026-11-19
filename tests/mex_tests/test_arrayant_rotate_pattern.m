@@ -1,6 +1,12 @@
-function test_arrayant_rotate_pattern
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% --- Single-frequency tests ---
+function test_arrayant_rotate_pattern
+% MEX interface test for quadriga_lib.arrayant_rotate_pattern.
+% Physics validation lives in the Catch2 suite (test_arrayant_rotate_pattern.cpp).
+
+%% Single-frequency tests
 
 ant = quadriga_lib.arrayant_generate('custom',[],[],5,20,0);
 
@@ -147,7 +153,7 @@ tmp = out.e_theta_re(:,:,3);
 assertEqual(s0,91);
 assertEqual(s1,271);
 
-% Errors
+%% Errors
 try
     quadriga_lib.arrayant_rotate_pattern( e_theta_re, [0; 0; 0] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -168,7 +174,7 @@ catch ME
     end
 end
 
-% --- Multi-frequency (struct-array) tests ---
+%% Multi-frequency (struct-array) tests
 
 % Build a 2-entry frequency-dependent struct array
 mf_ant = quadriga_lib.arrayant_generate('custom',[],[],5,20,0);
@@ -180,7 +186,7 @@ mf_multi(2) = mf_ant;
 mf_multi(1).center_freq = 3.5e9;
 mf_multi(2).center_freq = 28e9;
 
-% --- Basic dispatch: struct array in -> struct array out ---
+%% Basic dispatch: struct array in -> struct array out
 out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi, [0; 0; pi/2]);
 assertEqual(numel(out_mf), 2);
 
@@ -205,7 +211,7 @@ assertElementsAlmostEqual(out_mf(1).elevation_grid, mf_ant.elevation_grid, 'abso
 assertElementsAlmostEqual(out_mf(2).azimuth_grid,   mf_ant.azimuth_grid,   'absolute', 1e-14);
 assertElementsAlmostEqual(out_mf(2).elevation_grid, mf_ant.elevation_grid, 'absolute', 1e-14);
 
-% --- Equivalence with single-freq no-grid-adj modes ---
+%% Equivalence with single-freq no-grid-adj modes
 % multi usage=0 maps internally to single-freq usage=3 (both, no grid adj)
 % multi usage=1 maps internally to single-freq usage=4 (pattern only, no grid adj)
 % multi usage=2 stays at single-freq usage=2 (pol only, no grid adj)
@@ -230,19 +236,19 @@ for k = 1:2
     assertElementsAlmostEqual(out_2(k).e_phi_re,   ref_2.e_phi_re,   'absolute', 1e-12);
 end
 
-% --- usage 3 and 4 in multi-freq mode map to 0 and 1, as in Python ---
+%% usage 3 and 4 in multi-freq mode map to 0 and 1, as in Python
 out_3 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 3);
 out_4 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 4);
 assertEqual(out_3, out_0);
 assertEqual(out_4, out_1);
 
-% --- A call without output argument returns the result as ans (both branches) ---
+%% A call without output argument returns the result as ans (both branches)
 quadriga_lib.arrayant_rotate_pattern(mf_ant, [pi/6; pi/4; pi/3], 3);
 assertEqual(ans, ref_0); %#ok<NOANS>
 quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 0);
 assertEqual(ans, out_0); %#ok<NOANS>
 
-% --- Element selection in multi-freq mode ---
+%% Element selection in multi-freq mode
 mf_ant3 = quadriga_lib.arrayant_copy_element(mf_ant, 1, [2,3]);  % 3-element antenna
 clear mf_multi3
 mf_multi3(1) = mf_ant3;
@@ -271,7 +277,7 @@ for k = 1:2
     end
 end
 
-% --- Error: orientation with other than 3 elements ---
+%% Error: orientation with other than 3 elements
 try
     out = quadriga_lib.arrayant_rotate_pattern(mf_multi, [0; 0]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -284,4 +290,3 @@ end
 
 
 end
-

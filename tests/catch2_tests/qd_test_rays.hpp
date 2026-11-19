@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Fixtures and oracles of the ray-level tests (gbsm_rays, ssf_rays, ssf_paths, gbsm_rays_from_paths,
+// Fixtures and oracles of the ray-level tests (gbsm_rays, ssf_rays, ssf_scatterers, ssf_paths, gbsm_rays_from_paths,
 // qrt_paths_from_scatterers, gbsm_single_link_channel), independent of the functions under test:
 //  - make_rnd_ray: a "ray" set cube with distinct values, so that ssf_rays tests need no gbsm_draw; columns
 //    b·N·M + n·M + m for blocks 0 to 12, 13·N·M + n for block 13, 13·N·M + N + n·M + m for block 14

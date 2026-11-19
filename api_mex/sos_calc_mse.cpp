@@ -6,22 +6,6 @@
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex.hpp"
 
-#include <cmath>
-#include <string>
-
-// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
-// the argument instead of wrapping around in the conversion to an unsigned type.
-static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
-{
-    const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
-    {
-        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
-    return (arma::uword)v;
-}
-
 /*!SECTION
 Sum-of-sinusoids random number generator
 SECTION!*/
@@ -80,19 +64,16 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
     const arma::vec acf = qd_mex_get_Col<double>(prhs[1], false, "acf");
     const arma::vec dist = qd_mex_get_Col<double>(prhs[2], false, "dist");
-    const arma::uword n_dir = (nrhs < 4) ? 10 : qd_mex_sos_count(prhs[3], "n_dir", 10.0);
+    const arma::uword n_dir = (nrhs < 4) ? 10 : qd_mex_get_count(prhs[3], "n_dir", 10.0);
 
-    // Wrap optional pointers
     double mse_dB = 0.0, mse_core_dB = 0.0, mse_all_dB = 0.0;
     arma::vec acf_tail;
     arma::mat test_dir;
@@ -101,10 +82,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_acf_tail = (nlhs > 3) ? &acf_tail : nullptr;
     arma::mat *p_test_dir = (nlhs > 4) ? &test_dir : nullptr;
 
-    // Call library function
     CALL_QD(mse_dB = quadriga_lib::sos_calc_mse<double>(spatial_freq, acf, dist, p_mse_core, p_mse_all, p_acf_tail, p_test_dir, n_dir));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&mse_dB);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&mse_core_dB);

@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// File output of qdant_write, checked by reading back with qdant_read: round trips of single- and multi-element
+// arrays, IDs and layouts when appending and overwriting, accuracy of low-level and very large pattern data,
+// single-precision accuracy of positions and coupling, locale-independent number text, namespace prefixes.
+// Each case writes its own file in the working folder and removes it.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -46,7 +51,6 @@ TEST_CASE("Arrayant writing to QDANT file - Minimal test")
     unsigned id = quadriga_lib::qdant_write("test.qdant", ant);
     CHECK(id == 1);
 
-    // Load file again and compare
     auto antI = quadriga_lib::qdant_read<float>("test.qdant");
 
     CHECK(arma::approx_equal(antI.azimuth_grid, ant.azimuth_grid, "absdiff", 1e-6));
@@ -108,7 +112,6 @@ TEST_CASE("Arrayant writing/reading from QDANT file - Multi-Element Array")
 
 TEST_CASE("Arrayant writing to QDANT file - Complex test")
 {
-    // Create new file
     std::ofstream f;
     f.open("test.qdant");
     f << "<qdant><arrayant>" << std::endl;
@@ -222,7 +225,6 @@ static double qdant_err_element(const quadriga_lib::arrayant<T> &ref, const quad
     return err;
 }
 
-// The writer stored magnitudes with a floor at -100 dB absolute power; samples below it read back as 0
 // The file is accurate to 6e-8 of the element peak; an element at a low level is quantized relative to its own peak
 TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
 {
@@ -282,7 +284,6 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
     std::remove(fn.c_str());
 }
 
-// Element positions, coupling and pattern values were written with 6 significant digits
 // The file has single-precision-equivalent accuracy: positions and coupling (magnitude, phase) as floats, pattern
 // samples within 6e-8 of the element peak
 TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positions, coupling and pattern")
@@ -308,7 +309,7 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
 
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
 
-        // Positions exact as float: the value read back rounds to the same float (before: 6 significant digits, 123.457)
+        // Positions exact as float: the value read back rounds to the same float
         arma::fmat pos_float = arma::conv_to<arma::fmat>::from(a.element_pos);
         CHECK(arma::approx_equal(arma::conv_to<arma::fmat>::from(b.element_pos), pos_float, "absdiff", 0.0f));
         CHECK((float)b.element_pos(0, 1) == 123.456789f);

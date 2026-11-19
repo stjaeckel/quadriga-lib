@@ -66,7 +66,7 @@ struct MtlTable
 };
 
 // Trim leading/trailing whitespace (incl. CR/LF/tab)
-static inline std::string trim_ws(const std::string &s)
+static inline std::string qd_trim_ws(const std::string &s)
 {
     size_t b = s.find_first_not_of(" \t\r\n");
     if (b == std::string::npos)
@@ -76,14 +76,14 @@ static inline std::string trim_ws(const std::string &s)
 }
 
 // Remove a trailing '\r' (files with Windows line endings read on Linux / macOS)
-static inline void strip_cr(std::string &line)
+static inline void qd_strip_cr(std::string &line)
 {
     if (!line.empty() && line.back() == '\r')
         line.pop_back();
 }
 
 // Remove leading spaces and tabs (indented .mtl statements)
-static inline void strip_leading_ws(std::string &line)
+static inline void qd_strip_leading_ws(std::string &line)
 {
     size_t b = line.find_first_not_of(" \t");
     line.erase(0, b == std::string::npos ? line.size() : b);
@@ -94,7 +94,7 @@ static inline void strip_leading_ws(std::string &line)
 // indices); the texture / normal parts are skipped. Reads at most 4 references and stops at the first token that
 // does not start with an integer. A reference is stored as magnitude (saturated, so any overlong value stays out of
 // range) and sign. Returns the number of references read.
-static inline int parse_face_refs(const char *s, unsigned long long *mag, bool *neg)
+static inline int qd_parse_face_refs(const char *s, unsigned long long *mag, bool *neg)
 {
     int n = 0;
     ++s; // 'f'
@@ -120,15 +120,15 @@ static inline int parse_face_refs(const char *s, unsigned long long *mag, bool *
     return n;
 }
 
-// Split a CSV line into trimmed cells.
+// Split a CSV line into trimmed cells
 // Note: std::getline drops truly-trailing empty fields, so callers pad rows to the header width before indexing.
-static inline std::vector<std::string> split_csv(const std::string &line)
+static inline std::vector<std::string> qd_split_csv(const std::string &line)
 {
     std::vector<std::string> out;
     std::istringstream ss(line);
     std::string cell;
     while (std::getline(ss, cell, ','))
-        out.push_back(trim_ws(cell));
+        out.push_back(qd_trim_ws(cell));
     return out;
 }
 
@@ -136,7 +136,7 @@ static inline std::vector<std::string> split_csv(const std::string &line)
 // "itu_concrete.001" -> "itu_concrete"; "concrete.gray.001" -> "concrete".
 // Names without a dot are returned unchanged. This lets one CSV material back many
 // Blender sub-materials (concrete.gray, concrete.white, ... and their .001 duplicates).
-static inline std::string base_material_name(const std::string &s)
+static inline std::string qd_base_material_name(const std::string &s)
 {
     size_t dot = s.find('.');
     return (dot == std::string::npos) ? s : s.substr(0, dot);
@@ -146,7 +146,7 @@ static inline std::string base_material_name(const std::string &s)
 // "name" column (the join key for .obj materials); every other column is treated as numeric.
 // Empty numeric cells parse as 0.0. A non-empty cell must be one finite number in full ("1.5x", "nan" and "inf" are
 // errors).
-static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
+static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
 {
     MtlTable T;
     std::string line;
@@ -159,7 +159,7 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
         (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF)
         line.erase(0, 3);
 
-    std::vector<std::string> header = split_csv(line);
+    std::vector<std::string> header = qd_split_csv(line);
     if (header.empty())
         throw std::runtime_error("Error reading materials: '" + src + "' has an empty header.");
 
@@ -192,10 +192,10 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
     while (std::getline(in, line))
     {
         ++line_num;
-        if (trim_ws(line).empty())
+        if (qd_trim_ws(line).empty())
             continue;
 
-        std::vector<std::string> cell = split_csv(line);
+        std::vector<std::string> cell = qd_split_csv(line);
         if (cell.size() < header.size())
             cell.resize(header.size()); // pad trailing empties dropped by getline
 
@@ -240,19 +240,19 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
 }
 
 // Load the material table: built-in default if fn_csv is empty, otherwise from the CSV file.
-static MtlTable load_mtl_table(const std::string &fn_csv)
+static MtlTable qd_load_mtl_table(const std::string &fn_csv)
 {
     if (fn_csv.empty())
     {
         std::istringstream ss(DEFAULT_MATERIAL_CSV);
-        return parse_mtl_table(ss, "<default materials>");
+        return qd_parse_mtl_table(ss, "<default materials>");
     }
     if (!std::filesystem::exists(fn_csv))
         throw std::runtime_error("Error opening file: CSV file '" + fn_csv + "' does not exist.");
     std::ifstream f(fn_csv);
     if (!f.is_open())
         throw std::runtime_error("Error opening file: failed to open CSV file '" + fn_csv + "'.");
-    return parse_mtl_table(f, fn_csv);
+    return qd_parse_mtl_table(f, fn_csv);
 }
 
 // Read Principled BSDF (visual) properties from the companion .mtl file, one row per name in 'names'
@@ -260,7 +260,7 @@ static MtlTable load_mtl_table(const std::string &fn_csv)
 // Re,Ge,Be,sheen,clearcoat,clearcoat_roughness,anisotropic,anisotropic_rotation,transmission.
 // If the .mtl is absent or no name matches, bsdf is returned empty ([0,17]).
 template <typename dtype>
-static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::string &mtllib_fn,
+static void qd_read_mtl_bsdf(const std::filesystem::path &obj_file, const std::string &mtllib_fn,
                           const std::vector<std::string> &names, arma::Mat<dtype> *bsdf)
 {
     std::filesystem::path mtl_file = obj_file;
@@ -291,7 +291,7 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
         // Defaults
         double R = 0.8, G = 0.8, B = 0.8;    // Base color
         double Re = 0.0, Ge = 0.0, Be = 0.0; // Emission color
-        double alpha = 1.0;                  // Transparency
+        double alpha = 1.0;                  // Opacity, 1 = opaque
         double ior = 1.45;                   // Index of refraction
         double roughness = 0.5;
         double metallic = 0.0;
@@ -308,8 +308,8 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
         // Find "newmtl <name>" (the name compared without surrounding whitespace, like the "usemtl" names)
         while (std::getline(fileR, line))
         {
-            strip_leading_ws(line);
-            if (line.rfind("newmtl ", 0) == 0 && trim_ws(line.substr(7)) == names[i_mtl])
+            qd_strip_leading_ws(line);
+            if (line.rfind("newmtl ", 0) == 0 && qd_trim_ws(line.substr(7)) == names[i_mtl])
             {
                 any_found = true;
                 break;
@@ -319,8 +319,8 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
         // Scan until the next "newmtl " or EOF (statements may be indented)
         while (std::getline(fileR, line))
         {
-            strip_cr(line);
-            strip_leading_ws(line);
+            qd_strip_cr(line);
+            qd_strip_leading_ws(line);
             if (line.rfind("newmtl ", 0) == 0)
                 break;
 
@@ -446,7 +446,7 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
         bsdf->set_size(0, 17);
 }
 
-// Helper: Convert mesh to vert_list + face_ind (Blender-style, per-object self-contained)
+// Convert mesh to vert_list + face_ind (Blender-style, per-object self-contained)
 // - Co-located vertices within "threshold" belonging to the SAME object are merged into one.
 // - Identical coordinates in DIFFERENT objects are kept separate (duplicated); no cross-object
 //  referencing, each object is self-contained.
@@ -458,7 +458,7 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
 //  lowest vertex index wins, which reproduces the insertion order of a greedy linear scan.
 // - Objects are welded independently and in parallel (OpenMP); output ordering is unaffected.
 template <typename dtype>
-static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh, 9 ]
+static void qd_mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh, 9 ]
                            const arma::uvec &obj_ind,    // Object index, 0-based, Size: [ n_mesh ]
                            arma::Mat<dtype> &vert_list,  // Out: List of vertices, Size: [ n_vert_out, 3 ]
                            arma::umat &face_ind,         // Out: face indices, 0-based, Size: [ n_mesh, 3 ]
@@ -467,7 +467,7 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
     const arma::uword n_mesh = mesh.n_rows;
 
     if (mesh.n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns.");
+        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
     if (obj_ind.n_elem != n_mesh)
         throw std::invalid_argument("Input 'obj_ind' must have one element per mesh face.");
@@ -647,14 +647,14 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
     }
 }
 
-// Helper: Split objects into connected components ("separate by loose parts")
+// Split objects into connected components ("separate by loose parts")
 // - Two faces belong to the same part if they share at least one vertex index; connectivity is
 //  therefore defined by the welded vertex list, not by coordinates.
 // - Parts never span objects, even if objects happen to share vertex indices.
 // - Union-find over vertex indices, O(n_mesh * inverse-Ackermann); parts are numbered in order of
 //  their first face, so the output order follows the input face order.
 // - Parts are disjoint by construction, so splitting never duplicates vertices.
-static void separate_loose_parts(const arma::umat &face_ind, // Face indices, Size: [ n_mesh, 3 ]
+static void qd_separate_loose_parts(const arma::umat &face_ind, // Face indices, Size: [ n_mesh, 3 ]
                                  const arma::uvec &obj_ind,  // Object index or empty, Size: [ n_mesh ]
                                  arma::uword n_vert,         // Number of vertices in the vertex list
                                  std::vector<arma::uword> &face_order, // Out: face indices grouped by part
@@ -899,7 +899,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         empty_geometry_outputs();
         if (want_csv_table)
         {
-            table = load_mtl_table(fn_csv);
+            table = qd_load_mtl_table(fn_csv);
             fill_csv_table_out(table);
         }
         return 0;
@@ -922,7 +922,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         std::string line;
         while (std::getline(fileR, line))
         {
-            strip_cr(line);
+            qd_strip_cr(line);
             if (line.length() > 2 && line[0] == 'v' && line[1] == ' ')
                 ++n_vert;
             else if (line.length() > 2 && line[0] == 'f' && line[1] == ' ')
@@ -936,7 +936,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         empty_geometry_outputs();
         if (want_csv_table)
         {
-            table = load_mtl_table(fn_csv);
+            table = qd_load_mtl_table(fn_csv);
             fill_csv_table_out(table);
         }
         return 0;
@@ -946,7 +946,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
 
     // Load the material table now if any csv output is requested (needed for csv_ind resolution)
     if (want_csv_table)
-        table = load_mtl_table(fn_csv);
+        table = qd_load_mtl_table(fn_csv);
 
     // What needs to be materialized during the parse
     const bool need_vert = (mesh != nullptr || vert_list != nullptr);
@@ -1028,7 +1028,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         auto it = table.index.find(raw);
         if (it != table.index.end())
             return it->second + 1;
-        std::string stripped = base_material_name(raw);
+        std::string stripped = qd_base_material_name(raw);
         if (stripped != raw)
         {
             auto it2 = table.index.find(stripped);
@@ -1054,12 +1054,12 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
 
     while (std::getline(fileR, line))
     {
-        strip_cr(line);
+        qd_strip_cr(line);
 
         // mtllib reference (used later to locate the .mtl file)
         if (line.rfind("mtllib ", 0) == 0)
         {
-            mtllib_fn = trim_ws(line.substr(7));
+            mtllib_fn = qd_trim_ws(line.substr(7));
             continue;
         }
 
@@ -1088,7 +1088,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
 
             unsigned long long mag[4];
             bool neg[4];
-            const int n_ref = parse_face_refs(line.c_str(), mag, neg);
+            const int n_ref = qd_parse_face_refs(line.c_str(), mag, neg);
             if (n_ref < 3)
                 throw std::runtime_error("Error reading face data in '" + fn + "'.");
             if (n_ref > 3)
@@ -1134,7 +1134,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         // Object "o " (precedes the object's vertices, materials and faces)
         if (line.length() > 2 && line[0] == 'o' && line[1] == ' ')
         {
-            local_obj_names.push_back(trim_ws(line.substr(2)));
+            local_obj_names.push_back(qd_trim_ws(line.substr(2)));
             cur_obj = (arma::uword)local_obj_names.size() - 1;
             have_obj = true;
             // A new object resets the active material
@@ -1147,7 +1147,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         // "usemtl (null)" (written by obj_file_write) marks the following faces as having no material
         if (line.rfind("usemtl ", 0) == 0)
         {
-            std::string raw = trim_ws(line.substr(7));
+            std::string raw = qd_trim_ws(line.substr(7));
             if (raw == "(null)")
             {
                 cur_mtl = 0;
@@ -1196,7 +1196,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
 
     // Visual BSDF from the companion .mtl file
     if (bsdf != nullptr)
-        read_mtl_bsdf<dtype>(obj_file, mtllib_fn, local_mtl_names, bsdf);
+        qd_read_mtl_bsdf<dtype>(obj_file, mtllib_fn, local_mtl_names, bsdf);
 
     return n_faces;
 }
@@ -1327,7 +1327,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     if (has_mesh)
     {
         if (mesh.n_cols != 9)
-            throw std::invalid_argument("Input 'mesh' must have 9 columns.");
+            throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
         n_mesh = mesh.n_rows;
     }
     else
@@ -1417,7 +1417,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
     if (has_mesh)
     {
-        mesh2vert_list(mesh, obj_ind.empty() ? arma::uvec(n_mesh, arma::fill::zeros) : obj_ind, VL_local, FI_local, threshold);
+        qd_mesh2vert_list(mesh, obj_ind.empty() ? arma::uvec(n_mesh, arma::fill::zeros) : obj_ind, VL_local, FI_local, threshold);
         pVL = &VL_local;
         pFI = &FI_local;
     }
@@ -1580,7 +1580,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     std::vector<arma::uword> face_order, blk_bnd, blk_obj;
 
     if (split_loose_parts)
-        separate_loose_parts(FI, obj_ind, VL.n_rows, face_order, blk_bnd, blk_obj);
+        qd_separate_loose_parts(FI, obj_ind, VL.n_rows, face_order, blk_bnd, blk_obj);
     else
     {
         face_order.resize(n_mesh);
@@ -1724,7 +1724,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
                 if (R != (dtype)0.8 || G != (dtype)0.8 || B != (dtype)0.8) // base color
                     mtl << "Kd " << fmt(R) << " " << fmt(G) << " " << fmt(B) << "\n";
-                if (d != (dtype)1.0) // transparency
+                if (d != (dtype)1.0) // dissolve (opacity)
                     mtl << "d " << fmt(d) << "\n";
                 if (Pr != (dtype)0.5) // roughness (Pr, never Ns)
                     mtl << "Pr " << fmt(Pr) << "\n";

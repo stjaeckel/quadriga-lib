@@ -61,7 +61,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
@@ -73,7 +72,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar_in");
     const bool validate = (nrhs < 2) ? true : qd_mex_get_scalar<bool>(prhs[1], "validate", true);
 
-    // Output allocation
     std::vector<std::string> key_order;
     arma::mat lsp_xcorr;
     bool lsp_xcorr_chk = false;
@@ -81,10 +79,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&lsp_xcorr, 8, 8);
 
-    // Wrap optional pointers
     arma::mat *p_lsp_xcorr = lsp_xcorr.empty() ? nullptr : &lsp_xcorr;
 
-    // Call library function
     CALL_QD(lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, p_lsp_xcorr, &key_order, validate));
 
     // Scenario parameters: numeric keys in canonical order

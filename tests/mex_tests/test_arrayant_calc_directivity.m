@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_arrayant_calc_directivity
+% MEX interface test for quadriga_lib.arrayant_calc_directivity.
 
 ant = quadriga_lib.arrayant_generate('dipole');
 directivity = quadriga_lib.arrayant_calc_directivity(ant);
@@ -29,7 +34,7 @@ assertElementsAlmostEqual( directivity, [1.760964, 1.760964], 'absolute', 1e-6 )
 directivity = quadriga_lib.arrayant_calc_directivity(ant_mf, [1,1]);
 assertElementsAlmostEqual( directivity, [1.760964, 1.760964; 1.760964, 1.760964], 'absolute', 1e-6 );
 
-% Errors
+%% Errors
 
 % Split mode (the arrayant fields as separate inputs) is not supported
 A = ant.e_theta_re; B = ant.e_theta_im; C = ant.e_phi_re;
@@ -99,4 +104,3 @@ catch ME
 end
 
 end
-

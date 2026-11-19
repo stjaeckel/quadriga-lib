@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_ssf_paths
 % MEX interface test for quadriga_lib.ssf_paths.
 % Scope: argument and output handling, optional inputs, index conversion, error paths.

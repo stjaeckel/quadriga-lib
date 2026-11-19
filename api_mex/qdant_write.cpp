@@ -66,7 +66,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be an arrayant struct or struct array.");
 
-    // Assemble array antenna object
     auto ant = quadriga_lib::arrayant<double>();
     auto ant_multi = std::vector<quadriga_lib::arrayant<double>>();
     const bool is_multi = mxGetNumberOfElements(prhs[1]) > 1;
@@ -79,11 +78,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         ant = qd_mex_struct2arrayant(prhs[1], true, false, "arrayant");
 
-    // Check if files exists in multi-freq mode and throw error if yes
     if (is_multi && std::filesystem::exists(fn))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File exists. Appending a multi-frequency array to an existing file is not allowed.");
 
-    // Write to file
     if (is_multi)
         CALL_QD(qdant_write_multi(fn, ant_multi));
     else

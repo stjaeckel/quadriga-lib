@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // usage: bench_variants <variant> <n_gen> <n_coeff> <n_pos>
 // variants: a4 (library AVX2), ah4 / ah8 (named accumulators, 4 / 8 generators), at8 (tiled, packed weights),
 //           g (library GENERIC), gs (grouped accumulation), gsc (grouped + sincos)

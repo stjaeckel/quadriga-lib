@@ -352,7 +352,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         if (abs_toa->n_elem != n_link)
             abs_toa->set_size(n_link);
         const double toa_mu = sp.at("absTOA_mu"), toa_sigma = sp.at("absTOA_sigma"), l_max = sp.at("absTOA_Lmax");
-        const double bound = (l_max > 0.0) ? 2.0 * l_max / 299792458.0 : std::numeric_limits<double>::infinity();
+        const double bound = (l_max > 0.0) ? 2.0 * l_max / qd_speed_of_light : std::numeric_limits<double>::infinity();
         for (arma::uword l = 0; l < n_link; ++l)
             (*abs_toa)(l) = (toa_mu > -30.0) ? std::min(std::pow(10.0, toa_mu + toa_sigma * rnd(l, 8)), bound) : 0.0;
     }

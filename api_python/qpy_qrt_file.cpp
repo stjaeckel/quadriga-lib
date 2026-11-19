@@ -3,9 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "qd_helpers_python_types.hpp"
-#include "qd_helpers_wrappers.hpp"
-
-
 
 /*!SECTION
 Channel functions
@@ -49,7 +46,6 @@ py::tuple qrt_file_parse(const py::handle &fn)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    // Declare outputs
     arma::uword n_cir, n_orig, n_dest, n_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
@@ -57,12 +53,10 @@ py::tuple qrt_file_parse(const py::handle &fn)
     arma::fvec center_freq;
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
-    // Call library function
     quadriga_lib::qrt_file_parse(fn_s, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset,
                                  &orig_names, &dest_names, &version, &center_freq,
                                  &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
-    // Copy to python
     auto cir_offset_py = qd_python_copy2numpy(&cir_offset);
     auto orig_names_py = qd_python_copy2list(orig_names);
     auto dest_names_py = qd_python_copy2list(dest_names);
@@ -72,7 +66,6 @@ py::tuple qrt_file_parse(const py::handle &fn)
     auto orig_pos_py = qd_python_copy2numpy(&orig_pos);
     auto orig_orientation_py = qd_python_copy2numpy(&orig_orientation);
 
-    // Return tuple
     return py::make_tuple(n_cir, n_orig, n_dest, n_freq, cir_offset_py, orig_names_py,
                           dest_names_py, version, center_freq_py, cir_pos_py, cir_orientation_py,
                           orig_pos_py, orig_orientation_py);

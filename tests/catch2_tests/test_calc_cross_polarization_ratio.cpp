@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Linear and circular XPR and the path gain of calc_cross_polarization_ratio: the LOS window, several CIRs with
+// mobile ends, complex entries, float, validation and aliasing. Oracles: hand-computed power sums of small real or
+// complex Jones matrices; the circular columns are also compared with get_channels_spherical driven by circular
+// patterns. Naming in the comments: M_<rx><tx>, rows 2-3 = M_hv (H rx, V tx), rows 4-5 = M_vh (V rx, H tx).
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
 #include "quadriga_tools.hpp"
@@ -18,7 +23,6 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     arma::mat rx(3, 1);
     rx.col(0) = arma::vec({10.0, 0.0, 0.0});
 
-    // Path powers
     arma::vec pw(3);
     pw(0) = 1.0; // LOS
     pw(1) = 0.5; // NLOS
@@ -33,11 +37,9 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     // M_vv=0.9, M_hv=0.1, M_vh=0.1, M_hh=0.8 (all real)
     M.col(1) = arma::vec({0.9, 0.0, 0.1, 0.0, 0.1, 0.0, 0.8, 0.0});
 
-    // NLOS path 2: more cross-pol
-    // NLOS path 2: M_vv=0.7, M_vh=0.2, M_hv=0.3, M_hh=0.6 (all real)
+    // NLOS path 2: more cross-pol, M_vv=0.7, M_hv=0.2, M_vh=0.3, M_hh=0.6 (all real)
     M.col(2) = arma::vec({0.7, 0.0, 0.2, 0.0, 0.3, 0.0, 0.6, 0.0});
 
-    // Path lengths: LOS = 10.0, NLOS = 12.0, 15.0
     arma::vec pl(3);
     pl(0) = 10.0;
     pl(1) = 12.0;
@@ -56,7 +58,7 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     REQUIRE(xpr.n_cols == 6);
     REQUIRE(pg.n_elem == 1);
 
-    // pg includes ALL paths (including LOS)
+    // pg = 0.5 · sum over all paths (including LOS) of power · sum |M|^2
     // LOS: 1.0 * (1 + 0 + 0 + 1) = 2.0
     // NLOS1: 0.5 * (0.81 + 0.01 + 0.01 + 0.64) = 0.5 * 1.47 = 0.735
     // NLOS2: 0.5 * (0.49 + 0.09 + 0.04 + 0.36) = 0.5 * 0.98 = 0.49
@@ -64,17 +66,17 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
 
     // XPR only from NLOS paths (LOS excluded by default)
     // P_vv = 0.5*0.81 + 0.5*0.49 = 0.405 + 0.245 = 0.65
-    // P_hv = 0.5*0.01 + 0.5*0.09 = 0.005 + 0.045 = 0.05
-    // P_vh = 0.5*0.01 + 0.5*0.04 = 0.005 + 0.02  = 0.025
+    // P_vh = 0.5*0.01 + 0.5*0.09 = 0.005 + 0.045 = 0.05
+    // P_hv = 0.5*0.01 + 0.5*0.04 = 0.005 + 0.02  = 0.025
     // P_hh = 0.5*0.64 + 0.5*0.36 = 0.32  + 0.18  = 0.50
 
-    // V-XPR = P_vv / P_hv = 0.65 / 0.05 = 13.0
+    // V-XPR = P_vv / P_vh = 0.65 / 0.05 = 13.0
     CHECK(std::abs(xpr(0, 1) - 13.0) < 1e-10);
 
-    // H-XPR = P_hh / P_vh = 0.50 / 0.025 = 20.0
+    // H-XPR = P_hh / P_hv = 0.50 / 0.025 = 20.0
     CHECK(std::abs(xpr(0, 2) - 20.0) < 1e-10);
 
-    // Aggregate linear = (P_vv + P_hh) / (P_hv + P_vh) = 1.15 / 0.075
+    // Aggregate linear = (P_vv + P_hh) / (P_vh + P_hv) = 1.15 / 0.075
     CHECK(std::abs(xpr(0, 0) - 1.15 / 0.075) < 1e-10);
 }
 
@@ -114,11 +116,11 @@ TEST_CASE("calc_cross_polarization_ratio - Include LOS")
                                                 (arma::Col<double> *)nullptr, true);
 
     // V-XPR without LOS: only NLOS path
-    // P_vv = 0.5*0.64, P_hv = 0.5*0.04 => XPR_V = 0.64/0.04 = 16
+    // P_vv = 0.5*0.64, P_vh = 0.5*0.04 => XPR_V = 0.64/0.04 = 16
     CHECK(std::abs(xpr_no_los(0, 1) - 16.0) < 1e-10);
 
     // V-XPR with LOS: includes LOS path which has zero cross-pol
-    // P_vv = 1.0*1.0 + 0.5*0.64 = 1.32, P_hv = 0.5*0.04 = 0.02
+    // P_vv = 1.0*1.0 + 0.5*0.64 = 1.32, P_vh = 0.5*0.04 = 0.02
     // XPR_V = 1.32 / 0.02 = 66.0
     CHECK(std::abs(xpr_with_los(0, 1) - 66.0) < 1e-10);
 }
@@ -209,7 +211,6 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
 
 TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
 {
-    // Test with complex-valued M entries
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
     arma::mat rx(3, 1);
@@ -218,7 +219,7 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
     arma::vec pw(1);
     pw(0) = 1.0;
 
-    // M_vv = 0.8+0.2j, M_vh = 0.05+0.05j, M_hv = 0.1-0.1j, M_hh = 0.7-0.3j
+    // M_vv = 0.8+0.2j, M_hv = 0.05+0.05j, M_vh = 0.1-0.1j, M_hh = 0.7-0.3j
     arma::mat M(8, 1);
     M.col(0) = arma::vec({0.8, 0.2, 0.05, 0.05, 0.1, -0.1, 0.7, -0.3});
 
@@ -233,15 +234,14 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
     arma::vec pg;
     quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr, &pg);
 
-    // Manual calculation
     double abs2_vv = 0.8 * 0.8 + 0.2 * 0.2;     // 0.68
-    double abs2_hv = 0.1 * 0.1 + 0.1 * 0.1;     // 0.02
-    double abs2_vh = 0.05 * 0.05 + 0.05 * 0.05; // 0.005
+    double abs2_vh = 0.1 * 0.1 + 0.1 * 0.1;     // 0.02
+    double abs2_hv = 0.05 * 0.05 + 0.05 * 0.05; // 0.005
     double abs2_hh = 0.7 * 0.7 + 0.3 * 0.3;     // 0.58
 
     CHECK(std::abs(pg(0) - 0.5 * (abs2_vv + abs2_hv + abs2_vh + abs2_hh)) < 1e-14);
-    CHECK(std::abs(xpr(0, 1) - abs2_vv / abs2_hv) < 1e-10);
-    CHECK(std::abs(xpr(0, 2) - abs2_hh / abs2_vh) < 1e-10);
+    CHECK(std::abs(xpr(0, 1) - abs2_vv / abs2_vh) < 1e-10);
+    CHECK(std::abs(xpr(0, 2) - abs2_hh / abs2_hv) < 1e-10);
     CHECK(std::abs(xpr(0, 0) - (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh)) < 1e-10);
 }
 
@@ -292,11 +292,11 @@ TEST_CASE("calc_cross_polarization_ratio - Multiple CIRs with mobile TX/RX")
     REQUIRE(pg.n_elem == 2);
 
     // CIR 0: V-XPR from NLOS only (path 1)
-    // P_vv = 0.5 * 0.64 = 0.32, P_hv = 0.5 * 0.04 = 0.02
+    // P_vv = 0.5 * 0.64 = 0.32, P_vh = 0.5 * 0.04 = 0.02
     CHECK(std::abs(xpr(0, 1) - 0.32 / 0.02) < 1e-10);
 
     // CIR 1: V-XPR from NLOS only (path 1)
-    // P_vv = 0.4 * 0.36 = 0.144, P_hv = 0.4 * 0.09 = 0.036
+    // P_vv = 0.4 * 0.36 = 0.144, P_vh = 0.4 * 0.09 = 0.036
     CHECK(std::abs(xpr(1, 1) - 0.144 / 0.036) < 1e-10);
 }
 
@@ -338,7 +338,6 @@ TEST_CASE("calc_cross_polarization_ratio - Window size effect")
                                                         (arma::Col<double> *)nullptr, false, 0.01);
 
     // Small window includes path 1, large window excludes it
-    // They should give different results
     CHECK(xpr_small(0, 1) != xpr_large(0, 1));
 
     // Large window: only path 2
@@ -482,7 +481,6 @@ TEST_CASE("calc_cross_polarization_ratio - Float precision")
 
 TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
 {
-    // Create a path with known circular polarization behavior
     // M = {{0.5, 0.5}, {0.5, 0.5}} (all real)
     // This distributes power equally in all polarization components
     arma::mat tx(3, 1);

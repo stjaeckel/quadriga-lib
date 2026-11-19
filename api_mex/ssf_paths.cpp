@@ -81,11 +81,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
-    if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rays' must be a 1x1 struct.");
 
-    // Read inputs
-    const auto rays = qd_mex_struct2gbsm_rays(prhs[0], 0, false, "rays");
+    const auto rays = qd_mex_struct2gbsm_rays(prhs[0], "rays");
     const arma::vec link_gain_dB = qd_mex_get_Col<double>(prhs[1], false, "link_gain_dB");
     const std::string mobility = (nrhs < 3) ? std::string("auto") : qd_mex_get_string(prhs[2], "auto", "mobility");
     const arma::vec tx_pos = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3], false, "tx_pos");
@@ -109,33 +106,23 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Empty outputs keep their size: matrices as returned (e.g. 'fbs_pos' [3, 0] in "phase"), vectors [0, 1], 'polmat'
     // [8, 0, n_freq]
-    auto mat = [](const arma::mat &x)
-    { return x.empty() ? mxCreateNumericMatrix(x.n_rows, x.n_cols, mxDOUBLE_CLASS, mxREAL) : qd_mex_copy2matlab(&x); };
-    auto col = [](const auto &x)
-    {
-        using T = typename std::decay_t<decltype(x)>::elem_type;
-        return x.empty() ? mxCreateNumericMatrix(0, 1, qd_mex_class_id<T>(), mxREAL) : qd_mex_copy2matlab(&x);
-    };
-    plhs[0] = mat(path_gain);
+    plhs[0] = qd_mex_copy2matlab_keep_shape(path_gain);
     if (nlhs > 1)
-        plhs[1] = col(path_length);
+        plhs[1] = qd_mex_copy2matlab_keep_shape(path_length);
     if (nlhs > 2)
-    {
-        const mwSize d[3] = {8, 0, (mwSize)polmat.n_slices};
-        plhs[2] = polmat.empty() ? mxCreateNumericArray(3, d, mxDOUBLE_CLASS, mxREAL) : qd_mex_copy2matlab(&polmat);
-    }
+        plhs[2] = qd_mex_copy2matlab_keep_shape(polmat);
     arma::vec *ang[4] = {&aod, &eod, &aoa, &eoa};
     for (int k = 3; k < 7 && k < nlhs; ++k)
-        plhs[k] = col(*ang[k - 3]);
+        plhs[k] = qd_mex_copy2matlab_keep_shape(*ang[k - 3]);
     if (nlhs > 7)
-        plhs[7] = mat(fbs_pos);
+        plhs[7] = qd_mex_copy2matlab_keep_shape(fbs_pos);
     if (nlhs > 8)
-        plhs[8] = mat(lbs_pos);
+        plhs[8] = qd_mex_copy2matlab_keep_shape(lbs_pos);
     if (nlhs > 9)
-        plhs[9] = col(path_type); // Codes, not shifted
+        plhs[9] = qd_mex_copy2matlab_keep_shape(path_type); // Codes, not shifted
     if (nlhs > 10)
     {
         ray_ind += 1; // 0-based (C++) -> 1-based (MATLAB)
-        plhs[10] = col(ray_ind);
+        plhs[10] = qd_mex_copy2matlab_keep_shape(ray_ind);
     }
 }

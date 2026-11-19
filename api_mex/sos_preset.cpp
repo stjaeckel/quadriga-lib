@@ -52,13 +52,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string name = qd_mex_get_string(prhs[0], "", "name");
     const double dist_decorr = (nrhs < 2) ? 10.0 : qd_mex_get_scalar<double>(prhs[1], "dist_decorr", 10.0);
 
@@ -70,13 +68,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&dist, 200);
 
-    // Wrap optional pointers
     arma::vec *p_acf = acf.empty() ? nullptr : &acf;
     arma::vec *p_dist = dist.empty() ? nullptr : &dist;
 
-    // Call library function
     CALL_QD(spatial_freq = quadriga_lib::sos_preset<double>(name, p_acf, p_dist, dist_decorr));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&spatial_freq);
 }

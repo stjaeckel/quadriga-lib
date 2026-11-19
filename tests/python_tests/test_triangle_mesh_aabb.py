@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.RTtools.triangle_mesh_aabb.
+
 import sys
 import os
 import unittest
@@ -141,7 +143,7 @@ class test_case(unittest.TestCase):
     def test_integration_with_segmentation(self):
         triangles_out, sub_idx, mesh_idx, mtl_prop_out = RTtools.triangle_mesh_segmentation(
             self.triangles.copy(),
-            target_size=2,   # target_size
+            target_size=2,
             vec_size=1
         )
         expected = aabb_numpy(triangles_out, sub_idx)

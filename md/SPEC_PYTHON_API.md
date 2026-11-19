@@ -9,6 +9,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
   - A new wrapper is NOT picked up automatically: it must be included and registered in the dispatcher of its submodule (see "pybind11 registration").
   - All wrappers of one submodule are compiled into a single translation unit. Names of wrapper functions and of `static` helper functions must therefore be unique within the submodule.
 - `src/qd_helpers_python.hpp` (numpy / list / dict conversions) and `src/qd_helpers_python_types.hpp` (arrayant / channel dicts, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
+- `src/qd_helpers_wrappers.hpp` — helpers shared with the MEX wrappers: `qd_arrayant_fill_defaults`, `qd_hdf5_select_slots`, the chunked QRT reader. The snapshot selection of the batch wrappers, `qd_snapshot_list`, is in `src/qd_helpers_shared.hpp`.
 - `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`); `api_mex/*.cpp` — MEX wrappers.
 - `tests/python_tests/test_<function_name>.py` — tests, one file per wrapper; pytest collects all `test_*.py` files in the folder, so a new test file needs no registration.
 - `lib/` — the compiled Python module (`quadriga_lib.cpython-*.so`) is installed here by the build; the tests import it from there.
@@ -289,7 +290,7 @@ py::object qd_python_any2numpy(const std::any &dset);
 - A key carries the name of its C++ member; exceptions: a `_re` / `_im` member pair is one complex key (`coeff`), and a member that is a `std::vector` over snapshots is a list or a stacked array (see above).
 - Reading: `qd_python_list2channel(handle, validate)` accepts a single dict or a list of dicts and always returns a `std::vector`; `qd_python_dict2channel(dict, validate)` reads one dict. All keys are optional; the list and stack layout is detected per key; `coeff_re` / `coeff_im` are accepted as an alternative to `coeff`.
 - Writing: `qd_python_channel2list(chan_vec, validate, stack)` or `qd_python_channel2dict(channel, snap, validate, stack)`; `snap` selects snapshots (0-based, empty = all). Only populated members become keys.
-- Unstructured data (`par_names` / `par_data`, a list of `std::any`) is NOT part of the channel dict. It is exchanged through a separate `par` dict, converted with `qd_python_anycast` / `qd_python_any2numpy`; see `qpy_hdf5_write_channel.cpp` and `qpy_hdf5_read_channel.cpp`.
+- Unstructured data (`par_names` / `par_data`, a list of `std::any`) is NOT part of the channel dict. It is exchanged through a separate `par` dict, converted with `qd_python_anycast` / `qd_python_any2numpy`; see `hdf5_write_channel` and `hdf5_read_channel` in `qpy_hdf5.cpp`.
 - In the documentation, refer to [[hdf5_read_channel]] for the layout instead of repeating the table.
 
 ## Exception handling

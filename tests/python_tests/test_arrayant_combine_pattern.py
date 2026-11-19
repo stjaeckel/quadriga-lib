@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.arrayant.combine_pattern.
+
 import sys
 import os
 import unittest
@@ -96,7 +98,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(out["coupling_im"], np.zeros((1, 1)), atol=1e-14, rtol=0)
         npt.assert_allclose(out["element_pos"][:, 0], [0.0, 0.0, 0.0], atol=1e-14, rtol=0)
 
-        # Regression: with no `freq` argument the input center_freq must be retained (not zeroed).
+        # With no `freq_new` argument the input center_freq is kept.
         self.assertEqual(float(out["center_freq"]), 2.0e9)
         self.assertEqual(out["name"], "bla")
 
@@ -160,14 +162,14 @@ class test_case(unittest.TestCase):
                 for k in (1, 2, 3)]
         mf = _stack_mf(ants)
 
-        # Scalar freq selects a single frequency -> single (3D) dict, scalar center_freq.
+        # Scalar freq_new selects a single frequency -> single (3D) dict, scalar center_freq.
         out = arrayant.combine_pattern(mf, freq_new=2e9)
         self.assertEqual(out["e_theta_re"].ndim, 3)
         self.assertEqual(np.ndim(out["center_freq"]), 0)
         npt.assert_allclose(out["e_theta_re"][:, :, 0], np.full((3, 4), 2.0), atol=1e-12, rtol=0)
         self.assertEqual(float(out["center_freq"]), 2e9)
 
-        # Vector freq interpolates -> 4D output (linear blend of the in-phase reals).
+        # Vector freq_new interpolates -> 4D output (linear blend of the in-phase reals).
         out = arrayant.combine_pattern(mf, freq_new=[1.5e9, 2.5e9])
         self.assertEqual(out["e_theta_re"].shape[3], 2)
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 0], np.full((3, 4), 1.5), atol=1e-10, rtol=0)
@@ -179,7 +181,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 0], np.full((3, 4), 1.0), atol=1e-12, rtol=0)
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 1], np.full((3, 4), 3.0), atol=1e-12, rtol=0)
 
-        # Single-freq input + vector freq -> 4D output, all clamped to that one entry.
+        # Single-freq input + vector freq_new -> 4D output, all clamped to that one entry.
         single = _ant_sf(n_elem=1, et_re=2.0, et_im=0.0, ep_re=0.0, ep_im=0.0, center_freq=2e9)
         out = arrayant.combine_pattern(single, freq_new=[1e9, 2e9, 3e9])
         self.assertEqual(out["e_theta_re"].shape[3], 3)
@@ -263,7 +265,7 @@ class test_case(unittest.TestCase):
             d_combined = arrayant.calc_directivity(_slice_freq(out, k), i_element=0)
             self.assertGreater(d_combined, d_single + 1.2)
 
-    # ---- freq input-conversion tests ----
+    # ---- freq_new input conversion ----
 
     def test_freq_input_conversion(self):
         ant = _ant_sf(n_elem=1, et_re=1.0, et_im=0.0, ep_re=0.0, ep_im=0.0, center_freq=2e9)
@@ -276,7 +278,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=np.array(2.5e9))["center_freq"]), 2.5e9)
         self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=np.float64(2.5e9))["center_freq"]), 2.5e9)
 
-        # freq <= 0 and freq=None mean "not given" -> the input center_freq is kept.
+        # freq_new <= 0 and freq_new=None mean "not given" -> the input center_freq is kept.
         for noop in (0, 0.0, None):
             self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=noop)["center_freq"]), 2e9)
 
@@ -292,7 +294,7 @@ class test_case(unittest.TestCase):
     def test_freq_input_invalid(self):
         ant = _ant_sf(n_elem=1, et_re=1.0, et_im=0.0, ep_re=0.0, ep_im=0.0, center_freq=2e9)
 
-        # Non-numeric `freq` values must raise a clear error, not crash or pass silently.
+        # Non-numeric `freq_new` values must raise a clear error, not crash or pass silently.
         for bad_freq in ("not_a_number",
                          ["a", "b"],
                          np.array(["p", "q"]),

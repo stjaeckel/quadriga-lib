@@ -18,9 +18,7 @@
 #include <regex>
 #include <set>
 
-// ============================================================================================================
-// The rig's self-checks: inline constructions against independent references
-// ============================================================================================================
+// ---- The rig's self-checks: inline constructions against independent references ----
 
 namespace mt_rows // inline rows: page 11.4 (fitted at 343 m/s), page 11.3, the leaf fixtures of test_acoustic_leaf.cpp
 {
@@ -321,9 +319,7 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
     }
 }
 
-// ============================================================================================================
-// The table and its materials
-// ============================================================================================================
+// ---- The table and its materials ----
 
 TEST_CASE("Materials table - every row has a material case and every column a valid value", "[acoustic][materials]")
 {

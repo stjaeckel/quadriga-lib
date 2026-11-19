@@ -8,13 +8,15 @@
 #include "mex.h"
 #include <string>
 #include <armadillo>
-#include <utility> // for std::move
-#include <cstring> // For std::memcopy
+#include <utility>
+#include <cstring>
 #include <any>
-#include <string>
 #include <type_traits>
 #include <array>
 #include <limits>
+#include <cmath>
+#include <unordered_map>
+#include <vector>
 
 // Raises a C++ error message in MATLAB / Octave. A C++ message names an entry of a vector input only by the prefix
 // "Entry <i>: " or "Snapshot <i>: " with a 0-based <i>; every such prefix is rewritten to <i> + 1, so that MATLAB
@@ -50,7 +52,7 @@ inline void qd_mex_cpp_error(std::string msg)
         }                                \
     } while (0)
 
-// Helper: check if MATLAB array type matches the requested C++ dtype
+// Check if MATLAB array type matches the requested C++ dtype
 template <typename dtype>
 inline bool qd_mex_type_matches(const mxArray *input)
 {
@@ -70,7 +72,7 @@ inline bool qd_mex_type_matches(const mxArray *input)
         return false;
 }
 
-// Helper: Map C++ type to MATLAB class ID
+// Map C++ type to MATLAB class ID
 template <typename dtype>
 inline mxClassID qd_mex_class_id()
 {
@@ -87,10 +89,10 @@ inline mxClassID qd_mex_class_id()
     else if constexpr (std::is_same_v<dtype, unsigned long long>)
         return mxUINT64_CLASS;
     else
-        static_assert(!std::is_same_v<dtype, dtype>, "Unsupported dtype for qd_mex_init_output");
+        static_assert(!std::is_same_v<dtype, dtype>, "qd_mex_class_id: unsupported dtype");
 }
 
-// Helper: true if the value v (MATLAB type stype) can be converted to dtype without loss. For integer targets
+// True if the value v (MATLAB type stype) can be converted to dtype without loss. For integer targets
 // (except bool) this rejects NaN, Inf, fractional values and values outside the range of dtype; integer sources
 // are checked against the range only. Floating-point and bool targets accept every value.
 template <typename dtype, typename stype>
@@ -115,7 +117,7 @@ inline bool qd_mex_fits(stype v)
         return (unsigned long long)v <= (unsigned long long)std::numeric_limits<dtype>::max();
 }
 
-// Helper: convert one value to dtype; sets "bad" if it does not fit (see qd_mex_fits) and returns 0 in that case
+// Convert one value to dtype; sets "bad" if it does not fit (see qd_mex_fits) and returns 0 in that case
 template <typename dtype, typename stype>
 inline dtype qd_mex_cast(stype v, bool &bad)
 {
@@ -124,7 +126,7 @@ inline dtype qd_mex_cast(stype v, bool &bad)
     return ok ? (dtype)v : dtype(0);
 }
 
-// Helper: calls f with a typed pointer to the data of a real numeric or logical array (all integer classes, single,
+// Calls f with a typed pointer to the data of a real numeric or logical array (all integer classes, single,
 // double, logical); any other class raises "Input 'x' has an unsupported data type." (var_name empty: "Unsupported data
 // type."). The class is checked before the data pointer is read: Octave raises an internal error for mxGetData of
 // classes without numeric data (e.g. function handles).
@@ -164,7 +166,7 @@ inline void qd_mex_visit_data(const mxArray *input, const std::string &var_name,
     mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
 }
 
-// Helper: error for integer input that does not fit dtype
+// Error for integer input that does not fit dtype
 // - Types up to 32 bit state the range, e.g. "Input 'x' must be an integer from 0 to 4294967295."
 // - 64-bit types state only the sign, e.g. "Input 'x' must be a non-negative integer."; their limits lie far
 //   beyond any value an input can sensibly have
@@ -189,7 +191,7 @@ inline void qd_mex_integer_error(const std::string &var_name, bool scalar, bool 
     mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
 }
 
-// Helper: reject complex and sparse input, and input with more than max_dims dimensions
+// Reject complex and sparse input, and input with more than max_dims dimensions
 // (mxGetData of a sparse array holds only the non-zero values, so it cannot be read as a dense array)
 inline void qd_mex_check_input(const mxArray *input, const std::string &var_name = "", size_t max_dims = 4)
 {
@@ -211,7 +213,7 @@ inline void qd_mex_check_input(const mxArray *input, const std::string &var_name
     }
 }
 
-// Helper: Read up to 4 dimensions from a MATLAB array. Missing dims default to 1.
+// Read up to 4 dimensions from a MATLAB array. Missing dims default to 1.
 // Returns {d1, d2, d3, d4, n_data}. Rejects complex and sparse input and input with more than 4 dimensions.
 inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input, const std::string &var_name = "")
 {
@@ -225,13 +227,12 @@ inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input, const std::st
     return {d1, d2, d3, d4, d1 * d2 * d3 * d4};
 }
 
-// Helper for qd_mex_get_scalar: reads the one element and casts it to <dtype>; sets "bad" when the value
+// Used by qd_mex_get_scalar: reads the one element and casts it to <dtype>; sets "bad" when the value
 // does not fit an integer type (see qd_mex_fits); returns default_value for empty input; more than one element
 // raises "Input 'x' must be a scalar."
 template <typename dtype>
 inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_name, dtype default_value, bool &bad)
 {
-    // Set default value in case of empty input
     if (mxGetNumberOfElements(input) == 0)
         return default_value;
 
@@ -248,7 +249,7 @@ inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_nam
     return value;
 }
 
-// Read a scalar input from MATLAB and convert it to a desired c++ output type
+// Read a scalar input
 // - Casts to <dtype>; returns default_value for empty input; more than one element is an error
 // - Integer types (except bool) need an integer value in their range: NaN, Inf, fractional, negative (unsigned) or
 //   too large values raise an error
@@ -270,6 +271,20 @@ inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = "")
 {
     static_assert(std::is_floating_point_v<dtype>, "qd_mex_get_scalar: integer and bool types need a default value.");
     return qd_mex_get_scalar<dtype>(input, var_name, dtype(NAN));
+}
+
+// Reads a count argument (number of coefficients, generators, ...) as double, so that a negative, non-finite or
+// non-integer value is rejected with the name of the argument ("Input 'x' must be an integer >= 1.") instead of
+// wrapping around in the conversion to an unsigned type; returns default_value for empty input
+inline arma::uword qd_mex_get_count(const mxArray *input, const char *var_name, double default_value)
+{
+    const double v = qd_mex_get_scalar<double>(input, var_name, default_value);
+    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
+    {
+        const std::string msg = std::string("Input '") + var_name + "' must be an integer >= 1.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
+    return (arma::uword)v;
 }
 
 // Read the seed of a random number generator: -1 (random) or 0 ... 2^63-1
@@ -350,42 +365,42 @@ inline std::string qd_mex_get_string_or_empty(const mxArray *input, std::string 
 
 // Reinterpret MATLAB Array to Armadillo Column Vector
 template <typename dtype>
-inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create_copy = false, const std::string &var_name = "")
+inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, const std::string &var_name = "")
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
         return arma::Col<dtype>();
 
-    return arma::Col<dtype>((dtype *)mxGetData(input), n_data, create_copy, !create_copy);
+    return arma::Col<dtype>((dtype *)mxGetData(input), n_data, false, true);
 }
 
 // Reinterpret MATLAB Array to Armadillo Matrix
 template <typename dtype>
-inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create_copy = false, const std::string &var_name = "")
+inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, const std::string &var_name = "")
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
         return arma::Mat<dtype>(d1, d2 * d3 * d4);
 
-    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2 * d3 * d4, create_copy, !create_copy);
+    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2 * d3 * d4, false, true);
 }
 
 // Reinterpret MATLAB Array to Armadillo Cube
 template <typename dtype>
-inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool create_copy = false, const std::string &var_name = "")
+inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, const std::string &var_name = "")
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
         return arma::Cube<dtype>(d1, d2, d3 * d4);
 
-    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
+    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, false, true);
 }
 
 template <typename dtype>
-inline std::vector<arma::Cube<dtype>> qd_mex_reinterpret_CubeVec(const mxArray *input, bool create_copy = false, const std::string &var_name = "")
+inline std::vector<arma::Cube<dtype>> qd_mex_reinterpret_CubeVec(const mxArray *input, const std::string &var_name = "")
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
     if (n_data == 0)
@@ -396,121 +411,64 @@ inline std::vector<arma::Cube<dtype>> qd_mex_reinterpret_CubeVec(const mxArray *
     std::vector<arma::Cube<dtype>> output;
     output.reserve(d4); // prevent later reallocation of aliasing cubes
     for (size_t i = 0; i < d4; ++i)
-        output.emplace_back(data + i * stride, d1, d2, d3, create_copy, !create_copy);
+        output.emplace_back(data + i * stride, d1, d2, d3, false, true);
 
     return output;
 }
 
 // Converts input to <std::any>
-// - Contained types: scalar native c++, arma::Col, arma::Row, arma::Mat, arma::Cube
+// - Contained types: scalar native c++, arma::Col, arma::Mat (also for a row vector), arma::Cube
 // - Inputs with more than 3 dimensions are rejected (a cube is the largest type)
 // - Empty inputs read to empty outputs
-// - Input datatypes are maintained
+// - Input datatypes are maintained (double, single, int32, uint32, int64, uint64)
 // - Does not copy data
 // - See also: quadriga_lib::any_type_id
-inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", bool create_copy = false)
+inline std::any qd_mex_anycast(const mxArray *input, const std::string &var_name = "")
 {
     qd_mex_check_input(input, var_name, 3); // Rejects complex and sparse input, and more than 3 dimensions
 
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d34 = n_dim < 3 ? 1 : (size_t)dims[2];          // Number of elements on third dimension
-    size_t n_data = d1 * d2 * d34;
+    const size_t n_dim = (size_t)mxGetNumberOfDimensions(input);
+    const mwSize *dims = mxGetDimensions(input);
+    const size_t d1 = (size_t)dims[0], d2 = (size_t)dims[1], d3 = n_dim < 3 ? 1 : (size_t)dims[2];
+    const size_t n_data = d1 * d2 * d3;
 
-    if (n_data == 0) // Return empty
+    if (n_data == 0)
         return std::any();
 
-    // Generate pointers for the 6 supported MATLAB data types
-    if (mxIsDouble(input))
+    auto wrap = [&](auto *ptr) -> std::any
     {
-        if (d1 == 1 && d2 == 1 && d34 == 1)
-            return *(double *)mxGetData(input);
-        else if (d1 != 1 && d2 == 1 && d34 == 1)
-            return arma::Col<double>((double *)mxGetData(input), n_data, create_copy, !create_copy);
-        else if (d1 == 1 && d2 != 1 && d34 == 1)
-            return arma::Mat<double>((double *)mxGetData(input), 1, n_data, create_copy, !create_copy);
-        else if (d34 != 1)
-            return arma::Cube<double>((double *)mxGetData(input), d1, d2, d34, create_copy, !create_copy);
-        else
-            return arma::Mat<double>((double *)mxGetData(input), d1, d2 * d34, create_copy, !create_copy);
-    }
-    if (mxIsSingle(input))
+        using dtype = std::remove_pointer_t<decltype(ptr)>;
+        if (n_data == 1)
+            return *ptr;
+        if (d2 == 1 && d3 == 1)
+            return arma::Col<dtype>(ptr, n_data, false, true);
+        if (d1 == 1 && d3 == 1)
+            return arma::Mat<dtype>(ptr, 1, n_data, false, true);
+        if (d3 != 1)
+            return arma::Cube<dtype>(ptr, d1, d2, d3, false, true);
+        return arma::Mat<dtype>(ptr, d1, d2, false, true);
+    };
+
+    switch (mxGetClassID(input)) // mxGetData only for numeric classes (Octave raises an error for others)
     {
-        if (d1 == 1 && d2 == 1 && d34 == 1)
-            return *(float *)mxGetData(input);
-        else if (d1 != 1 && d2 == 1 && d34 == 1)
-            return arma::Col<float>((float *)mxGetData(input), n_data, create_copy, !create_copy);
-        else if (d1 == 1 && d2 != 1 && d34 == 1)
-            return arma::Mat<float>((float *)mxGetData(input), 1, n_data, create_copy, !create_copy);
-        else if (d34 != 1)
-            return arma::Cube<float>((float *)mxGetData(input), d1, d2, d34, create_copy, !create_copy);
-        else
-            return arma::Mat<float>((float *)mxGetData(input), d1, d2 * d34, create_copy, !create_copy);
-    }
-    if (mxIsClass(input, "uint32"))
-    {
-        if (d1 == 1 && d2 == 1 && d34 == 1)
-            return *(unsigned *)mxGetData(input);
-        else if (d1 != 1 && d2 == 1 && d34 == 1)
-            return arma::Col<unsigned>((unsigned *)mxGetData(input), n_data, create_copy, !create_copy);
-        else if (d1 == 1 && d2 != 1 && d34 == 1)
-            return arma::Mat<unsigned>((unsigned *)mxGetData(input), 1, n_data, create_copy, !create_copy);
-        else if (d34 != 1)
-            return arma::Cube<unsigned>((unsigned *)mxGetData(input), d1, d2, d34, create_copy, !create_copy);
-        else
-            return arma::Mat<unsigned>((unsigned *)mxGetData(input), d1, d2 * d34, create_copy, !create_copy);
-    }
-    if (mxIsClass(input, "int32"))
-    {
-        if (d1 == 1 && d2 == 1 && d34 == 1)
-            return *(int *)mxGetData(input);
-        else if (d1 != 1 && d2 == 1 && d34 == 1)
-            return arma::Col<int>((int *)mxGetData(input), n_data, create_copy, !create_copy);
-        else if (d1 == 1 && d2 != 1 && d34 == 1)
-            return arma::Mat<int>((int *)mxGetData(input), 1, n_data, create_copy, !create_copy);
-        else if (d34 != 1)
-            return arma::Cube<int>((int *)mxGetData(input), d1, d2, d34, create_copy, !create_copy);
-        else
-            return arma::Mat<int>((int *)mxGetData(input), d1, d2 * d34, create_copy, !create_copy);
-    }
-    if (mxIsClass(input, "uint64"))
-    {
-        if (d1 == 1 && d2 == 1 && d34 == 1)
-            return *(unsigned long long *)mxGetData(input);
-        else if (d1 != 1 && d2 == 1 && d34 == 1)
-            return arma::Col<unsigned long long>((unsigned long long *)mxGetData(input), n_data, create_copy, !create_copy);
-        else if (d1 == 1 && d2 != 1 && d34 == 1)
-            return arma::Mat<unsigned long long>((unsigned long long *)mxGetData(input), 1, n_data, create_copy, !create_copy);
-        else if (d34 != 1)
-            return arma::Cube<unsigned long long>((unsigned long long *)mxGetData(input), d1, d2, d34, create_copy, !create_copy);
-        else
-            return arma::Mat<unsigned long long>((unsigned long long *)mxGetData(input), d1, d2 * d34, create_copy, !create_copy);
-    }
-    if (mxIsClass(input, "int64"))
-    {
-        if (d1 == 1 && d2 == 1 && d34 == 1)
-            return *(long long *)mxGetData(input);
-        else if (d1 != 1 && d2 == 1 && d34 == 1)
-            return arma::Col<long long>((long long *)mxGetData(input), n_data, create_copy, !create_copy);
-        else if (d1 == 1 && d2 != 1 && d34 == 1)
-            return arma::Mat<long long>((long long *)mxGetData(input), 1, n_data, create_copy, !create_copy);
-        else if (d34 != 1)
-            return arma::Cube<long long>((long long *)mxGetData(input), d1, d2, d34, create_copy, !create_copy);
-        else
-            return arma::Mat<long long>((long long *)mxGetData(input), d1, d2 * d34, create_copy, !create_copy);
+    case mxDOUBLE_CLASS:
+        return wrap((double *)mxGetData(input));
+    case mxSINGLE_CLASS:
+        return wrap((float *)mxGetData(input));
+    case mxUINT32_CLASS:
+        return wrap((unsigned *)mxGetData(input));
+    case mxINT32_CLASS:
+        return wrap((int *)mxGetData(input));
+    case mxUINT64_CLASS:
+        return wrap((unsigned long long *)mxGetData(input));
+    case mxINT64_CLASS:
+        return wrap((long long *)mxGetData(input));
+    default:
+        break;
     }
 
-    // Throw error if type is not supported
-    if (var_name.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
-    else
-    {
-        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_message.c_str());
-    }
-
+    const std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
+    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     return std::any();
 }
 
@@ -576,8 +534,9 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
 template <typename dtype>
 inline std::vector<arma::Cube<dtype>> qd_mex_typecast_CubeVec(const mxArray *input, std::string var_name = "")
 {
-    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
-    if (n_data == 0)
+    const std::array<size_t, 5> dims = qd_mex_get_dims(input, var_name); // Not structured bindings: C++17 lambdas cannot capture those
+    const size_t d1 = dims[0], d2 = dims[1], d3 = dims[2], d4 = dims[3];
+    if (dims[4] == 0)
         return {};
 
     std::vector<arma::Cube<dtype>> output;
@@ -612,7 +571,7 @@ template <typename dtype>
 inline arma::Col<dtype> qd_mex_get_Col(const mxArray *input, bool copy = false, const std::string &var_name = "")
 {
     return (qd_mex_type_matches<dtype>(input) && !copy)
-               ? qd_mex_reinterpret_Col<dtype>(input, false, var_name)
+               ? qd_mex_reinterpret_Col<dtype>(input, var_name)
                : qd_mex_typecast_Col<dtype>(input, var_name);
 }
 
@@ -620,7 +579,7 @@ template <typename dtype>
 inline arma::Mat<dtype> qd_mex_get_Mat(const mxArray *input, bool copy = false, const std::string &var_name = "")
 {
     return (qd_mex_type_matches<dtype>(input) && !copy)
-               ? qd_mex_reinterpret_Mat<dtype>(input, false, var_name)
+               ? qd_mex_reinterpret_Mat<dtype>(input, var_name)
                : qd_mex_typecast_Mat<dtype>(input, var_name);
 }
 
@@ -628,7 +587,7 @@ template <typename dtype>
 inline arma::Cube<dtype> qd_mex_get_Cube(const mxArray *input, bool copy = false, const std::string &var_name = "")
 {
     return (qd_mex_type_matches<dtype>(input) && !copy)
-               ? qd_mex_reinterpret_Cube<dtype>(input, false, var_name)
+               ? qd_mex_reinterpret_Cube<dtype>(input, var_name)
                : qd_mex_typecast_Cube<dtype>(input, var_name);
 }
 
@@ -636,7 +595,7 @@ template <typename dtype>
 inline std::vector<arma::Cube<dtype>> qd_mex_get_CubeVec(const mxArray *input, bool copy = false, const std::string &var_name = "")
 {
     return (qd_mex_type_matches<dtype>(input) && !copy)
-               ? qd_mex_reinterpret_CubeVec<dtype>(input, false, var_name)
+               ? qd_mex_reinterpret_CubeVec<dtype>(input, var_name)
                : qd_mex_typecast_CubeVec<dtype>(input, var_name);
 }
 
@@ -648,7 +607,7 @@ template <typename dtype = arma::uword>
 inline arma::Col<dtype> qd_mex_get_index_Col(const mxArray *input, const std::string &var_name)
 {
     static_assert(std::is_integral_v<dtype> && std::is_unsigned_v<dtype>, "qd_mex_get_index_Col: unsigned integer types only.");
-    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
+    const size_t n_data = qd_mex_get_dims(input, var_name)[4]; // Not a structured binding: C++17 lambdas cannot capture those
     if (n_data == 0)
         return arma::Col<dtype>();
 
@@ -715,22 +674,7 @@ inline std::vector<std::string> qd_mex_get_strings(const mxArray *input, const s
 template <typename dtype>
 inline mxArray *qd_mex_copy2matlab(const dtype *input) // Scalar
 {
-    // Get classID from dtype
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     mxArray *output = mxCreateNumericMatrix(1, 1, classID, mxREAL);
     std::memcpy((dtype *)mxGetData(output), input, sizeof(dtype));
@@ -740,21 +684,7 @@ inline mxArray *qd_mex_copy2matlab(const dtype *input) // Scalar
 template <typename dtype>
 inline mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input) // Row Vector
 {
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     mxArray *output = mxCreateNumericMatrix(1, (mwSize)input->n_elem, classID, mxREAL);
     std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
@@ -763,125 +693,61 @@ inline mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input) // Row Vector
 
 template <typename dtype>
 inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input, // Column Vector
-                                   bool transpose = false,        // Transpose output
-                                   size_t ns = 0,                 // Number of elements in output
-                                   const size_t *is = nullptr)    // List of elements to copy, 0-based
+                                   bool transpose = false)        // Transpose output
 {
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    ns = ns == 0 ? input->n_elem : ns;
-    mxArray *output = transpose ? mxCreateNumericMatrix(1, (mwSize)ns, classID, mxREAL)
-                                : mxCreateNumericMatrix((mwSize)ns, 1, classID, mxREAL);
-    dtype *ptr_o = (dtype *)mxGetData(output);
-    const dtype *ptr_i = input->memptr();
-
-    if (is == nullptr) // Copy all that fit, further output elements stay zero
-        std::memcpy(ptr_o, ptr_i, sizeof(dtype) * (ns < input->n_elem ? ns : input->n_elem));
-    else // Copy selected
-        for (size_t i = 0ULL; i < ns; ++i)
-            ptr_o[i] = is[i] >= input->n_elem ? *ptr_i : ptr_i[is[i]];
-
+    const mwSize n = (mwSize)input->n_elem;
+    mxArray *output = transpose ? mxCreateNumericMatrix(1, n, classID, mxREAL) : mxCreateNumericMatrix(n, 1, classID, mxREAL);
+    std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input, // Matrix
-                                   size_t ns = 0,                 // Number of columns in output
-                                   const size_t *is = nullptr)    // List of columns to copy, 0-based
+inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input) // Matrix
 {
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    size_t m = input->n_rows;          // Rows
-    ns = ns == 0 ? input->n_cols : ns; // Output columns
-    mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, mxREAL);
-    dtype *ptr = (dtype *)mxGetData(output);
-
-    if (is == nullptr) // Copy all columns that fit, further output columns stay zero
-        std::memcpy(ptr, input->memptr(), sizeof(dtype) * m * (ns < input->n_cols ? ns : input->n_cols));
-    else // Copy selected
-        for (size_t i = 0ULL; i < ns; ++i)
-        {
-            size_t k = is[i] >= input->n_cols ? 0ULL : is[i];
-            std::memcpy(&ptr[i * m], input->colptr(k), sizeof(dtype) * m);
-        }
-
+    mxArray *output = mxCreateNumericMatrix((mwSize)input->n_rows, (mwSize)input->n_cols, classID, mxREAL);
+    std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input, // Cube
-                                   size_t ns = 0,                  // Number of columns in output
-                                   const size_t *is = nullptr)     // List of columns to copy, 0-based
+inline mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input) // Cube
 {
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    size_t m = input->n_rows * input->n_cols; // Rows and columns
-    ns = ns == 0 ? input->n_slices : ns;      // Slices
-    mwSize dims[3] = {(mwSize)input->n_rows, (mwSize)input->n_cols, (mwSize)ns};
+    mwSize dims[3] = {(mwSize)input->n_rows, (mwSize)input->n_cols, (mwSize)input->n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
-    dtype *ptr = (dtype *)mxGetData(output);
-
-    if (is == nullptr) // Copy all slices that fit, further output slices stay zero
-        std::memcpy(ptr, input->memptr(), sizeof(dtype) * m * (ns < input->n_slices ? ns : input->n_slices));
-    else // Copy selected
-        for (size_t i = 0ULL; i < ns; ++i)
-        {
-            size_t k = is[i] >= input->n_slices ? 0ULL : is[i];
-            std::memcpy(&ptr[i * m], input->slice_memptr(k), sizeof(dtype) * m);
-        }
-
+    std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
+}
+
+// Copies an arma::Col, Mat or Cube like qd_mex_copy2matlab, but an empty input keeps its dimensions (e.g. a Col
+// [0, 1], a Mat [3, 0], a Cube [n_rx, n_tx, 0]) instead of becoming 0x0; for outputs whose shape is documented
+template <typename T>
+inline mxArray *qd_mex_copy2matlab_keep_shape(const T &x)
+{
+    using dtype = typename T::elem_type;
+    if (!x.is_empty())
+        return qd_mex_copy2matlab(&x);
+    if constexpr (std::is_same_v<T, arma::Cube<dtype>>)
+    {
+        mwSize dims[3] = {(mwSize)x.n_rows, (mwSize)x.n_cols, (mwSize)x.n_slices};
+        return mxCreateNumericArray(3, dims, qd_mex_class_id<dtype>(), mxREAL);
+    }
+    else
+        return mxCreateNumericMatrix((mwSize)x.n_rows, (mwSize)x.n_cols, qd_mex_class_id<dtype>(), mxREAL);
 }
 
 inline mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings)
@@ -915,206 +781,88 @@ inline mxArray *qd_mex_copy2matlab(const std::vector<bool> *bools)
     return out;
 }
 
-// Creates an mxArray based on a vector of armadillo input types
-// - adds one additional dimension, e.g. arma::Cube --> MATLAB 4D
-// - optional input: reading order of vector elements
-// - copies data
-// - zero-padding of missing data
-// - returns empty Matrix object is vector is empty
+// Copies a vector of Armadillo objects to an mxArray with one more dimension (e.g. arma::Cube -> MATLAB 4D); entries
+// smaller than the largest one are zero-padded; an empty vector gives a 0x0 matrix
 template <typename dtype>
-inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
-                                     size_t ns = 0,
-                                     const size_t *is = nullptr, dtype padding = (dtype)0)
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input)
 {
-    // Get classID from dtype
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    bool use_padding = padding != (dtype)0;
-
-    // Get maximum input data dimensions
     size_t m = 0ULL;
     for (auto &v : *input)
         m = v.n_rows > m ? v.n_rows : m;
-    ns = ns == 0ULL ? input->size() : ns;
+    const size_t ns = input->size();
 
     mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
-
-    // Copy data; without "is", snapshots after the last input element stay zero (or "padding")
     for (size_t i = 0ULL; i < ns; ++i)
-    {
-        if (is == nullptr && i >= input->size())
-        {
-            if (use_padding)
-                for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
-                    *p = padding;
-            continue;
-        }
-        size_t k = (is == nullptr) ? i : (is[i] >= input->size() ? 0ULL : is[i]);
-        size_t r = input->at(k).n_rows;
-
-        if (use_padding && r != m)
-            for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
-                *p = padding;
-
-        std::memcpy(&ptr[i * m], input->at(k).memptr(), sizeof(dtype) * r);
-    }
+        std::memcpy(&ptr[i * m], input->at(i).memptr(), sizeof(dtype) * input->at(i).n_rows);
 
     return output;
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
-                                     size_t ns = 0,
-                                     const size_t *is = nullptr,
-                                     dtype padding = (dtype)0)
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input)
 {
-    // Get classID from dtype
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    bool use_padding = padding != (dtype)0;
-
-    // Get maximum input data dimensions
     size_t n_rows = 0ULL, n_cols = 0ULL;
     for (auto &v : *input)
         n_rows = v.n_rows > n_rows ? v.n_rows : n_rows,
         n_cols = v.n_cols > n_cols ? v.n_cols : n_cols;
-
-    size_t m = n_rows * n_cols;
-    ns = ns == 0ULL ? input->size() : ns;
+    const size_t m = n_rows * n_cols, ns = input->size();
 
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)ns};
     mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    // Copy data; without "is", snapshots after the last input element stay zero (or "padding")
     for (size_t i = 0ULL; i < ns; ++i)
     {
-        if (is == nullptr && i >= input->size())
-        {
-            if (use_padding)
-                for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
-                    *p = padding;
-            continue;
-        }
-        size_t k = (is == nullptr) ? i : (is[i] >= input->size() ? 0ULL : is[i]);
-        size_t r = input->at(k).n_rows, c = input->at(k).n_cols;
-
-        if (use_padding && r * c != m)
-            for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
-                *p = padding;
-
-        if (r == n_rows)
-            std::memcpy(&ptr[i * m], input->at(k).memptr(), sizeof(dtype) * r * c);
+        const arma::Mat<dtype> &v = input->at(i);
+        if (v.n_rows == n_rows)
+            std::memcpy(&ptr[i * m], v.memptr(), sizeof(dtype) * v.n_elem);
         else // Copy column by column
-            for (size_t ic = 0ULL; ic < c; ++ic)
-                std::memcpy(&ptr[i * m + ic * n_rows],
-                            input->at(k).colptr(ic), sizeof(dtype) * r);
+            for (size_t ic = 0ULL; ic < v.n_cols; ++ic)
+                std::memcpy(&ptr[i * m + ic * n_rows], v.colptr(ic), sizeof(dtype) * v.n_rows);
     }
 
     return output;
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input,
-                                     size_t ns = 0,
-                                     const size_t *is = nullptr,
-                                     dtype padding = (dtype)0)
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input)
 {
-    // Get classID from dtype
-    mxClassID classID;
-    if (typeid(dtype).name() == typeid(float).name())
-        classID = mxSINGLE_CLASS;
-    else if (typeid(dtype).name() == typeid(double).name())
-        classID = mxDOUBLE_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned).name())
-        classID = mxUINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(int).name())
-        classID = mxINT32_CLASS;
-    else if (typeid(dtype).name() == typeid(unsigned long long).name())
-        classID = mxUINT64_CLASS;
-    else if (typeid(dtype).name() == typeid(long long).name())
-        classID = mxINT64_CLASS;
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported datatype.");
+    const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    bool use_padding = padding != (dtype)0;
-
-    // Get maximum input data dimensions
     size_t n_rows = 0ULL, n_cols = 0ULL, n_slices = 0ULL;
     for (auto &v : *input)
         n_rows = v.n_rows > n_rows ? v.n_rows : n_rows,
         n_cols = v.n_cols > n_cols ? v.n_cols : n_cols,
         n_slices = v.n_slices > n_slices ? v.n_slices : n_slices;
-
-    size_t m = n_rows * n_cols * n_slices;
-    ns = ns == 0ULL ? input->size() : ns;
+    const size_t m = n_rows * n_cols * n_slices, ns = input->size();
 
     mwSize dims[4] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices, (mwSize)ns};
     mxArray *output = mxCreateNumericArray(4, dims, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
-    // Copy data; without "is", snapshots after the last input element stay zero (or "padding")
     for (size_t i = 0ULL; i < ns; ++i)
     {
-        if (is == nullptr && i >= input->size())
-        {
-            if (use_padding)
-                for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
-                    *p = padding;
-            continue;
-        }
-        size_t k = (is == nullptr) ? i : (is[i] >= input->size() ? 0ULL : is[i]);
-        size_t r = input->at(k).n_rows, c = input->at(k).n_cols, s = input->at(k).n_slices;
-
-        if (use_padding && r * c * s != m)
-            for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
-                *p = padding;
-
-        if (r == n_rows && c == n_cols)
-            std::memcpy(&ptr[i * m], input->at(k).memptr(), sizeof(dtype) * r * c * s);
+        const arma::Cube<dtype> &v = input->at(i);
+        if (v.n_rows == n_rows && v.n_cols == n_cols)
+            std::memcpy(&ptr[i * m], v.memptr(), sizeof(dtype) * v.n_elem);
         else // Copy column by column
-            for (size_t is = 0ULL; is < s; ++is)
-                for (size_t ic = 0ULL; ic < c; ++ic)
-                    std::memcpy(&ptr[i * m + is * n_rows * n_cols + ic * n_rows],
-                                input->at(k).slice_colptr(is, ic), sizeof(dtype) * r);
+            for (size_t is = 0ULL; is < v.n_slices; ++is)
+                for (size_t ic = 0ULL; ic < v.n_cols; ++ic)
+                    std::memcpy(&ptr[i * m + is * n_rows * n_cols + ic * n_rows], v.slice_colptr(is, ic), sizeof(dtype) * v.n_rows);
     }
 
     return output;
@@ -1129,7 +877,7 @@ std::vector<obj> qd_mex_matlab2vector(const mxArray *input, size_t vec_dim, cons
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
     std::vector<obj> output;
-    if (n_data == 0) // Return empty std::vector
+    if (n_data == 0)
         return output;
     if (vec_dim > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
@@ -1192,7 +940,7 @@ inline std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const s
     qd_mex_check_input(input, var_name, (size_t)-1);
     const size_t n_data = (size_t)mxGetNumberOfElements(input);
     std::vector<bool> output;
-    if (n_data == 0) // Return empty
+    if (n_data == 0)
         return output;
     output.reserve(n_data);
     qd_mex_visit_data(input, var_name, [&](auto *src)
@@ -1202,7 +950,7 @@ inline std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const s
     return output;
 }
 
-// Creates an mxArray based on the armadillo type, Initializes mxArray and reinterprets armadillo object
+// Allocates a zero-initialized MATLAB output and maps the Armadillo object onto its memory
 template <typename dtype>
 inline mxArray *qd_mex_init_output(arma::Row<dtype> *input, size_t n_elem) // 1D Row Vector
 {
@@ -1281,7 +1029,7 @@ inline mxArray *qd_mex_init_output(std::vector<arma::Cube<dtype>> *input,
     return output;
 }
 
-// Make an empty struct
+// 1 x N struct array with the given (unset) fields; a 0x0 struct without fields for an empty field list
 inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields, size_t N = 1)
 {
     mxArray *output;
@@ -1307,21 +1055,27 @@ inline void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *
     mxSetField(strct, n, field.c_str(), data);
 }
 
+// Raises "Input 'x' must be a struct." ("Input must be a struct." for an empty var_name) unless input is a struct;
+// one: the struct must have exactly one element ("... must be a 1x1 struct.")
+inline void qd_mex_check_struct(const mxArray *input, const std::string &var_name = "", bool one = false)
+{
+    if (mxIsStruct(input) && (!one || mxGetNumberOfElements(input) == 1))
+        return;
+    const std::string msg = (var_name.empty() ? std::string("Input") : "Input '" + var_name + "'") +
+                            (one ? " must be a 1x1 struct." : " must be a struct.");
+    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+}
+
 inline bool qd_mex_has_field(const mxArray *strct, const std::string &field)
 {
-    if (!mxIsStruct(strct))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+    qd_mex_check_struct(strct);
     return mxGetField(strct, 0, field.c_str()) != nullptr;
 }
 
 inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0, const std::string &var_name = "")
 {
     const std::string in = var_name.empty() ? std::string("") : " in '" + var_name + "'";
-    if (!mxIsStruct(strct))
-    {
-        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
+    qd_mex_check_struct(strct, var_name);
 
     size_t n_elem = (size_t)mxGetNumberOfElements(strct);
     if (n >= n_elem)
@@ -1428,20 +1182,6 @@ inline std::vector<obj> qd_mex_read_cell(const mxArray *input, const char *var_n
             out[i] = get(element, var_name);
     }
     return out;
-}
-
-// Batch snapshot selection: all 'n_snap' snapshots for an empty 'i_snap' (0-based), else 'i_snap' after a range check
-inline arma::uvec qd_mex_snapshot_list(const arma::uvec &i_snap, size_t n_snap, const char *var_name = "i_snap")
-{
-    if (i_snap.is_empty())
-        return n_snap == 0 ? arma::uvec() : arma::regspace<arma::uvec>(0, (arma::uword)n_snap - 1);
-    for (arma::uword i : i_snap)
-        if (i >= n_snap)
-        {
-            const std::string msg = "Entries in '" + std::string(var_name) + "' cannot exceed the number of snapshots (" + std::to_string(n_snap) + ").";
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-        }
-    return i_snap;
 }
 
 // Batch positions and orientations: a 3-element vector (row or column) applies to all snapshots, else [3, n_snap]

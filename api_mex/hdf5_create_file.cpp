@@ -49,13 +49,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const unsigned nx = (nrhs < 2) ? 65536U : qd_mex_get_scalar<unsigned>(prhs[1], "nx", 65536U);
     const unsigned ny = (nrhs < 3) ? 1U : qd_mex_get_scalar<unsigned>(prhs[2], "ny", 1U);
     const unsigned nz = (nrhs < 4) ? 1U : qd_mex_get_scalar<unsigned>(prhs[3], "nz", 1U);
     const unsigned nw = (nrhs < 5) ? 1U : qd_mex_get_scalar<unsigned>(prhs[4], "nw", 1U);
 
-    // Create file (C++ throws if it exists)
+    // C++ throws if the file exists
     CALL_QD(quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw));
 }

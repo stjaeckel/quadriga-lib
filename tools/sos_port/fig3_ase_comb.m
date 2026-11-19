@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Fig. 3 of the paper: achievable ASE against the number of sinusoids for the combined ACF (3-D tables).
 res_dir = sos_port_init(); p = sos_port_paper_values();
 dist = (0:199) * 0.25; acf = sos_port_acf('Comb', dist, 10);

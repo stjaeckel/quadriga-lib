@@ -1,4 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_ray_triangle_intersect
+% MEX interface test for quadriga_lib.ray_triangle_intersect.
+% Physics validation lives in the Catch2 suite (test_ray_triangle_intersect.cpp).
 
 cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top NorthEast
            1    -1     1   ,   -1    -1    -1   ,    1    -1    -1;   %  2 South Lower
@@ -15,7 +21,7 @@ cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
 
 
 orig(1,:) = [ -10.0,  0.0,   0.5 ]; dest(1,:) = [  10.0,  0.0,   0.5];    % FBS West Upper (9), SBS East Upper (11)
-orig(2,:) = [  10.0,  0.0,  -0.5 ]; dest(2,:) = [ -10.0,  0.0,  -0.5];    % FBS East Lower Top (5), SBS West Lower (3)
+orig(2,:) = [  10.0,  0.0,  -0.5 ]; dest(2,:) = [ -10.0,  0.0,  -0.5];    % FBS East Lower (5), SBS West Lower (3)
 orig(3,:) = [ -10.0,  0.0,   2.0 ]; dest(3,:) = [  10.0,  0.0,   2.0];    % Miss
 orig(4,:) = [   0.5,  0.0,  10.0 ]; dest(4,:) = [  0.5,   0.0, -10.0];    % FBS Top NorthEast (1), SBS Bottom SouthEast (10)
 orig(5,:) = [   0.0, 10.0,  -0.5 ]; dest(5,:) = [  0.0, -10.0,  -0.5];    % FBS North Lower (6), SBS South Lower (2)
@@ -109,7 +115,7 @@ try
     fbs_only = quadriga_lib.ray_triangle_intersect( orig, dest(2:end,:), cube );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of elements in ''orig'' and ''dest'' dont match.';
+    expectedErrorMessage = 'Number of elements in ''orig'' and ''dest'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -157,7 +163,7 @@ assertEqual( isbs2, isbs );
 % NaNs in cube, but hit (first row)
 [ fbs2, sbs2, no_hit2, ifbs2, isbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, [nan(1,9);cube(2:end,:)] );
 
-% ray 4 (hits face 1 at FBS)
+% ray 4 (face 1 is NaN, so only face 10 is hit)
 assertElementsAlmostEqual( fbs2(4,:), [ 0.5, 0,-1], 'absolute', 1e-6 );
 assertElementsAlmostEqual( sbs2(4,:), dest(4,:), 'absolute', 1e-6 );
 assertEqual( no_hit2(4), uint32(1) );
@@ -193,7 +199,7 @@ catch ME
     end
 end
 
-% ---- Single-precision inputs (type casting via qd_mex_get_double_Mat) ----
+%% Single-precision inputs
 [ fbs2, sbs2, no_hit2, ifbs2, isbs2 ] = quadriga_lib.ray_triangle_intersect( single(orig), single(dest), single(cube) );
 assertElementsAlmostEqual( fbs2, fbs, 'absolute', 1e-5 );
 assertElementsAlmostEqual( sbs2, sbs, 'absolute', 1e-5 );
@@ -201,7 +207,7 @@ assertEqual( no_hit2, no_hit );
 assertEqual( ifbs2, ifbs );
 assertEqual( isbs2, isbs );
 
-% ---- Sub-mesh index (uint32) ----
+%% Sub-mesh index (uint32)
 [ cube_seg, smi ] = quadriga_lib.triangle_mesh_segmentation( cube, 4 );
 aabb_seg = quadriga_lib.triangle_mesh_aabb( cube_seg, smi );
 
@@ -213,83 +219,83 @@ assertElementsAlmostEqual( fbs_seg, fbs, 'absolute', 1e-6 );
 assertElementsAlmostEqual( sbs_seg, sbs, 'absolute', 1e-6 );
 assertEqual( no_hit_seg, no_hit );
 
-% ---- Sub-mesh index as double (typecast path via qd_mex_typecast_Col) ----
+%% Sub-mesh index as double
 [ fbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, double(smi) );
 assertElementsAlmostEqual( fbs2, fbs_seg, 'absolute', 1e-6 );
 
-% ---- Sub-mesh index as int32 (typecast path) ----
+%% Sub-mesh index as int32
 [ fbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, int32(smi) );
 assertElementsAlmostEqual( fbs2, fbs_seg, 'absolute', 1e-6 );
 
-% ---- Sub-mesh index validation: first index not 0 ----
+%% Sub-mesh index validation: first index not 0
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([2; 6]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-mesh must start at the first face.';
+    expectedErrorMessage = 'Input ''sub_mesh_ind'' must start at the first mesh face.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% ---- Sub-mesh index validation: not sorted ----
+%% Sub-mesh index validation: not sorted
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([1; 6; 3]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sub-mesh indices must be sorted in ascending order.';
+    expectedErrorMessage = 'Entries of ''sub_mesh_ind'' must be strictly increasing.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% ---- Sub-mesh index validation: exceeds mesh size ----
+%% Sub-mesh index validation: exceeds mesh size
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([1; 99]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sub-mesh indices cannot exceed number of mesh elements.';
+    expectedErrorMessage = 'Entries of ''sub_mesh_ind'' cannot point beyond the last mesh face.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% ---- Pre-computed AABB ----
+%% Pre-computed AABB
 [ fbs2, sbs2, no_hit2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi, aabb_seg );
 assertElementsAlmostEqual( fbs2, fbs_seg, 'absolute', 1e-6 );
 assertElementsAlmostEqual( sbs2, sbs_seg, 'absolute', 1e-6 );
 assertEqual( no_hit2, no_hit_seg );
 
-% ---- AABB row count mismatch ----
+%% AABB row count mismatch
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi, aabb_seg(1,:) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''aabb'' must match number of sub-meshes.';
+    expectedErrorMessage = 'Input ''aabb'' must have size [n_sub, 6].';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% ---- AABB column count mismatch ----
+%% AABB column count mismatch
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi, aabb_seg(:,1:3) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''aabb'' must have at least 6 columns';
+    expectedErrorMessage = 'Input ''aabb'' must have size [n_sub, 6].';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% ---- Skipping optional args with [] ----
+%% Skipping optional args with []
 [ fbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube, [], [], 1, 0 );
 assertElementsAlmostEqual( fbs2, fbs, 'absolute', 1e-6 );
 
 [ fbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi, [], 1 );
 assertElementsAlmostEqual( fbs2, fbs_seg, 'absolute', 1e-6 );
 
-% ---- Kernel selector: GENERIC (1) ----
+%% Kernel selector: GENERIC (1)
 [ fbs2, sbs2, no_hit2, ifbs2, isbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube, [], [], 1 );
 assertElementsAlmostEqual( fbs2, fbs, 'absolute', 1e-6 );
 assertElementsAlmostEqual( sbs2, sbs, 'absolute', 1e-6 );
@@ -297,7 +303,7 @@ assertEqual( no_hit2, no_hit );
 assertEqual( ifbs2, ifbs );
 assertEqual( isbs2, isbs );
 
-% ---- Kernel selector: AVX2 (2) ----
+%% Kernel selector: AVX2 (2)
 % AVX2 may not be available; if so, an error is expected
 try
     [ fbs2, sbs2, no_hit2, ifbs2, isbs2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube, [], [], 2 );
@@ -314,7 +320,7 @@ catch ME
     end
 end
 
-% ---- Kernel selector: CUDA (3) - expected to fail without GPU ----
+%% Kernel selector: CUDA (3) - expected to fail without GPU
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube, [], [], 3 );
 catch ME
@@ -324,7 +330,7 @@ catch ME
     end
 end
 
-% ---- AVX2 kernel with sub-mesh and pre-computed AABB ----
+%% AVX2 kernel with sub-mesh and pre-computed AABB
 try
     [ fbs2, sbs2, no_hit2 ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi, aabb_seg, 2 );
     assertElementsAlmostEqual( fbs2, fbs_seg, 'absolute', 1e-5 );

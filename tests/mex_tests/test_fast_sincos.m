@@ -1,5 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_fast_sincos
-% Single MOxUnit test covering the MATLAB API behavior of quadriga_lib.fast_sincos
+% MEX interface test for quadriga_lib.fast_sincos.
+% Physics validation lives in the Catch2 suite (test_fast_sincos.cpp).
 
 % Helper for approximate equality on singles (handles empty inputs gracefully)
 assert_close = @(a,b,tol) assertTrue( max([0; abs(single(a(:))-single(b(:)))]) <= tol );

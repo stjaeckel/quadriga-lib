@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Cross-check for Fig. 4: is the scatter of the estimated ACF between initialisations a property of the sum of
 % sinusoids or of any field with this ACF? An exact Gaussian field with the exponential ACF is drawn from its
 % covariance matrix (Cholesky) at 1500 positions in the cube of Fig. 4 and estimated with the same bins, and

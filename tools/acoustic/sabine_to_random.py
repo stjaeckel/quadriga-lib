@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
+
 """
 Sabine (reverberation-chamber, ISO 354) absorption to random-incidence absorption, by Jeong's method.
 

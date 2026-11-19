@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.channel.qrt_file_parse and qrt_file_read.
+
 import sys
 import os
 import pathlib
@@ -24,9 +26,7 @@ FN_V5 = os.path.join(current_dir, '../data/test_v5.qrt')
 
 class test_case(unittest.TestCase):
 
-    # ------------------------------------------------------------------
-    # qrt_file_parse
-    # ------------------------------------------------------------------
+    # ---- qrt_file_parse ----
     def test_parse_v4(self):
         (n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version,
          center_freq, cir_pos, cir_orientation, orig_pos, orig_orientation) = \
@@ -86,9 +86,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(orig_pos.shape, (n_orig, 3))
         self.assertEqual(orig_orientation.shape, (n_orig, 3))
 
-    # ------------------------------------------------------------------
-    # qrt_file_read - single snapshot, downlink / uplink
-    # ------------------------------------------------------------------
+    # ---- qrt_file_read - single snapshot, downlink / uplink ----
     def test_read_v4(self):
         # --- downlink, first link: i_cir=0, i_orig=0 ---
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
@@ -96,7 +94,6 @@ class test_case(unittest.TestCase):
          aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [0], 0, uplink=False, normalize_polmat=1)
 
-        # qrt_file_read returns center_freq in Hz
         npt.assert_allclose(center_freq[0], 3.75e9, rtol=1e-7)  # v4 stores GHz, converted to Hz in float
 
         # Scalar-per-snapshot outputs are (3, n_out) -> here (3, 1)
@@ -149,9 +146,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(M[0], M_dl[[0, 1, 4, 5, 2, 3, 6, 7]], atol=1e-12, rtol=0)
         npt.assert_allclose(path_gain[0], path_gain_dl, rtol=1e-12, atol=0)
 
-    # ------------------------------------------------------------------
-    # qrt_file_read - v5 file, normalize_polmat switch
-    # ------------------------------------------------------------------
+    # ---- qrt_file_read - v5 file, normalize_polmat switch ----
     def test_read_v5(self):
         # normalize_polmat = 0: M and path_gain as stored in the QRT file
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
@@ -193,9 +188,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(res_hz[0], [1.0e9, 1.5e9], rtol=1e-6, atol=0)
         npt.assert_allclose(res_hz[7][0], res_ghz[7][0], rtol=1e-12, atol=0)
 
-    # ------------------------------------------------------------------
-    # qrt_file_read - multiple snapshots in one call (shared read cache)
-    # ------------------------------------------------------------------
+    # ---- qrt_file_read - multiple snapshots in one call (shared read cache) ----
     def test_read_multi_cir(self):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
@@ -247,9 +240,7 @@ class test_case(unittest.TestCase):
         for i in range(3):
             self.assertEqual(len(interact_type[i]), 0)
 
-    # ------------------------------------------------------------------
-    # qrt_file_read - default arguments
-    # ------------------------------------------------------------------
+    # ---- qrt_file_read - default arguments ----
     def test_read_defaults(self):
         # Default i_cir (omitted) reads ALL snapshots in the file (n_cir = 7)
         res = channel.qrt_file_read(FN_V4)
@@ -283,9 +274,7 @@ class test_case(unittest.TestCase):
         for x, y in zip(a, b):
             npt.assert_array_equal(x, y)
 
-    # ------------------------------------------------------------------
-    # qrt_file_read - error handling
-    # ------------------------------------------------------------------
+    # ---- qrt_file_read - error handling ----
     def test_read_errors(self):
         # CIR index out of range, checked before any CIR is read
         with self.assertRaisesRegex(ValueError, "^Snapshot 1: CIR index exceeds"):

@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_triangle_mesh_segmentation
+% MEX interface test for quadriga_lib.triangle_mesh_segmentation.
 
 mesh = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top NorthEast
     1    -1     1   ,   -1    -1    -1   ,    1    -1    -1;   %  2 South Lower
@@ -17,7 +22,7 @@ mtl_ind = (1:12)';   % 1-based per-face material index (each face its own materi
 
 [mesh_sub, mtl_ind_sub] = quadriga_lib.subdivide_triangles(3, mesh, mtl_ind);
 
-% Test 1: Mesh size is already below threshold, test padding
+%% Mesh size below the threshold: padding
 [mesh_seg, sub_mesh_ind, mesh_ind, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_ind_sub);
 
 assertTrue( size(mesh_seg,1) == 112 );
@@ -42,7 +47,7 @@ assertEqual( double(mtlR(:)'), [1:12, 0, 0, 0, 0] );
 
 assertEqual( mesh_ind(1:108), uint32(1:108)' );
 
-% Test 2: Subdivide, no padding
+%% Subdivide, no padding
 [mesh_seg, sub_mesh_ind, mesh_ind, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64, 1, mtl_ind_sub);
 
 assertTrue( numel(sub_mesh_ind) == 3 );
@@ -57,7 +62,8 @@ quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64);
 quadriga_lib.triangle_mesh_segmentation(mesh_sub);
 quadriga_lib.triangle_mesh_segmentation(mesh_sub, [], []);
 
-try % 5 imputs
+%% Errors
+try % 5 inputs
     quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64, 1, mtl_ind_sub, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -67,7 +73,7 @@ catch ME
     end
 end
 
-try % 0 imputs
+try % 0 inputs
     quadriga_lib.triangle_mesh_segmentation();
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME

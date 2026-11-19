@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_arrayant_interpolate
 % MEX interface test for quadriga_lib.arrayant_interpolate.
 % Scope: argument and output handling, index conversion, single- and multi-frequency mode, kernels, error paths.
@@ -119,7 +123,7 @@ assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az ), 'Wrong number o
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 0, 1 ), ...
     'Wrong number of input arguments.' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( [], az, el, [], [], [], [], [-2, 2], [-1, 1], [3, 1], ...
-    [6, 2], [0, pi], 0 ), 'Wrong number of input arguments.' );                          % Separate fields: removed
+    [6, 2], [0, pi], 0 ), 'Wrong number of input arguments.' );                          % Separate fields are not accepted
 assert_throws( @() out9( ant, az, el ), 'Wrong number of output arguments.' );
 assert_throws( @() out5( ant_m, az, el ), 'Multi-frequency mode supports at most 4 outputs' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [0, 1] ), 'cannot be 0 (1-based index)' );

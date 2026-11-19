@@ -37,13 +37,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[1], false, "triangles_in");
     const arma::uword n_div = qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 0);
 
@@ -58,7 +56,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'n_div' is too large.");
     arma::uword n_triangles_out = n_triangles_in * n_div * n_div;
 
-    // Output allocation
     arma::mat triangles_out;
     arma::uvec mtl_ind_out;
 
@@ -72,9 +69,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             plhs[1] = mxCreateDoubleMatrix(0, 0, mxREAL);
     }
 
-    // Wrap optional pointers
     arma::uvec *p_mtl_ind_out = mtl_ind_out.is_empty() ? nullptr : &mtl_ind_out;
 
-    // Call library function
     CALL_QD(quadriga_lib::subdivide_triangles<double>(n_div, triangles_in, triangles_out, mtl_ind, p_mtl_ind_out));
 }

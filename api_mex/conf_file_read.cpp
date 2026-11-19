@@ -172,17 +172,14 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const bool validate = (nrhs < 2) ? true : qd_mex_get_scalar<bool>(prhs[1], "validate", true);
 
-    // Output allocation
     std::unordered_map<std::string, double> scenpar;
     std::unordered_map<std::string, std::vector<double>> plpar;
     std::string pl_model;
@@ -193,12 +190,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&lsp_xcorr, 8, 8);
 
-    // Wrap optional pointers
     arma::mat *p_lsp_xcorr = lsp_xcorr.empty() ? nullptr : &lsp_xcorr;
     std::vector<std::string> *p_short_names = (nlhs > 4) ? &short_names : nullptr;
     std::vector<std::string> *p_ignored_keys = (nlhs > 5) ? &ignored_keys : nullptr;
 
-    // Call library function
     CALL_QD(scenpar = quadriga_lib::conf_file_read(fn, &pl_model, &plpar, p_lsp_xcorr, &lsp_xcorr_chk,
                                                    &key_order, &pl_order, p_short_names, p_ignored_keys, validate));
 

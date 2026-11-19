@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // Variant of qd_SOS_AVX2 with a branch-free accumulation for full groups of generators: the partial sums
 // are named variables (registers), not an array indexed by a loop with a run-time bound. The arithmetic per
 // (position, generator) is unchanged: float partial sums over 16 sinusoids, cos term then sin term, added in

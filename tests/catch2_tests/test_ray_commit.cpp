@@ -284,9 +284,7 @@ namespace
     }
 }
 
-// ===========================================================================================
-// Basic commit
-// ===========================================================================================
+// ---- Basic commit ----
 
 TEST_CASE("ray_commit - a receiver on the beam axis is committed")
 {
@@ -363,9 +361,7 @@ TEST_CASE("ray_commit - several receivers on one ray")
     check_commit_shape(out, 0, P.n_rows, 1, false);
 }
 
-// ===========================================================================================
-// Gates
-// ===========================================================================================
+// ---- Gates ----
 
 TEST_CASE("ray_commit - shading by the first-bounce face")
 {
@@ -492,9 +488,7 @@ TEST_CASE("ray_commit - ignore_direct_path drops transmission-only arrivals")
     CHECK(C.commit(S, P, out, o) == 1);
 }
 
-// ===========================================================================================
-// Payload
-// ===========================================================================================
+// ---- Payload ----
 
 TEST_CASE("ray_commit - the receive-side mirror is applied in EM mode")
 {
@@ -605,9 +599,7 @@ TEST_CASE("ray_commit - every frequency slot is updated")
     CHECK(out[0].calc_gain(0.0f, 2) < out[0].calc_gain(0.0f, 0));
 }
 
-// ===========================================================================================
-// Append semantics
-// ===========================================================================================
+// ---- Append semantics ----
 
 TEST_CASE("ray_commit - results are appended, not overwritten")
 {
@@ -673,9 +665,7 @@ TEST_CASE("ray_commit - repeated calls are deterministic")
     }
 }
 
-// ===========================================================================================
-// Scale
-// ===========================================================================================
+// ---- Scale ----
 
 TEST_CASE("ray_commit - the pair list spans more than one block")
 {
@@ -738,9 +728,7 @@ TEST_CASE("ray_commit - sub-cloud partitioning does not change the result")
     }
 }
 
-// ===========================================================================================
-// Point index mapping
-// ===========================================================================================
+// ---- Point index mapping ----
 
 TEST_CASE("ray_commit - point_ind drops padding rows")
 {
@@ -857,9 +845,7 @@ TEST_CASE("ray_commit - padding is committed when point_ind is omitted")
     CHECK(nb > na); // the extra entries are the padding rows
 }
 
-// ===========================================================================================
-// min_segments
-// ===========================================================================================
+// ---- min_segments ----
 
 TEST_CASE("ray_commit - min_segments gate")
 {
@@ -930,9 +916,7 @@ TEST_CASE("ray_commit - min_segments and ignore_direct_path are independent gate
     }
 }
 
-// ===========================================================================================
-// Input validation
-// ===========================================================================================
+// ---- Input validation ----
 
 TEST_CASE("ray_commit - input validation")
 {

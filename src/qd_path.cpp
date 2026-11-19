@@ -3,12 +3,13 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
+#include "qd_helpers_shared.hpp"
 
-#include <cstring>   // std::memcpy
-#include <stdexcept> // std::invalid_argument
-#include <cstddef>   // size_t
-#include <cstdint>   // uint8_t
-#include <utility>   // std::as_const
+#include <cstring>
+#include <stdexcept>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -16,103 +17,6 @@
 /*!SECTION
 Channel functions
 SECTION!*/
-
-/* Declaration from 'quadriga_channel.hpp':
-
-    // Class for storing and managing path data
-    class path
-    {
-    private:
-        uint8_t nFRQ = 1;                                                   // Bit 7: scalar flag; bits 0-6: number of frequencies (1-127)
-        uint8_t nSEG = 0;                                                   // Number of segments
-        uint8_t interact_type[2] = {0, 0};                                  // Type of the first 2 interactions
-        float len_acc = 0.0f;                                               // Accumulated path length
-        float xprmat[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // EM: Jones matrix for freq 0, col-major; SCALAR: Pressure coeffs for freqs 0-3
-        // Jones labels <out><in> (= <rx><tx> in get_channels_*): ReHV = H out, V in = rows 2-3; ReVH = V out, H in = rows 4-5
-        float *data = nullptr;                                              // Variable-length data buffer
-
-        // Data buffer EM:
-        // ┌─────────────────────────────────────────────────────┐
-        // │ Coordinates: [x,y,z] × nSEG = 12×nSEG bytes         │
-        // ├─────────────────────────────────────────────────────┤
-        // │ Jones: [ReVV,ImVV,ReHV,ImHV,ReVH,ImVH,ReHH,ImHH]    │
-        // │        × nFREQ-1 = 32×(nFREQ-1) bytes               │
-        // ├─────────────────────────────────────────────────────┤
-        // | Interactions: 4 * ((nSEG+1) / 4) bytes, nSEG > 2    │
-        // └─────────────────────────────────────────────────────┘
-
-        // Data buffer SCALAR:
-        // ┌─────────────────────────────────────────────────────┐
-        // │ Coordinates: [x,y,z] × nSEG = 12×nSEG bytes         │
-        // ├─────────────────────────────────────────────────────┤
-        // │ Coeff: [Re,Im] × (nFREQ-4) = 8×(nFREQ-4) bytes      │
-        // ├─────────────────────────────────────────────────────┤
-        // | Interactions: 4 * ((nSEG+1) / 4) bytes, nSEG > 2    │
-        // └─────────────────────────────────────────────────────┘
-
-    public:
-        unsigned i_cir = 0; // CIR index (= the CIR to which the path belongs)
-        uint8_t n_ref = 0;  // Number of reflections
-        uint8_t n_tra = 0;  // Number of transmissions / refractions
-        uint8_t n_sub = 0;  // Number of subdivisions
-        uint8_t n_sct = 0;  // Number of scattering events
-
-        path() = default;                       // Default constructor: 0 segments, 1 frequency, EM mode
-        path(path &&other) noexcept;            // Move constructor
-        path(const path &other);                // Copy constructor
-        path &operator=(path &&other) noexcept; // Move assignment
-        path &operator=(const path &other);     // Copy assignment
-        void free();                            // Manually clear data buffer
-        ~path() { free(); }                     // Destructor
-
-        size_t n_seg() const { return (size_t)nSEG; }         // Number of segments
-        size_t n_freq() const { return size_t(nFRQ & 0x7F); } // Number of frequencies
-        bool is_scalar() const { return (nFRQ & 0x80) != 0; } // Layout mode
-
-        // Initialize data storage to a given layout
-        void init(size_t segments = 0, size_t frequencies = 1, bool scalar = false);
-        path(size_t segments, size_t frequencies = 1, bool scalar = false); // Init constructor
-
-        // Access coordinates of a specific segment
-        const float *coord(size_t seg = 0) const; // Read-only
-        float *coord(size_t seg = 0);             // Read + write
-
-        // Gets last segment coordinate by index (0=x, 1=y, 2=z)
-        float operator()(unsigned x) const { return (nSEG > 0 && x < 3 && data) ? data[(size_t(nSEG) - 1) * 3 + x] : NAN; }
-
-        // Calculate the total length of the path
-        // D = destination after last seg, O = origin before first seg
-        float length() const { return len_acc; }                                       // Get length
-        void set_length(float val) { len_acc = val; }                                  // Set length
-        float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
-        float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length
-        float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
-
-        // Access the polarization transfer matrix (EM) or pressure coefficient (scalar) of frequency index i_freq
-        const float *polmat(size_t i_freq = 0) const; // Read only
-        float *polmat(size_t i_freq = 0);             // Read + write
-
-        // Left-multiply ray's polarization transfer matrix; coeff_update must have length 8 (EM) or 2 (scalar)
-        // + calculate gain from the coefficients; freq in Hz, freq > 0 applies the free-space loss
-        float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
-
-        // Calculate gain from the coefficients; freq in Hz, freq > 0 applies the free-space loss
-        float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
-
-        // Duplicate path, writing to "target"; return length
-        float duplicate(path &target) const;
-
-        // Duplicate path and append segment; n_ref and n_tra are not changed; return length
-        // - Must be called before polmat_update/gain to use the correct path length in gain calculation
-        float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
-
-        // Get/set the interaction type sequence
-        std::vector<uint8_t> interaction_type_codes() const;
-        void set_interaction_type_codes(const std::vector<uint8_t> &codes);
-    };
-    static_assert(sizeof(path) == 56, "path must be exactly 56 bytes");
-
-*/
 
 /*!MD
 # path
@@ -237,21 +141,21 @@ MD!*/
 
 #define INLINE_TYPES 2 // Length of the inline type codes
 
-// Helper: Compute the offset of the history block in the data buffer
+// Offset of the interaction history block in the data buffer, in floats
 constexpr static size_t history_offset(size_t segments, size_t frequencies, bool scalar)
 {
     return scalar ? segments * 3 + (frequencies < 5 ? 0 : (frequencies - 4) * 2)
                   : segments * 3 + (frequencies < 2 ? 0 : (frequencies - 1) * 8);
 }
 
-// Helper: Compute the required buffer size to store a given number is segments and frequencies
+// Size of the data buffer in floats for the given number of segments and frequencies
 constexpr static size_t data_size(size_t segments, size_t frequencies, bool scalar)
 {
     size_t history_length = segments <= INLINE_TYPES ? 0 : (segments - INLINE_TYPES + 3) / 4;
     return history_offset(segments, frequencies, scalar) + history_length;
 }
 
-// Helper: Calculate gain (linear power) from Jones matrix values; freq (Hz) > 0 applies path loss
+// Gain (linear power) from the Jones matrix values; freq (Hz) > 0 applies the path loss
 // Scalar mode passes the pressure coefficient as [ReVV, ImVV] and zeros for the rest
 static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float ImHV,
                                     float ReVH, float ImVH, float ReHH, float ImHH,
@@ -273,14 +177,13 @@ static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float Im
             P /= path_length * path_length;
         else
         {
-            float k = 299792458.0f / (12.566370614f * freq * path_length);
+            float k = (float)qd_speed_of_light / (12.566370614f * freq * path_length);
             P *= k * k;
         }
     }
     return P;
 }
 
-// Move constructor
 quadriga_lib::path::path(path &&other) noexcept
     : nFRQ(other.nFRQ), nSEG(other.nSEG), len_acc(other.len_acc), data(other.data),
       i_cir(other.i_cir), n_ref(other.n_ref), n_tra(other.n_tra), n_sub(other.n_sub), n_sct(other.n_sct)
@@ -293,7 +196,6 @@ quadriga_lib::path::path(path &&other) noexcept
     other.nSEG = 0;
 }
 
-// Copy constructor
 quadriga_lib::path::path(const path &other)
     : nFRQ(other.nFRQ), nSEG(other.nSEG), len_acc(other.len_acc),
       i_cir(other.i_cir), n_ref(other.n_ref), n_tra(other.n_tra), n_sub(other.n_sub), n_sct(other.n_sct)
@@ -310,7 +212,6 @@ quadriga_lib::path::path(const path &other)
     }
 }
 
-// Move assignment
 quadriga_lib::path &quadriga_lib::path::operator=(path &&other) noexcept
 {
     if (this == &other)
@@ -334,7 +235,6 @@ quadriga_lib::path &quadriga_lib::path::operator=(path &&other) noexcept
     return *this;
 }
 
-// Copy assignment
 quadriga_lib::path &quadriga_lib::path::operator=(const path &other)
 {
     if (this == &other)
@@ -419,7 +319,6 @@ void quadriga_lib::path::init(size_t segments, size_t frequencies, bool scalar)
     len_acc = 0.0f;
 }
 
-// Constructor
 quadriga_lib::path::path(size_t segments, size_t frequencies, bool scalar)
 {
     init(segments, frequencies, scalar);
@@ -443,8 +342,7 @@ float quadriga_lib::path::calc_length(float Dx, float Dy, float Dz) const
     if (nSEG == 0)
         return NAN;
     const float *last = data + (size_t(nSEG) - 1) * 3;
-    float dx = Dx - last[0], dy = Dy - last[1], dz = Dz - last[2];
-    return len_acc + std::sqrt(dx * dx + dy * dy + dz * dz);
+    return len_acc + qd_calc_length(last[0], last[1], last[2], Dx, Dy, Dz);
 }
 
 // Full recalculation O -> seg[0] -> ... -> seg[nSEG-1] -> D.
@@ -457,14 +355,12 @@ float quadriga_lib::path::calc_length(float Dx, float Dy, float Dz, float Ox, fl
     for (size_t s = 0, nS = (size_t)nSEG; s < nS; ++s)
     {
         const float *c = data + s * 3;
-        float dx = c[0] - px, dy = c[1] - py, dz = c[2] - pz;
-        total += std::sqrt(dx * dx + dy * dy + dz * dz);
+        total += qd_calc_length(px, py, pz, c[0], c[1], c[2]);
         px = c[0], py = c[1], pz = c[2];
     }
     len_acc = total; // O -> last, excludes final leg to D
 
-    float dx = Dx - px, dy = Dy - py, dz = Dz - pz;
-    return total + std::sqrt(dx * dx + dy * dy + dz * dz);
+    return total + qd_calc_length(px, py, pz, Dx, Dy, Dz);
 }
 
 // 3-element overload; O = nullptr -> read-only member + last-to-D, else full recalc (updates member)
@@ -624,8 +520,7 @@ float quadriga_lib::path::extend(path &target, float x, float y, float z, uint8_
     if (nS)
     {
         const float *p = data + (nS - 1) * 3;
-        float dx = x - p[0], dy = y - p[1], dz = z - p[2];
-        dl = std::sqrt(dx * dx + dy * dy + dz * dz);
+        dl = qd_calc_length(p[0], p[1], p[2], x, y, z);
     }
 
     delete[] target.data;

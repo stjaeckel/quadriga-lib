@@ -19,26 +19,26 @@
 // Generate channel parameters for the IEEE indoor channel models as defined by TGn, TGac, TGah and TGax
 // - Outputs non-zero paths and clusters where the max. n_path_out = n_cluster * n_path (+1) from the IEEE tables (+1 additional LOS cluster, if present)
 // - Sub-path aod and aoa do not include AP or Station orientation
-static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Output: Station x/y positions, z=0 (2D model), Size: [3, n_users]
+static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Output: Station positions, z = 3 m per floor, Size: [3, n_users]
                                  arma::mat &rx_orientation,              // Output: Station orientation in radians, Size: [3, n_users]
-                                 std::vector<arma::mat> &aod,            // Output: Sub-path departure angles in radians, per-user, Size: n_subpath, n_path_out
-                                 std::vector<arma::mat> &aoa,            // Output: Sub-path arrival angles in radians, per-user, Size: n_subpath, n_path_out
-                                 std::vector<arma::mat> &pow,            // Output: Sub-path power, linear, relative to 0 dBm, per-user, Size: n_subpath, n_path_out
-                                 std::vector<arma::vec> &delay,          // Output: Path delays in seconds, per-user, Length: n_path_out
-                                 std::vector<arma::cube> &M,             // Output: Polarization transfer matrix, interleaved complex, col-major, per-user, Size: 8, n_subpath, n_path_out
+                                 std::vector<arma::mat> &aod,            // Output: Sub-path departure angles in radians, per user, Size: [n_subpath, n_path_out]
+                                 std::vector<arma::mat> &aoa,            // Output: Sub-path arrival angles in radians, per user, Size: [n_subpath, n_path_out]
+                                 std::vector<arma::mat> &pow,            // Output: Sub-path power, linear, relative to 0 dBm, per user, Size: [n_subpath, n_path_out]
+                                 std::vector<arma::vec> &delay,          // Output: Path delays in seconds, per user, Length: n_path_out
+                                 std::vector<arma::cube> &M,             // Output: Polarization transfer matrix, interleaved complex, col-major, per user, Size: [8, n_subpath, n_path_out]
                                  std::string ChannelType,                // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-                                 double CarrierFreq_Hz = 5.25e9,         // Carrier frequency
+                                 double CarrierFreq_Hz = 5.25e9,         // Carrier frequency in Hz
                                  double tap_spacing_s = 10.0e-9,         // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
-                                 arma::uword n_users = 1,                // Number of user (only for TGac, TGah)
-                                 arma::vec Dist_m = {4.99},              // Distance between TX and TX in meters, length n_users or length 1 (if same for all users)
+                                 arma::uword n_users = 1,                // Number of users (only for TGac, TGah)
+                                 arma::vec Dist_m = {4.99},              // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
                                  arma::uvec n_floors = {0},              // Number of floors for the TGah model, adjusted for each user, max. 4, length n_users or length 1 (if same for all users)
                                  arma::mat offset_angles = {},           // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
                                  arma::uword n_subpath = 20,             // Number of sub-paths per path and cluster for Laplacian AS mapping
-                                 arma::sword seed = -1,                  // Numeric seed, optional, value -1 disabled seed and uses system random device
+                                 arma::sword seed = -1,                  // Numeric seed; -1 seeds from the system random device
                                  double KF_linear_overwrite = NAN,       // Overwrites the default KF (linear scale)
-                                 double XPR_NLOS_linear_overwrite = NAN, // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
-                                 double SF_std_dB_LOS_overwrite = NAN,   // Overwrites the default Shadow Fading STD for LOS channels in dB
-                                 double SF_std_dB_NLOS_overwrite = NAN,  // Overwrites the default Shadow Fading STD for NLOS channels in dB
+                                 double XPR_NLOS_linear_overwrite = NAN, // Overwrites the default cross-polarization ratio (linear scale) for NLOS paths
+                                 double SF_std_dB_LOS_overwrite = NAN,   // Overwrites the default shadow fading STD for LOS channels in dB
+                                 double SF_std_dB_NLOS_overwrite = NAN,  // Overwrites the default shadow fading STD for NLOS channels in dB
                                  double dBP_m_overwrite = NAN,           // Overwrites the default breakpoint distance in meters
                                  arma::uvec n_walls = {0},               // Number of walls per user TGax models; [n_users] or [1]
                                  double wall_loss = 5.0)                 // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
@@ -99,11 +99,11 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     if (!std::isfinite(wall_loss))
         throw std::invalid_argument("Input 'wall_loss_dB' must be finite.");
 
-    // ---------- SCENARIO PARAMETERS ----------
+    // ---- Scenario parameters ----
 
     // Model parameters as in IEEE 802.11-03/940r4, Appendix C
     arma::mat power_clst_dB;      // Cluster power, rows = clusters, cols = paths
-    arma::mat AoD_deg;            // Departure angles at the RX
+    arma::mat AoD_deg;            // Departure angles at the TX
     arma::mat ASD_deg;            // Angular spread at the TX
     arma::mat AoA_deg;            // Arrival angles at the RX
     arma::mat ASA_deg;            // Angular spread at the RX
@@ -389,7 +389,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         n_path = delay_ns.n_elem;
     }
 
-    // ---------- HELPER FUNCTIONS ----------
+    // ---- Helper functions ----
 
     // Random number generator; the draws use the portable helpers qd_rng_uniform and qd_rng_normal
     std::mt19937_64 rng;
@@ -418,9 +418,9 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         return r - V_PI;
     };
 
-    // ---------- MODEL FUNCTIONS ----------
+    // ---- Model functions ----
 
-    // Lambda function for offset angle generation
+    // Offset angle generation
     // see IEEE 802.11-09/0308r12, A.2 – MATLAB-Independent Implementation
     auto get_offset_angles = [](arma::uword seed, arma::uword nValues, double *ptr)
     {
@@ -544,8 +544,8 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
 
     // NLOS Jones matrix (linear basis) with common random path phase.
     // Input: XPR (linear H↔V cross-pol ratio). Uses maximal quadrature (±90°) to include linear→circular leakage.
-    auto get_Jones_matrix = [&](double XPR_lin,  // Input: Cross-polarization ration, linear scale
-                                double *M_local) // Output: // interleaved Re,Im; col-major: (J11,J21 ; J12,J22), rows rx, columns tx, length 8
+    auto get_Jones_matrix = [&](double XPR_lin,  // Cross-polarization ratio, linear scale
+                                double *M_local) // Output: interleaved Re,Im; col-major: (J11,J21 ; J12,J22), rows rx, columns tx, length 8
     {
         if (!M_local || XPR_lin <= 0.0)
             return;
@@ -554,7 +554,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         const double beta = std::sqrt(1.0 / (1.0 + XPR_lin));      // cross-pol magnitude
 
         const double phi0 = V_2PI * qd_rng_uniform(rng);  // common path phase
-        const double theta = V_2PI * qd_rng_uniform(rng); // **shared** absolute phase for both columns
+        const double theta = V_2PI * qd_rng_uniform(rng); // Shared absolute phase for both columns
 
         const double Delta = V_PI_2;            // ±90° for max lin→circ mixing
         const double theta_a = theta;           // J_11 (rx V, tx V)
@@ -585,7 +585,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         M_local[7] = J.imag();
     };
 
-    // ---------- INITIALIZE OUTPUTS ----------
+    // ---- Initialize outputs ----
 
     arma::uword n_path_out = 1 + n_cluster * n_path; // +1 is for LOS steering matrix
 
@@ -607,9 +607,9 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         M.push_back(arma::cube(8, n_subpath, n_path_out, arma::fill::zeros));
     }
 
-    // ---------- MODEL STEPS ----------
+    // ---- Model steps ----
 
-    // Calculate Pathloss for each user
+    // Path loss for each user
     arma::vec Pathloss_dB(n_users, arma::fill::value(20.0 * std::log10(4.0 * V_PI * CarrierFreq_Hz / 3.0e8)));
     for (int i_user = 0; i_user < (int)n_users; ++i_user)
     {
@@ -647,7 +647,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     arma::vec Shadow_Fading_dB(n_users);
     for (arma::uword i_user = 0; i_user < n_users; ++i_user)
     {
-        // Use LOS SF for distances blow break point, and NLOS SF above
+        // Use LOS SF for distances below break point, and NLOS SF above
         double SF_std_dB = (Dist_m[i_user] < dBP_m) ? SF_std_dB_LOS : SF_std_dB_NLOS;
 
         // Overwrite SF std if user is on a different floor
@@ -665,7 +665,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         }
 
         Shadow_Fading_dB[i_user] = qd_rng_normal(rng); // standard normal sample
-        Shadow_Fading_dB[i_user] *= SF_std_dB; // Multiply by SF STD
+        Shadow_Fading_dB[i_user] *= SF_std_dB;
     }
 
     // Generate offset angles for MU-MIMO
@@ -757,7 +757,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
 
         // Remove zero-power paths from the output and scale path powers to include PDP, PL and SF
         // The threshold applies to the normalized PDP, so the number of paths does not depend on PL, SF, floors or walls
-        arma::uword j_path = 0; // Current non-zer path index, starts at 0
+        arma::uword j_path = 0; // Current non-zero path index, starts at 0
         for (arma::uword i_path = 0; i_path < n_path_out; ++i_path)
         {
             // Get current path power, can be 0

@@ -120,7 +120,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[1], false, "tx_pos");
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[2], false, "rx_pos");

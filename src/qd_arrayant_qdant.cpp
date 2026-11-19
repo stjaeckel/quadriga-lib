@@ -11,12 +11,11 @@
 #include <cstring>
 #include <limits>
 #include <vector>
+#include "qd_helpers_shared.hpp"
 #include "qd_helpers_arrayant.hpp"
 
 #define PUGIXML_HEADER_ONLY
 #include "pugixml.hpp"
-
-// Note: Uncomment "#define PUGIXML_HEADER_ONLY" in "pugiconfig.hpp"
 
 // Largest number of values the reader creates without data in the file: zero patterns of elements that have no
 // pattern node, and the identity coupling of files without 'CouplingAbs' (2^24 values, 128 MB in double precision)
@@ -115,7 +114,7 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
     std::string node_name, attr_name, attr_value;
     pugi::xml_node node, node_arrayant;
 
-    // Read the layout filed
+    // Read the layout field
     node_name = pfx + "layout";
     node = node_qdant.child(node_name.c_str());
     if (node.empty()) // Parse all arrayant nodes and extract id to build layout
@@ -137,7 +136,7 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
     else // Read the layout from the file
     {
         std::string s = node.text().as_string();
-        std::replace(s.begin(), s.end(), ' ', ';'); // replace all ' ' to ';'
+        std::replace(s.begin(), s.end(), ' ', ';');
         arma::Mat<unsigned> tmp;
         try
         {
@@ -180,7 +179,7 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
     // Read center frequency
     node_name = pfx + "CenterFrequency";
     node = node_arrayant.child(node_name.c_str());
-    *center_freq = node.empty() ? dtype(299792458.0) : dtype(node.text().as_double());
+    *center_freq = node.empty() ? dtype(qd_speed_of_light) : dtype(node.text().as_double());
 
     // Read the number of elements
     node_name = pfx + "NoElements";
@@ -395,7 +394,6 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
     return "";
 }
 
-// Declare templates
 template std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                             std::string *name,
                                             arma::Cube<float> *e_theta_re, arma::Cube<float> *e_theta_im,
@@ -672,11 +670,10 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     if (input_error != nullptr)
         *input_error = false;
 
-    std::string pfx = ""; // Set the default prefix
-    int ID = id;          // Copy ID
+    std::string pfx = "";
+    int ID = id;
 
-    // Try to load an existing xml file. If it exists, load it to
-    // "pugi::xml_document" otherwise create a new "pugi::xml_document"
+    // Load the file if it exists, else start a new document
     pugi::xml_document doc;
     pugi::xml_parse_result result = doc.load_file(fn.c_str());
     pugi::xml_node node_qdant, node_arrayant;
@@ -783,7 +780,7 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     // (degree) with decimals relative to the element peak (qd_qdant_decimal_thresholds)
     const std::streamsize digits_grid = 6;
 
-    // Element pos
+    // Element positions
     if (!element_pos->empty())
         node_arrayant.append_child((pfx + "ElementPosition").c_str()).text().set(qd_qdant_float_columns(*element_pos).c_str());
 
@@ -1008,7 +1005,6 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     return "";
 }
 
-// Declare templates
 template std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                              const std::string *name,
                                              const arma::Cube<float> *e_theta_re, const arma::Cube<float> *e_theta_im,

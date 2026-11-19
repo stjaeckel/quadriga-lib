@@ -1,6 +1,11 @@
-function test_arrayant_combine_pattern_example
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% Generate dipole pattern
+function test_arrayant_combine_pattern_example
+% MEX interface test for quadriga_lib.arrayant_combine_pattern: combines a 4-element dipole array
+% (smoke test, no assertions).
+
 ant = quadriga_lib.arrayant_generate('dipole');
 
 % Duplicate 4 times
@@ -15,14 +20,7 @@ ant.element_pos(2,:) = [ -0.75, -0.25, 0.25, 0.75];  % lambda, along y-axis
 ant.coupling_re = [ 1 ; 1 ; 1 ; 1 ]/sqrt(4);
 ant.coupling_im = [ 0 ; 0 ; 0 ; 0 ];
 
-% Calculate effective pattern
 ant_c = quadriga_lib.arrayant_combine_pattern( ant );
-
-% Plot gain
-%plot( ant.azimuth_grid*180/pi, [ 10*log10( ant.e_theta_re(91,:,1).^2 ); 10*log10( ant_c.e_theta_re(91,:).^2 ) ]);
-%axis([-180 180 -20 15]); ylabel('Gain (dBi)'); xlabel('Azimth angle (deg)'); legend('Dipole','Array')
 
 
 end
-
-

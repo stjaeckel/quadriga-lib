@@ -13,7 +13,6 @@
 #include <vector>
 #include <stdexcept>
 
-// --- Internal helper: accumulate_pdp ---
 // Sums the power per tap index, in the order of the entries, and returns the taps with non-zero power in ascending
 // order together with their power. The work does not depend on the absolute delays: a dense vector is used only over
 // the index range [d_min, d_max] and only when that range is small compared to the number of entries; otherwise the
@@ -60,7 +59,6 @@ static void accumulate_pdp(const unsigned *d, const double *p, arma::uword n, un
     }
 }
 
-// --- Internal helper: find_optimal_delays ---
 // Accumulates PDP, selects the strongest taps up to max_taps.
 // dn/pn: rounded tap indices and their power (n_non entries)
 // di/pi: interpolated tap indices and their power (n_int entries, may be 0)
@@ -714,7 +712,6 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_r
     delay_quant = std::move(out_dl);
 }
 
-// --- Explicit template instantiation ---
 template void quadriga_lib::quantize_delays(
     const std::vector<arma::Cube<float>> &coeff_re,
     const std::vector<arma::Cube<float>> &coeff_im,

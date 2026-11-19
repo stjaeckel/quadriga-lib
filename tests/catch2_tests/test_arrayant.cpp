@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Array antenna structure and operations: is_valid, the block-diagonal coupling of arrayant_concat, arrayant_remove_zeros,
+// arrayant_copy_element and the output checks of arrayant_calc_beamwidth. Oracles are hand-written grids and coupling
+// matrices; the short-dipole directivity is 1.76 dBi (10 log10(1.5)).
+
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -63,7 +67,7 @@ TEST_CASE("Arrayant is_valid - Checks the data")
 }
 
 // Append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
-// of ports differs from the number of elements, and treat an empty coupling_im as zeros (it used to crash).
+// of ports differs from the number of elements, and treat an empty coupling_im as zeros.
 TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than elements")
 {
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
@@ -124,7 +128,7 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
     CHECK(arma::approx_equal(f.coupling_re, T, "absdiff", 1e-14));
     CHECK(arma::all(arma::vectorise(f.coupling_im) == 0.0));
 
-    // arrayant_concat_multi shares the coupling assembly (empty couplings used to hit an Armadillo bounds error)
+    // arrayant_concat_multi with empty couplings
     std::vector<quadriga_lib::arrayant<double>> fm;
     REQUIRE_NOTHROW(fm = quadriga_lib::arrayant_concat_multi(std::vector<quadriga_lib::arrayant<double>>{e},
                                                              std::vector<quadriga_lib::arrayant<double>>{b}));
@@ -153,7 +157,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
         CHECK(arma::approx_equal(o.e_theta_re, o_ref.e_theta_re * s, "reldiff", 1e-12));
     }
 
-    // Float pattern scaled by 1e-8 (power 1e-16, below the old absolute limits)
+    // Float pattern scaled by 1e-8 (power 1e-16)
     auto af = quadriga_lib::generate_arrayant_custom<float>(90.0f, 90.0f, 0.0f, 5.0f);
     const float df_ref = qd_directivity(af, 0);
     quadriga_lib::arrayant<float> of_ref;

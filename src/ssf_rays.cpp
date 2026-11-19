@@ -329,25 +329,18 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     const bool tx_single = tx.n_cols != n_link, rotation = angle_model == "rotation";
     const arma::uword Fo = k1 - k0 + 1, r_slice = m_qd ? 0 : i_freq; // output frequencies, slice of rnd_ray
 
-    // Azimuth wrapped to [-pi, pi); elevation in [rad] of the zenith angle 90 deg - el_c + off (in [deg]), wrapped
-    // to [0, 360) and folded at 180 deg (TR 38.901 clause 7.5 step 7, used for ZOA and ZOD)
-    auto wrap = [pi](double x) { return x - 2.0 * pi * std::floor((x + pi) / (2.0 * pi)); };
-    auto fold = [d2r](double el_c, double off)
-    {
-        double t = 90.0 - el_c / d2r + off;
-        t -= 360.0 * std::floor(t / 360.0);
-        return (90.0 - (t >= 180.0 ? 360.0 - t : t)) * d2r;
-    };
+    // Elevation in [rad] of the zenith angle 90 deg - el_c + off (in [deg]), folded at 180 deg (used for ZOA and ZOD)
+    auto fold = [d2r](double el_c, double off) { return qd_gbsm_elev(90.0 - el_c / d2r + off); };
 
     // Ray direction of the rotation angle model: the offset direction (azimuth a, elevation e in [rad]) rotated by
     // R = Rz(az_c)·Ry(-el_c), which maps (1, 0, 0) to the cluster direction; equal to the additive model at el_c = 0
-    auto rotate = [&wrap](double az_c, double el_c, double a, double e, double &az, double &el)
+    auto rotate = [](double az_c, double el_c, double a, double e, double &az, double &el)
     {
         const double ce = std::cos(el_c), se = std::sin(el_c), ca = std::cos(az_c), sa = std::sin(az_c);
         const double v[3] = {std::cos(e) * std::cos(a), std::cos(e) * std::sin(a), std::sin(e)};
         const double w[3] = {ce * ca * v[0] - sa * v[1] - se * ca * v[2], ce * sa * v[0] + ca * v[1] - se * sa * v[2],
                              se * v[0] + ce * v[2]};
-        az = wrap(std::atan2(w[1], w[0])), el = std::atan2(w[2], std::sqrt(w[0] * w[0] + w[1] * w[1]));
+        az = qd_gbsm_wrap(std::atan2(w[1], w[0])), el = std::atan2(w[2], std::sqrt(w[0] * w[0] + w[1] * w[1]));
     };
 
     auto one_link = [&](arma::uword l)
@@ -430,7 +423,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                 split_b = n;
         }
 
-        // Owner end of the rotation polarisation model: the end of larger z, then x, then y, where the ends differ
+        // Owner end of the rotation polarization model: the end of larger z, then x, then y, where the ends differ
         // by more than 1 mm; the Tx if all three tie. The Rx as owner transposes the matrix (swap reciprocity)
         bool rx_owner = false;
         for (arma::uword i : {2, 0, 1})
@@ -504,8 +497,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                 }
                 else
                 {
-                    r.aod(i) = wrap(aod(l, s, g) + c_spread[0] * alpha[m] * d2r);
-                    r.aoa(i) = wrap(aoa(l, s, g) + c_spread[1] * alpha[M + m] * d2r);
+                    r.aod(i) = qd_gbsm_wrap(aod(l, s, g) + c_spread[0] * alpha[m] * d2r);
+                    r.aoa(i) = qd_gbsm_wrap(aoa(l, s, g) + c_spread[1] * alpha[M + m] * d2r);
                     r.eod(i) = fold(eod(l, s, g), c_spread[2] * alpha[2 * M + m]);
                     r.eoa(i) = fold(eoa(l, s, g), c_spread[3] * alpha[3 * M + m]);
                 }

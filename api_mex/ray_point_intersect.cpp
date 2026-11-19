@@ -53,13 +53,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 4 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[1], false, "orig");
     const arma::mat trivec = qd_mex_get_Mat<double>(prhs[2], false, "trivec");
     const arma::mat tridir = qd_mex_get_Mat<double>(prhs[3], false, "tridir");
@@ -82,15 +80,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<unsigned> *p_hit_index = (nlhs > 1) ? &hit_ind : nullptr;
     arma::u32_vec *p_hit_offset = (nlhs > 1) ? &hit_offset : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::ray_point_intersect<double>(points, orig, trivec, tridir,
                                                       p_hit_index, p_hit_offset, p_hit_count, nullptr,
                                                       sub_cloud_ind, use_kernel, gpu_id));
 
-    // Transpose the CSR list into the zero-padded [max_hits, n_points] MATLAB array.
-    // qd_mex_init_output allocates through mxCreateNumericMatrix, so the unused slots
-    // are already zero, and the 0-based to 1-based shift is folded into the write.
-    // (Zero-padding acts as a "no ray" sentinel since valid indices are >= 1.)
+    // Transpose the CSR list into the [max_hits, n_points] MATLAB array; mxCreateNumericMatrix zero-fills it, so 0 marks
+    // "no ray", and the 1-based shift is folded into the write
     if (nlhs > 1)
     {
         const arma::uword n_points = points.n_rows;

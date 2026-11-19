@@ -25,9 +25,8 @@
 #include "quadriga_lib_avx2_functions.hpp"
 #endif
 
-// OpenMP-safe exception handling
-// Declare `bool` + `std::string` before the parallel region, pass them in,
-// and rethrow a runtime_error after the region if the flag was set.
+// Runs __VA_ARGS__ inside an OpenMP parallel region, which no exception may leave: the first error sets error_flag
+// (bool) and error_msg (std::string), both declared before the region; the caller rethrows after the region
 #define OMP_SAFE_CALL(error_flag, error_msg, ...)                 \
     try                                                           \
     {                                                             \
@@ -50,21 +49,28 @@
         }                                                         \
     }
 
-// Runs f(i) for the items i = 0 ... n - 1 of a batch, in parallel if 'parallel' is set. An error of an item is
+// Runs f(i) for the items i = 0 ... n - 1 of a batch, in parallel if 'parallel' is set (dynamic schedule). With a
+// type S other than void, f(i, s) gets a scratch object S &s per thread, reused for its items. An error of an item is
 // rethrown after the loop with the prefix "<prefix> <id>: " of the lowest failing item (id = i, or id[i] if given),
-// as std::invalid_argument if it was one, else as std::runtime_error. std::exception_ptr is not used: it needs a libstdc++
-// symbol version that the libstdc++ bundled with older MATLAB releases lacks, so the MEX files would not load there.
-template <typename F>
-inline void qd_batch_loop(size_t n, bool parallel, const char *prefix, F &&f, const arma::uvec *id = nullptr)
+// as std::invalid_argument if it was one, else as std::runtime_error; the serial loop stops at the first error.
+// std::exception_ptr is not used: it needs a libstdc++ symbol version that the libstdc++ bundled with older MATLAB
+// releases lacks, so the MEX files would not load there.
+template <typename S = void, typename F>
+static inline void qd_batch_loop(size_t n, bool parallel, const char *prefix, F &&f, const arma::uvec *id = nullptr)
 {
-    long long n_i = (long long)n, i_err = n_i;
+    using scratch_type = std::conditional_t<std::is_void_v<S>, char, S>;
+    const long long n_i = (long long)n;
+    long long i_err = n_i;
     bool invalid_arg = false;
     std::string msg;
-#pragma omp parallel for if (parallel)
-    for (long long i = 0; i < n_i; ++i)
+    auto run = [&](long long i, scratch_type &scratch)
+    {
         try
         {
-            f((size_t)i);
+            if constexpr (std::is_void_v<S>)
+                (void)scratch, f((size_t)i);
+            else
+                f((size_t)i, scratch);
         }
         catch (const std::exception &e)
         {
@@ -72,6 +78,23 @@ inline void qd_batch_loop(size_t n, bool parallel, const char *prefix, F &&f, co
             if (i < i_err)
                 i_err = i, invalid_arg = dynamic_cast<const std::invalid_argument *>(&e) != nullptr, msg = e.what();
         }
+    };
+    if (parallel)
+    {
+#pragma omp parallel
+        {
+            scratch_type scratch{};
+#pragma omp for schedule(dynamic)
+            for (long long i = 0; i < n_i; ++i)
+                run(i, scratch);
+        }
+    }
+    else // Without a parallel region: its fixed cost (about 1.5 us per call, measured) matters for small batches
+    {
+        scratch_type scratch{};
+        for (long long i = 0; i < n_i && i_err == n_i; ++i)
+            run(i, scratch);
+    }
     if (i_err == n_i)
         return;
     msg = std::string(prefix) + " " + std::to_string(id ? (*id)[(arma::uword)i_err] : (arma::uword)i_err) + ": " + msg;
@@ -202,7 +225,20 @@ static inline int qd_kernel_auto_avx2(int use_kernel)
     return (use_kernel == 1 || !avx2_available) ? 1 : 2;
 }
 
-// Calculate length
+// Snapshot selection of the batch functions: all n_snap snapshots (0-based) for an empty 'i_snap', else a copy of
+// 'i_snap'; an entry >= n_snap throws std::invalid_argument (the message names no index, so that it reads right in
+// the 0-based and the 1-based interfaces)
+static inline arma::uvec qd_snapshot_list(const arma::uvec &i_snap, size_t n_snap)
+{
+    if (i_snap.is_empty())
+        return n_snap == 0 ? arma::uvec() : arma::regspace<arma::uvec>(0, (arma::uword)n_snap - 1);
+    for (arma::uword i : i_snap)
+        if (i >= n_snap)
+            throw std::invalid_argument("Input 'i_snap' contains indices outside the range of the " + std::to_string(n_snap) + " snapshots.");
+    return i_snap;
+}
+
+// Distance between the points O and D
 template <typename dtype>
 static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
 {
@@ -213,11 +249,11 @@ static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype
     return std::sqrt(b);
 }
 
-// Euler rotations to rotation matrix
+// Rotation matrices from Euler angles [bank, tilt, heading] in rad
 template <typename dtype>
-static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientation vectors (Euler rotations)
-                                      dtype *rotation_matrix_9xN,    // Rotation matrix in column-major ordering
-                                      size_t N = 1,                  // Number of elements
+static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Euler angles in rad, [3, N]
+                                      dtype *rotation_matrix_9xN,    // Output: rotation matrices, column-major, [9, N]
+                                      size_t N = 1,                  // Number of orientations
                                       bool transposeR = false)       // Returns the transpose of R
 {
     for (size_t i = 0; i < 3 * N; i += 3)
@@ -257,7 +293,7 @@ static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientat
     }
 }
 
-// Apply Euler rotations inplace
+// Rotates N points in place by the Euler angles (rad); data3xN is [3, N], or [N, 3] if 'transpose'
 template <typename dtype>
 static inline void qd_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *data3xN, size_t N, bool transpose = false)
 {
@@ -286,7 +322,7 @@ static inline void qd_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtyp
     }
 }
 
-// Multiply with scalar
+// Scales data[0 .. N-1] by 'scalar'
 template <typename dtype>
 static inline void qd_multiply_scalar(dtype scalar, dtype *data, size_t N)
 {
@@ -349,9 +385,10 @@ static inline double qd_interp_linear(const double *y, const double *x, size_t n
     return y[lo] + w * (y[hi] - y[lo]);
 }
 
-// Spherical interpolation with linear fallback for a single complex value pair
+// Spherical interpolation X between the complex values A (w = 0) and B (w = 1): the phase is interpolated on the
+// unit circle and the amplitude linearly; near-opposite phases fall back to linear interpolation
 template <typename dtype>
-inline void qd_slerp_complex(dtype Ar, dtype Ai, dtype Br, dtype Bi, dtype w, dtype &Xr, dtype &Xi)
+static inline void qd_slerp_complex(dtype Ar, dtype Ai, dtype Br, dtype Bi, dtype w, dtype &Xr, dtype &Xi)
 {
     constexpr dtype one = dtype(1.0), zero = dtype(0.0), neg_one = dtype(-1.0);
     const dtype R0 = std::numeric_limits<dtype>::epsilon() * std::numeric_limits<dtype>::epsilon() * std::numeric_limits<dtype>::epsilon();
@@ -419,12 +456,6 @@ static constexpr double qd_speed_of_light = 299792458.0;
 // and convert once at their entry; the material model works in EM-equivalent units.
 //   f_eq = f_acoustic * qd_acoustic_freq_scale
 static constexpr double qd_acoustic_freq_scale = qd_speed_of_light / qd_speed_of_sound;
-
-// Material-model frequency in GHz of a public frequency argument in Hz (acoustic Hz in scalar mode)
-static inline double qd_material_fGHz(double f_Hz, bool scalar_mode)
-{
-    return (scalar_mode ? f_Hz * qd_acoustic_freq_scale : f_Hz) * 1.0e-9;
-}
 
 // Atmospheric absorption coefficient alpha(f) in dB/m according to ISO 9613-1.
 // Defaults: T = 20 degrees Celsius, RH = 50 %, p = 1 atm (indoor sea-level).

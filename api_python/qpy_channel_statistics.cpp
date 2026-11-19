@@ -2,11 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
-#include "qd_helpers_python.hpp"
 #include "qd_helpers_python_types.hpp"
-
-
 
 /*!SECTION
 Channel statistics
@@ -52,14 +48,12 @@ py::tuple acdf(const py::array_t<double> &data,
                py::handle bins,
                arma::uword n_bins)
 {
-    // Read input data
     const auto data_a = qd_python_numpy2arma_Mat<double>(data, true);
     const auto bins_in_a = qd_python_numpy2arma_Col<double>(bins, true);
 
     arma::uword n_bins_out = bins_in_a.empty() ? n_bins : bins_in_a.n_elem;
     arma::uword n_sets = data_a.n_cols;
 
-    // Output allocation
     arma::mat cdf_per_set;
     arma::vec cdf_avg, bins_out, mu, sig;
 
@@ -68,17 +62,13 @@ py::tuple acdf(const py::array_t<double> &data,
     auto mu_py = qd_python_init_output(9, &mu);
     auto sig_py = qd_python_init_output(9, &sig);
 
-    // Special case for bins
     if (!bins_in_a.empty())
         bins_out = bins_in_a;
 
-    // Call library function
     quadriga_lib::acdf<double>(data_a, &bins_out, &cdf_per_set, &cdf_avg, &mu, &sig, n_bins);
 
-    // Copy to python
     auto bins_out_py = qd_python_copy2numpy(&bins_out);
 
-    // Return tuple
     return py::make_tuple(cdf_per_set_py, bins_out_py, cdf_avg_py, mu_py, sig_py);
 }
 
@@ -134,22 +124,18 @@ py::tuple calc_angular_spread(py::list az,
     const bool wrapping_b = qd_python_flag(wrapping, false, "wrapping");
     const bool calc_bank_angle_b = qd_python_flag(calc_bank_angle, false, "calc_bank_angle");
 
-    // Convert inputs to std::vector<arma::vec>
     std::vector<arma::vec> az_a = qd_python_list2vector_Col<double>(az);
     std::vector<arma::vec> el_a = qd_python_list2vector_Col<double>(el);
     std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
 
-    // Declare outputs
     arma::vec azimuth_spread, elevation_spread;
     arma::mat orientation;
     std::vector<arma::vec> phi, theta;
 
-    // Call library function
     quadriga_lib::calc_angular_spread<double>(az_a, el_a, powers_a,
                                               &azimuth_spread, &elevation_spread, &orientation,
                                               &phi, &theta, wrapping_b, calc_bank_angle_b, quantize_deg);
 
-    // Convert to Python
     auto azimuth_spread_py = qd_python_copy2numpy(&azimuth_spread);
     auto elevation_spread_py = qd_python_copy2numpy(&elevation_spread);
     auto orientation_py = qd_python_copy2numpy(&orientation);
@@ -232,22 +218,18 @@ py::tuple calc_cross_polarization_ratio(py::list powers,
 {
     const bool include_los_b = qd_python_flag(include_los, false, "include_los");
 
-    // Convert inputs
     std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
     std::vector<arma::mat> polmat_a = qd_python_list2vector_Mat<double>(polmat);
     std::vector<arma::vec> path_length_a = qd_python_list2vector_Col<double>(path_length);
     arma::mat tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     arma::mat rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
 
-    // Declare outputs
     arma::mat xpr;
     arma::vec pg;
 
-    // Call library
     quadriga_lib::calc_cross_polarization_ratio<double>(powers_a, polmat_a, path_length_a, tx_pos_a, rx_pos_a,
                                                         &xpr, &pg, include_los_b, window_size);
 
-    // Convert outputs
     auto xpr_py = qd_python_copy2numpy(&xpr);
     auto pg_py = qd_python_copy2numpy(&pg);
 
@@ -290,11 +272,9 @@ py::tuple calc_delay_spread(py::list delays,
                             double threshold_dB,
                             double granularity)
 {
-    // Convert Python lists to std::vector<arma::vec>
     std::vector<arma::vec> delays_a = qd_python_list2vector_Col<double>(delays);
     std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
 
-    // Declare outputs
     arma::vec mean_delay;
     const arma::vec ds = quadriga_lib::calc_delay_spread<double>(delays_a, powers_a, threshold_dB, granularity, &mean_delay);
 
@@ -341,16 +321,14 @@ py::tuple calc_rician_k_factor(py::list powers,
                                const py::array_t<double> &rx_pos,
                                double window_size)
 {
-    // Convert Python inputs to C++ types
     std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
     std::vector<arma::vec> path_length_a = qd_python_list2vector_Col<double>(path_length);
     arma::mat tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     arma::mat rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
 
-    // Declare outputs
     arma::vec kf, pg;
 
-    // Call C++ library (always compute all outputs for Python)
+    // All outputs are computed, also when the caller ignores some
     quadriga_lib::calc_rician_k_factor<double>(powers_a, path_length_a, tx_pos_a, rx_pos_a, &kf, &pg, window_size);
 
     auto kf_py = qd_python_copy2numpy(&kf);

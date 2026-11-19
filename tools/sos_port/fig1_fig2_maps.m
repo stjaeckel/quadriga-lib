@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Fig. 1 and Fig. 2 of the paper: an example of the 2-D process, and the desired and the approximated 2-D ACF.
 % Paper: combined ACF, 300 sinusoids, 250 m x 250 m with 0.5 m spacing, z = 0. Here: preset Comb256.
 res_dir = sos_port_init();

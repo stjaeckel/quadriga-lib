@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_gbsm_single_link_channel
 % MEX interface test for quadriga_lib.gbsm_single_link_channel.
 % Scope: argument and output handling, optional inputs, index conversion, error paths.

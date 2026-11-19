@@ -4,8 +4,6 @@
 
 #include "qd_helpers_python_types.hpp"
 
-
-
 /*!SECTION
 Array antenna functions
 SECTION!*/
@@ -143,7 +141,6 @@ py::dict arrayant_generate(const std::string &type,
     }
     const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
 
-    // Set default resolution by type when res == 0
     if (res == 0.0)
         res = (type == "omni" || type == "xpol") ? 10.0 : 1.0;
 

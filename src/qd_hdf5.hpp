@@ -83,7 +83,7 @@ namespace qd
         static constexpr size_t root_directory_entries = 16;   // Continuation messages reserved in root chunk 0
         static constexpr size_t directory_chunk_body = 16380;  // 819 Continuation messages
         static constexpr size_t link_chunk_body_first = 1024;  // Body of link chunk k: min(1024 * 2^k, 8192)
-        static constexpr size_t link_chunk_body_max = 8192;    //
+        static constexpr size_t link_chunk_body_max = 8192;
         static constexpr size_t chain_chunk_body_max = 16384;  // New chunk of a growable group: max(L + 20, min(16384, 2 * last))
         static constexpr size_t continuation_size = 20;        // Size of a Continuation message
         static constexpr size_t header_window = 16384;         // Read window for object headers of unknown length

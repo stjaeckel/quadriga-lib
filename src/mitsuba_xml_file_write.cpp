@@ -13,12 +13,10 @@
 #define PUGIXML_HEADER_ONLY
 #include "pugixml.hpp"
 
-// ----------------------------------------------------------------------------
-// Helper: groups the face indices by object in one pass (counting sort, ascending face order within each object,
+// Groups the face indices by object in one pass (counting sort, ascending face order within each object,
 // the order of arma::find(obj_ind == i)). The faces of object i are face_list[start[i] ... start[i + 1] - 1].
 // All entries of obj_ind must be below n_obj.
-// ----------------------------------------------------------------------------
-static void faces_by_object(const arma::uvec &obj_ind, arma::uword n_obj,
+static void qd_faces_by_object(const arma::uvec &obj_ind, arma::uword n_obj,
                             std::vector<arma::uword> &start, std::vector<arma::uword> &face_list)
 {
     start.assign(n_obj + 1, 0);
@@ -33,13 +31,9 @@ static void faces_by_object(const arma::uvec &obj_ind, arma::uword n_obj,
         face_list[cursor[obj_ind[f]]++] = f;
 }
 
-// ----------------------------------------------------------------------------
-// Helper: returns the ITU material that best matches `name`.
-// Fallback is "air".
-// ----------------------------------------------------------------------------
-static std::string_view map_to_itu(std::string_view name)
+// ITU material of the first table entry whose prefix or ITU name `name` begins with; "air" if none matches
+static std::string_view qd_map_to_itu(std::string_view name)
 {
-    // Extend this table once with all known mappings.
     static constexpr std::pair<std::string_view, std::string_view> kPrefixMap[] = {
 
         // Sionna default mappings
@@ -69,7 +63,6 @@ static std::string_view map_to_itu(std::string_view name)
         {"irr_glass", "itu_glass"},
     };
 
-    // C++ 17 version:
     for (auto [prefix, itu] : kPrefixMap)
         if ((name.size() >= prefix.size() && name.compare(0, prefix.size(), prefix) == 0) ||
             (name.size() >= itu.size() && name.compare(0, itu.size(), itu) == 0))
@@ -228,7 +221,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
 
         for (arma::uword i_mtl = 0; i_mtl < n_mtl; ++i_mtl)
         {
-            auto itu_name = map_to_itu(mtl_names[i_mtl]);
+            auto itu_name = qd_map_to_itu(mtl_names[i_mtl]);
 
             // insert if not seen yet; value == next available index
             auto [it, inserted] = itu_index.emplace(itu_name, itu_index.size());
@@ -268,22 +261,19 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     auto obj_ind_local = obj_ind;
     obj_names_local.reserve(2 * n_obj);
 
-    std::vector<arma::uword> obj_start, obj_faces; // faces per object, see faces_by_object
-    faces_by_object(obj_ind, n_obj, obj_start, obj_faces);
+    std::vector<arma::uword> obj_start, obj_faces; // faces per object, see qd_faces_by_object
+    qd_faces_by_object(obj_ind, n_obj, obj_start, obj_faces);
 
     arma::uword next_obj_id = n_obj;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
     {
-        // Get the the original object name
         const std::string base_name = obj_names_valid[i_obj];
 
         // All faces whose obj_ind == i_obj
         arma::uvec face_idx(obj_faces.data() + obj_start[i_obj], obj_start[i_obj + 1] - obj_start[i_obj]);
 
-        //  Gather the material IDs for these faces
         arma::uvec mtls_here = mtl_ind_local.elem(face_idx);
 
-        // Find the unique material IDs used by this object
         arma::uvec unique_mtls = arma::unique(mtls_here);
         if (unique_mtls.n_elem < 2)
             continue;
@@ -338,7 +328,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         throw std::runtime_error("Failed to create directory '" + mesh_folder.string() + "': " + ec.message());
 
     // Faces per object after the split
-    faces_by_object(obj_ind_local, n_obj, obj_start, obj_faces);
+    qd_faces_by_object(obj_ind_local, n_obj, obj_start, obj_faces);
 
     // Global to PLY-local vertex index; set for the vertices of each object before its faces read it
     std::vector<unsigned> ply_index(n_vert);
@@ -415,112 +405,9 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         fileW.close();
     }
 
-    // Write XML
     pugi::xml_document doc;
     auto node_scene = doc.append_child("scene");
     node_scene.append_attribute("version").set_value("3.0.0");
-
-    // { // Add integrator
-    //     auto node_integrator = node_scene.append_child("integrator");
-    //     node_integrator.append_attribute("type").set_value("path");
-
-    //     auto node_integer = node_integrator.append_child("integer");
-    //     node_integer.append_attribute("name").set_value("max_depth");
-    //     node_integer.append_attribute("value").set_value(5);
-    // }
-
-    // { // Add sensor
-    //     auto node_sensor = node_scene.append_child("sensor");
-    //     node_sensor.append_attribute("type").set_value("perspective");
-    //     node_sensor.append_attribute("id").set_value("camera");
-    //     node_sensor.append_attribute("name").set_value("camera");
-
-    //     // fov axis
-    //     auto node_string = node_sensor.append_child("string");
-    //     node_string.append_attribute("name").set_value("fov_axis");
-    //     node_string.append_attribute("value").set_value("x");
-
-    //     // scalar floats
-    //     auto node_float = node_sensor.append_child("float");
-    //     node_float.append_attribute("name").set_value("fov");
-    //     node_float.append_attribute("value").set_value(39.6);
-
-    //     node_float = node_sensor.append_child("float");
-    //     node_float.append_attribute("name").set_value("principal_point_offset_x");
-    //     node_float.append_attribute("value").set_value(0.0);
-
-    //     node_float = node_sensor.append_child("float");
-    //     node_float.append_attribute("name").set_value("principal_point_offset_y");
-    //     node_float.append_attribute("value").set_value(0.0);
-
-    //     node_float = node_sensor.append_child("float");
-    //     node_float.append_attribute("name").set_value("near_clip");
-    //     node_float.append_attribute("value").set_value(0.1);
-
-    //     node_float = node_sensor.append_child("float");
-    //     node_float.append_attribute("name").set_value("far_clip");
-    //     node_float.append_attribute("value").set_value(100.0);
-
-    //     // to_world transform
-    //     auto node_transform = node_sensor.append_child("transform");
-    //     node_transform.append_attribute("name").set_value("to_world");
-
-    //     auto node_rotate = node_transform.append_child("rotate");
-    //     node_rotate.append_attribute("x").set_value(1);
-    //     node_rotate.append_attribute("angle").set_value(116.44070980054053);
-
-    //     node_rotate = node_transform.append_child("rotate");
-    //     node_rotate.append_attribute("y").set_value(1);
-    //     node_rotate.append_attribute("angle").set_value(5.419622430558914e-06);
-
-    //     node_rotate = node_transform.append_child("rotate");
-    //     node_rotate.append_attribute("z").set_value(1);
-    //     node_rotate.append_attribute("angle").set_value(-133.30805320118378);
-
-    //     auto node_translate = node_transform.append_child("translate");
-    //     node_translate.append_attribute("value").set_value("7.358891 -6.925791 4.958309");
-
-    //     // sampler
-    //     auto node_sampler = node_sensor.append_child("sampler");
-    //     node_sampler.append_attribute("type").set_value("independent");
-    //     node_sampler.append_attribute("name").set_value("sampler");
-
-    //     auto node_integer = node_sampler.append_child("integer");
-    //     node_integer.append_attribute("name").set_value("sample_count");
-    //     node_integer.append_attribute("value").set_value(16);
-
-    //     // film
-    //     auto node_film = node_sensor.append_child("film");
-    //     node_film.append_attribute("type").set_value("hdrfilm");
-    //     node_film.append_attribute("name").set_value("film");
-
-    //     node_integer = node_film.append_child("integer");
-    //     node_integer.append_attribute("name").set_value("width");
-    //     node_integer.append_attribute("value").set_value(1920);
-
-    //     node_integer = node_film.append_child("integer");
-    //     node_integer.append_attribute("name").set_value("height");
-    //     node_integer.append_attribute("value").set_value(1080);
-    // }
-
-    // { // Add emitter
-    //     auto node_emitter = node_scene.append_child("emitter");
-    //     node_emitter.append_attribute("type").set_value("point");
-    //     node_emitter.append_attribute("id").set_value("elm__3");
-    //     node_emitter.append_attribute("name").set_value("elm__3");
-
-    //     // emitter position
-    //     auto node_point = node_emitter.append_child("point");
-    //     node_point.append_attribute("name").set_value("position");
-    //     node_point.append_attribute("x").set_value(4.076245307922363);
-    //     node_point.append_attribute("y").set_value(1.0054539442062378);
-    //     node_point.append_attribute("z").set_value(5.903861999511719);
-
-    //     // emitter intensity
-    //     auto node_rgb = node_emitter.append_child("rgb");
-    //     node_rgb.append_attribute("name").set_value("intensity");
-    //     node_rgb.append_attribute("value").set_value("79.577469 79.577469 79.577469");
-    // }
 
     // Write materials
     if (use_bsdf)

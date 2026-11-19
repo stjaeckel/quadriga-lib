@@ -39,13 +39,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input arguments
     const arma::uword n_div = qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 0);
     const double radius = qd_mex_get_scalar<double>(prhs[1], "radius");
     const bool direction_xyz = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "direction_xyz", false);
@@ -58,7 +56,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_faces = 20 * n_div * n_div;
     const arma::uword n_dir_cols = direction_xyz ? 9 : 6;
 
-    // Output allocation
     arma::mat center, vert, direction;
     arma::vec length;
 
@@ -70,11 +67,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         plhs[3] = qd_mex_init_output(&direction, n_faces, n_dir_cols);
 
-    // Wrap optional output pointers (center is required by C++, always pass &center)
+    // center is mandatory in C++
     arma::vec *p_length = length.empty() ? nullptr : &length;
     arma::mat *p_vert = vert.empty() ? nullptr : &vert;
     arma::mat *p_direction = direction.empty() ? nullptr : &direction;
 
-    // Call library function
     CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, center, p_length, p_vert, p_direction, direction_xyz));
 }

@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down plane: the default 2 x 2 quad, scale, rotation (Rz·Ry·Rx about the centre), translation, the order of
+// these transforms, subdivision, the +z normal of the Blender winding (also under negative scales), input validation.
+// Oracles: a hand-written reference plane transformed in scalar math, triangle areas, bounding boxes and normals.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"

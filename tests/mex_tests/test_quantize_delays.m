@@ -1,7 +1,12 @@
-function test_quantize_delays()
-% MOxUnit tests for quadriga_lib.quantize_delays
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% --- Input validation tests ---
+function test_quantize_delays()
+% MEX interface test for quadriga_lib.quantize_delays.
+% Physics validation lives in the Catch2 suite (test_quantize_delays.cpp).
+
+%% Input validation tests
 cre = ones(2, 2, 3, 1);
 cim = zeros(2, 2, 3, 1);
 dl = rand(2, 2, 3, 1) * 100e-9;
@@ -41,7 +46,7 @@ catch ME
     end
 end
 
-% --- Single path at exact tap boundary ---
+%% Single path at exact tap boundary
 cre = zeros(1, 1, 1, 1);
 cim = zeros(1, 1, 1, 1);
 dl = zeros(1, 1, 1, 1);
@@ -62,7 +67,7 @@ for k = 1:size(cre_q, 3)
 end
 assertEqual(found, true);
 
-% --- Half-tap offset with linear exponent ---
+%% Half-tap offset with linear exponent
 cre = zeros(1, 1, 1, 1);
 cim = zeros(1, 1, 1, 1);
 dl = zeros(1, 1, 1, 1);
@@ -84,7 +89,7 @@ end
 assertEqual(n_nonzero, 2);
 assertElementsAlmostEqual(sum_re, 4.0, 'absolute', 1e-12);
 
-% --- Half-tap offset with sqrt exponent ---
+%% Half-tap offset with sqrt exponent
 cre = zeros(1, 1, 1, 1);
 cim = zeros(1, 1, 1, 1);
 dl = zeros(1, 1, 1, 1);
@@ -107,7 +112,7 @@ end
 assertEqual(n_nonzero, 2);
 assertElementsAlmostEqual(sum_power, 16.0, 'absolute', 1e-10);
 
-% --- Already quantized input ---
+%% Already quantized input
 cre = zeros(1, 1, 3, 1);
 cim = zeros(1, 1, 3, 1);
 dl = zeros(1, 1, 3, 1);
@@ -133,7 +138,7 @@ for k = 1:size(cre_q, 3)
     end
 end
 
-% --- max_taps limits output ---
+%% max_taps limits output
 cre = zeros(1, 1, 5, 1);
 cim = zeros(1, 1, 5, 1);
 dl = zeros(1, 1, 5, 1);
@@ -154,7 +159,7 @@ end
 assertEqual(n_nonzero, 3);
 assertEqual(double(size(cre_q, 3) <= 3), 1.0);
 
-% --- Shared delays with fix_taps=2 ---
+%% Shared delays with fix_taps=2
 cre4 = randn(2, 2, 3, 2);
 cim4 = randn(2, 2, 3, 2);
 dl4 = zeros(1, 1, 3, 2);
@@ -167,7 +172,7 @@ dl4(1,1,3,:) = 30e-9;
 assertEqual(size(dl_q, 1), 1);
 assertEqual(size(dl_q, 2), 1);
 
-% --- Shared delays with fix_taps=0 produces per-antenna output ---
+%% Shared delays with fix_taps=0 produces per-antenna output
 cre4 = randn(2, 2, 2, 1);
 cim4 = randn(2, 2, 2, 1);
 dl4 = zeros(1, 1, 2, 1);
@@ -179,7 +184,7 @@ dl4(1,1,2,1) = 17.5e-9;
 assertEqual(size(dl_q, 1), 2);
 assertEqual(size(dl_q, 2), 2);
 
-% --- Multiple snapshots with fix_taps=1 ---
+%% Multiple snapshots with fix_taps=1
 cre4 = ones(2, 1, 2, 2);
 cim4 = zeros(2, 1, 2, 2);
 dl4 = zeros(2, 1, 2, 2);
@@ -196,7 +201,7 @@ for k = 1:n_taps
     assertElementsAlmostEqual(dl_q(1,1,k,1), dl_q(1,1,k,2), 'absolute', 1e-20);
 end
 
-% --- Paths combining at same tap ---
+%% Paths combining at same tap
 cre = zeros(1, 1, 2, 1);
 cim = zeros(1, 1, 2, 1);
 dl = zeros(1, 1, 2, 1);
@@ -214,7 +219,7 @@ for k = 1:size(cre_q, 3)
 end
 assertEqual(found, true);
 
-% --- Zero delay ---
+%% Zero delay
 cre = zeros(1, 1, 1, 1);
 cim = zeros(1, 1, 1, 1);
 dl = zeros(1, 1, 1, 1);

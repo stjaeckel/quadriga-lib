@@ -46,13 +46,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const arma::mat mesh = qd_mex_get_Mat<double>(prhs[0], false, "mesh");
     const arma::uword target_size = (nrhs < 2) ? 1024 : qd_mex_get_scalar<arma::uword>(prhs[1], "target_size", 1024);
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
@@ -60,24 +58,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Material index: 1-based in C++ as well (0 = no material), no shift intended
     const arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind");
 
-    // Output containers (sizes are determined inside the C++ call)
     arma::mat mesh_out;
     arma::u32_vec sub_mesh_ind;
     arma::uvec mtl_indR;
     arma::u32_vec mesh_ind;
 
-    // Wrap optional pointers
     arma::uvec *p_mtl_indR = (nlhs > 3) ? &mtl_indR : nullptr;
     arma::u32_vec *p_mesh_index = (nlhs > 2) ? &mesh_ind : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::triangle_mesh_segmentation<double>(mesh, mesh_out, sub_mesh_ind,
                                                              target_size, vec_size, mtl_ind, p_mtl_indR, p_mesh_index));
 
-    // Convert indices from 0-based (C++) to 1-based (MATLAB); mtl_indR is 1-based in C++ (no shift intended)
+    // mesh_ind (0 = padding) and mtl_indR (0 = no material) are 1-based in C++: no shift
     sub_mesh_ind += 1;
 
-    // Copy outputs to MATLAB (sizes only known after the C++ call)
     plhs[0] = qd_mex_copy2matlab(&mesh_out);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&sub_mesh_ind);

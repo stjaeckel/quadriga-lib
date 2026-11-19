@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.arrayant.calc_beamwidth: beamwidth and pointing of known patterns, element selection, multi-frequency output, error paths.
+
 import sys
 import os
 import unittest

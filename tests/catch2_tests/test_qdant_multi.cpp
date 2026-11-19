@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::qdant_write_multi and qdant_read_multi: round trips of multi-frequency speaker
+// models and other arrayants, the layout output, overwriting, agreement with qdant_read per entry, and errors.
+// QDANT is XML text, so values round-trip only to the printed precision (tolerances tol_d and tol_f).
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -27,15 +31,12 @@ TEST_CASE("QDANT Multi - Write/Read roundtrip with speaker model")
                                                        0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
     REQUIRE(spk.size() == 5);
 
-    // Write to file
     REQUIRE_NOTHROW(quadriga_lib::qdant_write_multi(fn, spk));
     CHECK(std::filesystem::exists(fn));
 
-    // Read back
     arma::u32_mat layout;
     auto spk_read = quadriga_lib::qdant_read_multi<double>(fn, &layout);
 
-    // Same number of entries
     REQUIRE(spk_read.size() == spk.size());
 
     // Layout should be [n_freq, 1] with entries 1...n_freq
@@ -44,7 +45,6 @@ TEST_CASE("QDANT Multi - Write/Read roundtrip with speaker model")
     for (arma::uword i = 0; i < 5; ++i)
         CHECK(layout(i, 0) == (unsigned)(i + 1));
 
-    // Compare each frequency entry
     for (size_t i = 0; i < spk.size(); ++i)
     {
         INFO("Frequency index: " << i);
@@ -55,31 +55,24 @@ TEST_CASE("QDANT Multi - Write/Read roundtrip with speaker model")
         CHECK(spk_read[i].n_elements() == spk[i].n_elements());
         CHECK(spk_read[i].n_ports() == spk[i].n_ports());
 
-        // Center frequency
         CHECK(std::abs(spk_read[i].center_freq - spk[i].center_freq) < tol_d);
 
-        // Name
         CHECK(spk_read[i].name == spk[i].name);
 
-        // Pattern data
         CHECK(arma::approx_equal(spk_read[i].e_theta_re, spk[i].e_theta_re, "absdiff", tol_d));
         CHECK(arma::approx_equal(spk_read[i].e_theta_im, spk[i].e_theta_im, "absdiff", tol_d));
         CHECK(arma::approx_equal(spk_read[i].e_phi_re, spk[i].e_phi_re, "absdiff", tol_d));
         CHECK(arma::approx_equal(spk_read[i].e_phi_im, spk[i].e_phi_im, "absdiff", tol_d));
 
-        // Grids
         CHECK(arma::approx_equal(spk_read[i].azimuth_grid, spk[i].azimuth_grid, "absdiff", tol_d));
         CHECK(arma::approx_equal(spk_read[i].elevation_grid, spk[i].elevation_grid, "absdiff", tol_d));
 
-        // Element positions
         CHECK(arma::approx_equal(spk_read[i].element_pos, spk[i].element_pos, "absdiff", tol_d));
 
-        // Coupling
         CHECK(arma::approx_equal(spk_read[i].coupling_re, spk[i].coupling_re, "absdiff", tol_d));
         CHECK(arma::approx_equal(spk_read[i].coupling_im, spk[i].coupling_im, "absdiff", tol_d));
     }
 
-    // Cleanup
     std::filesystem::remove(fn);
 }
 
@@ -286,7 +279,6 @@ TEST_CASE("QDANT Multi - Write empty vector throws")
 
     REQUIRE_THROWS_AS(quadriga_lib::qdant_write_multi(fn, empty_vec), std::invalid_argument);
 
-    // File should not have been created
     CHECK(!std::filesystem::exists(fn));
 }
 
@@ -390,7 +382,6 @@ TEST_CASE("QDANT Multi - Large number of entries")
     REQUIRE(layout.n_rows == (arma::uword)spk.size());
     REQUIRE(layout.n_cols == 1);
 
-    // Verify layout IDs are sequential 1..N
     for (arma::uword i = 0; i < layout.n_rows; ++i)
         CHECK(layout(i, 0) == (unsigned)(i + 1));
 

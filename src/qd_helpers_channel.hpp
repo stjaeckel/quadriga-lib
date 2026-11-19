@@ -3,25 +3,28 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Helpers shared by the sources of the channel sections: matrix products of the channel generators, the
-// combination of antenna patterns into coefficients, the batch ("_vec") checks and snapshot loop, and the type ID of
-// values in std::any
+// combination of antenna patterns into coefficients, the spherical-wave geometry, the element coupling, the batch
+// ("_vec") checks and snapshot loop, and the type ID of values in std::any
 
 #ifndef qd_helpers_channel_hpp
 #define qd_helpers_channel_hpp
 
 #include "quadriga_arrayant.hpp"
 #include "qd_helpers_arrayant.hpp"
+#include "qd_helpers_shared.hpp"
 
 #include <armadillo>
 #include <any>
 #include <cmath>
 #include <complex>
+#include <cstring>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
-// Calculate the matrix product X = A^T * B * C
-// - A, C can be NULL to calculate X = A^T * B or X = B * C
+// Matrix product X = A^T * B * C
+// - A, C can be nullptr to calculate X = A^T * B or X = B * C
 // - Output does not need to be initialized to 0
 template <typename dtype>
 static inline void qd_multiply_3_mat(const dtype *A, // n rows, m columns
@@ -33,7 +36,6 @@ static inline void qd_multiply_3_mat(const dtype *A, // n rows, m columns
     bool null_A = A == nullptr;
     bool null_C = C == nullptr;
 
-    // Avoid expensive typecasts
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
 
     // Calculate the output row by row
@@ -42,7 +44,7 @@ static inline void qd_multiply_3_mat(const dtype *A, // n rows, m columns
         for (size_t ip = 0; ip < p; ip++) // Initialize output to zero
             X[ip * m + im] = zero;
 
-        // Process temporary matrix T = A^H * B column-wise
+        // Process temporary matrix T = A^T * B column-wise
         for (size_t io = 0; io < o; ++io)
         {
             // Calculate one value of the temporary matrix T
@@ -63,8 +65,8 @@ static inline void qd_multiply_3_mat(const dtype *A, // n rows, m columns
     }
 }
 
-// Calculates the matrix product X = A^T * B * C
-// - Ar, Ai, Cr, Ci can be N
+// Complex matrix product X = A^T * B * C (transpose without conjugation)
+// - Ar, Cr can be nullptr (identity), Ai, Ci can be nullptr (zero)
 // - Output does not need to be initialized to 0
 template <typename dtype>
 static inline void qd_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n rows, m columns
@@ -73,7 +75,6 @@ static inline void qd_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, /
                                              dtype *Xr, dtype *Xi,             // m rows, p columns
                                              size_t n, size_t m, size_t o, size_t p)
 {
-    // Avoid expensive typecasts
     constexpr dtype zero = (dtype)0.0, one = (dtype)1.0;
 
     // Calculate the output row by row
@@ -83,7 +84,7 @@ static inline void qd_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, /
         for (size_t ip = 0; ip < p; ++ip)
             Xr[ip * m + im] = zero, Xi[ip * m + im] = zero;
 
-        // Process temporary matrix T = A^H * B column-wise
+        // Process temporary matrix T = A^T * B column-wise
         for (size_t io = 0; io < o; ++io)
         {
             // Calculate one value of the temporary matrix T
@@ -150,31 +151,26 @@ static inline void qd_power_mat(size_t n, size_t m,                             
     }
 }
 
-// Combine interpolated TX/RX antenna patterns with the polarization transfer
-// matrix and applies the propagation phase to produce one slice of MIMO
-// channel coefficients (one path, all TX-RX element pairs).
-//
-// For each link index R = 0 .. n_links-1 the operation is:
-//
-//   Jones product (complex multiply-accumulate across 4 polarization components):
+// Combines the interpolated TX/RX antenna patterns with the polarization transfer matrix and applies the
+// propagation phase: one slice of MIMO channel coefficients (one path, all TX-RX element pairs).
+// For each link index R = 0 .. n_links-1:
+//   Jones product (all values complex, c = re + j*im):
 //     c = Vr * M_VV * Vt  +  Hr * M_HV * Vt  +  Vr * M_VH * Ht  +  Hr * M_HH * Ht
-//   with labels M_<rx><tx> (first letter: RX polarisation, second: TX polarisation), i.e. pM holds the 2x2 Jones
+//   with labels M_<rx><tx> (first letter: RX polarization, second: TX polarization); pM holds the 2x2 Jones
 //   matrix column-major: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx).
-//   where Vr, Hr, Vt, Ht and M_xx are complex, giving complex c = re + j*im.
-//
-//   Phase rotation from element-specific path delay:
+//   Phase rotation from the element-specific path length:
 //     phase = wave_number * fmod(p_delays[R], wavelength)
 //     p_coeff_re[R] = ( re*cos(phase) + im*sin(phase)) * path_amplitude
 //     p_coeff_im[R] = (-re*sin(phase) + im*cos(phase)) * path_amplitude
 template <typename dtype>
-inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol pattern (real, imag), length n_links
+static inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol pattern (real, imag), length n_links
                              const dtype *pHrr, const dtype *pHri, // RX H-pol pattern (real, imag), length n_links
                              const dtype *pVtr, const dtype *pVti, // TX V-pol pattern (real, imag), length n_links
                              const dtype *pHtr, const dtype *pHti, // TX H-pol pattern (real, imag), length n_links
                              const dtype *pM,                      // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}, labels <rx><tx>
-                             const dtype *p_delays,                // Per-link path lengths in [m], length n_links  (read-only)
+                             const dtype *p_delays,                // Per-link path lengths in [m], length n_links
                              dtype wave_number,                    // 2*pi*f/c
-                             dtype wavelength,                     // wavelength  : c/f
+                             dtype wavelength,                     // c/f
                              dtype path_amplitude,                 // sqrt(path_gain) scaling factor (set 0 for fake LOS path)
                              dtype *p_coeff_re,                    // Output real part of coefficients, length n_links
                              dtype *p_coeff_im,                    // Output imag part of coefficients, length n_links
@@ -203,6 +199,202 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
     }
 }
 
+// Spherical-wave geometry of get_channels_spherical and get_channels_multifreq (frequency independent)
+// - Element positions in GCS: the local positions 'tx_el' [3, n_tx] / 'rx_el' [3, n_rx] (empty = zeros), rotated by
+//   the orientation (bank, tilt, heading) and moved to the array position; tx_pos, tx_ori, rx_pos, rx_ori have 3 values
+// - Paths: fbs, lbs [3, n_path], path_length [n_path]; n_out = n_path, or n_path + 1 with add_fake_los_path (slot 0 is
+//   the LOS path, path i_out - 1 in slot i_out)
+// - Writes the departure and arrival angles and the element-pair path length in [m] of output path i_out and link
+//   R = t * n_rx + r to aod, eod, aoa, eoa, len at i_out * n_links + R; each [n_links, n_out]
+// - NLOS path length between the phase centres: max(path_length, TX-FBS-LBS-RX polyline); the extra length goes into
+//   the FBS-LBS segment
+// - Element indices and local positions for qd_arrayant_interpolate_dispatch: i_tx, i_rx [n_links];
+//   tx_pos_interp, rx_pos_interp [3, n_links]
+// - dist_rx_tx: distance between the TX and RX phase centres
+// - Returns the output slot of the path whose length is closest to dist_rx_tx, within 0.1 mm (the true LOS path);
+//   0 if there is none
+template <typename dtype>
+static inline arma::uword qd_channels_spherical_geometry(const arma::Mat<dtype> &tx_el, const arma::Mat<dtype> &rx_el,
+                                                         arma::uword n_tx, arma::uword n_rx,
+                                                         const dtype *tx_pos, const dtype *tx_ori,
+                                                         const dtype *rx_pos, const dtype *rx_ori,
+                                                         const dtype *fbs, const dtype *lbs, const dtype *path_length,
+                                                         arma::uword n_out, bool add_fake_los_path,
+                                                         dtype *aod, dtype *eod, dtype *aoa, dtype *eoa, dtype *len,
+                                                         arma::uvec &i_tx, arma::Mat<dtype> &tx_pos_interp,
+                                                         arma::uvec &i_rx, arma::Mat<dtype> &rx_pos_interp,
+                                                         dtype &dist_rx_tx)
+{
+    constexpr dtype los_limit = (dtype)1.0e-4, zero = (dtype)0.0;
+    const arma::uword n_links = n_rx * n_tx;
+    const dtype Tx = tx_pos[0], Ty = tx_pos[1], Tz = tx_pos[2];
+    const dtype Rx = rx_pos[0], Ry = rx_pos[1], Rz = rx_pos[2];
+
+    // Element positions in GCS
+    auto element_gcs = [](const arma::Mat<dtype> &el, arma::uword n, const dtype *pos, const dtype *ori)
+    {
+        arma::Mat<dtype> p(3, n, arma::fill::zeros);
+        if (el.n_elem != 0)
+            std::memcpy(p.memptr(), el.memptr(), 3 * n * sizeof(dtype));
+        if (ori[0] != (dtype)0 || ori[1] != (dtype)0 || ori[2] != (dtype)0)
+            qd_rotate_inplace(ori[0], ori[1], ori[2], p.memptr(), n);
+        dtype *pp = p.memptr();
+        for (arma::uword i = 0; i < 3 * n; i += 3)
+            pp[i] += pos[0], pp[i + 1] += pos[1], pp[i + 2] += pos[2];
+        return p;
+    };
+    const arma::Mat<dtype> tx_gcs = element_gcs(tx_el, n_tx, tx_pos, tx_ori), rx_gcs = element_gcs(rx_el, n_rx, rx_pos, rx_ori);
+    const dtype *p_tx = tx_gcs.memptr(), *p_rx = rx_gcs.memptr();
+
+    dist_rx_tx = qd_calc_length(Tx, Ty, Tz, Rx, Ry, Rz);
+
+    // There may be several paths within los_limit of the TX-RX distance; the closest one is the true LOS path
+    arma::uword true_los_path = 0;
+    dtype shortest_path = los_limit;
+    std::vector<dtype> dr(n_rx);
+
+    for (arma::uword i_out = 0; i_out < n_out; ++i_out)
+    {
+        const bool fake_los = add_fake_los_path && i_out == 0;
+        const arma::uword i = add_fake_los_path && i_out != 0 ? i_out - 1 : i_out;
+        const dtype *pf = &fbs[3 * i], *pl = &lbs[3 * i];
+        const arma::uword o_slice = i_out * n_links;
+
+        // Shortest possible path length (TX > FBS > LBS > RX)
+        dtype d_length = dist_rx_tx, d_fbs_lbs = zero;
+        if (!fake_los)
+        {
+            d_fbs_lbs = qd_calc_length(pf[0], pf[1], pf[2], pl[0], pl[1], pl[2]);
+            const dtype d_shortest = qd_calc_length(Tx, Ty, Tz, pf[0], pf[1], pf[2]) + d_fbs_lbs +
+                                     qd_calc_length(pl[0], pl[1], pl[2], Rx, Ry, Rz);
+            d_length = (path_length[i] < d_shortest) ? d_shortest : path_length[i];
+
+            // Paths with more interactions than FBS and LBS are longer than the TX-FBS-LBS-RX polyline: the extra
+            // length goes into the FBS-LBS segment, so that the phase-centre length equals d_length (= path_length)
+            d_fbs_lbs += d_length - d_shortest;
+        }
+
+        // Slot 0 of add_fake_los_path is the LOS path by definition, also when the TX-RX distance overflows
+        if (fake_los || std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
+        {
+            if (!fake_los)
+                true_los_path = i_out, shortest_path = std::abs(d_length - dist_rx_tx);
+
+            for (arma::uword t = 0; t < n_tx; ++t)
+            {
+                const dtype *pt = &p_tx[3 * t];
+                for (arma::uword r = 0; r < n_rx; ++r)
+                {
+                    const dtype *pr = &p_rx[3 * r];
+                    const dtype x = pr[0] - pt[0], y = pr[1] - pt[1], z = pr[2] - pt[2];
+                    const dtype d = std::sqrt(x * x + y * y + z * z);
+                    const arma::uword io = o_slice + t * n_rx + r;
+                    aod[io] = std::atan2(y, x);
+                    eod[io] = (d < los_limit) ? zero : std::asin(z / d);
+                    aoa[io] = std::atan2(-y, -x);
+                    eoa[io] = -eod[io];
+                    len[io] = d;
+                }
+            }
+        }
+        else // NLOS path
+        {
+            for (arma::uword r = 0; r < n_rx; ++r)
+            {
+                const dtype *pr = &p_rx[3 * r];
+                const dtype x = pl[0] - pr[0], y = pl[1] - pr[1], z = pl[2] - pr[2];
+                dr[r] = std::sqrt(x * x + y * y + z * z);
+                aoa[o_slice + r] = std::atan2(y, x);
+                eoa[o_slice + r] = (dr[r] < los_limit) ? zero : std::asin(z / dr[r]);
+            }
+            for (arma::uword t = 0; t < n_tx; ++t)
+            {
+                const dtype *pt = &p_tx[3 * t];
+                const dtype x = pf[0] - pt[0], y = pf[1] - pt[1], z = pf[2] - pt[2];
+                const dtype dt = std::sqrt(x * x + y * y + z * z), at = std::atan2(y, x),
+                            et = (dt < los_limit) ? zero : std::asin(z / dt);
+                for (arma::uword r = 0; r < n_rx; ++r)
+                {
+                    const arma::uword io = o_slice + t * n_rx + r;
+                    aod[io] = at;
+                    eod[io] = et;
+                    aoa[io] = aoa[o_slice + r];
+                    eoa[io] = eoa[o_slice + r];
+                    len[io] = dt + d_fbs_lbs + dr[r];
+                }
+            }
+        }
+    }
+
+    // Element indices and local positions of the links
+    i_tx.set_size(n_links), i_rx.set_size(n_links);
+    tx_pos_interp.zeros(3, n_links), rx_pos_interp.zeros(3, n_links);
+    const dtype *ptl = tx_el.n_elem != 0 ? tx_el.memptr() : nullptr, *prl = rx_el.n_elem != 0 ? rx_el.memptr() : nullptr;
+    for (arma::uword t = 0; t < n_tx; ++t)
+        for (arma::uword r = 0; r < n_rx; ++r)
+        {
+            const arma::uword R = t * n_rx + r;
+            i_tx[R] = t, i_rx[R] = r;
+            if (ptl != nullptr)
+                std::memcpy(tx_pos_interp.colptr(R), &ptl[3 * t], 3 * sizeof(dtype));
+            if (prl != nullptr)
+                std::memcpy(rx_pos_interp.colptr(R), &prl[3 * r], 3 * sizeof(dtype));
+        }
+
+    return true_los_path;
+}
+
+// True if the coupling (coupling_re [n_el, n_ports] or empty = identity, coupling_im of the same size or empty =
+// zero) is the identity within 1e-6 per entry, so that the channel generators can skip it
+template <typename dtype>
+static inline bool qd_coupling_is_identity(const arma::Mat<dtype> &coupling_re, const arma::Mat<dtype> &coupling_im)
+{
+    constexpr dtype limit = (dtype)1.0e-6, one = (dtype)1.0;
+    const arma::uword n = coupling_re.n_rows;
+    if (coupling_re.n_elem != 0 && coupling_re.n_cols != n)
+        return false;
+    const dtype *p = coupling_re.memptr();
+    for (arma::uword c = 0; c < coupling_re.n_cols; ++c)
+        for (arma::uword r = 0; r < n; ++r)
+            if (std::abs(p[c * n + r] - (r == c ? one : (dtype)0.0)) > limit)
+                return false;
+    for (const dtype v : coupling_im)
+        if (std::abs(v) > limit)
+            return false;
+    return true;
+}
+
+// Applies the antenna coupling to one path of the channel generators: coefficients C_out = A_rx^T * C_in * A_tx
+// with the complex coupling matrices (rx_re/rx_im [n_rx, n_rx_ports], tx_re/tx_im [n_tx, n_tx_ports], nullptr =
+// identity / zero), delays D_out = P_rx^T * D_in * P_tx with the column-normalized coupling powers (rx_pwr, tx_pwr,
+// see qd_power_mat)
+// - Inputs cr_in, ci_in, dl_in [n_rx, n_tx]; outputs cr_out, ci_out, dl_out [n_rx_ports, n_tx_ports]
+// - The outputs may be the inputs (in place, when the port counts equal the element counts); the result then goes
+//   through 'temp', which is resized as needed
+template <typename dtype>
+static inline void qd_coupling_apply_slot(const dtype *rx_re, const dtype *rx_im, const dtype *tx_re, const dtype *tx_im,
+                                          const dtype *rx_pwr, const dtype *tx_pwr,
+                                          size_t n_rx, size_t n_rx_ports, size_t n_tx, size_t n_tx_ports,
+                                          const dtype *cr_in, const dtype *ci_in, const dtype *dl_in,
+                                          dtype *cr_out, dtype *ci_out, dtype *dl_out, std::vector<dtype> &temp)
+{
+    const size_t n_ports = n_rx_ports * n_tx_ports;
+    if (cr_out != cr_in)
+    {
+        qd_multiply_3_complex_mat(rx_re, rx_im, cr_in, ci_in, tx_re, tx_im, cr_out, ci_out, n_rx, n_rx_ports, n_tx, n_tx_ports);
+        qd_multiply_3_mat(rx_pwr, dl_in, tx_pwr, dl_out, n_rx, n_rx_ports, n_tx, n_tx_ports);
+        return;
+    }
+    if (temp.size() < 2 * n_ports)
+        temp.resize(2 * n_ports);
+    dtype *tX = temp.data(), *tY = tX + n_ports;
+    qd_multiply_3_complex_mat(rx_re, rx_im, cr_in, ci_in, tx_re, tx_im, tX, tY, n_rx, n_rx_ports, n_tx, n_tx_ports);
+    std::memcpy(cr_out, tX, n_ports * sizeof(dtype));
+    std::memcpy(ci_out, tY, n_ports * sizeof(dtype));
+    qd_multiply_3_mat(rx_pwr, dl_in, tx_pwr, tX, n_rx, n_rx_ports, n_tx, n_tx_ports);
+    std::memcpy(dl_out, tX, n_ports * sizeof(dtype));
+}
+
 // Checks of the "_vec" channel functions, before any output is changed: positions and orientations [3, 1] or
 // [3, n_snap], antennas and kernel (also without snapshots; the single call checks them again, from a cache).
 // 'n_path(s)' gives the number of input paths of snapshot s. Returns whether the snapshot loop runs in parallel: from
@@ -210,7 +402,7 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
 // thread: 3.2 us per call and 0.35 us per coefficient). 8 SISO snapshots with one path each (work 80) run 2x
 // (spherical) and 2.9x (planar) faster than on one thread, 4 snapshots 1.3x (spherical).
 template <typename dtype, typename N>
-inline bool qd_channels_vec_check(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
+static inline bool qd_channels_vec_check(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
                                   const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
                                   const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
                                   size_t n_snap, N &&n_path, int use_kernel)
@@ -223,12 +415,7 @@ inline bool qd_channels_vec_check(const quadriga_lib::arrayant<dtype> &tx_array,
             throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 1 or 'n_snap' columns.");
 
     qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
-    std::string antenna_error = qd_arrayant_is_valid_quick(tx_array);
-    if (!antenna_error.empty())
-        throw std::invalid_argument("Transmit antenna: " + antenna_error);
-    antenna_error = qd_arrayant_is_valid_quick(rx_array);
-    if (!antenna_error.empty())
-        throw std::invalid_argument("Receive antenna: " + antenna_error);
+    qd_arrayant_check_tx_rx(tx_array, rx_array);
 
     const arma::uword n_links = tx_array.e_theta_re.n_slices * rx_array.e_theta_re.n_slices;
     arma::uword n_work = 0ULL;
@@ -239,22 +426,20 @@ inline bool qd_channels_vec_check(const quadriga_lib::arrayant<dtype> &tx_array,
 
 // Column s of a position or orientation with 1 or n_snap columns, aliased without copying
 template <typename dtype>
-inline arma::Mat<dtype> qd_channels_vec_col(const arma::Mat<dtype> &m, size_t s)
+static inline arma::Mat<dtype> qd_channels_vec_col(const arma::Mat<dtype> &m, size_t s)
 {
     return arma::Mat<dtype>(const_cast<dtype *>(m.colptr(m.n_cols == 1ULL ? 0ULL : s)), 3, 1, false, true);
 }
 
-// Calls 'call(s, coeff_re_s, coeff_im_s)' for the snapshots s = 0 ... n_snap - 1, in parallel if 'parallel' is set.
+// Calls 'call(s, coeff_re_s, coeff_im_s)' for the snapshots s = 0 ... n_snap - 1 with qd_batch_loop (prefix "Snapshot").
 // - Without 'coeff', the split outputs are the entries of 'coeff_re' / 'coeff_im' (resized to n_snap).
 // - With 'coeff', each thread computes into its own split cubes and interleaves them into the entry of 'coeff';
 //   'coeff_re' and 'coeff_im' are left empty. Entries that already have the output size are written in place.
-// - An error throws std::invalid_argument with the message of the call, preceded by "Snapshot <s>: " of the lowest
-//   failing snapshot.
 // - Inside the parallel region, parallel regions of 'call' run on one thread (one active level by default).
 template <typename dtype, typename F>
-inline void qd_channels_snapshot_loop(size_t n_snap, bool parallel,
-                                      std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
-                                      std::vector<arma::Cube<std::complex<dtype>>> *coeff, F &&call)
+static inline void qd_channels_snapshot_loop(size_t n_snap, bool parallel,
+                                             std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
+                                             std::vector<arma::Cube<std::complex<dtype>>> *coeff, F &&call)
 {
     if (coeff != nullptr)
     {
@@ -265,57 +450,23 @@ inline void qd_channels_snapshot_loop(size_t n_snap, bool parallel,
     else if (coeff_re.size() != n_snap || coeff_im.size() != n_snap)
         coeff_re.resize(n_snap), coeff_im.resize(n_snap);
 
-    std::string error_message;
-    long long error_snap = (long long)n_snap;
-    const long long n_snap_i = (long long)n_snap;
-
-    // One snapshot of the loop; 'cr' and 'ci' are the split scratch of the complex output, reused by the thread
-    auto run = [&](long long i, arma::Cube<dtype> &cr, arma::Cube<dtype> &ci)
-    {
-        const size_t s = (size_t)i;
-        try
+    using split_cubes = std::pair<arma::Cube<dtype>, arma::Cube<dtype>>; // Scratch of the complex output
+    qd_batch_loop<split_cubes>(n_snap, parallel, "Snapshot", [&](size_t s, split_cubes &split)
+                               {
+        if (coeff == nullptr)
         {
-            if (coeff == nullptr)
-                call(s, coeff_re[s], coeff_im[s]);
-            else
-            {
-                call(s, cr, ci);
-                arma::Cube<std::complex<dtype>> &c = (*coeff)[s];
-                if (c.n_rows != cr.n_rows || c.n_cols != cr.n_cols || c.n_slices != cr.n_slices)
-                    c.set_size(cr.n_rows, cr.n_cols, cr.n_slices);
-                std::complex<dtype> *p = c.memptr();
-                const dtype *p_re = cr.memptr(), *p_im = ci.memptr();
-                for (arma::uword k = 0; k < cr.n_elem; ++k)
-                    p[k] = std::complex<dtype>(p_re[k], p_im[k]);
-            }
+            call(s, coeff_re[s], coeff_im[s]);
+            return;
         }
-        catch (const std::exception &e)
-        {
-#pragma omp critical
-            if (i < error_snap)
-                error_snap = i, error_message = e.what();
-        }
-    };
-
-    if (parallel)
-    {
-#pragma omp parallel
-        {
-            arma::Cube<dtype> cr, ci;
-#pragma omp for schedule(dynamic)
-            for (long long i = 0; i < n_snap_i; ++i)
-                run(i, cr, ci);
-        }
-    }
-    else // Without a parallel region: its fixed cost (about 1.5 us per call, measured) matters for single snapshots
-    {
-        arma::Cube<dtype> cr, ci;
-        for (long long i = 0; i < n_snap_i && error_snap == n_snap_i; ++i)
-            run(i, cr, ci);
-    }
-
-    if (error_snap < n_snap_i)
-        throw std::invalid_argument("Snapshot " + std::to_string(error_snap) + ": " + error_message);
+        arma::Cube<dtype> &cr = split.first, &ci = split.second;
+        call(s, cr, ci);
+        arma::Cube<std::complex<dtype>> &c = (*coeff)[s];
+        if (c.n_rows != cr.n_rows || c.n_cols != cr.n_cols || c.n_slices != cr.n_slices)
+            c.set_size(cr.n_rows, cr.n_cols, cr.n_slices);
+        std::complex<dtype> *p = c.memptr();
+        const dtype *p_re = cr.memptr(), *p_im = ci.memptr();
+        for (arma::uword k = 0; k < cr.n_elem; ++k)
+            p[k] = std::complex<dtype>(p_re[k], p_im[k]); });
 }
 
 // Type ID, shape and a read-only pointer to the data of the value in a std::any (implementation of any_type_id)

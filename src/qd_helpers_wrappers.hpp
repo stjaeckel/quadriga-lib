@@ -7,6 +7,7 @@
 #ifndef qd_helpers_wrappers_hpp
 #define qd_helpers_wrappers_hpp
 
+#include "quadriga_arrayant.hpp"
 #include "quadriga_channel.hpp"
 
 #include <armadillo>
@@ -22,6 +23,21 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+// Defaults of the optional arrayant fields after reading a MATLAB struct or Python dict: an empty 'element_pos' becomes
+// zeros [3, n_elements], an empty coupling (both parts empty) identity [n_elements, n_elements], an empty
+// 'coupling_im' zeros of the size of 'coupling_re'; given members stay unchanged. The library treats empty members
+// the same way, so this changes only the arrays that the wrappers return.
+static inline void qd_arrayant_fill_defaults(quadriga_lib::arrayant<double> &ant)
+{
+    const arma::uword n_elements = ant.e_theta_re.n_slices;
+    if (ant.element_pos.is_empty())
+        ant.element_pos.zeros(3, n_elements);
+    if (ant.coupling_re.is_empty() && ant.coupling_im.is_empty())
+        ant.coupling_re.eye(n_elements, n_elements);
+    if (ant.coupling_im.is_empty())
+        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+}
 
 // Occupied slots of an HDF5 slot selection, for hdf5_read_channel_vec (used by the MEX and Python read wrappers)
 // - dims, channel_id: layout {nx, ny, nz, nw} and channel ID per slot, as returned by hdf5_read_layout; dims = 0
@@ -61,17 +77,15 @@ static inline arma::u32_mat qd_hdf5_select_slots(const arma::u32_vec &dims, cons
     return arma::u32_mat(slots.data(), 4, slots.size() / 4);
 }
 
-// ---- Chunked reading of QRT CIRs (qrt_file_read) ----
-// Chunked, double-buffered reading of QRT CIRs
+// ---- Chunked, double-buffered reading of QRT CIRs (qrt_file_read) ----
 // - A reader thread reads the next chunk of CIRs while the calling thread converts the previous one, so that file
 //   reading and conversion overlap; the peak memory is the converted output plus two chunks
 // - The reader thread uses only the shared state on the heap (stream, cache, buffers), never MATLAB or Python objects
 // - No std::exception_ptr and no std::condition_variable::wait: the MEX files must load with the older libstdc++ of
 //   MATLAB (tests/check_mex_symbol_versions.sh); errors are passed as type and message, waits use wait_for
 
-
 // Adds 'offset' to the position in a "Snapshot <k>: " prefix of a qrt_file_read message about one CIR of a chunk
-inline std::string qd_qrt_shift_prefix(const std::string &msg, arma::uword offset)
+static inline std::string qd_qrt_shift_prefix(const std::string &msg, arma::uword offset)
 {
     const std::string p = "Snapshot ";
     if (offset == 0 || msg.compare(0, p.size(), p) != 0)
@@ -155,7 +169,7 @@ struct qd_qrt_chunk_state
 // - 'Unlock' is a scoped type constructed while the calling thread waits for the reader (e.g. py::gil_scoped_release)
 // - Errors of the reader are rethrown on the calling thread after the reader has stopped
 template <typename Unlock, typename Init, typename Consume>
-inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
+static inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
                                 int normalize_polmat, int n_req, Init init, Consume consume, arma::uword chunk_size = 16)
 {
     auto st = std::make_shared<qd_qrt_chunk_state>();

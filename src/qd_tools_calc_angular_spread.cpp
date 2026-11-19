@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <string>
 
-// --- Internal helper: 1D RMS angular spread with wrapping and optional quantization ---
+// 1D RMS angular spread with wrapping and optional quantization
 template <typename dtype>
 static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uword L, dtype quantize_rad)
 {

@@ -4,8 +4,6 @@
 
 #include "qd_helpers_python_types.hpp"
 
-
-
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
@@ -192,25 +190,22 @@ py::tuple obj_file_write(const py::handle &fn,
     const auto bsdf_a = qd_python_numpy2arma_Mat<double>(bsdf, true);
     const auto obj_names_v = qd_python_list2vector_Strings(obj_names);
     const auto mtl_names_v = qd_python_list2vector_Strings(mtl_names);
-    const auto csv_ind_a = qd_python_numpy2arma_Col<arma::uword>(csv_ind, true, false, "csv_ind");
+    const auto csv_ind_a = qd_python_numpy2arma_Col<arma::uword>(csv_ind, true, false, "csv_ind"); // 1-based (0 = no material), not shifted
     const auto csv_names_v = qd_python_list2vector_Strings(csv_names);
 
-    // csv_ind is 1-based on both sides (0 = no material); no index shift
     std::unordered_map<std::string, std::vector<double>> csv_prop_m;
     if (!csv_prop.is_none())
         csv_prop_m = qd_python_dict2map<double>(csv_prop);
 
-    // Outputs (size determined by the C++ call) - always allocated and returned
     arma::mat vert_list_out;
     arma::umat face_ind_out;
 
-    // Call library function
     quadriga_lib::obj_file_write<double>(fn_s, mesh_a, obj_ind_a, mtl_ind_a, obj_names_v, mtl_names_v,
                                          &vert_list_out, &face_ind_out, vert_list_a, face_ind_a,
                                          bsdf_a, threshold, csv_ind_a, csv_names_v, csv_prop_m,
                                          csv_write_defaults_b, split_loose_parts_b);
 
-    // Copy to python (face indices stay 0-based)
+    // Face indices stay 0-based
     auto vert_list_out_py = qd_python_copy2numpy(&vert_list_out);
     auto face_ind_out_py = qd_python_copy2numpy<arma::uword, py::ssize_t>(&face_ind_out);
 

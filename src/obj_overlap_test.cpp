@@ -11,7 +11,7 @@
 // Line-Triangle intersect in 2D coordinates
 // - Triangle is defined by vertices P0(0,0), P1(x1,0) and P2(x2,y2)
 // - The line segment is given by O(ox,oy) -> D(dx,dy)
-// - We consider special rules for “on-edge” tolerance, co-linearity, etc. as follows:
+// - Rules for the on-edge tolerance and co-linearity:
 //   1. If either point O or D lies within the triangle and the other lies outside or at the boundary
 //      (i.e. the line crosses one edge/vertex or lies on that edge/vertex), it counts as a hit
 //   2. If the entire line segment lies within the triangle (i.e. both points are inside), it counts as a hit
@@ -30,13 +30,13 @@
 // - Returns 0 for a miss or the rule number that caused the hit otherwise
 // - Returns -1 if the triangle is degenerate, i.e. has a zero-sized area
 template <typename dtype>
-static inline int line_triangle_intersect_2D(dtype x1, dtype x2, dtype y2,    // Triangle
+static inline int qd_line_triangle_intersect_2D(dtype x1, dtype x2, dtype y2,    // Triangle
                                              dtype ox, dtype oy,              // Line origin point O
                                              dtype dx, dtype dy,              // Line destination point D
                                              dtype tolerance = (dtype)0.0005) // Intersect tolerance in m
 {
     const dtype eps = (dtype)1.0e-6; // Numeric tolerance
-    const dtype z0 = (dtype)0.0;     // Zero
+    const dtype z0 = (dtype)0.0;
 
     // Returns cross product of vectors A(ax,ay) x B(bx,by).
     auto crossp2D = [&](dtype ax, dtype ay, dtype bx, dtype by) -> dtype
@@ -193,8 +193,8 @@ static inline int line_triangle_intersect_2D(dtype x1, dtype x2, dtype y2,    //
             return 4;
 
         // 3) Check if inside (strictly ignoring edges):
-        //    We'll do area-sum approach. We'll say "inside" if areaP0P1P2 == area(P0,P1,P) + area(P1,P2,P) + area(P2,P0,P)
-        //    with a small epsilon. We'll treat zero on an edge as "outside" to be consistent with the prior "on-edge" check.
+        //    Inside if area(P0,P1,P2) == area(P0,P1,P) + area(P1,P2,P) + area(P2,P0,P) within a small epsilon; points on an
+        //    edge were classified by the on-edge check above
         const dtype A1 = area2D(px, py, x1, z0, x2, y2);
         const dtype A2 = area2D(z0, z0, px, py, x2, y2);
         const dtype A3 = area2D(z0, z0, x1, z0, px, py);
@@ -214,7 +214,7 @@ static inline int line_triangle_intersect_2D(dtype x1, dtype x2, dtype y2,    //
     int cP1 = line_colinear_with(x1, z0, x2, y2); // Edge 1: P1->P2
     int cP2 = line_colinear_with(x2, y2, z0, z0); // Edge 2: P2->P0
 
-    // The line can only be co-linear with one of the 3 edges, hence only one vale can be != 0
+    // The line can only be co-linear with one of the 3 edges, hence only one value can be != 0
     if (cP0 == 1 || cP1 == 1 || cP2 == 1) // Case 7b triggered for one of the edges
         return 7;                         // Return HIT for rule 7
     if (cP0 < 0 || cP1 < 0 || cP2 < 0)    // Case 7a or 7c triggered for one of the edges
@@ -261,7 +261,7 @@ static inline int line_triangle_intersect_2D(dtype x1, dtype x2, dtype y2,    //
             return 6;
     }
 
-    // If we somehow get here (e.g. missed some edge case?), default to no intersection
+    // No rule matched: no intersection
     return 0;
 }
 
@@ -410,8 +410,9 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
         box[6 * i_obj_prev + 5] = Zmax;
     }
 
-    // Split the mesh into individual objects
-    std::vector<arma::Mat<dtype>> obj_faces(n_obj); // Mesh split into individual objects
+    // Mesh split into objects. Faces [18, n_faces]: vertices 1 to 3, unit normal N, in-plane unit vectors U (along
+    // vertex 1 -> 2) and V = N x U. Edges [6, 3 * n_faces]: start and end point, edge k of face i in column i + k * n_faces.
+    std::vector<arma::Mat<dtype>> obj_faces(n_obj);
     std::vector<arma::Mat<dtype>> obj_edges(n_obj);
 
 #pragma omp parallel for if (n_obj >= 32)
@@ -490,21 +491,21 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
                 x1 -= x0, y1 -= y0, z1 -= z0;
                 x2 -= x0, y2 -= y0, z2 -= z0;
 
-                // Calculate normal vector N - store on X2
-                crossp(x1, y1, z1, x2, y2, z2, &x2, &y2, &z2, true);
+                // Normal vector N, stored in x2, y2, z2
+                qd_crossp(x1, y1, z1, x2, y2, z2, &x2, &y2, &z2, true);
                 p_faces[o_face + 9] = x2;
                 p_faces[o_face + 10] = y2;
                 p_faces[o_face + 11] = z2;
 
-                // P0 -> P1 (X1) as a direction for U
+                // U: direction of vertex 1 -> 2
                 dtype len = (dtype)1.0 / std::sqrt(x1 * x1 + y1 * y1 + z1 * z1);
                 x1 *= len, y1 *= len, z1 *= len;
                 p_faces[o_face + 12] = x1;
                 p_faces[o_face + 13] = y1;
                 p_faces[o_face + 14] = z1;
 
-                // V = N x U, store result in X2
-                crossp(x2, y2, z2, x1, y1, z1, &x2, &y2, &z2, true);
+                // V = N x U
+                qd_crossp(x2, y2, z2, x1, y1, z1, &x2, &y2, &z2, true);
                 p_faces[o_face + 15] = x2;
                 p_faces[o_face + 16] = y2;
                 p_faces[o_face + 17] = z2;
@@ -738,8 +739,8 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
                 {
                     dtype dx = px - x0, dy = py - y0, dz = pz - z0;
                     point2D res;
-                    res.x = dx * Ux + dy * Uy + dz * Uz; // coordinate along Ux
-                    res.y = dx * Vx + dy * Vy + dz * Vz; // coordinate along Uy
+                    res.x = dx * Ux + dy * Uy + dz * Uz; // coordinate along U
+                    res.y = dx * Vx + dy * Vy + dz * Vz; // coordinate along V
                     return res;
                 };
                 auto P1 = project2D(x1, y1, z1);
@@ -773,7 +774,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
                               My = p_edge_faces[o_edge_face + 10],
                               Mz = p_edge_faces[o_edge_face + 11];
 
-                        dtype dtp = dotp(Mx, My, Mz, Nx, Ny, Nz);
+                        dtype dtp = qd_dotp(Mx, My, Mz, Nx, Ny, Nz);
                         if (std::fabs(dtp - (dtype)1.0) > (dtype)1e-5) // Different directions?
                             continue;
 
@@ -781,23 +782,10 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
                         auto O = project2D(ox, oy, oz);
                         auto D = project2D(dx, dy, dz);
 
-                        int edge_hit = line_triangle_intersect_2D(P1.x, P2.x, P2.y, O.x, O.y, D.x, D.y, tolerance);
+                        int edge_hit = qd_line_triangle_intersect_2D(P1.x, P2.x, P2.y, O.x, O.y, D.x, D.y, tolerance);
 
                         if (edge_hit != 0 && p_hit[i_edge] == 0U) // A 2D hit where there was no hit
                             p_hit[i_edge] = 1U;
-
-                        // Debugging output
-                        // std::cout << "F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
-                        //           << " (" << x1 << "," << y1 << "," << z1 << ")"
-                        //           << " (" << x2 << "," << y2 << "," << z2 << ")} ::"
-                        //           << " {(" << 0 << "," << 0 << ")"
-                        //           << " (" << P1.x << "," << P1.y << ")"
-                        //           << " (" << P2.x << "," << P2.y << ")} ;"
-                        //           << " E:" << i_edge << "(" << i_edge % n_faces << ") {(" << ox << "," << oy << "," << oz << ")"
-                        //           << " (" << dx << "," << dy << "," << dz << ")} ::"
-                        //           << " {(" << O.x << "," << O.y << ")"
-                        //           << " (" << D.x << "," << D.y << ")} ;"
-                        //           << " H:" << edge_hit << std::endl;
 
                         if (nothing_to_report_so_far && edge_hit != 0)
                         {

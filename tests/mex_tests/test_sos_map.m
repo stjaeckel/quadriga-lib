@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_sos_map
 % MEX interface test for quadriga_lib.sos_map.
 % Scope: argument and output handling, defaults, error paths.

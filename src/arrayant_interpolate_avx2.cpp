@@ -20,15 +20,9 @@ namespace
     // general). The paths differ only in how they load inputs (broadcast vs. SoA gather) and store outputs
     // (contiguous vs. strided).
 
-    // 3×3 rotation matrix, 8 SIMD lanes per entry
-    //
-    // Stores R^T in column-major order (equivalently, R in row-major order).
-    // r[0..2] = column 0 of R^T = row 0 of R
-    // r[3..5] = column 1 of R^T = row 1 of R
-    // r[6..8] = column 2 of R^T = row 2 of R
-    //
-    // Forward rotation:  d = R * v   uses r[0],r[3],r[6] / r[1],r[4],r[7] / r[2],r[5],r[8]
-    // Back-rotation:     d = R^T * v uses r[0],r[1],r[2] / r[3],r[4],r[5] / r[6],r[7],r[8]
+    // 3×3 rotation matrix, 8 SIMD lanes per entry: R^T in column-major order (= R in row-major order), r[0..2] is
+    // row 0 of R. Forward rotation d = R * v uses r[0],r[3],r[6] / r[1],r[4],r[7] / r[2],r[5],r[8], back-rotation
+    // d = R^T * v uses r[0],r[1],r[2] / r[3],r[4],r[5] / r[6],r[7],r[8].
     struct RMatrix8
     {
         __m256 r[9];
@@ -61,30 +55,12 @@ namespace
         float eps_cubed;       // Tiny guard for weight computation (eps^3)
     };
 
-    // Vectorized azimuth grid lookup with cyclic wrapping
-    //
-    // For 8 azimuth query values in `az8`, finds the bracketing grid indices and the
-    // interpolation weight for bilinear interpolation. Azimuth wraps cyclically: values
-    // below grid min or above grid max interpolate between the last and first grid points.
-    //
-    // Handles three sub-cases internally:
-    //   n == 1:         Single grid point, no interpolation needed
-    //   uniform grid:   O(1) index from (az - min) / step, with cyclic wrap handling
-    //   non-uniform:    Vectorized binary search + cyclic wrap handling
-    //
-    // Inputs:
-    //   az8     — 8 query azimuth values [rad]
-    //   p       — precomputed grid parameters (see AzGridParams)
-    //
-    // Outputs:
-    //   iUp8    — lower bracket indices (8× int32), range [0, n-1]
-    //   iUn8    — upper bracket indices (8× int32), range [0, n-1]
-    //   up8     — interpolation weight for the lower bracket, range [0, 1]
-    //             (weight for upper bracket is implicitly 1 - up8)
+    // Azimuth grid lookup for 8 query values, cyclic: values below the first or above the last grid point interpolate
+    // between the last and the first one. n == 1: no interpolation; uniform grid: O(1) index; else binary search.
     static inline void avx2_grid_search_azimuth(
-        __m256 az8,
-        const AzGridParams &p,
-        __m256i *iUp8, __m256i *iUn8, __m256 *up8)
+        __m256 az8,                                // Query azimuth in rad
+        const AzGridParams &p,                     // Grid parameters
+        __m256i *iUp8, __m256i *iUn8, __m256 *up8) // Output: lower / upper bracket index in [0, n-1], weight of the lower one
     {
         const __m256 ones_8 = _mm256_set1_ps(1.0f);
         const __m256 zeros_8 = _mm256_setzero_ps();
@@ -182,29 +158,12 @@ namespace
         *up8 = _mm256_blendv_ps(up_norm, wrap_up, wrap_mask);
     }
 
-    // Vectorized elevation grid lookup with clamping
-    //
-    // For 8 elevation query values in `el8`, finds the bracketing grid indices and the
-    // interpolation weight. Elevation is clamped (not cyclic): values below grid min
-    // snap to index 0 with weight 1; values above grid max snap to the last index.
-    //
-    // Handles three sub-cases internally:
-    //   n <= 1:         Single grid point, no interpolation needed
-    //   uniform grid:   O(1) index + bottom-clamp
-    //   non-uniform:    Vectorized binary search + full clamp (both ends)
-    //
-    // Inputs:
-    //   el8     — 8 query elevation values [rad]
-    //   p       — precomputed grid parameters (see ElGridParams)
-    //
-    // Outputs:
-    //   iVp8    — lower bracket indices (8× int32), range [0, n-1]
-    //   iVn8    — upper bracket indices (8× int32), range [0, n-1]
-    //   vp8     — interpolation weight for the lower bracket, range [0, 1]
+    // Elevation grid lookup for 8 query values, clamped: values below the first grid point snap to index 0 with weight
+    // 1, values above the last to the last index. n <= 1: no interpolation; uniform grid: O(1) index; else binary search.
     static inline void avx2_grid_search_elevation(
-        __m256 el8,
-        const ElGridParams &p,
-        __m256i *iVp8, __m256i *iVn8, __m256 *vp8)
+        __m256 el8,                                // Query elevation in rad
+        const ElGridParams &p,                     // Grid parameters
+        __m256i *iVp8, __m256i *iVn8, __m256 *vp8) // Output: lower / upper bracket index in [0, n-1], weight of the lower one
     {
         const __m256 ones_8 = _mm256_set1_ps(1.0f);
         const __m256 zeros_8 = _mm256_setzero_ps();
@@ -300,39 +259,16 @@ namespace
         }
     }
 
-    // Rotation, coordinate transform, and polarization gamma
-    //
-    // Combines three stages of the interpolation pipeline that share intermediate values:
-    //
-    //   Stage B: Rotate input direction vector by antenna orientation matrix R.
-    //            Convert rotated Cartesian direction to local az/el via cart2geo.
-    //            Derive sin/cos of output angles from the Cartesian components directly
-    //            (avoids extra sincos calls).
-    //
-    //   Stage C: Compute input/output basis vectors (theta-hat, phi-hat) and the
-    //            polarization rotation angle gamma from their dot products.
-    //            eTHi, ePHi are the input basis vectors (from global az/el).
-    //            eTHo is the output basis vector (from local az/el), back-rotated by R^T
-    //            to the global frame for the dot product.
-    //
-    // Inputs:
-    //   R           — Rotation matrix (8 lanes per entry, see RMatrix8)
-    //   sAZi8       — sin(input_azimuth),   8 lanes
-    //   cAZi8       — cos(input_azimuth),   8 lanes
-    //   sELi8       — sin(input_elevation), 8 lanes
-    //   cELi8       — cos(input_elevation), 8 lanes
-    //
-    // Outputs:
-    //   dx8, dy8, dz8   — rotated direction vector (needed for distance computation)
-    //   az8, el8        — local azimuth/elevation in antenna coordinates [rad]
-    //   cos_gamma8      — cos of polarization rotation angle
-    //   sin_gamma8      — sin of polarization rotation angle
+    // Rotation of the query direction by R, local angles (cart2geo) and the polarization rotation angle gamma. The sin /
+    // cos of the local angles follow from the Cartesian components (no extra sincos). gamma follows from the dot
+    // products of the input basis vectors eTHi, ePHi (global angles) with the output basis vector eTHo (local angles),
+    // back-rotated by R^T to the global frame.
     static inline void avx2_rotate_and_polarize(
-        const RMatrix8 &R,
-        __m256 sAZi8, __m256 cAZi8, __m256 sELi8, __m256 cELi8,
-        __m256 *dx8, __m256 *dy8, __m256 *dz8,
-        __m256 *az8, __m256 *el8,
-        __m256 *cos_gamma8, __m256 *sin_gamma8)
+        const RMatrix8 &R,                                      // Rotation matrix, see RMatrix8
+        __m256 sAZi8, __m256 cAZi8, __m256 sELi8, __m256 cELi8, // sin / cos of the global azimuth and elevation
+        __m256 *dx8, __m256 *dy8, __m256 *dz8,                  // Output: rotated direction, for the distance
+        __m256 *az8, __m256 *el8,                               // Output: local azimuth and elevation in rad
+        __m256 *cos_gamma8, __m256 *sin_gamma8)                 // Output: cos / sin of the polarization rotation angle
     {
         // Input direction in Cartesian: [cEL*cAZ, cEL*sAZ, sEL]
         __m256 Cx8 = _mm256_mul_ps(cELi8, cAZi8);
@@ -391,21 +327,10 @@ namespace
         *sin_gamma8 = _mm256_fmadd_ps(ePHi_x8, eTHor_x8, _mm256_mul_ps(ePHi_y8, eTHor_y8));
     }
 
-    // Signed projected distance from element position onto direction
-    //
-    // Computes the effective distance as the signed projection of the element position
-    // vector onto the (unnormalized) direction vector [dx, dy, dz].
-    // Result is negated to match the convention used in the channel model.
-    //
-    // Inputs:
-    //   dx8, dy8, dz8  — rotated direction vector (from avx2_rotate_and_polarize)
-    //   px8, py8, pz8  — element position vector (8 lanes)
-    //
-    // Returns:
-    //   dist8 — signed projected distance (8 lanes, negated)
+    // Signed projection of the element position onto the direction, negated (convention of the channel model)
     static inline __m256 avx2_compute_distance(
-        __m256 dx8, __m256 dy8, __m256 dz8,
-        __m256 px8, __m256 py8, __m256 pz8)
+        __m256 dx8, __m256 dy8, __m256 dz8,  // Rotated direction from avx2_rotate_and_polarize
+        __m256 px8, __m256 py8, __m256 pz8)  // Element position in m
     {
         __m256 dot8 = _mm256_fmadd_ps(dx8, px8, _mm256_fmadd_ps(dy8, py8, _mm256_mul_ps(dz8, pz8)));
         __m256 dx2_8 = _mm256_mul_ps(dx8, dx8);
@@ -418,19 +343,8 @@ namespace
             _mm256_set1_ps(-0.0f)); // negate
     }
 
-    // Gather 8 doubles by index, convert to 8 floats in one __m256
-    //
-    // AVX2 can only gather 4 doubles at a time, so this splits the 8 indices into
-    // low (lanes 0-3) and high (lanes 4-7) halves, gathers each as __m256d, converts
-    // to __m128 (4 floats), and recombines into a single __m256.
-    //
-    // Inputs:
-    //   base   — pointer to double array to gather from
-    //   idx_lo — indices for lanes 0-3 (4× int32)
-    //   idx_hi — indices for lanes 4-7 (4× int32)
-    //
-    // Returns:
-    //   8 gathered-and-converted float values
+    // Gather 8 doubles by index and convert them to 8 floats; AVX2 gathers only 4 doubles at a time, so the indices are
+    // split into lanes 0-3 (idx_lo) and lanes 4-7 (idx_hi)
     static inline __m256 gather_d2f(const double *base, __m128i idx_lo, __m128i idx_hi)
     {
         return _mm256_set_m128(
@@ -438,52 +352,20 @@ namespace
             _mm256_cvtpd_ps(_mm256_i32gather_pd(base, idx_lo, 8)));
     }
 
-    // Gather pattern samples, SLERP interpolation, polarization rotation
-    //
-    // Combines three tightly-coupled stages:
-    //
-    //   Stage F: Build four gather indices from grid bracket indices (iUp/iUn × iVp/iVn),
-    //            element pattern offset, and n_elevation stride.
-    //
-    //   Gather:  Load 4 × 2 = 8 complex pattern samples (theta + phi polarizations) at the
-    //            four bilinear corner points (A=Up/Vp, B=Un/Vp, C=Up/Vn, D=Un/Vn).
-    //            dtype-dependent: float uses direct i32gather, double splits into 4+4 gathers
-    //            with double→float conversion.
-    //
-    //   SLERP:   6× complex spherical interpolation to produce the bilinear-interpolated
-    //            theta and phi field values.
-    //
-    //   Stage G: Apply polarization rotation (Jones matrix rotation by gamma) to transform
-    //            from local antenna coordinates to global coordinates.
-    //            Optionally compute gamma = atan2(sin_gamma, cos_gamma).
-    //
-    // Inputs:
-    //   iUp8, iUn8     — azimuth bracket indices from grid search
-    //   iVp8, iVn8     — elevation bracket indices from grid search
-    //   up8, vp8       — interpolation weights (lower bracket)
-    //   offset8        — per-element pattern offset: i_element * n_pattern_samples (0-based index)
-    //   n_elevation    — number of elevation grid points (stride for column-major pattern)
-    //   p_theta_re/im  — theta (vertical) pattern data, real and imaginary parts
-    //   p_phi_re/im    — phi (horizontal) pattern data, real and imaginary parts
-    //   cos_gamma8     — cos of polarization rotation angle
-    //   sin_gamma8     — sin of polarization rotation angle
-    //   compute_gamma  — if true, compute gamma8 = atan2(sin_gamma, cos_gamma)
-    //
-    // Outputs:
-    //   v_re8, v_im8   — interpolated + rotated vertical field (real, imaginary)
-    //   h_re8, h_im8   — interpolated + rotated horizontal field (real, imaginary)
-    //   gamma8         — polarization rotation angle [rad] (only meaningful if compute_gamma)
+    // Gather the pattern samples at the four bilinear corners (A = Up/Vp, B = Un/Vp, C = Up/Vn, D = Un/Vn; double
+    // patterns are gathered 4 + 4 and converted to float), interpolate them by 6 SLERPs, and rotate the polarization by
+    // gamma from local antenna coordinates to global coordinates
     template <typename dtype>
     static inline void avx2_gather_slerp_polrot(
-        __m256i iUp8, __m256i iUn8, __m256i iVp8, __m256i iVn8,
-        __m256 up8, __m256 vp8,
-        __m256i offset8, size_t n_elevation,
-        const dtype *p_theta_re, const dtype *p_theta_im,
-        const dtype *p_phi_re, const dtype *p_phi_im,
-        __m256 cos_gamma8, __m256 sin_gamma8,
-        bool compute_gamma,
-        __m256 *v_re8, __m256 *v_im8, __m256 *h_re8, __m256 *h_im8,
-        __m256 *gamma8)
+        __m256i iUp8, __m256i iUn8, __m256i iVp8, __m256i iVn8,     // Azimuth / elevation bracket indices from the grid search
+        __m256 up8, __m256 vp8,                                     // Weights of the lower brackets
+        __m256i offset8, size_t n_elevation,                        // i_element * n_pattern_samples; column stride of the pattern
+        const dtype *p_theta_re, const dtype *p_theta_im,           // e-theta pattern, real / imaginary part
+        const dtype *p_phi_re, const dtype *p_phi_im,               // e-phi pattern, real / imaginary part
+        __m256 cos_gamma8, __m256 sin_gamma8,                       // cos / sin of the polarization rotation angle
+        bool compute_gamma,                                         // Compute gamma8 = atan2(sin_gamma, cos_gamma)
+        __m256 *v_re8, __m256 *v_im8, __m256 *h_re8, __m256 *h_im8, // Output: rotated e-theta (V) and e-phi (H) field
+        __m256 *gamma8)                                             // Output: gamma in rad, only if compute_gamma
     {
         // Build gather indices for the 4 bilinear corners
         const __m256i n_el_i = _mm256_set1_epi32((int)n_elevation);
@@ -681,11 +563,8 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
     dtype *p_v_re = V_re, *p_v_im = V_im, *p_h_re = H_re, *p_h_im = H_im;
     dtype *p_dist = dist, *p_azimuth_loc = azimuth_loc, *p_elevation_loc = elevation_loc, *p_gamma = gamma;
 
-    // All computation is done in float for AVX2 throughput.
-    // When dtype=double, inputs are cast to float during precomputation,
-    // results are written back to dtype* outputs (implicit float->double promotion).
-
-    // All constants are float — avoids double-eps vanishing below float precision
+    // All computation is in float, double inputs are converted during the precomputation. The constants are float too,
+    // so that no double epsilon vanishes below float precision.
     const float two_pi = (float)dtype(6.28318530717958647692528676655900576);
     const float eps_cubed = FLT_EPSILON * FLT_EPSILON * FLT_EPSILON; // tiny guard for weight computation
     constexpr float one = 1.0f;
@@ -732,15 +611,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
     const bool az_uniform = az_step_rinv > 0.0f, el_uniform = el_step_rinv > 0.0f;
     const int az_bsearch_iters = bsearch_iters(n_azimuth), el_bsearch_iters = bsearch_iters(n_elevation);
 
-    // Pack grid search parameters into structs
-    // grid_f fields are assigned below after the grid arrays are allocated
+    // grid_f is assigned below, once the grid arrays exist
     AzGridParams az_gp = {nullptr, az_step_inv, n_azimuth, az_uniform,
                           az_fmin, az_fmax, az_step_rinv, az_bsearch_iters, eps_cubed};
     ElGridParams el_gp = {nullptr, el_step_inv, n_elevation, el_uniform,
                           el_fmin, el_step_rinv, el_bsearch_iters, eps_cubed};
-    // grid_f arrays are allocated below and assigned to the structs
 
-    // Grid arrays (standalone, small allocations)
     qd_avx2_buffer az_grid_f_buf(n_azimuth + 1, sizeof(float)), el_grid_f_buf(n_elevation + 1, sizeof(float));
     float *az_grid_f = (float *)az_grid_f_buf.ptr;
     float *el_grid_f = (float *)el_grid_f_buf.ptr;
@@ -848,12 +724,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 for (int k = 0; k < 9; ++k)
                     R.r[k] = _mm256_loadu_ps(&R_elem[k * n_out_padded + o_base]);
 
-                // Stages B+C: Rotation, cart2geo, basis vectors, gamma
+                // Rotation, local angles, polarization angle gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
                 avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
                                          &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
 
-                // Stage D: Distance
+                // Projected distance
                 __m256 dist8 = _mm256_setzero_ps();
                 if (p_dist != nullptr)
                 {
@@ -863,13 +739,13 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     dist8 = avx2_compute_distance(dx8, dy8, dz8, px8, py8, pz8);
                 }
 
-                // Stage E: Grid search
+                // Grid search
                 __m256i iUp8, iUn8, iVp8, iVn8;
                 __m256 up8, vp8;
                 avx2_grid_search_azimuth(az8, az_gp, &iUp8, &iUn8, &up8);
                 avx2_grid_search_elevation(el8, el_gp, &iVp8, &iVn8, &vp8);
 
-                // Stages F+G: Gather, SLERP, polarization rotation
+                // Gather, SLERP, polarization rotation
                 __m256i offset8 = _mm256_loadu_si256((const __m256i *)&offset_elem[o_base]);
                 __m256 v_re8, v_im8, h_re8, h_im8, gamma8;
                 avx2_gather_slerp_polrot<dtype>(
@@ -1000,7 +876,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 const bool is_ang_tail_iter = (av == n_ang_vec - 1) && (ang_tail != 0);
                 const size_t n_valid = is_ang_tail_iter ? n_valid_ang_tail : 8;
 
-                // Stage A: Load 8 input angles (contiguous in [1, n_ang] layout)
+                // Load 8 input angles (contiguous in [1, n_ang] layout)
                 __m256 az_in8, el_in8;
                 if constexpr (sizeof(dtype) == sizeof(float))
                 {
@@ -1043,23 +919,23 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
                 _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
 
-                // Stages B+C: Rotation, cart2geo, basis vectors, gamma
+                // Rotation, local angles, polarization angle gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
                 avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
                                          &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
 
-                // Stage D: Distance
+                // Projected distance
                 __m256 dist8 = _mm256_setzero_ps();
                 if (p_dist != nullptr)
                     dist8 = avx2_compute_distance(dx8, dy8, dz8, px_bc, py_bc, pz_bc);
 
-                // Stage E: Grid search
+                // Grid search
                 __m256i iUp8, iUn8, iVp8, iVn8;
                 __m256 up8, vp8;
                 avx2_grid_search_azimuth(az8, az_gp, &iUp8, &iUn8, &up8);
                 avx2_grid_search_elevation(el8, el_gp, &iVp8, &iVn8, &vp8);
 
-                // Stages F+G: Gather, SLERP, polarization rotation
+                // Gather, SLERP, polarization rotation
                 __m256 v_re8, v_im8, h_re8, h_im8, gamma8;
                 avx2_gather_slerp_polrot<dtype>(
                     iUp8, iUn8, iVp8, iVn8, up8, vp8, offset_bc, n_elevation,
@@ -1183,7 +1059,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
     // Two-level loop without angle hoisting (sincos computed per vector iteration)
     else
     {
-        // For per_angle_rotation with OMP, each thread needs its own R buffer
         avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
         {
             // Output base pointers for this angle's column
@@ -1196,10 +1071,8 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
             dtype *out_el = p_elevation_loc ? p_elevation_loc + a * n_out : nullptr;
             dtype *out_gam = p_gamma ? p_gamma + a * n_out : nullptr;
 
-            // Determine which R buffer to use for this angle
-            float *R_this = R_elem; // default: per-element R from precompute
-            // Thread-local R buffer for per_angle_rotation
-            // Stack allocation for typical sizes, heap for large n_out
+            // Per-angle rotation needs a per-thread R buffer: on the stack for n_out <= 64, else on the heap
+            float *R_this = R_elem;
             float R_local[9 * 64];
             qd_avx2_buffer R_heap(n_out_padded > 64 && per_angle_rotation ? 9 * n_out_padded : 0, sizeof(float));
             float *R_work;
@@ -1233,7 +1106,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 const bool is_tail_iter = (ov == n_out_vec - 1) && (tail != 0);
                 const size_t n_valid = is_tail_iter ? n_valid_tail : 8;
 
-                // Stage A: Input Angles -> sincos
+                // Input angles and their sin / cos
                 __m256 az_in8, el_in8;
                 if (per_element_angles)
                 {
@@ -1292,12 +1165,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 for (int k = 0; k < 9; ++k)
                     R.r[k] = _mm256_loadu_ps(&R_this[k * n_out_padded + o_base]);
 
-                // Stages B+C: Rotation, cart2geo, basis vectors, gamma
+                // Rotation, local angles, polarization angle gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
                 avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
                                          &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
 
-                // Stage D: Distance
+                // Projected distance
                 __m256 dist8 = _mm256_setzero_ps();
                 if (p_dist != nullptr)
                 {
@@ -1307,13 +1180,13 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     dist8 = avx2_compute_distance(dx8, dy8, dz8, px8, py8, pz8);
                 }
 
-                // Stage E: Grid search
+                // Grid search
                 __m256i iUp8, iUn8, iVp8, iVn8;
                 __m256 up8, vp8;
                 avx2_grid_search_azimuth(az8, az_gp, &iUp8, &iUn8, &up8);
                 avx2_grid_search_elevation(el8, el_gp, &iVp8, &iVn8, &vp8);
 
-                // Stages F+G: Gather, SLERP, polarization rotation
+                // Gather, SLERP, polarization rotation
                 __m256i offset8 = _mm256_loadu_si256((const __m256i *)&offset_elem[o_base]);
                 __m256 v_re8, v_im8, h_re8, h_im8, gamma8;
                 avx2_gather_slerp_polrot<dtype>(

@@ -2,10 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
 #include "qd_helpers_python.hpp"
-
-
+#include "quadriga_lib.hpp"
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -78,17 +76,14 @@ py::array_t<double> sos_rand(const py::array_t<double> &dist_decorr,
                              const std::string &preset,
                              arma::sword seed)
 {
-    // Read inputs
     const auto dist_decorr_a = qd_python_numpy2arma_Col<double>(dist_decorr, true);
     const auto pos_a = qd_python_numpy2arma_Mat<double>(pos, true);
     const auto pos_b_a = qd_python_numpy2arma_Mat<double>(pos_b, true);
     const auto dist_decorr_b_a = qd_python_numpy2arma_Col<double>(dist_decorr_b, true);
 
-    // Output allocation
     arma::mat val;
     auto val_py = qd_python_init_output(pos_a.n_rows, dist_decorr_a.n_elem, &val);
 
-    // Call library function
     quadriga_lib::sos_rand<double>(dist_decorr_a, pos_a, val, pos_b_a, dist_decorr_b_a, preset, seed);
 
     return val_py;
@@ -164,17 +159,14 @@ py::array_t<double> sos_randi(const py::array_t<double> &dist_decorr,
                               const std::string &preset,
                               arma::sword seed)
 {
-    // Read inputs
     const auto dist_decorr_a = qd_python_numpy2arma_Col<double>(dist_decorr, true);
     const auto pos_a = qd_python_numpy2arma_Mat<double>(pos, true);
     const auto pos_b_a = qd_python_numpy2arma_Mat<double>(pos_b, true);
     const auto dist_decorr_b_a = qd_python_numpy2arma_Col<double>(dist_decorr_b, true);
 
-    // Output allocation
     arma::mat val;
     auto val_py = qd_python_init_output(pos_a.n_rows, dist_decorr_a.n_elem, &val);
 
-    // Call library function
     quadriga_lib::sos_randi<double>(dist_decorr_a, pos_a, imax, val, pos_b_a, dist_decorr_b_a, preset, seed);
 
     return val_py;
@@ -246,17 +238,14 @@ py::array_t<double> sos_randn(const py::array_t<double> &dist_decorr,
                               const std::string &preset,
                               arma::sword seed)
 {
-    // Read inputs
     const auto dist_decorr_a = qd_python_numpy2arma_Col<double>(dist_decorr, true);
     const auto pos_a = qd_python_numpy2arma_Mat<double>(pos, true);
     const auto pos_b_a = qd_python_numpy2arma_Mat<double>(pos_b, true);
     const auto dist_decorr_b_a = qd_python_numpy2arma_Col<double>(dist_decorr_b, true);
 
-    // Output allocation
     arma::mat val;
     auto val_py = qd_python_init_output(pos_a.n_rows, dist_decorr_a.n_elem, &val);
 
-    // Call library function
     quadriga_lib::sos_randn<double>(dist_decorr_a, pos_a, val, pos_b_a, dist_decorr_b_a, preset, seed);
 
     return val_py;

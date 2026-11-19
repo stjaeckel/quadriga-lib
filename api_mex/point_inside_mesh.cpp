@@ -52,9 +52,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto mesh_arma = qd_mex_get_Mat<double>(prhs[1], false, "mesh");
     double distance = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "distance", 0.0);
 
-    // Object index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    // Object index: MATLAB 1-based -> C++ 0-based
     const arma::uvec obj_ind_arma = (nrhs < 3) ? arma::uvec() : qd_mex_get_index_Col(prhs[2], "obj_ind");
-
 
     arma::uvec res;
     CALL_QD(res = quadriga_lib::point_inside_mesh(points_arma, mesh_arma, obj_ind_arma, distance));

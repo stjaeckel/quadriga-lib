@@ -58,20 +58,17 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 4 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0], false, "center_freq");
     const arma::mat rnd = qd_mex_get_Mat<double>(prhs[1], false, "rnd");
     const std::vector<std::string> models = qd_mex_get_strings(prhs[2], "models");
     const arma::vec weights = qd_mex_get_Col<double>(prhs[3], false, "weights");
     const double d2d_in_max = (nrhs < 5) ? 25.0 : qd_mex_get_scalar<double>(prhs[4], "d2d_in_max", 25.0);
 
-    // Output allocation
     arma::mat loss_dB;
     arma::vec d2d_in;
     arma::uvec model_ind;
@@ -80,11 +77,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&model_ind, rnd.n_rows);
 
-    // Wrap optional pointers
     arma::vec *p_d2d_in = (nlhs > 1) ? &d2d_in : nullptr;
     arma::uvec *p_model_index = (nlhs > 2) ? &model_ind : nullptr;
 
-    // Call library function
     CALL_QD(loss_dB = quadriga_lib::o2i_loss(center_freq, rnd, models, weights, d2d_in_max, p_d2d_in, p_model_index));
     plhs[0] = qd_mex_copy2matlab(&loss_dB);
 

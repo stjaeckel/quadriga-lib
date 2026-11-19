@@ -159,7 +159,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double dgv = (nrhs < 14) ? 0.5 : qd_mex_get_scalar<double>(prhs[13], "dgv", 0.5);
     double dgh = (nrhs < 15) ? 0.5 : qd_mex_get_scalar<double>(prhs[14], "dgh", 0.5);
 
-    // Set default resolution by type
     if (res == 0.0)
     {
         if (array_type == "omni" || array_type == "xpol")
@@ -265,7 +264,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Array type not supported!");
 
-    // Set center frequency for all types
     arrayant.center_freq = freq;
 
     plhs[0] = qd_mex_arrayant2struct(arrayant);

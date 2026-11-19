@@ -64,22 +64,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Load inputs (cast to double if needed)
     arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
     arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
     arma::mat mesh = qd_mex_get_Mat<double>(prhs[2], false, "mesh");
 
-    // Optional inputs
     arma::u32_vec sub_mesh_ind = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_index_Col<unsigned>(prhs[3], "sub_mesh_ind"); // 1-based -> 0-based
     arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4], false, "aabb");
     int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 
-
-    // Number of rays
     arma::uword n_rays = orig.n_rows;
 
-    // Initialize output memory
     arma::mat fbs, sbs;
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
@@ -97,14 +92,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 4)
         plhs[4] = qd_mex_init_output(&sbs_ind, n_rays);
 
-    // Pointers
     arma::mat *p_fbs = fbs.empty() ? nullptr : &fbs;
     arma::mat *p_sbs = sbs.empty() ? nullptr : &sbs;
     arma::u32_vec *p_no_interact = n_interact.empty() ? nullptr : &n_interact;
     arma::u32_vec *p_fbs_ind = fbs_ind.empty() ? nullptr : &fbs_ind;
     arma::u32_vec *p_sbs_ind = sbs_ind.empty() ? nullptr : &sbs_ind;
 
-    // Call library function
     CALL_QD(quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, p_fbs, p_sbs,
                                                          p_no_interact, p_fbs_ind, p_sbs_ind,
                                                          sub_mesh_ind, aabb, use_kernel, gpu_id));

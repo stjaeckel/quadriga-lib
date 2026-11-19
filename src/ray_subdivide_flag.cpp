@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_generic_functions.hpp"
+#include "qd_helpers_site.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -77,21 +77,6 @@ void quadriga_lib::ray_subdivide_flag(
 - [[ray_mesh_interact]] (reports the same edge length as `edge_lengthN`)
 MD!*/
 
-// HELPER: Normalize a vector in place, return its original length
-// Mirrors the fallback in ray_mesh_interact so both report the same edge length
-static inline double qd_normalize(double &x, double &y, double &z)
-{
-    double len = std::sqrt(x * x + y * y + z * z);
-    if (len > 2e-7)
-    {
-        double scl = 1.0 / len;
-        x *= scl, y *= scl, z *= scl;
-    }
-    else
-        x = 1.0, y = 0.0, z = 0.0;
-    return len;
-}
-
 void quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
                                       const arma::fmat &orig,
                                       const arma::fmat &dest,
@@ -105,13 +90,7 @@ void quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
                                       uint8_t max_subdivisions,
                                       float subdivision_tolerance)
 {
-    // Validate mesh
-    if (mesh.n_elem == 0)
-        throw std::invalid_argument("Input 'mesh' cannot be empty.");
-    if (mesh.n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns.");
-
-    const arma::uword n_mesh = mesh.n_rows;
+    const arma::uword n_mesh = qd_check_mesh(mesh);
 
     // Validate the launch configuration
     if (orig.n_elem == 0)
@@ -207,21 +186,9 @@ void quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
         ODx = Dx - Ox, ODy = Dy - Oy, ODz = Dz - Oz; // Update direction O to D
         double OD_length = qd_normalize(ODx, ODy, ODz);
 
-        // Compute the FBS intersect point, initialize with fallback
-        double Fx = (double)p_mesh[iFBS - 1];
-        double Fy = (double)p_mesh[iFBS - 1 + n_mesh];
-        double Fz = (double)p_mesh[iFBS - 1 + 2 * n_mesh];
-
-        double E1x = (double)p_mesh[iFBS - 1 + 3 * n_mesh] - Fx,
-               E1y = (double)p_mesh[iFBS - 1 + 4 * n_mesh] - Fy,
-               E1z = (double)p_mesh[iFBS - 1 + 5 * n_mesh] - Fz;
-        double E2x = (double)p_mesh[iFBS - 1 + 6 * n_mesh] - Fx,
-               E2y = (double)p_mesh[iFBS - 1 + 7 * n_mesh] - Fy,
-               E2z = (double)p_mesh[iFBS - 1 + 8 * n_mesh] - Fz;
-
-        // Plane normal vector
-        double Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x;
-        qd_normalize(Nx, Ny, Nz);
+        // FBS face plane; its first vertex is the fallback FBS intersect point
+        double Fx, Fy, Fz, Nx, Ny, Nz;
+        qd_face_plane(p_mesh, n_mesh, iFBS, Fx, Fy, Fz, Nx, Ny, Nz);
 
         // Ray-plane intersection
         double cos_theta = ODx * Nx + ODy * Ny + ODz * Nz;  // goes to zero as the ray approaches tangency
@@ -268,17 +235,8 @@ void quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
             T[3 * iTube] = Wx - Fx, T[3 * iTube + 1] = Wy - Fy, T[3 * iTube + 2] = Wz - Fz;
         }
 
-        // Calculate the maximum edge length
-        double Ex = T[3] - T[0], Ey = T[4] - T[1], Ez = T[5] - T[2];
-        double scl = Ex * Ex + Ey * Ey + Ez * Ez;
-        edge_length = (scl > edge_length) ? scl : edge_length;
-        Ex = T[6] - T[0], Ey = T[7] - T[1], Ez = T[8] - T[2];
-        scl = Ex * Ex + Ey * Ey + Ez * Ez;
-        edge_length = (scl > edge_length) ? scl : edge_length;
-        Ex = T[6] - T[3], Ey = T[7] - T[4], Ez = T[8] - T[5];
-        scl = Ex * Ex + Ey * Ey + Ez * Ez;
-        edge_length = (scl > edge_length) ? scl : edge_length;
-        edge_length = std::sqrt(edge_length);
+        // Same edge length as ray_mesh_interact reports
+        edge_length = qd_tube_edge_length(T, edge_length);
 
         p_tmp[iRx] = (edge_length > tolerance) ? 1u : 0u;
     }

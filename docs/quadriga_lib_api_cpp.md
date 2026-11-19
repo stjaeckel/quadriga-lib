@@ -2636,7 +2636,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
 - Throws `std::invalid_argument` for an index out of range, before any CIR is read or any output is changed. Throws `std::runtime_error` if
   the file cannot be opened, is not a QRT file of a supported version, is truncated, or if a count or offset in it
   does not fit the file size (path data: only when it is read); outputs may then be partly written. A message about
-  one requested CIR starts with "Snapshot <k>: ", with k its position in `i_cir`.
+  one requested CIR starts with `"Snapshot <k>: "`, with k its position in `i_cir`.
 
 ### Declaration:
 ```cpp

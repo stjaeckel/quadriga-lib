@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_error_text_percent
 % Error messages that contain text from the caller or from a file (file names, material names) must reach
 % MATLAB / Octave unchanged. A '%' in that text is plain text, not a printf directive: '%s' or '%n' must

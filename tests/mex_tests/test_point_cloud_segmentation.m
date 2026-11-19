@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_point_cloud_segmentation
+% MEX interface test for quadriga_lib.point_cloud_segmentation.
 
 points = zeros(4, 3);
 points(:, 1) = 0.0:0.1:0.3;
@@ -9,7 +14,7 @@ points(1:8, 2) = points(1:8, 2) - 50.0;
 points(9:16, 2) = points(9:16, 2) + 50.0;
 points(:, 3) = points(:, 3) + 1.0;
 
-% Test 1: Mesh size is already below threshold, test padding
+%% Point count below the threshold: padding
 [points_out, sub_cloud_ind, forward_ind, reverse_ind] = quadriga_lib.point_cloud_segmentation(points, 1024, 10);
 
 assertTrue( size(points_out,1) == 20 );
@@ -26,7 +31,7 @@ assertEqual( forward_ind(1:16), uint32(1:16)' );
 assertEqual( reverse_ind, uint32(1:16)' );
 assertEqual( forward_ind(17:20), uint32([0,0,0,0])' );
 
-% Test 2: Subdivide, no padding
+%% Subdivide: 4 sub-clouds, each padded to 5 points
 points(:,2) = points(:,2) * 0.1;
 [points_out, sub_cloud_ind, forward_ind, reverse_ind] = quadriga_lib.point_cloud_segmentation(points, 4, 5);
 
@@ -45,7 +50,8 @@ quadriga_lib.point_cloud_segmentation(points, 64);
 quadriga_lib.point_cloud_segmentation(points);
 quadriga_lib.point_cloud_segmentation(points, [], []);
 
-try % 4 imputs
+%% Errors
+try % 4 inputs
     quadriga_lib.point_cloud_segmentation(points, 64, 1, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -55,7 +61,7 @@ catch ME
     end
 end
 
-try % 0 imputs
+try % 0 inputs
     quadriga_lib.point_cloud_segmentation();
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME

@@ -1,9 +1,12 @@
-%% 
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function quadriga_lib_mex_tests
 
 single_run = false;
 
-% Qudriga-lib path
+% quadriga-lib path
 tmp = which('quadriga_lib.version');
 if isempty(strfind(tmp,'+quadriga_lib/version.mex'))
     current_dir = pwd;
@@ -13,7 +16,7 @@ if isempty(strfind(tmp,'+quadriga_lib/version.mex'))
     cd(current_dir);
 end 
 
-% MOxUnit Setup
+% MOxUnit path
 tmp = which('MOxUnitTestSuite');
 if isempty(tmp)
     current_dir = pwd;
@@ -60,7 +63,3 @@ end
 if ~all_passed
     error('quadriga_lib_mex_tests: some tests failed');
 end
-
-
-
-

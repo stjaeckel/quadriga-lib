@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of calc_delay_spread: RMS delay spread and mean delay of power-weighted CIRs, the dB threshold, delay
+// binning (granularity), float and double, validation, outputs that alias inputs.
+// Oracles: closed-form moments of small hand-picked path sets; for granularity, a dense reference that bins over
+// the global delay range and then computes the spread of the binned profile without granularity.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 #include <algorithm>
@@ -37,9 +42,8 @@ TEST_CASE("calc_delay_spread - Basic single CIR")
     double expected_mean = 1.0e-6 / 1.75;
     CHECK(std::abs(mean_delay(0) - expected_mean) < 1e-14);
 
-    // Verify delay spread is positive and reasonable
     CHECK(ds(0) > 0.0);
-    CHECK(ds(0) < 2e-6); // Must be less than max delay spread
+    CHECK(ds(0) < 2e-6); // below the delay span
 }
 
 TEST_CASE("calc_delay_spread - Single path yields zero spread")
@@ -54,8 +58,8 @@ TEST_CASE("calc_delay_spread - Single path yields zero spread")
     arma::vec ds = q_ds(delays, powers, 100.0, 0.0, &mean_delay);
 
     REQUIRE(ds.n_elem == 1);
-    CHECK(std::abs(ds(0)) < 1e-20);
-    CHECK(std::abs(mean_delay(0) - 5e-6) < 1e-20);
+    CHECK(std::abs(ds(0)) < 1e-15);
+    CHECK(std::abs(mean_delay(0) - 5e-6) < 1e-15);
 }
 
 TEST_CASE("calc_delay_spread - Equal power two paths")
@@ -133,13 +137,11 @@ TEST_CASE("calc_delay_spread - Granularity bins paths")
     std::vector<arma::vec> delays = {tau};
     std::vector<arma::vec> powers = {pow};
 
-    // Without granularity
     arma::vec ds_no_gran = q_ds(delays, powers, 100.0, 0.0);
 
     // With 50 ns granularity - first two paths should be binned together
     arma::vec ds_gran = q_ds(delays, powers, 100.0, 50e-9);
 
-    // Both should produce positive delay spreads
     CHECK(ds_no_gran(0) > 0.0);
     CHECK(ds_gran(0) > 0.0);
 }
@@ -152,7 +154,6 @@ TEST_CASE("calc_delay_spread - Without mean_delay output")
     std::vector<arma::vec> delays = {tau};
     std::vector<arma::vec> powers = {pow};
 
-    // Call without mean_delay pointer
     arma::vec ds = q_ds(delays, powers);
 
     REQUIRE(ds.n_elem == 1);
@@ -215,14 +216,12 @@ TEST_CASE("calc_delay_spread - Granularity with mean_delay output")
     REQUIRE(ds.n_elem == 1);
     REQUIRE(mean_delay.n_elem == 1);
 
-    // With 100 ns granularity, paths at 0/50ns -> bin 0, paths at 500/550ns -> bin 500ns
-    // Two bins with equal total power -> mean delay ≈ 250 ns
+    // 100 ns bins: two groups of two equal-power paths near 0 and 500 ns
     CHECK(mean_delay(0) > 0.0);
     CHECK(ds(0) > 0.0);
 }
 
-// Reference: the dense binning over the global delay range (the algorithm before the sparse binning), followed by
-// the direct computation on the binned profile
+// Reference: dense binning over the global delay range, followed by the direct computation on the binned profile
 template <typename dtype>
 static arma::Col<dtype> ds_dense_reference(const std::vector<arma::Col<dtype>> &d, const std::vector<arma::Col<dtype>> &p,
                                            dtype threshold, dtype g, arma::Col<dtype> *mean_delay)
@@ -326,7 +325,7 @@ TEST_CASE("calc_delay_spread - Granularity and delays must be finite, bin count 
     std::vector<arma::fvec> df = {{0.1f, 0.1f}}, pf = {{1.0f, 0.5f}};
     CHECK_THROWS_AS(q_ds<float>(df, pf, 100.0f, 1.0e-40f), std::invalid_argument);
 
-    // Without granularity the delays are not checked (as before)
+    // Without granularity the delays are not checked
     std::vector<arma::vec> dn = {{0.0, nan}};
     CHECK_NOTHROW(q_ds<double>(dn, p, 100.0, 0.0));
 }

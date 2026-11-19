@@ -87,13 +87,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Load inputs (cast to double if needed)
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
     const arma::mat mesh = qd_mex_get_Mat<double>(prhs[2], false, "mesh");
     const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind");
 
-    // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
     auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);
 
     if (mxGetNumberOfElements(prhs[5]) == 0)
@@ -112,7 +110,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     arma::uword n_pos = orig.n_rows;
 
-    // Initialize output containers
     arma::vec gain;
     arma::mat polmat;
     arma::cube coord;
@@ -132,10 +129,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                 thin_slab_threshold, apply_fspl, apply_phase));
 
     if (nlhs > 2) // Keep the [3, 0, n_pos] shape for lod 0
-    {
-        mwSize dims[3] = {(mwSize)coord.n_rows, (mwSize)coord.n_cols, (mwSize)coord.n_slices};
-        plhs[2] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
-        if (coord.n_elem != 0)
-            std::memcpy(mxGetData(plhs[2]), coord.memptr(), coord.n_elem * sizeof(double));
-    }
+        plhs[2] = qd_mex_copy2matlab_keep_shape(coord);
 }

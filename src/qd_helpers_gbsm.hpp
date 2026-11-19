@@ -2,10 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Helpers shared by the source files of the geometry-based stochastic model (quadriga_gbsm.hpp). Internal header,
-// not part of the public API and not installed. It holds only helpers that are used by more than one source file;
-// all names start with 'qd_gbsm_'. The phase-set machinery of the spatially correlated generators is file-local in
-// qd_gbsm_phases.cpp.
+// Helpers shared by the sources of the geometry-based stochastic model functions (quadriga_gbsm.hpp)
 //
 // Units: positions in [m], rows {x, y, z}; carrier frequencies in [Hz].
 //
@@ -60,6 +57,21 @@ static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat 
         throw std::invalid_argument("Input 'rx_pos' must be finite.");
     if (tx_pos != nullptr && !tx_pos->is_finite())
         throw std::invalid_argument("Input 'tx_pos' must be finite.");
+}
+
+// Azimuth in [rad] wrapped to [-pi, pi)
+static inline double qd_gbsm_wrap(double x)
+{
+    const double pi = arma::datum::pi;
+    return x - 2.0 * pi * std::floor((x + pi) / (2.0 * pi));
+}
+
+// Zenith angle in [deg] to elevation in [rad]: wrapped to [0, 360), [180, 360) -> 360 - t (TR 38.901 clause 7.5
+// step 7), elevation = 90 - zenith
+static inline double qd_gbsm_elev(double t)
+{
+    t -= 360.0 * std::floor(t / 360.0);
+    return (90.0 - (t > 180.0 ? 360.0 - t : t)) * arma::datum::pi / 180.0;
 }
 
 // Validation of the carrier frequencies in [Hz]: not empty, finite and > 0; throws std::invalid_argument

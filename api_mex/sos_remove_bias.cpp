@@ -89,7 +89,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 4)
@@ -105,16 +104,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec dist = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "dist");
     const double spatial_freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_scale_b", 1.0);
 
-    // Wrap optional pointers
     arma::mat offset, mean_before;
     arma::mat *p_phase_b = phase_b.empty() ? nullptr : &phase_b;
     arma::mat *p_offset = (nlhs > 2) ? &offset : nullptr;
     arma::mat *p_mean_before = (nlhs > 3) ? &mean_before : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, pos_b, p_phase_b, acf, dist, p_offset, p_mean_before, spatial_freq_scale_b));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&phase);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&phase_b);

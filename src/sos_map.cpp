@@ -3,7 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_sos.hpp"
-#include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
 
 #include <cstdint>
@@ -90,10 +89,7 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
         throw std::invalid_argument("Input 'y' requires 'spatial_freq' to have at least 2 columns.");
     if (has_z && spatial_freq.n_cols < 3)
         throw std::invalid_argument("Input 'z' requires 'spatial_freq' to have 3 columns.");
-    if (use_kernel < 0 || use_kernel > 2)
-        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
-    if (use_kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
-        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+    qd_kernel_auto_avx2(use_kernel); // Checks the selector here; sos_val selects the kernel
 
     const arma::uword nx = x.n_elem, ny = has_y ? y.n_elem : 1, nz = has_z ? z.n_elem : 1, n_gen = phase.n_cols;
 

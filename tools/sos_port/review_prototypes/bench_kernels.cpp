@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // usage: bench <mode> <n_gen> <n_coeff> <n_pos> [tile_blocks]
 // mode 1: qd_SOS_GENERIC, 2: qd_SOS_AVX2, 10/11/12: sos_val<double> use_kernel 0/1/2, 20: sos_val<float> auto,
 //      30: sos_val two devices same map (auto), 31: two maps (auto)

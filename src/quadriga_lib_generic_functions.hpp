@@ -2,19 +2,13 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// A collection of non-accelerated functions
+// Declarations of the GENERIC kernels
 
 #ifndef quadriga_lib_genericfun_H
 #define quadriga_lib_genericfun_H
 
 #include <cstddef>
 #include <vector>
-#include <cmath>
-#include <algorithm>
-#include <climits>
-#include <limits>
-#include <stdexcept>
-#include <cstdint>
 
 // Assemble a point-major CSR hit list from a set of packed hit buffers
 // Each hit is a 64 bit record, the upper 32 bit hold the 0-based point index
@@ -65,12 +59,12 @@ template <typename dtype>
 void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First vertex coordinate in GCS, length n_mesh
                     const dtype *Ux, const dtype *Uy, const dtype *Uz, // Second vertex coordinate in GCS, length n_mesh
                     const dtype *Vx, const dtype *Vy, const dtype *Vz, // Third vertex coordinate in GCS, length n_mesh
-                    const size_t n_mesh,                               // Number of triangles (multiple of VEC_SIZE)
+                    const size_t n_mesh,                               // Number of triangles
                     const unsigned *SMI,                               // List of sub-mesh indices, length n_sub
-                    const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub_s
-                    const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub_s
-                    const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub_s
-                    const size_t n_sub,                                // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                    const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub
+                    const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub
+                    const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub
+                    const size_t n_sub,                                // Number of sub-meshes
                     const dtype *Ox, const dtype *Oy, const dtype *Oz, // Ray origin in GCS, length n_ray
                     const dtype *Dx, const dtype *Dy, const dtype *Dz, // Ray destination in GCS, length n_ray
                     const size_t n_ray,                                // Number of rays
@@ -85,10 +79,10 @@ template <typename dtype>
 void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Point coordinates, length n_point
                     const size_t n_point,                                 // Number of points
                     const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
-                    const dtype *Xmin, const dtype *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
-                    const dtype *Ymin, const dtype *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
-                    const dtype *Zmin, const dtype *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
-                    const size_t n_sub,                                   // Number of sub-clouds (n_sub <= n_sub_s)
+                    const dtype *Xmin, const dtype *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub
+                    const dtype *Ymin, const dtype *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub
+                    const dtype *Zmin, const dtype *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub
+                    const size_t n_sub,                                   // Number of sub-clouds
                     const dtype *T1x, const dtype *T1y, const dtype *T1z, // First ray vertex coordinate in GCS, length n_ray
                     const dtype *T2x, const dtype *T2y, const dtype *T2z, // Second ray vertex coordinate in GCS, length n_ray
                     const dtype *T3x, const dtype *T3y, const dtype *T3z, // Third ray vertex coordinate in GCS, length n_ray
@@ -96,7 +90,7 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     const dtype *D1x, const dtype *D1y, const dtype *D1z, // First ray direction in GCS, length n_ray
                     const dtype *D2x, const dtype *D2y, const dtype *D2z, // Second ray direction in GCS, length n_ray
                     const dtype *D3x, const dtype *D3y, const dtype *D3z, // Third ray direction in GCS, length n_ray
-                    const dtype *rD1, const dtype *rD2, const dtype *rD3, // Inverse Dot product of ray direction and normal vector
+                    const dtype *rD1, const dtype *rD2, const dtype *rD3, // 1 / dot(D, N) per ray vertex, length n_ray
                     const size_t n_ray,                                   // Number of rays
                     std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                     unsigned *hit_offset);                                // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
@@ -112,7 +106,7 @@ void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coefficients, rea
                     const dtype *__restrict CFi,    // Channel coefficients, imaginary part, Size [n_ant, n_path]
                     const dtype *__restrict DL,     // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
                     const size_t n_ant,             // Number of MIMO sub-links
-                    const size_t n_path,            // Number multipath components
+                    const size_t n_path,            // Number of multipath components
                     const bool planar_wave,         // Indicator that same delays are used for all antennas
                     const double *__restrict freq,  // Carrier frequencies -bandwidth * pilot_grid in [Hz], Length [ n_carrier ]
                     const size_t n_carrier,         // Number of carriers

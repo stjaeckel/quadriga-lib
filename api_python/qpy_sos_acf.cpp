@@ -2,10 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
 #include "qd_helpers_python.hpp"
-
-
+#include "quadriga_lib.hpp"
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -45,7 +43,6 @@ MD!*/
 py::tuple sos_acf_2d(const py::array_t<double> &acf,
                      const py::array_t<double> &dist)
 {
-    // Read inputs
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
@@ -54,7 +51,6 @@ py::tuple sos_acf_2d(const py::array_t<double> &acf,
     arma::vec dist_2d;
     auto dist_2d_py = qd_python_init_output(n_grid, &dist_2d);
 
-    // Call library function
     const arma::mat acf_2d = quadriga_lib::sos_acf_2d<double>(acf_a, dist_a, &dist_2d);
 
     return py::make_tuple(qd_python_copy2numpy(&acf_2d), dist_2d_py);
@@ -99,7 +95,6 @@ MD!*/
 py::tuple sos_acf_approx(const py::array_t<double> &spatial_freq,
                          const py::array_t<double> &dist)
 {
-    // Read inputs
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
@@ -108,7 +103,6 @@ py::tuple sos_acf_approx(const py::array_t<double> &spatial_freq,
     arma::vec dist_2d;
     auto dist_2d_py = qd_python_init_output(n_grid, &dist_2d);
 
-    // Call library function
     const arma::cube acf_approx = quadriga_lib::sos_acf_approx<double>(freq_a, dist_a, &dist_2d);
 
     return py::make_tuple(qd_python_copy2numpy(&acf_approx), dist_2d_py);
@@ -178,7 +172,6 @@ py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
                            py::handle dist,
                            arma::sword seed)
 {
-    // Read inputs
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Col<double>(phase, true);
     const auto bins_a = qd_python_numpy2arma_Col<double>(bins, true);
@@ -197,7 +190,6 @@ py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
         p_acf_est_dual = &acf_est_dual;
     }
 
-    // Call library function
     const arma::vec acf_est = quadriga_lib::sos_acf_estimate<double>(freq_a, phase_a, bins_a, n_pos, &dist_est, p_acf_est_dual,
                                                                      acf_a, dist_a, seed);
 
@@ -233,12 +225,10 @@ py::array_t<double> sos_acfi(const py::array_t<double> &acf,
                              const py::array_t<double> &dist,
                              const py::array_t<double> &d)
 {
-    // Read inputs
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
     const auto d_a = qd_python_numpy2arma_Col<double>(d, true);
 
-    // Call library function
     const arma::vec val = quadriga_lib::sos_acfi<double>(acf_a, dist_a, d_a);
     return qd_python_copy2numpy(&val);
 }

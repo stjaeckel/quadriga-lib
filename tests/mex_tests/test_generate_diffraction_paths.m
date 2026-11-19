@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_generate_diffraction_paths
+% MEX interface test for quadriga_lib.generate_diffraction_paths.
 
 orig = [0, 0, 10];
 dest = [100, 0, 10];
@@ -55,7 +60,7 @@ f_ac = 1000;
 assertElementsAlmostEqual( rays_s, rays_e, 'absolute', 1e-9 );
 assertElementsAlmostEqual( weights_s, weights_e, 'absolute', 1e-12 );
 
-% --- Error tests ---
+%% Errors
 
 try % 3 inputs
     quadriga_lib.generate_diffraction_paths(orig, dest, fc);
@@ -131,13 +136,13 @@ try % orig/dest row count mismatch
     quadriga_lib.generate_diffraction_paths([orig; orig], dest, fc, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' don''t match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% lod 7 (1 path, 10 segments) is public; the valid range is 1-7; empty input names the input
+% lod 7 has 1 path and 10 segments; the valid range is 1-7; empty input names the input
 [rays7, w7] = quadriga_lib.generate_diffraction_paths(orig_m, dest_m, fc, 7);
 assertEqual( size(rays7), [n_pos, 1, 9, 3] );
 assertEqual( size(w7), [n_pos, 1, 10] );
@@ -158,7 +163,7 @@ catch ME
 end
 assertTrue( failed );
 
-% lod has no default: an empty value is an error (it became 1)
+% lod has no default: an empty value is an error
 failed = false;
 try
     [~, ~] = quadriga_lib.generate_diffraction_paths(orig, dest, fc, []);

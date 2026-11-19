@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_conf_file_read
 % MEX interface test for quadriga_lib.conf_file_read.
 % Scope: argument and output handling, struct layout, defaults, error paths.
@@ -17,7 +21,7 @@ write_file( fn, { '% Comment', 'DS_mu = -7.5   % delay spread', 'NumClusters = 1
 %% Basic call, all outputs
 [ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys ] = quadriga_lib.conf_file_read( fn );
 
-% scenpar: 171 fields in the canonical order, new keys at the end; the line SubpathMethod = legacy is ignored
+% scenpar: 171 fields in the canonical order; the line SubpathMethod = legacy is ignored
 names = fieldnames( scenpar );
 assertEqual( size(scenpar), [1, 1] );
 assertEqual( numel(names), 171 );

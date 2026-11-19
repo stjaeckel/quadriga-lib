@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.RTtools.ray_triangle_intersect: hits on a cube, NaN inputs, sub-meshes and AABBs, kernels, input layouts, error paths.
+
 import sys
 import os
 import unittest
@@ -62,9 +64,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
             [  0.0,  0.0,  0.0],
         ])
 
-    # ------------------------------------------------------------------ #
-    #  Basic intersection correctness (matches MEX test)                  #
-    # ------------------------------------------------------------------ #
     def test_basic_intersections(self):
         atol = 1e-6
         fbs, sbs, no_hit, ifbs, isbs = RTtools.ray_triangle_intersect(
@@ -112,9 +111,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         self.assertEqual(int(ifbs[5]), 0)
         self.assertEqual(int(isbs[5]), 0)
 
-    # ------------------------------------------------------------------ #
-    #  Output shapes                                                      #
-    # ------------------------------------------------------------------ #
     def test_output_shapes(self):
         fbs, sbs, no_hit, ifbs, isbs = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube)
@@ -125,9 +121,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         self.assertEqual(ifbs.shape, (n,))
         self.assertEqual(isbs.shape, (n,))
 
-    # ------------------------------------------------------------------ #
-    #  NaN handling in orig/dest                                          #
-    # ------------------------------------------------------------------ #
     def test_nan_in_orig_dest(self):
         nan_row = np.array([[np.nan, np.nan, np.nan]])
         orig2 = np.vstack([nan_row, self.orig[1:], nan_row])
@@ -151,9 +144,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         self.assertEqual(int(ifbs[1]), 5)
         self.assertEqual(int(isbs[1]), 3)
 
-    # ------------------------------------------------------------------ #
-    #  NaN in mesh (last row, no effect on hits)                          #
-    # ------------------------------------------------------------------ #
+    # ---- NaN in mesh (last row, no effect on hits) ----
     def test_nan_in_mesh_last_row(self):
         mesh2 = self.cube.copy()
         mesh2[-1] = np.nan
@@ -169,9 +160,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs, ifbs_ref)
         npt.assert_array_equal(isbs, isbs_ref)
 
-    # ------------------------------------------------------------------ #
-    #  NaN in mesh (first row, affects ray 3 FBS which hits tri 1)        #
-    # ------------------------------------------------------------------ #
+    # ---- NaN in mesh (first row, affects ray 3 FBS which hits tri 1) ----
     def test_nan_in_mesh_first_row(self):
         mesh2 = self.cube.copy()
         mesh2[0] = np.nan
@@ -186,9 +175,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         self.assertEqual(int(ifbs[3]), 10)
         self.assertEqual(int(isbs[3]), 0)
 
-    # ------------------------------------------------------------------ #
-    #  Input validation: column mismatch                                  #
-    # ------------------------------------------------------------------ #
+    # ---- Input validation ----
     def test_error_orig_too_few_cols(self):
         with self.assertRaises(Exception) as ctx:
             RTtools.ray_triangle_intersect(self.orig[:, :2], self.dest, self.cube)
@@ -204,46 +191,35 @@ class TestRayTriangleIntersect(unittest.TestCase):
             RTtools.ray_triangle_intersect(self.orig, self.dest, self.cube[:, :8])
         self.assertIn("mesh", str(ctx.exception).lower())
 
-    # ------------------------------------------------------------------ #
-    #  Input validation: row mismatch orig/dest                           #
-    # ------------------------------------------------------------------ #
     def test_error_row_mismatch(self):
         with self.assertRaises(Exception) as ctx:
             RTtools.ray_triangle_intersect(self.orig, self.dest[1:], self.cube)
         self.assertIn("match", str(ctx.exception).lower())
 
-    # ------------------------------------------------------------------ #
-    #  Input validation: empty inputs                                     #
-    # ------------------------------------------------------------------ #
     def test_error_empty_inputs(self):
         empty = np.empty((0, 3))
         with self.assertRaises(Exception):
             RTtools.ray_triangle_intersect(empty, empty, self.cube)
 
-    # ------------------------------------------------------------------ #
-    #  Sub-mesh index validation                                          #
-    # ------------------------------------------------------------------ #
+    # ---- Sub-mesh index validation ----
     def test_error_submesh_not_starting_at_zero(self):
         smi = np.array([1, 6], dtype=np.uint32)
         with self.assertRaises(Exception) as ctx:
             RTtools.ray_triangle_intersect(self.orig, self.dest, self.cube, smi)
-        self.assertIn("start at the first face", str(ctx.exception))
+        self.assertIn("start at the first mesh face", str(ctx.exception))
 
     def test_error_submesh_not_sorted(self):
         smi = np.array([0, 6, 3], dtype=np.uint32)
         with self.assertRaises(Exception) as ctx:
             RTtools.ray_triangle_intersect(self.orig, self.dest, self.cube, smi)
-        self.assertIn("ascending order", str(ctx.exception))
+        self.assertIn("strictly increasing", str(ctx.exception))
 
     def test_error_submesh_exceeds_mesh(self):
         smi = np.array([0, 99], dtype=np.uint32)
         with self.assertRaises(Exception) as ctx:
             RTtools.ray_triangle_intersect(self.orig, self.dest, self.cube, smi)
-        self.assertIn("exceed", str(ctx.exception).lower())
+        self.assertIn("beyond the last mesh face", str(ctx.exception))
 
-    # ------------------------------------------------------------------ #
-    #  Segmented mesh with sub-mesh index                                 #
-    # ------------------------------------------------------------------ #
     def test_segmented_mesh(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
@@ -260,9 +236,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_allclose(sbs, sbs_ref, atol=1e-6)
         npt.assert_array_equal(no_hit, no_hit_ref)
 
-    # ------------------------------------------------------------------ #
-    #  Pre-computed AABB                                                  #
-    # ------------------------------------------------------------------ #
     def test_precomputed_aabb(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
@@ -280,9 +253,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs, ifbs_ref)
         npt.assert_array_equal(isbs, isbs_ref)
 
-    # ------------------------------------------------------------------ #
-    #  AABB validation errors                                             #
-    # ------------------------------------------------------------------ #
     def test_error_aabb_row_mismatch(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
@@ -301,9 +271,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
             RTtools.ray_triangle_intersect(self.orig, self.dest, cube_seg, smi, aabb[:, :3])
         self.assertIn("aabb", str(ctx.exception).lower())
 
-    # ------------------------------------------------------------------ #
-    #  Kernel selector: GENERIC (1)                                       #
-    # ------------------------------------------------------------------ #
+    # ---- Kernel selector ----
     def test_kernel_generic(self):
         fbs_ref, sbs_ref, no_hit_ref, ifbs_ref, isbs_ref = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube)
@@ -317,9 +285,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs, ifbs_ref)
         npt.assert_array_equal(isbs, isbs_ref)
 
-    # ------------------------------------------------------------------ #
-    #  Kernel selector: AVX2 (2) — may not be available                   #
-    # ------------------------------------------------------------------ #
     def test_kernel_avx2(self):
         fbs_ref, sbs_ref, no_hit_ref, ifbs_ref, isbs_ref = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube)
@@ -337,9 +302,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs, ifbs_ref)
         npt.assert_array_equal(isbs, isbs_ref)
 
-    # ------------------------------------------------------------------ #
-    #  Kernel selector: CUDA (3) — may not be available                   #
-    # ------------------------------------------------------------------ #
     def test_kernel_cuda(self):
         try:
             RTtools.ray_triangle_intersect(
@@ -347,9 +309,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         except ValueError as e:
             self.assertIn("CUDA kernel requested but not available", str(e))
 
-    # ------------------------------------------------------------------ #
-    #  AVX2 kernel with segmented mesh + pre-computed AABB                #
-    # ------------------------------------------------------------------ #
     def test_kernel_avx2_with_submesh_and_aabb(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
@@ -369,9 +328,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_allclose(sbs, sbs_ref, atol=1e-5)
         npt.assert_array_equal(no_hit, no_hit_ref)
 
-    # ------------------------------------------------------------------ #
-    #  GENERIC kernel with explicit skip of optional args                 #
-    # ------------------------------------------------------------------ #
+    # ---- Optional arguments: None and omitted ----
     def test_none_inputs(self):
         # Mandatory arrays refuse None and cannot be omitted; sub_mesh_ind=None, aabb=None equal omitted
         args = (self.orig, self.dest, self.cube)
@@ -396,9 +353,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
 
         npt.assert_allclose(fbs, fbs_ref, atol=1e-6)
 
-    # ------------------------------------------------------------------ #
-    #  Single-precision inputs (adapter should cast to double internally) #
-    # ------------------------------------------------------------------ #
+    # ---- Input dtypes and memory layout ----
     def test_single_precision_inputs(self):
         fbs_ref, sbs_ref, no_hit_ref, ifbs_ref, isbs_ref = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube)
@@ -413,9 +368,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs, ifbs_ref)
         npt.assert_array_equal(isbs, isbs_ref)
 
-    # ------------------------------------------------------------------ #
-    #  Sub-mesh index dtype variants (int64, int32)                       #
-    # ------------------------------------------------------------------ #
     def test_submesh_index_int64(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
 
@@ -438,9 +390,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
 
         npt.assert_allclose(fbs, fbs_ref, atol=1e-6)
 
-    # ------------------------------------------------------------------ #
-    #  F-contiguous vs C-contiguous inputs produce identical results       #
-    # ------------------------------------------------------------------ #
     def test_f_vs_c_contiguous(self):
         # Default numpy arrays are C-contiguous (row-major)
         orig_c = np.ascontiguousarray(self.orig)
@@ -451,7 +400,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         dest_f = np.asfortranarray(self.dest)
         mesh_f = np.asfortranarray(self.cube)
 
-        # Verify memory layout
         self.assertTrue(orig_c.flags['C_CONTIGUOUS'])
         self.assertTrue(orig_f.flags['F_CONTIGUOUS'])
 
@@ -466,9 +414,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs_c, ifbs_f)
         npt.assert_array_equal(isbs_c, isbs_f)
 
-    # ------------------------------------------------------------------ #
-    #  Mixed contiguity: F-contiguous mesh, C-contiguous rays             #
-    # ------------------------------------------------------------------ #
     def test_mixed_contiguity(self):
         orig_c = np.ascontiguousarray(self.orig)
         dest_c = np.ascontiguousarray(self.dest)
@@ -486,9 +431,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_array_equal(ifbs, ifbs_ref)
         npt.assert_array_equal(isbs, isbs_ref)
 
-    # ------------------------------------------------------------------ #
-    #  F-contiguous with segmented mesh + AABB                            #
-    # ------------------------------------------------------------------ #
     def test_f_contiguous_with_submesh_and_aabb(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
@@ -505,9 +447,6 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_allclose(sbs, sbs_ref, atol=1e-7)
         npt.assert_array_equal(no_hit, no_hit_ref)
 
-    # ------------------------------------------------------------------ #
-    #  Single ray (1, 3) — minimal batch                                  #
-    # ------------------------------------------------------------------ #
     def test_single_ray(self):
         fbs, sbs, no_hit, ifbs, isbs = RTtools.ray_triangle_intersect(
             self.orig[:1], self.dest[:1], self.cube)

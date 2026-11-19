@@ -2,6 +2,12 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::acdf: the automatic bins (201 over the finite range, n_bins), user bins, the per-set CDFs, the
+// quantile-space average and the deciles mu and sig over the sets, the exclusion of non-finite samples and of sets
+// without finite values, float, optional outputs, input validation and aliasing.
+// Oracles: small data sets with known CDF end points and quantiles (0 to 999: the p-quantile is about p·999), and
+// invariance: identical sets average like one set, empty sets do not enter the average.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 
@@ -25,7 +31,6 @@ TEST_CASE("ACDF - Basic single column")
     CHECK(std::abs(bins(0) - 0.0) < 1e-10);
     CHECK(std::abs(bins(200) - 9.0) < 1e-10);
 
-    // Sh should be [201, 1]
     REQUIRE(Sh.n_rows == 201);
     REQUIRE(Sh.n_cols == 1);
 
@@ -41,7 +46,6 @@ TEST_CASE("ACDF - Basic single column")
     REQUIRE(Sc.n_elem == 201);
     CHECK(arma::approx_equal(Sc, Sh.col(0), "absdiff", 1e-10));
 
-    // mu should have 9 elements
     REQUIRE(mu.n_elem == 9);
 
     // sig should be all zeros for single column
@@ -94,7 +98,6 @@ TEST_CASE("ACDF - Custom bins")
     for (arma::uword i = 0; i < 100; ++i)
         data(i, 0) = (double)i;
 
-    // Provide custom bins
     arma::vec bins = {0, 25, 50, 75, 99};
     arma::mat Sh;
 
@@ -128,7 +131,7 @@ TEST_CASE("ACDF - Handles Inf and NaN")
     CHECK(std::abs(bins(0) - 0.0) < 1e-10);
     CHECK(std::abs(bins(200) - 9.0) < 1e-10);
 
-    // CDF should sum to 1.0 at the last bin (only 10 valid samples)
+    // CDF reaches 1.0 at the last bin (only the 10 finite samples count)
     CHECK(std::abs(Sh(200, 0) - 1.0) < 1e-10);
 }
 
@@ -317,7 +320,7 @@ TEST_CASE("ACDF - Data sets without finite values are excluded from the averages
     quadriga_lib::acdf<double>(d1, &b1, &cps1, &ca1, &mu1, &sig1);
 
     CHECK(std::abs(mu1(4) - 49.005) < 1e-12);
-    CHECK(arma::approx_equal(mu, mu1, "absdiff", 0.0)); // median 49.005 (74.2275 with the bias)
+    CHECK(arma::approx_equal(mu, mu1, "absdiff", 1e-12)); // median 49.005 (74.2275 if the empty set entered the average)
     CHECK(arma::approx_equal(sig, sig1, "absdiff", 0.0));
     CHECK(arma::approx_equal(ca, ca1, "absdiff", 0.0));
     CHECK(arma::approx_equal(cps.col(0), cps1.col(0), "absdiff", 0.0));

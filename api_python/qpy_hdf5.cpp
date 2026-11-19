@@ -3,9 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "qd_helpers_python_types.hpp"
-#include "qd_helpers_wrappers.hpp"
-
-
 
 /*!SECTION
 Channel functions
@@ -273,7 +270,6 @@ py::tuple hdf5_read_layout(const py::handle &fn)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    // Read the storage layout and the per-slot channel IDs
     arma::Col<unsigned> channel_id;
     arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn_s, &channel_id);
 
@@ -388,13 +384,11 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    // Convert the channel input (single dict or list of dicts) to channel objects
     std::vector<quadriga_lib::channel<double>> channels = qd_python_list2channel(chan, false); // C++ validates, naming the entry
     const arma::uword n_chan = (arma::uword)channels.size();
     if (n_chan == 0)
         throw std::invalid_argument("Input 'chan' must contain at least one channel.");
 
-    // Parse the unstructured 'par' data: dict, list of dicts, or None
     std::vector<py::dict> par_vec;
     if (!par.is_none())
     {
@@ -416,8 +410,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
             throw std::invalid_argument("'par' must have the same number of entries as 'chan'.");
     }
 
-    // Resolve a slot-index argument (scalar / vector / None) to a 0-based index vector.
-    // 'ix' defaults to 0 ... n_chan-1; the others default to a scalar 0.
+    // Slot index: scalar, vector or None; 'ix' defaults to 0 ... n_chan-1, the others to 0
     auto parse_idx = [&](py::handle h, const char *name, bool is_x) -> arma::Col<unsigned>
     {
         arma::Col<unsigned> v = qd_python_numpy2arma_Col<unsigned>(h, false, false, name);

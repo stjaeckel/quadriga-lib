@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Re-creates the results of the 2018 paper "Efficient Sum-of-Sinusoids-Based Spatial Consistency for the
 % 3GPP New-Radio Channel Model" with the sum-of-sinusoids functions of quadriga-lib.
 %

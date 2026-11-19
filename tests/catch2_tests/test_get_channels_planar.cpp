@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// get_channels_planar and get_channels_planar_vec: amplitudes, delays and Doppler of hand-placed paths between omni
+// elements (exact by construction), the coupling matrix, the slot layout of add_fake_los_path, zero paths, the tilt
+// sign, aliasing and shape checks; the AVX2 kernel and the vec form are compared with the GENERIC single call.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -15,7 +19,6 @@ TEST_CASE("Get Channels Planar - Minimal test")
 
     float pi = 3.141592653589793f, pid180 = 0.017453292519943f;
 
-    // Generate test antenna
     auto ant = quadriga_lib::generate_arrayant_omni<float>();
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 1.0;
@@ -54,7 +57,6 @@ TEST_CASE("Get Channels Planar - Minimal test")
     M(6, 0) = -1.0;
     M(6, 1) = -1.0;
 
-    // Shortest path length is automatically obtained from FBS / LBS
     arma::fcube coeff_re, coeff_im, delay;
     arma::fvec rx_Doppler;
 
@@ -65,7 +67,6 @@ TEST_CASE("Get Channels Planar - Minimal test")
                                              coeff_re, coeff_im, delay, 2997924580.0, true, false,
                                              &rx_Doppler);
 
-    // Check amplitude
     arma::fcube amp = arma::sqrt(coeff_re % coeff_re + coeff_im % coeff_im);
     CHECK(std::abs(amp.at(0, 0, 0) - 1.0f) < 1.0e-6f);
     CHECK(std::abs(amp.at(1, 0, 0) - 2.0f) < 1.0e-6f);
@@ -76,7 +77,6 @@ TEST_CASE("Get Channels Planar - Minimal test")
     CHECK(std::abs(amp.at(0, 1, 1) - 1.0f) < 1.0e-4f);
     CHECK(std::abs(amp.at(1, 1, 1) - 2.0f) < 1.0e-4f);
 
-    // Check delays
     float C = 299792458.0;
     float d0 = 20.0;
     float e0 = (std::sqrt(9.0 * 9.0 + 10.0 * 10.0) + std::sqrt(9.0 * 9.0 + 20.0 * 20.0 + 10.0 * 10.0));
@@ -92,7 +92,6 @@ TEST_CASE("Get Channels Planar - Minimal test")
     CHECK(std::abs(delay.at(0, 1, 1) - e2 / C) < 1.2e-10f);
     CHECK(std::abs(delay.at(1, 1, 1) - e3 / C) < 1.2e-10f);
 
-    // Check Doppler
     float Doppler = std::cos(aoa.at(1)) * std::cos(eoa.at(1));
     REQUIRE(rx_Doppler.n_elem == 2);
     CHECK(std::abs(rx_Doppler.at(0) + 1.0f) < 1.0e-6f);
@@ -105,7 +104,7 @@ TEST_CASE("Get Channels Planar - Fake LOS")
     float pi = 3.141592653589793f, pid180 = 0.017453292519943f;
     auto ant = quadriga_lib::generate_arrayant_omni<float>();
 
-    // LOS-Path and LBS / FBS are reversed
+    // The LOS path is the second input path
 
     arma::fvec aod(2), eod(2), aoa(2), eoa(2), path_gain(2), path_length(2);
 
@@ -133,7 +132,6 @@ TEST_CASE("Get Channels Planar - Fake LOS")
     M(6, 0) = -1.0;
     M(6, 1) = -1.0;
 
-    // Shortest path length is automatically obtained from FBS / LBS
     arma::fcube coeff_re, coeff_im, delay;
 
     quadriga_lib::get_channels_planar<float>(ant, ant,
@@ -146,13 +144,11 @@ TEST_CASE("Get Channels Planar - Fake LOS")
     REQUIRE(coeff_im.n_slices == 3);
     REQUIRE(delay.n_slices == 3);
 
-    // Check amplitude
     arma::fcube amp = arma::sqrt(coeff_re % coeff_re + coeff_im % coeff_im);
     CHECK(std::abs(amp.at(0, 0, 0) - 1.0f) < 1.0e-6f);
     CHECK(std::abs(amp.at(0, 0, 1) - 0.5f) < 1.0e-6f);
     CHECK(std::abs(amp.at(0, 0, 2) - 0.0f) < 1.0e-6f);
 
-    // Check delays
     float C = 299792458.0;
     float d0 = 20.0;
     float e0 = (std::sqrt(10.0 * 10.0 + 10.0 * 10.0) + std::sqrt(10.0 * 10.0 + 20.0 * 20.0 + 10.0 * 10.0));
@@ -179,7 +175,6 @@ TEST_CASE("Get Channels Planar - Coupling")
     M(0, 0) = 1.0;
     M(6, 0) = -1.0;
 
-    // Shortest path length is automatically obtained from FBS / LBS
     arma::cube coeff_re, coeff_im, delay;
 
     // Case 1 : No coupling (identity matrix)
@@ -475,7 +470,6 @@ TEST_CASE("Get Channels Planar - Position and orientation shapes")
 
 TEST_CASE("Get Channels Planar - AVX2 interpolation agrees with GENERIC, auto is GENERIC")
 {
-    // AVX2 antenna interpolation agrees with GENERIC; auto selects GENERIC (identical results); invalid values throw
     auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos(1, 1) = 0.1;

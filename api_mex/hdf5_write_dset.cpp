@@ -55,7 +55,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const std::string name = qd_mex_get_string(prhs[1], "", "name");
     const unsigned ix = (nrhs < 4) ? 0U : qd_mex_get_index<unsigned>(prhs[3], "ix"); // 1-based -> 0-based
@@ -64,17 +63,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned iw = (nrhs < 7) ? 0U : qd_mex_get_index<unsigned>(prhs[6], "iw"); // 1-based -> 0-based
     const std::string prefix = (nrhs < 8) ? std::string("par_") : qd_mex_get_string_or_empty(prhs[7], "par_", "prefix");
 
-    // Validate data is non-empty
     if (mxGetNumberOfElements(prhs[2]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'data' cannot be empty.");
 
-    // Wrap data into std::any (strings need special handling)
     std::any data;
     if (mxIsClass(prhs[2], "char"))
         data = std::any(qd_mex_get_string(prhs[2], "", "data"));
     else
-        data = qd_mex_anycast(prhs[2], "data", false);
+        data = qd_mex_anycast(prhs[2], "data");
 
-    // Write dataset (C++ creates a missing file)
+    // C++ creates a missing file
     CALL_QD(quadriga_lib::hdf5_write_dset(fn, name, data, ix, iy, iz, iw, prefix));
 }

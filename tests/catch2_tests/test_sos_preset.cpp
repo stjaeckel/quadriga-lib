@@ -16,7 +16,7 @@
 //  - scaling: dist ~ d, spatial_freq ~ 1/d
 //  - quality: the measures of sos_calc_mse (which has its own suite) against the frequency tables of the
 //    MATLAB class qd_sos of QuaDRiGa, which serve as reference. The numbers in the table below were
-//    measured on those tables with sos_calc_mse and 100 test directions (md/LOG_QD_SOS.md, WI-5). A preset
+//    measured on those tables with sos_calc_mse and 100 test directions. A preset
 //    has to reach the reference value minus 10·log10( N_ref / N ), because the mean squared error of a
 //    sum of N sinusoids scales with 1/N and the presets with 128 and 256 sinusoids are compared with
 //    reference tables of 150 and 300. No allowance where the preset is the larger table.
@@ -218,8 +218,8 @@ TEST_CASE("sos_preset - the documented generation gives tables of the same quali
     // has the same directions and limits and a fit within 1.5 dB of the shipped table (the spread of the
     // fit over 48 seeds was 1.5 to 3 dB for the 128 tables).
     // The tables with 128 and 256 sinusoids are regenerated here (6 s on one core). Those with 512 and 1024
-    // take another 60 s; they were regenerated once, on 2026-10-12, with a largest difference of 1.1e-16
-    // (md/LOG_QD_SOS.md) and are pinned by the checksums below.
+    // take another 60 s; regenerated once, they differ from the shipped tables by at most 1.1e-16 and are
+    // pinned by the checksums below.
     for (arma::uword i : {0, 1, 4, 5, 8, 9})
     {
         const Preset &p = presets[i];

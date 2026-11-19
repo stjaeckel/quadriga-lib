@@ -2,10 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
 #include "qd_helpers_python_types.hpp"
 #include "qd_helpers_gbsm.hpp"
-#include "qd_helpers_python.hpp"
 
 #include <limits>
 
@@ -92,7 +90,6 @@ py::tuple lsp_generate(py::handle scenpar,
                        py::handle cholesky,
                        py::handle clip_spreads)
 {
-    // Read inputs
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const bool cholesky_b = qd_python_flag(cholesky, true, "cholesky");
     const bool clip_spreads_b = qd_python_flag(clip_spreads, true, "clip_spreads");
@@ -102,7 +99,6 @@ py::tuple lsp_generate(py::handle scenpar,
     const auto rnd_a = qd_python_numpy2arma_Mat<double>(rnd, true);
     const auto sf_sigma_a = qd_python_numpy2arma_Mat<double>(sf_sigma_dB, true);
 
-    // Output allocation
     const arma::uword n_link = qd_gbsm_n_link(rx_pos_a), n_freq = center_freq_a.n_elem;
     arma::cube lsp, lsp_mu, lsp_sigma;
     arma::vec abs_toa;
@@ -114,7 +110,6 @@ py::tuple lsp_generate(py::handle scenpar,
     auto lsp_mu_py = qd_python_init_output(n_link, n_freq, (arma::uword)8, &lsp_mu);
     auto lsp_sigma_py = qd_python_init_output(n_link, n_freq, (arma::uword)8, &lsp_sigma);
 
-    // Call library function
     quadriga_lib::lsp_generate(scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, rnd_a, lsp, sf_sigma_a, &abs_toa, &gr_eps_re,
                                &gr_eps_im, &eod_offset_deg, &lsp_mu, &lsp_sigma, cholesky_b, clip_spreads_b);
 
@@ -222,7 +217,6 @@ py::tuple path_loss(py::handle plpar,
     arma::mat sf_sigma_dB;
     auto sf_sigma_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &sf_sigma_dB);
 
-    // Call library function
     const arma::mat pl_dB = quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a,
                                                     &sf_sigma_dB, d2d_in_a, rnd_he_a);
 
@@ -303,7 +297,6 @@ py::tuple los_probability(const std::string &model,
     const double d_clutter_d = clutter(d_clutter, "d_clutter"), r_clutter_d = clutter(r_clutter, "r_clutter"),
                  h_clutter_d = clutter(h_clutter, "h_clutter");
 
-    // Read inputs
     const auto d2d_out_a = qd_python_numpy2arma_Col<double>(d2d_out, true);
     const auto h_bs_a = qd_python_numpy2arma_Col<double>(h_bs, true);
     const auto h_ut_a = qd_python_numpy2arma_Col<double>(h_ut, true);
@@ -317,10 +310,8 @@ py::tuple los_probability(const std::string &model,
     if (soft)
         los_soft_py = qd_python_init_output(d2d_out_a.n_elem, center_freq_a.n_elem, &los_soft);
 
-    // Optional output
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
-    // Call library function
     const arma::vec p_los = quadriga_lib::los_probability(model, d2d_out_a, h_bs_a, h_ut_a, d_clutter_d, r_clutter_d,
                                                           h_clutter_d, rnd_g_a, center_freq_a, p_los_soft);
 
@@ -377,19 +368,16 @@ py::tuple o2i_loss(const py::array_t<double> &center_freq,
                    const py::array_t<double> &weights,
                    double d2d_in_max)
 {
-    // Read inputs
     const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto rnd_a = qd_python_numpy2arma_Mat<double>(rnd, true);
     const auto models_a = qd_python_list2vector_Strings(models);
     const auto weights_a = qd_python_numpy2arma_Col<double>(weights, true);
 
-    // Output allocation
     arma::vec d2d_in;
     arma::uvec model_ind;
     auto d2d_in_py = qd_python_init_output(rnd_a.n_rows, &d2d_in);
     auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_ind);
 
-    // Call library function
     const arma::mat loss_dB = quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, d2d_in_max, &d2d_in,
                                                      &model_ind);
 

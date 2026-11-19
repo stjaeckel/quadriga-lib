@@ -770,7 +770,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
                                         a2.coupling_re, a2.coupling_im, n_elem2,
                                         out.coupling_re, out.coupling_im);
 
-        // Validate and initialize check_ptr
+        // The check also marks the entry as validated
         err = out.is_valid();
         if (!err.empty())
             throw std::invalid_argument("Entry " + std::to_string(i) + ": Output validation failed: " + err);
@@ -1042,7 +1042,6 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
         out.center_freq = dtype(f_new);
         out.name = arrayant_vec[0].name;
 
-        // Quick-check pointers
         qd_arrayant_mark_valid(out);
     }
 

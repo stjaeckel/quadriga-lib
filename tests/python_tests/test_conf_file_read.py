@@ -258,7 +258,7 @@ class test_case(unittest.TestCase):
             quadriga_lib.gbsm.conf_file_read(self.fn, no_such_argument=1)
 
     def test_submodule(self):
-        # The conf functions live in quadriga_lib.gbsm, no longer in quadriga_lib.tools
+        # The conf functions are in quadriga_lib.gbsm, not in quadriga_lib.tools
         for name in ["conf_file_read", "conf_file_write", "conf_file_list", "scenpar_validate"]:
             self.assertTrue(hasattr(quadriga_lib.gbsm, name), name)
             self.assertFalse(hasattr(quadriga_lib.tools, name), name)

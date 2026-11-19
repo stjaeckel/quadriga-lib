@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
+
 """
 Mechanical checks of the material-model page and of the material part of the Data Formats page, run from the
 repository root:

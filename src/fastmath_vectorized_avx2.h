@@ -7,52 +7,54 @@
 
 #include <stddef.h>
 
-template <typename dtype> // float or double
+// AVX2 kernels of the fast math functions, defined in fastmath_vectorized_avx2.cpp for dtype float and double.
+// Element-wise over n_val values, no alignment needed; results in float, those of GEO2CART / CART2GEO in dtype.
+template <typename dtype>
 void qd_SINCOS_AVX2(const dtype *x,
                     float *s,
                     float *c,
                     size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_SIN_AVX2(const dtype *x,
                  float *s,
                  size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_COS_AVX2(const dtype *x,
                  float *c,
                  size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_ASIN_AVX2(const dtype *x,
                   float *s,
                   size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_ACOS_AVX2(const dtype *x,
                   float *c,
                   size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_ATAN2_AVX2(const dtype *y,
                    const dtype *x,
                    float *a,
                    size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_SLERP_AVX2(const dtype *Ar, const dtype *Ai,
                    const dtype *Br, const dtype *Bi,
                    const dtype *w,
                    float *Xr, float *Xi,
                    size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_GEO2CART_AVX2(const dtype *az, const dtype *el, const dtype *len,
                       dtype *x, dtype *y, dtype *z,
                       dtype *sAZ, dtype *cAZ, dtype *sEL, dtype *cEL,
                       size_t n_val);
 
-template <typename dtype> // float or double
+template <typename dtype>
 void qd_CART2GEO_AVX2(const dtype *x, const dtype *y, const dtype *z,
                       dtype *az, dtype *el, dtype *len,
                       size_t n_val);

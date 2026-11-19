@@ -1,10 +1,13 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_gbsm_draw
 % MEX interface test for quadriga_lib.gbsm_draw.
 % Scope: argument and output handling, set types and set index, defaults, error paths.
 % Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, _cluster.cpp, _ray.cpp).
 
-% ---- Set type 'lsf' ----
-%% Setup: phases of a scenario with distinct decorrelation distances, 5 links
+%% Set type 'lsf'. Setup: phases of a scenario with distinct decorrelation distances, 5 links
 scenpar = struct( 'DS_lambda', 10, 'AS_D_lambda', 18, 'AS_A_lambda', 15, 'ES_D_lambda', 12, 'ES_A_lambda', 8 );
 phase = quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7 );
 rx_pos = [ 0, 0, 1.5; 20, 5, 1.5; 45, -10, 3; 80, 30, 1.5; 3, 4, 10 ]';
@@ -112,8 +115,7 @@ assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos(1:2), rx_pos ), ...
     'Input ''tx_pos'' must have 3 rows.' );                                                         % C++
 
-% ---- Set type 'cluster' ----
-%% Setup: UMi LOS file (N = 12, SC_lambda = 12 m), shared and per-frequency phases, 5 links
+%% Set type 'cluster'. Setup: UMi LOS file (N = 12, SC_lambda = 12 m), shared and per-frequency phases, 5 links
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_LOS.conf' ) );
 N = sp.NumClusters - 1;

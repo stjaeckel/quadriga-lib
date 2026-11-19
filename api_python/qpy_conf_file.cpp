@@ -4,8 +4,6 @@
 
 #include "qd_helpers_python_types.hpp"
 
-
-
 /*!SECTION
 Geometry-based stochastic model
 SECTION!*/
@@ -65,13 +63,10 @@ py::tuple conf_file_list(py::handle dirs,
         throw std::invalid_argument("Expected a string, a list of strings, or None.");
     const bool parse_shortnames_b = qd_python_flag(parse_shortnames, true, "parse_shortnames");
 
-    // Output allocation
     std::vector<std::string> file_names, file_dirs;
 
-    // Call library function
     const auto scenarios = quadriga_lib::conf_file_list(dirs_v, &file_names, &file_dirs, parse_shortnames_b);
 
-    // Copy to python
     auto scenarios_py = qd_python_copy2list(scenarios);
     auto file_names_py = qd_python_copy2list(file_names);
     auto file_dirs_py = qd_python_copy2list(file_dirs);
@@ -243,11 +238,9 @@ MD!*/
 py::tuple conf_file_read(const py::handle &fn,
                          py::handle validate)
 {
-    // Read inputs
     const std::string fn_s = qd_python_path(fn, "fn");
     const bool validate_b = qd_python_flag(validate, true, "validate");
 
-    // Output allocation
     std::unordered_map<std::string, std::vector<double>> plpar;
     std::string pl_model;
     std::vector<std::string> key_order, pl_order, short_names, ignored_keys;
@@ -255,7 +248,6 @@ py::tuple conf_file_read(const py::handle &fn,
 
     auto lsp_xcorr_py = qd_python_init_output((arma::uword)8, (arma::uword)8, &lsp_xcorr);
 
-    // Call library function
     bool lsp_xcorr_chk = false;
     const auto scenpar = quadriga_lib::conf_file_read(fn_s, &pl_model, &plpar, &lsp_xcorr, &lsp_xcorr_chk, &key_order,
                                                       &pl_order, &short_names, &ignored_keys, validate_b);
@@ -357,7 +349,6 @@ void conf_file_write(const py::handle &fn,
     const auto valid_range_a = qd_python_numpy2arma_Mat<double>(valid_range, true);
     const bool write_defaults_b = qd_python_flag(write_defaults, false, "write_defaults");
 
-    // Call library function
     quadriga_lib::conf_file_write(fn_s, scenpar_m, pl_model, plpar_m, pl_order, short_names_v,
                                   ref_s, ref_sec_v, valid_range_a, write_defaults_b);
 }
@@ -419,13 +410,12 @@ py::tuple scenpar_validate(py::handle scenpar_in,
     auto scenpar = qd_python_dict2scenpar(scenpar_in, "scenpar_in");
     const bool validate_b = qd_python_flag(validate, true, "validate");
 
-    // Output allocation
     std::vector<std::string> key_order;
     arma::mat lsp_xcorr;
 
     auto lsp_xcorr_py = qd_python_init_output((arma::uword)8, (arma::uword)8, &lsp_xcorr);
 
-    // Call library function; completes 'scenpar' in place (a copy, the input dict is not changed)
+    // Completes 'scenpar' in place (a copy; the input dict is not changed)
     const bool lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, &lsp_xcorr, &key_order,
                                                               validate_b);
 

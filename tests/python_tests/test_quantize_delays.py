@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.channel.quantize_delays: tap grid, snapshot lists, output forms, error paths.
+
 import sys
 import os
 import unittest
@@ -270,7 +272,6 @@ class test_quantize_delays(unittest.TestCase):
         nz_snap1 = sum(1 for k in range(n_taps) if abs(cre_q[1][0, 0, k]) > 1e-10)
         self.assertEqual(nz_snap1, 1)
 
-        # Verify snap 1 coefficient
         found = False
         for k in range(n_taps):
             if abs(dl_q[1][0, 0, k] - 5e-9) < 1e-20:
@@ -479,7 +480,7 @@ class test_quantize_delays(unittest.TestCase):
             quadriga_lib.channel.quantize_delays(coeff)
         with self.assertRaises(TypeError):  # None for a mandatory input
             quadriga_lib.channel.quantize_delays(None, dl)
-        with self.assertRaises(TypeError):  # the split form is gone
+        with self.assertRaises(TypeError):  # split coeff_re / coeff_im inputs are not accepted
             quadriga_lib.channel.quantize_delays(coeff_re=[np.ones((1, 1, 2))], coeff_im=[np.zeros((1, 1, 2))], delay=dl)
         with self.assertRaises(ValueError):  # not a list
             quadriga_lib.channel.quantize_delays(coeff[0], dl)

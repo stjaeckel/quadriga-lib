@@ -7,13 +7,14 @@
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_python.hpp"
+#include "qd_helpers_wrappers.hpp"
 
 #include <iterator>
 #include <type_traits>
 
 namespace py = pybind11;
 
-static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
+static inline py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
 {
     py::dict output;
     output["e_theta_re"] = qd_python_copy2numpy(&ant.e_theta_re);
@@ -30,7 +31,7 @@ static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &an
     return output;
 }
 
-static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::arrayant<double>> &ant)
+static inline py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::arrayant<double>> &ant)
 {
     if (ant.empty())
         return py::dict();
@@ -120,21 +121,7 @@ static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::ar
     return output;
 }
 
-// Wrapper defaults of the optional arrayant fields, as in the MATLAB / Octave reader: an empty element_pos becomes
-// zeros, an empty coupling identity, an empty coupling_im zeros (the library treats empty members the same way;
-// filled members keep the arrays that the wrappers return unchanged)
-static void qd_python_fill_arrayant_defaults(quadriga_lib::arrayant<double> &ant)
-{
-    const arma::uword n_elements = ant.e_theta_re.n_slices;
-    if (ant.element_pos.is_empty())
-        ant.element_pos.zeros(3, n_elements);
-    if (ant.coupling_re.is_empty() && ant.coupling_im.is_empty())
-        ant.coupling_re.eye(n_elements, n_elements);
-    if (ant.coupling_im.is_empty())
-        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
-}
-
-static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
+static inline quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
                                                               bool view = false, bool strict = false,
                                                               bool validate = false)
 {
@@ -161,7 +148,7 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
         ant.coupling_re = qd_python_numpy2arma_Mat<double>(arrayant["coupling_re"], view, strict);
     if (arrayant.contains("coupling_im"))
         ant.coupling_im = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
-    qd_python_fill_arrayant_defaults(ant);
+    qd_arrayant_fill_defaults(ant);
 
     if (arrayant.contains("center_freq")) // Scalar or array with exactly one element
     {
@@ -187,7 +174,7 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
 // Multi-frequency: dict → std::vector<arrayant>
 // - 'require_center_freq': 4D input without 'center_freq' raises; pass false only where the frequency is not used
 //   (all entries then get the default 299792458)
-static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi(const py::dict &arrayant,
+static inline std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi(const py::dict &arrayant,
                                                                                  bool view = false, bool strict = false,
                                                                                  bool validate = false,
                                                                                  bool require_center_freq = true)
@@ -196,8 +183,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
     py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
     int nd = (int)e_theta_re_arr.request().ndim;
 
-    // 1D/2D pattern fields describe a single-frequency antenna with implicit trailing dimensions.
-    // Delegate to the single-frequency parser (qd_python_numpy2arma_Cube promotes them to 3D cubes) and return a length-1 vector.
+    // 1D/2D patterns: a single-frequency antenna with implicit trailing dimensions (promoted to 3D), one entry
     if (nd < 3)
     {
         std::vector<quadriga_lib::arrayant<double>> ant(1);
@@ -309,7 +295,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
             ant[f].coupling_re = std::move(coupling_re_vec[f]);
         if (has_coupling_im)
             ant[f].coupling_im = std::move(coupling_im_vec[f]);
-        qd_python_fill_arrayant_defaults(ant[f]);
+        qd_arrayant_fill_defaults(ant[f]);
     }
 
     if (validate)
@@ -326,7 +312,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
 // (stack = false) or stacked into one higher-dimensional Numpy array along an
 // appended snapshot axis (stack = true). i_vec selects / orders the snapshots.
 template <typename dtype_numpy, typename dtype_arma>
-static py::object qd_python_emit_paths(const std::vector<dtype_arma> *re,
+static inline py::object qd_python_emit_paths(const std::vector<dtype_arma> *re,
                                        bool stack,
                                        const arma::uvec &i_vec = arma::uvec(),
                                        const std::vector<dtype_arma> *im = nullptr)
@@ -338,7 +324,7 @@ static py::object qd_python_emit_paths(const std::vector<dtype_arma> *re,
 }
 
 // Convert a single channel object to the Python channel dict
-static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &channel,
+static inline py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &channel,
                                        const arma::uvec &snap = arma::uvec(),
                                        bool validate = false,
                                        bool stack = false)
@@ -428,7 +414,7 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     return output;
 }
 
-static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<double>> &chan,
+static inline py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<double>> &chan,
                                        bool validate = false,
                                        bool stack = false)
 {
@@ -438,15 +424,11 @@ static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<d
     return list;
 }
 
-// Build a single channel object from a Python channel dict (inverse of qd_python_channel2dict).
-//
-// Per-snapshot fields are accepted in either layout, auto-detected per field:
-//   * "list" model  — a Python list of per-snapshot arrays (n_path may vary per snapshot)
-//   * "stack" model — a single Numpy array with the snapshot index as the last axis
-// Positions, orientations and center_freq are plain arrays in both models.
-// Dict keys match qd_python_channel2dict / hdf5_read_channel (NOT the legacy write keys).
-// Unstructured "par" data is NOT handled here — it is kept separate (see hdf5_write_channel).
-static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict,
+// Python channel dict -> channel (inverse of qd_python_channel2dict, same keys)
+// - Per-snapshot members, detected per key: a list of per-snapshot arrays ("list" model, n_path may vary) or one array
+//   with the snapshot index on the last axis ("stack" model); positions, orientations and center_freq are plain arrays
+// - The unstructured 'par' data is not read here (hdf5_write_channel reads it separately)
+static inline quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict,
                                                             bool validate = false)
 {
     quadriga_lib::channel<double> c;
@@ -456,9 +438,7 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
         return dict.contains(key) && !dict[key].is_none();
     };
 
-    // Load one member if its key is present. Positions, orientations and center_freq are plain arrays;
-    // per-snapshot members are a list of per-snapshot arrays ("list" model) or one array with the
-    // snapshot index on the last axis ("stack" model).
+    // Loads one member if its key is present and not None
     auto load = [&](const char *key, auto &member)
     {
         if (!has(key))
@@ -540,14 +520,9 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
     return c;
 }
 
-// Build a vector of channel objects from Python input (inverse of qd_python_channel2list).
-//
-// Accepts either:
-//   * a list of channel dicts  -> one channel per list entry
-//   * a single channel dict    -> a length-1 vector (convenience, mirrors MEX scalar-struct)
-// Each dict is converted via qd_python_dict2channel; per-snapshot fields independently use
-// the list or stack model (see there).
-static std::vector<quadriga_lib::channel<double>> qd_python_list2channel(const py::handle &obj,
+// List of channel dicts -> channels (inverse of qd_python_channel2list); a single dict gives one channel, None none;
+// each dict is read by qd_python_dict2channel
+static inline std::vector<quadriga_lib::channel<double>> qd_python_list2channel(const py::handle &obj,
                                                                          bool validate = false)
 {
     std::vector<quadriga_lib::channel<double>> channels;
@@ -555,7 +530,6 @@ static std::vector<quadriga_lib::channel<double>> qd_python_list2channel(const p
     if (obj.is_none())
         return channels;
 
-    // Single dict -> length-1 vector
     if (py::isinstance<py::dict>(obj))
     {
         channels.push_back(qd_python_dict2channel(py::reinterpret_borrow<py::dict>(obj), validate));
@@ -579,7 +553,7 @@ static std::vector<quadriga_lib::channel<double>> qd_python_list2channel(const p
 
 // Convert an unstructured dataset (std::any) to a numpy array / scalar / str.
 // Missing dataset -> None. Stored type and shape are preserved.
-static py::object qd_python_any2numpy(const std::any &dset)
+static inline py::object qd_python_any2numpy(const std::any &dset)
 {
     if (!dset.has_value())
         return py::none();
@@ -653,7 +627,7 @@ static py::object qd_python_any2numpy(const std::any &dset)
 // Python flag -> bool
 // - None gives 'default_value'; Python bool and numpy.bool_ give their value
 // - Anything else (also int and str) throws py::type_error naming the input 'name'
-static bool qd_python_flag(const py::handle &value, bool default_value, const std::string &name)
+static inline bool qd_python_flag(const py::handle &value, bool default_value, const std::string &name)
 {
     if (value.is_none())
         return default_value;
@@ -669,7 +643,7 @@ static bool qd_python_flag(const py::handle &value, bool default_value, const st
 
 // Python path -> std::string; returns false if 'value' is not a path
 // - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
-static bool qd_python_try_path(const py::handle &value, std::string &path)
+static inline bool qd_python_try_path(const py::handle &value, std::string &path)
 {
     py::object v = py::reinterpret_borrow<py::object>(value);
     if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v) && py::hasattr(v, "__fspath__"))
@@ -681,7 +655,7 @@ static bool qd_python_try_path(const py::handle &value, std::string &path)
 }
 
 // Python path (str, bytes or os.PathLike) -> std::string; anything else throws py::type_error naming the input 'name'
-static std::string qd_python_path(const py::handle &value, const std::string &name)
+static inline std::string qd_python_path(const py::handle &value, const std::string &name)
 {
     std::string path;
     if (!qd_python_try_path(value, path))
@@ -694,7 +668,7 @@ static std::string qd_python_path(const py::handle &value, const std::string &na
 // Read a dict value as a C-contiguous double array
 // - Accepts Python numbers and numpy scalars or arrays of the kinds bool, int, uint and float
 // - str, None, complex values and anything numpy cannot convert throw std::invalid_argument with 'error_msg'
-static py::array_t<double, py::array::c_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_> qd_python_real_array(const py::handle &value,
+static inline py::array_t<double, py::array::c_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_> qd_python_real_array(const py::handle &value,
                                                                                           const std::string &error_msg)
 {
     py::array arr = py::array::ensure(value);
@@ -712,7 +686,7 @@ static py::array_t<double, py::array::c_style | py::array::forcecast | py::detai
 // - Key names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
 // - None or an empty dict gives an empty map
 // - 'var_name' is used in the error messages
-static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::handle &obj,
+static inline std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::handle &obj,
                                                                       const std::string &var_name = "scenpar")
 {
     std::unordered_map<std::string, double> scenpar;
@@ -748,7 +722,7 @@ static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::
 
 // Map of QuaDRiGa scenario parameters -> dict of float values, keys in the order of 'key_order'
 // - Every name in 'key_order' must be in 'scenpar'
-static py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, double> &scenpar,
+static inline py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, double> &scenpar,
                                        const std::vector<std::string> &key_order)
 {
     py::dict output;
@@ -763,7 +737,7 @@ static py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, dou
 // - 'pl_order' lists the numeric entries in dict order
 // - None or an empty dict gives an empty map, empty 'pl_model' and empty 'pl_order'
 // - 'var_name' is used in the error messages
-static std::unordered_map<std::string, std::vector<double>> qd_python_dict2plpar(const py::handle &obj,
+static inline std::unordered_map<std::string, std::vector<double>> qd_python_dict2plpar(const py::handle &obj,
                                                                                 std::string &pl_model,
                                                                                 std::vector<std::string> &pl_order,
                                                                                 const std::string &var_name = "plpar")
@@ -804,7 +778,7 @@ static std::unordered_map<std::string, std::vector<double>> qd_python_dict2plpar
 // QuaDRiGa path-loss parameters -> dict, empty if 'pl_model' and 'pl_order' are both empty
 // - Entry 'model' (str) first if 'pl_model' is not empty, then one 1D array per key in the order of 'pl_order';
 //   every name in 'pl_order' must be in 'plpar'
-static py::dict qd_python_plpar2dict(const std::string &pl_model,
+static inline py::dict qd_python_plpar2dict(const std::string &pl_model,
                                      const std::unordered_map<std::string, std::vector<double>> &plpar,
                                      const std::vector<std::string> &pl_order)
 {
@@ -831,7 +805,7 @@ static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap
 // Labels, codes or counts (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
 // - A uint32 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float (exact
 //   below 2^53) and every entry must be an integer from 0 to 2^32 - 1, else std::invalid_argument naming 'name'
-static arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::string &name)
+static inline arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::string &name)
 {
     if (py::isinstance<py::array_t<unsigned>>(obj))
         return qd_python_numpy2arma_Col<unsigned>(obj, true);
@@ -850,7 +824,7 @@ static arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::str
 // - 'gr_eps' (complex, a real array = imaginary part 0) is copied into 'gr_eps_re' and 'gr_eps_im'
 // - Missing optional keys mean empty; a missing other key or an unknown key throws, naming 'var_name'
 // - Validation is left to is_valid()
-static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const std::string &var_name = "rays")
+static inline quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const std::string &var_name = "rays")
 {
     const auto *K = qd_python_gbsm_rays_keys, *K_end = K + std::size(qd_python_gbsm_rays_keys);
     for (auto item : d)
@@ -899,7 +873,7 @@ static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const
 // whose size is known, as qd_mex_init_gbsm_rays; with 'has_gr', 'gr_eps_re' and 'gr_eps_im' are allocated in C++
 // - The other keys are empty arrays ('gr_eps' complex, 'fallback' uint32); the caller sets 'method' and, with
 //   'has_gr', 'gr_eps' after the call
-static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
+static inline py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
                                          bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
 {
     py::list out;
@@ -937,91 +911,6 @@ static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, 
         out.append(d);
     }
     return out;
-}
-
-// Path inputs of the channel functions: true if 'h' is a list of numpy arrays (batch mode) or an empty list
-static bool qd_python_is_array_list(const py::handle &h)
-{
-    if (!py::isinstance<py::list>(h))
-        return false;
-    py::list lst = py::reinterpret_borrow<py::list>(h);
-    return lst.size() == 0 || py::isinstance<py::array>(lst[0]);
-}
-
-// Aliases the arrays of a list (batch mode), or a single input as a one-entry vector, without copying the data (arrays
-// that are not Fortran-contiguous float64 are copied, as are lists and scalars of a single input). T is
-// arma::Col<double>, arma::Mat<double> or arma::Cube<double>.
-// Every entry is added to 'keep_alive': the aliased memory must stay valid while the GIL is released, even if another
-// thread removes the entry from the list.
-template <typename T>
-static std::vector<T> qd_python_alias_list(const py::handle &h, bool batch, std::vector<py::object> &keep_alive)
-{
-    std::vector<T> out;
-    auto add = [&](const py::handle &item)
-    {
-        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
-        if constexpr (std::is_same_v<T, arma::Col<double>>)
-            out.push_back(qd_python_numpy2arma_Col<double>(keep_alive.back(), true));
-        else if constexpr (std::is_same_v<T, arma::Mat<double>>)
-            out.push_back(qd_python_numpy2arma_Mat<double>(keep_alive.back(), true));
-        else
-            out.push_back(qd_python_numpy2arma_Cube<double>(keep_alive.back(), true));
-    };
-    if (batch)
-    {
-        py::list lst = py::reinterpret_borrow<py::list>(h);
-        out.reserve(lst.size());
-        for (auto item : lst)
-            add(item);
-    }
-    else
-        out.reserve(1), add(h);
-    return out;
-}
-
-// Adds all values of a dict (e.g. an arrayant whose patterns are aliased) to 'keep_alive'
-static void qd_python_keep_dict_values(const py::dict &dict, std::vector<py::object> &keep_alive)
-{
-    for (auto item : dict)
-        keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
-}
-
-// Frequency selection of the channel wrappers: all snapshots must have the same number of frequencies 'n_freq' in
-// 'path_gain' [n_path, n_freq] and 'polmat' [8, n_path, n_freq], 'center_freq' is empty or has 'n_freq' entries, and
-// 'i_freq' < n_freq (unless there are no snapshots). The slice 'i_freq' of every snapshot is aliased into 'path_gain_f'
-// and 'polmat_f'; returns the selected center frequency (0 for an empty 'center_freq').
-static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_gain, const std::vector<arma::Cube<double>> &polmat,
-                                    const arma::Col<double> &center_freq, arma::uword i_freq,
-                                    std::vector<arma::vec> &path_gain_f, std::vector<arma::mat> &polmat_f)
-{
-    const size_t n_snap = path_gain.size();
-    arma::uword n_freq = 0ULL;
-    for (size_t i = 0; i < n_snap; ++i)
-    {
-        const arma::uword n_freq_i = path_gain[i].n_cols;
-        if (i == 0)
-            n_freq = n_freq_i;
-        else if (n_freq_i != n_freq)
-            throw std::invalid_argument("All entries of 'path_gain' must have the same number of frequencies.");
-
-        if (polmat[i].n_slices != n_freq_i)
-            throw std::invalid_argument("Inputs 'path_gain' and 'polmat' must have the same number of frequencies.");
-    }
-
-    if (!center_freq.empty() && center_freq.n_elem != n_freq)
-        throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
-
-    if (n_snap != 0 && i_freq >= n_freq)
-        throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
-
-    path_gain_f.clear(), polmat_f.clear();
-    path_gain_f.reserve(n_snap), polmat_f.reserve(n_snap);
-    for (size_t i = 0; i < n_snap; ++i)
-    {
-        path_gain_f.emplace_back(const_cast<double *>(path_gain[i].colptr(i_freq)), path_gain[i].n_rows, false, true);
-        polmat_f.emplace_back(const_cast<double *>(polmat[i].slice_memptr(i_freq)), polmat[i].n_rows, polmat[i].n_cols, false, true);
-    }
-    return center_freq.empty() ? 0.0 : center_freq.at(i_freq);
 }
 
 #endif

@@ -6,22 +6,6 @@
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex.hpp"
 
-#include <cmath>
-#include <string>
-
-// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
-// the argument instead of wrapping around in the conversion to an unsigned type.
-static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
-{
-    const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
-    {
-        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
-    return (arma::uword)v;
-}
-
 /*!SECTION
 Sum-of-sinusoids random number generator
 SECTION!*/
@@ -81,33 +65,28 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 4 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
     const arma::vec phase = qd_mex_get_Col<double>(prhs[1], false, "phase");
     const arma::vec bins = qd_mex_get_Col<double>(prhs[2], false, "bins");
-    const arma::uword n_pos = qd_mex_sos_count(prhs[3], "n_pos", 0.0);
+    const arma::uword n_pos = qd_mex_get_count(prhs[3], "n_pos", 0.0);
     const arma::vec acf = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4], false, "acf");
     const arma::vec dist = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "dist");
     const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_get_seed(prhs[6]);
 
-    // Output allocation
     arma::vec acf_est, dist_est, acf_est_dual;
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&dist_est, bins.n_elem);
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&acf_est_dual, bins.n_elem);
 
-    // Wrap optional pointers
     arma::vec *p_dist_est = dist_est.empty() ? nullptr : &dist_est;
     arma::vec *p_acf_est_dual = acf_est_dual.empty() ? nullptr : &acf_est_dual;
 
-    // Call library function
     CALL_QD(acf_est = quadriga_lib::sos_acf_estimate<double>(spatial_freq, phase, bins, n_pos, p_dist_est, p_acf_est_dual, acf, dist, seed));
     plhs[0] = qd_mex_copy2matlab(&acf_est);
 }

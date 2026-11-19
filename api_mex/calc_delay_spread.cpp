@@ -43,29 +43,23 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::vector<arma::vec> delays = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "delays");
     const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[1], 1, "powers");
     const double threshold_dB = (nrhs < 3) ? 100.0 : qd_mex_get_scalar<double>(prhs[2], "threshold_dB", 100.0);
     const double granularity = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "granularity", 0.0);
 
-    // Declare outputs
     arma::vec ds;
     arma::vec mean_delay;
 
-    // Set up optional output pointer
     arma::vec *p_mean_delay = (nlhs > 1) ? &mean_delay : nullptr;
 
-    // Call library function
     CALL_QD(ds = quadriga_lib::calc_delay_spread<double>(delays, powers, threshold_dB, granularity, p_mean_delay));
 
-    // Write outputs
     plhs[0] = qd_mex_copy2matlab(&ds);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&mean_delay);

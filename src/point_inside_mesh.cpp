@@ -57,7 +57,7 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
         throw std::invalid_argument("Input 'points' must have 3 columns.");
 
     if (mesh.n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns.");
+        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
     if (obj_ind.n_elem != 0 && obj_ind.n_elem != mesh.n_rows)
         throw std::invalid_argument("Number of elements in 'obj_ind' does not match number of rows in 'mesh'.");
@@ -130,7 +130,7 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
             p_dest[i] += p_orig[i];
     }
 
-    // Calculate BVH tree
+    // Sub-meshes with bounding boxes for the intersection test
     arma::Mat<dtype> meshR;
     arma::u32_vec sub_mesh_ind(1);
     size_t target_size = 10 * (size_t)std::ceil(std::sqrt((double)n_mesh));

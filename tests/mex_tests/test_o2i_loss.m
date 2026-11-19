@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_o2i_loss
 % MEX interface test for quadriga_lib.o2i_loss.
 % Scope: argument and output handling, index conversion, defaults, error paths.

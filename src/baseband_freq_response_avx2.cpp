@@ -7,9 +7,6 @@
 #include "quadriga_lib_avx2_functions.hpp"
 #include "fastmath_avx2.h"
 
-// Vector size for AVX2
-#define VEC_SIZE 8
-
 // AVX2 accelerated implementation of DFT
 // The phase x = freq * delay (in cycles) is computed in double precision and reduced to x - round(x), which is in
 // [-0.5, 0.5], before sin / cos are evaluated in single precision; coefficients and sums are single precision
@@ -18,21 +15,20 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
                  const dtype *__restrict CFi,    // Channel coefficients, imaginary part, Size [n_ant, n_path]
                  const dtype *__restrict DL,     // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
                  const size_t n_ant,             // Number of MIMO sub-links
-                 const size_t n_path,            // Number multipath components
+                 const size_t n_path,            // Number of multipath components
                  const bool planar_wave,         // Indicator that same delays are used for all antennas
                  const double *__restrict freq,  // Carrier frequencies -bandwidth * pilot_grid in [Hz], Size [ n_carrier ]
-                 const size_t n_carrier,         // Number of carriers, mutiple of 8
+                 const size_t n_carrier,         // Number of carriers, multiple of qd_avx2_vec_size
                  float *__restrict Hr,           // Channel matrix, real part, Size [ n_carrier, n_ant ]
                  float *__restrict Hi)           // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 {
-    // Preallocate per-path, per-antenna scalars to avoid per-block casts
+    // Per-path values of one antenna, converted once instead of once per carrier block
     qd_avx2_buffer crf_buf(n_path, sizeof(float)), cif_buf(n_path, sizeof(float)), dld_buf(n_path, sizeof(double));
     float *crf = (float *)crf_buf.ptr, *cif = (float *)cif_buf.ptr;
     double *dld = (double *)dld_buf.ptr;
 
-    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant) // Antenna loop
+    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
     {
-        // Fill scalars once per (antenna, path)
         for (size_t i_path = 0; i_path < n_path; ++i_path)
         {
             const size_t idx = i_path * n_ant + i_ant;
@@ -42,7 +38,7 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
         }
 
         const size_t base = i_ant * n_carrier;
-        for (size_t i_carrier = 0; i_carrier < n_carrier; i_carrier += VEC_SIZE)
+        for (size_t i_carrier = 0; i_carrier < n_carrier; i_carrier += qd_avx2_vec_size)
         {
             const size_t o = base + i_carrier;
 

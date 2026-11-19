@@ -2,11 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
-#include "qd_helpers_python.hpp"
 #include "qd_helpers_python_types.hpp"
-
-
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -60,10 +56,8 @@ py::tuple sos_preset(const std::string &name,
     auto acf_py = qd_python_init_output((arma::uword)200, &acf);
     auto dist_py = qd_python_init_output((arma::uword)200, &dist);
 
-    // Call library function
     const arma::mat spatial_freq = quadriga_lib::sos_preset<double>(name, &acf, &dist, dist_decorr);
 
-    // Copy to python
     auto freq_py = qd_python_copy2numpy(&spatial_freq);
 
     return py::make_tuple(freq_py, acf_py, dist_py);
@@ -195,7 +189,6 @@ py::tuple sos_generate(const py::array_t<double> &acf,
     const bool uniform_smp_b = qd_python_flag(uniform_smp, true, "uniform_smp");
     const bool random_init_b = qd_python_flag(random_init, true, "random_init");
 
-    // Read inputs
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
@@ -203,12 +196,10 @@ py::tuple sos_generate(const py::array_t<double> &acf,
     arma::mat test_dir;
     arma::vec ase;
 
-    // Call library function
     const arma::mat spatial_freq = quadriga_lib::sos_generate<double>(acf_a, dist_a, n_coeff, &ase, &test_dir, n_dim,
                                                                       uniform_smp_b, n_dir, random_init_b,
                                                                       spatial_freq_min, spatial_freq_max, seed);
 
-    // Copy to python
     auto freq_py = qd_python_copy2numpy(&spatial_freq);
     auto ase_py = qd_python_copy2numpy(&ase);
     auto test_dir_py = qd_python_copy2numpy(&test_dir);
@@ -273,7 +264,6 @@ py::tuple sos_calc_mse(const py::array_t<double> &spatial_freq,
                        const py::array_t<double> &dist,
                        arma::uword n_dir)
 {
-    // Read inputs
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
@@ -284,10 +274,8 @@ py::tuple sos_calc_mse(const py::array_t<double> &spatial_freq,
     arma::mat test_dir;
     auto acf_tail_py = qd_python_init_output((arma::uword)4, &acf_tail);
 
-    // Call library function
     double mse_dB = quadriga_lib::sos_calc_mse<double>(freq_a, acf_a, dist_a, &mse_core_dB, &mse_all_dB, &acf_tail, &test_dir, n_dir);
 
-    // Copy to python
     auto test_dir_py = qd_python_copy2numpy(&test_dir);
 
     return py::make_tuple(mse_dB, mse_core_dB, mse_all_dB, acf_tail_py, test_dir_py);

@@ -25,9 +25,7 @@ PG = np.linspace(0, 1, 4)  # pilot grid of the error tests
 
 class test_case(unittest.TestCase):
 
-    # ==================================================================================
-    # Reference values
-    # ==================================================================================
+    # ---- Reference values ----
 
     def test_reference_values(self):
         coeff = np.zeros((4, 3, 2), dtype=complex)
@@ -74,9 +72,7 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(hmat_re[:, :, :, 3] * 3.0, hmat_re[:, :, :, 1], decimal=5)
         npt.assert_almost_equal(hmat_re[:, :, :, 3] * 2.0, hmat_re[:, :, :, 2], decimal=5)
 
-    # ==================================================================================
-    # Error handling
-    # ==================================================================================
+    # ---- Error handling ----
 
     def test_error_missing_argument(self):
         c, d = [np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1))]
@@ -136,9 +132,7 @@ class test_case(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "'coeff_re' must contain at least one snapshot"):
             channel.baseband_freq_response([], [], PG, 1e6)
 
-    # ==================================================================================
-    # i_snap and varying n_path
-    # ==================================================================================
+    # ---- i_snap and varying n_path ----
 
     def test_snap(self):
         c = [i * np.ones((1, 1, 1), dtype=complex) for i in [1, 2, 3]]

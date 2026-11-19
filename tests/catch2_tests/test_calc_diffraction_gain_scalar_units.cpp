@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests that the scalar (acoustic) mode of calc_diffraction_gain, medium_gain, interface_gain, refractive_index and
+// generate_diffraction_paths takes center_freq as the acoustic frequency. Oracle: the EM-mode result at the frequency
+// of the same wavelength, f · c_light / 343 m/s. The diffraction values themselves are tested in
+// test_calc_diffraction_gain.cpp and the material functions in their own suites.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_tools.hpp"

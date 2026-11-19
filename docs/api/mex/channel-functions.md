@@ -153,9 +153,6 @@ quadriga_lib.channel_export_obj_file( fn, chan, max_paths, gain_max_dB, gain_min
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
 
-### Outputs:
-- This function writes the OBJ file directly to disk and does not return any data
-
 ---
 <a id="hdf5_create_file"></a>
 ## hdf5_create_file

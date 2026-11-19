@@ -5,28 +5,6 @@
 #include "quadriga_tools.hpp"
 #include "qd_helpers_shared.hpp"
 
-// Flip LR inplace
-template <typename dtype>
-static inline void qd_flip_lr_inplace(dtype *data_NxM, size_t M, size_t N = 3)
-{
-    if (M < 2)
-        return;
-
-    size_t half = M >> 1; // floor(M/2)
-    for (size_t i = 0; i < half; ++i)
-    {
-        dtype *left = data_NxM + i * N;
-        dtype *right = data_NxM + (M - 1 - i) * N;
-
-        for (size_t c = 0; c < N; ++c)
-        {
-            dtype tmp = left[c];
-            left[c] = right[c];
-            right[c] = tmp;
-        }
-    }
-}
-
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
@@ -173,7 +151,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
             // Update segment start for next segment
             x = (double)lx, y = (double)ly, z = (double)lz;
 
-            // Sore FBS position (segment 0)
+            // Store FBS position (segment 0)
             fx = (ii == 0) ? lx : fx;
             fy = (ii == 0) ? ly : fy;
             fz = (ii == 0) ? lz : fz;
@@ -183,7 +161,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
                 *ppc++ = lx, *ppc++ = ly, *ppc++ = lz;
         }
 
-        // Calculate vector pointing last segment start to RX position
+        // Vector from the last segment start to the RX position
         x -= (double)Rx, y -= (double)Ry, z -= (double)Rz;
 
         // Add last segment length to total path length
@@ -214,9 +192,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
         // Calculate angles
         if (p_angles != nullptr)
         {
-            // Calculate arrival angles
-            // x,y,z is already set to L-R
-            // x = lx - Rx, y = ly - Ry, z = lz - Rz;
+            // Arrival angles; x, y, z already hold LBS - RX
             d = std::sqrt(x * x + y * y + z * z);
 
             if (reverse_path)
@@ -230,7 +206,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
                 p_angles[3 * n_path + i_path] = (d < los_limit) ? (dtype)0.0 : (dtype)std::asin(z / d); // EOA
             }
 
-            // Calculate departure angles
+            // Departure angles
             x = (double)fx - (double)Tx, y = (double)fy - (double)Ty, z = (double)fz - (double)Tz;
             d = std::sqrt(x * x + y * y + z * z);
 
@@ -252,7 +228,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
 
         // Reverse order in path_coord (if needed)
         if (reverse_path && path_coord != nullptr)
-            qd_flip_lr_inplace(path_coord->at(i_path).memptr(), path_coord->at(i_path).n_cols);
+            path_coord->at(i_path) = arma::fliplr(path_coord->at(i_path));
     }
 }
 

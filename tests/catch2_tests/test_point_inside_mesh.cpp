@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down point_inside_mesh: the returned object index (1-based, 0 = outside) for points inside, outside and within
+// the distance threshold of a closed mesh, input validation, and the result for a mesh far from the origin.
+// Fixture: a 2 m cube centred at the origin (12 faces, one object); expectations follow from the geometry.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 
@@ -28,7 +32,7 @@ TEST_CASE("Test Point inside Mesh")
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 0);
 
-    // A distance outside [0, 20] m throws, NaN included (it used to act as 0)
+    // A distance outside [0, 20] m throws, NaN included
     for (double d : {arma::datum::nan, -0.1, 20.1, arma::datum::inf})
         CHECK_THROWS_AS(res = quadriga_lib::point_inside_mesh<double>(points, mesh, obj_ind, d), std::invalid_argument);
 

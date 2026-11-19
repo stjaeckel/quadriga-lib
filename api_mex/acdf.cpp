@@ -54,7 +54,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const arma::mat data = qd_mex_get_Mat<double>(prhs[0], false, "data");
     const arma::vec bins_in = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1], false, "bins_in");
     const arma::uword n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "n_bins", 201);
@@ -62,7 +61,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_bins_out = bins_in.empty() ? n_bins : bins_in.n_elem;
     arma::uword n_sets = data.n_cols;
 
-    // Output allocation
     arma::mat cdf_per_set;
     arma::vec cdf_avg, bins_out, mu, sig;
 
@@ -77,20 +75,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 4)
         plhs[4] = qd_mex_init_output(&sig, 9);
 
-    // Special case for bins
     if (!bins_in.empty())
         bins_out = bins_in;
 
-    // Wrap optional pointers
     arma::mat *p_cdf = cdf_per_set.empty() ? nullptr : &cdf_per_set;
     arma::vec *p_avg = cdf_avg.empty() ? nullptr : &cdf_avg;
     arma::vec *p_mu = mu.empty() ? nullptr : &mu;
     arma::vec *p_sig = sig.empty() ? nullptr : &sig;
 
-    // Call library function
     CALL_QD(quadriga_lib::acdf<double>(data, &bins_out, p_cdf, p_avg, p_mu, p_sig, n_bins));
 
-    // Copy to MATLAB
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&bins_out);
 }

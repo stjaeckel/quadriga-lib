@@ -1,9 +1,13 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_baseband_freq_response_multi
 % MEX interface test for quadriga_lib.baseband_freq_response_multi.
 % Scope: argument and output handling, index conversion, cell-array batches, kernels, error paths.
 % Physics validation lives in the Catch2 suite (test_baseband_freq_response_multi.cpp).
 
-% ---- Common test data ---------------------------------------------------
+%% Common test data
 % [n_rx=4, n_tx=3, n_path=2]
 coeff = zeros(4,3,2);
 coeff(:,1,1) = 0.25:0.25:1;
@@ -31,7 +35,7 @@ for f = 1:3
 end
 freq_new = linspace(1e9, 3e9, 11)';
 
-% ---- Test 1: cross-check against the single-frequency function ----------
+%% Cross-check against the single-frequency function
 % Constant envelope across freq -> SLERP is identity. H must match a single-frequency
 % call with pilot_grid * bandwidth = freq_new.
 [ hmat_re_m,  hmat_im_m  ] = quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay_4d, freq, freq_new );
@@ -51,7 +55,7 @@ assertEqual( size(hmat_re_m1), [4 3] );
 assertElementsAlmostEqual( hmat_re_m1, hmat_re_m(:,:,3), 'absolute', 1e-6 );
 assertElementsAlmostEqual( hmat_im_m1, hmat_im_m(:,:,3), 'absolute', 1e-6 );
 
-% ---- Test 2: SLERP magnitude interpolation across freq ------------------
+%% SLERP magnitude interpolation across freq
 % Envelope amplitude ramps 1, 2, 3 across freq; expect linear interpolation.
 amps  = [1 2 3];
 tau_r = 100e-9;
@@ -59,7 +63,7 @@ c = reshape(amps(:) .* exp(-1j*2*pi*freq*tau_r), 1, 1, 1, 3);
 [ hr_r, hi_r ] = quadriga_lib.baseband_freq_response_multi( real(c), imag(c), tau_r, freq, freq_new );
 assertElementsAlmostEqual( squeeze(abs(hr_r + 1j*hi_r)), interp1(freq, amps, freq_new), 'absolute', 1e-5 );
 
-% ---- Test 3: absolute carriers for single-frequency coefficients --------
+%% Absolute carriers for single-frequency coefficients
 % One input frequency f0 (a 3D array): H(f) = sum_p c_p * exp(-j 2 pi (f - f0) tau_p), the result of
 % baseband_freq_response with pilot_grid * bandwidth = f - f0. Carriers in any order, also below f0.
 cre = reshape([1 0.5], 1, 1, 2); cim = reshape([0 0.25], 1, 1, 2); dl = reshape([10e-9 35e-9], 1, 1, 2);
@@ -73,7 +77,7 @@ assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(fa), 'absolute', 1e-5 );
 assertElementsAlmostEqual( hr, hr_b, 'absolute', 1e-5 );
 assertElementsAlmostEqual( hi, hi_b, 'absolute', 1e-5 );
 
-% ---- Test 4: remove_delay_phase = false (envelope coefficients) ---------
+%% Remove_delay_phase = false (envelope coefficients)
 % A constant envelope c gets the delay phase of freq_new only: H(f) = sum_p c_p * exp(-j 2 pi f tau_p)
 ce = cat(4, cre + 1j*cim, cre + 1j*cim);
 fin = [1e9; 1.01e9]; fout = [1.002e9; 1.007e9];   % not on a multiple of 1/tau, so the two settings differ
@@ -83,7 +87,7 @@ assertElementsAlmostEqual( squeeze(hr_e + 1j*hi_e), He, 'absolute', 1e-6 );
 [ hr_t, ~ ] = quadriga_lib.baseband_freq_response_multi( real(ce), imag(ce), dl, fin, fout, true );
 assertTrue( max(abs(hr_t(:) - hr_e(:))) > 0.1 );
 
-% ---- Test 5: batch as cell arrays, i_snap -------------------------------
+%% Batch as cell arrays, i_snap
 cre_b = { coeff_re_4d, 2 * coeff_re_4d, coeff_re_4d(:,:,1,:) };
 cim_b = { coeff_im_4d, 2 * coeff_im_4d, coeff_im_4d(:,:,1,:) };
 dl_b = { delay_4d, delay, delay(1) };
@@ -111,7 +115,7 @@ assertEqual( quadriga_lib.baseband_freq_response_multi( cre_b, cim_b, dl_b, freq
 assertTrue( isa(hr_sp, 'double') );
 assertElementsAlmostEqual( hr_sp + 1j*hi_sp, hmat_re_m + 1j*hmat_im_m, 'absolute', 1e-5 );
 
-% ---- Errors ---------------------------------------------------------------
+%% Errors
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay_4d(:,:,:,1:2), freq, freq_new ), ...
     'The 4th dimension of ''delay'' must be 1 or the length of ''freq''.' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay, freq(1:2), freq_new ), ...
@@ -121,7 +125,7 @@ assert_throws( @() quadriga_lib.baseband_freq_response_multi( {coeff_re_4d, coef
     {coeff_im_4d, coeff_im_4d(1,:,:,:)}, {delay, delay}, freq, freq_new ), 'same number of rows and columns' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( cre_b, cim_b, dl_b, freq, freq_new, true, 0 ), '1-based' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( cre_b, cim_b, dl_b, freq, freq_new, true, 4 ), ...
-    'cannot exceed the number of snapshots' );
+    'outside the range of the' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay, flipud(freq), freq_new ), ...
     'strictly ascending' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay, freq ), 'Wrong number of input arguments' );

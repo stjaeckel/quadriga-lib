@@ -91,9 +91,9 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     if (tridir.n_cols != 6 && tridir.n_cols != 9)
         throw std::invalid_argument("Input 'tridir' must have 6 or 9 columns.");
     if (trivec.n_rows != n_ray)
-        throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'trivec' do not match.");
     if (tridir.n_rows != n_ray)
-        throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'tridir' do not match.");
 
     const bool have_dest = (!dest.is_empty());
     if (have_dest && dest.n_rows != n_ray)

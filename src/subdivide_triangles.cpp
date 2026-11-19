@@ -57,7 +57,7 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
         throw std::invalid_argument("Input 'triangles_in' cannot be empty.");
 
     if (triangles_in.n_cols != 9)
-        throw std::invalid_argument("Input 'triangles_in' must have 9 columns.");
+        throw std::invalid_argument("Input 'triangles_in' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
     qd_check_alias(&triangles_out, "triangles_out", &triangles_in);
     qd_check_alias(mtl_ind_out, "mtl_ind_out", &mtl_ind);
@@ -83,10 +83,10 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
         mtl_ind_out->set_size(n_triangles_out);
 
     // Process each triangle
-    arma::uword cnt = 0;                                  // Counter
-    dtype stp = dtype(1.0) / dtype(n_div);                // Step size
-    const dtype *p_triangles_in = triangles_in.memptr();  // Pointer to input memory
-    dtype *p_triangles_out = triangles_out.memptr();      // Pointer to output memory
+    arma::uword cnt = 0;
+    dtype stp = dtype(1.0) / dtype(n_div);
+    const dtype *p_triangles_in = triangles_in.memptr();
+    dtype *p_triangles_out = triangles_out.memptr();
     const arma::uword *p_mtl_ind = process_mtl_ind ? mtl_ind.memptr() : nullptr;
     arma::uword *p_mtl_ind_out = process_mtl_ind ? mtl_ind_out->memptr() : nullptr;
 

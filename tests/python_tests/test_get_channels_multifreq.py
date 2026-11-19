@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.channel.multifreq: output shapes, frequency interpolation, agreement with channel.spherical, EM and acoustic cases, error paths.
+
 import sys
 import os
 import unittest
@@ -110,9 +112,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             a = amp(coeff_re, coeff_im, 0, 0, 0, f)
             self.assertGreater(a, 0.0)
 
-    # ============================================================================
-    # SECTION 1: Input validation
-    # ============================================================================
+    # ---- Input validation ----
 
     def test_empty_tx_array_throws(self):
         """Empty TX antenna pattern fields should raise an error."""
@@ -196,9 +196,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
                 tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi,
                 fo, propagation_speed=-1.0)
 
-    # ============================================================================
-    # SECTION 2: Output sizing
-    # ============================================================================
+    # ---- Output sizing ----
 
     def test_output_dimensions(self):
         """Verify 4D output shape: (n_rx, n_tx, n_path, n_freq_new)."""
@@ -234,10 +232,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             add_fake_los_path=True))
 
         self.assertEqual(cr.shape[2], 2)  # 1 path + 1 fake LOS
-
-    # ============================================================================
-    # SECTION 3: Match single-frequency get_channels_spherical
-    # ============================================================================
 
     def test_matches_single_freq_spherical(self):
         """Multi-freq with single entry should match get_channels_spherical."""
@@ -283,9 +277,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         npt.assert_allclose(ci[:, :, :, 0], ci_ref, atol=1e-10, rtol=0)
         npt.assert_allclose(dl[:, :, :, 0], dl_ref, atol=1e-14, rtol=0)
 
-    # ============================================================================
-    # SECTION 4: Delay calculation with custom propagation speed
-    # ============================================================================
+    # ---- Delay calculation with custom propagation speed ----
 
     def test_acoustic_delays(self):
         """Speed of sound should produce correct acoustic delays."""
@@ -332,9 +324,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         ratio = dl_a[0, 0, 0, 0] / dl_r[0, 0, 0, 0]
         self.assertAlmostEqual(ratio, c_radio / c_sound, delta=1e-6)
 
-    # ============================================================================
-    # SECTION 5: Scalar pressure Jones matrix (M with 2 rows)
-    # ============================================================================
+    # ---- Scalar pressure Jones matrix (M with 2 rows) ----
 
     def test_scalar_M_matches_full_M(self):
         """Scalar M (2 rows) should give same VV result as full M (8 rows)."""
@@ -362,9 +352,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         npt.assert_allclose(ci_f, ci_s, atol=1e-12, rtol=0)
         npt.assert_allclose(dl_f, dl_s, atol=1e-14, rtol=0)
 
-    # ============================================================================
-    # SECTION 6: Frequency interpolation of path_gain and M
-    # ============================================================================
+    # ---- Frequency interpolation of path_gain and M ----
 
     def test_path_gain_linear_interpolation(self):
         """Path gain should be linearly interpolated across frequency."""
@@ -404,10 +392,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertGreater(a, 0.5)
         self.assertLess(a, 1.5)
 
-    # ============================================================================
-    # SECTION 7: Extrapolation (clamping)
-    # ============================================================================
-
     def test_extrapolation_clamps(self):
         """Querying below freq range should clamp to first entry."""
         tx = gen_omni(); rx = gen_omni()
@@ -430,9 +414,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         amp_ex = amp(cr_ex, ci_ex, 0, 0, 0, 0)
         self.assertAlmostEqual(amp_lo, amp_ex, delta=1e-10)
 
-    # ============================================================================
-    # SECTION 8: Multiple output frequencies
-    # ============================================================================
+    # ---- Multiple output frequencies ----
 
     def test_multiple_output_frequencies(self):
         """Multiple output frequencies should produce correct shape and finite values."""
@@ -470,9 +452,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             with self.assertRaises(TypeError):
                 quadriga_lib.channel.multifreq(*args[:i], None, *args[i + 1:])
 
-    # ============================================================================
-    # SECTION 9: GHz antenna with frequency-dependent pattern
-    # ============================================================================
+    # ---- GHz antenna with frequency-dependent pattern ----
 
     def test_freq_dependent_pattern(self):
         """Frequency-dependent pattern (scaled by frequency) should increase amplitude."""
@@ -512,10 +492,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertGreater(a1, a0)
         self.assertGreater(a2, a1)
 
-    # ============================================================================
-    # SECTION 10: Acoustic speaker simulation
-    # ============================================================================
-
     def test_acoustic_speaker_simulation(self):
         """Acoustic speaker: verify output shape and finite values."""
         tx_woofer = quadriga_lib.arrayant.generate_speaker(
@@ -525,8 +501,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
             angular_resolution_deg=10.0)
 
-        # Note: arrayant_concat_multi is not yet available in Python, so we test
-        # each driver individually to confirm the API works with generate_speaker output
         rx = gen_omni()
         fbs = np.array([[0.5], [0.0], [0.0]], order='F')
         lbs = np.array([[0.5], [0.0], [0.0]], order='F')
@@ -543,10 +517,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertEqual(cr.shape[3], 3)  # 3 output frequencies
         self.assertTrue(np.all(np.isfinite(cr)))
         self.assertTrue(np.all(np.isfinite(dl)))
-
-    # ============================================================================
-    # SECTION 11: Full polarimetric Jones matrix
-    # ============================================================================
 
     def test_full_polarimetric_jones(self):
         """Full polarimetric Jones with cross-pol should produce non-zero H response."""
@@ -571,9 +541,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertGreater(amp_v, 0.1)
         self.assertGreater(amp_h, 0.1)
 
-    # ============================================================================
-    # SECTION 12: TX and RX orientation
-    # ============================================================================
+    # ---- TX and RX orientation ----
 
     def test_tx_orientation(self):
         """TX orientation should rotate the pattern."""
@@ -600,9 +568,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertEqual(cr.shape[3], 1)  # single freq
         self.assertTrue(np.all(np.isfinite(cr)))
 
-    # ============================================================================
-    # SECTION 13: Frequency-dependent phase from wave number
-    # ============================================================================
+    # ---- Frequency-dependent phase from wave number ----
 
     def test_different_frequencies_different_phases(self):
         """Different frequencies should produce different phases but same amplitude."""
@@ -628,10 +594,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         # Delays should be the same (same geometry)
         npt.assert_allclose(dl[0, 0, 0, 0], dl[0, 0, 0, 1], atol=1e-14, rtol=0)
 
-    # ============================================================================
-    # SECTION 14: NLOS paths
-    # ============================================================================
-
     def test_los_and_nlos_delays(self):
         """LOS and NLOS paths should have different delays."""
         C = 299792458.0
@@ -656,10 +618,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertLess(dl[0, 0, 0, 0], dl[0, 0, 1, 0])
         npt.assert_allclose(dl[0, 0, 0, 0], 10.0 / C, atol=1e-12, rtol=0)
         npt.assert_allclose(dl[0, 0, 1, 0], d_nlos / C, atol=1e-10, rtol=0)
-
-    # ============================================================================
-    # SECTION 15: Multi-element MIMO antenna
-    # ============================================================================
 
     def test_2x2_mimo(self):
         """2x2 MIMO: correct dimensions and element scaling."""
@@ -691,10 +649,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         a01 = amp(cr, ci, 0, 1, 0, 0)
         self.assertAlmostEqual(a01 / a00, 2.0, delta=0.1)
 
-    # ============================================================================
-    # SECTION 17: Zero center_freq (phase disabled)
-    # ============================================================================
-
     def test_zero_frequency_disables_phase(self):
         """Zero output frequency should disable phase rotation."""
         tx = gen_omni(); rx = gen_omni()
@@ -710,10 +664,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
 
         self.assertAlmostEqual(abs(ci[0, 0, 0, 0]), 0.0, places=14)
         self.assertAlmostEqual(cr[0, 0, 0, 0], 1.0, delta=1e-10)
-
-    # ============================================================================
-    # SECTION 18: Multiple freq entries
-    # ============================================================================
 
     def test_multiple_freq_varying_gain(self):
         """Multiple freq entries with varying path gain should interpolate correctly."""
@@ -739,10 +689,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertAlmostEqual(a1, 2.0, delta=0.01)
         self.assertAlmostEqual(a2, 3.0, delta=0.01)
 
-    # ============================================================================
-    # SECTION 19: Absolute vs relative delays
-    # ============================================================================
-
     def test_absolute_vs_relative_delays(self):
         """Absolute delay includes LOS, relative subtracts it."""
         C = 299792458.0; dist = 20.0
@@ -764,9 +710,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         npt.assert_allclose(dl_a[0, 0, 0, 0], dist / C, atol=1e-12, rtol=0)
         self.assertAlmostEqual(abs(dl_r[0, 0, 0, 0]), 0.0, places=14)
 
-    # ============================================================================
-    # SECTION 20: Amplitude stable, phase varies with frequency
-    # ============================================================================
+    # ---- Amplitude stable, phase varies with frequency ----
 
     def test_sweep_amplitude_stable_phase_varies(self):
         """Across a frequency sweep, amplitude should be stable, phase should vary."""
@@ -785,10 +729,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         for f in range(1, 10):
             a = amp(cr, ci, 0, 0, 0, f)
             self.assertAlmostEqual(a, amp_ref, delta=1e-10)
-
-    # ============================================================================
-    # SECTION 22: Acoustic single-bounce reflection
-    # ============================================================================
 
     def test_acoustic_single_bounce(self):
         """Acoustic simulation: NLOS delay should be greater than LOS delay."""
@@ -815,9 +755,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         npt.assert_allclose(dl[0, 0, 0, 0], d_los / c_sound, atol=1e-10, rtol=0)
         npt.assert_allclose(dl[0, 0, 1, 0], d_nlos / c_sound, atol=1e-10, rtol=0)
 
-    # ============================================================================
-    # SECTION 23: Frequency-dependent path gain with acoustic simulation
-    # ============================================================================
+    # ---- Frequency-dependent path gain with acoustic simulation ----
 
     def test_air_absorption_increases_with_frequency(self):
         """Higher frequency should reduce amplitude (air absorption model)."""
@@ -843,9 +781,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertGreater(a_lo, a_mid)
         self.assertGreater(a_mid, a_hi)
 
-    # ============================================================================
-    # SECTION 24: Coupling interpolation across frequency
-    # ============================================================================
+    # ---- Coupling interpolation across frequency ----
 
     def test_freq_dependent_coupling(self):
         """Frequency-dependent coupling should produce different coefficients."""
@@ -891,10 +827,6 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         # The two frequency slices should differ (different coupling)
         self.assertFalse(np.allclose(cr[:, :, :, 0], cr[:, :, :, 1], atol=1e-6))
 
-    # ============================================================================
-    # SECTION 25: Reversed freq_new order
-    # ============================================================================
-
     def test_reversed_freq_new_order(self):
         """Reversed freq_new order should give consistent results."""
         tx = gen_omni(); rx = gen_omni()
@@ -920,15 +852,12 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         npt.assert_allclose(dl_f[:, :, :, 0], dl_r[:, :, :, 1], atol=1e-14, rtol=0)
         npt.assert_allclose(dl_f[:, :, :, 1], dl_r[:, :, :, 0], atol=1e-14, rtol=0)
 
-    # ============================================================================
-    # Edge case: 3D (single-freq) antenna input
-    # ============================================================================
+    # ---- Edge case: 3D (single-freq) antenna input ----
 
     def test_single_freq_3d_antenna_input(self):
         """Standard 3D-pattern antenna dict (no 4th freq dim) should work correctly."""
         tx = gen_omni(); rx = gen_omni()
 
-        # Verify input is indeed 3D
         self.assertEqual(tx['e_theta_re'].ndim, 3)
 
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')

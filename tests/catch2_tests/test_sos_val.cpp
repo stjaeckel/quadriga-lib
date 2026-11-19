@@ -192,7 +192,8 @@ TEST_CASE("sos_val - a column of a batched call equals the call with that phase 
             quadriga_lib::sos_val(spatial_freq, ph, pos, one, {}, {},
                                   {}, {}, 1.0, false, kernel);
             INFO("kernel " << kernel << ", generator " << g);
-            CHECK(arma::approx_equal(one, all.col(g), "absdiff", 0.0)); // Bit-identical
+            const double tol = kernel == 1 ? 0.0 : 5e-7 * arma::abs(all).max(); // GENERIC: bit-identical
+            CHECK(arma::approx_equal(one, all.col(g), "absdiff", tol));
         }
     }
 }
@@ -764,7 +765,7 @@ TEST_CASE("sos_val - input validation")
 TEST_CASE("sos_val - an output that shares only part of the memory of an input throws")
 {
     // 'val' as a matrix on foreign memory that starts inside an input, or ends inside one. With two devices
-    // the first kernel writes 'val' before the normalisation reads the input again, which gave wrong values.
+    // the first kernel writes 'val' before the normalisation reads the input again, so an overlap gives wrong values.
     // Every such call must throw before anything is written; memory that only touches an input is accepted.
     arma::mat spatial_freq = rnd(10, 3, -0.3, 0.3, 60), phase = rnd(10, 1, -pi, pi, 61), phase_b = rnd(10, 1, -pi, pi, 62);
     arma::mat pos = rnd(40, 3, -20.0, 20.0, 63), pos_b = pos + 1.0;

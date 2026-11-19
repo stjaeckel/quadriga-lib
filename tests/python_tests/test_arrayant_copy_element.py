@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.arrayant.copy_element: single- and multi-frequency arrayants, output layout, error paths.
+
 import sys
 import os
 import unittest
@@ -72,9 +74,7 @@ def make_multi_freq_ant(n_el=5, n_az=9, n_elem=1, n_freq=3):
 class TestCopyElementSingleFreq(unittest.TestCase):
     """Tests for copy_element with single-frequency (3D) arrayants."""
 
-    # ================================================================================
-    # Basic copy operations
-    # ================================================================================
+    # ---- Basic copy operations ----
 
     def test_copy_single_to_new_index(self):
         """Copy element 0 to index 1 — should expand from 1 to 2 elements."""
@@ -133,9 +133,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         npt.assert_array_almost_equal(out['e_theta_re'][:, :, 3],
                                       np.full((5, 9), 2.0), decimal=14)
 
-    # ================================================================================
-    # Output structure
-    # ================================================================================
+    # ---- Output structure ----
 
     def test_output_is_3d(self):
         """Single-freq input produces 3D output patterns."""
@@ -178,9 +176,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         _ = arrayant.copy_element(ant, 0, 1)
         self.assertEqual(ant['e_theta_re'].shape, original_shape)
 
-    # ================================================================================
-    # All pattern fields copied
-    # ================================================================================
+    # ---- All pattern fields copied ----
 
     def test_all_pattern_fields_copied(self):
         """All four pattern fields should have the copied element."""
@@ -197,9 +193,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         npt.assert_array_almost_equal(out['e_phi_re'][:, :, 1], 3.0)
         npt.assert_array_almost_equal(out['e_phi_im'][:, :, 1], 4.0)
 
-    # ================================================================================
-    # Error handling
-    # ================================================================================
+    # ---- Error handling ----
 
     def test_mismatched_source_dest_length_throws(self):
         """source and dest vectors of different lengths should throw."""
@@ -230,9 +224,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         with self.assertRaises(ValueError):
             arrayant.copy_element(ant, 0, np.array([2**64 - 1], dtype=np.uint64))
 
-    # ================================================================================
-    # Integration with generate
-    # ================================================================================
+    # ---- Integration with generate ----
 
     def test_copy_on_generated_antenna(self):
         """Copy element on a generated omni antenna."""
@@ -249,9 +241,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
 class TestCopyElementMultiFreq(unittest.TestCase):
     """Tests for copy_element with multi-frequency (4D) arrayants."""
 
-    # ================================================================================
-    # Basic copy operations
-    # ================================================================================
+    # ---- Basic copy operations ----
 
     def test_copy_single_to_new_index(self):
         """Copy element 0 to index 1 — should expand from 1 to 2 elements across all freqs."""
@@ -306,9 +296,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
             npt.assert_array_almost_equal(out['e_theta_re'][:, :, 3, f],
                                           out['e_theta_re'][:, :, 1, f])
 
-    # ================================================================================
-    # Output structure
-    # ================================================================================
+    # ---- Output structure ----
 
     def test_output_is_4d(self):
         """Multi-freq input produces 4D output patterns."""
@@ -362,9 +350,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
                                   i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(ant['e_theta_re'].shape, original_shape)
 
-    # ================================================================================
-    # All pattern fields copied
-    # ================================================================================
+    # ---- All pattern fields copied ----
 
     def test_all_pattern_fields_copied(self):
         """All four pattern fields should have the copied element at all frequencies."""
@@ -381,9 +367,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
             npt.assert_array_almost_equal(out['e_phi_re'][:, :, 1, f], 3.0)
             npt.assert_array_almost_equal(out['e_phi_im'][:, :, 1, f], 4.0)
 
-    # ================================================================================
-    # Error handling
-    # ================================================================================
+    # ---- Error handling ----
 
     def test_mismatched_source_dest_length_throws(self):
         """source and dest vectors of different lengths should throw."""
@@ -399,9 +383,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
             arrayant.copy_element(ant, i_source=np.array([5], dtype=np.uint64),
                                   i_target=np.array([1], dtype=np.uint64))
 
-    # ================================================================================
-    # Integration with generate_speaker
-    # ================================================================================
+    # ---- Integration with generate_speaker ----
 
     def test_copy_on_generated_speaker(self):
         """Copy element on a generated speaker (multi-freq)."""

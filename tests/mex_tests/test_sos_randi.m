@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_sos_randi
 % MEX interface test for quadriga_lib.sos_randi.
 % Scope: argument and output handling, defaults, error paths.
@@ -70,8 +74,8 @@ assert_throws( @() quadriga_lib.sos_randi( dd, pos, 6, [], dd ), 'dist_decorr_b'
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], 'Comb300' ), 'Input ''preset'' is not a known preset.' );  % thrown by C++
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 0 ), 'imax' );                           % thrown by C++
 
-% imax is validated by the wrapper before the conversion to an unsigned type: a negative or non-finite
-% value used to wrap around and return values around 1e18
+% imax is validated by the wrapper before the conversion to an unsigned type, so that a negative or
+% non-finite value does not wrap around
 assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, -3 ), 'Input ''imax'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, NaN ), 'Input ''imax'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, Inf ), 'Input ''imax'' must be an integer >= 1.' );

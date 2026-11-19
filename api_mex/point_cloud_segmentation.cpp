@@ -41,38 +41,31 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input arguments
     const arma::mat points = qd_mex_get_Mat<double>(prhs[0], false, "points");
     const arma::uword target_size = (nrhs < 2) ? 1024 : qd_mex_get_scalar<arma::uword>(prhs[1], "target_size", 1024);
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Outputs (sizes are determined by C++ at runtime)
     arma::mat points_out;
     arma::u32_vec sub_cloud_ind, forward_ind, reverse_ind;
 
-    // Wrap optional output pointers using nlhs guard
-    // (.empty() guard is unsafe here because C++ resizes these outputs)
+    // nlhs guard, not .empty(): C++ sizes these outputs
     arma::u32_vec *p_forward_index = (nlhs > 2) ? &forward_ind : nullptr;
     arma::u32_vec *p_reverse_index = (nlhs > 3) ? &reverse_ind : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::point_cloud_segmentation<double>(points, points_out, sub_cloud_ind,
                                                            target_size, vec_size,
                                                            p_forward_index, p_reverse_index));
 
-    // Convert 0-based C++ indices to 1-based MATLAB indices
-    // (forward_ind is already 1-based in C++ with 0 for padding — no conversion)
+    // forward_ind is 1-based in C++ (0 = padding): no shift
     sub_cloud_ind += 1;
     if (p_reverse_index != nullptr)
         reverse_ind += 1;
 
-    // Copy outputs to MATLAB
     plhs[0] = qd_mex_copy2matlab(&points_out);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&sub_cloud_ind);

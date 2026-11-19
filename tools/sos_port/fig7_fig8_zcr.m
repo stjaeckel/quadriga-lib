@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Fig. 7 and Fig. 8 of the paper: zero-crossing rate against the number of sinusoids, and the ACF close to
 % the origin, both for a decorrelation distance of 20 m.
 %

@@ -1,24 +1,12 @@
 % SPDX-License-Identifier: Apache-2.0
-%
-% quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-% Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-%
-% Licensed under the Apache License, Version 2.0 (the "License");
-% you may not use this file except in compliance with the License.
-% You may obtain a copy of the License at
-% http://www.apache.org/licenses/LICENSE-2.0
-%
-% Unless required by applicable law or agreed to in writing, software
-% distributed under the License is distributed on an "AS IS" BASIS,
-% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-% See the License for the specific language governing permissions and
-% limitations under the License.
-% ------------------------------------------------------------------------
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
 function test_calc_delay_spread()
-% MOxUnit tests for quadriga_lib.calc_delay_spread
+% MEX interface test for quadriga_lib.calc_delay_spread.
+% Physics validation lives in the Catch2 suite (test_calc_delay_spread.cpp).
 
-% --- Basic single CIR with 3 paths ---
+%% Basic single CIR with 3 paths
 delays = [0; 1e-6; 2e-6];
 powers = [1.0; 0.5; 0.25];
 
@@ -35,7 +23,7 @@ assertElementsAlmostEqual( mean_delay, expected_mean, 'absolute', 1e-14 );
 assertTrue( ds > 0 );
 assertTrue( ds < 2e-6 );
 
-% --- Single path yields zero spread ---
+%% Single path yields zero spread
 delays = 5e-6;
 powers = 1.0;
 
@@ -43,7 +31,7 @@ powers = 1.0;
 assertElementsAlmostEqual( ds, 0.0, 'absolute', 1e-20 );
 assertElementsAlmostEqual( mean_delay, 5e-6, 'absolute', 1e-20 );
 
-% --- Two equal-power paths ---
+%% Two equal-power paths
 delays = [0; 2e-6];
 powers = [1.0; 1.0];
 
@@ -51,7 +39,7 @@ powers = [1.0; 1.0];
 assertElementsAlmostEqual( mean_delay, 1e-6, 'absolute', 1e-14 );
 assertElementsAlmostEqual( ds, 1e-6, 'absolute', 1e-14 );
 
-% --- Multiple CIRs (2 rows) ---
+%% Multiple CIRs (2 rows)
 delays = [0 1e-6, 0; 0, 1e-6, 2e-6];
 powers = [1.0, 1.0, 0; 1.0, 1.0, 1.0];
 
@@ -68,7 +56,7 @@ assertElementsAlmostEqual( ds(1), 0.5e-6, 'absolute', 1e-14 );
 assertElementsAlmostEqual( mean_delay(2), 1e-6, 'absolute', 1e-14 );
 assertTrue( ds(2) > 0 );
 
-% --- Threshold filters weak paths ---
+%% Threshold filters weak paths
 delays = [0, 10e-6, 1e-6];
 powers = [1.0, 0.001, 0.5];
 
@@ -78,7 +66,7 @@ ds_all = quadriga_lib.calc_delay_spread( delays', powers', 100.0 );
 % DS with all paths should be larger
 assertTrue( ds_all > ds_20 );
 
-% --- Granularity bins paths ---
+%% Granularity bins paths
 delays = [100e-9, 110e-9, 1000e-9];
 powers = [1.0, 1.0, 1.0];
 
@@ -88,14 +76,14 @@ ds_gran = quadriga_lib.calc_delay_spread( delays', powers', 100.0, 50e-9 );
 assertTrue( ds_no_gran > 0 );
 assertTrue( ds_gran > 0 );
 
-% --- Without mean_delay output ---
+%% Without mean_delay output
 delays = [0, 1e-6];
 powers = [1.0, 1.0];
 
 ds = quadriga_lib.calc_delay_spread( delays', powers' );
 assertElementsAlmostEqual( ds, 0.5e-6, 'absolute', 1e-14 );
 
-% --- Granularity with mean_delay output ---
+%% Granularity with mean_delay output
 delays = [0, 50e-9, 500e-9, 550e-9];
 powers = [1.0, 1.0, 1.0, 1.0];
 
@@ -104,7 +92,7 @@ powers = [1.0, 1.0, 1.0, 1.0];
 assertTrue( mean_delay > 0 );
 assertTrue( ds > 0 );
 
-% --- Any real class: 8- and 16-bit integers and logical arrays as their double values ---
+%% Any real class: 8- and 16-bit integers and logical arrays as their double values
 [ds_i, mean_i] = quadriga_lib.calc_delay_spread( int8([0; 2; 5]), [true; false; true] );
 [ds_d, mean_d] = quadriga_lib.calc_delay_spread( [0; 2; 5], [1; 0; 1] );
 assertEqual( [ds_i, mean_i], [ds_d, mean_d] );

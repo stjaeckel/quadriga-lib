@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.tools.calc_delay_spread: values for known CIRs, threshold, granularity, error paths.
+
 import sys
 import os
 import unittest

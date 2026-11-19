@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_triangle_mesh_aabb
+% MEX interface test for quadriga_lib.triangle_mesh_aabb.
 
 mesh = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top NorthEast
            1    -1     1   ,   -1    -1    -1   ,    1    -1    -1;   %  2 South Lower
@@ -15,14 +20,14 @@ mesh = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
 
 mesh_sub = quadriga_lib.subdivide_triangles(3, mesh);
 
-% Test no output
+% No output
 quadriga_lib.triangle_mesh_aabb( mesh_sub );
 
-% Test default 
+% Whole mesh, no sub-mesh index
 aabb = quadriga_lib.triangle_mesh_aabb( mesh_sub );
 assertElementsAlmostEqual( aabb, [-1 1 -1 1 -1 1], 'absolute', 1e-14 );
 
-% Test segmentation
+% Segmented mesh: one AABB per sub-mesh
 [mesh_seg, sub_mesh_ind] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64);
 assertTrue( numel(sub_mesh_ind) > 1 );
 
@@ -81,7 +86,7 @@ try % Wrong sub mesh index
     aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([1;0;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-mesh must start at the first face.';
+    expectedErrorMessage = 'Input ''sub_mesh_ind'' must start at the first mesh face.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -91,7 +96,7 @@ try % Wrong sub mesh index
     aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([0;0;1000]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sub-mesh indices cannot exceed number of faces.';
+    expectedErrorMessage = 'Entries of ''sub_mesh_ind'' cannot point beyond the last mesh face.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -101,7 +106,7 @@ try % Wrong sub mesh index
     aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([0;1000;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sub-mesh indices must be sorted in ascending order.';
+    expectedErrorMessage = 'Entries of ''sub_mesh_ind'' must be strictly increasing.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -118,11 +123,3 @@ catch ME
 end
 
 end
-
-
-
-
-
-
-
-

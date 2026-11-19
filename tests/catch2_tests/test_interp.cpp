@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// interp_1D and interp_2D: the binary index search equals a linear-scan reference with the same weights and sum
+// (exactly, for sorted, unsorted and duplicate grids); end values outside the grid, NaN propagation, the checks of
+// non-finite grids and of the output argument.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_math.hpp"
@@ -108,19 +112,22 @@ TEST_CASE("interp - binary index search gives the results of the linear scan")
             arma::vec yo = {-0.5, 0.0, 0.3, 0.99, 2.0};
 
             INFO("n = " << n << ", variant " << variant);
+            // Bound 4 eps * max|data|: summation order and FMA contraction may differ from the reference
+            const double tol1 = 4.0 * arma::datum::eps * arma::abs(d1).max(), tol2 = 4.0 * arma::datum::eps * arma::abs(d2).max();
             arma::vec r1 = q_interp_1D<double>(xi, d1, xo);
             arma::mat ref1 = ref_interp_2D<double>(arma::mat(d1.t()), xi, arma::vec(1), xo, arma::vec(1));
-            CHECK(arma::approx_equal(r1, arma::vec(ref1.row(0).t()), "absdiff", 0.0));
+            CHECK(arma::approx_equal(r1, arma::vec(ref1.row(0).t()), "absdiff", tol1));
 
             arma::mat r2 = q_interp_2D<double>(xi, yi, d2, xo, yo);
             arma::mat ref2 = ref_interp_2D<double>(d2, xi, yi, xo, yo);
-            CHECK(arma::approx_equal(r2, ref2, "absdiff", 0.0));
+            CHECK(arma::approx_equal(r2, ref2, "absdiff", tol2));
 
             arma::fvec xif = arma::conv_to<arma::fvec>::from(xi), xof = arma::conv_to<arma::fvec>::from(xo);
             arma::fvec d1f = arma::conv_to<arma::fvec>::from(d1);
+            const float tol1f = 4.0f * arma::fdatum::eps * arma::abs(d1f).max();
             arma::fvec r1f = q_interp_1D<float>(xif, d1f, xof);
             arma::fmat ref1f = ref_interp_2D<float>(arma::fmat(d1f.t()), xif, arma::fvec(1), xof, arma::fvec(1));
-            CHECK(arma::approx_equal(r1f, arma::fvec(ref1f.row(0).t()), "absdiff", 0.0f));
+            CHECK(arma::approx_equal(r1f, arma::fvec(ref1f.row(0).t()), "absdiff", tol1f));
         }
 }
 
@@ -166,8 +173,7 @@ TEST_CASE("interp - a NaN query gives NaN, outside the grid the nearest end valu
 
 TEST_CASE("interp - non-finite grid values in 'x' or 'y' throw")
 {
-    // A NaN in a grid that is_sorted() accepts gave NaN at some queries, an unsorted grid with NaN threw inside the
-    // sort; the grids are now checked first
+    // A NaN in a sorted grid would give NaN at some queries, in an unsorted one it would throw inside the sort
     auto message = [](auto fn) -> std::string
     {
         try

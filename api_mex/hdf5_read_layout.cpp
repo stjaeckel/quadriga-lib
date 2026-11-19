@@ -43,10 +43,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
-    // Read storage layout (and channel IDs when requested)
     arma::Col<unsigned> storage_space;
     arma::Col<unsigned> channel_id;
     arma::Col<unsigned> *p_channel_id = (nlhs > 1) ? &channel_id : nullptr;

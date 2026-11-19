@@ -1,7 +1,10 @@
-function test_qd_ieee_chan
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% =====================================================================
-% Covered tests:
+function test_qd_ieee_chan
+% MEX interface test for quadriga_lib.get_channels_ieee_indoor (Catch2 suite: test_qd_ieee_chan.cpp).
+% Covered:
 % - K-Factor model for Type A (xpol)
 % - Correctness of TX/RX positions and orientations (TGac defaults + manual)
 % - LOS Steering matrix (Xpol isolation)
@@ -11,12 +14,9 @@ function test_qd_ieee_chan
 % - TGax floor penetration loss formula (n=2,3,4 vs n=1 reference)
 % - Doppler shift on the LOS path (moving station)
 % - Uplink-downlink reciprocity (time-domain)
-% =====================================================================
 
 
-% ---------------------------------------------------------------------
-% 1) Type A, single user, cross-polarised antenna
-% ---------------------------------------------------------------------
+%% 1) Type A, single user, cross-polarised antenna
 ant = quadriga_lib.arrayant_generate('xpol');
 chan = quadriga_lib.get_channels_ieee_indoor(ant, ant, 'A');
 
@@ -69,9 +69,7 @@ p11 = H0_re(2, 2)^2 + H0_im(2, 2)^2;
 assertElementsAlmostEqual(p00, p11, 'absolute', 0);
 
 
-% ---------------------------------------------------------------------
-% 2) Type A, two users, default TGac offset angles
-% ---------------------------------------------------------------------
+%% 2) Type A, two users, default TGac offset angles
 ant = quadriga_lib.arrayant_generate('omni', 30.0);
 chan = call_ieee(ant, ant, 'A', ...
     'center_freq', 2.4e9, ...
@@ -99,9 +97,7 @@ assertElementsAlmostEqual(chan(2).rx_pos(:, 1), [cx; cy; 0], 'absolute', 1e-5);
 assertElementsAlmostEqual(chan(2).rx_orientation(3, 1) * 180/pi, ori_deg, 'absolute', 1e-4);
 
 
-% ---------------------------------------------------------------------
-% 3) Type A, two users, manual offset angles (all 100°)
-% ---------------------------------------------------------------------
+%% 3) Type A, two users, manual offset angles (all 100°)
 offset_angles = 100 * ones(4, 2);
 chan = call_ieee(ant, ant, 'A', ...
     'center_freq', 2.4e9, ...
@@ -126,9 +122,7 @@ for u = 1:2
 end
 
 
-% ---------------------------------------------------------------------
-% 4) Type B, three users, mixed distances and floors
-% ---------------------------------------------------------------------
+%% 4) Type B, three users, mixed distances and floors
 chan = call_ieee(ant, ant, 'B', ...
     'center_freq', 2.4e9, ...
     'tap_spacing', 10e-9, ...
@@ -178,9 +172,7 @@ expected_ns = [0, 0, 10, 20, 20, 30, 30, 40, 40, 50, 60, 70, 80].';
 assertElementsAlmostEqual(d_per_path(:), expected_ns, 'absolute', 1.5);
 
 
-% ---------------------------------------------------------------------
-% 5) Seed consistency: identical seed → identical channel
-% ---------------------------------------------------------------------
+%% 5) Seed consistency: identical seed → identical channel
 chan_a = call_ieee(ant, ant, 'B', 'center_freq', 2.4e9, ...
                    'dist', 3, 'seed', 1234);
 chan_b = call_ieee(ant, ant, 'B', 'center_freq', 2.4e9, ...
@@ -200,14 +192,11 @@ catch ME
 end
 
 
-% ---------------------------------------------------------------------
-% 6) Wall penetration loss (NEW: n_walls / wall_loss_dB)
-%
+%% 6) Wall penetration loss (n_walls / wall_loss_dB)
 % Wall loss is a deterministic additive term in the path loss. With a
 % fixed seed and otherwise identical inputs, walls don't change path
 % structure or RNG draws, so the SF realisation is identical and the
 % total path power in dB must differ by exactly -n_walls * wall_loss_dB.
-% ---------------------------------------------------------------------
 seed = 42;
 
 % Reference: no walls
@@ -256,14 +245,11 @@ for u = 1:3
 end
 
 
-% ---------------------------------------------------------------------
-% 7) TGax floor penetration loss formula (NEW: dual-band floor logic)
-%
+%% 7) TGax floor penetration loss formula
 % For TGax (CarrierFreq >= 1 GHz) the per-floor penetration loss is
 %     FL(n) = 18.3 * n^((n+2)/(n+1) - 0.46)   [dB], for n_floors >= 1
 % Comparing two runs with n_floors > 0 ensures both lose the LOS path,
 % so path structure and SF realisation are identical at a fixed seed.
-% ---------------------------------------------------------------------
 seed = 7;
 FL = @(n) 18.3 .* n.^((n + 2) ./ (n + 1) - 0.46);
 
@@ -283,9 +269,7 @@ for nf = [2, 3, 4]
 end
 
 
-% ---------------------------------------------------------------------
-% 8) Doppler shift on the LOS path (moving station)
-% ---------------------------------------------------------------------
+%% 8) Doppler shift on the LOS path (moving station)
 fGHz                = 2.4;
 update_interval_s       = 0.0025;
 observation_time_s  = 10.0;
@@ -326,14 +310,11 @@ fD_expected = v * (fGHz * 1e9) / 3e8;
 assertElementsAlmostEqual(f_peak, fD_expected, 'absolute', 5.0);
 
 
-% ---------------------------------------------------------------------
-% 9) Uplink-downlink reciprocity (time domain)
-%
+%% 9) Uplink-downlink reciprocity (time domain)
 % For a fixed seed, the uplink channel must equal the transpose (no
 % conjugation) of the downlink channel per path and snapshot, with
 % transposed delays: the reciprocal channel, with the same Doppler shift
 % for a moving station.
-% ---------------------------------------------------------------------
 ant = quadriga_lib.arrayant_generate('xpol');   % 2 elements at each end
 
 common = {'center_freq', 2.4e9, 'tap_spacing', 5e-9, ...
@@ -377,7 +358,7 @@ for s = 1:6
 end
 assertElementsAlmostEqual(max_err, 0, 'absolute', 1e-10);
 
-% Override rules: NaN selects the default; out-of-range values throw; errors name the argument
+% Override rules: the model defaults passed explicitly match []; out-of-range values throw; errors name the argument
 ant = quadriga_lib.arrayant_generate('omni');
 assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'kf', -1), 'quadriga_lib:CPPerror');
 assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'xpr_nlos', 0), 'quadriga_lib:CPPerror');
@@ -396,9 +377,7 @@ assertFalse(isempty(strfind(msg, 'dist_breakpoint')));
 end
 
 
-% =====================================================================
-% Helper: call get_channels_ieee_indoor with name-value defaults
-% =====================================================================
+% Call get_channels_ieee_indoor with name-value overrides
 function chan = call_ieee(ant_ap, ant_sta, model, varargin)
 
 % All optional inputs default to [], which selects the documented default

@@ -58,10 +58,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read filename
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
-    // Parse 'chan' (mandatory, struct or struct array)
     if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'chan' must be a non-empty struct.");
 
@@ -72,8 +70,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool has_par = (nrhs > 2) && (mxGetNumberOfElements(prhs[2]) != 0);
     if (has_par)
     {
-        if (!mxIsStruct(prhs[2]))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'par' must be a struct.");
+        qd_mex_check_struct(prhs[2], "par");
         if ((arma::uword)mxGetNumberOfElements(prhs[2]) != n_chan)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'par' must have the same number of elements as 'chan'.");
     }
@@ -136,7 +133,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 if (mxIsClass(field_data, "char"))
                     c.par_data.push_back(std::any(qd_mex_get_string(field_data, "", "par." + field_name)));
                 else
-                    c.par_data.push_back(qd_mex_anycast(field_data, "par." + field_name, false));
+                    c.par_data.push_back(qd_mex_anycast(field_data, "par." + field_name));
             }
 
         slots.at(0, k) = ix_vec.n_elem == 1 ? ix_vec.at(0) : ix_vec.at(k);

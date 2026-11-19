@@ -224,13 +224,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 10)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
     const arma::mat phase = qd_mex_get_Mat<double>(prhs[1], false, "phase");
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[2], false, "pos");
@@ -242,10 +240,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool uniform = (nrhs < 9) ? false : qd_mex_get_scalar<bool>(prhs[8], "uniform", false);
     const int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
 
-    // Output allocation
     arma::mat val;
     plhs[0] = qd_mex_init_output(&val, pos.n_rows, phase.n_cols);
 
-    // Call library function
     CALL_QD(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val, pos_b, phase_b, acf, dist, spatial_freq_scale_b, uniform, use_kernel));
 }

@@ -1,9 +1,13 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_baseband_freq_response
 % MEX interface test for quadriga_lib.baseband_freq_response.
 % Scope: argument and output handling, index conversion, cell-array batches, kernels, error paths.
 % Physics validation lives in the Catch2 suite (test_baseband_freq_response.cpp).
 
-% ---- Common single-frequency test data --------------------------------
+%% Common single-frequency test data
 % [n_rx=4, n_tx=3, n_path=2]
 coeff = zeros(4,3,2);
 coeff(:,1,1) = 0.25:0.25:1;
@@ -20,7 +24,7 @@ delay(2) = 1.5/fc;
 
 pilots = 0:0.1:2;   % 21 pilot positions, range 0..2
 
-% ---- Test 1: one snapshot ---------------------------------------------
+%% One snapshot
 [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc );
 
 assertEqual( size(hmat_re), [4 3 21] );
@@ -40,14 +44,14 @@ assertElementsAlmostEqual( hmat_re(:,:,11), T, 'absolute', 1.5e-6 );
 % Linearity: col 2 of coeff is 4x col 1
 assertElementsAlmostEqual( hmat_re(:,1,:)*4, hmat_re(:,2,:), 'absolute', 1.5e-6 );
 
-% ---- Test 2: single carrier -------------------------------------------
+%% Single carrier
 [ hmat_re_s1, hmat_im_s1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, 0.5, fc );
 assertEqual( size(hmat_re_s1), [4 3] );
 [ hmat_re_ref, hmat_im_ref ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [0.4, 0.5, 0.6], fc );
 assertElementsAlmostEqual( hmat_re_s1, hmat_re_ref(:,:,2), 'absolute', 1e-6 );
 assertElementsAlmostEqual( hmat_im_s1, hmat_im_ref(:,:,2), 'absolute', 1e-6 );
 
-% ---- Batch: cell arrays, snapshot s has its coefficients scaled by s ----
+%% Batch: cell arrays, snapshot s has its coefficients scaled by s
 n_snap = 3;
 cre = cell(n_snap, 1); cim = cell(n_snap, 1); dl = cell(n_snap, 1);
 for s = 1:n_snap
@@ -56,7 +60,7 @@ for s = 1:n_snap
     dl{s} = delay;
 end
 
-% ---- Test 3: all snapshots (i_snap omitted) ----------------------------
+%% All snapshots (i_snap omitted)
 [ hmat_re_ms, hmat_im_ms ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
 assertEqual( size(hmat_re_ms), [4 3 21 3] );
 assertEqual( size(hmat_im_ms), [4 3 21 3] );
@@ -65,7 +69,7 @@ for s = 1:n_snap
     assertElementsAlmostEqual( hmat_im_ms(:,:,:,s), s * hmat_im, 'absolute', 1e-5 );
 end
 
-% ---- Test 4: i_snap ----------------------------------------------------
+%% i_snap
 [ hmat_re_a, hmat_im_a ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 2 3] );
 assertEqual( hmat_re_a, hmat_re_ms );
 assertEqual( hmat_im_a, hmat_im_ms );
@@ -96,7 +100,7 @@ assertEqual( quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [], 
 assertTrue( isa(hr_sp, 'double') );
 assertElementsAlmostEqual( hr_sp + 1j*hi_sp, hmat_re + 1j*hmat_im, 'absolute', 1e-5 );
 
-% ---- Test 5: the number of paths may differ between snapshots ----------
+%% The number of paths may differ between snapshots
 cre_v = { real(coeff), real(coeff(:,:,1)) };
 cim_v = { imag(coeff), imag(coeff(:,:,1)) };
 dl_v = { delay, delay(1) };
@@ -107,13 +111,13 @@ assertEqual( hr_v(:,:,:,1), hmat_re );
 assertEqual( hr_v(:,:,:,2), hr_1 );
 assertEqual( hi_v(:,:,:,2), hi_1 );
 
-% ---- Errors -------------------------------------------------------------
+%% Errors
 assert_throws( @() quadriga_lib.baseband_freq_response( cat(4, real(coeff), real(coeff)), ...
     cat(4, imag(coeff), imag(coeff)), delay, pilots, fc ), 'more than 3 dimensions' );
 assert_throws( @() quadriga_lib.baseband_freq_response( cre, imag(coeff), dl, pilots, fc ), 'must all be cell arrays' );
 assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), cim, dl, pilots, fc ), 'must all be cell arrays' );
 assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [0 1] ), '1-based' );
-assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 5] ), 'cannot exceed the number of snapshots' );
+assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 5] ), 'outside the range of the' );
 assert_throws( @() quadriga_lib.baseband_freq_response( {real(coeff), zeros(2,3,2)}, {imag(coeff), zeros(2,3,2)}, ...
     {delay, delay}, pilots, fc ), 'same number of rows and columns' );
 assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl(1:2), pilots, fc ), 'same number of snapshots' );

@@ -6,6 +6,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 # REPOSITORY LAYOUT AND BUILD
 - `api_mex/<function_name>.cpp` — MEX wrappers, one file per MATLAB function. CMake globs `api_mex/*.cpp`, so a new file needs no registration in the build system.
 - `src/qd_helpers_mex.hpp` (generic conversions) and `src/qd_helpers_mex_types.hpp` (arrayant / channel structs, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
+- `src/qd_helpers_wrappers.hpp` — helpers shared with the Python wrappers: `qd_arrayant_fill_defaults`, `qd_hdf5_select_slots`, the chunked QRT reader. The snapshot selection of the batch wrappers, `qd_snapshot_list` (call through `CALL_QD`), is in `src/qd_helpers_shared.hpp`.
 - `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`).
 - `tests/mex_tests/test_<function_name>.m` — MOxUnit tests, one file per wrapper; `tests/quadriga_lib_mex_tests.m` collects and runs all `tests/mex_tests/test*.m` files, so a new test file needs no registration.
 - `+quadriga_lib/` — the MATLAB package populated by the build: the compiled MEX files and one `.m` help file per function.
@@ -88,7 +89,7 @@ if (nlhs > 2)
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex.hpp"
 ```
-- `#include "qd_helpers_mex_types.hpp"` instead when the wrapper converts arrayant structs, channel structs or `std::any` datasets; it pulls in the three headers above.
+- `#include "qd_helpers_mex_types.hpp"` instead when the wrapper converts arrayant structs, channel structs or `std::any` datasets; it pulls in the three headers above and `qd_helpers_wrappers.hpp`.
 
 ## Helper function signatures
 - Armadillo is pulled in by `quadriga_lib.hpp`. `dtype` in the helpers is one of float, double, int, unsigned, long long, unsigned long long (plus bool for scalars).
@@ -145,9 +146,13 @@ std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const std::str
 // 1x1 struct of numeric vectors -> map (one key per field, equal lengths); non-struct or empty -> empty map
 std::unordered_map<std::string, std::vector<dtype>> qd_mex_struct2map(const mxArray *strct);
 
+// Count argument (number of coefficients, generators, ...): an integer >= 1, else "Input 'x' must be an integer >= 1.";
+// returns default_value for empty input
+arma::uword qd_mex_get_count(const mxArray *input, const char *var_name, double default_value);
+
 // Any numeric MATLAB array -> std::any holding a scalar / arma::Col / Mat / Cube of the MATLAB class
-// (no cast, borrows memory unless create_copy). Strings are not handled, use qd_mex_get_string.
-std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", bool create_copy = false);
+// (no cast, borrows the memory). Strings are not handled, use qd_mex_get_string.
+std::any qd_mex_anycast(const mxArray *input, const std::string &var_name = "");
 
 // ---------- Outputs: C++ -> MATLAB (copy) ----------
 
@@ -155,29 +160,19 @@ mxArray *qd_mex_copy2matlab(const dtype *input); // Scalar
 mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input); // Row Vector
 
 mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input, // Column Vector
-                            bool transpose = false,        // Transpose output (return a row vector)
-                            size_t ns = 0,                 // Number of elements in output
-                            const size_t *is = nullptr);   // List of elements to copy, 0-based
+                            bool transpose = false);       // Transpose output (return a row vector)
+mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input);  // Matrix
+mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input); // Cube
 
-mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input, // Matrix
-                            size_t ns = 0,                 // Number of columns in output
-                            const size_t *is = nullptr);   // List of columns to copy, 0-based
-
-mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input, // Cube
-                            size_t ns = 0,                  // Number of columns in output
-                            const size_t *is = nullptr);    // List of columns to copy, 0-based
-
+mxArray *qd_mex_copy2matlab_keep_shape(const T &x); // Col, Mat or Cube; an empty input keeps its dimensions (not 0x0)
 mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings); // Cell array of strings [n, 1]
 mxArray *qd_mex_copy2matlab(const std::vector<bool> *bools);          // Logical column vector
 
 // std::vector of Armadillo objects -> ND array with one extra dimension, zero-padded to the largest
-// element; empty vector -> empty matrix. Ignore ns, is, padding.
-mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
-                              size_t ns = 0, const size_t *is = nullptr, dtype padding = (dtype)0);
-mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
-                              size_t ns = 0, const size_t *is = nullptr, dtype padding = (dtype)0);
-mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input,
-                              size_t ns = 0, const size_t *is = nullptr, dtype padding = (dtype)0);
+// element; empty vector -> empty matrix.
+mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input);
+mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input);
+mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input);
 
 // Map -> 1x1 struct, one column-vector field per key; field_order fixes the order of the fields
 mxArray *qd_mex_map2struct(const std::unordered_map<std::string, std::vector<dtype>> &map,
@@ -197,6 +192,7 @@ bool qd_mex_same_dims(const mxArray *a, const mxArray *b); // equal dimensions, 
 
 mxArray *qd_mex_make_struct(const std::vector<std::string> &fields, size_t N = 1); // 1xN struct array; no fields -> 0x0 struct
 void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data, size_t n = 0); // n = element index, 0-based
+void qd_mex_check_struct(const mxArray *input, const std::string &var_name = "", bool one = false); // errors unless a struct (one: 1x1)
 bool qd_mex_has_field(const mxArray *strct, const std::string &field);
 mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0,
                           const std::string &var_name = ""); // errors if field is missing, naming 'var_name' if given

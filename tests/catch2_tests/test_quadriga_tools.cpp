@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down the geometry helpers of quadriga_tools.hpp: interp_2D, interp_1D, icosphere, subdivide_triangles, the
+// segmentation and splitting of meshes and point clouds, subdivide_rays, coord2path, combine_irs_coord and
+// calc_rotation_matrix, with their size limits, outputs that alias inputs and position shapes.
+// Oracles: hand-computed values for small exact-by-construction inputs (the default cube, axis-aligned paths).
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -173,7 +178,6 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
 
     // Per-face 0-based material index (each face its own material, to test reordering)
     arma::uvec mtl_ind = arma::regspace<arma::uvec>(0, 11);
-    // Subdivide the mesh into smaller chunks
     arma::fmat cube_sub = cube;
     arma::uvec mtl_ind_sub;
     quadriga_lib::subdivide_triangles(3, cube, cube_sub, mtl_ind, &mtl_ind_sub);
@@ -260,7 +264,6 @@ TEST_CASE("Quadriga tools - Mesh split ignores columns after the 9th")
 
 TEST_CASE("Quadriga tools - Point Cloud Segmentation")
 {
-    // Generate set of points
     arma::fmat points(4, 3);
     points.col(0) = arma::regspace<arma::fvec>(0.0f, 0.1f, 0.3f);
     points = repmat(points, 2, 1);
@@ -270,7 +273,6 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
     points.submat(8, 1, 15, 1) += 50.0f;
     points.col(2) += 1.0f;
 
-    // Calculate bounding box
     arma::fmat aabb;
     aabb = quadriga_lib::point_cloud_aabb(points);
 

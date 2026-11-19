@@ -3,41 +3,23 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
-#include <cstring>   // std::memcopy
-#include <iomanip>   // std::setprecision
-#include <algorithm> // std::replace
-#include <iostream>
+#include <cstring>
 #include <limits>
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
 #include "qd_helpers_arrayant.hpp"
 
+// Cartesian unit vectors from azimuth and elevation angles [N], interleaved output [3, N]
 template <typename dtype>
-static inline void qd_geo2cart_interleaved(size_t N,                 // Number of values
-                                           dtype *cart_3xN,          // Interleaved Cartesian coordinates (output)
-                                           const dtype *az,          // Input azimuth angles, length N
-                                           const dtype *el,          // Input elevation angles, length N
-                                           const dtype *r = nullptr) // Input vector length (optional), length N
+static inline void qd_geo2cart_interleaved(size_t N, dtype *cart_3xN, const dtype *az, const dtype *el)
 {
-    bool has_length = (r != nullptr);
-
     for (size_t i = 0; i < N; ++i)
     {
-        double ca = (double)az[i];
-        double sa = std::sin(ca);
-        ca = std::cos(ca);
-
-        double ce = (double)el[i];
-        double se = std::sin(ce);
-        ce = std::cos(ce);
-
-        double le = has_length ? (double)r[i] : 1.0;
-
+        const double ca = std::cos((double)az[i]), sa = std::sin((double)az[i]);
+        const double ce = std::cos((double)el[i]), se = std::sin((double)el[i]);
         dtype *C = &cart_3xN[3 * i];
-        C[0] = dtype(le * ce * ca);
-        C[1] = dtype(le * ce * sa);
-        C[2] = dtype(le * se);
+        C[0] = dtype(ce * ca), C[1] = dtype(ce * sa), C[2] = dtype(se);
     }
 }
 
@@ -362,7 +344,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 
     qd_arrayant_mark_valid(ant);
 
-    // Normalize to Gain
+    // Normalize to gain
     const arma::Col<dtype> directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant);
     dtype directivity = dtype(std::pow(10.0, 0.1 * double(directivity_dBi[0])));
     dtype p_max = ant.e_theta_re.max();
@@ -409,11 +391,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
 {
     // Fix input ranges
     N = (N == 0ULL) ? 1ULL : N;
-    center_freq = (center_freq <= (dtype)0.0) ? (dtype)299792458.0 : center_freq;
+    center_freq = (center_freq <= (dtype)0.0) ? (dtype)qd_speed_of_light : center_freq;
     spacing = (spacing < (dtype)0.0) ? (dtype)0.5 : spacing;
     res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
 
-    double wavelength = 299792458.0 / double(center_freq);
+    double wavelength = qd_speed_of_light / double(center_freq);
     constexpr dtype zero = dtype(0.0);
 
     // Initialize pattern
@@ -523,7 +505,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     // Fix input ranges
     M = (M == 0ULL) ? 1ULL : M;
     N = (N == 0ULL) ? 1ULL : N;
-    center_freq = (center_freq <= (dtype)0.0) ? (dtype)299792458.0 : center_freq;
+    center_freq = (center_freq <= (dtype)0.0) ? (dtype)qd_speed_of_light : center_freq;
     pol = (pol == 0 || pol > 6) ? 1 : pol;
     spacing = (spacing < (dtype)0.0) ? (dtype)0.5 : spacing;
     Mg = (Mg == 0ULL) ? 1ULL : Mg;
@@ -533,7 +515,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
 
     double pi = arma::datum::pi, rad2deg = 180.0 / pi, deg2rad = pi / 180.0;
-    double wavelength = 299792458.0 / double(center_freq);
+    double wavelength = qd_speed_of_light / double(center_freq);
     constexpr dtype zero = dtype(0.0);
 
     // Initialize pattern
@@ -772,7 +754,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - `quadriga_lib::arrayant<dtype>` — Multibeam planar array antenna object
 MD!*/
 
-// Generate multi-beam antenna
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<dtype> az, arma::Col<dtype> el, arma::Col<dtype> weight,
                                                                         dtype center_freq, unsigned pol, dtype spacing, dtype az_3dB, dtype el_3dB,
@@ -797,7 +778,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     // Fix input ranges
     M = (M == 0) ? 1 : M;
     N = (N == 0) ? 1 : N;
-    center_freq = (center_freq <= zero) ? (dtype)299792458.0 : center_freq;
+    center_freq = (center_freq <= zero) ? (dtype)qd_speed_of_light : center_freq;
     pol = (pol == 0 || pol > 3) ? 1 : pol;
     spacing = (spacing < zero) ? (dtype)0.5 : spacing;
     az_3dB = (az_3dB <= zero) ? (dtype)120.0 : az_3dB; // Default per-element beamwidth
@@ -805,17 +786,15 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     rear_gain_lin = (rear_gain_lin < zero) ? zero : rear_gain_lin;
 
     // Normalized distance = 5000 wavelengths
-    dtype dist = dtype(5000.0 * 299792458.0) / center_freq;
+    dtype dist = dtype(5000.0 * qd_speed_of_light) / center_freq;
 
     // Convert from DEG to RAD
     qd_multiply_scalar((dtype)0.017453292519943, az.memptr(), n_beams);
     qd_multiply_scalar((dtype)0.017453292519943, el.memptr(), n_beams);
 
-    // Convert angles to cartesian
     arma::Mat<dtype> cart(3, n_beams, arma::fill::none);
-    qd_geo2cart_interleaved<dtype>(n_beams, cart.memptr(), az.memptr(), el.memptr(), nullptr);
+    qd_geo2cart_interleaved<dtype>(n_beams, cart.memptr(), az.memptr(), el.memptr());
 
-    // Build pattern
     auto pattern = quadriga_lib::generate_arrayant_custom<dtype>(az_3dB, el_3dB, rear_gain_lin, res);
 
     // Assemble array antenna
@@ -825,7 +804,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     arma::Mat<dtype> cpl_eye = ant.coupling_re;
     arma::Mat<dtype> cpl_zero = ant.coupling_im;
 
-    // Probe array
     auto probe = quadriga_lib::generate_arrayant_omni<dtype>(30.0);
 
     // Phase shifters
@@ -840,14 +818,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     arma::Mat<dtype> path_pol = {1.0, zero, zero, zero, zero, zero, -1.0, zero};
     path_pol = path_pol.t();
 
-    // Storage for the coefficients
     arma::Cube<dtype> coeff_re(1, n_elements, n_beams);
     arma::Cube<dtype> coeff_im(1, n_elements, n_beams);
     arma::Cube<dtype> delay(1, n_elements, n_beams);
 
     // Variables for the optimization loop
-    arma::Col<dtype> gain(n_beams);                                                // zeros
-    arma::Mat<dtype> search_direction(2, n_beams, arma::fill::value((dtype)0.05)); // rad
+    arma::Col<dtype> gain(n_beams);
+    arma::Mat<dtype> search_direction(2, n_beams, arma::fill::value((dtype)0.05)); // Step size in rad
     arma::Mat<dtype> angles(2, n_beams);
     for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
         angles(0, i_beam) = az[i_beam], angles(1, i_beam) = el[i_beam];
@@ -873,12 +850,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
             arma::Col<dtype> aod = {test_angles(0, i_beam)};
             arma::Col<dtype> eod = {test_angles(1, i_beam)};
 
-            // Temporary storage for the coefficients
             arma::Cube<dtype> coeff_re_tmp, coeff_im_tmp, delay_tmp;
 
             // Receiver positions
             dtype R[3];
-            qd_geo2cart_interleaved<dtype>(1, R, aod.memptr(), eod.memptr(), nullptr);
+            qd_geo2cart_interleaved<dtype>(1, R, aod.memptr(), eod.memptr());
             qd_multiply_scalar(dist, R, 3);
 
             const arma::Col<dtype> r_pos = {R[0], R[1], R[2]};
@@ -955,10 +931,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
             dtype b = separate_beams ? coeff_im_tmp[i_beam] : coeff_im_tmp[0];
             dtype gain_new = a * a + b * b;
 
-            // auto tmp = test_angles * 57.29577951308232;
-            // tmp.print("test angles");
-            // std::cout << "IT = " << lp << ", B = " << i_beam << ", Gain = " << 10.0*std::log10( gain[i_beam]) << " > " << 10.0*std::log10(gain_new) << std::endl;
-
             // Update search direction for next iteration. The first iteration tests the start angles and is always
             // stored, also when the gain is 0 (e.g. a beam towards a pole, where the element pattern is 0).
             if (gain_new > gain[i_beam] || lp == 0) // Update gain and angles, keep search direction
@@ -978,13 +950,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
             }
         }
     }
-
-    // auto tmp = angles * 57.29577951308232;
-    // tmp.print("final angles");
-
-    // arma::Col<dtype> tmp2 = arma::log10(gain);
-    // tmp2 *= 10.0;
-    // tmp2.print("final gain");
 
     // Apply polarization
     if (pol > 1)

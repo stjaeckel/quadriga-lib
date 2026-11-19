@@ -3,15 +3,11 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <immintrin.h>
-#include <cstring>
 #include "fastmath_avx2.h"
 #include "quadriga_lib_avx2_functions.hpp"
 
-// ---------------------------------------------------------------------------
-// Jones product kernel (8 float lanes)
-// ---------------------------------------------------------------------------
-// Computes the complex MIMO coefficient from interpolated antenna patterns
-// and the 2x2 polarization transfer matrix for 8 TX-RX links in parallel.
+// Jones product for 8 TX-RX links: complex MIMO coefficient from the interpolated antenna patterns and the 2x2
+// polarization transfer matrix
 //
 //   c = Vr * M_VV * Vt  +  Hr * M_HV * Vt  +  Vr * M_VH * Ht  +  Hr * M_HH * Ht
 //
@@ -21,8 +17,7 @@
 //   re += U*Tx_re - V*Tx_im
 //   im += V*Tx_re + U*Tx_im
 //
-// This factorisation halves the number of multiplies vs. the direct expansion
-// (8 mul + 24 FMA across all 4 components, down from 32 mul + 32 FMA).
+// This factorisation needs 10 mul + 22 FMA for all four terms.
 static inline void jones_product_8(__m256 Vrr, __m256 Vri, __m256 Hrr, __m256 Hri,
                                    __m256 Vtr, __m256 Vti, __m256 Htr, __m256 Hti,
                                    __m256 M0, __m256 M1, __m256 M2, __m256 M3,
@@ -79,11 +74,7 @@ static inline void jones_product_8(__m256 Vrr, __m256 Vri, __m256 Hrr, __m256 Hr
     *im_out = im;
 }
 
-// ---------------------------------------------------------------------------
-// Phase rotation kernel (8 float lanes)
-// ---------------------------------------------------------------------------
-// Applies:  coeff = (re*cp + im*sp,  im*cp - re*sp) * amplitude
-//
+// Phase rotation of 8 links: coeff = (re*cp + im*sp, im*cp - re*sp) * amplitude
 static inline void phase_rotate_8(__m256 re, __m256 im, __m256 sp, __m256 cp, __m256 amp,
                                   __m256 *__restrict out_re, __m256 *__restrict out_im)
 {
@@ -93,10 +84,7 @@ static inline void phase_rotate_8(__m256 re, __m256 im, __m256 sp, __m256 cp, __
     *out_im = _mm256_mul_ps(ci, amp);
 }
 
-// ---------------------------------------------------------------------------
-// Float specialization
-// ---------------------------------------------------------------------------
-// All arithmetic in single precision. Phase fmod keeps the sincos input
+// Float specialization: all arithmetic in single precision. Phase fmod keeps the sincos input
 // small so the float-only Cody-Waite range reduction stays accurate.
 template <>
 void qd_coeff_combine_avx2<float>(const float *__restrict pVrr, const float *__restrict pVri,
@@ -118,7 +106,6 @@ void qd_coeff_combine_avx2<float>(const float *__restrict pVrr, const float *__r
     __m256 M4 = _mm256_set1_ps(pM[4]), M5 = _mm256_set1_ps(pM[5]);
     __m256 M6 = _mm256_set1_ps(pM[6]), M7 = _mm256_set1_ps(pM[7]);
 
-    // Broadcast scalar constants
     __m256 vWN = _mm256_set1_ps(wave_number);
     __m256 vWL = _mm256_set1_ps(wavelength);
     __m256 vInvWL = _mm256_set1_ps(1.0f / wavelength);
@@ -161,7 +148,6 @@ void qd_coeff_combine_avx2<float>(const float *__restrict pVrr, const float *__r
             dl = _mm256_maskload_ps(p_delays + R, mask);
         }
 
-        // Jones product
         __m256 re, im;
         jones_product_8(Vrr, Vri, Hrr, Hri, Vtr, Vti, Htr, Hti,
                         M0, M1, M2, M3, M4, M5, M6, M7, &re, &im);
@@ -180,7 +166,6 @@ void qd_coeff_combine_avx2<float>(const float *__restrict pVrr, const float *__r
         __m256 out_re, out_im;
         phase_rotate_8(re, im, sp, cp, vAmp, &out_re, &out_im);
 
-        // Store
         if (R < n8)
         {
             _mm256_storeu_ps(p_coeff_re + R, out_re);
@@ -195,21 +180,11 @@ void qd_coeff_combine_avx2<float>(const float *__restrict pVrr, const float *__r
     }
 }
 
-// ---------------------------------------------------------------------------
-// Double specialization
-// ---------------------------------------------------------------------------
-// Strategy: convert antenna patterns from double to float, run the Jones
-// product in 8-wide float SIMD for full throughput.  For the phase, keep
-// delays in double for the fmod and feed the double-precision phases into
-// _fm256_sincos256_pd which does Cody-Waite range reduction in double
-// before evaluating the polynomial in float.  Results are converted back
-// to double for storage.
-//
-// This gives the full 8x SIMD width while maintaining double-precision
-// accuracy in the phase-critical path.
-//
+// Double specialization: the Jones product runs in 8-wide float. The path lengths stay in double for the fmod, and
+// _fm256_sincos256_pd reduces the phase in double before evaluating the polynomial in float, so the phase keeps
+// double-precision accuracy. Results are converted back to double.
 
-// Helper: load 8 consecutive doubles, convert to 8 packed floats
+// Load 8 consecutive doubles as 8 packed floats
 static inline __m256 load_8d_as_8f(const double *__restrict p)
 {
     __m128 lo = _mm256_cvtpd_ps(_mm256_loadu_pd(p));
@@ -217,7 +192,7 @@ static inline __m256 load_8d_as_8f(const double *__restrict p)
     return _mm256_set_m128(hi, lo);
 }
 
-// Helper: store 8 packed floats as 8 consecutive doubles
+// Store 8 packed floats as 8 consecutive doubles
 static inline void store_8f_as_8d(double *__restrict p, __m256 v)
 {
     _mm256_storeu_pd(p, _mm256_cvtps_pd(_mm256_castps256_ps128(v)));
@@ -255,7 +230,6 @@ void qd_coeff_combine_avx2<double>(const double *__restrict pVrr, const double *
 
     for (; R < n8; R += 8)
     {
-        // Load antenna patterns: 8 doubles → 8 floats
         __m256 Vrr = load_8d_as_8f(pVrr + R), Vri = load_8d_as_8f(pVri + R);
         __m256 Hrr = load_8d_as_8f(pHrr + R), Hri = load_8d_as_8f(pHri + R);
         __m256 Vtr = load_8d_as_8f(pVtr + R), Vti = load_8d_as_8f(pVti + R);
@@ -266,7 +240,7 @@ void qd_coeff_combine_avx2<double>(const double *__restrict pVrr, const double *
         jones_product_8(Vrr, Vri, Hrr, Hri, Vtr, Vti, Htr, Hti,
                         M0, M1, M2, M3, M4, M5, M6, M7, &re, &im);
 
-        // Phase computation in double: phase = wave_number * fmod(dl, wavelength)
+        // Phase in double: phase = wave_number * fmod(dl, wavelength)
         __m256d dl_lo = _mm256_loadu_pd(p_delays + R);
         __m256d dl_hi = _mm256_loadu_pd(p_delays + R + 4);
 
@@ -287,21 +261,18 @@ void qd_coeff_combine_avx2<double>(const double *__restrict pVrr, const double *
         __m256 out_re, out_im;
         phase_rotate_8(re, im, sp, cp, vAmp, &out_re, &out_im);
 
-        // Store: convert float results back to double
         store_8f_as_8d(p_coeff_re + R, out_re);
         store_8f_as_8d(p_coeff_im + R, out_im);
     }
 
-    // ---- Tail: zero-padded buffers for the remaining 1-7 links ----
+    // Tail: the remaining 1-7 links
     if (R < n_links)
     {
         size_t tail = n_links - R;
 
-        // Zero-initialised aligned buffers for pattern data (converted to float)
+        // Zero-padded buffers: patterns in float, path lengths in double
         alignas(32) float bVrr[8] = {}, bVri[8] = {}, bHrr[8] = {}, bHri[8] = {};
         alignas(32) float bVtr[8] = {}, bVti[8] = {}, bHtr[8] = {}, bHti[8] = {};
-
-        // Zero-initialised aligned buffers for delays (kept in double)
         alignas(32) double bDl[8] = {};
 
         for (size_t i = 0; i < tail; ++i)
@@ -317,7 +288,6 @@ void qd_coeff_combine_avx2<double>(const double *__restrict pVrr, const double *
             bDl[i] = p_delays[R + i];
         }
 
-        // Jones product
         __m256 re, im;
         jones_product_8(_mm256_load_ps(bVrr), _mm256_load_ps(bVri),
                         _mm256_load_ps(bHrr), _mm256_load_ps(bHri),
@@ -344,7 +314,7 @@ void qd_coeff_combine_avx2<double>(const double *__restrict pVrr, const double *
         __m256 out_re, out_im;
         phase_rotate_8(re, im, sp, cp, vAmp, &out_re, &out_im);
 
-        // Extract valid lanes back to double
+        // Write back the valid lanes as double
         alignas(32) float tmp_re[8], tmp_im[8];
         _mm256_store_ps(tmp_re, out_re);
         _mm256_store_ps(tmp_im, out_im);

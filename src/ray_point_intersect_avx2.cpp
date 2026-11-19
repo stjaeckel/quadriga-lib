@@ -8,7 +8,7 @@
 #include <immintrin.h>
 
 #include "quadriga_lib_avx2_functions.hpp"
-#include "quadriga_lib_generic_functions.hpp" // qd_RPI_staging
+#include "quadriga_lib_generic_functions.hpp"
 
 #if defined(_MSC_VER) // Windows
 #include <intrin.h>
@@ -17,9 +17,6 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-// Vector size for AVX2
-#define VEC_SIZE 8
 
 // Index of the lowest set bit, mask must not be zero
 static inline int qd_first_set_bit(int mask)
@@ -34,13 +31,13 @@ static inline int qd_first_set_bit(int mask)
 }
 
 // AVX2 accelerated implementation of RayPointIntersect
-void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (allocated n_point + 7)
-                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to n_point + 7
+void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (allocated n_point + qd_avx2_vec_size - 1)
+                 const size_t n_point,                                 // Number of points
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
                  const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
-                 const size_t n_sub,                                   // Number of sub-clouds (n_sub <= n_sub_s)
+                 const size_t n_sub,                                   // Number of sub-clouds, n_sub_s = n_sub rounded up to a multiple of qd_avx2_vec_size
                  const float *T1x, const float *T1y, const float *T1z, // First ray vertex coordinate in GCS, length n_ray
                  const float *T2x, const float *T2y, const float *T2z, // Second ray vertex coordinate in GCS, length n_ray
                  const float *T3x, const float *T3y, const float *T3z, // Third ray vertex coordinate in GCS, length n_ray
@@ -48,7 +45,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                  const float *D1x, const float *D1y, const float *D1z, // First ray direction in GCS, length n_ray
                  const float *D2x, const float *D2y, const float *D2z, // Second ray direction in GCS, length n_ray
                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
-                 const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
+                 const float *rD1, const float *rD2, const float *rD3, // 1 / dot(D, N) per ray vertex, length n_ray
                  const size_t n_ray,                                   // Number of rays
                  std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                  unsigned *hit_offset)                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
@@ -61,7 +58,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
         qd_avx2_throw_invalid_argument("Number of rays exceeds maximum supported number.");
 
     // Constant values needed for some operations
-    const size_t n_sub_s = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
+    const size_t n_sub_s = (n_sub % qd_avx2_vec_size == 0) ? n_sub : qd_avx2_vec_size * (n_sub / qd_avx2_vec_size + 1);
     const long long n_point_l = (long long)n_point; // Number of points as signed 64 bit
     const long long n_ray_l = (long long)n_ray;     // Number of rays as signed 64 bit
 
@@ -149,7 +146,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
         __m256 oy2_x_ny = _mm256_mul_ps(oy2, ny);
         __m256 oz2_x_nz = _mm256_mul_ps(oz2, nz);
 
-        for (size_t i_sub = 0; i_sub < n_sub_s; i_sub += VEC_SIZE)
+        for (size_t i_sub = 0; i_sub < n_sub_s; i_sub += qd_avx2_vec_size)
         {
             // Load point bounding box
             __m256 b0_low = _mm256_loadu_ps(&Xmin[i_sub]);
@@ -276,7 +273,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
             long long i_point_start = (long long)SCI[i_sub];
             long long i_point_end = (i_sub == n_sub - 1) ? n_point_l : (long long)SCI[i_sub + 1];
 
-            for (long long i_point = i_point_start; i_point < i_point_end; i_point += VEC_SIZE) // Points loop
+            for (long long i_point = i_point_start; i_point < i_point_end; i_point += qd_avx2_vec_size) // Points loop
             {
                 // Load point coordinate
                 __m256 rx = _mm256_loadu_ps(&Px[i_point]);
@@ -354,7 +351,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                 PQ = _mm256_fmsub_ps(e1z, ty, PQ); // PQ = e1z * ty - e1y * tz
                 __m256 V = _mm256_mul_ps(nx, PQ);  // V = nx * PQ
 
-                PQ = _mm256_mul_ps(e1z, tx);       // PQ = e1y * tx
+                PQ = _mm256_mul_ps(e1z, tx);       // PQ = e1z * tx
                 PQ = _mm256_fmsub_ps(e1x, tz, PQ); // PQ = e1x * tz - e1z * tx
                 V = _mm256_fmadd_ps(ny, PQ, V);    // V = ny * PQ + V
 

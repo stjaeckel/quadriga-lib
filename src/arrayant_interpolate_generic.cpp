@@ -25,7 +25,6 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
     const bool per_element_rotation = n_rotation_cols > 1;
     const bool per_angle_rotation = n_rotation_slices > 1;
 
-    // Pointers for direct memory access
     const dtype *p_theta_re = e_theta_re, *p_theta_im = e_theta_im; // Vertical pattern
     const dtype *p_phi_re = e_phi_re, *p_phi_im = e_phi_im;         // Horizontal pattern
     const dtype *p_az_global = azimuth, *p_el_global = elevation;   // Angles
@@ -55,19 +54,15 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
     for (size_t a = 1; a < n_elevation; ++a)
         el_diff[a] = one / (p_elevation_grid[a] - p_elevation_grid[a - 1]);
 
-    // Interpolate the pattern data using spheric interpolation
-    // datatype "int" is required by MSVC to allow parallel for
+    // Spherical interpolation of the pattern data; MSVC needs an "int" loop index for parallel for
 #pragma omp parallel for if (n_ang > 1 && n_ang * n_out >= 256)
     for (int a_i32 = 0; a_i32 < (int)n_ang; ++a_i32)
     {
-        // Convert a_i32 to 64 bit
         const size_t a = (size_t)a_i32;
 
-        // Get the local pointer for the angles
         const dtype *p_az_local = per_element_angles ? &p_az_global[a * n_out] : &p_az_global[a];
         const dtype *p_el_local = per_element_angles ? &p_el_global[a * n_out] : &p_el_global[a];
 
-        // Decare and initialize all local variables
         size_t i_up = 0, i_un = 0, i_vp = 0, i_vn = 0;  // Indices for reading the pattern
         dtype up = one, un = zero, vp = one, vn = zero; // Relative weights for interpolation
         dtype cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
@@ -229,7 +224,6 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
                 dtype gAi = fAi * gAr, gBi = fBi * gBr, gCi = fCi * gCr, gDi = fDi * gDr;
                 gAr = fAr * gAr, gBr = fBr * gBr, gCr = fCr * gCr, gDr = fDr * gDr;
 
-                // Declare variables
                 dtype cPhase = (ampA < R1 || ampB < R1) ? neg_one : gAr * gBr + gAi * gBi; // Cosine of phase
                 bool linear_int = cPhase < tS;
 

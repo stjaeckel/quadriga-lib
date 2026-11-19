@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "qd_helpers_shared.hpp"
 #include "qd_helpers_gbsm.hpp"
 
 #include <algorithm>
@@ -321,7 +322,7 @@ void quadriga_lib::ssf_scatterers(gbsm_rays &rays, double d_min)
         const double ud[3] = {ce * std::cos(rays.aod(i)), ce * std::sin(rays.aod(i)), std::sin(rays.eod(i))};
         const double ua[3] = {ca * std::cos(rays.aoa(i)), ca * std::sin(rays.aoa(i)), std::sin(rays.eoa(i))};
         const double w[3] = {ud[0] - ua[0], ud[1] - ua[1], ud[2] - ua[2]};
-        const double L = d3D + 299792458.0 * rays.delay(i);
+        const double L = d3D + qd_speed_of_light * rays.delay(i);
         double s = 0.0;
         if (L > d3D) // zero or negative excess length: fallback (also avoids the 0 / 0 of L = -d3D)
         {

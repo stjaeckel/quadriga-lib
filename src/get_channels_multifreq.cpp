@@ -16,10 +16,10 @@
 #include "qd_helpers_arrayant.hpp"
 #include "qd_helpers_channel.hpp"
 
-// Find bracketing indices and weight for frequency interpolation
-// Returns: i_lo, i_hi, weight (0=lo, 1=hi), exact_match flag
+// Bracketing indices i_lo, i_hi and weight w (0 = i_lo, 1 = i_hi) of freq in center_freqs (any order);
+// exact is set when freq matches an entry within 1e-6 (relative) or lies outside the range; then only i_lo is used
 template <typename dtype>
-static inline void find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype freq,
+static inline void qd_find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype freq,
                                      arma::uword &i_lo, arma::uword &i_hi, dtype &w, bool &exact)
 {
     arma::uword n = center_freqs.n_elem;
@@ -76,10 +76,9 @@ static inline void find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype
     w = (freq - center_freqs[i_lo]) / (center_freqs[i_hi] - center_freqs[i_lo]);
 }
 
-// Interpolate a complex-valued matrix pair using SLERP per element
-// Handles empty imaginary matrices (treated as zeros)
+// SLERP per element between two complex matrices given as real and imaginary parts; an empty imaginary part is zero
 template <typename dtype>
-static inline void interpolate_complex_matrix(const arma::Mat<dtype> &re_lo, const arma::Mat<dtype> &im_lo,
+static inline void qd_interpolate_complex_matrix(const arma::Mat<dtype> &re_lo, const arma::Mat<dtype> &im_lo,
                                               const arma::Mat<dtype> &re_hi, const arma::Mat<dtype> &im_hi,
                                               dtype w, arma::Mat<dtype> &re_out, arma::Mat<dtype> &im_out)
 {
@@ -223,21 +222,19 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                           bool use_absolute_delays, bool add_fake_los_path, dtype propagation_speed,
                                           std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
-    constexpr dtype los_limit = dtype(1.0e-4);
     constexpr dtype zero = dtype(0.0);
     constexpr dtype one = dtype(1.0);
     const dtype rC = one / propagation_speed;
     const dtype two_pi = dtype(2.0) * dtype(arma::datum::pi);
 
-    // Input validation
     if (tx_array.empty())
         throw std::invalid_argument("Input 'tx_array' cannot be empty.");
     if (rx_array.empty())
         throw std::invalid_argument("Input 'rx_array' cannot be empty.");
     const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
     const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
-    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
-    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
+    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2];
+    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2];
 
     // Kernel of the antenna interpolation, checked before any early return (the pattern size of AVX2 per call)
     const int kernel = qd_arrayant_interpolate_kernel(use_kernel, 0);
@@ -298,10 +295,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     // as LOS) fills the input; its own slot is dropped.
     if (add_fake_los_path && no_paths)
     {
-        const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
         const arma::Mat<dtype> fbs_d = pos_d.t();
-        const arma::Col<dtype> length_d = {std::sqrt(x * x + y * y + z * z) + one};
+        const arma::Col<dtype> length_d = {qd_calc_length(Tx, Ty, Tz, Rx, Ry, Rz) + one};
         const arma::uword n_f = freq.n_elem;
         const arma::Mat<dtype> gain_d(1, n_f, arma::fill::ones);
         arma::Cube<dtype> M_d((polmat.n_rows == 2) ? 2 : 8, 1, n_f, arma::fill::zeros);
@@ -407,249 +403,96 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         rx_center_freqs[i] = (dtype)rx_array[i].center_freq;
 
     // Phase 1: Geometry computation (frequency-independent, sequential)
-    // Transmitter and receiver orientation
-    arma::Cube<dtype> tx_ori(3, 1, 1, arma::fill::zeros);
-    arma::Cube<dtype> rx_ori(3, 1, 1, arma::fill::zeros);
-    bool tx_orientation_not_zero = (Tb != zero || Tt != zero || Th != zero);
-    bool rx_orientation_not_zero = (Rb != zero || Rt != zero || Rh != zero);
-
-    if (tx_orientation_not_zero)
-    {
-        dtype *ptr = tx_ori.memptr();
-        ptr[0] = Tb;
-        ptr[1] = Tt;
-        ptr[2] = Th;
-    }
-    if (rx_orientation_not_zero)
-    {
-        dtype *ptr = rx_ori.memptr();
-        ptr[0] = Rb;
-        ptr[1] = Rt;
-        ptr[2] = Rh;
-    }
-
-    // Calculate antenna element positions in GCS
-    arma::Mat<dtype> tx_element_pos(3, n_tx, arma::fill::zeros);
-    arma::Mat<dtype> rx_element_pos(3, n_rx, arma::fill::zeros);
-    dtype *p_tx = tx_element_pos.memptr();
-    dtype *p_rx = rx_element_pos.memptr();
-
-    if (!tx_array[0].element_pos.is_empty())
-        std::memcpy(p_tx, tx_array[0].element_pos.memptr(), 3 * n_tx * sizeof(dtype));
-    if (tx_orientation_not_zero)
-        qd_rotate_inplace(Tb, Tt, Th, p_tx, n_tx);
-    for (arma::uword t = 0; t < 3 * n_tx; t += 3)
-        p_tx[t] += Tx, p_tx[t + 1] += Ty, p_tx[t + 2] += Tz;
-
-    if (!rx_array[0].element_pos.is_empty())
-        std::memcpy(p_rx, rx_array[0].element_pos.memptr(), 3 * n_rx * sizeof(dtype));
-    if (rx_orientation_not_zero)
-        qd_rotate_inplace(Rb, Rt, Rh, p_rx, n_rx);
-    for (arma::uword r = 0; r < 3 * n_rx; r += 3)
-        p_rx[r] += Rx, p_rx[r + 1] += Ry, p_rx[r + 2] += Rz;
-
-    // Free-space distance
-    dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
-    dtype dist_rx_tx = std::sqrt(x * x + y * y + z * z);
-
-    // Allocate geometry arrays (reused across all frequencies)
     arma::Mat<dtype> AOD(n_links, n_out), EOD(n_links, n_out);
     arma::Mat<dtype> AOA(n_links, n_out), EOA(n_links, n_out);
     arma::Mat<dtype> path_delays_geom(n_links, n_out); // Element-resolved path lengths [m]
-
     dtype *p_aod = AOD.memptr(), *p_eod = EOD.memptr();
     dtype *p_aoa = AOA.memptr(), *p_eoa = EOA.memptr();
     dtype *p_path_dl = path_delays_geom.memptr();
 
-    const dtype *p_fbs = fbs_pos.memptr();
-    const dtype *p_lbs = lbs_pos.memptr();
-    const dtype *p_length = path_length.memptr();
+    arma::uvec i_tx_element, i_rx_element;
+    arma::Mat<dtype> tx_element_pos_interp, rx_element_pos_interp;
+    dtype dist_rx_tx;
+    const arma::uword true_los_path = qd_channels_spherical_geometry(tx_array[0].element_pos, rx_array[0].element_pos, n_tx, n_rx,
+                                                                     p_tp, p_to, p_rp, p_ro, fbs_pos.memptr(), lbs_pos.memptr(),
+                                                                     path_length.memptr(), n_out, add_fake_los_path,
+                                                                     p_aod, p_eod, p_aoa, p_eoa, p_path_dl,
+                                                                     i_tx_element, tx_element_pos_interp,
+                                                                     i_rx_element, rx_element_pos_interp, dist_rx_tx);
+    const arma::Cube<dtype> tx_ori(const_cast<dtype *>(p_to), 3, 1, 1), rx_ori(const_cast<dtype *>(p_ro), 3, 1, 1);
 
-    // LOS path detection
-    arma::uword true_los_path = 0;
-    dtype shortest_path = los_limit;
-
-    for (arma::uword i_out = 0; i_out < n_out; ++i_out)
-    {
-        const arma::uword i = (add_fake_los_path && i_out == 0) ? 0 : (add_fake_los_path ? i_out - 1 : i_out);
-        const arma::uword ix = 3 * i, iy = ix + 1, iz = ix + 2;
-        const arma::uword o_slice = i_out * n_links;
-
-        dtype d_shortest = dist_rx_tx, d_length = dist_rx_tx, d_fbs_lbs = zero;
-        if (!add_fake_los_path || i_out != 0)
-        {
-            x = p_fbs[ix] - Tx;
-            y = p_fbs[iy] - Ty;
-            z = p_fbs[iz] - Tz;
-            d_shortest = std::sqrt(x * x + y * y + z * z);
-            x = p_lbs[ix] - p_fbs[ix];
-            y = p_lbs[iy] - p_fbs[iy];
-            z = p_lbs[iz] - p_fbs[iz];
-            d_fbs_lbs = std::sqrt(x * x + y * y + z * z);
-            d_shortest += d_fbs_lbs;
-            x = Rx - p_lbs[ix];
-            y = Ry - p_lbs[iy];
-            z = Rz - p_lbs[iz];
-            d_shortest += std::sqrt(x * x + y * y + z * z);
-            d_length = (p_length[i] < d_shortest) ? d_shortest : p_length[i];
-
-            // Paths with more interactions than FBS and LBS are longer than the TX-FBS-LBS-RX polyline: the extra
-            // length goes into the FBS-LBS segment, so that the phase-centre length equals d_length (= path_length)
-            d_fbs_lbs += d_length - d_shortest;
-        }
-
-        // Slot 0 of add_fake_los_path is the LOS path by definition, also when the TX-RX distance overflows
-        if ((add_fake_los_path && i_out == 0) || std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
-        {
-            if (!add_fake_los_path || i_out != 0)
-                true_los_path = i_out, shortest_path = std::abs(d_length - dist_rx_tx);
-
-            for (arma::uword t = 0; t < n_tx; ++t)
-            {
-                dtype *pt = &p_tx[3 * t];
-                for (arma::uword r = 0; r < n_rx; ++r)
-                {
-                    dtype *pr = &p_rx[3 * r];
-                    x = pr[0] - pt[0];
-                    y = pr[1] - pt[1];
-                    z = pr[2] - pt[2];
-                    dtype d = std::sqrt(x * x + y * y + z * z);
-                    arma::uword io = o_slice + t * n_rx + r;
-                    p_aod[io] = std::atan2(y, x);
-                    p_eod[io] = (d < los_limit) ? zero : std::asin(z / d);
-                    p_aoa[io] = std::atan2(-y, -x);
-                    p_eoa[io] = -p_eod[io];
-                    p_path_dl[io] = d;
-                }
-            }
-        }
-        else // NLOS path
-        {
-            dtype *dr = new dtype[n_rx];
-            for (arma::uword r = 0; r < n_rx; ++r)
-            {
-                dtype *pr = &p_rx[3 * r];
-                x = p_lbs[ix] - pr[0];
-                y = p_lbs[iy] - pr[1];
-                z = p_lbs[iz] - pr[2];
-                dr[r] = std::sqrt(x * x + y * y + z * z);
-                p_aoa[o_slice + r] = std::atan2(y, x);
-                p_eoa[o_slice + r] = (dr[r] < los_limit) ? zero : std::asin(z / dr[r]);
-            }
-            for (arma::uword t = 0; t < n_tx; ++t)
-            {
-                dtype *pt = &p_tx[3 * t];
-                x = p_fbs[ix] - pt[0];
-                y = p_fbs[iy] - pt[1];
-                z = p_fbs[iz] - pt[2];
-                dtype dt = std::sqrt(x * x + y * y + z * z);
-                dtype at = std::atan2(y, x);
-                dtype et = (dt < los_limit) ? zero : std::asin(z / dt);
-                for (arma::uword r = 0; r < n_rx; ++r)
-                {
-                    arma::uword io = o_slice + t * n_rx + r;
-                    p_aod[io] = at;
-                    p_eod[io] = et;
-                    p_aoa[io] = p_aoa[o_slice + r];
-                    p_eoa[io] = p_eoa[o_slice + r];
-                    p_path_dl[io] = dt + d_fbs_lbs + dr[r];
-                }
-            }
-            delete[] dr;
-        }
-    }
-
-    // Prepare TX/RX element indices and interpolation positions (frequency-independent)
-    arma::uvec i_tx_element(n_links);
-    arma::Mat<dtype> tx_element_pos_interp(3, n_links);
-    {
-        arma::uword *pe = i_tx_element.memptr();
-        dtype *pp = tx_element_pos_interp.memptr();
-        arma::Mat<dtype> tx_local(3, n_tx, arma::fill::zeros);
-        if (!tx_array[0].element_pos.is_empty())
-            std::memcpy(tx_local.memptr(), tx_array[0].element_pos.memptr(), 3 * n_tx * sizeof(dtype));
-        dtype *ptl = tx_local.memptr();
-        for (arma::uword t = 0; t < n_tx; ++t)
-            for (arma::uword r = 0; r < n_rx; ++r)
-                *pe++ = t, *pp++ = ptl[3 * t], *pp++ = ptl[3 * t + 1], *pp++ = ptl[3 * t + 2];
-    }
-
-    arma::uvec i_rx_element(n_links);
-    arma::Mat<dtype> rx_element_pos_interp(3, n_links);
-    {
-        arma::uword *pe = i_rx_element.memptr();
-        dtype *pp = rx_element_pos_interp.memptr();
-        arma::Mat<dtype> rx_local(3, n_rx, arma::fill::zeros);
-        if (!rx_array[0].element_pos.is_empty())
-            std::memcpy(rx_local.memptr(), rx_array[0].element_pos.memptr(), 3 * n_rx * sizeof(dtype));
-        dtype *prl = rx_local.memptr();
-        for (arma::uword t = 0; t < n_tx; ++t)
-            for (arma::uword r = 0; r < n_rx; ++r)
-                *pe++ = r, *pp++ = prl[3 * r], *pp++ = prl[3 * r + 1], *pp++ = prl[3 * r + 2];
-    }
-
-    // Determine if element coupling is needed (check ALL entries across frequencies)
+    // Element coupling, skipped when it is the identity at all frequencies
     const bool different_output_size = (n_tx != n_tx_ports || n_rx != n_rx_ports);
     bool apply_element_coupling = different_output_size;
+    for (const auto *arr : {&tx_array, &rx_array})
+        for (const auto &a : *arr)
+            apply_element_coupling = apply_element_coupling || !qd_coupling_is_identity(a.coupling_re, a.coupling_im);
 
-    if (!apply_element_coupling)
+    // Coupling of one array at an output frequency, interpolated between its bracket entries (SLERP per complex entry;
+    // empty coupling_re = identity, empty coupling_im = zero), and its column-normalized power for the delays
+    auto interpolate_coupling = [](const std::vector<quadriga_lib::arrayant<dtype>> &arr, arma::uword lo, arma::uword hi,
+                                   dtype w, bool exact, arma::uword n_el, arma::uword n_pt,
+                                   arma::Mat<dtype> &cpl_re, arma::Mat<dtype> &cpl_im, arma::Mat<dtype> &cpl_pwr)
     {
-        // Check all TX entries for non-identity coupling
-        for (arma::uword e = 0; e < tx_array.size() && !apply_element_coupling; ++e)
+        const arma::Mat<dtype> &re_lo = arr[lo].coupling_re, &im_lo = arr[lo].coupling_im;
+        if (exact)
         {
-            const auto &ta = tx_array[e];
-            if (ta.coupling_re.n_elem != 0 && ta.coupling_re.n_rows == n_tx && ta.coupling_re.n_cols == n_tx)
-            {
-                const dtype *p = ta.coupling_re.memptr();
-                for (arma::uword r = 0; r < n_tx && !apply_element_coupling; ++r)
-                    for (arma::uword c = 0; c < n_tx && !apply_element_coupling; ++c)
-                    {
-                        if (r == c && std::abs(p[c * n_tx + r] - one) > dtype(1e-6))
-                            apply_element_coupling = true;
-                        else if (r != c && std::abs(p[c * n_tx + r]) > dtype(1e-6))
-                            apply_element_coupling = true;
-                    }
-            }
-            if (!apply_element_coupling && ta.coupling_im.n_elem != 0)
-                for (const dtype *p = ta.coupling_im.begin(); p < ta.coupling_im.end(); ++p)
-                    if (std::abs(*p) > dtype(1e-6))
-                    {
-                        apply_element_coupling = true;
-                        break;
-                    }
+            if (re_lo.n_elem != 0)
+                cpl_re = re_lo;
+            else
+                cpl_re.eye(n_el, n_pt);
+            if (im_lo.n_elem != 0)
+                cpl_im = im_lo;
+            else
+                cpl_im.zeros(n_el, n_pt);
         }
-
-        // Check all RX entries for non-identity coupling
-        for (arma::uword e = 0; e < rx_array.size() && !apply_element_coupling; ++e)
+        else
         {
-            const auto &ra = rx_array[e];
-            if (ra.coupling_re.n_elem != 0 && ra.coupling_re.n_rows == n_rx && ra.coupling_re.n_cols == n_rx)
-            {
-                const dtype *p = ra.coupling_re.memptr();
-                for (arma::uword r = 0; r < n_rx && !apply_element_coupling; ++r)
-                    for (arma::uword c = 0; c < n_rx && !apply_element_coupling; ++c)
-                    {
-                        if (r == c && std::abs(p[c * n_rx + r] - one) > dtype(1e-6))
-                            apply_element_coupling = true;
-                        else if (r != c && std::abs(p[c * n_rx + r]) > dtype(1e-6))
-                            apply_element_coupling = true;
-                    }
-            }
-            if (!apply_element_coupling && ra.coupling_im.n_elem != 0)
-                for (const dtype *p = ra.coupling_im.begin(); p < ra.coupling_im.end(); ++p)
-                    if (std::abs(*p) > dtype(1e-6))
-                    {
-                        apply_element_coupling = true;
-                        break;
-                    }
+            const arma::Mat<dtype> &re_hi = arr[hi].coupling_re, &im_hi = arr[hi].coupling_im;
+            arma::Mat<dtype> eye;
+            if (re_lo.n_elem == 0 || re_hi.n_elem == 0)
+                eye.eye(n_el, n_pt);
+            qd_interpolate_complex_matrix(re_lo.n_elem != 0 ? re_lo : eye, im_lo, re_hi.n_elem != 0 ? re_hi : eye, im_hi,
+                                          w, cpl_re, cpl_im);
         }
-    }
+        cpl_pwr.set_size(n_el, n_pt);
+        qd_power_mat(n_el, n_pt, cpl_pwr.memptr(), true, cpl_re.memptr(), cpl_im.memptr());
+    };
 
     // Phase 2: Per-frequency processing (parallelized over output frequencies)
     // The interpolation calls inside the parallel region do not throw for the validated arrays; should one, the error
     // is passed on after the region
     bool omp_failed = false;
     std::string omp_error;
+
+    // Pattern of one array at the angles of one path, interpolated between its bracket entries (SLERP per value)
+    auto interpolate_pattern = [&](const std::vector<quadriga_lib::arrayant<dtype>> &arr, arma::uword lo, arma::uword hi,
+                                   dtype w, bool exact, const arma::Mat<dtype> &az, const arma::Mat<dtype> &el,
+                                   const arma::uvec &i_element, const arma::Cube<dtype> &ori, const arma::Mat<dtype> &pos,
+                                   arma::Mat<dtype> &V_re, arma::Mat<dtype> &V_im, arma::Mat<dtype> &H_re, arma::Mat<dtype> &H_im)
+    {
+        if (exact)
+        {
+            OMP_SAFE_CALL(omp_failed, omp_error,
+                          qd_arrayant_interpolate_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
+                                                                  V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr, nullptr, kernel));
+            return;
+        }
+        arma::Mat<dtype> Vr_lo(n_links, 1), Vi_lo(n_links, 1), Hr_lo(n_links, 1), Hi_lo(n_links, 1);
+        arma::Mat<dtype> Vr_hi(n_links, 1), Vi_hi(n_links, 1), Hr_hi(n_links, 1), Hi_hi(n_links, 1);
+        OMP_SAFE_CALL(omp_failed, omp_error,
+                      qd_arrayant_interpolate_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
+                                                              Vr_lo, Vi_lo, Hr_lo, Hi_lo, nullptr, nullptr, nullptr, nullptr, kernel));
+        OMP_SAFE_CALL(omp_failed, omp_error,
+                      qd_arrayant_interpolate_dispatch<dtype>(arr[hi], az, el, i_element, ori, pos,
+                                                              Vr_hi, Vi_hi, Hr_hi, Hi_hi, nullptr, nullptr, nullptr, nullptr, kernel));
+        for (arma::uword k = 0; k < n_links; ++k)
+        {
+            qd_slerp_complex(Vr_lo[k], Vi_lo[k], Vr_hi[k], Vi_hi[k], w, V_re[k], V_im[k]);
+            qd_slerp_complex(Hr_lo[k], Hi_lo[k], Hr_hi[k], Hi_hi[k], w, H_re[k], H_im[k]);
+        }
+    };
+
     const int n_freq_new_i = (int)n_freq_new;
 #pragma omp parallel for schedule(static) if (n_freq_new >= 8)
     for (int f_i = 0; f_i < n_freq_new_i; ++f_i)
@@ -664,10 +507,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         dtype tx_w, rx_w, fin_w;
         bool tx_exact, rx_exact, fin_exact;
 
-        find_freq_bracket(tx_center_freqs, f_new, tx_lo, tx_hi, tx_w, tx_exact);
-        find_freq_bracket(rx_center_freqs, f_new, rx_lo, rx_hi, rx_w, rx_exact);
-        find_freq_bracket(freq, f_new, fin_lo, fin_hi, fin_w, fin_exact);
-
+        qd_find_freq_bracket(tx_center_freqs, f_new, tx_lo, tx_hi, tx_w, tx_exact);
+        qd_find_freq_bracket(rx_center_freqs, f_new, rx_lo, rx_hi, rx_w, rx_exact);
+        qd_find_freq_bracket(freq, f_new, fin_lo, fin_hi, fin_w, fin_exact);
         // Interpolate path gain at this frequency (linear interpolation)
         const dtype *p_gain_in = path_gain.memptr(); // Column-major [n_path, n_freq]
         arma::Col<dtype> gain_f(n_path);
@@ -712,98 +554,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             }
         }
 
-        // Interpolate coupling matrices at this frequency (SLERP per complex entry)
-        arma::Mat<dtype> tx_cpl_re_f, tx_cpl_im_f;
-        arma::Mat<dtype> rx_cpl_re_f, rx_cpl_im_f;
+        // Interpolate coupling matrices at this frequency
+        arma::Mat<dtype> tx_cpl_re_f, tx_cpl_im_f, rx_cpl_re_f, rx_cpl_im_f;
         arma::Mat<dtype> tx_coupling_pwr_f, rx_coupling_pwr_f;
-
         if (apply_element_coupling)
         {
-            // TX coupling interpolation
-            const arma::Mat<dtype> &tx_cpl_re_lo = tx_array[tx_lo].coupling_re;
-            const arma::Mat<dtype> &tx_cpl_im_lo = tx_array[tx_lo].coupling_im;
-
-            if (tx_exact)
-            {
-                // Use the bracket entry directly
-                if (tx_cpl_re_lo.n_elem != 0)
-                    tx_cpl_re_f = tx_cpl_re_lo;
-                else
-                {
-                    tx_cpl_re_f.eye(n_tx, n_tx_ports);
-                }
-                if (tx_cpl_im_lo.n_elem != 0)
-                    tx_cpl_im_f = tx_cpl_im_lo;
-                else
-                    tx_cpl_im_f.zeros(n_tx, n_tx_ports);
-            }
-            else
-            {
-                // Build effective matrices for lo and hi (handle empty → identity/zeros)
-                arma::Mat<dtype> re_lo_eff, im_lo_eff, re_hi_eff, im_hi_eff;
-                const arma::Mat<dtype> &tx_cpl_re_hi = tx_array[tx_hi].coupling_re;
-                const arma::Mat<dtype> &tx_cpl_im_hi = tx_array[tx_hi].coupling_im;
-
-                if (tx_cpl_re_lo.n_elem != 0)
-                    re_lo_eff = tx_cpl_re_lo;
-                else
-                    re_lo_eff.eye(n_tx, n_tx_ports);
-
-                if (tx_cpl_re_hi.n_elem != 0)
-                    re_hi_eff = tx_cpl_re_hi;
-                else
-                    re_hi_eff.eye(n_tx, n_tx_ports);
-
-                // im can be empty → treated as zeros inside interpolate_complex_matrix
-                interpolate_complex_matrix(re_lo_eff, tx_cpl_im_lo,
-                                           re_hi_eff, tx_cpl_im_hi,
-                                           tx_w, tx_cpl_re_f, tx_cpl_im_f);
-            }
-
-            // RX coupling interpolation
-            const arma::Mat<dtype> &rx_cpl_re_lo = rx_array[rx_lo].coupling_re;
-            const arma::Mat<dtype> &rx_cpl_im_lo = rx_array[rx_lo].coupling_im;
-
-            if (rx_exact)
-            {
-                if (rx_cpl_re_lo.n_elem != 0)
-                    rx_cpl_re_f = rx_cpl_re_lo;
-                else
-                    rx_cpl_re_f.eye(n_rx, n_rx_ports);
-
-                if (rx_cpl_im_lo.n_elem != 0)
-                    rx_cpl_im_f = rx_cpl_im_lo;
-                else
-                    rx_cpl_im_f.zeros(n_rx, n_rx_ports);
-            }
-            else
-            {
-                arma::Mat<dtype> re_lo_eff, im_lo_eff, re_hi_eff, im_hi_eff;
-                const arma::Mat<dtype> &rx_cpl_re_hi = rx_array[rx_hi].coupling_re;
-                const arma::Mat<dtype> &rx_cpl_im_hi = rx_array[rx_hi].coupling_im;
-
-                if (rx_cpl_re_lo.n_elem != 0)
-                    re_lo_eff = rx_cpl_re_lo;
-                else
-                    re_lo_eff.eye(n_rx, n_rx_ports);
-
-                if (rx_cpl_re_hi.n_elem != 0)
-                    re_hi_eff = rx_cpl_re_hi;
-                else
-                    re_hi_eff.eye(n_rx, n_rx_ports);
-
-                interpolate_complex_matrix(re_lo_eff, rx_cpl_im_lo,
-                                           re_hi_eff, rx_cpl_im_hi,
-                                           rx_w, rx_cpl_re_f, rx_cpl_im_f);
-            }
-
-            // Compute power matrices for delay coupling
-            tx_coupling_pwr_f.set_size(n_tx, n_tx_ports);
-            rx_coupling_pwr_f.set_size(n_rx, n_rx_ports);
-            qd_power_mat(n_tx, n_tx_ports, tx_coupling_pwr_f.memptr(), true,
-                         tx_cpl_re_f.memptr(), tx_cpl_im_f.memptr());
-            qd_power_mat(n_rx, n_rx_ports, rx_coupling_pwr_f.memptr(), true,
-                         rx_cpl_re_f.memptr(), rx_cpl_im_f.memptr());
+            interpolate_coupling(tx_array, tx_lo, tx_hi, tx_w, tx_exact, n_tx, n_tx_ports, tx_cpl_re_f, tx_cpl_im_f, tx_coupling_pwr_f);
+            interpolate_coupling(rx_array, rx_lo, rx_hi, rx_w, rx_exact, n_rx, n_rx_ports, rx_cpl_re_f, rx_cpl_im_f, rx_coupling_pwr_f);
         }
 
         // Internal storage for this frequency (if output size differs from element size)
@@ -828,102 +585,24 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         // Copy geometric path delays (same for all frequencies, in meters)
         std::memcpy(p_delays_f, p_path_dl, n_links * n_out * sizeof(dtype));
 
-        // MIMO coefficient calculation — sequential loop over paths
+        // MIMO coefficients, one path after the other
         for (arma::uword j = 0; j < n_out; ++j)
         {
             const arma::uword i = add_fake_los_path ? (j == 0 ? 0 : j - 1) : j;
             const arma::uword o_slice = j * n_links;
 
-            // Interpolate TX antenna at departure angles
+            // Interpolate the TX antenna at the departure angles and the RX antenna at the arrival angles
             const arma::Mat<dtype> AOD_j(&p_aod[o_slice], n_links, 1, false, true);
             const arma::Mat<dtype> EOD_j(&p_eod[o_slice], n_links, 1, false, true);
-
-            arma::Mat<dtype> Vt_re(n_links, 1), Vt_im(n_links, 1);
-            arma::Mat<dtype> Ht_re(n_links, 1), Ht_im(n_links, 1);
-
-            if (tx_exact)
-            {
-                const auto &ta = tx_array[tx_lo];
-                OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ta, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
-                                                                      Vt_re, Vt_im, Ht_re, Ht_im, nullptr, nullptr, nullptr, nullptr, kernel));
-            }
-            else
-            {
-                arma::Mat<dtype> Vt_re_lo(n_links, 1), Vt_im_lo(n_links, 1);
-                arma::Mat<dtype> Ht_re_lo(n_links, 1), Ht_im_lo(n_links, 1);
-                arma::Mat<dtype> Vt_re_hi(n_links, 1), Vt_im_hi(n_links, 1);
-                arma::Mat<dtype> Ht_re_hi(n_links, 1), Ht_im_hi(n_links, 1);
-
-                const auto &ta_lo = tx_array[tx_lo];
-                OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ta_lo, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
-                                                                      Vt_re_lo, Vt_im_lo, Ht_re_lo, Ht_im_lo, nullptr, nullptr, nullptr, nullptr, kernel));
-
-                const auto &ta_hi = tx_array[tx_hi];
-                OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ta_hi, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
-                                                                      Vt_re_hi, Vt_im_hi, Ht_re_hi, Ht_im_hi, nullptr, nullptr, nullptr, nullptr, kernel));
-
-                // SLERP blend between bracket entries
-                dtype *vtr = Vt_re.memptr(), *vti = Vt_im.memptr();
-                dtype *htr = Ht_re.memptr(), *hti = Ht_im.memptr();
-                const dtype *vlr = Vt_re_lo.memptr(), *vli = Vt_im_lo.memptr();
-                const dtype *vhr = Vt_re_hi.memptr(), *vhi = Vt_im_hi.memptr();
-                const dtype *hlr = Ht_re_lo.memptr(), *hli = Ht_im_lo.memptr();
-                const dtype *hhr = Ht_re_hi.memptr(), *hhi = Ht_im_hi.memptr();
-                for (arma::uword k = 0; k < n_links; ++k)
-                {
-                    qd_slerp_complex(vlr[k], vli[k], vhr[k], vhi[k], tx_w, vtr[k], vti[k]);
-                    qd_slerp_complex(hlr[k], hli[k], hhr[k], hhi[k], tx_w, htr[k], hti[k]);
-                }
-            }
-
-            // Interpolate RX antenna at arrival angles
             const arma::Mat<dtype> AOA_j(&p_aoa[o_slice], n_links, 1, false, true);
             const arma::Mat<dtype> EOA_j(&p_eoa[o_slice], n_links, 1, false, true);
 
-            arma::Mat<dtype> Vr_re(n_links, 1), Vr_im(n_links, 1);
-            arma::Mat<dtype> Hr_re(n_links, 1), Hr_im(n_links, 1);
-
-            if (rx_exact)
-            {
-                const auto &ra = rx_array[rx_lo];
-                OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ra, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
-                                                                      Vr_re, Vr_im, Hr_re, Hr_im, nullptr, nullptr, nullptr, nullptr, kernel));
-            }
-            else
-            {
-                arma::Mat<dtype> Vr_re_lo(n_links, 1), Vr_im_lo(n_links, 1);
-                arma::Mat<dtype> Hr_re_lo(n_links, 1), Hr_im_lo(n_links, 1);
-                arma::Mat<dtype> Vr_re_hi(n_links, 1), Vr_im_hi(n_links, 1);
-                arma::Mat<dtype> Hr_re_hi(n_links, 1), Hr_im_hi(n_links, 1);
-
-                const auto &ra_lo = rx_array[rx_lo];
-
-                OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ra_lo, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
-                                                                      Vr_re_lo, Vr_im_lo, Hr_re_lo, Hr_im_lo, nullptr, nullptr, nullptr, nullptr, kernel));
-
-                const auto &ra_hi = rx_array[rx_hi];
-
-                OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ra_hi, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
-                                                                      Vr_re_hi, Vr_im_hi, Hr_re_hi, Hr_im_hi, nullptr, nullptr, nullptr, nullptr, kernel));
-
-                dtype *vrr = Vr_re.memptr(), *vri = Vr_im.memptr();
-                dtype *hrr = Hr_re.memptr(), *hri = Hr_im.memptr();
-                const dtype *vlr = Vr_re_lo.memptr(), *vli = Vr_im_lo.memptr();
-                const dtype *vhr = Vr_re_hi.memptr(), *vhi = Vr_im_hi.memptr();
-                const dtype *hlr = Hr_re_lo.memptr(), *hli = Hr_im_lo.memptr();
-                const dtype *hhr = Hr_re_hi.memptr(), *hhi = Hr_im_hi.memptr();
-                for (arma::uword k = 0; k < n_links; ++k)
-                {
-                    qd_slerp_complex(vlr[k], vli[k], vhr[k], vhi[k], rx_w, vrr[k], vri[k]);
-                    qd_slerp_complex(hlr[k], hli[k], hhr[k], hhi[k], rx_w, hrr[k], hri[k]);
-                }
-            }
+            arma::Mat<dtype> Vt_re(n_links, 1), Vt_im(n_links, 1), Ht_re(n_links, 1), Ht_im(n_links, 1);
+            arma::Mat<dtype> Vr_re(n_links, 1), Vr_im(n_links, 1), Hr_re(n_links, 1), Hr_im(n_links, 1);
+            interpolate_pattern(tx_array, tx_lo, tx_hi, tx_w, tx_exact, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
+                                Vt_re, Vt_im, Ht_re, Ht_im);
+            interpolate_pattern(rx_array, rx_lo, rx_hi, rx_w, rx_exact, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
+                                Vr_re, Vr_im, Hr_re, Hr_im);
 
             // Compute MIMO coefficients for this path
             const dtype *pM = M_f.colptr(i);
@@ -933,97 +612,45 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             const dtype *pHtr = Ht_re.memptr(), *pHti = Ht_im.memptr();
             const dtype path_amplitude = (add_fake_los_path && j == 0) ? zero : std::sqrt(gain_f[i]);
 
-            for (arma::uword t = 0; t < n_tx; ++t)
-                for (arma::uword r = 0; r < n_rx; ++r)
+            if (scalar_M) // Scalar pressure: only the (V rx, V tx) component, polmat = [Re, Im]
+                for (arma::uword R = 0; R < n_links; ++R)
                 {
-                    arma::uword R = t * n_rx + r;
-                    dtype re = zero, im = zero;
-
-                    if (scalar_M)
-                    {
-                        // Scalar pressure: only the (V rx, V tx) component, polmat = [Re, Im]
-                        re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
-                        im += pVrr[R] * pM[1] * pVtr[R] + pVri[R] * pM[0] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] - pVri[R] * pM[1] * pVti[R];
-                    }
-                    else
-                    {
-                        // Full 2x2 Jones, column-major: (V rx, V tx), (H rx, V tx), (V rx, H tx), (H rx, H tx), Re/Im each
-                        re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
-                        re += pHrr[R] * pM[2] * pVtr[R] - pHri[R] * pM[3] * pVtr[R] - pHrr[R] * pM[3] * pVti[R] - pHri[R] * pM[2] * pVti[R];
-                        re += pVrr[R] * pM[4] * pHtr[R] - pVri[R] * pM[5] * pHtr[R] - pVrr[R] * pM[5] * pHti[R] - pVri[R] * pM[4] * pHti[R];
-                        re += pHrr[R] * pM[6] * pHtr[R] - pHri[R] * pM[7] * pHtr[R] - pHrr[R] * pM[7] * pHti[R] - pHri[R] * pM[6] * pHti[R];
-
-                        im += pVrr[R] * pM[1] * pVtr[R] + pVri[R] * pM[0] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] - pVri[R] * pM[1] * pVti[R];
-                        im += pHrr[R] * pM[3] * pVtr[R] + pHri[R] * pM[2] * pVtr[R] + pHrr[R] * pM[2] * pVti[R] - pHri[R] * pM[3] * pVti[R];
-                        im += pVrr[R] * pM[5] * pHtr[R] + pVri[R] * pM[4] * pHtr[R] + pVrr[R] * pM[4] * pHti[R] - pVri[R] * pM[5] * pHti[R];
-                        im += pHrr[R] * pM[7] * pHtr[R] + pHri[R] * pM[6] * pHtr[R] + pHrr[R] * pM[6] * pHti[R] - pHri[R] * pM[7] * pHti[R];
-                    }
-
-                    // Apply phase rotation from path delay
-                    dtype dl = p_delays_f[o_slice + R];
-                    dtype phase = wave_number * std::fmod(dl, wavelength);
-                    dtype cp = std::cos(phase), sp = std::sin(phase);
-
+                    const dtype re = pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
+                    const dtype im = pVrr[R] * pM[1] * pVtr[R] + pVri[R] * pM[0] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] - pVri[R] * pM[1] * pVti[R];
+                    const dtype phase = wave_number * std::fmod(p_delays_f[o_slice + R], wavelength);
+                    const dtype cp = std::cos(phase), sp = std::sin(phase);
                     p_coeff_re[o_slice + R] = (re * cp + im * sp) * path_amplitude;
                     p_coeff_im[o_slice + R] = (-re * sp + im * cp) * path_amplitude;
-
-                    // Convert path length [m] to propagation delay [s]
-                    dl = use_absolute_delays ? dl : dl - dist_rx_tx;
-                    p_delays_f[o_slice + R] = dl * rC;
                 }
+            else
+                qd_coeff_combine(pVrr, pVri, pHrr, pHri, pVtr, pVti, pHtr, pHti,
+                                 pM, &p_delays_f[o_slice], wave_number, wavelength, path_amplitude,
+                                 &p_coeff_re[o_slice], &p_coeff_im[o_slice], n_links);
 
-        } // End path loop
-
-        // Apply antenna element coupling (using interpolated coupling matrices)
-        if (apply_element_coupling)
-        {
-            dtype *tempX = new dtype[n_ports];
-            dtype *tempY = new dtype[n_ports];
-            dtype *tempT = new dtype[n_ports];
-
-            const dtype *tx_cpl_re_ptr = tx_cpl_re_f.memptr();
-            const dtype *tx_cpl_im_ptr = tx_cpl_im_f.memptr();
-            const dtype *rx_cpl_re_ptr = rx_cpl_re_f.memptr();
-            const dtype *rx_cpl_im_ptr = rx_cpl_im_f.memptr();
-
-            for (arma::uword j = 0; j < n_out; ++j)
+            // Convert path lengths [m] to propagation delays [s]
+            for (arma::uword R = 0; R < n_links; ++R)
             {
-                arma::uword o_slice = j * n_links;
-
-                if (different_output_size)
-                {
-                    // Coupling writes to output cubes; internal storage holds element-space data
-                    qd_multiply_3_complex_mat(rx_cpl_re_ptr, rx_cpl_im_ptr,
-                                              &p_coeff_re[o_slice], &p_coeff_im[o_slice],
-                                              tx_cpl_re_ptr, tx_cpl_im_ptr,
-                                              out_re.slice_memptr(j), out_im.slice_memptr(j),
-                                              n_rx, n_rx_ports, n_tx, n_tx_ports);
-
-                    qd_multiply_3_mat(rx_coupling_pwr_f.memptr(), &p_delays_f[o_slice],
-                                      tx_coupling_pwr_f.memptr(), delay[f].slice_memptr(j),
-                                      n_rx, n_rx_ports, n_tx, n_tx_ports);
-                }
-                else
-                {
-                    // Coupling applied in-place via temporaries
-                    qd_multiply_3_complex_mat(rx_cpl_re_ptr, rx_cpl_im_ptr,
-                                              &p_coeff_re[o_slice], &p_coeff_im[o_slice],
-                                              tx_cpl_re_ptr, tx_cpl_im_ptr,
-                                              tempX, tempY,
-                                              n_rx, n_rx_ports, n_tx, n_tx_ports);
-                    std::memcpy(&p_coeff_re[o_slice], tempX, n_ports * sizeof(dtype));
-                    std::memcpy(&p_coeff_im[o_slice], tempY, n_ports * sizeof(dtype));
-
-                    qd_multiply_3_mat(rx_coupling_pwr_f.memptr(), &p_delays_f[o_slice],
-                                      tx_coupling_pwr_f.memptr(), tempT,
-                                      n_rx, n_rx_ports, n_tx, n_tx_ports);
-                    std::memcpy(&p_delays_f[o_slice], tempT, n_ports * sizeof(dtype));
-                }
+                const dtype dl = use_absolute_delays ? p_delays_f[o_slice + R] : p_delays_f[o_slice + R] - dist_rx_tx;
+                p_delays_f[o_slice + R] = dl * rC;
             }
 
-            delete[] tempX;
-            delete[] tempY;
-            delete[] tempT;
+        }
+
+        // Apply antenna element coupling (using interpolated coupling matrices); without different_output_size the
+        // data is in the outputs and the coupling runs in place
+        if (apply_element_coupling)
+        {
+            std::vector<dtype> temp;
+            for (arma::uword j = 0; j < n_out; ++j)
+            {
+                const arma::uword o_slice = j * n_links;
+                qd_coupling_apply_slot(rx_cpl_re_f.memptr(), rx_cpl_im_f.memptr(), tx_cpl_re_f.memptr(), tx_cpl_im_f.memptr(),
+                                       rx_coupling_pwr_f.memptr(), tx_coupling_pwr_f.memptr(), n_rx, n_rx_ports, n_tx, n_tx_ports,
+                                       &p_coeff_re[o_slice], &p_coeff_im[o_slice], &p_delays_f[o_slice],
+                                       different_output_size ? out_re.slice_memptr(j) : &p_coeff_re[o_slice],
+                                       different_output_size ? out_im.slice_memptr(j) : &p_coeff_im[o_slice],
+                                       different_output_size ? delay[f].slice_memptr(j) : &p_delays_f[o_slice], temp);
+            }
         }
 
         // Move true LOS path to slot 0 if fake LOS was added
@@ -1054,13 +681,12 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 dst[2 * k] = src_re[k], dst[2 * k + 1] = src_im[k];
         }
 
-    } // End frequency loop (OMP parallel)
+    }
 
     if (omp_failed)
         throw std::runtime_error(omp_error);
 }
 
-// Explicit template instantiations
 template void quadriga_lib::get_channels_multifreq(
     const std::vector<quadriga_lib::arrayant<float>> &, const std::vector<quadriga_lib::arrayant<float>> &,
     const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &,

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // Provide std::__throw_bad_array_new_length locally for MATLAB installs that
 // ship libstdc++ < GLIBCXX_3.4.29 (i.e. MATLAB versions bundled before GCC 11).
 // GCC 11+ emits this symbol for any `new T[n]` with runtime n, including ones

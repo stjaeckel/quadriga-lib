@@ -58,7 +58,7 @@ Computations and file I/O on a channel are free functions, see section "Channel 
 (e.g. [[channel_calc_effective_path_gain]], [[channel_export_obj_file]], [[hdf5_write_channel]], [[quantize_delays]]).
 MD!*/
 
-// CHANNEL METHODS : Return object dimensions
+// Object dimensions
 template <typename dtype>
 arma::uword quadriga_lib::channel<dtype>::n_snap() const
 {
@@ -224,7 +224,6 @@ bool quadriga_lib::channel<dtype>::empty() const
     return true;
 }
 
-// CHANNEL METHOD : Validate correctness of the members
 template <typename dtype>
 std::string quadriga_lib::channel<dtype>::is_valid() const
 {
@@ -662,6 +661,5 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         this->lbs_pos[i_snap] = arma::join_rows(this->lbs_pos[i_snap], *lbs_pos_add);
 }
 
-// Instantiate templates
 template class quadriga_lib::channel<float>;
 template class quadriga_lib::channel<double>;

@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.RTtools.point_cloud_segmentation: output layout, index maps, padding, error paths.
+
 import sys
 import os
 import unittest
@@ -36,7 +38,6 @@ class test_case(unittest.TestCase):
         rng = np.random.default_rng(seed)
         points_in = rng.normal(size=(n_points, 3))
 
-        # Run once
         data = RTtools.point_cloud_segmentation(points_in, target_size=target_size, vec_size=vec_size)
         self.assertIsInstance(data, tuple)
         self.assertEqual(len(data), 4)

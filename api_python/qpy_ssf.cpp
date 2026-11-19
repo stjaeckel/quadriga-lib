@@ -5,8 +5,6 @@
 #include "qd_helpers_python_types.hpp"
 #include "qd_helpers_gbsm.hpp"
 
-
-
 /*!SECTION
 Geometry-based stochastic model
 SECTION!*/
@@ -112,7 +110,6 @@ py::tuple ssf_clusters(py::handle scenpar,
                        py::handle o2i,
                        py::handle n_cluster)
 {
-    // Read inputs
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
@@ -142,7 +139,6 @@ py::tuple ssf_clusters(py::handle scenpar,
     std::vector<bool> o2i_a(o2i_in.n_elem);
     for (arma::uword i = 0; i < o2i_in.n_elem; ++i)
         o2i_a[i] = o2i_in[i] != 0.0;
-
 
     // Output allocation in numpy memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the call
     // throws before any output is needed
@@ -174,7 +170,6 @@ py::tuple ssf_clusters(py::handle scenpar,
         n_active_py = qd_python_init_output(n_link, &n_active);
     }
 
-    // Call library function
     quadriga_lib::ssf_clusters(scenpar_a, tx_pos_a, rx_pos_a, lsp_a, rnd_a, delay, power, aod, eod, aoa, eoa, method,
                                rnd_freq_a, lsp_anchor_a, eod_offset_deg_a, abs_toa_a, gr_eps_re, gr_eps_im, o2i_a,
                                n_cluster_a, &n_active);
@@ -306,7 +301,6 @@ py::list ssf_rays(py::handle scenpar,
                   py::handle pol_variability,
                   py::handle random_phase)
 {
-    // Read inputs
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
@@ -448,7 +442,6 @@ py::tuple ssf_paths(const py::dict &rays,
                     py::handle kf_ratio,
                     py::handle oxygen)
 {
-    // Read inputs
     const auto rays_a = qd_python_dict2gbsm_rays(rays, "rays");
     const auto link_gain_dB_a = qd_python_numpy2arma_Col<double>(link_gain_dB, true);
     const auto tx_pos_a = qd_python_numpy2arma_Col<double>(tx_pos, true);

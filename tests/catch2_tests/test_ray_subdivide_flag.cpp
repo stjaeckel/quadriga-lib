@@ -17,9 +17,9 @@
 // which also exercises the decision boundary itself.
 //
 // The second oracle is ray_mesh_interact's edge_lengthN. ray_subdivide_flag exists to be the single
-// source of truth for the subdivision decision, and ray_progress no longer derives it from
-// edge_lengthN, so the two implementations can drift apart silently. The cross-check here is what
-// makes that drift loud. It also pins the property that made the split possible in the first place:
+// source of truth for the subdivision decision; ray_progress does not derive it from edge_lengthN,
+// so the two implementations can drift apart silently. The cross-check here makes that drift loud.
+// It also pins the property that allows the split:
 // the footprint depends only on where the vertex rays meet the face, so it is the same for
 // reflection and for transmission, and the same for any material.
 //
@@ -62,9 +62,7 @@ namespace
         return SQRT3 * L * std::tan(deg * (float)(arma::datum::pi / 180.0));
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Materials and scene
-    // ---------------------------------------------------------------------------------------
+    // ---- Materials and scene ----
 
     // Convert a per-face material matrix [n_face, 9] with columns {a,b,c,d,att,attB,alpha,
     // alphaB,fRef} into the (mtl_ind, mtl_prop-map) pair, deduplicating identical rows.
@@ -126,9 +124,7 @@ namespace
         return S;
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Beam set
-    // ---------------------------------------------------------------------------------------
+    // ---- Beam set ----
 
     struct Beams
     {
@@ -238,9 +234,7 @@ namespace
         }
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Oracles
-    // ---------------------------------------------------------------------------------------
+    // ---- Oracles ----
 
     // Edge length as reported by ray_mesh_interact, for the whole set. interaction_type selects
     // reflection (0) or transmission (1) / refraction (2); the result must not depend on it.
@@ -278,9 +272,7 @@ namespace
     }
 }
 
-// ===========================================================================================
-// Geometry
-// ===========================================================================================
+// ---- Geometry ----
 
 TEST_CASE("ray_subdivide_flag - edge length matches the closed form")
 {
@@ -389,13 +381,11 @@ TEST_CASE("ray_subdivide_flag - rays that miss the mesh are never flagged")
     CHECK(f[2] == false);
 }
 
-// ===========================================================================================
-// Cross-check against ray_mesh_interact
-// ===========================================================================================
+// ---- Cross-check against ray_mesh_interact ----
 
 TEST_CASE("ray_subdivide_flag - agrees with the edge length reported by ray_mesh_interact")
 {
-    // ray_progress no longer derives the decision from edge_lengthN, so the two implementations
+    // ray_progress does not derive the decision from edge_lengthN, so the two implementations
     // can drift apart without anything else failing. This is the guard against that.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
@@ -471,9 +461,7 @@ TEST_CASE("ray_subdivide_flag - the footprint does not depend on the interaction
         CHECK(fd[i] == fc[i]);
 }
 
-// ===========================================================================================
-// State gates
-// ===========================================================================================
+// ---- State gates ----
 
 TEST_CASE("ray_subdivide_flag - state gates")
 {
@@ -496,7 +484,7 @@ TEST_CASE("ray_subdivide_flag - state gates")
     SECTION("the medium word is compared whole, not masked")
     {
         // Bit 15 is the resolved flag, bits 0-14 the material. A ray outside a medium but carrying
-        // the flag is left alone, matching what ray_progress did.
+        // the flag is left alone.
         Beams B = one_beam(1.0f);
         intersect(B, S);
         B.cur(0) = (short)0x8000;
@@ -574,9 +562,7 @@ TEST_CASE("ray_subdivide_flag - gates are applied per ray")
     }
 }
 
-// ===========================================================================================
-// Threading and determinism
-// ===========================================================================================
+// ---- Threading and determinism ----
 
 TEST_CASE("ray_subdivide_flag - the parallel and serial paths agree")
 {
@@ -619,9 +605,7 @@ TEST_CASE("ray_subdivide_flag - the parallel and serial paths agree")
     CHECK(again == fl);
 }
 
-// ===========================================================================================
-// Input validation
-// ===========================================================================================
+// ---- Input validation ----
 
 TEST_CASE("ray_subdivide_flag - input validation")
 {

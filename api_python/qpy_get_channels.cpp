@@ -4,7 +4,98 @@
 
 #include "qd_helpers_python_types.hpp"
 
+// Path inputs of the channel functions: true if 'h' is a list of numpy arrays (batch mode) or an empty list
+static inline bool qd_python_is_array_list(const py::handle &h)
+{
+    if (!py::isinstance<py::list>(h))
+        return false;
+    py::list lst = py::reinterpret_borrow<py::list>(h);
+    return lst.size() == 0 || py::isinstance<py::array>(lst[0]);
+}
 
+// Aliases the arrays of a list (batch mode), or a single input as a one-entry vector, without copying the data (arrays
+// that are not Fortran-contiguous float64 are copied, as are lists and scalars of a single input). T is
+// arma::Col<double>, arma::Mat<double> or arma::Cube<double>.
+// Every entry is added to 'keep_alive': the aliased memory must stay valid while the GIL is released, even if another
+// thread removes the entry from the list.
+template <typename T>
+static inline std::vector<T> qd_python_alias_list(const py::handle &h, bool batch, std::vector<py::object> &keep_alive)
+{
+    std::vector<T> out;
+    auto add = [&](const py::handle &item)
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        if constexpr (std::is_same_v<T, arma::Col<double>>)
+            out.push_back(qd_python_numpy2arma_Col<double>(keep_alive.back(), true));
+        else if constexpr (std::is_same_v<T, arma::Mat<double>>)
+            out.push_back(qd_python_numpy2arma_Mat<double>(keep_alive.back(), true));
+        else
+            out.push_back(qd_python_numpy2arma_Cube<double>(keep_alive.back(), true));
+    };
+    if (batch)
+    {
+        py::list lst = py::reinterpret_borrow<py::list>(h);
+        out.reserve(lst.size());
+        for (auto item : lst)
+            add(item);
+    }
+    else
+        out.reserve(1), add(h);
+    return out;
+}
+
+// Adds all values of a dict (e.g. an arrayant whose patterns are aliased) to 'keep_alive'
+static inline void qd_python_keep_dict_values(const py::dict &dict, std::vector<py::object> &keep_alive)
+{
+    for (auto item : dict)
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
+}
+
+// Frequency selection of the channel wrappers: all snapshots must have the same number of frequencies 'n_freq' in
+// 'path_gain' [n_path, n_freq] and 'polmat' [8, n_path, n_freq], 'center_freq' is empty or has 'n_freq' entries, and
+// 'i_freq' < n_freq (unless there are no snapshots). The slice 'i_freq' of every snapshot is aliased into 'path_gain_f'
+// and 'polmat_f'; returns the selected center frequency (0 for an empty 'center_freq').
+static inline double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_gain, const std::vector<arma::Cube<double>> &polmat,
+                                    const arma::Col<double> &center_freq, arma::uword i_freq,
+                                    std::vector<arma::vec> &path_gain_f, std::vector<arma::mat> &polmat_f)
+{
+    const size_t n_snap = path_gain.size();
+    arma::uword n_freq = 0ULL;
+    for (size_t i = 0; i < n_snap; ++i)
+    {
+        const arma::uword n_freq_i = path_gain[i].n_cols;
+        if (i == 0)
+            n_freq = n_freq_i;
+        else if (n_freq_i != n_freq)
+            throw std::invalid_argument("All entries of 'path_gain' must have the same number of frequencies.");
+
+        if (polmat[i].n_slices != n_freq_i)
+            throw std::invalid_argument("Inputs 'path_gain' and 'polmat' must have the same number of frequencies.");
+    }
+
+    if (!center_freq.empty() && center_freq.n_elem != n_freq)
+        throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
+
+    if (n_snap != 0 && i_freq >= n_freq)
+        throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
+
+    path_gain_f.clear(), polmat_f.clear();
+    path_gain_f.reserve(n_snap), polmat_f.reserve(n_snap);
+    for (size_t i = 0; i < n_snap; ++i)
+    {
+        path_gain_f.emplace_back(const_cast<double *>(path_gain[i].colptr(i_freq)), path_gain[i].n_rows, false, true);
+        polmat_f.emplace_back(const_cast<double *>(polmat[i].slice_memptr(i_freq)), polmat[i].n_rows, polmat[i].n_cols, false, true);
+    }
+    return center_freq.empty() ? 0.0 : center_freq.at(i_freq);
+}
+
+// Position or orientation input of the planar and spherical wrappers: in batch mode a [3, n_snap] matrix or one column
+// for all snapshots (checked by the C++ core), else any 3-element array, returned as [3, 1]
+static inline arma::Mat<double> qd_python_get_xyz(const py::handle &h, const char *name, bool batch)
+{
+    return batch ? qd_python_numpy2arma_Mat<double>(h, true)
+                 : arma::Mat<double>(qd_python_numpy2arma_Col<double>(h.cast<py::array_t<double>>(), false, false, name, 3));
+}
 
 // IRS arrayant dict: the coupling matrix holds the IRS weights; without one, C++ raises instead of using identity
 static inline quadriga_lib::arrayant<double> qd_irs_dict2arrayant(const py::dict &irs)
@@ -157,12 +248,10 @@ py::tuple get_channels_planar(const py::dict &tx_array,
         path_gain_a.size() != n_snap || path_length_a.size() != n_snap || polmat_a.size() != n_snap)
         throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' must have the same length.");
 
-    // Positions and orientations: one column per snapshot or one for all (checked by the C++ core); a single snapshot
-    // takes any 3-element array
-    auto position = [&](const py::handle &h, const char *name)
-    { return batch ? qd_python_numpy2arma_Mat<double>(h, true) : arma::Mat<double>(qd_python_numpy2arma_Col<double>(h.cast<py::array_t<double>>(), false, false, name, 3)); };
-    const arma::Mat<double> tx_pos_a = position(tx_pos, "tx_pos"), tx_orientation_a = position(tx_orientation, "tx_orientation");
-    const arma::Mat<double> rx_pos_a = position(rx_pos, "rx_pos"), rx_orientation_a = position(rx_orientation, "rx_orientation");
+    const arma::Mat<double> tx_pos_a = qd_python_get_xyz(tx_pos, "tx_pos", batch);
+    const arma::Mat<double> tx_orientation_a = qd_python_get_xyz(tx_orientation, "tx_orientation", batch);
+    const arma::Mat<double> rx_pos_a = qd_python_get_xyz(rx_pos, "rx_pos", batch);
+    const arma::Mat<double> rx_orientation_a = qd_python_get_xyz(rx_orientation, "rx_orientation", batch);
 
     // Frequency slice of every snapshot, aliased without copying; path counts are validated by the C++ core
     std::vector<arma::vec> path_gain_f;
@@ -347,12 +436,10 @@ py::tuple get_channels_spherical(const py::dict &tx_array,
         path_length_a.size() != n_snap || polmat_a.size() != n_snap)
         throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must have the same length.");
 
-    // Positions and orientations: one column per snapshot or one for all (checked by the C++ core); a single snapshot
-    // takes any 3-element array
-    auto position = [&](const py::handle &h, const char *name)
-    { return batch ? qd_python_numpy2arma_Mat<double>(h, true) : arma::Mat<double>(qd_python_numpy2arma_Col<double>(h.cast<py::array_t<double>>(), false, false, name, 3)); };
-    const arma::Mat<double> tx_pos_a = position(tx_pos, "tx_pos"), tx_orientation_a = position(tx_orientation, "tx_orientation");
-    const arma::Mat<double> rx_pos_a = position(rx_pos, "rx_pos"), rx_orientation_a = position(rx_orientation, "rx_orientation");
+    const arma::Mat<double> tx_pos_a = qd_python_get_xyz(tx_pos, "tx_pos", batch);
+    const arma::Mat<double> tx_orientation_a = qd_python_get_xyz(tx_orientation, "tx_orientation", batch);
+    const arma::Mat<double> rx_pos_a = qd_python_get_xyz(rx_pos, "rx_pos", batch);
+    const arma::Mat<double> rx_orientation_a = qd_python_get_xyz(rx_orientation, "rx_orientation", batch);
 
     // Frequency slice of every snapshot, aliased without copying; path counts are validated by the C++ core
     std::vector<arma::vec> path_gain_f;
@@ -495,11 +582,9 @@ py::tuple get_channels_multifreq(const py::dict &tx_array,
     const bool use_absolute_delays_b = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
     const bool add_fake_los_path_b = qd_python_flag(add_fake_los_path, false, "add_fake_los_path");
 
-    // Parse antenna dictionaries (3D single-freq or 4D multi-freq handled internally)
     auto ant_tx_vec = qd_python_dict2arrayant_multi(tx_array, true);
     auto ant_rx_vec = qd_python_dict2arrayant_multi(rx_array, true);
 
-    // Parse remaining input arguments
     const auto fbs_pos_a = qd_python_numpy2arma_Mat(fbs_pos, true);
     const auto lbs_pos_a = qd_python_numpy2arma_Mat(lbs_pos, true);
     const auto path_gain_a = qd_python_numpy2arma_Mat(path_gain, true);
@@ -512,7 +597,6 @@ py::tuple get_channels_multifreq(const py::dict &tx_array,
     const auto freq_a = qd_python_numpy2arma_Col(freq, true);
     const auto freq_new_a = qd_python_numpy2arma_Col(freq_new, true);
 
-    // Derived output sizes
     arma::uword n_ports_tx = ant_tx_vec[0].n_ports();
     arma::uword n_ports_rx = ant_rx_vec[0].n_ports();
     arma::uword n_path = add_fake_los_path_b ? fbs_pos_a.n_cols + 1 : fbs_pos_a.n_cols;
@@ -651,7 +735,6 @@ py::tuple get_channels_irs(const py::dict &tx_array,
     const bool want_absolute = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
     const bool want_angles = qd_python_flag(angles, false, "angles");
 
-    // Antenna arrays
     const auto tx_array_a = qd_python_dict2arrayant(tx_array, true);
     const auto rx_array_a = qd_python_dict2arrayant(rx_array, true);
     const auto irs_array_a = qd_irs_dict2arrayant(irs_array);
@@ -664,7 +747,6 @@ py::tuple get_channels_irs(const py::dict &tx_array,
         irs_array_2_a = qd_irs_dict2arrayant(py::reinterpret_borrow<py::dict>(irs_array_2));
     }
 
-    // Positions and orientations
     const auto tx_pos_a = qd_python_numpy2arma_Col(tx_pos, true, false, "tx_pos", 3);
     const auto tx_orientation_a = qd_python_numpy2arma_Col(tx_orientation, true, false, "tx_orientation", 3);
     const auto rx_pos_a = qd_python_numpy2arma_Col(rx_pos, true, false, "rx_pos", 3);
@@ -689,7 +771,6 @@ py::tuple get_channels_irs(const py::dict &tx_array,
     std::vector<bool> active_path_a(active_path_in.n_elem);
     for (arma::uword i = 0; i < active_path_in.n_elem; ++i)
         active_path_a[i] = active_path_in[i] != 0.0;
-
 
     // Output sizes depend on the path selection: copied after the call
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
@@ -834,7 +915,7 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
                                   const double wall_loss_dB,
                                   const py::handle &stack)
 {
-    // Parse input arguments (None gives an empty container, which selects the default)
+    // None gives an empty container, which selects the C++ default
     const auto ant_tx_a = qd_python_dict2arrayant(ap_array, true);
     const auto ant_rx_a = qd_python_dict2arrayant(sta_array, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
@@ -844,13 +925,11 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
     const auto n_walls_a = qd_python_numpy2arma_Col<arma::uword>(n_walls, true, false, "n_walls");
     const bool stack_b = qd_python_flag(stack, false, "stack");
 
-    // Call CPP implementation
     const auto chan = quadriga_lib::get_channels_ieee_indoor(ant_tx_a, ant_rx_a, channel_type, center_freq, tap_spacing, n_users,
                                                              observation_time, update_interval, speed_station_kmh, speed_env_kmh,
                                                              dist_a, n_floors_a, uplink_b, offset_angles_deg_a, n_subpath,
                                                              doppler_effect, seed, kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB,
                                                              dist_breakpoint, n_walls_a, wall_loss_dB);
 
-    // Copy results to Python
     return qd_python_channel2list(chan, false, stack_b);
 }

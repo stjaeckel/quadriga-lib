@@ -6,7 +6,6 @@
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex.hpp"
 
-#include <cmath>
 #include <string>
 
 /*!SECTION
@@ -74,13 +73,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::vec dist_decorr = qd_mex_get_Col<double>(prhs[0], false, "dist_decorr");
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[1], false, "pos");
     const arma::mat pos_b = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2], false, "pos_b");
@@ -88,10 +85,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::string preset = (nrhs < 5) ? std::string("Comb256") : qd_mex_get_string(prhs[4], "Comb256", "preset");
     const arma::sword seed = (nrhs < 6) ? -1 : qd_mex_get_seed(prhs[5]);
 
-    // Output allocation
     arma::mat val;
     plhs[0] = qd_mex_init_output(&val, pos.n_rows, dist_decorr.n_elem);
 
-    // Call library function
     CALL_QD(quadriga_lib::sos_rand<double>(dist_decorr, pos, val, pos_b, dist_decorr_b, preset, seed));
 }

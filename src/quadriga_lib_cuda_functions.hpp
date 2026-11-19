@@ -19,12 +19,12 @@ template <typename dtype>
 void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First vertex coordinate in GCS, length n_mesh
                  const dtype *Ux, const dtype *Uy, const dtype *Uz, // Second vertex coordinate in GCS, length n_mesh
                  const dtype *Vx, const dtype *Vy, const dtype *Vz, // Third vertex coordinate in GCS, length n_mesh
-                 const size_t n_mesh,                               // Number of triangles (multiple of VEC_SIZE)
+                 const size_t n_mesh,                               // Number of triangles
                  const unsigned *SMI,                               // List of sub-mesh indices, length n_sub
-                 const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub_s
-                 const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub_s
-                 const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub_s
-                 const size_t n_sub,                                // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                 const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub
+                 const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub
+                 const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub
+                 const size_t n_sub,                                // Number of sub-meshes
                  const dtype *Ox, const dtype *Oy, const dtype *Oz, // Ray origin in GCS, length n_ray
                  const dtype *Dx, const dtype *Dy, const dtype *Dz, // Ray destination in GCS, length n_ray
                  const size_t n_ray,                                // Number of rays
@@ -38,10 +38,10 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First ver
 void qd_RPI_CUDA(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point
                  const size_t n_point,                                 // Number of points
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
-                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
-                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
-                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
-                 const size_t n_sub,                                   // Number of sub-clouds (n_sub <= n_sub_s)
+                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub
+                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub
+                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub
+                 const size_t n_sub,                                   // Number of sub-clouds
                  const float *T1x, const float *T1y, const float *T1z, // First ray vertex coordinate in GCS, length n_ray
                  const float *T2x, const float *T2y, const float *T2z, // Second ray vertex coordinate in GCS, length n_ray
                  const float *T3x, const float *T3y, const float *T3z, // Third ray vertex coordinate in GCS, length n_ray
@@ -49,7 +49,7 @@ void qd_RPI_CUDA(const float *Px, const float *Py, const float *Pz,    // Point 
                  const float *D1x, const float *D1y, const float *D1z, // First ray direction in GCS, length n_ray
                  const float *D2x, const float *D2y, const float *D2z, // Second ray direction in GCS, length n_ray
                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
-                 const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
+                 const float *rD1, const float *rD2, const float *rD3, // 1 / dot(D, N) per ray vertex, length n_ray
                  const size_t n_ray,                                   // Number of rays
                  std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                  unsigned *hit_offset,                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller

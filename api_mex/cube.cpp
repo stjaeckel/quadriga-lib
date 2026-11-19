@@ -47,7 +47,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
@@ -59,10 +58,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec location = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2], false, "location");
     const arma::uword n_div = (nrhs < 4) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[3], "n_div", 1);
 
-    // Call library function (returns mesh by value)
     arma::mat mesh;
     CALL_QD(mesh = quadriga_lib::cube<double>(scale, rotation, location, n_div));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&mesh);
 }

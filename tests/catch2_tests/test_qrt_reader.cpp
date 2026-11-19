@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// qrt_file_parse, qrt_read_cache_init and qrt_file_read on the QRT files in tests/data (test.qrt: version 4,
+// 3 origins, 2 destinations, 7 CIRs; test_v5.qrt: two frequencies). Oracles: positions and orientations stored in
+// the files, path lengths, angles and free-space gain recomputed from the interaction points, uplink as the
+// reciprocal of downlink, list reads against single-CIR reads, and the error and aliasing rules.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_channel.hpp"
@@ -36,7 +41,6 @@ TEST_CASE("QRT Reader")
     arma::fvec center_freq_f;
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
-    // Check parser
     quadriga_lib::qrt_file_parse(fn, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset, &orig_names, &dest_names, &version,
                                  &center_freq_f, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
@@ -97,7 +101,6 @@ TEST_CASE("QRT Reader")
     F = {0, 3.1416, 1.5708};
     CHECK(arma::approx_equal(orig_orientation.col(2), F, "absdiff", 1.5e-4));
 
-    // Check Cache
     std::ifstream stream(fn, std::ios::in | std::ios::binary);
     auto cache = quadriga_lib::qrt_read_cache_init("", &stream);
 
@@ -141,8 +144,7 @@ TEST_CASE("QRT Reader")
             aod = v_aod[0], eod = v_eod[0], aoa = v_aoa[0], eoa = v_eoa[0];
         };
 
-        // Check positions and orientations of first link
-        // Normalization: path gain = FSPL, Jones matrix M = material losses
+        // First link, normalize_polmat = 0: path gain = FSPL, Jones matrix M = material losses
         read(0, 0, false, 0, xxx == 1); // xxx = 0: open / close file, 1: use cache
 
         CHECK(std::abs(center_freq[0] - 3.75e9) < 1.0e-7 * 3.75e9); // v4 stores GHz, converted to Hz in float
@@ -165,7 +167,6 @@ TEST_CASE("QRT Reader")
         double d3 = arma::norm(R - LBS);   // LBS to R
         double total_length = d1 + d2 + d3;
 
-        // Calculate angles for path 0
         arma::vec dir_tx = (FBS - O) / d1;
         double aod_calc = std::atan2(dir_tx[1], dir_tx[0]);
         double eod_calc = std::asin(dir_tx[2]);
@@ -175,9 +176,9 @@ TEST_CASE("QRT Reader")
         double eoa_calc = -std::asin(dir_rx[2]);
 
         // Calculate FSPL as linear gain: (lambda / (4*pi*d))^2
-        double wavelength = 299792458.0 / center_freq[0]; // c/f
+        double wavelength = 299792458.0 / center_freq[0];
         double path_gain_calc = wavelength / (4.0 * M_PI * total_length);
-        path_gain_calc = path_gain_calc * path_gain_calc; // Square it
+        path_gain_calc = path_gain_calc * path_gain_calc;
 
         REQUIRE(path_length.n_elem == 19);
         REQUIRE(path_gain.n_elem == 19);
@@ -186,7 +187,7 @@ TEST_CASE("QRT Reader")
         CHECK(std::abs(eod[0] - eod_calc) < 1.5e-4);
         CHECK(std::abs(aoa[0] - aoa_calc) < 1.5e-4);
         CHECK(std::abs(eoa[0] - eoa_calc) < 1.5e-4);
-        CHECK(std::abs(path_gain[0] - path_gain_calc) / path_gain_calc < 1e-3); // Relative error
+        CHECK(std::abs(path_gain[0] - path_gain_calc) / path_gain_calc < 1e-3);
 
         // Path 17: O > FBS > R (single bounce)
         FBS = {-9.88096, 57.83151626586914, 0.5};
@@ -195,7 +196,6 @@ TEST_CASE("QRT Reader")
         d3 = arma::norm(R - FBS); // FBS to R
         total_length = d1 + d3;
 
-        // Calculate angles for path 17
         dir_tx = (FBS - O) / d1;
         aod_calc = std::atan2(dir_tx[1], dir_tx[0]);
         eod_calc = std::asin(dir_tx[2]);
@@ -204,7 +204,6 @@ TEST_CASE("QRT Reader")
         aoa_calc = std::atan2(dir_rx[1], dir_rx[0]) + M_PI;
         eoa_calc = -std::asin(dir_rx[2]);
 
-        // Calculate FSPL as linear gain
         path_gain_calc = wavelength / (4.0 * M_PI * total_length);
         path_gain_calc = path_gain_calc * path_gain_calc;
 
@@ -218,7 +217,6 @@ TEST_CASE("QRT Reader")
         // Path 18: O > R (LOS path)
         d1 = arma::norm(R - O); // O to R (LOS path)
 
-        // Calculate angles for path 18
         dir_tx = (R - O) / d1;
         aod_calc = std::atan2(dir_tx[1], dir_tx[0]);
         eod_calc = std::asin(dir_tx[2]);
@@ -227,7 +225,6 @@ TEST_CASE("QRT Reader")
         aoa_calc = std::atan2(dir_tx[1], dir_tx[0]) + M_PI;
         eoa_calc = -std::asin(dir_tx[2]);
 
-        // Calculate FSPL as linear gain
         path_gain_calc = wavelength / (4.0 * M_PI * d1);
         path_gain_calc = path_gain_calc * path_gain_calc;
 
@@ -238,7 +235,7 @@ TEST_CASE("QRT Reader")
         CHECK(std::abs(eoa[18] - eoa_calc) < 1.5e-4);
         CHECK(std::abs(path_gain[18] - path_gain_calc) / path_gain_calc < 1e-3);
 
-        // Normalization: path gain = path power, Jones matrix M = stronger column has power of 2
+        // normalize_polmat = 1: path gain = path power, the stronger column of M has power 1
         const arma::cube M0 = M;
         const arma::mat path_gain0 = path_gain;
         read(0, 0, false, 1, xxx == 1);
@@ -258,11 +255,11 @@ TEST_CASE("QRT Reader")
         for (arma::uword i = 0; i < 19; ++i)
         {
             // Extract Jones matrix for path i (4 complex values = 8 real values)
-            // Layout: [Re(H_VV), Im(H_VV), Re(H_VH), Im(H_VH), Re(H_HV), Im(H_HV), Re(H_HH), Im(H_HH)]
+            // Rows (re, im): 0-1 VV, 2-3 HV, 4-5 VH, 6-7 HH (rx, tx)
             arma::cx_mat H(2, 2);
             H(0, 0) = arma::cx_double(M(0, i, 0), M(1, i, 0)); // VV
-            H(0, 1) = arma::cx_double(M(2, i, 0), M(3, i, 0)); // VH
-            H(1, 0) = arma::cx_double(M(4, i, 0), M(5, i, 0)); // HV
+            H(0, 1) = arma::cx_double(M(2, i, 0), M(3, i, 0)); // HV
+            H(1, 0) = arma::cx_double(M(4, i, 0), M(5, i, 0)); // VH
             H(1, 1) = arma::cx_double(M(6, i, 0), M(7, i, 0)); // HH
 
             arma::cx_mat H1(2, 2);
@@ -300,7 +297,7 @@ TEST_CASE("QRT Reader")
             CHECK(rel_error < 1e-3);
         }
 
-        // Check positions and orientations of second link
+        // Second link
         read(1, 1, false, 1, false);
 
         T = {-2.67888, 60.257, 2.0};
@@ -315,7 +312,7 @@ TEST_CASE("QRT Reader")
         T = {0.0, 0.0, 1.2753};
         CHECK(arma::approx_equal(rx_orientation, T, "absdiff", 1.5e-4));
 
-        // Test uplink
+        // Uplink
         const arma::cube M_dl = M;
         const arma::mat path_gain_dl = path_gain;
         const arma::mat fbs_dl = fbs_pos, lbs_dl = lbs_pos;
@@ -373,7 +370,7 @@ TEST_CASE("QRT Reader v5")
     std::vector<arma::mat> v_pg;
     arma::vec center_freq;
 
-    // Check positions and orientations of first link
+    // CIR 1, normalize_polmat = 0: M as stored, one slice per frequency
     quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, &center_freq, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &v_pg,
                                         nullptr, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, 0);
@@ -398,7 +395,7 @@ TEST_CASE("QRT Reader v5")
     T = {0.0866, 0, 0, 0, 0, 0, -0.0866, 0};
     CHECK(arma::approx_equal(B, T, "absdiff", 1.5e-4));
 
-    // Check positions and orientations of first link
+    // Default normalize_polmat = 1: the stronger column of M has power 1
     quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, &center_freq, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &v_pg,
                                         nullptr, &v_M);

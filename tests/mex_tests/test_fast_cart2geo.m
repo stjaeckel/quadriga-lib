@@ -1,9 +1,14 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_fast_cart2geo
+% MEX interface test for quadriga_lib.fast_cart2geo.
 
 [x, y, z] = deal(rand(6,2), rand(6,2), rand(6,2));
 v = 1/sqrt(2);
 
-% --- Argument count errors ---
+%% Argument count errors
 
 assert_cpp_error( @() quadriga_lib.fast_cart2geo, 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.fast_cart2geo(x), 'Wrong number of input arguments.' );
@@ -20,22 +25,22 @@ catch ME
     end
 end
 
-% --- Shape errors, also with an equal number of elements ---
+%% Shape errors, also with an equal number of elements
 
 assert_cpp_error( @() quadriga_lib.fast_cart2geo(rand(4,1), rand(5,1), rand(4,1)), 'Input ''y'' must have the same size as ''x''.' );
 assert_cpp_error( @() quadriga_lib.fast_cart2geo(rand(4,1), rand(4,1), rand(1,4)), 'Input ''z'' must have the same size as ''x''.' );
 
-% The combined [3, n, m] input is gone: y and z cannot be empty
+% y and z cannot be empty
 assert_cpp_error( @() quadriga_lib.fast_cart2geo(rand(3,6,2), [], []), 'Input ''y'' must have the same size as ''x''.' );
 
-% --- Known values ---
+%% Known values
 
 [az,el,le] = quadriga_lib.fast_cart2geo([-v;0], [-v;2*v], [0;2*v]);
 assertElementsAlmostEqual( az, [-3*pi/4; pi/2], 'absolute', 1e-5 );
 assertElementsAlmostEqual( el, [0; pi/4],       'absolute', 1e-5 );
 assertElementsAlmostEqual( le, [1; 2],          'absolute', 1e-5 );
 
-% --- Outputs preserve the input shape and type ---
+%% Outputs preserve the input shape and type
 
 [az,el,le] = quadriga_lib.fast_cart2geo(x, y, z);
 quadriga_lib.fast_cart2geo(x, y, z);   % no output: ans is az
@@ -64,7 +69,7 @@ assertElementsAlmostEqual( le1, sqrt(double(single(x)).^2 + y.^2 + z.^2), 'absol
 [az1,el1,le1] = quadriga_lib.fast_cart2geo(zeros(0,3), zeros(0,3), zeros(0,3));
 assert( isequal(size(az1), [0,3]) && isequal(size(el1), [0,3]) && isequal(size(le1), [0,3]) );
 
-% --- Outputs equal the reference formulas element-wise (GENERIC kernel) ---
+%% Outputs equal the reference formulas element-wise (GENERIC kernel)
 
 [az1,el1,le1] = quadriga_lib.fast_cart2geo(x, y, z, 1);
 le_ref = sqrt(x.^2 + y.^2 + z.^2);
@@ -72,7 +77,7 @@ assertElementsAlmostEqual( az1, atan2(y, x),                          'absolute'
 assertElementsAlmostEqual( el1, asin(min(max(z ./ le_ref, -1), 1)),   'absolute', 1e-12 );
 assertElementsAlmostEqual( le1, le_ref,                               'absolute', 1e-12 );
 
-% --- use_kernel variants ---
+%% use_kernel variants
 
 [az0,el0,le0] = quadriga_lib.fast_cart2geo(x, y, z, 0);  % auto
 assertElementsAlmostEqual( az0, az1, 'absolute', 1e-5 );
@@ -83,7 +88,7 @@ assertElementsAlmostEqual( le0, le1, 'absolute', 1e-5 );
 assertEqual( quadriga_lib.fast_cart2geo(x, y, z, []), az0 );
 assertEqual( quadriga_lib.fast_cart2geo(x, y, z), az0 );
 
-% Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
+% Kernel values outside 0, 1, 2 are rejected
 for k = [3, 99]
     assert_cpp_error( @() quadriga_lib.fast_cart2geo(x, y, z, k), 'Input ''use_kernel'' must be 0, 1 or 2.' );
 end

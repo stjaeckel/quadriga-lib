@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.RTtools.calc_diffraction_gain: outputs, optional inputs, materials, FSPL and phase flags, error paths.
+
 import sys
 import os
 import unittest
@@ -63,7 +65,7 @@ class test_case(unittest.TestCase):
         self.orig_clear = np.array([[-10.0, 0.0, 0.5]])  # entirely left of the cube
         self.dest_clear = np.array([[-5.0, 0.0, 0.5]])
 
-    # --- Output plumbing ---
+    # ---- Output plumbing ----
 
     def test_minimal_args(self):
         # Six args (the required minimum) must run; all three outputs are always
@@ -85,7 +87,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(gain.shape, (2,))
         self.assertEqual(xprmat.shape, (8, 2))
 
-        # lod = 5 -> n_seg = 1 (path midpoints).
+        # lod = 5 -> one waypoint per position (the path midpoint).
         gain5, xpr5, coord5 = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=5)
         npt.assert_allclose(gain5, [10 ** -0.3, 10 ** -0.3], atol=1e-6, rtol=0)
@@ -97,7 +99,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(coord5, expected, atol=1e-10, rtol=0)
 
     def test_coord_dimensions(self):
-        # coord is (3, n_seg, n_pos); n_seg = 2 (lod 1,2), 3 (lod 3), 4 (lod 4),
+        # coord is (3, n_wp, n_pos), the n_wp waypoints without the endpoints: 2 (lod 1,2), 3 (lod 3), 4 (lod 4),
         # 1 (lod 5,6).
         lods = [1, 2, 3, 4, 5, 6]
         n_segs = [2, 2, 3, 4, 1, 1]
@@ -107,7 +109,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(coord.shape, (3, n_seg, 2),
                              f'coord dimension mismatch at lod {lod}')
 
-    # --- Input casting & acceleration passthrough ---
+    # ---- Input casting & acceleration passthrough ----
 
     def test_input_casting_single(self):
         # Single-precision inputs are cast to double internally.
@@ -160,7 +162,7 @@ class test_case(unittest.TestCase):
             use_kernel=1, gpu_id=0)
         npt.assert_allclose(gain_ref, gain_full, atol=1e-10, rtol=0)
 
-    # --- xprmat sanity ---
+    # ---- xprmat sanity ----
 
     def test_xprmat_clear_path(self):
         # Clear path (entirely outside) -> gain 1 and identity Jones matrix. Row
@@ -188,7 +190,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(xpr[2:6], np.zeros(4), atol=1e-9, rtol=0)           # off-diagonals
         npt.assert_allclose(0.5 * np.sum(xpr ** 2), 1.0, atol=1e-9, rtol=0)     # normalization
 
-    # --- scalar_mode ---
+    # ---- scalar_mode ----
 
     def test_scalar_mode(self):
         eps2 = np.tile([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
@@ -213,7 +215,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(xpr_sc_c.shape, (2, 1))
         npt.assert_allclose(xpr_sc_c[:, 0], [1.0, 0.0], atol=1e-12, rtol=0)
 
-    # --- Material index 0 (no material) ---
+    # ---- Material index 0 (no material) ----
 
     def test_material_index_zero(self):
         # Index 0 means "no material": the face is intersected but applies no
@@ -231,7 +233,7 @@ class test_case(unittest.TestCase):
             self.orig, self.dest, self.cube, lossy_ind, lossy_prop, 10e9, lod=0)
         self.assertTrue(np.all(gain_lossy < 0.5))
 
-    # --- Physics sanity ---
+    # ---- Physics sanity ----
 
     def test_physics_los(self):
         # LOS (unobstructed) path above the cube -> gain ~ 1.
@@ -272,7 +274,7 @@ class test_case(unittest.TestCase):
             self.orig_in, self.dest_in, self.cube, matB_ind, matB_prop, 10e9, lod=3)
         npt.assert_allclose(gain_A, gain_B, atol=1e-12, rtol=0)
 
-    # --- thin_slab_threshold (Fabry-Perot plumbing) ---
+    # ---- thin_slab_threshold (Fabry-Perot plumbing) ----
 
     def test_thin_slab_threshold(self):
         # Thin lossless dielectric slab tuned to half-wave optical thickness at
@@ -299,11 +301,11 @@ class test_case(unittest.TestCase):
         self.assertTrue(0.0 < g_off[0] <= 1.0 + 1e-9)
         self.assertTrue(g_on[0] > g_off[0] + 1e-3)  # resonance enhances transmission
 
-    # --- apply_fspl / apply_phase ---
+    # ---- apply_fspl / apply_phase ----
 
     def test_fspl_phase_defaults(self):
-        # Both flags default to False: omitting them must reproduce the legacy
-        # result exactly (gain relative to FSPL, xprmat without propagation phase).
+        # Both flags default to False: omitting them gives the gain relative to FSPL
+        # and xprmat without propagation phase.
         g_def, x_def, c_def = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2)
         g_exp, x_exp, c_exp = quadriga_lib.RTtools.calc_diffraction_gain(
@@ -459,11 +461,9 @@ class test_case(unittest.TestCase):
             with self.assertRaises(TypeError):
                 quadriga_lib.RTtools.calc_diffraction_gain(*args[:i], None, *args[i + 1:])
 
-    # --- Error handling ---
-    # pybind11 re-raises std::exception as RuntimeError; the reference tests match
-    # only that an exception is raised, not the message text (library-layer
-    # strings are being refactored). MEX-only guards (nlhs / nrhs counts, the
-    # "1-based sub_mesh cannot be 0" check) do not apply to the Python binding.
+    # ---- Error handling ----
+    # These tests check only that an exception is raised, not its type or message. MEX-only guards (nlhs / nrhs
+    # counts, the "1-based sub_mesh cannot be 0" check) do not apply to the Python binding.
 
     def test_error_missing_required_arg(self):
         # center_freq is required (no default).
@@ -503,9 +503,6 @@ class test_case(unittest.TestCase):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
                 self.orig, self.dest, self.cube[:, 0:8], self.mtl_ind, self.mtl_prop, 1e9, lod=0)
-
-    # Best-effort guards (mirroring the MEX "(guess)" cases) — remove or adjust
-    # if the refactored library does not enforce them.
 
     def test_error_nonpositive_frequency(self):
         with self.assertRaises(Exception):

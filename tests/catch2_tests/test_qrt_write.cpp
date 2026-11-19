@@ -2,8 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// New test cases for the QRT write path (qrt_file_init / qrt_file_append / qrt_file_read_raw)
-// and reserved-but-unwritten origin reads. Intended to be appended to test_qrt_reader.cpp.
+// Tests of the QRT write path (qrt_file_init, qrt_file_append, qrt_file_read_raw): the header written by init,
+// the v5 (EM) and v6 (scalar) layouts and their frequency unit, input validation before the file is touched,
+// round trips of appended paths, reserved-but-unwritten origins, full slots, a shared stream and cache, and
+// the uplink transpose. The fixture paths carry a distinct value per coordinate and coefficient, so that a
+// swap or interleave error shows; files are written to tests/data/ and removed at the end of each case.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -18,8 +21,8 @@ using quadriga_lib::path;
 
 namespace
 {
-    // Build one EM path: nSEG segments at deterministic coordinates, identity-plus-offset
-    // Jones per frequency, and per-segment type codes. i_cir selects the target CIR.
+    // Build one EM path: nSEG segments at deterministic coordinates, distinct Jones entries
+    // per frequency, and per-segment type codes. i_cir selects the target CIR.
     static path make_em_path(unsigned i_cir, unsigned nSEG, unsigned nFreq,
                              const std::vector<uint8_t> &types)
     {
@@ -202,7 +205,7 @@ TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
     CHECK(arma::approx_equal(stored(), freq, "absdiff", 0.0f));
     arma::mat gain_Hz = check_read(arma::conv_to<arma::vec>::from(freq));
 
-    // The same file as written before the library stored Hz: same frequencies and path gains
+    // The same file with the list in GHz (older v5 files): same frequencies and path gains
     patch(3.75f, 28.0f);
     arma::mat gain_GHz = check_read({3.75e9, 28.0e9});
     CHECK(arma::approx_equal(gain_GHz, gain_Hz, "reldiff", 1.0e-6));
@@ -302,12 +305,12 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
 
     quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, cir_orient, dest_names, cir_offset, nOrig, false);
 
-    // Build paths for origin 0: CIR 0 gets a LOS + a 1-reflection; CIR 2 gets an 8-segment path
+    // Build paths for origin 0: CIR 0 gets a LOS and a 1-transmission path; CIR 2 gets an 8-segment path
     // that crosses the inline/history boundary. CIR 1 stays empty.
     std::vector<path> paths;
     paths.push_back(make_em_path(0, 0, nFreq, {}));         // LOS
     paths.push_back(make_em_path(0, 1, nFreq, {100}));      // 1 transmission
-    std::vector<uint8_t> t8 = {1, 2, 3, 4, 5, 6, 200, 201}; // 6 inline + 2 overflow, last two = reflections
+    std::vector<uint8_t> t8 = {1, 2, 3, 4, 5, 6, 200, 201}; // 2 inline + 6 in the buffer, last two = reflections
     paths.push_back(make_em_path(2, 8, nFreq, t8));
 
     arma::fvec tx_pos = {1.0f, 2.0f, 3.0f};
@@ -315,7 +318,6 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
     size_t n_written = quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, tx_orient, "TX0");
     CHECK(n_written == 3);
 
-    // Read origin 0 back.
     std::vector<path> rd = quadriga_lib::qrt_file_read_raw(fn, 0);
     REQUIRE(rd.size() == 3);
 

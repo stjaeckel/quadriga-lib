@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.tools.write_png: file output, colour range, NaN and Inf data, flags, error paths.
+
 import sys
 import os
 import pathlib
@@ -35,23 +37,19 @@ class test_case(unittest.TestCase):
         gradient[0,:] = 0.0
         gradient[-1,:] = 10.0
 
-        # File name to write
         out_file = "test.png"
 
-        # quadriga_lib.tools.write_png(fn, data, *, colormap, min_val, max_val, log_transform)
         quadriga_lib.tools.write_png(
             out_file,
             gradient,
-            colormap="jet",          # any valid Matplotlib‑style colormap string works
+            colormap="jet",          # one of the built-in colormaps of the library
             min_val=0.0,             # matches gradient.min()
             max_val=max_val,         # matches gradient.max()
             log_transform=False
         )
 
-        # Check that the file was created
         self.assertTrue(os.path.exists(out_file))
 
-        # Clean up
         os.remove(out_file)
 
     @unittest.skipUnless(Image is not None, "Pillow is not installed")

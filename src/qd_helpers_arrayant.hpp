@@ -19,14 +19,10 @@
 #include <string>
 #include <vector>
 
-#if BUILD_WITH_AVX2
-#include "quadriga_lib_avx2_functions.hpp"
-#endif
-
 // Check if elements of a vector are in a specific range; NaN is out of range
 // With check_sorted, the values must also be strictly increasing
 template <typename dtype>
-static bool qd_in_range(const dtype *data, size_t n_elem, dtype min, dtype max, bool inclusive = true, bool check_sorted = false)
+static inline bool qd_in_range(const dtype *data, size_t n_elem, dtype min, dtype max, bool inclusive = true, bool check_sorted = false)
 {
     if (inclusive)
     {
@@ -54,7 +50,7 @@ static bool qd_in_range(const dtype *data, size_t n_elem, dtype min, dtype max, 
 // Grid resolution in degrees for the pattern generators: values <= 0 select the default, values above 90 are set to 90;
 // NaN, infinite values and values below 0.1 deg throw (a 0.1 deg grid has 3601 x 1801 samples per element)
 template <typename dtype>
-inline dtype qd_arrayant_grid_resolution(dtype res, dtype res_default, const char *name)
+static inline dtype qd_arrayant_grid_resolution(dtype res, dtype res_default, const char *name)
 {
     if (!std::isfinite(res) || (res > (dtype)0.0 && res < (dtype)0.1))
         throw std::invalid_argument(std::string("Input '") + name + "' must be finite and at least 0.1 degrees, or <= 0 for the default.");
@@ -102,7 +98,7 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
 // arrayant_concat_multi). An empty coupling_re is an identity block (one port per element); an empty coupling_im is
 // zero. Outputs are set to [n_el1 + n_el2, n_ports1 + n_ports2]; they must not alias the inputs.
 template <typename dtype>
-inline void qd_arrayant_coupling_block_diag(const arma::Mat<dtype> &coupling_re1, const arma::Mat<dtype> &coupling_im1,
+static inline void qd_arrayant_coupling_block_diag(const arma::Mat<dtype> &coupling_re1, const arma::Mat<dtype> &coupling_im1,
                                             arma::uword n_el1,
                                             const arma::Mat<dtype> &coupling_re2, const arma::Mat<dtype> &coupling_im2,
                                             arma::uword n_el2,
@@ -187,7 +183,7 @@ namespace quadriga_lib
 // data pointer when a member is resized); empty element_pos (zeros) and coupling (identity) fit.
 // A matching cache does not prove that the values are unchanged.
 template <typename dtype>
-inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
+static inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
 {
     // Relaxed atomic loads: is_valid may mark the object in another thread at the same time
     const dtype *p[9];
@@ -211,7 +207,7 @@ inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
 // Marks an arrayant as validated: sets the cache to the current data pointers (relaxed atomic stores, so threads that
 // read the object at the same time see either the old or the new mark)
 template <typename dtype>
-inline void qd_arrayant_mark_valid(const quadriga_lib::arrayant<dtype> &ant)
+static inline void qd_arrayant_mark_valid(const quadriga_lib::arrayant<dtype> &ant)
 {
     const dtype *p[9] = {ant.e_theta_re.memptr(), ant.e_theta_im.memptr(), ant.e_phi_re.memptr(), ant.e_phi_im.memptr(),
                          ant.azimuth_grid.memptr(), ant.elevation_grid.memptr(), ant.element_pos.memptr(),
@@ -222,7 +218,7 @@ inline void qd_arrayant_mark_valid(const quadriga_lib::arrayant<dtype> &ant)
 
 // Removes the mark of an arrayant
 template <typename dtype>
-inline void qd_arrayant_clear_mark(const quadriga_lib::arrayant<dtype> &ant)
+static inline void qd_arrayant_clear_mark(const quadriga_lib::arrayant<dtype> &ant)
 {
     for (auto &p : quadriga_lib::qd_arrayant_access::check_ptr(ant))
         p.store(nullptr, std::memory_order_relaxed);
@@ -237,9 +233,22 @@ std::string qd_arrayant_check(const quadriga_lib::arrayant<dtype> &ant);
 // Validity check for library functions: passes at once when the cache matches, else runs the full check
 // - Read only, so threads may check a shared object at the same time
 template <typename dtype>
-inline std::string qd_arrayant_is_valid_quick(const quadriga_lib::arrayant<dtype> &ant)
+static inline std::string qd_arrayant_is_valid_quick(const quadriga_lib::arrayant<dtype> &ant)
 {
     return qd_arrayant_cache_matches(ant) ? std::string() : qd_arrayant_check(ant);
+}
+
+// Validity check of the TX and RX arrays of the channel generators (qd_arrayant_is_valid_quick); throws
+// std::invalid_argument with the message prefixed by "Transmit antenna: " or "Receive antenna: "
+template <typename dtype>
+static inline void qd_arrayant_check_tx_rx(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array)
+{
+    std::string error_message = qd_arrayant_is_valid_quick(tx_array);
+    if (!error_message.empty())
+        throw std::invalid_argument("Transmit antenna: " + error_message);
+    error_message = qd_arrayant_is_valid_quick(rx_array);
+    if (!error_message.empty())
+        throw std::invalid_argument("Receive antenna: " + error_message);
 }
 
 // Throws std::invalid_argument if one of the outputs out[0 .. N-1] is a data member of 'ant' or shares memory with

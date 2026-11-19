@@ -612,7 +612,7 @@ TEST_CASE("qd_hdf5 - decimal names and the superblock checks")
 
 TEST_CASE("qd_hdf5 - a dataset without elements must not declare extents larger than the file")
 {
-    // Dataspace {0, 2^62} holds no elements; readers used to build an Armadillo object with 2^62 rows from it
+    // Dataspace {0, 2^62} holds no elements, but a reader would build an Armadillo object with 2^62 rows from it
     auto dataset_object = [](uint64_t d0, uint64_t d1)
     {
         h5::chunk c;

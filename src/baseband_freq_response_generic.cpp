@@ -34,7 +34,7 @@ void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coefficients, rea
                     const dtype *__restrict CFi,    // Channel coefficients, imaginary part, Size [n_ant, n_path]
                     const dtype *__restrict DL,     // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
                     const size_t n_ant,             // Number of MIMO sub-links
-                    const size_t n_path,            // Number multipath components
+                    const size_t n_path,            // Number of multipath components
                     const bool planar_wave,         // Indicator that same delays are used for all antennas
                     const double *__restrict freq,  // Carrier frequencies -bandwidth * pilot_grid in [Hz], Length [ n_carrier ]
                     const size_t n_carrier,         // Number of carriers

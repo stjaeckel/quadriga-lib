@@ -1,8 +1,12 @@
-function test_generate_speaker
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% ================================================================================
-% Output structure and types
-% ================================================================================
+function test_generate_speaker
+% MEX interface test for quadriga_lib.generate_speaker.
+% Physics validation lives in the Catch2 suite (test_speaker_generate.cpp).
+
+%% Output structure and types
 
 % Default call returns a struct array with all expected fields
 data = quadriga_lib.generate_speaker();
@@ -43,9 +47,7 @@ assertTrue(isvector(data(1).elevation_grid));
 % element_pos is (3, n_elements); single driver -> 1 element
 assertTrue(isequal(size(data(1).element_pos), [3, 1]));
 
-% ================================================================================
-% Angular resolution
-% ================================================================================
+%% Angular resolution
 
 % 5 deg: azimuth 73, elevation 37
 data = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], [], [], [], [], [], [], 5.0);
@@ -63,9 +65,7 @@ d10 = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], [], [], [], 
 assertTrue(size(d5(1).e_theta_re, 1) > size(d10(1).e_theta_re, 1));
 assertTrue(size(d5(1).e_theta_re, 2) > size(d10(1).e_theta_re, 2));
 
-% ================================================================================
-% Custom frequency vector
-% ================================================================================
+%% Custom frequency vector
 
 % Explicit frequency vector is reflected in center_freq
 freqs = [100.0, 500.0, 1000.0, 5000.0, 10000.0];
@@ -84,9 +84,7 @@ data = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], [], [], [],
 assertTrue(numel(data) == 2);
 assertElementsAlmostEqual([data.center_freq], freqs, 'absolute', 1e-6);
 
-% ================================================================================
-% Driver types
-% ================================================================================
+%% Driver types
 
 % Piston driver
 data = quadriga_lib.generate_speaker('piston');
@@ -110,9 +108,7 @@ pat = data(1).e_theta_re;
 rel_spread = (max(pat(:)) - min(pat(:))) / mean(abs(pat(:)));
 assertTrue(rel_spread < 0.01);
 
-% ================================================================================
-% Radiation types
-% ================================================================================
+%% Radiation types
 
 % All four radiation types produce finite output
 rad_types = {'monopole', 'hemisphere', 'dipole', 'cardioid'};
@@ -152,9 +148,7 @@ if on_axis > 0
     assertTrue(at_rear / on_axis < 0.15);
 end
 
-% ================================================================================
-% Frequency response (bandpass behavior)
-% ================================================================================
+%% Frequency response (bandpass behavior)
 
 % Peak on-axis response should occur within passband
 freqs = [20.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 18000.0];
@@ -193,9 +187,7 @@ amp_5k  = abs(data(1).e_theta_re(el_mid, az_mid));
 amp_18k = abs(data(2).e_theta_re(el_mid, az_mid));
 assertTrue(amp_5k > amp_18k);
 
-% ================================================================================
-% Sensitivity scaling (+10 dB -> factor ~3.16 in amplitude)
-% ================================================================================
+%% Sensitivity scaling (+10 dB -> factor ~3.16 in amplitude)
 
 d85 = quadriga_lib.generate_speaker([], [], [], [], [], [], 85.0, [], ...
                                      [], [], [], [], [], 1000.0, 10.0);
@@ -206,9 +198,7 @@ max_95 = max(abs(d95(1).e_theta_re(:)));
 ratio = max_95 / max_85;
 assertElementsAlmostEqual(ratio, 10.0^(10.0/20.0), 'absolute', 1e-2);
 
-% ================================================================================
-% Rolloff slope: steeper attenuates out-of-band more, in-band unchanged
-% ================================================================================
+%% Rolloff slope: steeper attenuates out-of-band more, in-band unchanged
 
 freqs = [20.0, 500.0];
 d12 = quadriga_lib.generate_speaker([], [], 80.0, [], 12.0, [], [], [], ...
@@ -224,9 +214,7 @@ amp_500_48 = abs(d48(2).e_theta_re(el, az));
 assertElementsAlmostEqual(amp_500_12, amp_500_48, 'absolute', 0.1);
 assertTrue(amp_20_12 > amp_20_48);
 
-% ================================================================================
-% Piston directivity vs frequency and radius
-% ================================================================================
+%% Piston directivity vs frequency and radius
 
 % Piston narrows at higher frequencies
 freqs = [200.0, 8000.0];
@@ -259,9 +247,7 @@ ratio_large = abs(d_large(1).e_theta_re(el_mid, az_90)) / ...
               max(abs(d_large(1).e_theta_re(el_mid, az_0)), 1e-30);
 assertTrue(ratio_small > ratio_large);
 
-% ================================================================================
-% Horn parameters
-% ================================================================================
+%% Horn parameters
 
 % Custom coverage
 data = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [], [], ...
@@ -280,9 +266,7 @@ for v = { NaN, [], 0.0, -1.0 }
     end
 end
 
-% ================================================================================
-% Baffle parameters
-% ================================================================================
+%% Baffle parameters
 
 % Different baffle sizes change hemisphere pattern (different baffle-step freqs)
 d_small = quadriga_lib.generate_speaker([], [], [], [], [], [], [], 'hemisphere', ...
@@ -291,9 +275,7 @@ d_large = quadriga_lib.generate_speaker([], [], [], [], [], [], [], 'hemisphere'
                                          [], [], [], 0.40, 0.40, 1000.0, 10.0);
 assertTrue(~isequal(d_small(1).e_theta_re, d_large(1).e_theta_re));
 
-% ================================================================================
-% Auto frequency generation
-% ================================================================================
+%% Auto frequency generation
 
 % Auto freqs span the passband
 data = quadriga_lib.generate_speaker([], [], 200.0, 8000.0);
@@ -307,9 +289,7 @@ cf = [data.center_freq];
 assertTrue(cf(1) >= 20.0);
 assertTrue(cf(end) <= 20000.0);
 
-% ================================================================================
-% E-phi zero, piston+monopole e_theta_im zero
-% ================================================================================
+%% E-phi zero, piston+monopole e_theta_im zero
 
 % e_phi fields are zero (acoustic: scalar pressure)
 data = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], ...
@@ -323,9 +303,7 @@ data = quadriga_lib.generate_speaker('piston', [], [], [], [], [], [], 'monopole
 assertElementsAlmostEqual(data(1).e_theta_im, zeros(size(data(1).e_theta_im)), ...
                           'absolute', 1e-14);
 
-% ================================================================================
-% Coupling matrix
-% ================================================================================
+%% Coupling matrix
 
 % Single driver -> 1x1 identity coupling
 data = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], ...
@@ -333,17 +311,13 @@ data = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], ...
 assertElementsAlmostEqual(data(1).coupling_re, 1.0, 'absolute', 1e-14);
 assertElementsAlmostEqual(data(1).coupling_im, 0.0, 'absolute', 1e-14);
 
-% ================================================================================
-% Name
-% ================================================================================
+%% Name
 
 data = quadriga_lib.generate_speaker('piston');
 assertTrue(ischar(data(1).name));
 assertTrue(~isempty(data(1).name));
 
-% ================================================================================
-% Cutoff shift moves passband
-% ================================================================================
+%% Cutoff shift moves passband
 
 freqs = [200.0, 2000.0, 10000.0];
 d_low  = quadriga_lib.generate_speaker([], [], 50.0,   1000.0, [], [], [], [], ...
@@ -363,9 +337,7 @@ amp_high_200 = abs(d_high(1).e_theta_re(el, az));
 amp_high_10k = abs(d_high(3).e_theta_re(el, az));
 assertTrue(amp_high_10k > amp_high_200);
 
-% ================================================================================
-% Errors
-% ================================================================================
+%% Errors
 
 % A radius of 0 is an error, not a request for the default
 try

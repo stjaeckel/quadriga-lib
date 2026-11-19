@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // Timings of the functions around sos_val. Each line: label, best time in ms over repeated calls.
 #include "quadriga_lib.hpp"
 #include <chrono>

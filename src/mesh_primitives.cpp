@@ -4,7 +4,59 @@
 
 #include "quadriga_tools.hpp"
 
+#include <cmath>
+#include <stdexcept>
 
+// Scales the vertices of 'mesh' [n_face, 9] by (sx, sy, sz), rotates them by the Euler angles 'rotation' (0 or 3
+// elements, R = Rz * Ry * Rx) and translates them by 'location' (0 or 3 elements); a negative product of the scales
+// mirrors the mesh, so the winding is swapped to keep the normals pointing outward
+template <typename dtype>
+static void qd_scale_rotate_translate(arma::Mat<dtype> &mesh, double sx, double sy, double sz,
+                                      const arma::vec &rotation, const arma::vec &location)
+{
+    double rx = 0.0, ry = 0.0, rz = 0.0;
+    if (rotation.n_elem == 3)
+        rx = rotation.at(0), ry = rotation.at(1), rz = rotation.at(2);
+    else if (rotation.n_elem != 0)
+        throw std::invalid_argument("Input 'rotation' must have 0 or 3 elements.");
+
+    double lx = 0.0, ly = 0.0, lz = 0.0;
+    if (location.n_elem == 3)
+        lx = location.at(0), ly = location.at(1), lz = location.at(2);
+    else if (location.n_elem != 0)
+        throw std::invalid_argument("Input 'location' must have 0 or 3 elements.");
+
+    // Blender Euler XYZ convention
+    double ca = std::cos(rx), sa = std::sin(rx);
+    double cb = std::cos(ry), sb = std::sin(ry);
+    double cc = std::cos(rz), sc = std::sin(rz);
+
+    double R00 = cc * cb, R01 = cc * sb * sa - sc * ca, R02 = cc * sb * ca + sc * sa;
+    double R10 = sc * cb, R11 = sc * sb * sa + cc * ca, R12 = sc * sb * ca - cc * sa;
+    double R20 = -sb, R21 = cb * sa, R22 = cb * ca;
+
+    const arma::uword n_faces = mesh.n_rows;
+    dtype *pm = mesh.memptr();
+    for (arma::uword v = 0; v < 3; ++v) // three triangle corners
+    {
+        dtype *px = pm + (3 * v) * n_faces;
+        dtype *py = pm + (3 * v + 1) * n_faces;
+        dtype *pz = pm + (3 * v + 2) * n_faces;
+        for (arma::uword n = 0; n < n_faces; ++n)
+        {
+            double x = sx * (double)px[n];
+            double y = sy * (double)py[n];
+            double z = sz * (double)pz[n];
+            px[n] = dtype(R00 * x + R01 * y + R02 * z + lx);
+            py[n] = dtype(R10 * x + R11 * y + R12 * z + ly);
+            pz[n] = dtype(R20 * x + R21 * y + R22 * z + lz);
+        }
+    }
+
+    // Swapping the second and third vertex restores the winding (as Blender's "Apply Scale")
+    if (sx * sy * sz < 0.0)
+        mesh.swap_cols(3, 6), mesh.swap_cols(4, 7), mesh.swap_cols(5, 8);
+}
 
 /*!SECTION
 Site-specific simulation tools
@@ -65,20 +117,6 @@ arma::Mat<dtype> quadriga_lib::cube(const arma::vec &scale,
     else if (scale.n_elem != 0)
         throw std::invalid_argument("Input 'scale' must have 0, 1, or 3 elements.");
 
-    // Resolve rotation: empty = none, length 3 = Euler angles [rad] about x, y, z
-    double rx = 0.0, ry = 0.0, rz = 0.0;
-    if (rotation.n_elem == 3)
-        rx = rotation.at(0), ry = rotation.at(1), rz = rotation.at(2);
-    else if (rotation.n_elem != 0)
-        throw std::invalid_argument("Input 'rotation' must have 0 or 3 elements.");
-
-    // Resolve location: empty = origin, length 3 = translation
-    double lx = 0.0, ly = 0.0, lz = 0.0;
-    if (location.n_elem == 3)
-        lx = location.at(0), ly = location.at(1), lz = location.at(2);
-    else if (location.n_elem != 0)
-        throw std::invalid_argument("Input 'location' must have 0 or 3 elements.");
-
     // Default cube: 6 faces split into 12 triangles, vertices at +/-1 (edge length 2)
     arma::Mat<dtype> base = {
         {-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
@@ -98,39 +136,7 @@ arma::Mat<dtype> quadriga_lib::cube(const arma::vec &scale,
     arma::Mat<dtype> mesh;
     quadriga_lib::subdivide_triangles(n_div, base, mesh);
 
-    // Rotation matrix R = Rz * Ry * Rx (Blender Euler XYZ convention)
-    double ca = std::cos(rx), sa = std::sin(rx);
-    double cb = std::cos(ry), sb = std::sin(ry);
-    double cc = std::cos(rz), sc = std::sin(rz);
-
-    double R00 = cc * cb, R01 = cc * sb * sa - sc * ca, R02 = cc * sb * ca + sc * sa;
-    double R10 = sc * cb, R11 = sc * sb * sa + cc * ca, R12 = sc * sb * ca - cc * sa;
-    double R20 = -sb, R21 = cb * sa, R22 = cb * ca;
-
-    // Apply scale -> rotate -> translate to all vertices (column-major, per corner)
-    const arma::uword n_faces = mesh.n_rows;
-    dtype *pm = mesh.memptr();
-    for (arma::uword v = 0; v < 3; ++v) // three triangle corners
-    {
-        dtype *px = pm + (3 * v) * n_faces;
-        dtype *py = pm + (3 * v + 1) * n_faces;
-        dtype *pz = pm + (3 * v + 2) * n_faces;
-        for (arma::uword n = 0; n < n_faces; ++n)
-        {
-            double x = sx * (double)px[n];
-            double y = sy * (double)py[n];
-            double z = sz * (double)pz[n];
-            px[n] = dtype(R00 * x + R01 * y + R02 * z + lx);
-            py[n] = dtype(R10 * x + R11 * y + R12 * z + ly);
-            pz[n] = dtype(R20 * x + R21 * y + R22 * z + lz);
-        }
-    }
-
-    // A negative product of the scales mirrors the mesh, which reverses the winding; swapping the second and third vertex
-    // restores it (as Blender's "Apply Scale")
-    if (sx * sy * sz < 0.0)
-        mesh.swap_cols(3, 6), mesh.swap_cols(4, 7), mesh.swap_cols(5, 8);
-
+    qd_scale_rotate_translate(mesh, sx, sy, sz, rotation, location);
     return mesh;
 }
 
@@ -195,20 +201,6 @@ arma::Mat<dtype> quadriga_lib::plane(const arma::vec &scale,
     else if (scale.n_elem != 0)
         throw std::invalid_argument("Input 'scale' must have 0, 1, 2, or 3 elements.");
 
-    // Resolve rotation: empty = none, length 3 = Euler angles [rad] about x, y, z
-    double rx = 0.0, ry = 0.0, rz = 0.0;
-    if (rotation.n_elem == 3)
-        rx = rotation.at(0), ry = rotation.at(1), rz = rotation.at(2);
-    else if (rotation.n_elem != 0)
-        throw std::invalid_argument("Input 'rotation' must have 0 or 3 elements.");
-
-    // Resolve location: empty = origin, length 3 = translation
-    double lx = 0.0, ly = 0.0, lz = 0.0;
-    if (location.n_elem == 3)
-        lx = location.at(0), ly = location.at(1), lz = location.at(2);
-    else if (location.n_elem != 0)
-        throw std::invalid_argument("Input 'location' must have 0 or 3 elements.");
-
     // Default plane: 1 quad split into 2 triangles, vertices at +/-1 in xy, z = 0 (edge length 2)
     arma::Mat<dtype> base = {
         {1.0, -1.0, 0.0, -1.0, 1.0, 0.0, -1.0, -1.0, 0.0},
@@ -218,39 +210,7 @@ arma::Mat<dtype> quadriga_lib::plane(const arma::vec &scale,
     arma::Mat<dtype> mesh;
     quadriga_lib::subdivide_triangles(n_div, base, mesh);
 
-    // Rotation matrix R = Rz * Ry * Rx (Blender Euler XYZ convention)
-    double ca = std::cos(rx), sa = std::sin(rx);
-    double cb = std::cos(ry), sb = std::sin(ry);
-    double cc = std::cos(rz), sc = std::sin(rz);
-
-    double R00 = cc * cb, R01 = cc * sb * sa - sc * ca, R02 = cc * sb * ca + sc * sa;
-    double R10 = sc * cb, R11 = sc * sb * sa + cc * ca, R12 = sc * sb * ca - cc * sa;
-    double R20 = -sb, R21 = cb * sa, R22 = cb * ca;
-
-    // Apply scale -> rotate -> translate to all vertices (column-major, per corner)
-    const arma::uword n_faces = mesh.n_rows;
-    dtype *pm = mesh.memptr();
-    for (arma::uword v = 0; v < 3; ++v) // three triangle corners
-    {
-        dtype *px = pm + (3 * v) * n_faces;
-        dtype *py = pm + (3 * v + 1) * n_faces;
-        dtype *pz = pm + (3 * v + 2) * n_faces;
-        for (arma::uword n = 0; n < n_faces; ++n)
-        {
-            double x = sx * (double)px[n];
-            double y = sy * (double)py[n];
-            double z = (double)pz[n]; // no scaling in z, plane has no thickness
-            px[n] = dtype(R00 * x + R01 * y + R02 * z + lx);
-            py[n] = dtype(R10 * x + R11 * y + R12 * z + ly);
-            pz[n] = dtype(R20 * x + R21 * y + R22 * z + lz);
-        }
-    }
-
-    // A negative product of the x and y scales mirrors the mesh, which reverses the winding; swapping the second and third vertex
-    // restores it (as Blender's "Apply Scale")
-    if (sx * sy < 0.0)
-        mesh.swap_cols(3, 6), mesh.swap_cols(4, 7), mesh.swap_cols(5, 8);
-
+    qd_scale_rotate_translate(mesh, sx, sy, 1.0, rotation, location); // no scaling in z, the plane has no thickness
     return mesh;
 }
 

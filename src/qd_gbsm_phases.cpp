@@ -502,7 +502,7 @@ arma::cube quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, 
     //   which left a non-zero drop mean whenever the two decorrelation distances differ (also in single mobility)
     // - Consequences for gbsm_draw at the same positions: in single mobility the link mean of columns 0 to 8 is 0; in
     //   dual mobility the link mean of DS, KF, SF, XPR and TOA is 0 when all links have the same Tx-Rx distance (the
-    //   normalisation is then the same for all links), while ASD/ASA and ESD/ESA have a zero link mean only
+    //   normalization is then the same for all links), while ASD/ASA and ESD/ESA have a zero link mean only
     //   approximately (their two devices see different fields, each corrected over the union of the positions)
     // - 2D mode: one offset per generator cannot zero the means of several floor fields at once, so all positions
     //   are corrected as floor 0; in 3D mode the correction covers all positions as one 3D field
@@ -673,7 +673,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
         if (cds <= 0.0)
             lambda_14 = 0.1;
         else
-            lambda_14 = (casa > 0.0) ? std::min(std::max(1.6 * 299792458.0 * cds / casa, 0.1), 1.0e4) : 1.0e4;
+            lambda_14 = (casa > 0.0) ? std::min(std::max(1.6 * qd_speed_of_light * cds / casa, 0.1), 1.0e4) : 1.0e4;
     }
 
     const bool ray = set_type == "ray";

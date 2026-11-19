@@ -77,7 +77,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read filename
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
     // Slot indices (1-based -> 0-based); omitted or [] selects the full extent

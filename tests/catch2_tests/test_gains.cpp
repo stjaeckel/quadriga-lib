@@ -77,7 +77,7 @@ static inline void write_los_qrt(const std::string &fn, const arma::vec &freq,
     REQUIRE(written == (size_t)n_cir);
 }
 
-// The spreading-loss model must be bit-for-bit the same whether it arrives through
+// The spreading-loss model must be the same whether it arrives through
 // qrt_file_read or through calc_diffraction_gain(apply_fspl = true). EM mode: the loss is
 // 32.45 + 20*log10(f_GHz) + 20*log10(d), so both the distance and the frequency dependence
 // are exercised by sweeping three distances against three widely separated bands.
@@ -202,8 +202,7 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
         }
 
         // Spreading alone is frequency-independent in scalar mode, so any band-to-band
-        // difference is air absorption. Solve for the absorption difference and check it is
-        // positive and grows with distance, i.e. it really is a per-meter term.
+        // difference is air absorption, which must be positive.
         double extra_dB = -10.0 * std::log10(pg(0, 2) / pg(0, 0));
         CHECK(extra_dB > 0.0);
 
@@ -493,7 +492,7 @@ TEST_CASE("Gains - Acoustic and EM phase use different wave speeds")
     CHECK(std::abs(em - std::complex<double>(1.0, 0.0)) < 1e-2);
     CHECK(std::abs(ac - em) > 1e-2);
 
-    // Both remain unit-magnitude, so xprmat stays normalized either way
+    // Both remain unit-magnitude, so polmat stays normalized either way
     CHECK(std::abs(std::abs(em) - 1.0) < 1e-12);
     CHECK(std::abs(std::abs(ac) - 1.0) < 1e-12);
 

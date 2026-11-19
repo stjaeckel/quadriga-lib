@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.RTtools.obj_file_write: round trips through obj_file_read (geometry, objects, materials, CSV properties, BSDF), error paths.
+
 import sys
 import os
 import unittest

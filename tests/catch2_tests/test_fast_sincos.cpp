@@ -2,10 +2,14 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// fast_sincos (float output, GENERIC and AVX2 kernels in blocks of 8): accuracy against std::sin / std::cos in
+// double of the input as stored in dtype, block tails, arguments up to 1e10, non-finite input, lane independence
+// within a block, aliasing outputs and kernel selection.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_approx.hpp>           // Catch::Approx (Catch2 v3)
-#include "quadriga_math.hpp"                // declares quadriga_lib::sincos_approx
+#include "quadriga_math.hpp"                // fast_sincos
 #include "quadriga_lib.hpp"                 // quadriga_lib_has_AVX2
 #include <armadillo>
 #include <cmath>
@@ -162,7 +166,6 @@ TEST_CASE("fast_sincos - Outputs that alias inputs")
 
 TEST_CASE("fast_sincos - GENERIC and AVX2 meet the documented error, auto is AVX2 if available")
 {
-    // Both kernels stay within the documented error of the exact values; auto is AVX2 when available, else GENERIC
     const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
     const arma::vec x = arma::linspace<arma::vec>(-1.0e4, 1.0e4, 1003);
     arma::fvec s_auto, c_auto;

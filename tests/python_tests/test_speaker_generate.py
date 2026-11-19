@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.arrayant.generate_speaker: output layout, driver and radiation types, frequency response, error paths.
+
 import sys
 import os
 import unittest
@@ -20,9 +22,7 @@ from quadriga_lib import arrayant
 class TestSpeakerGenerate(unittest.TestCase):
     """Tests for arrayant.generate_speaker()"""
 
-    # ================================================================================
-    # Output structure and types
-    # ================================================================================
+    # ---- Output structure and types ----
 
     def test_default_returns_dict_with_required_keys(self):
         """Default call returns a dict with all expected keys."""
@@ -83,9 +83,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertTrue(data['e_theta_re'].flags.f_contiguous,
                         "e_theta_re should be Fortran contiguous")
 
-    # ================================================================================
-    # Angular resolution
-    # ================================================================================
+    # ---- Angular resolution ----
 
     def test_angular_resolution_5deg(self):
         """5 deg resolution: azimuth 73 points, elevation 37 points."""
@@ -106,9 +104,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertGreater(d5['e_theta_re'].shape[0], d10['e_theta_re'].shape[0])
         self.assertGreater(d5['e_theta_re'].shape[1], d10['e_theta_re'].shape[1])
 
-    # ================================================================================
-    # Custom frequency vector
-    # ================================================================================
+    # ---- Custom frequency vector ----
 
     def test_custom_frequencies(self):
         """Explicit frequency vector is used and reflected in center_freq."""
@@ -132,9 +128,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertEqual(data['e_theta_re'].shape[3], 2)
         npt.assert_array_almost_equal(data['center_freq'], freqs)
 
-    # ================================================================================
-    # Driver types
-    # ================================================================================
+    # ---- Driver types ----
 
     def test_piston_driver(self):
         """Piston driver produces valid finite patterns."""
@@ -168,9 +162,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         rel_spread = (np.max(pat) - np.min(pat)) / np.mean(np.abs(pat))
         self.assertLess(rel_spread, 0.01, "Monopole omni should be nearly isotropic")
 
-    # ================================================================================
-    # Radiation types
-    # ================================================================================
+    # ---- Radiation types ----
 
     def test_radiation_monopole(self):
         """Monopole radiation produces finite output."""
@@ -231,9 +223,7 @@ class TestSpeakerGenerate(unittest.TestCase):
             self.assertLess(at_rear / on_axis, 0.15,
                             "Cardioid should have null at rear")
 
-    # ================================================================================
-    # Frequency response (bandpass behavior)
-    # ================================================================================
+    # ---- Frequency response (bandpass behavior) ----
 
     def test_bandpass_peak_in_passband(self):
         """Maximum on-axis response should occur within the passband."""
@@ -279,9 +269,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertGreater(amp_5k, amp_18k,
                            "5 kHz should be stronger than 18 kHz for 12 kHz upper cutoff")
 
-    # ================================================================================
-    # Sensitivity scaling
-    # ================================================================================
+    # ---- Sensitivity scaling ----
 
     def test_sensitivity_scaling(self):
         """Higher sensitivity produces larger pattern amplitudes."""
@@ -296,9 +284,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         ratio = max_95 / max_85
         npt.assert_almost_equal(ratio, 10.0 ** (10.0 / 20.0), decimal=2)
 
-    # ================================================================================
-    # Piston directivity vs frequency
-    # ================================================================================
+    # ---- Piston directivity vs frequency ----
 
     def test_piston_beaming_increases_with_frequency(self):
         """Piston pattern should narrow (more directional) at higher frequencies."""
@@ -320,9 +306,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertGreater(ratio_lo, ratio_hi,
                            "Piston should be more directional at 8 kHz than at 200 Hz")
 
-    # ================================================================================
-    # Horn parameters
-    # ================================================================================
+    # ---- Horn parameters ----
 
     def test_horn_custom_coverage(self):
         """Horn with custom coverage angles produces valid output."""
@@ -345,9 +329,7 @@ class TestSpeakerGenerate(unittest.TestCase):
             data = arrayant.generate_speaker(**kw, **arg)
             npt.assert_allclose(data['e_theta_re'], ref['e_theta_re'], atol=1e-10, rtol=0)
 
-    # ================================================================================
-    # Baffle parameters (piston only)
-    # ================================================================================
+    # ---- Baffle parameters (piston only) ----
 
     def test_different_baffle_sizes_change_pattern(self):
         """Different baffle dimensions produce different hemisphere radiation patterns."""
@@ -362,9 +344,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertFalse(np.allclose(d_small['e_theta_re'], d_large['e_theta_re']),
                          "Different baffle sizes should produce different patterns")
 
-    # ================================================================================
-    # Rolloff slope
-    # ================================================================================
+    # ---- Rolloff slope ----
 
     def test_steeper_rolloff_attenuates_more(self):
         """Steeper lower rolloff should attenuate out-of-band frequencies more."""
@@ -385,9 +365,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertGreater(amp_20_12, amp_20_48,
                            "48 dB/oct should attenuate 20 Hz more than 12 dB/oct")
 
-    # ================================================================================
-    # Auto frequency generation
-    # ================================================================================
+    # ---- Auto frequency generation ----
 
     def test_auto_freq_covers_passband(self):
         """Auto-generated frequencies should span at least the passband."""
@@ -405,9 +383,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertGreaterEqual(cf[0], 20.0)
         self.assertLessEqual(cf[-1], 20000.0)
 
-    # ================================================================================
-    # E-phi should be zero (acoustic: no polarization, only e_theta used)
-    # ================================================================================
+    # ---- Polarization (acoustic: only e_theta is used) ----
 
     def test_e_phi_is_zero(self):
         """For loudspeakers, e_phi fields should be zero (scalar pressure, no polarization)."""
@@ -422,9 +398,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         npt.assert_array_almost_equal(data['e_theta_im'],
                                       np.zeros_like(data['e_theta_im']), decimal=14)
 
-    # ================================================================================
-    # Coupling matrix
-    # ================================================================================
+    # ---- Coupling matrix ----
 
     def test_single_driver_identity_coupling(self):
         """Single driver should have identity coupling (1x1 real, 0 imaginary)."""
@@ -432,9 +406,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         npt.assert_almost_equal(data['coupling_re'], np.array([[1.0]]), decimal=14)
         npt.assert_almost_equal(data['coupling_im'], np.array([[0.0]]), decimal=14)
 
-    # ================================================================================
-    # Name
-    # ================================================================================
+    # ---- Name ----
 
     def test_name_contains_driver_type(self):
         """Name string should be set."""
@@ -442,9 +414,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertIsInstance(data['name'], str)
         self.assertGreater(len(data['name']), 0)
 
-    # ================================================================================
-    # Errors
-    # ================================================================================
+    # ---- Errors ----
 
     def test_invalid_driver_type_throws(self):
         """Invalid driver type should raise an error."""
@@ -461,9 +431,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "radius"):
             arrayant.generate_speaker(radius=0.0, center_freq=np.array([1000.0]), angular_resolution_deg=90.0)
 
-    # ================================================================================
-    # Reproduce with different parameters
-    # ================================================================================
+    # ---- Reproduce with different parameters ----
 
     def test_radius_affects_directivity(self):
         """Larger radius should produce narrower beam at same frequency."""

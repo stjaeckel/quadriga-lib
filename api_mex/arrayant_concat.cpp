@@ -47,11 +47,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    if (!mxIsStruct(prhs[0]))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in1' must be a struct.");
-        
-    if (!mxIsStruct(prhs[1]))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in2' must be a struct.");
+    qd_mex_check_struct(prhs[0], "arrayant_in1");
+    qd_mex_check_struct(prhs[1], "arrayant_in2");
 
     size_t n_freq1 = (size_t)mxGetNumberOfElements(prhs[0]);
     size_t n_freq2 = (size_t)mxGetNumberOfElements(prhs[1]);
@@ -62,7 +59,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (n_freq1 != n_freq2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'arrayant_in1' and 'arrayant_in2' must have the same number of entries.");
 
-    // Assemble array antenna objects (single or multi-frequency)
     auto ant1 = quadriga_lib::arrayant<double>();
     auto ant2 = quadriga_lib::arrayant<double>();
     auto ant1_multi = std::vector<quadriga_lib::arrayant<double>>();
@@ -79,16 +75,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant2 = qd_mex_struct2arrayant(prhs[1], false, false, "arrayant_in2");
     }
 
-    // Output containers
     auto ant_out = quadriga_lib::arrayant<double>();
     auto ant_out_multi = std::vector<quadriga_lib::arrayant<double>>();
 
-    // Dispatch
     if (n_freq1 > 1)
         CALL_QD(ant_out_multi = quadriga_lib::arrayant_concat_multi<double>(ant1_multi, ant2_multi));
     else
         CALL_QD(ant_out = quadriga_lib::arrayant_concat(ant1, ant2));
 
-    // Output as struct (or struct array for multi-frequency)
     plhs[0] = (n_freq1 > 1) ? qd_mex_arrayant2struct_multi(ant_out_multi) : qd_mex_arrayant2struct(ant_out);
 }

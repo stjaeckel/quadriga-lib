@@ -79,7 +79,7 @@ namespace mt
     {
         return a.kind == SOLID && b.kind == SOLID && cavity(a.row) && !mass(b.row) && col(b.row, "e") <= 10.0;
     }
-    // The stack rule (measured in the plan): sheets on the room side, at most two and then with air behind (three
+    // The stack rule: sheets on the room side, at most two and then with air behind (three
     // co-located faces: R up to 0.98 off), and one sheet glued at the last solid's exit; no two mass-law sheets on one
     // face (rule 9); no two traced wave media back to back (one straight path misses their exchange), except a box of
     // air in front of a non-dense fill; no lossless wave medium with a critical angle as a solid.

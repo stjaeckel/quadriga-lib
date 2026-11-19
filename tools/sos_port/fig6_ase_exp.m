@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Fig. 6 of the paper: achievable ASE against the number of sinusoids for the exponential ACF, 2-D and 3-D tables.
 % The ASE is the error on the coordinate plane(s) inside the disc covered by the ACF (mse_core of sos_calc_mse).
 res_dir = sos_port_init(); p = sos_port_paper_values();

@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.RTtools.point_inside_mesh.
+
 import sys
 import os
 import unittest
@@ -37,54 +39,47 @@ class test_case(unittest.TestCase):
             [-1.0,  1.0,  1.0,   1.0,  1.0,  1.0,   1.0,  1.0, -1.0]    # 11 North Upper
         ])
 
-        # Define two query points [(0, 0, 0.5), (-1.1, 0, 0)]
         points = np.array([
             [ 0.0,  0.0,  0.5],
             [-1.1,  0.0,  0.0]
         ])
 
-        # Define obj_ind = [1, 1, 1, ..., 1]
+        # All faces belong to object 1 (0-based), reported as 2 (1-based)
         obj_ind = np.full(12, 1)
 
-        # ──────────── Case 1: Provide (points, mesh, obj_ind) ────────────
-        # C++ expected:  res.n_elem == 2; res[0] == 2; res[1] == 0
+        # Case 1: (points, mesh, obj_ind)
         res = RTtools.point_inside_mesh(points, mesh, obj_ind)
-        # Check that two results are returned
         self.assertEqual(res.shape[0], 2)
         # First point should lie in object index 2
         self.assertEqual(int(res[0]), 2)
         # Second point is outside all triangles → returns 0
         self.assertEqual(int(res[1]), 0)
 
-        # ──────────── Case 2: Provide only (points, mesh) ────────────
-        # C++ expected:  res.n_elem == 2; res[0] == 1; res[1] == 0
+        # Case 2: (points, mesh)
         res = RTtools.point_inside_mesh(points, mesh)
         self.assertEqual(res.shape[0], 2)
         # Without obj_ind, it should default to "1"
         self.assertEqual(int(res[0]), 1)
         self.assertEqual(int(res[1]), 0)
 
-        # ──────────── Case 3: (points, mesh, None, distance = 0.12) ────────────
-        # C++ expected:  res.n_elem == 2; res[0] == 1; res[1] == 1
+        # Case 3: (points, mesh, None, distance = 0.12)
         res = RTtools.point_inside_mesh(points, mesh, distance=0.12)
         self.assertEqual(res.shape[0], 2)
         self.assertEqual(int(res[0]), 1)
-        # The second point is still just outside → but within 0.12 distance of face 0, so index=1
+        # The second point is 0.1 m outside the west face (x = -1), within distance 0.12
         self.assertEqual(int(res[1]), 1)
 
-        # ──────────── Case 4: (points, mesh, obj_ind, distance = 0.09) ────────────
-        # C++ expected:  res.n_elem == 2; res[0] == 2; res[1] == 0
+        # Case 4: (points, mesh, obj_ind, distance = 0.09)
         res = RTtools.point_inside_mesh(points, mesh, obj_ind, distance=0.09)
         self.assertEqual(res.shape[0], 2)
         # Tolerance too small → same as Case 1
         self.assertEqual(int(res[0]), 2)
         self.assertEqual(int(res[1]), 0)
 
-        # ──────────── Case 5: (points, mesh, obj_ind, distance = 2.0) ────────────
-        # C++ expected:  res.n_elem == 2; res[0] == 2; res[1] == 2
+        # Case 5: (points, mesh, obj_ind, distance = 2.0)
         res = RTtools.point_inside_mesh(points, mesh, obj_ind, distance=2.0)
         self.assertEqual(res.shape[0], 2)
-        # With a huge tolerance, both points fall within the distance of some face whose obj_ind=2
+        # With distance 2.0 both points count as inside object 2 (1-based)
         self.assertEqual(int(res[0]), 2)
         self.assertEqual(int(res[1]), 2)
         

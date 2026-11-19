@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// ray_init: icosphere ray count, output shapes and initial ray state, geometry invariants (unit directions,
+// destinations at max_path_length, full-sphere coverage) and the launch sphere radius: 1 cm by default, at most
+// 0.8 times the distance to the nearest mesh face or receive point, unchanged by sub-mesh acceleration.
+// Fixtures: launch point at the origin; the 2x2x2 cube centred at (3,0,0) has its nearest face at 2 m.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_lib.hpp"

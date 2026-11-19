@@ -7,7 +7,6 @@
 
 namespace py = pybind11;
 
-// Include parts
 #include "qpy_diffraction.cpp"
 #include "qpy_mesh_primitives.cpp"
 #include "qpy_icosphere.cpp"

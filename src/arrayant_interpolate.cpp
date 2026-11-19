@@ -42,7 +42,7 @@ static inline void qd_check_interpolation_inputs(const arma::Mat<dtype> &azimuth
         throw std::invalid_argument("Input 'element_pos' must have size [3, n_out].");
 }
 
-// Internal dispatch, declared in qd_arrayant_functions.hpp
+// Declared in qd_helpers_arrayant.hpp
 template <typename dtype>
 void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant,
                                       const arma::Mat<dtype> &azimuth, const arma::Mat<dtype> &elevation,
@@ -492,7 +492,6 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
         (hi ? cached_hi : cached_lo) = (arma::sword)idx;
     };
 
-    // Process each target frequency
     const dtype *p_freq = freq.memptr();
     const dtype eps = std::numeric_limits<dtype>::epsilon();
 

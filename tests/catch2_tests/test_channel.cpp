@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of the channel class and channel_calc_effective_path_gain: the effective path gain from polmat, with the
+// free-space loss of path_length and center_freq, from path_gain and from the coefficients; is_valid consistency
+// checks and the add_paths guards (32-bit count overflow, inputs that are fields of the channel).
+// Oracle: FSPL = 32.45 + 20·lg f_GHz + 20·lg d, written out in the test.
+
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
 
@@ -25,20 +30,17 @@ TEST_CASE("Channel - Effective Path Gain")
     c.polmat.push_back(arma::mat(8, 1, arma::fill::randn));
     c.polmat.push_back(arma::mat(8, 1, arma::fill::randn));
 
-    // Calc effective PG and check results
     auto p = quadriga_lib::channel_calc_effective_path_gain(c);
     arma::vec q1 = c.polmat[0] % c.polmat[0];
     arma::vec q2 = c.polmat[1] % c.polmat[1];
     CHECK(std::abs(arma::sum(q1) - p.at(0)) < 1e-14);
     CHECK(std::abs(arma::sum(q2) - p.at(1)) < 1e-14);
 
-    // Add a path length
     arma::Col<double> l = {1.0};
     c.path_length.push_back(l);
     l = {2.0};
     c.path_length.push_back(l);
 
-    // Check additional gain
     p = quadriga_lib::channel_calc_effective_path_gain(c);
     double a1 = std::pow(10.0, -3.245);
     double a2 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(2.0)));
@@ -48,17 +50,15 @@ TEST_CASE("Channel - Effective Path Gain")
     // Set same frequency for all snapshots
     c.center_freq = 10.0e9;
 
-    // Check additional gain
     p = quadriga_lib::channel_calc_effective_path_gain(c);
     a1 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(10.0)));
     a2 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(10.0) - 20.0 * std::log10(2.0)));
     CHECK(std::abs(a1 * arma::sum(q1) - p.at(0)) < 1e-14 * p.at(0));
     CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-14 * p.at(1));
 
-    // Sett different frequencies for snapshots
+    // Different frequencies per snapshot
     c.center_freq = {12.0e9, 20.0e9};
 
-    // Check gain
     p = quadriga_lib::channel_calc_effective_path_gain(c);
     a1 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(12.0)));
     a2 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(20.0) - 20.0 * std::log10(2.0)));
@@ -71,12 +71,11 @@ TEST_CASE("Channel - Effective Path Gain")
     l = {0.2};
     c.path_gain.push_back(l);
 
-    // Check gain
     p = quadriga_lib::channel_calc_effective_path_gain(c);
     CHECK(std::abs(0.1 * arma::sum(q1) - p.at(0)) < 1e-14);
     CHECK(std::abs(0.2 * arma::sum(q2) - p.at(1)) < 1e-14);
 
-    // Calculate coefficients
+    // Coefficients from get_channels_planar: the same gain without polmat and path_length
     arma::Cube<double> coeff_re, coeff_im, delay;
     auto ant = quadriga_lib::generate_arrayant_xpol<double>();
 

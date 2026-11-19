@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Edge cases of fast_geo2cart and fast_cart2geo on the GENERIC and, when available, AVX2 kernels: large azimuths,
+// tiny, huge and non-finite vectors, NaN propagation in the vector body and the remainder, the use_kernel argument
+// and aliased outputs. Oracles: std::cos, std::sin and std::atan2 in double.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 #include "quadriga_math.hpp"
@@ -90,7 +94,7 @@ TEMPLATE_TEST_CASE("fast_cart2geo - Tiny, huge and non-finite vectors", "[fast_c
 
 TEMPLATE_TEST_CASE("fast_cart2geo - NaN input gives NaN elevation", "[fast_cart2geo]", float, double)
 {
-    // A NaN in x, y or z gives NaN in el and len (el was 0), and a NaN in x or y also in az, in both kernels, in the
+    // A NaN in x, y or z gives NaN in el and len, and a NaN in x or y also in az, in both kernels, in the
     // vector body and in the remainder; the other values are unchanged
     using dtype = TestType;
     const arma::uword n = 21; // two blocks of 8 and a remainder of 5
@@ -130,7 +134,6 @@ TEMPLATE_TEST_CASE("fast_cart2geo - NaN input gives NaN elevation", "[fast_cart2
                 CHECK(len[i] == len0[i]);
             }
         }
-        // Without 'len'
         arma::Col<dtype> az2, el2;
         quadriga_lib::fast_cart2geo<dtype>(x, y, z, az2, el2, nullptr, k);
         CHECK(std::isnan(el2[9]));

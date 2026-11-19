@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // Where the time of sos_val goes outside the kernel. usage: bench4 <n_gen> <n_coeff> <n_pos>
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"

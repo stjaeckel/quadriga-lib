@@ -2,11 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
 #include "qd_helpers_python_types.hpp"
-#include "qd_helpers_python.hpp"
-
-
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -243,7 +239,6 @@ py::array_t<double> sos_val(const py::array_t<double> &spatial_freq,
 {
     const bool uniform_b = qd_python_flag(uniform, false, "uniform");
 
-    // Read inputs
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Mat<double>(phase, true);
     const auto pos_a = qd_python_numpy2arma_Mat<double>(pos, true);
@@ -252,11 +247,9 @@ py::array_t<double> sos_val(const py::array_t<double> &spatial_freq,
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
-    // Output allocation
     arma::mat val;
     auto val_py = qd_python_init_output(pos_a.n_rows, phase_a.n_cols, &val);
 
-    // Call library function
     quadriga_lib::sos_val<double>(freq_a, phase_a, pos_a, val, pos_b_a, phase_b_a, acf_a, dist_a,
                                   spatial_freq_scale_b, uniform_b, use_kernel);
 
@@ -311,7 +304,6 @@ py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
 {
     const bool uniform_b = qd_python_flag(uniform, false, "uniform");
 
-    // Read inputs
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Mat<double>(phase, true);
     const auto x_a = qd_python_numpy2arma_Col<double>(x, true);
@@ -321,11 +313,9 @@ py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
     const arma::uword nx = x_a.n_elem, ny = y_a.is_empty() ? 1 : y_a.n_elem;
     const arma::uword nz = z_a.is_empty() ? 1 : z_a.n_elem, n_gen = phase_a.n_cols;
 
-    // Output allocation
     std::vector<arma::cube> map;
     auto map_py = qd_python_init_output(ny, nx, nz, n_gen, &map);
 
-    // Call library function
     quadriga_lib::sos_map<double>(freq_a, phase_a, x_a, map, y_a, z_a, uniform_b, use_kernel);
 
     return map_py;
@@ -429,15 +419,12 @@ py::tuple sos_remove_bias(const py::array_t<double> &spatial_freq,
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
-    // Wrap optional pointers
     arma::mat offset, mean_before;
     arma::mat *p_phase_b = phase_b_out.is_empty() ? nullptr : &phase_b_out;
 
-    // Call library function
     quadriga_lib::sos_remove_bias<double>(freq_a, phase_out, pos_a, pos_b_a, p_phase_b, acf_a, dist_a,
                                           &offset, &mean_before, spatial_freq_scale_b);
 
-    // Copy to python
     auto phase_out_py = qd_python_copy2numpy(&phase_out);
     py::object phase_b_out_py = py::none();
     if (p_phase_b != nullptr)

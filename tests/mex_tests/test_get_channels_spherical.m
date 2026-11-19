@@ -1,6 +1,12 @@
-function test_get_channels_spherical
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% Generate test antenna
+function test_get_channels_spherical
+% MEX interface test for quadriga_lib.get_channels_spherical.
+% Physics validation lives in the Catch2 suite (test_get_channels_spherical.cpp).
+
+%% Setup: test antenna
 ant = quadriga_lib.arrayant_generate('omni');
 ant.e_theta_re(:,:,2) = 2;
 ant.e_theta_im(:,:,2) = 0;
@@ -86,7 +92,7 @@ catch ME
     end
 end
 
-% Exception handling
+%% Errors
 [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
 
 ant = rmfield(ant,'element_pos');

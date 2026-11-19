@@ -1,6 +1,12 @@
-function test_arrayant_combine_pattern
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% ==== Single-frequency tests ====
+function test_arrayant_combine_pattern
+% MEX interface test for quadriga_lib.arrayant_combine_pattern.
+% Physics validation lives in the Catch2 suite (test_arrayant_combine_pattern.cpp, test_arrayant_combine_pattern_multi.cpp).
+
+%% Single-frequency
 
 azimuth_grid    = [-1.5,0,1.5,2] * pi/2;
 elevation_grid  = [-0.9,0,0.9] * pi/2;
@@ -61,7 +67,7 @@ assertElementsAlmostEqual( out.e_theta_im, e_theta_im, 'absolute', 1e-14 );
 assertElementsAlmostEqual( out.e_phi_re, e_phi_re, 'absolute', 1e-14 );
 assertElementsAlmostEqual( out.e_phi_im, e_phi_im, 'absolute', 1e-14 );
 
-% Grid inerpolation
+% Grid interpolation
 ant = quadriga_lib.arrayant_generate('3gpp', 10, [], [], [], [], 2, [], [], [], 0.0);
 ant.e_theta_re(:,:,2) = 2 * ant.e_theta_re(:,:,2);
 ant.coupling_re = [1;1];
@@ -89,7 +95,7 @@ out = quadriga_lib.arrayant_combine_pattern(ant);
 directivity_out = quadriga_lib.arrayant_calc_directivity(out);
 assertTrue(directivity_out > directivity_ant + 1.2);
 
-% Errors
+%% Errors
 try
     out = quadriga_lib.arrayant_combine_pattern( ant, [],[],[],[],[]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -177,7 +183,7 @@ catch ME
 end
 
 
-% ==== Multi-frequency tests ====
+%% Multi-frequency
 
 % Build a 3-entry multi-freq struct array (scale=1,2,3 at 1/2/3 GHz)
 freqs_mf = [1e9, 2e9, 3e9];
@@ -359,7 +365,7 @@ d2 = quadriga_lib.arrayant_calc_directivity(out(2));
 assertTrue( d1 > d0 + 1.2 );
 assertTrue( d2 > d0 + 1.2 );
 
-% ==== Multi-frequency error tests ====
+%% Multi-frequency errors
 
 % Only the struct output: a second output is an error, also for multi-frequency results
 try
@@ -416,7 +422,7 @@ catch ME
     end
 end
 
-% ==== Propagation speed ====
+%% Propagation speed
 
 % Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
 omni = quadriga_lib.arrayant_generate('omni', 10);

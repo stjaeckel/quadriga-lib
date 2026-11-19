@@ -5,7 +5,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#include <iomanip> // std::setprecision
+#include <iomanip>
 
 /*!SECTION
 Channel functions
@@ -63,7 +63,6 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
                                            arma::uword n_edges)
 {
 
-    // Check validity
     std::string error_message = chan.is_valid();
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
@@ -80,7 +79,6 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     if (chan.polmat.empty() && chan.coeff_re.empty())
         throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
 
-    // Input validation
     if (!std::isfinite(gain_max_dB) || !std::isfinite(gain_min_dB) || !(gain_max_dB > gain_min_dB))
         throw std::invalid_argument("Inputs 'gain_max_dB' and 'gain_min_dB' must be finite, with 'gain_max_dB' larger than 'gain_min_dB'.");
 
@@ -128,7 +126,6 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     std::ofstream outFile(fn_mtl);
     if (outFile.is_open())
     {
-        // Write some text to the file
         outFile << "# QuaDRiGa " << "path data colormap\n\n";
         for (arma::uword i = 0ULL; i < n_cmap; ++i)
         {
@@ -147,7 +144,6 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     outFile = std::ofstream(fn);
     if (outFile.is_open())
     {
-        // Write some text to the file
         outFile << "# QuaDRiGa Path OBJ File\n";
         outFile << "mtllib " << fn_mtl_base << "\n";
     }
@@ -157,7 +153,6 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     bool moving_tx = chan.tx_pos.n_cols != 1ULL;
     bool moving_rx = chan.rx_pos.n_cols != 1ULL;
 
-    // Export each snapshot
     arma::uword vert_counter = 0ULL;
     for (arma::uword i_snap_out = 0ULL; i_snap_out < n_snap_out; ++i_snap_out)
     {

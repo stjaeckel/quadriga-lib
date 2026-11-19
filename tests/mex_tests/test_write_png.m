@@ -1,7 +1,12 @@
-function test_write_png
-% MOxUnit test for quadriga_lib.write_png (MEX)
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-    % --- Test data (matches the Python test) ---
+function test_write_png
+% MEX interface test for quadriga_lib.write_png.
+% Physics validation lives in the Catch2 suite (test_write_png.cpp).
+
+    %% Setup: gradient test data, as in the Python test
     N = 50;
     max_val = 10.0;
     v = linspace(0.0, max_val, N+1); % mimic endpoint=False
@@ -10,16 +15,15 @@ function test_write_png
     gradient(1, :) = 0.0;
     gradient(end, :) = 10.0;
 
-    % --- Temp output file ---
     outFile = [tempname, '.png'];
     c = onCleanup(@() delete_if_exists(outFile));
 
-    % --- 1) Basic call (explicit params) ---
+    %% Basic call, explicit parameters
     quadriga_lib.write_png(outFile, gradient, 'jet', 0.0, max_val, false);
     assertTrue(exist(outFile, 'file') == 2);
     delete_if_exists(outFile);
 
-    % --- 2) Error: the function returns no output ---
+    %% Error: the function returns no output
     try
         t = quadriga_lib.write_png(outFile, gradient, 'jet', 0.0, max_val, false);
         error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -31,17 +35,17 @@ function test_write_png
     end
     assertFalse(exist(outFile, 'file') == 2);
 
-    % --- 3) Minimal args (defaults are applied inside MEX) ---
+    %% Minimal arguments: defaults
     quadriga_lib.write_png(outFile, gradient);
     assertTrue(exist(outFile, 'file') == 2);
     delete_if_exists(outFile);
 
-    % --- 4) Error: infinite limits (NaN selects the data minimum / maximum) ---
+    %% Error: infinite limits (NaN selects the data minimum / maximum)
     f = @() quadriga_lib.write_png(outFile, gradient, 'jet', NaN, Inf);
     assertExceptionThrown(f, 'quadriga_lib:CPPerror');
     assertFalse(exist(outFile, 'file') == 2);
 
-    % --- 5) Error: wrong number of inputs ---
+    %% Error: wrong number of inputs
     f = @() quadriga_lib.write_png();
     assertExceptionThrown(f, 'quadriga_lib:CPPerror');
 end

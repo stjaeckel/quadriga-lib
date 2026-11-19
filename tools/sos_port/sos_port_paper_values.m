@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function p = sos_port_paper_values()
 % Values of the 2018 paper, read from its text and figures (figure values to about 0.1 dB).
 % ASE values are given as in the paper, 10*log10(ASE), i.e. negative numbers.

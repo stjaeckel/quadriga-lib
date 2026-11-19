@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.tools.acdf.
+
 import sys
 import os
 import unittest
@@ -27,7 +29,6 @@ class test_acdf(unittest.TestCase):
         npt.assert_allclose(bins[0], 0.0, atol=1e-10, rtol=0)
         npt.assert_allclose(bins[-1], 9.0, atol=1e-10, rtol=0)
 
-        # Sh should be (201, 1)
         self.assertEqual(cdf_per_set.shape, (201, 1))
 
         # CDF should end at 1.0
@@ -36,11 +37,10 @@ class test_acdf(unittest.TestCase):
         # CDF should be non-decreasing
         self.assertTrue(np.all(np.diff(cdf_per_set[:, 0]) >= 0))
 
-        # Sc should equal Sh for single column
+        # cdf_avg equals cdf_per_set for a single column
         self.assertEqual(cdf_avg.shape[0], 201)
         npt.assert_allclose(cdf_avg, cdf_per_set[:, 0], atol=1e-10, rtol=0)
 
-        # mu and sig shapes
         self.assertEqual(mu.shape[0], 9)
         self.assertEqual(sig.shape[0], 9)
 
@@ -57,7 +57,7 @@ class test_acdf(unittest.TestCase):
         # Both columns should have the same CDF
         npt.assert_allclose(cdf_per_set[:, 0], cdf_per_set[:, 1], atol=1e-10, rtol=0)
 
-        # Sc should be close to 1.0 at last bin (quantile grid tops at 0.999)
+        # cdf_avg is close to 1.0 at the last bin (quantile grid tops at 0.999)
         npt.assert_allclose(cdf_avg[-1], 1.0, atol=0.02, rtol=0)
 
         # sig reflects variation within quantile window, not across sets

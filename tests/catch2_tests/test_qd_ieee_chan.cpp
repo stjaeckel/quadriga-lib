@@ -2,31 +2,18 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of get_channels_ieee_indoor (IEEE TGn / TGac / TGah / TGax indoor models): sizes, positions and orientations,
+// LOS and NLOS steering with offset angles, power-delay profiles and RMS delay spreads, Doppler (station, environment,
+// moving vehicle), uplink-downlink reciprocity, wall and floor losses, seeds, validation.
+// Oracles: the tap tables and angles of the TGn/TGac documents (IEEE 802.11-09/0308r12, 802.11-09/0569r0), the
+// analytic TGn bell Doppler spectrum, get_channels_spherical for the Doppler sign, and the TGax floor-loss formula
+// of IEEE 802.11-14/0882r4.
+
 #include <catch2/catch_test_macros.hpp>
 #include <limits>
 #include "ieee_channel_model_functions.hpp"
 #include "quadriga_lib.hpp"
 #include "qd_test_arrayant.hpp"
-
-// Covered tests:
-// - K-Factor model for Type A
-// - Correctness of TX/RX positions and orientations
-// - Directional antennas at TX and RX
-// - LOS Steering matrix
-// - NLOS Steering and correct application of offset angles
-// - Manual setting of offset angles
-// - Seed consistency
-// - Doppler shift for LOS path
-// - TGac badwidth extension
-// - Delay, Powers and RMSDS for TGn and TGac
-// - Doppler from moving vehicle in Model F
-// - Uplink-downlink reciprocity for MIMO channels (plain transpose, moving station)
-// - Doppler sign of a moving station against get_channels_spherical (downlink and uplink)
-// - Floors add attenuation but no delay
-// - Number of paths independent of distance, floors and walls
-// - Invalid XPR, non-finite observation time and update rate
-// - Wall penetration loss (default 5 dB, custom 7 dB, per-user vector)
-// - TGax floor penetration loss formula (n=2,3,4 vs n=1 reference)
 
 static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double update_interval, double BW = 100e6)
 {
@@ -83,11 +70,9 @@ static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double
 
 TEST_CASE("IEEE Chan - A + 1user + Xpol")
 {
-    // Generate a cross-pol channel
     auto ant = quadriga_lib::generate_arrayant_xpol<double>();
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A");
 
-    // Check dimensions of the channel object
     REQUIRE(chan.size() == 1);
     REQUIRE(chan[0].n_tx() == 2);
     REQUIRE(chan[0].n_rx() == 2);
@@ -100,7 +85,7 @@ TEST_CASE("IEEE Chan - A + 1user + Xpol")
     // Both paths should have equal power at KF = 0 dB
     CHECK(std::abs(chan[0].path_gain[0][0] - chan[0].path_gain[0][1]) < 1e-20);
 
-    // Calculate path gain from coefficients and compare
+    // Path gain from the coefficients: sum of |h|² over the 2x2 entries, halved
     arma::cube vc = chan[0].coeff_re[0] % chan[0].coeff_re[0] + chan[0].coeff_im[0] % chan[0].coeff_im[0];
     arma::vec vv = arma::sum(arma::mat(vc.memptr(), 2 * 2, 2), 0).t();
     vv *= 0.5;
@@ -136,7 +121,6 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
 
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A", 2.4e9, 1e-8, 2);
 
-    // Check dimensions of the channel object
     REQUIRE(chan.size() == 2);
 
     REQUIRE(chan[0].n_tx() == ant.n_elements());
@@ -169,7 +153,7 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
     aod_rad = aod_deg * 1.745329251994330e-02;
     cx = 4.99 * std::cos(aod_rad);
     cy = 4.99 * std::sin(aod_rad);
-    ori = aod_deg - aoa_deg + 180.0; // -122.718
+    ori = aod_deg - aoa_deg + 180.0; // -78.126
     CHECK(arma::all(arma::abs(chan[1].rx_pos.col(0) - arma::vec{cx, cy, 0.0}) < 1e-5));
     CHECK(std::abs(ori - chan[1].rx_orientation[2] * 57.29577951308232) < 1e-4);
 
@@ -190,12 +174,12 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
     chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A", 2.4e9, 1e-8, 2, 0.0,
                                                   0.001, 0.0, 1.2, {1.99}, {0}, false, offset_angles, 100, 50.0, 11);
 
-    aod_deg = 100.0; // From TGac doc.: IEEE 802.11-09/0308r12
-    aoa_deg = 100.0; // From TGac MATLAB code
+    aod_deg = 100.0; // offset angle set above
+    aoa_deg = 100.0; // offset angle set above
     aod_rad = aod_deg * 1.745329251994330e-02;
     cx = 1.99 * std::cos(aod_rad);
     cy = 1.99 * std::sin(aod_rad);
-    ori = aod_deg - aoa_deg + 180.0; // -122.718
+    ori = aod_deg - aoa_deg + 180.0; // 180
     CHECK(arma::all(arma::abs(chan[0].rx_pos.col(0) - arma::vec{cx, cy, 0.0}) < 1e-5));
     CHECK(std::abs(ori - chan[0].rx_orientation[2] * 57.29577951308232) < 1e-4);
     CHECK(arma::all(arma::abs(chan[1].rx_pos.col(0) - arma::vec{cx, cy, 0.0}) < 1e-5));
@@ -242,11 +226,9 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
                                                        tap_spacing, n_users, observation_time, update_interval,
                                                        speed_station_kmh, speed_env_kmh, dist, n_floors);
 
-    // Transform function
     auto linear_2_dB = [](double x)
     { return 10.0 * std::log10(x); };
 
-    // Check array sizes
     REQUIRE(chan.size() == 3);
 
     CHECK(chan[0].n_tx() == ant.n_elements());
@@ -306,7 +288,6 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
 
     CHECK(arma::all(arma::abs(arma::vectorise(A) - 1.0) < 1e-12));
 
-    // Check delays
     auto d = arma::mat(chan[0].delay[0].memptr(), 4 * 4, 13);
     d *= 1e9;
 
@@ -340,7 +321,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     CHECK(arma::all(arma::abs(d.col(10) - 70.0) < 1.5));
     CHECK(arma::all(arma::abs(d.col(11) - 80.0) < 1.5));
 
-    // Check floor indicator
+    // A floor puts the station 3 m higher
     CHECK(chan[0].rx_pos[2] == 0.0);
     CHECK(chan[1].rx_pos[2] == 0.0);
     CHECK(chan[2].rx_pos[2] == 3.0);
@@ -398,16 +379,14 @@ TEST_CASE("IEEE Chan - A + Doppler Shift")
     arma::rowvec DS_lin = arma::sum(P, 0);    // sum over delay (rows)
     arma::vec DS_dB = 10.0 * arma::log10(DS_lin.t() + 1e-12);
 
-    // Simple sanity checks; adjust or extend as needed
     REQUIRE(DS_dB.n_elem == static_cast<arma::uword>(w));
     REQUIRE(Doppler_axis_Hz.n_elem == static_cast<arma::uword>(w));
 
-    // Example: check that max is somewhere near the expected Doppler
+    // The spectrum peak lies at the Doppler shift of the station speed
     arma::uword idx_max;
     DS_dB.max(idx_max);
     double f_at_max = Doppler_axis_Hz(idx_max);
 
-    // Expected Doppler magnitude
     double v = speed_station_kmh / 3.6;
     double c0 = 3.0e8;
     double fc = fGHz * 1.0e9;
@@ -751,10 +730,10 @@ TEST_CASE("IEEE Chan - Doppler from moving vehicle")
     double fGHz = 2.4;
     double tap_spacing_ns = 10;
     double observation_time_s = 2.0;
-    double update_interval = 0.004;    // 100 Hz sampling -> 0.05 Hz resolution
+    double update_interval = 0.004;    // 250 Hz sampling -> 0.5 Hz resolution
     double speed_station_kmh = 0.0;  // TGn: stations static
     double speed_env_kmh = 0.0;      // TGn environmental speed
-    double speed_vehicle_kmh = 40.0; // TGn environmental speed
+    double speed_vehicle_kmh = 40.0; // moving vehicle of model F
 
     auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
 
@@ -1150,8 +1129,8 @@ TEST_CASE("IEEE Chan - Non-finite observation time and update interval")
 
 TEST_CASE("IEEE Chan - Tap spacing 10 ns / 2^k and non-finite carrier frequency, distance and speeds")
 {
-    // A tap spacing that is not 10 ns / 2^k (e.g. 7 ns, which rounded to a factor of 1 and was treated as 10 ns)
-    // throws; so do NaN and Inf carrier frequency, distance and speeds
+    // A tap spacing that is not 10 ns / 2^k (e.g. 7 ns) throws; so do NaN and Inf carrier frequency, distance and
+    // speeds
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
     auto run = [&](double fc, double tap, double dist, double v_sta, double v_env)
     {

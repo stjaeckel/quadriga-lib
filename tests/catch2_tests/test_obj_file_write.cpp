@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::obj_file_write: round trips through obj_file_read of geometry, objects, materials,
+// BSDF data and the CSV material table, the derived vertex list and face indices (vertex welding), duplicate
+// material names, splitting into loose parts, faces without material, and input validation. Oracles are the
+// written inputs and the text of the written .obj / .mtl / .csv files; the fixture is a 2 x 2 x 2 cube.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_tools.hpp"
@@ -14,7 +19,7 @@
 #include <fstream>
 #include <filesystem>
 
-// A unit cube: 8 vertices, 12 triangular faces (same geometry as the reader test)
+// A 2 x 2 x 2 cube (vertices at +/-1): 8 vertices, 12 triangular faces
 static inline arma::mat cube_vertices()
 {
     return arma::mat{
@@ -1197,8 +1202,8 @@ TEST_CASE("Test OBJ File Write - Non-finite and very large coordinates")
                             {1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}};
     CHECK(n_vert(base, 0.001) == 4);
 
-    // Cell indices beyond the 64-bit range: 1e13 m / 1 mm overflowed the hash, 1e15 m / 0.1 mm the cell index; the
-    // points stay distinct (the spacing of doubles at 1e15 is 0.125)
+    // Large cell indices (1e13 m / 1 mm; 1e15 m / 0.1 mm is beyond the 64-bit range): the points stay distinct
+    // (the spacing of doubles at 1e15 is 0.125)
     CHECK(n_vert(base + 1.0e13, 0.001) == 4);
     for (double offset : {1.0e15, -1.0e15})
         CHECK(n_vert(base + offset, 1.0e-4) == 4);

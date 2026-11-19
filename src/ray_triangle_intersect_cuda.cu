@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// CUDA variant of qd_RTI — Möller–Trumbore ray-triangle intersection
+// CUDA Möller–Trumbore ray-triangle intersection (qd_RTI_CUDA)
 
 #include <cstdint>
 #include <cstdlib>
@@ -36,15 +36,13 @@
     } while (0)
 #endif
 
-#include "cuda_common.hpp" // replaces local CUDA_CHECK + cuda_runtime.h
+#include "cuda_common.hpp"
 #include "quadriga_lib_cuda_functions.hpp"
 
 namespace
-{ // ---------------------------------------------------------------
+{
 
-    // ============================================================================
-    // Constants
-    // ============================================================================
+    // ---- Constants ----
 
     static constexpr int BLOCK_SIZE = 256;
     static_assert(BLOCK_SIZE % 32 == 0, "BLOCK_SIZE must be a multiple of 32 (warp size)");
@@ -67,9 +65,7 @@ namespace
     // Sentinel for packed FBS/SBS: t=1.0f (no hit), face=UINT32_MAX
     static constexpr uint64_t PACKED_SENTINEL = (uint64_t(0x3F800000u) << 32) | uint64_t(0xFFFFFFFFu);
 
-    // ============================================================================
-    // Device helper: pack/unpack float+face into uint64 for atomicMin
-    // ============================================================================
+    // ---- Device helper: pack/unpack float+face into uint64 for atomicMin ----
 
     __device__ __forceinline__
         uint64_t
@@ -92,9 +88,7 @@ namespace
         return (uint32_t)(packed & 0xFFFFFFFFu);
     }
 
-    // ============================================================================
-    // Device helper: warp-level queue compaction
-    // ============================================================================
+    // ---- Device helper: warp-level queue compaction ----
 
     __device__ __forceinline__ void RTI_enqueue_warp(bool has_hit, uint32_t ray_idx, uint16_t aabb_idx,
                                                      uint32_t *__restrict__ wq_ray, uint16_t *__restrict__ wq_aabb,
@@ -125,9 +119,7 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Kernel 0: RTI_init_per_ray_state
-    // ============================================================================
+    // ---- Kernel 0: RTI_init_per_ray_state ----
 
     __global__ void RTI_init_per_ray_state(
         uint64_t *__restrict__ fbs_packed,
@@ -148,10 +140,8 @@ namespace
             *queue_tail = 0u;
     }
 
-    // ============================================================================
-    // Kernel 1: RTI_aabb_test_and_enqueue
+    // ---- Kernel 1: RTI_aabb_test_and_enqueue ----
     // Slab test with NaN-safe ordered comparisons (no fminf/fmaxf).
-    // ============================================================================
 
     __global__ void RTI_aabb_test_and_enqueue(
         // Ray data (batch)
@@ -195,7 +185,7 @@ namespace
 
             if (valid)
             {
-                // Slab test — NaN-safe via conditional swaps (Section 4.1)
+                // Slab test — NaN-safe via conditional swaps
                 float t0_lo = (Xmin[i_sub] - ox) * dx_i;
                 float t0_hi = (Xmax[i_sub] - ox) * dx_i;
                 if (t0_lo > t0_hi)
@@ -238,10 +228,8 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Kernel 2: RTI_moller_trumbore_fbs
+    // ---- Kernel 2: RTI_moller_trumbore_fbs ----
     // First-bounce scatter — finds closest hit per ray via 64-bit atomicMin.
-    // ============================================================================
 
     __global__ void __launch_bounds__(256, 2)
         RTI_moller_trumbore_fbs(
@@ -305,7 +293,7 @@ namespace
             // U = dot(T, PQ)
             float U = tx * PQ_x + ty * PQ_y + tz * PQ_z;
 
-            // QQ = cross(E1, T)  (reuse PQ variable names for clarity)
+            // QQ = cross(E1, T)
             float QQ_x = e1y * tz - e1z * ty;
             float QQ_y = e1z * tx - e1x * tz;
             float QQ_z = e1x * ty - e1y * tx;
@@ -325,7 +313,7 @@ namespace
             // Hit conditions (same as AVX2: U>=0, V>=0, U+V<=1, W>=0, W<1)
             if (U >= 0.0f && V >= 0.0f && (U + V) <= 1.0f && W >= 0.0f && W < 1.0f)
             {
-                // Force positive zero to prevent negative-zero atomicMin bug (Section 7.1)
+                // Force positive zero to prevent negative-zero atomicMin bug
                 W = fmaxf(W, 0.0f);
 
                 local_hit_count++;
@@ -351,11 +339,9 @@ namespace
         wq_had_hit[i] = (local_hit_count > 0u) ? 1u : 0u;
     }
 
-    // ============================================================================
-    // Kernel 3: RTI_moller_trumbore_sbs
+    // ---- Kernel 3: RTI_moller_trumbore_sbs ----
     // Second-bounce scatter — processes only compacted work items (had hit).
     // Skips the FBS face.
-    // ============================================================================
 
     __global__ void __launch_bounds__(256, 2)
         RTI_moller_trumbore_sbs(
@@ -452,10 +438,8 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Kernel 4: RTI_finalize_outputs
+    // ---- Kernel 4: RTI_finalize_outputs ----
     // Unpacks packed FBS/SBS into user-facing Wf, Ws, If, Is, hit_cnt.
-    // ============================================================================
 
     __global__ void RTI_finalize_outputs(
         const unsigned long long *__restrict__ fbs_packed,
@@ -490,9 +474,7 @@ namespace
             d_hit_cnt[ray_idx] = hit_cnt_atomic[ray_idx];
     }
 
-    // ============================================================================
-    // Kernel 5a/5b: double ↔ float conversion (one element per thread)
-    // ============================================================================
+    // ---- Kernel 5a/5b: double ↔ float conversion (one element per thread) ----
 
     __global__ void RTI_d2f(const double *__restrict__ in, float *__restrict__ out, uint32_t n)
     {
@@ -508,9 +490,7 @@ namespace
             out[i] = (double)in[i];
     }
 
-    // ============================================================================
-    // Kernel 6: subtract_inplace for dest-orig and edge computing
-    // ============================================================================
+    // ---- Kernel 6: subtract_inplace for dest-orig and edge computing ----
 
     __global__ void RTI_subtract_inplace(float *__restrict__ a,
                                          const float *__restrict__ b,
@@ -521,10 +501,8 @@ namespace
             a[i] -= b[i];
     }
 
-    // ============================================================================
-    // RAII cleanup struct
+    // ---- RAII cleanup struct ----
     // Holds all device and pinned-host pointers. Destructor frees everything.
-    // ============================================================================
 
     struct CudaBuffers
     {
@@ -655,9 +633,7 @@ namespace
         }
     };
 
-    // ============================================================================
-    // Helper: ceil(log2(n)) — number of bits needed to represent values 0..n-1
-    // ============================================================================
+    // ---- Helper: ceil(log2(n)) — number of bits needed to represent values 0..n-1 ----
 
     static inline int RTI_ceil_log2(uint32_t n)
     {
@@ -673,9 +649,7 @@ namespace
         return bits;
     }
 
-    // ============================================================================
-    // Helper: upload scene host → device
-    // ============================================================================
+    // ---- Helper: upload scene host → device ----
 
     template <typename dtype>
     static inline void RTI_upload_scene(float *&d_ptr, const dtype *h_ptr, size_t count)
@@ -694,10 +668,8 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Helper: stage ray input batch from user arrays into pinned buffer
+    // ---- Helper: stage ray input batch from user arrays into pinned buffer ----
     // Layout in pinned buffer: [Ox ... | Oy ... | Oz ... | Dx ... | Dy ... | Dz ...]
-    // ============================================================================
 
     template <typename dtype>
     static inline void RTI_stage_ray_input(dtype *pinned, size_t batch_size,
@@ -713,10 +685,8 @@ namespace
         memcpy(pinned + 5 * batch_size, Dz + offset, count * sizeof(dtype));
     }
 
-    // ============================================================================
-    // Helper: copy ray output from pinned buffer to user arrays
+    // ---- Helper: copy ray output from pinned buffer to user arrays ----
     // Layout: [Wf ... | Ws ... | If ... | Is ... | hit_cnt ...]
-    // ============================================================================
 
     template <typename dtype>
     static inline void RTI_unstage_ray_output(const char *pinned, size_t batch_size,
@@ -736,9 +706,8 @@ namespace
             memcpy(hit_cnt + offset, pinned + 2 * tW + 2 * u4, count * sizeof(uint32_t));
     }
 
-} // end anonymous namespace --------------------------------------------------
+} // namespace
 
-// Public entry point — external linkage
 template <typename dtype>
 void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                  const dtype *Ux, const dtype *Uy, const dtype *Uz,
@@ -759,13 +728,13 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
 {
     constexpr bool is_double = std::is_same_v<dtype, double>;
 
-    // --- Early returns (Section 8) ---
+    // --- Early returns ---
     if (n_ray == 0)
         return;
 
     if (n_sub == 0 || n_mesh == 0)
     {
-        // Zero-fill all outputs on host — no GPU work needed
+        // No geometry: every ray misses (W = 1, index 0)
         for (size_t i = 0; i < n_ray; ++i)
         {
             Wf[i] = dtype(1.0);
@@ -778,21 +747,17 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         return;
     }
 
-    // --- Range check: n_sub must fit in uint16 (Section 8) ---
+    // --- Range check: n_sub must fit in uint16 ---
     if (n_sub > 65535)
         throw std::invalid_argument("qd_RTI_CUDA: n_sub > 65535 not supported (uint16 AABB index).");
 
     bool count_hits = (hit_cnt != nullptr);
 
-    // --- Set CUDA device ---
     CUDA_CHECK(cudaSetDevice(gpu_id));
 
-    // --- RAII struct for all allocations ---
     CudaBuffers buf;
 
-    // =====================================================================
-    // Upload scene data (resident for the entire run)
-    // =====================================================================
+    // ---- Upload scene data (resident for the entire run) ----
 
     RTI_upload_scene(buf.d_Tx, Tx, n_mesh);
     RTI_upload_scene(buf.d_Ty, Ty, n_mesh);
@@ -837,9 +802,7 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     RTI_upload_scene(buf.d_Zmin, Zmin, n_sub);
     RTI_upload_scene(buf.d_Zmax, Zmax, n_sub);
 
-    // =====================================================================
-    // Batch size calculation (Section 5.1)
-    // =====================================================================
+    // ---- Batch size calculation ----
 
     RTI_dbg_mem("after scene upload");
 
@@ -902,8 +865,6 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     // The CUB temp size depends on the queue capacity, which depends on the
     // batch size, which depends on the CUB temp size. Three passes settle it:
     // pass 1 uses a pessimistic bound, passes 2 and 3 use the real capacity.
-    // Sizing it from n_ray instead (the original approach) reserved temp space
-    // for a queue far larger than the one actually allocated.
     size_t cub_temp_per_stream = cub_temp_for((n_ray < 10000000) ? n_ray * E : 10000000ULL * E);
     size_t batch_size = derive_batch(cub_temp_per_stream);
     RTI_DBG("sizing pass 1: cub=%zu MB batch=%zu\n", cub_temp_per_stream >> 20, batch_size);
@@ -927,9 +888,8 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         size_t worst_case = batch_size * n_sub;
 
         // Spend leftover budget on queue headroom. When n_ray is small the batch
-        // is clamped by n_ray rather than by memory, which used to leave a queue
-        // sized for E=10 next to gigabytes of unused VRAM — and a scene with a
-        // high hit rate then had to re-run the batch several times to fit it.
+        // is clamped by n_ray rather than by memory; a queue sized for E=10 would
+        // leave VRAM unused and make high-hit-rate scenes re-run the batch.
         size_t base_bytes = 2 * cub_temp_per_stream + 2 * batch_size * per_ray_bytes;
         size_t spare = (usable > base_bytes) ? usable - base_bytes : 0;
         queue_capacity = std::min(worst_case, queue_capacity + spare / (2 * bpe));
@@ -961,17 +921,13 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     }
 #endif
 
-    // =====================================================================
-    // Create streams
-    // =====================================================================
+    // ---- Create streams ----
 
     CUDA_CHECK(cudaStreamCreate(&buf.stream[0]));
     CUDA_CHECK(cudaStreamCreate(&buf.stream[1]));
     buf.streams_created = true;
 
-    // =====================================================================
-    // Allocate per-stream device buffers + pinned host memory
-    // =====================================================================
+    // ---- Allocate per-stream device buffers + pinned host memory ----
 
     size_t ray_f_bytes = stride * sizeof(float);
     size_t ray_u_bytes = stride * sizeof(uint32_t);
@@ -1042,24 +998,20 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
 
     RTI_dbg_mem("after per-stream allocation");
 
-    // =====================================================================
-    // Compute number of bits for CUB radix sort
-    // =====================================================================
+    // ---- Compute number of bits for CUB radix sort ----
 
     int num_aabb_bits = RTI_ceil_log2((uint32_t)n_sub);
     if (num_aabb_bits > 16)
         num_aabb_bits = 16;
 
-    // =====================================================================
-    // Batching loop — double-buffered async pipeline (Section 5.2)
-    // =====================================================================
+    // ---- Batching loop — double-buffered async pipeline ----
 
     // Host-side readback values (one per stream)
     uint32_t h_queue_tail[2] = {0, 0};
     uint32_t h_num_compact[2] = {0, 0};
 
-    // What each stream currently has in flight. Chunk lengths are no longer
-    // uniform, so the D→H unstage cannot recompute them from the batch index.
+    // What each stream currently has in flight. Chunk lengths vary (they shrink
+    // on queue overflow), so the D→H unstage cannot derive them from the batch index.
     size_t inflight_offset[2] = {0, 0};
     size_t inflight_count[2] = {0, 0};
     int last_stream = 0;
@@ -1251,8 +1203,7 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                     batch_idx, ray_offset, n_ray_batch, qt, queue_capacity,
                     (double)qt / (double)(n_ray_batch ? n_ray_batch : 1));
 
-        // --- CUB radix sort: work queue by aabb_idx (Section 6) ---
-        // Use DoubleBuffer to avoid explicit input/output management
+        // --- CUB radix sort: work queue by aabb_idx ---
         cub::DoubleBuffer<uint16_t> d_sort_keys(buf.d_wq_aabb_idx_A[s], buf.d_wq_aabb_idx_B[s]);
         cub::DoubleBuffer<uint32_t> d_sort_vals(buf.d_wq_ray_idx_A[s], buf.d_wq_ray_idx_B[s]);
 
@@ -1288,7 +1239,7 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                 buf.d_wq_had_hit[s]);
         }
 
-        // --- CUB compaction: DeviceSelect::Flagged (Section 4.2a) ---
+        // --- CUB compaction: DeviceSelect::Flagged ---
         if (qt > 0)
         {
             cub::CountingInputIterator<uint32_t> iota(0);
@@ -1386,7 +1337,6 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
         }
         else
         {
-            // Original float download (unchanged)
             size_t out_off = 0;
             CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
                                        buf.d_Wf[s], n_ray_batch * sizeof(float), cudaMemcpyDeviceToHost, cs));

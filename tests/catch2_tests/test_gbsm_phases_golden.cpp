@@ -56,7 +56,6 @@ namespace
         double draw[3][6];   // seed 7: single, dual, floor
     };
 
-    // Values of quadriga-lib before the merge of the random-set functions
     const golden_set GOLDEN[] = {
         {"lsf_nb", "lsf", -1, false,
          {{1.5983500054156474, -0.98231016785905501, -2.221985480450293, 0.046004503373173286,

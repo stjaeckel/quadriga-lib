@@ -84,7 +84,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     if (dest.n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing the x,y,z coordinates.");
     if (dest.n_rows != n_pos)
-        throw std::invalid_argument("Number of rows in 'orig' and 'dest' don't match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' do not match.");
 
     if (!std::isfinite(center_freq) || center_freq <= (dtype)0.0)
         throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
@@ -212,7 +212,6 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
 
     qd_repeat_sequence(p_tw, n_path, n_pos, n_seg + 1, weight.memptr());
 
-    // Pointers
     auto p_ox = orig.colptr(0), p_oy = orig.colptr(1), p_oz = orig.colptr(2); // Origin pointer (dtype)
     auto p_dx = dest.colptr(0), p_dy = dest.colptr(1), p_dz = dest.colptr(2); // Destination pointer (dtype)
     auto p_tx = tx.memptr(), p_ty = ty.memptr(), p_tz = tz.memptr();          // Normalized ellipsoid coordinates
@@ -221,7 +220,6 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     // Constants
     double lambda_div_8 = 0.125 * (scalar_mode ? qd_speed_of_sound : qd_speed_of_light) / (double)center_freq; // lambda / 8
 
-// Iterate through positions
 #pragma omp parallel for schedule(static) if (n_pos >= 64)
     for (long long i = 0; i < (long long)n_pos; ++i)
     {

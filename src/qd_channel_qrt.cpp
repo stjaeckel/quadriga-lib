@@ -251,11 +251,8 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
         qrt_check_stream(fileR);
     }
 
-    // Pre-compute path_data_offset for each origin
-    // For each origin, this is the absolute byte offset to the start of the
-    // path_data_index[] array within that origin's data block.
-    // Layout: [tx_name_length(1)] [tx_name(N)] [freq(4, v4 only)] [max_paths(4)] [path_data_index[n_cir]]
-    // So: path_data_offset = orig_index + 1 + tx_name_length + (v4 ? 4 : 0) + 4
+    // path_data_offset: absolute byte offset of path_data_index[] in the data block of each origin, laid out as
+    // [tx_name_length(1)] [tx_name(N)] [freq(4, v4 only)] [max_paths(4)] [path_data_index[n_cir]]
     if (cache.n_orig != 0)
     {
         cache.path_data_offset.set_size(cache.n_orig);
@@ -544,10 +541,9 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     bool scalar = (cache.version == 6);
     size_t pol_stride = scalar ? 2 : 8;
 
-    // BS-region offsets. Header up to orig_fmt is fixed-walkable; with orig_fmt = 7 the BS block is
-    // orig_fmt(1) + 6 * n_orig floats, followed by the u64 index table.
-    // orig_pos_base = start of bs_x[]; bs_index_base = start of bs_data_index[].
-    // Derive orig_pos_base by replaying the header length up to and including orig_fmt.
+    // Origin (BS) block: with orig_fmt = 7 it is orig_fmt(1) + 6 * n_orig floats, followed by the u64 index table;
+    // orig_pos_base is the start of the position columns, orig_index_base the start of the index table. The header
+    // is replayed up to orig_fmt to find them.
     size_t off = 11 + 4 * sizeof(unsigned); // ID + n_orig/n_cir/n_dest/n_freq
     off += (size_t)n_freq * sizeof(float);  // frequencies[]
     if (n_cir != 0)
@@ -578,7 +574,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     size_t orig_pos_base = off + 1;                                       // skip orig_fmt byte
     size_t orig_index_base = orig_pos_base + 6 * n_orig * sizeof(float);  // after 6 columns
 
-    // Validate paths and bin by CIR (the "2D path index" phase). Throw before any write.
+    // Validate paths and bin them by CIR; throws before any write
     std::vector<unsigned> no_hit(n_cir, 0);
     for (const auto &p : path_data)
     {
@@ -1018,7 +1014,7 @@ Read ray-tracing CIR data from a QRT file
 - Throws `std::invalid_argument` for an index out of range, before any CIR is read or any output is changed. Throws `std::runtime_error` if
   the file cannot be opened, is not a QRT file of a supported version, is truncated, or if a count or offset in it
   does not fit the file size (path data: only when it is read); outputs may then be partly written. A message about
-  one requested CIR starts with "Snapshot <k>: ", with k its position in `i_cir`.
+  one requested CIR starts with `"Snapshot <k>: "`, with k its position in `i_cir`.
 
 ## Declaration:
 ```
@@ -1291,7 +1287,6 @@ static void qrt_read_cir(std::ifstream &fileR, size_t file_size, const quadriga_
         for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
             for (arma::uword i_path = 0; i_path < n_path; ++i_path)
             {
-                // load as dtype into registers
                 const dtype r11 = (dtype)src[0];
                 const dtype i11 = (dtype)src[1];
                 const dtype r21 = v6 ? 0.0 : (dtype)src[2];
@@ -1310,7 +1305,6 @@ static void qrt_read_cir(std::ifstream &fileR, size_t file_size, const quadriga_
                     gain = (p1 > p2) ? p1 : p2;
                 }
 
-                // write path gain
                 if (pg)
                     *pg++ = gain;
 
@@ -1645,7 +1639,6 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 - [[qrt_file_read]] (read processed CIR data instead of raw paths)
 MD!*/
 
-// Read raw ray-tracing data from QRT file
 std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::string &fn,
                                                                 arma::uword i_orig,
                                                                 std::ifstream *file,

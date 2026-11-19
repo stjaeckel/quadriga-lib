@@ -671,7 +671,7 @@ TEST_CASE("conf_file_write - with write_defaults every key is written once")
         CHECK(n_lines(text, "SubpathMethod") == 0);
     }
 
-    // All sections except the path loss (no PL input) are present, in the decided order
+    // All sections except the path loss (no PL input) are present, in their fixed order
     const std::vector<std::string> titles = {
         "% Large scale distributions", "% Large-Scale fading decorrelation distances", "% Inter-parameter correlations",
         "% Model parameters", "% EoD offset (elevation of departure, TR: ZOD offset)",

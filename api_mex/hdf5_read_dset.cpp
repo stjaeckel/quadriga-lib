@@ -49,7 +49,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const std::string name = qd_mex_get_string(prhs[1], "", "name");
     const unsigned ix = (nrhs < 3) ? 0U : qd_mex_get_index<unsigned>(prhs[2], "ix"); // 1-based -> 0-based
@@ -58,7 +57,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned iw = (nrhs < 6) ? 0U : qd_mex_get_index<unsigned>(prhs[5], "iw"); // 1-based -> 0-based
     const std::string prefix = (nrhs < 7) ? std::string("par_") : qd_mex_get_string_or_empty(prhs[6], "par_", "prefix");
 
-    // Read dataset
     std::any dset;
     CALL_QD(dset = quadriga_lib::hdf5_read_dset(fn, name, ix, iy, iz, iw, prefix));
 

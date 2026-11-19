@@ -1,4 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_interp
+% MEX interface test for quadriga_lib.interp.
+% Physics validation lives in the Catch2 suite (test_interp.cpp).
 
 I = [ 1,0,-2; 1,0,-2 ];
 I(:,:,2) = [2,2,2;4,4,4];
@@ -84,7 +90,7 @@ catch ME
     end
 end
 
-% 2D data (y given) without y_new is an error naming y_new (it was interpolated at y = 0)
+% 2D data (y given) without y_new is an error naming y_new
 failed = false;
 try
     [~] = quadriga_lib.interp( [0 1], [0 1], [0 1; 2 3], 0.5 );

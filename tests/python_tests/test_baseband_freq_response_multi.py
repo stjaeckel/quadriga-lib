@@ -31,9 +31,7 @@ def module_dir():
 
 class test_case(unittest.TestCase):
 
-    # ==================================================================================
-    # Error handling
-    # ==================================================================================
+    # ---- Error handling ----
 
     def test_3d_coeff(self):
         # 3D items are one input frequency; with more input frequencies they are an error
@@ -69,9 +67,7 @@ class test_case(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "'coeff_re' must contain at least one snapshot"):
             channel.baseband_freq_response_multi([], [], np.array([1e9]), np.array([1e9]))
 
-    # ==================================================================================
-    # Snapshot lists, delay layouts, remove_delay_phase
-    # ==================================================================================
+    # ---- Snapshot lists, delay layouts, remove_delay_phase ----
 
     def test_remove_delay_phase_false(self):
         # remove_delay_phase = False reaches C++: a constant envelope gets the delay phase of freq_new only
@@ -122,11 +118,8 @@ class test_case(unittest.TestCase):
                                                     freq_new=np.linspace(1e9, 2e9, 64))
         self.assertEqual(hmat.shape, (2, 3, 64, 1))
 
-    # ==================================================================================
-    # An invalid multi-frequency input raises ValueError with one and with several threads; run in a subprocess,
-    # since an exception that left an OpenMP region aborted the interpreter (std::terminate)
-    # ==================================================================================
-
+    # An invalid multi-frequency input raises ValueError with one and with several threads. It runs in a subprocess,
+    # since an exception leaving an OpenMP region aborts the interpreter (std::terminate).
     def test_exception_in_parallel_region_raises(self):
         code = (
             "import numpy as np, quadriga_lib as q\n"

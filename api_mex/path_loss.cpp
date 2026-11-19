@@ -95,7 +95,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 5 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
@@ -117,10 +116,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&sf_sigma_dB, qd_gbsm_n_link(rx_pos), center_freq.n_elem);
 
-    // Wrap optional pointers
     arma::mat *p_sf_sigma = (nlhs > 1) ? &sf_sigma_dB : nullptr;
 
-    // Call library function
     CALL_QD(pl_dB = quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, p_sf_sigma, d2d_in, rnd_he));
     plhs[0] = qd_mex_copy2matlab(&pl_dB);
 }

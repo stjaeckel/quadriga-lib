@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_conf_file_write
 % MEX interface test for quadriga_lib.conf_file_write.
 % Scope: argument handling, struct conversion, defaults, error paths. The file is read back with

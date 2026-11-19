@@ -7,7 +7,6 @@
 
 namespace py = pybind11;
 
-// Include parts
 #include "qpy_fastmath.cpp"
 #include "qpy_write_png.cpp"
 #include "qpy_channel_statistics.cpp"

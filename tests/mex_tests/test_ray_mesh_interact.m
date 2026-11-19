@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_ray_mesh_interact
+% MEX interface test for quadriga_lib.ray_mesh_interact.
 
 % Shared 2-ray, air-filled cube setup (x-z plane, normal incidence on the x-walls)
 mesh = quadriga_lib.cube;
@@ -9,8 +14,7 @@ mtl_prop = repmat([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], 12, 1);  % Air,
 orig(1,:) = [ -10.0,  0.0,   0.5 ]; dest(1,:) = [  10.0,  0.0,   0.5];   % FBS West (x=-1), SBS East (x=+1)
 orig(2,:) = [  10.0,  0.0,  -0.5 ]; dest(2,:) = [ -10.0,  0.0,  -0.5];   % FBS East (x=+1), SBS West (x=-1)
 
-% fbs/sbs points are no longer inputs; we still need the face indices from ray_triangle_intersect,
-% and we keep the points to cross-check the engine-computed fbsN/sbsN below.
+% ray_mesh_interact takes face indices, not fbs/sbs points; the points cross-check fbsN/sbsN below.
 [ fbs, sbs, ~, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh );
 
 % Call without outputs - should be fine
@@ -21,14 +25,14 @@ quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_
     fbs_angleN, thicknessN, edge_lengthN, normal_vecN ] = ...
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
 
-% origN sits ON the face now (relaunch offset reduced to a few ULP, was 1 mm)
+% origN sits on the face (relaunch offset of a few ULP)
 assertElementsAlmostEqual( origN, [-1.0, 0, 0.5; 1.0, 0, -0.5], 'absolute', 1e-6 );
 assertElementsAlmostEqual( destN, [-12, 0, 0.5; 12, 0, -0.5], 'absolute', 5e-6 );
-% New engine-computed interaction points reproduce ray_triangle_intersect
+% Engine-computed interaction points reproduce ray_triangle_intersect
 assertElementsAlmostEqual( fbsN, fbs, 'absolute', 1e-6 );
 assertElementsAlmostEqual( sbsN, sbs, 'absolute', 1e-6 );
 assertElementsAlmostEqual( gainN, [0;0], 'absolute', 1e-6 );        % air reflects nothing
-assertEqual( size(xprmatN), [8 2] );                               % xprmat is now [8, n_rayN]
+assertEqual( size(xprmatN), [8 2] );                               % xprmat is [8, n_rayN]
 assertElementsAlmostEqual( xprmatN, zeros(8,2), 'absolute', 1e-6 );
 assertTrue( isempty(trivecN) );
 assertTrue( isempty(tridirN) );
@@ -116,8 +120,8 @@ assertElementsAlmostEqual( gainN, obl * (0.5*T_te^2 + 0.5*T_tm^2), 'absolute', 1
 assertElementsAlmostEqual( gainN + 0.5*R_par^2 + 0.5*R_per^2, 1, 'absolute', 1e-9 );  % R + T = 1
 assertElementsAlmostEqual( xprmatN, sqrt(obl) * [T_tm;0;0;0;0;0;T_te;0], 'absolute', 1e-6 );
 
-% In-medium absorption (alpha) no longer contributes to gainN; it moved to the (non-MEX) medium_gain
-% helper. With real eps and sigma = 0, gainN is the lossless Fresnel reflection only.
+% In-medium absorption (alpha) is not part of gainN (it is applied by the non-MEX medium_gain).
+% With real eps and sigma = 0, gainN is the lossless Fresnel reflection only.
 mtl_alpha = repmat([1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 1.0, 5.0], 12, 1);  % alpha = 4 dB/m @ 10 GHz
 [mtl_alpha_ind, mtl_alpha_st] = m2p(mtl_alpha);
 orig_a = [0.5, 0.1, 0.0]; dest_a = [2.0, 1.6, 0.0];   % inside, 45 deg on East face (eps 1.5 -> air)
@@ -163,7 +167,7 @@ assertElementsAlmostEqual( xNa, xNb, 'absolute', 1e-12 );
 assertElementsAlmostEqual( oNa, oNb, 'absolute', 1e-12 );
 assertElementsAlmostEqual( dNa, dNb, 'absolute', 1e-12 );
 
-% Scalar interactions (types 3/4/5): scalar xprmat is now [2, n_rayN] = [Re; Im]
+% Scalar interactions (types 3/4/5): scalar xprmat is [2, n_rayN] = [Re; Im]
 % Air: reflection -> zero, transmission -> unity
 [ origN, ~, ~, ~, gainN, xprmatN ] = ...
     quadriga_lib.ray_mesh_interact( 3, 1e4, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
@@ -300,7 +304,7 @@ assertTrue( bitand(double(out_typeN(1)),32) ~= 0 );
 trivec = repmat([0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0], 2, 1);
 tridir = zeros(2,6);
 
-% ---- Error handling ----
+%% Errors
 
 try % 8 inputs (too few, minimum is 9)
     quadriga_lib.ray_mesh_interact( 0, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind );
@@ -332,7 +336,7 @@ catch ME
     end
 end
 
-try % wrong type (valid range is now 0..5)
+try % wrong type (valid range is 0..5)
     quadriga_lib.ray_mesh_interact( 6, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -356,7 +360,7 @@ try % wrong orig (row mismatch)
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig(1,:), dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' dont match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -376,7 +380,7 @@ try % wrong dest (row mismatch)
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest(1,:), mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' dont match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -466,7 +470,7 @@ try % wrong trivec (row mismatch)
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, trivec(1,:), tridir );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''trivec'' dont match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''trivec'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -486,7 +490,7 @@ try % wrong tridir (row mismatch)
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind, trivec, tridir(1,:) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''tridir'' dont match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''tridir'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -502,8 +506,7 @@ catch ME
     end
 end
 
-% compact sits in argument slot 12, the slot orig_length used to occupy. Passing it there
-% must reach the flag itself: with compact = false both rays are kept even though ray 2 misses.
+% compact is argument 12. Passing it there must reach the flag itself: with compact = false both rays are kept even though ray 2 misses.
 orig_z = [ -10.0, 0.0, 0.5 ; -10.0, 3.0, 0.5 ];
 dest_z = [  10.0, 0.0, 0.5 ;  10.0, 3.0, 0.5 ];
 [ ~, ~, ~, fbs_ind_z, sbs_ind_z ] = quadriga_lib.ray_triangle_intersect( orig_z, dest_z, mesh );
@@ -520,7 +523,7 @@ assertEqual( size(origN,1), 1 );
 end
 
 % Convert a per-face [n_face, 9] material matrix with columns
-% {a,b,c,d,att,attB,alpha,alphaB,fRef} into the (mtl_ind, struct) pair the new
+% {a,b,c,d,att,attB,alpha,alphaB,fRef} into the (mtl_ind, struct) pair the
 % API expects. Identical rows are deduplicated; mtl_ind is 1-based.
 function [mtl_ind, st] = m2p(M)
 names = {'a','b','c','d','att','attB','alpha','alphaB','fRef'};

@@ -2,6 +2,12 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::arrayant_combine_pattern_multi: input validation, the output structure, agreement with
+// the single-frequency arrayant_combine_pattern per entry, custom angle grids, SLERP interpolation of pattern
+// and coupling between entries and clamping outside them, the frequency-dependent phase of element positions,
+// and the propagation speed. Fixtures are 1- and 2-element vectors on a 2-point azimuth grid with real
+// patterns that scale with the entry index, so interpolated values follow by hand.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -11,11 +17,8 @@
 #include <string>
 #include <vector>
 
-// ================================================================================================
-// Helper: Build a simple multi-frequency arrayant vector
-// Each entry has 1 element, 1 elevation sample, 2 azimuth samples (0 and pi)
-// Pattern values scale with frequency index for easy verification
-// ================================================================================================
+// Multi-frequency arrayant vector: each entry has 1 element, 1 elevation sample, 2 azimuth samples (0 and pi);
+// the pattern values scale with the entry index (1, 2, 3, ...)
 static std::vector<quadriga_lib::arrayant<double>>
 build_simple_multi(const arma::vec &center_freqs, bool polarimetric = false)
 {
@@ -24,7 +27,7 @@ build_simple_multi(const arma::vec &center_freqs, bool polarimetric = false)
     for (arma::uword i = 0; i < center_freqs.n_elem; ++i)
     {
         quadriga_lib::arrayant<double> ant;
-        double scale = (double)(i + 1); // 1, 2, 3, ...
+        double scale = (double)(i + 1);
         ant.e_theta_re.zeros(1, 2, 1);
         ant.e_theta_re.slice(0) = arma::mat({{scale, -scale}});
         ant.e_theta_im.zeros(1, 2, 1);
@@ -51,11 +54,8 @@ build_simple_multi(const arma::vec &center_freqs, bool polarimetric = false)
     return vec;
 }
 
-// ================================================================================================
-// Helper: Build a 2-element vector with non-trivial coupling
-// Each entry has 2 elements at zero position (no phase shift needed)
-// Coupling combines both elements into 1 port via [1; 1] (sum)
-// ================================================================================================
+// Multi-frequency vector of 2 elements at zero position (no phase shift); the coupling [1; 1] sums both
+// elements into 1 port
 static std::vector<quadriga_lib::arrayant<double>>
 build_2elem_multi(const arma::vec &center_freqs)
 {
@@ -76,7 +76,6 @@ build_2elem_multi(const arma::vec &center_freqs)
         ant.azimuth_grid = {0.0, pi};
         ant.elevation_grid = {0.0};
         ant.element_pos.zeros(3, 2);
-        // [1; 1] coupling: sums both elements into a single port
         ant.coupling_re.ones(2, 1);
         ant.coupling_im.zeros(2, 1);
         ant.center_freq = center_freqs[i];
@@ -85,9 +84,7 @@ build_2elem_multi(const arma::vec &center_freqs)
     return vec;
 }
 
-// ================================================================================================
-// SECTION 1: Input validation
-// ================================================================================================
+// ---- Input validation ----
 
 TEST_CASE("Combine multi - Empty vector throws")
 {
@@ -203,9 +200,7 @@ TEST_CASE("Combine multi - Duplicate freq_new entries produce identical outputs"
         CHECK(std::abs(o.center_freq - 1500.0) < 1e-6);
 }
 
-// ================================================================================================
-// SECTION 2: Output structure
-// ================================================================================================
+// ---- Output structure ----
 
 TEST_CASE("Combine multi - Output count defaults to input count")
 {
@@ -302,9 +297,7 @@ TEST_CASE("Combine multi - Output name inherited from arrayant_vec[0]")
         CHECK(o.name == "my_array");
 }
 
-// ================================================================================================
-// SECTION 3: Single entry vector — equivalent to single-freq combine_pattern
-// ================================================================================================
+// ---- Single entry: equivalent to the single-frequency combine_pattern ----
 
 TEST_CASE("Combine multi - Single entry matches single-freq combine_pattern")
 {
@@ -338,9 +331,7 @@ TEST_CASE("Combine multi - Single entry, clamped query frequency uses that entry
     }
 }
 
-// ================================================================================================
-// SECTION 4: Exact frequency match — output matches single-freq combine_pattern per entry
-// ================================================================================================
+// ---- Exact frequency match: equal to combine_pattern per entry ----
 
 TEST_CASE("Combine multi - Default output matches per-entry single-freq combine_pattern")
 {
@@ -372,9 +363,7 @@ TEST_CASE("Combine multi - 2-element coupling sums elements correctly at exact f
     CHECK(std::abs(out[0].e_theta_re(0, 1, 0) - (-3.0)) < 1e-10);
 }
 
-// ================================================================================================
-// SECTION 5: Custom output grids
-// ================================================================================================
+// ---- Custom output grids ----
 
 TEST_CASE("Combine multi - Custom azimuth_grid_new used in output")
 {
@@ -431,9 +420,7 @@ TEST_CASE("Combine multi - All three grids custom")
     }
 }
 
-// ================================================================================================
-// SECTION 6: Frequency interpolation (between input entries)
-// ================================================================================================
+// ---- Frequency interpolation between entries ----
 
 TEST_CASE("Combine multi - Midpoint frequency interpolation (in-phase reals)")
 {
@@ -533,9 +520,7 @@ TEST_CASE("Combine multi - Coupling magnitude SLERP equals nearest at quarter po
     CHECK(std::abs(out[1].e_theta_re(0, 0, 0) - 5.0) < 1e-9);
 }
 
-// ================================================================================================
-// SECTION 7: Extrapolation (clamping)
-// ================================================================================================
+// ---- Extrapolation (clamping) ----
 
 TEST_CASE("Combine multi - Query below lowest center_freq clamps to first entry")
 {
@@ -565,14 +550,12 @@ TEST_CASE("Combine multi - Query above highest center_freq clamps to last entry"
     CHECK(arma::approx_equal(out[0].e_theta_im, ref.e_theta_im, "absdiff", 1e-9));
 }
 
-// ================================================================================================
-// SECTION 8: No-coupling (empty coupling matrices) case
-// ================================================================================================
+// ---- Empty coupling ----
 
 TEST_CASE("Combine multi - Empty coupling treated as identity")
 {
-    // Build a 2-element vector; first entry has empty coupling, but identity-shape inferred.
-    // Per arrayant_is_valid_multi, all entries must have same coupling shape (or all empty).
+    // 2-element entries, all with empty coupling (the entries of a vector share the coupling shape, or all
+    // have none)
     double pi = arma::datum::pi;
     std::vector<quadriga_lib::arrayant<double>> vec;
     for (int i = 0; i < 2; ++i)
@@ -605,9 +588,7 @@ TEST_CASE("Combine multi - Empty coupling treated as identity")
     CHECK(std::abs(out[0].e_theta_re(0, 0, 1) - 2.0) < 1e-10); // port 1 = elem 1
 }
 
-// ================================================================================================
-// SECTION 9: Multi-element pattern combination at a single output frequency
-// ================================================================================================
+// ---- Multi-element combination ----
 
 TEST_CASE("Combine multi - Cross-frequency, multi-element combination")
 {
@@ -649,9 +630,7 @@ TEST_CASE("Combine multi - Multi-port coupling produces multi-element output")
     CHECK(std::abs(out[0].e_theta_re(0, 0, 1) - 2.0) < 1e-10); // port 1 = elem 1
 }
 
-// ================================================================================================
-// SECTION 10: Element-position phase shift (frequency-dependent)
-// ================================================================================================
+// ---- Element-position phase shift ----
 
 TEST_CASE("Combine multi - Single elem at zero pos: result is real (no phase shift)")
 {
@@ -699,7 +678,6 @@ TEST_CASE("Combine multi - Element position introduces frequency-dependent phase
     REQUIRE(out.size() == 1);
     // Cross-check against single-freq combine_pattern (also negates dist)
     auto ref = quadriga_lib::arrayant_combine_pattern(ant);
-    // Allow a slightly looser tolerance: single-freq uses c=299792448 (typo), multi uses c=299792458.
     CHECK(std::abs(out[0].e_theta_re(0, 0, 0) - ref.e_theta_re(0, 0, 0)) < 1e-5);
     CHECK(std::abs(out[0].e_theta_im(0, 0, 0) - ref.e_theta_im(0, 0, 0)) < 1e-5);
 
@@ -748,8 +726,8 @@ TEST_CASE("Combine multi - Doubling frequency doubles the phase shift")
 
 TEST_CASE("Combine multi - Negated dist sign matches single-freq combine_pattern")
 {
-    // Critical regression test: ensure dist sign matches the convention of arrayant_interpolate.
-    // Use a position that produces a non-trivial phase, then compare to single-freq.
+    // The sign of the position phase matches the convention of arrayant_interpolate; a position with a
+    // non-trivial phase is compared with the single-frequency combine_pattern.
     const double C0 = 299792458.0;
     double f0 = 2.4e9;
     double lambda0 = C0 / f0;
@@ -774,14 +752,12 @@ TEST_CASE("Combine multi - Negated dist sign matches single-freq combine_pattern
     auto ref = quadriga_lib::arrayant_combine_pattern(ant);
 
     REQUIRE(out.size() == 1);
-    // Loose tolerance because of c=299792448 vs 299792458 difference; sign mismatch would be ~1.0
+    // A sign error would give a difference of order 1
     CHECK(std::abs(out[0].e_theta_re(0, 0, 0) - ref.e_theta_re(0, 0, 0)) < 1e-5);
     CHECK(std::abs(out[0].e_theta_im(0, 0, 0) - ref.e_theta_im(0, 0, 0)) < 1e-5);
 }
 
-// ================================================================================================
-// SECTION 11: Frequency-dependent pattern and coupling combined
-// ================================================================================================
+// ---- Frequency-dependent pattern and coupling ----
 
 TEST_CASE("Combine multi - GHz antenna with varying pattern and coupling")
 {
@@ -818,9 +794,7 @@ TEST_CASE("Combine multi - GHz antenna with varying pattern and coupling")
     CHECK(g3 >= g0 - 1e-9);
 }
 
-// ================================================================================================
-// SECTION 12: Acoustic / generate_speaker workflow
-// ================================================================================================
+// ---- Acoustic generate_speaker workflow ----
 
 TEST_CASE("Combine multi - Single speaker generate_speaker workflow")
 {
@@ -887,9 +861,7 @@ TEST_CASE("Combine multi - 2-way speaker workflow with arrayant_concat_multi")
     CHECK(t8k > w8k * 1.5);
 }
 
-// ================================================================================================
-// SECTION 13: Dense frequency sweep
-// ================================================================================================
+// ---- Further cases ----
 
 TEST_CASE("Combine multi - Dense sweep produces smooth finite output")
 {
@@ -911,10 +883,6 @@ TEST_CASE("Combine multi - Dense sweep produces smooth finite output")
         CHECK(out[i].e_theta_re(0, 0, 0) >= out[i - 1].e_theta_re(0, 0, 0) - 1e-9);
 }
 
-// ================================================================================================
-// SECTION 14: Unsorted input center_frequencies still work
-// ================================================================================================
-
 TEST_CASE("Combine multi - Input arrayant_vec in unsorted frequency order")
 {
     // Build entries in non-sorted order: 2000, 500, 1000
@@ -934,10 +902,6 @@ TEST_CASE("Combine multi - Input arrayant_vec in unsorted frequency order")
     CHECK(arma::approx_equal(out[2].e_theta_re, ref_2000.e_theta_re, "absdiff", 1e-9));
 }
 
-// ================================================================================================
-// SECTION 15: Single output frequency
-// ================================================================================================
-
 TEST_CASE("Combine multi - Single output frequency entry produces single output")
 {
     arma::vec entry_freqs = {1000.0, 2000.0, 3000.0};
@@ -950,10 +914,6 @@ TEST_CASE("Combine multi - Single output frequency entry produces single output"
     CHECK(std::abs(out[0].center_freq - 1500.0) < 1e-6);
 }
 
-// ================================================================================================
-// SECTION 16: Float instantiation works
-// ================================================================================================
-
 TEST_CASE("Combine multi - Float instantiation")
 {
     auto ant_f = quadriga_lib::generate_arrayant_omni<float>();
@@ -964,10 +924,6 @@ TEST_CASE("Combine multi - Float instantiation")
     REQUIRE(out.size() == 1);
     CHECK(out[0].is_valid().empty());
 }
-
-// ================================================================================================
-// SECTION 17: Polarimetric arrayant — both V and H preserved
-// ================================================================================================
 
 TEST_CASE("Combine multi - Polarimetric pattern preserves V and H")
 {
@@ -986,14 +942,10 @@ TEST_CASE("Combine multi - Polarimetric pattern preserves V and H")
     CHECK(std::abs(out[1].e_phi_re(0, 0, 0) - (-1.0)) < 1e-9);
 }
 
-// ================================================================================================
-// SECTION 18: Validation can be combined with custom grids
-// ================================================================================================
-
 TEST_CASE("Combine multi - Custom angular grid resamples pattern correctly")
 {
     double pi = arma::datum::pi;
-    // Use a omni antenna with constant pattern = 1.0 across full sphere
+    // Omni antenna with constant pattern 1.0 over the full sphere
     auto base = quadriga_lib::generate_arrayant_omni<double>();
     base.center_freq = 1.0e9;
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
@@ -1007,10 +959,6 @@ TEST_CASE("Combine multi - Custom angular grid resamples pattern correctly")
     for (arma::uword a = 0; a < 3; ++a)
         CHECK(std::abs(out[0].e_theta_re(0, a, 0) - 1.0) < 1e-6);
 }
-
-// ================================================================================================
-// SECTION 19: Two-step equivalence (combine, then re-interpolate)
-// ================================================================================================
 
 TEST_CASE("Combine multi - Default freq grid recovers per-entry combine_pattern (multi-element)")
 {
@@ -1028,7 +976,6 @@ TEST_CASE("Combine multi - Default freq grid recovers per-entry combine_pattern 
     }
 }
 
-// The position phase used the speed of light; acoustic arrays were combined without it
 TEST_CASE("Combine multi - Propagation speed")
 {
     // Two omni "speakers" 0.2 m apart at 1 kHz (lambda = 0.344 m in air), summed into one port

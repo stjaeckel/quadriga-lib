@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
 // GENERIC variants. (a) sincos in one call, (b) accumulation of 4 generators at a time; the order of the
 // additions per (position, generator) is unchanged, so the results must be bit-identical to qd_SOS_GENERIC.
 #ifndef _GNU_SOURCE

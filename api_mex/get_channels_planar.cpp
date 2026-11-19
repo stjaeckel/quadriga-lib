@@ -95,7 +95,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Parse antenna objects
     auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
     auto ant_rx = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
 
@@ -152,7 +151,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         return;
     }
 
-    // Single snapshot
     const auto aod = qd_mex_get_Col<double>(prhs[6], false, "aod");
     const auto eod = qd_mex_get_Col<double>(prhs[7], false, "eod");
     const auto aoa = qd_mex_get_Col<double>(prhs[8], false, "aoa");
@@ -165,10 +163,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
     const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[5], "rx_orientation", 3);
 
-    // Derived inputs
     arma::uword n_path = add_fake_los_path ? aod.n_elem + 1 : aod.n_elem;
 
-    // Initialize output memory
     arma::cube coeff_re, coeff_im, delay;
     arma::vec rx_Doppler;
 
@@ -180,7 +176,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         plhs[3] = qd_mex_init_output(&rx_Doppler, n_path, true);
 
-    // Call the C++ function
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_planar<double>(ant_tx, ant_rx,
                                                       tx_pos, tx_orientation, rx_pos, rx_orientation,

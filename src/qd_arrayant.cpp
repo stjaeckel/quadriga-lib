@@ -3,12 +3,11 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
-#include <cstring>   // std::memcopy
-#include <algorithm> // std::replace
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "quadriga_math.hpp"
+#include "qd_helpers_shared.hpp"
 #include "qd_helpers_arrayant.hpp"
 
 /*!SECTION
@@ -91,7 +90,7 @@ arma::uword quadriga_lib::arrayant<dtype>::n_ports() const
         return coupling_re.n_cols;
 }
 
-// ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
+// Empties all members
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::reset()
 {
@@ -122,7 +121,7 @@ void quadriga_lib::arrayant<dtype>::reset()
     if (coupling_im.n_elem != 0)
         coupling_im.reset();
 
-    center_freq = dtype(299792458.0);
+    center_freq = dtype(qd_speed_of_light);
 }
 
 /*!MD
@@ -148,7 +147,6 @@ void quadriga_lib::arrayant<dtype>::set_size(
 - **`n_ports`** — Number of ports (columns of coupling matrix)
 MD!*/
 
-// ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uword n_azimuth,
                                              arma::uword n_elements, arma::uword n_ports)
@@ -287,7 +285,7 @@ std::string qd_arrayant_check(const quadriga_lib::arrayant<dtype> &ant)
 template std::string qd_arrayant_check(const quadriga_lib::arrayant<float> &);
 template std::string qd_arrayant_check(const quadriga_lib::arrayant<double> &);
 
-// ARRAYANT METHOD : Full check; a passing check marks the object as validated
+// A passing check marks the object as validated
 template <typename dtype>
 std::string quadriga_lib::arrayant<dtype>::is_valid() const
 {
@@ -352,6 +350,5 @@ quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(arrayant
 static_assert(std::atomic<const float *>::is_always_lock_free && std::atomic<const double *>::is_always_lock_free,
               "Atomic pointers are not lock-free on this platform.");
 
-// Instantiate templates
 template class quadriga_lib::arrayant<float>;
 template class quadriga_lib::arrayant<double>;

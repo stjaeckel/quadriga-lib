@@ -7,8 +7,7 @@
 
 namespace py = pybind11;
 
-// Include parts
-#include "qpy_baseband_freq_response.cpp" // also baseband_freq_response_multi
+#include "qpy_baseband_freq_response.cpp"
 #include "qpy_channel_export_obj_file.cpp"
 #include "qpy_hdf5.cpp"
 #include "qpy_get_channels.cpp"

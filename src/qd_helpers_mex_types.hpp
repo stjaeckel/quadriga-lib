@@ -7,6 +7,7 @@
 
 #include "mex.h"
 #include "qd_helpers_mex.hpp"
+#include "qd_helpers_wrappers.hpp"
 #include "quadriga_lib.hpp"
 
 #include <algorithm>
@@ -81,22 +82,13 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant_element(const mxArr
     ant.e_phi_im = qd_mex_get_Cube<double>(get("e_phi_im"), copy, fld("e_phi_im"));
     ant.azimuth_grid = qd_mex_get_Col<double>(get("azimuth_grid"), copy, fld("azimuth_grid"));
     ant.elevation_grid = qd_mex_get_Col<double>(get("elevation_grid"), copy, fld("elevation_grid"));
-    const arma::uword n_elements = ant.e_theta_re.n_slices;
-
     if (const mxArray *a = opt("element_pos"))
         ant.element_pos = qd_mex_get_Mat<double>(a, copy, fld("element_pos"));
-    else
-        ant.element_pos.zeros(3, n_elements);
-
-    const mxArray *c_re = opt("coupling_re"), *c_im = opt("coupling_im");
-    if (c_re)
-        ant.coupling_re = qd_mex_get_Mat<double>(c_re, copy, fld("coupling_re"));
-    else if (!c_im)
-        ant.coupling_re.eye(n_elements, n_elements);
-    if (c_im)
-        ant.coupling_im = qd_mex_get_Mat<double>(c_im, copy, fld("coupling_im"));
-    else
-        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+    if (const mxArray *a = opt("coupling_re"))
+        ant.coupling_re = qd_mex_get_Mat<double>(a, copy, fld("coupling_re"));
+    if (const mxArray *a = opt("coupling_im"))
+        ant.coupling_im = qd_mex_get_Mat<double>(a, copy, fld("coupling_im"));
+    qd_arrayant_fill_defaults(ant);
 
     if (const mxArray *a = opt("center_freq"))
         ant.center_freq = qd_mex_get_scalar<double>(a, fld("center_freq"), 299792458.0);
@@ -109,11 +101,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant_element(const mxArr
 inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false,
                                                              const std::string &var_name = "")
 {
-    if (!mxIsStruct(input))
-    {
-        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
+    qd_mex_check_struct(input, var_name);
     auto ant = qd_mex_struct2arrayant_element(input, 0, copy, var_name);
     if (validate)
     {
@@ -128,11 +116,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
 inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(const mxArray *input, bool validate = false, bool copy = false,
                                                                                 const std::string &var_name = "")
 {
-    if (!mxIsStruct(input))
-    {
-        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
+    qd_mex_check_struct(input, var_name);
     std::vector<quadriga_lib::arrayant<double>> ant;
     for (size_t n = 0; n < (size_t)mxGetNumberOfElements(input); ++n)
         ant.push_back(qd_mex_struct2arrayant_element(input, n, copy, var_name));
@@ -277,11 +261,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
 inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool validate = false, bool copy = false,
                                                                        const std::string &var_name = "")
 {
-    if (!mxIsStruct(input))
-    {
-        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
+    qd_mex_check_struct(input, var_name);
     auto fld = [&](const char *f) { return var_name.empty() ? std::string(f) : var_name + "." + f; }; // Names in errors
 
     const size_t n_chan = (size_t)mxGetNumberOfElements(input);
@@ -379,8 +359,7 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
     if (mxIsEmpty(input))
         return scenpar;
 
-    if (!mxIsStruct(input) || mxGetNumberOfElements(input) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
+    qd_mex_check_struct(input, var_name, true);
 
     const int n_fields = mxGetNumberOfFields(input);
     for (int f = 0; f < n_fields; ++f)
@@ -435,8 +414,7 @@ inline std::unordered_map<std::string, std::vector<double>> qd_mex_struct2plpar(
     if (mxIsEmpty(input))
         return plpar;
 
-    if (!mxIsStruct(input) || mxGetNumberOfElements(input) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + var_name + "' must be a 1x1 struct.").c_str());
+    qd_mex_check_struct(input, var_name, true);
 
     const int n_fields = mxGetNumberOfFields(input);
     for (int f = 0; f < n_fields; ++f)
@@ -495,7 +473,6 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
     if (!dset.has_value())
         return mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL);
 
-    // Dispatch on the std::any contents
     int type_id = quadriga_lib::any_type_id(&dset);
 
 #define CASE_ARMA(id, ARMA_TYPE)                    \
@@ -585,15 +562,13 @@ inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
     "eoa", "polmat", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
 inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
-// Element i of a gbsm_rays struct array -> gbsm_rays
-// - Borrows the MATLAB memory (read-only) unless 'copy'; integer fields accept any real class (cast and checked)
+// 1x1 gbsm_rays struct -> gbsm_rays
+// - Borrows the MATLAB memory (read-only); integer fields accept any real class (cast and checked)
 // - Missing optional fields mean empty; a missing other field or an unknown field throws, naming 'var_name'
 // - Empty arrays keep their dimensions (e.g. 'power' [0, n_freq] for n_ray = 0); validation is left to is_valid()
-inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::uword i = 0, bool copy = false,
-                                                       const std::string &var_name = "rays")
+inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, const std::string &var_name = "rays")
 {
-    if (!mxIsStruct(s) || (size_t)i >= mxGetNumberOfElements(s))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + var_name + "' must be a struct.").c_str());
+    qd_mex_check_struct(s, var_name, true);
     const auto &F = qd_mex_gbsm_rays_fields;
     for (int f = 0; f < mxGetNumberOfFields(s); ++f)
         if (std::find(F.begin(), F.end(), std::string(mxGetFieldNameByNumber(s, f))) == F.end())
@@ -607,7 +582,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
 
     // Field data or nullptr (missing or unset)
     auto get = [&](const std::string &f) -> const mxArray *
-    { return mxGetField(s, (mwIndex)i, f.c_str()); };
+    { return mxGetField(s, 0, f.c_str()); };
 
     quadriga_lib::gbsm_rays r;
     const mxArray *a = get("method");
@@ -626,12 +601,12 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
     {
         using T = typename std::decay_t<decltype(x)>::elem_type;
         if ((a = get(f)) != nullptr && !mxIsEmpty(a))
-            x = qd_mex_get_Col<T>(a, copy, var_name + "." + f);
+            x = qd_mex_get_Col<T>(a, false, var_name + "." + f);
     };
     auto mat = [&](const std::string &f, arma::mat &x)
     {
         if ((a = get(f)) != nullptr)
-            x = qd_mex_get_Mat<double>(a, copy, var_name + "." + f);
+            x = qd_mex_get_Mat<double>(a, false, var_name + "." + f);
     };
     col("tx_pos", r.tx_pos), col("rx_pos", r.rx_pos), col("center_freq", r.center_freq);
     col("delay", r.delay), col("aod", r.aod), col("eod", r.eod), col("aoa", r.aoa), col("eoa", r.eoa);
@@ -639,7 +614,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
     col("fallback", r.fallback);
     mat("power", r.power), mat("fbs_pos", r.fbs_pos), mat("lbs_pos", r.lbs_pos);
     if ((a = get("polmat")) != nullptr)
-        r.polmat = qd_mex_get_Cube<double>(a, copy, var_name + ".polmat");
+        r.polmat = qd_mex_get_Cube<double>(a, false, var_name + ".polmat");
     return r;
 }
 

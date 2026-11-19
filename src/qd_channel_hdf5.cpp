@@ -828,12 +828,10 @@ template <typename dtype>
 static int qHDF_write_slot(const std::string &fn, const quadriga_lib::channel<dtype> &chan, const std::vector<std::string> &names,
                            unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
-    // Determine if the channel object has no structured data fields
     const bool channel_is_empty = chan.empty();
 
-    // Are there unstructured fields?
     if (channel_is_empty && names.empty())
-        return 0; // Nothing to be done!
+        return 0;
 
     // Open the file (created just large enough for the slot if it does not exist), the slot and its old channel group
     const char *open_error = "Error opening file. It may be opened by another program.";
@@ -1515,7 +1513,6 @@ std::any quadriga_lib::hdf5_read_dset(
 - [[any_type_id]] (inspect the type held in a `std::any`)
 MD!*/
 
-// Read unstructured data from HDF5 file
 std::any quadriga_lib::hdf5_read_dset(const std::string &fn, const std::string &name,
                                       unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                                       const std::string &prefix)
@@ -1565,7 +1562,6 @@ std::vector<std::string> quadriga_lib::hdf5_read_dset_names(
 - [[hdf5_write_dset]] (write an unstructured dataset)
 MD!*/
 
-// Read names of the unstructured data fields from the HDF file
 std::vector<std::string> quadriga_lib::hdf5_read_dset_names(const std::string &fn, unsigned ix, unsigned iy, unsigned iz,
                                                             unsigned iw, const std::string &prefix)
 {
@@ -1629,7 +1625,6 @@ void quadriga_lib::hdf5_write_dset(
 - [[any_type_id]] (inspect the type held in a `std::any`)
 MD!*/
 
-// Writes unstructured data to a hdf5 file
 void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &name, const std::any &data,
                                    unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                                    const std::string &prefix)

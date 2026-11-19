@@ -120,9 +120,7 @@ namespace
     }
 }
 
-// ------------------------------------------------------------------------------------------------------------------
-// gbsm_init_phases ("cluster")
-// ------------------------------------------------------------------------------------------------------------------
+// ---- gbsm_init_phases ("cluster") ----
 
 TEST_CASE("gbsm_init_phases - cluster: output size follows the set and the scenario")
 {
@@ -305,9 +303,7 @@ TEST_CASE("gbsm_init_phases - cluster: input validation")
     }
 }
 
-// ------------------------------------------------------------------------------------------------------------------
-// gbsm_draw ("cluster")
-// ------------------------------------------------------------------------------------------------------------------
+// ---- gbsm_draw ("cluster") ----
 
 TEST_CASE("gbsm_draw - cluster: single mobility values equal the sum of sinusoids")
 {

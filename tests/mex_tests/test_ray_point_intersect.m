@@ -1,4 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_ray_point_intersect
+% MEX interface test for quadriga_lib.ray_point_intersect.
+% Physics validation lives in the Catch2 suite (test_ray_point_intersect.cpp).
 
 points = zeros(4, 3);
 points(:, 1) = -0.1:0.1:0.2;
@@ -15,7 +21,7 @@ orig = orig - [10,20,30];
 hit_count = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir );
 assertTrue( all( hit_count == uint32(1) ) );
 
-% Test second output: ray_ind shape, type, 1-based content
+% Second output: ray_ind shape, type, 1-based content
 [hit_count, ray_ind] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir );
 assertTrue( isa(ray_ind, 'uint32') );
 assertTrue( isa(hit_count, 'uint32') );
@@ -56,7 +62,8 @@ assertEqual( hit_count, hit_count_u );
 hit_count_R = quadriga_lib.ray_point_intersect( pointsR, orig, trivec, tridir, sub_cloud_ind );
 assertEqual( hit_count, hit_count_R(reverse_ind) );
 
-try % 3 imputs
+%% Errors
+try % 3 inputs
     quadriga_lib.ray_point_intersect( orig, trivec, tridir );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -66,7 +73,7 @@ catch ME
     end
 end
 
-try % 8 imputs
+try % 8 inputs
     quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, 1, 0, 0, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -90,7 +97,7 @@ try % orig error
     [~,~] = quadriga_lib.ray_point_intersect( points, orig(1:2,:), trivec, tridir);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''trivec'' dont match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''trivec'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -120,7 +127,7 @@ try % tridir error
     [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir(1:2,:));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''tridir'' dont match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''tridir'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -150,7 +157,7 @@ try % sub-cloud error
     [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, [2,8]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-cloud must start at the first point.';
+    expectedErrorMessage = 'Input ''sub_cloud_ind'' must start at the first point.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -160,7 +167,7 @@ try % sub-cloud error
     [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, [1,33]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sub-cloud indices cannot exceed number of points.';
+    expectedErrorMessage = 'Entries of ''sub_cloud_ind'' cannot point beyond the last point.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

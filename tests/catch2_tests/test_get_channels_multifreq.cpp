@@ -2,6 +2,13 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::get_channels_multifreq: input validation, output sizes, agreement with
+// get_channels_spherical at a single frequency, delays for radio and acoustic propagation speeds, interpolation
+// of path gain (linear) and M (SLERP) between input frequencies and clamping outside them, unsorted frequency
+// grids, frequency-dependent patterns and coupling, add_fake_los_path, 0 paths, the complex output, aliasing, the
+// tilt convention and the AVX2 kernel. Oracles are closed-form path lengths and phases (k L) on axis-aligned
+// geometry and the single-frequency function.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -12,18 +19,14 @@
 #include <string>
 #include <vector>
 
-// ================================================================================================
-// Helper: Wrap a single-frequency arrayant into a 1-element vector
-// ================================================================================================
+// Wraps a single-frequency arrayant into a 1-element vector
 template <typename dtype>
 static std::vector<quadriga_lib::arrayant<dtype>> wrap_single(const quadriga_lib::arrayant<dtype> &ant)
 {
     return {ant};
 }
 
-// ================================================================================================
-// SECTION 1: Input validation
-// ================================================================================================
+// ---- Input validation ----
 
 TEST_CASE("Multifreq - Empty TX array throws")
 {
@@ -203,9 +206,7 @@ TEST_CASE("Multifreq - Non-finite TX or RX position or orientation throws")
         }
 }
 
-// ================================================================================================
-// SECTION 2: Output sizing
-// ================================================================================================
+// ---- Outputs ----
 
 TEST_CASE("Multifreq - Output vector and cube dimensions")
 {
@@ -258,16 +259,11 @@ TEST_CASE("Multifreq - Fake LOS adds extra path slice")
     REQUIRE(cr[0].n_slices == 2); // 1 path + 1 fake LOS = 2
 }
 
-// ================================================================================================
-// SECTION 3: Match single-frequency get_channels_spherical
-// ================================================================================================
-
 TEST_CASE("Multifreq - Matches get_channels_spherical for single freq, single entry")
 {
     double C = 299792458.0;
     double fc = 2997924580.0; // 10 * C (wavelength = 0.1 m)
 
-    // Create the antenna
     auto ant_single = quadriga_lib::generate_arrayant_omni<double>();
     quadriga_lib::arrayant_copy_element(ant_single, 0, {1});
     ant_single.element_pos(1, 0) = 1.0;
@@ -314,10 +310,6 @@ TEST_CASE("Multifreq - Matches get_channels_spherical for single freq, single en
     CHECK(arma::approx_equal(ci[0], ci_ref, "absdiff", 5e-6));
     CHECK(arma::approx_equal(dl[0], dl_ref, "absdiff", 1e-6));
 }
-
-// ================================================================================================
-// SECTION 4: Delay calculation with custom propagation speed
-// ================================================================================================
 
 TEST_CASE("Multifreq - Speed of sound produces correct acoustic delays")
 {
@@ -383,10 +375,6 @@ TEST_CASE("Multifreq - Radio vs acoustic delays differ by speed ratio")
     CHECK(std::abs(ratio - c_radio / c_sound) < 1e-6);
 }
 
-// ================================================================================================
-// SECTION 5: Scalar pressure Jones matrix (M with 2 rows)
-// ================================================================================================
-
 TEST_CASE("Multifreq - Scalar M (2 rows) produces same VV result as full M (8 rows)")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -421,10 +409,6 @@ TEST_CASE("Multifreq - Scalar M (2 rows) produces same VV result as full M (8 ro
     CHECK(arma::approx_equal(ci_f[0], ci_s[0], "absdiff", 1e-12));
     CHECK(arma::approx_equal(dl_f[0], dl_s[0], "absdiff", 1e-14));
 }
-
-// ================================================================================================
-// SECTION 6: Frequency interpolation of path_gain and M
-// ================================================================================================
 
 TEST_CASE("Multifreq - Path gain linearly interpolated across frequency")
 {
@@ -480,10 +464,6 @@ TEST_CASE("Multifreq - M interpolated with SLERP (phase rotation)")
     CHECK(amp < 1.5);
 }
 
-// ================================================================================================
-// SECTION 7: Extrapolation (clamping)
-// ================================================================================================
-
 TEST_CASE("Multifreq - Extrapolation clamps path gain and M")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -511,15 +491,11 @@ TEST_CASE("Multifreq - Extrapolation clamps path gain and M")
                                           fbs, lbs, pg, pl, M, fi, fo_ex, cr_ex, ci_ex, dl_ex);
 
     // Clamped below should use gain=1.0 (first entry), same as exact first entry
-    // Note: coefficients may differ slightly due to different wave number, but amplitude should match
+    // The phases differ (other wave number), the amplitudes match
     double amp_lo = std::sqrt(cr_lo[0](0, 0, 0) * cr_lo[0](0, 0, 0) + ci_lo[0](0, 0, 0) * ci_lo[0](0, 0, 0));
     double amp_ex = std::sqrt(cr_ex[0](0, 0, 0) * cr_ex[0](0, 0, 0) + ci_ex[0](0, 0, 0) * ci_ex[0](0, 0, 0));
     CHECK(std::abs(amp_lo - amp_ex) < 1e-10);
 }
-
-// ================================================================================================
-// SECTION 8: Multiple output frequencies
-// ================================================================================================
 
 TEST_CASE("Multifreq - Multiple output frequencies produce correct count and finite values")
 {
@@ -546,10 +522,6 @@ TEST_CASE("Multifreq - Multiple output frequencies produce correct count and fin
         CHECK(dl[f].is_finite());
     }
 }
-
-// ================================================================================================
-// SECTION 9: EM antenna GHz domain
-// ================================================================================================
 
 TEST_CASE("Multifreq - GHz antenna with frequency-dependent pattern")
 {
@@ -586,10 +558,6 @@ TEST_CASE("Multifreq - GHz antenna with frequency-dependent pattern")
     CHECK(a1 > a0);
     CHECK(a2 > a1);
 }
-
-// ================================================================================================
-// SECTION 10: Acoustic speaker simulation
-// ================================================================================================
 
 TEST_CASE("Multifreq - Acoustic 2-way speaker with omni microphone (documentation example)")
 {
@@ -633,7 +601,6 @@ TEST_CASE("Multifreq - Acoustic 2-way speaker with omni microphone (documentatio
     CHECK(coeff_re[0].n_cols == 2);
     CHECK(coeff_re[0].n_slices == 1);
 
-    // All outputs should be finite
     for (int f = 0; f < 3; ++f)
     {
         CHECK(coeff_re[f].is_finite());
@@ -685,10 +652,6 @@ TEST_CASE("Multifreq - Acoustic woofer dominates at low freq, tweeter at high fr
     CHECK(tweet_8k > woof_8k * 2.0);
 }
 
-// ================================================================================================
-// SECTION 11: Full polarimetric Jones matrix
-// ================================================================================================
-
 TEST_CASE("Multifreq - Full polarimetric Jones with cross-pol coupling")
 {
     // Create a cross-pol probe as RX (has both V and H response)
@@ -726,10 +689,6 @@ TEST_CASE("Multifreq - Full polarimetric Jones with cross-pol coupling")
     CHECK(amp_h > 0.1);
 }
 
-// ================================================================================================
-// SECTION 12: TX and RX orientation
-// ================================================================================================
-
 TEST_CASE("Multifreq - TX orientation rotates pattern")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
@@ -766,10 +725,6 @@ TEST_CASE("Multifreq - TX orientation rotates pattern")
     CHECK(cr[0].is_finite());
 }
 
-// ================================================================================================
-// SECTION 13: Frequency-dependent phase from wave number
-// ================================================================================================
-
 TEST_CASE("Multifreq - Different frequencies produce different phases")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -801,10 +756,6 @@ TEST_CASE("Multifreq - Different frequencies produce different phases")
     // Delays should be the same (geometry doesn't change)
     CHECK(std::abs(dl[0](0, 0, 0) - dl[1](0, 0, 0)) < 1e-14);
 }
-
-// ================================================================================================
-// SECTION 14: NLOS paths
-// ================================================================================================
 
 TEST_CASE("Multifreq - LOS and NLOS paths have different delays")
 {
@@ -838,10 +789,6 @@ TEST_CASE("Multifreq - LOS and NLOS paths have different delays")
     CHECK(std::abs(delay_los - 10.0 / C) < 1e-12);
     CHECK(std::abs(delay_nlos - d_nlos / C) < 1e-10);
 }
-
-// ================================================================================================
-// SECTION 15: Multi-element MIMO antenna
-// ================================================================================================
 
 TEST_CASE("Multifreq - 2x2 MIMO output dimensions and element scaling")
 {
@@ -880,10 +827,6 @@ TEST_CASE("Multifreq - 2x2 MIMO output dimensions and element scaling")
     CHECK(std::abs(a01 / a00 - 2.0) < 0.1);
 }
 
-// ================================================================================================
-// SECTION 16: Float template
-// ================================================================================================
-
 TEST_CASE("Multifreq - Float template compiles and runs")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<float>());
@@ -904,10 +847,6 @@ TEST_CASE("Multifreq - Float template compiles and runs")
     CHECK(cr[0].is_finite());
     CHECK(cr[1].is_finite());
 }
-
-// ================================================================================================
-// SECTION 17: Zero center_freq (phase disabled)
-// ================================================================================================
 
 TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
 {
@@ -931,10 +870,6 @@ TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
     // coeff_re should be +1.0 (unit gain, no phase rotation)
     CHECK(std::abs(cr[0](0, 0, 0) - 1.0) < 1e-10);
 }
-
-// ================================================================================================
-// SECTION 18: Multiple freq entries
-// ================================================================================================
 
 TEST_CASE("Multifreq - Multiple freq entries with varying path gain")
 {
@@ -965,10 +900,6 @@ TEST_CASE("Multifreq - Multiple freq entries with varying path gain")
     CHECK(std::abs(a2 - 3.0) < 0.01);
 }
 
-// ================================================================================================
-// SECTION 19: Absolute vs relative delays
-// ================================================================================================
-
 TEST_CASE("Multifreq - Absolute delay includes LOS, relative subtracts it")
 {
     double C = 299792458.0;
@@ -997,10 +928,6 @@ TEST_CASE("Multifreq - Absolute delay includes LOS, relative subtracts it")
     CHECK(std::abs(dl_r[0](0, 0, 0)) < 1e-14); // LOS relative = 0
 }
 
-// ================================================================================================
-// SECTION 20: Consistency across freq_new (amplitude stable, phase varies)
-// ================================================================================================
-
 TEST_CASE("Multifreq - Sweep: amplitude stable, phase varies with frequency")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -1026,10 +953,6 @@ TEST_CASE("Multifreq - Sweep: amplitude stable, phase varies with frequency")
         CHECK(std::abs(amp - amp_ref) < 1e-10);
     }
 }
-
-// ================================================================================================
-// SECTION 21: Output memory reuse (pre-allocated)
-// ================================================================================================
 
 TEST_CASE("Multifreq - Pre-allocated output vectors are reused")
 {
@@ -1064,10 +987,6 @@ TEST_CASE("Multifreq - Pre-allocated output vectors are reused")
     CHECK(cr[1].memptr() == p1);
 }
 
-// ================================================================================================
-// SECTION 22: Acoustic with single-bounce reflection
-// ================================================================================================
-
 TEST_CASE("Multifreq - Acoustic single-bounce produces NLOS delay > LOS")
 {
     double c_sound = 343.0;
@@ -1099,10 +1018,6 @@ TEST_CASE("Multifreq - Acoustic single-bounce produces NLOS delay > LOS")
     CHECK(std::abs(dl[0](0, 0, 1) - d_nlos / c_sound) < 1e-10);
 }
 
-// ================================================================================================
-// SECTION 23: Frequency-dependent path gain with acoustic simulation
-// ================================================================================================
-
 TEST_CASE("Multifreq - Air absorption increases with frequency (acoustic)")
 {
     double c_sound = 343.0;
@@ -1133,10 +1048,6 @@ TEST_CASE("Multifreq - Air absorption increases with frequency (acoustic)")
     CHECK(a_lo > a_mid);
     CHECK(a_mid > a_hi);
 }
-
-// ================================================================================================
-// SECTION 24: Coupling interpolation across frequency
-// ================================================================================================
 
 TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficients")
 {
@@ -1181,10 +1092,6 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
     CHECK(!arma::approx_equal(cr[0], cr[1], "absdiff", 1e-6));
 }
 
-// ================================================================================================
-// SECTION 25: Reversed freq_new order
-// ================================================================================================
-
 TEST_CASE("Multifreq - Reversed freq_new order gives consistent results")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -1215,13 +1122,9 @@ TEST_CASE("Multifreq - Reversed freq_new order gives consistent results")
     CHECK(arma::approx_equal(dl_f[1], dl_r[0], "absdiff", 1e-14));
 }
 
-// SECTION 26: Unsorted freq / freq_new (reference-first ordering)
-//
-// Regression guard: get_channels_multifreq must not assume freq / freq_new are sorted.
-// Acoustic ray tracing puts the path-culling reference frequency first, so the grid is
-// intentionally unordered, e.g. {125, 16, 31.5, 63, 250} where entries 1..3 fall BELOW
-// entry 0. An earlier frequency-bracket implementation clamped everything <= freq[0]
-// to column 0, silently collapsing the sub-reference bands onto the reference value.
+// freq / freq_new need not be sorted: acoustic ray tracing puts the path-culling reference frequency first,
+// e.g. {125, 16, 31.5, 63, 250}, where entries 1..3 lie below entry 0. A bracket search that clamps everything
+// <= freq[0] to column 0 would collapse these bands onto the reference value.
 TEST_CASE("Multifreq - Unsorted freq is not clamped to first entry")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -1269,16 +1172,11 @@ TEST_CASE("Multifreq - Unsorted freq is not clamped to first entry")
     CHECK(std::abs(amp(3) / a_ref - std::sqrt(25.0 / 4.0)) < 1e-9); // 63   -> col 3
     CHECK(std::abs(amp(4) / a_ref - std::sqrt(36.0 / 4.0)) < 1e-9); // 250  -> col 4
 
-    // Explicit statement of the regression: the sub-reference bands must NOT
-    // collapse onto the reference amplitude (the exact failure of the old clamp).
+    // The bands below the reference do not collapse onto the reference amplitude
     CHECK(std::abs(amp(1) - a_ref) > 1e-6);
     CHECK(std::abs(amp(2) - a_ref) > 1e-6);
     CHECK(std::abs(amp(3) - a_ref) > 1e-6);
 }
-
-// ================================================================================================
-// path_length of NLOS paths, add_fake_los_path layout
-// ================================================================================================
 
 TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
 {

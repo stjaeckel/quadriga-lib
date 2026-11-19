@@ -5,8 +5,6 @@
 #include "qd_helpers_python_types.hpp"
 #include "qd_helpers_gbsm.hpp"
 
-
-
 /*!SECTION
 Geometry-based stochastic model
 SECTION!*/
@@ -92,7 +90,6 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
                               py::handle dual_mobility,
                               py::handle horizontal)
 {
-    // Read inputs
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const auto phase_a = qd_python_numpy2arma_Cube<double>(phase, true);
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
@@ -102,12 +99,10 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
     const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-
     // Output allocation in numpy memory: (n_link, n_gen), n_gen = columns of 'phase' (checked by the library)
     arma::mat rnd;
     auto rnd_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), phase_a.n_cols, &rnd);
 
-    // Call library function
     quadriga_lib::gbsm_draw(scenpar_a, set_type, phase_a, tx_pos_a, rx_pos_a, rnd, (arma::sword)set_id, preset,
                             floor_id_a, center_freq_a, dual_mobility_b, horizontal_b);
 
@@ -169,7 +164,6 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
                                      py::handle remove_bias,
                                      py::handle horizontal)
 {
-    // Read inputs
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
@@ -177,7 +171,6 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
     const bool remove_bias_b = qd_python_flag(remove_bias, true, "remove_bias");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    // Call library function
     const arma::cube phase = quadriga_lib::gbsm_init_phases(scenpar_a, set_type, (arma::sword)seed, (arma::sword)set_id,
                                                             preset, tx_pos_a, rx_pos_a, dual_mobility_b, remove_bias_b,
                                                             horizontal_b);

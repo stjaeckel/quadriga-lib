@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down ray_point_intersect: which points lie inside which ray tubes, the consistency of the four output forms
+// (flat hit list, offsets, counts, per-point lists), agreement of the kernels, discarding the padding of point
+// buffers that are not a multiple of the AVX2 vector size, sub-cloud indices and input validation.
+// Fixtures: icosphere beams and subdivided rays from the library, hand-made parallel tubes along +z.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
 #include <iostream>
@@ -10,8 +15,7 @@
 #include <cmath>
 #include <stdexcept>
 
-// --- Helper: Check that the CSR outputs and the split form agree ---
-// Verifies the structural contract of ray_point_intersect:
+// The CSR outputs and the split form agree (structural contract of ray_point_intersect):
 //   hit_offset[0] == 0, monotone, hit_offset[n_point] == hit_ind.size()
 //   hit_count[i]  == hit_offset[i+1] - hit_offset[i]
 //   hits_per_point[i] is exactly the hit_ind block of point i
@@ -60,8 +64,7 @@ static bool csr_is_consistent(const std::vector<unsigned> &hit_ind,
     return true;
 }
 
-// --- Helper: Build a single parallel ray tube pointing in +z ---
-// Equilateral triangle of circumradius R in the z = 0 plane with all three
+// A single parallel ray tube pointing in +z: equilateral triangle of circumradius R in the z = 0 plane with all three
 // vertex rays pointing in +z, so the tube cross-section stays constant.
 static void make_parallel_tube(float R, arma::fmat &orig, arma::fmat &trivec, arma::fmat &tridir)
 {
@@ -84,7 +87,6 @@ static void make_parallel_tube(float R, arma::fmat &orig, arma::fmat &trivec, ar
 
 TEST_CASE("Ray-Point Intersect - Simple Mode")
 {
-    // Generate set of points
     arma::fmat points(4, 3);
     points.col(0) = arma::regspace<arma::fvec>(0.0f, 0.1f, 0.3f);
     points = repmat(points, 2, 1);
@@ -95,21 +97,17 @@ TEST_CASE("Ray-Point Intersect - Simple Mode")
     points.col(2) += 1.0f;
     points.col(1) *= 0.1f;
 
-    // Create a sub-cloud index
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind, reverse_ind;
     quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8, nullptr, &reverse_ind);
 
-    // Generate a set of ray beams
     arma::fmat orig, trivec, tridir;
     quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
 
-    // Change the location
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
 
-    // Call intersect
     arma::u32_vec hit_count;
     std::vector<arma::u32_vec> ind;
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir, nullptr, nullptr, &hit_count, &ind, sub_cloud_ind);
@@ -122,11 +120,9 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
     arma::vec rx_pos = {-10, -10, 0.1}; // Lower left point
     arma::vec rx_xy = {20, 20};         // x-y scale
 
-    // Generate x and y vectors
     arma::vec x = arma::regspace(rx_pos(0), res, rx_pos(0) + rx_xy(0));
     arma::vec y = arma::regspace(rx_pos(1), res, rx_pos(1) + rx_xy(1));
 
-    // Create meshgrid
     arma::mat X(y.n_elem, x.n_elem);
     arma::mat Y(y.n_elem, x.n_elem);
 
@@ -136,22 +132,18 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
     for (arma::uword j = 0; j < x.n_elem; ++j)
         Y.col(j) = y;
 
-    // Flatten the meshgrid and create the points matrix
     arma::mat points(X.n_elem, 3);
     points.col(0) = arma::vectorise(X);
     points.col(1) = arma::vectorise(Y);
     points.col(2).fill(rx_pos(2));
 
-    // Generate a set of ray beams
     arma::mat orig, trivec, tridir;
     quadriga_lib::icosphere<double>(12, 1.0, orig, nullptr, &trivec, &tridir, true);
 
-    // Change the location
     orig.col(0) -= 10.0;
     orig.col(1) -= 20.0;
     orig.col(2) -= 30.0;
 
-    // Call intersect
     arma::u32_vec hit_count;
     std::vector<arma::u32_vec> ind;
     quadriga_lib::ray_point_intersect<double>(points, orig, trivec, tridir, nullptr, nullptr, &hit_count, &ind);
@@ -163,7 +155,6 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
     quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN);
     CHECK(origN.n_rows == 4 * orig.n_rows);
 
-    // Call intersect
     hit_count.reset();
     quadriga_lib::ray_point_intersect<double>(points, origN, trivecN, tridirN, nullptr, nullptr, &hit_count);
     CHECK(arma::all(hit_count == 1));
@@ -182,7 +173,6 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
     quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN, nullptr, index);
     CHECK(origN.n_rows == 4 * index.n_elem);
 
-    // Call intersect
     hit_count.reset();
     quadriga_lib::ray_point_intersect<double>(points, origN, trivecN, tridirN, nullptr, nullptr, &hit_count);
     CHECK(arma::all(hit_count == 1));

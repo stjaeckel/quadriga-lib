@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.RTtools.cube and RTtools.plane: face winding under negative scales.
+
 import sys
 import os
 import unittest

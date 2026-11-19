@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of the quadriga_lib::path class: the buffer layout and seeding of EM and scalar paths, accessor bounds,
+// calc_length, calc_gain, polmat_update, duplicate and extend (including the inline/buffer boundary of the
+// interaction codes), and move, copy and free. Oracles are hand computations on unit-distance geometry, the
+// free-space path loss (c / (4 pi f d))^2, and a mirror of the buffer layout of qd_path.cpp.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
 
@@ -249,7 +254,7 @@ TEST_CASE("path - calc_gain EM free-space path loss")
 
     CHECK(std::abs(p.calc_gain(freq) - expected) < 1.0e-6f * expected);
 
-    // Same value as the GHz form used before the frequency was taken in Hz: lambda = 0.299792458 / f_GHz
+    // Same value as the GHz form with lambda = 0.299792458 / f_GHz
     for (float f_Hz : {1.0e6f, 2.4e9f, 28.0e9f, 300.0e9f})
     {
         float k_GHz = 0.299792458f / (12.566370614f * (f_Hz * 1.0e-9f) * p.length());

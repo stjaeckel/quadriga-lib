@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of get_channels_irs, combine_irs_coord and channel::add_paths. get_channels_irs: path loss, IRS array
+// gain and delays on TX-IRS-RX geometries with closed-form path lengths, empty segments, input shapes, aliasing,
+// the tilt convention, a separate RX-side IRS array, and AVX2 against GENERIC. combine_irs_coord: the merged
+// coordinate list with reversed segments and inactive paths. add_paths: the size checks of each field.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_lib.hpp"
@@ -216,7 +221,7 @@ TEST_CASE("Tools - Combine IRS Coord")
          {2, 2, 0, 2, 2, 0, -2, -2, 0, 0, -2, -2}};
     CHECK(arma::approx_equal(interact_coord, T, "absdiff", 1e-14));
 
-    // Reverse both segment2
+    // Reverse both segments
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
                                     n_interact_1, interact_coord_1, n_interact_2, interact_coord_2,
                                     n_interact, interact_coord, 1, 1);
@@ -242,7 +247,7 @@ TEST_CASE("Tools - Combine IRS Coord")
          {2, 2, 0, -2, -2, 0, 0, -2, -2}};
     CHECK(arma::approx_equal(interact_coord, T, "absdiff", 1e-14));
 
-    // Disable first path
+    // Disable paths 1 and 3 as well
     active_path[1] = false;
     active_path[3] = false;
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
@@ -262,7 +267,7 @@ TEST_CASE("Channel - Add Paths")
     c.tx_pos = arma::mat(3, 1);
     c.tx_pos(2, 0) = 1.0;
 
-    c.rx_pos = arma::mat(3, 2); // 2 sanpshots
+    c.rx_pos = arma::mat(3, 2); // 2 snapshots
     c.rx_pos(0, 0) = 20.0;
     c.rx_pos(1, 0) = 0.0;
     c.rx_pos(2, 0) = 1.0;
@@ -279,7 +284,7 @@ TEST_CASE("Channel - Add Paths")
     // Test out of bound
     REQUIRE_THROWS_AS(c.add_paths(2), std::invalid_argument);
 
-    // Channel object requires exisiting MIMO coefficients
+    // Channel object requires existing MIMO coefficients
     REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_new), std::invalid_argument);
 
     // Add coefficients to channel
@@ -393,7 +398,7 @@ TEST_CASE("Channel - Add Paths")
     c.path_length.push_back(arma::vec(15, arma::fill::randn));
     c.path_length.push_back(arma::vec(12, arma::fill::randn));
 
-    // Path gain and path lenght mismatch
+    // Path gain and path length mismatch
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, &path_gain, &path_length), std::invalid_argument);
 
     // No path length provided (but channel has it)
@@ -418,7 +423,7 @@ TEST_CASE("Channel - Add Paths")
     // Mismatch
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_gain, &path_polarization), std::invalid_argument);
 
-    // No path length provided (but channel has it)
+    // No path_polarization provided (but channel has it)
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length), std::invalid_argument);
 
     // OK
@@ -433,12 +438,12 @@ TEST_CASE("Channel - Add Paths")
     path_polarization = arma::mat(8, 2, arma::fill::randn);
     auto path_angles = arma::mat(2, 4, arma::fill::randn);
 
-    // Channel has no path_polarization
+    // Channel has no path_angles
     REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_polarization, &path_angles), std::invalid_argument);
     c.path_angles.push_back(arma::mat(15, 4, arma::fill::randn));
     c.path_angles.push_back(arma::mat(14, 4, arma::fill::randn));
 
-    // No path length provided (but channel has it)
+    // No path_angles provided (but channel has it)
     REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_polarization), std::invalid_argument);
 
     // OK
@@ -452,12 +457,12 @@ TEST_CASE("Channel - Add Paths")
     c.polmat.clear();
     auto path_pos = arma::mat(3, 2, arma::fill::randn);
 
-    // Channel has no path_polarization
+    // Channel has no fbs_pos
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles, &path_pos), std::invalid_argument);
     c.fbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
     c.fbs_pos.push_back(arma::mat(3, 14, arma::fill::randn));
 
-    // No path length provided (but channel has it)
+    // No fbs_pos provided (but channel has it)
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles), std::invalid_argument);
 
     // OK
@@ -467,13 +472,13 @@ TEST_CASE("Channel - Add Paths")
     CHECK(n_paths[0] == 17ULL);
     CHECK(n_paths[1] == 16ULL);
 
-    // Channel has no path_polarization
+    // Add lbs_pos; the channel has no lbs_pos
     c.path_angles.clear();
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos, &path_pos), std::invalid_argument);
     c.lbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
     c.lbs_pos.push_back(arma::mat(3, 16, arma::fill::randn));
 
-    // No path length provided (but channel has it)
+    // No lbs_pos provided (but channel has it)
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos), std::invalid_argument);
 
     // OK
@@ -486,10 +491,8 @@ TEST_CASE("Channel - Add Paths")
 
 TEST_CASE("Tools - Combine IRS Coord inactive")
 {
-    // n_path_1 = 1, n_path_2 = 3
-    // active_path skips middle path (index 1)
-    // pI2 = [1, 2, 1] — middle path has 2 coords that must still advance i_start_2
-    // Without the bug fix, path 2 reads from the wrong offset in interact_coord_2
+    // n_path_1 = 1, n_path_2 = 3; active_path skips the middle path (index 1), whose 2 coordinates
+    // in interact_coord_2 (n_interact_2 = [1, 2, 1]) must still advance the read offset for path 2
 
     float Ix = 1.0f, Iy = 2.0f, Iz = 3.0f;
 
@@ -544,7 +547,7 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
     CHECK(interact_coord(2, 2) == 22.0f);
 
     // Path 1: seg1[0] → IRS → seg2[2]  (seg2 path index 2, col 3 in interact_coord_2)
-    // Bug: without fix this reads col 1 ([30,31,32]) instead of col 3 ([40,41,42])
+    // An offset not advanced past the inactive path would read col 1 ([30,31,32]) instead of col 3 ([40,41,42])
     CHECK(interact_coord(0, 3) == 10.0f);
     CHECK(interact_coord(1, 3) == 11.0f);
     CHECK(interact_coord(2, 3) == 12.0f);
@@ -656,7 +659,7 @@ TEST_CASE("Tools - Combine IRS Coord - shapes of interact_coord_1 / _2 are check
     arma::u32_vec n10 = {10}, n1 = {1}, n0 = {0}, n23 = {2, 3};
     arma::mat c3x10(3, 10, arma::fill::ones), c3x1(3, 1, arma::fill::ones), c3x5(3, 5, arma::fill::ones);
 
-    CHECK(throws_naming(n10, arma::mat(2, 10, arma::fill::ones), n1, c3x1, "interact_coord_1")); // heap over-read before
+    CHECK(throws_naming(n10, arma::mat(2, 10, arma::fill::ones), n1, c3x1, "interact_coord_1"));
     CHECK(throws_naming(n10, arma::mat(3, 9, arma::fill::ones), n1, c3x1, "interact_coord_1"));
     CHECK(throws_naming(n10, arma::mat(4, 10, arma::fill::ones), n1, c3x1, "interact_coord_1"));
     CHECK(throws_naming(n10, c3x10, n1, arma::mat(2, 1, arma::fill::ones), "interact_coord_2"));

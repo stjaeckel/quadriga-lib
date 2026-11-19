@@ -7,7 +7,6 @@
 
 namespace py = pybind11;
 
-// Include parts
 #include "qpy_sos_generate.cpp"
 #include "qpy_sos_acf.cpp"
 #include "qpy_sos_val.cpp"

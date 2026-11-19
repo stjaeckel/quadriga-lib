@@ -97,7 +97,6 @@ auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
 MD!*/
 
 // Piston directivity function: 2*J1(x)/x, returns 1.0 at x=0
-// Uses C++17 std::cyl_bessel_j for J1
 static double qd_piston_directivity(double x)
 {
     double ax = std::abs(x);
@@ -117,10 +116,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
 {
     arma::Col<dtype> center_freq = center_freq_in; // Local copy; filled with third-octave bands if not given
 
-    // Constants
     const double c_sound = qd_speed_of_sound; // Speed of sound in [m/s]
-    const double pi = arma::datum::pi;   // 3.14159...
-    const double two_pi = 2.0 * pi;     // 6.28318...
+    const double pi = arma::datum::pi;
+    const double two_pi = 2.0 * pi;
 
     // --- Input validation ---
     if (driver_type != "piston" && driver_type != "horn" && driver_type != "omni")
@@ -231,10 +229,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
     // --- Sensitivity: linear amplitude relative to 85 dB SPL reference ---
     double sens_lin = std::pow(10.0, ((double)sensitivity_dB - 85.0) / 20.0);
 
-    // --- Horn: compute cosine-power exponents from coverage angles ---
-    // For cos^n(theta) pattern: -3dB at theta_3dB means cos^n(theta_3dB) = 0.5
-    // Solving: n = log(0.5) / log(cos(theta_3dB/2))
-    // (theta_3dB/2 because the coverage angle is the full -3dB width)
+    // --- Horn: cosine-power exponents from the coverage angles ---
+    // The coverage angle is the full width at which cos^n(theta) = 0.5: n = log(0.5) / log(cos(coverage / 2))
     double horn_exp_h = 1.0, horn_exp_v = 1.0;
     if (driver_type == "horn")
     {
@@ -387,7 +383,6 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
             }
         }
 
-        // Set the data pointers for quick validation
         qd_arrayant_mark_valid(ant);
     }
 

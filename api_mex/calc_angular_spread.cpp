@@ -55,13 +55,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs: convert MATLAB matrices to std::vector<arma::vec>
     const std::vector<arma::vec> az = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "az");
     const std::vector<arma::vec> el = qd_mex_matlab2vector_Col<double>(prhs[1], 1, "el");
     const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[2], 1, "powers");
@@ -70,23 +68,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool calc_bank_angle = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "calc_bank_angle", false);
     const double quantize_deg = (nrhs < 6) ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "quantize_deg", 0.0);
 
-    // Declare output variables
     arma::vec azimuth_spread, elevation_spread;
     arma::mat orientation;
     std::vector<arma::vec> phi, theta;
 
-    // Set up optional output pointers based on nlhs
     arma::vec *p_es = (nlhs > 1) ? &elevation_spread : nullptr;
     arma::mat *p_orient = (nlhs > 2) ? &orientation : nullptr;
     std::vector<arma::vec> *p_phi = (nlhs > 3) ? &phi : nullptr;
     std::vector<arma::vec> *p_theta = (nlhs > 4) ? &theta : nullptr;
 
-    // Call library function (double precision only)
     CALL_QD(quadriga_lib::calc_angular_spread<double>(
         az, el, powers, &azimuth_spread, p_es, p_orient, p_phi, p_theta,
         wrapping, calc_bank_angle, quantize_deg));
 
-    // Write outputs to MATLAB
     plhs[0] = qd_mex_copy2matlab(&azimuth_spread);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&elevation_spread);

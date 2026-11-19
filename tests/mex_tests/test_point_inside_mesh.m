@@ -1,5 +1,12 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_point_inside_mesh
-    % Define the mesh as a 12×9 matrix (each row: [x1 y1 z1  x2 y2 z2  x3 y3 z3]):
+% MEX interface test for quadriga_lib.point_inside_mesh.
+% Physics validation lives in the Catch2 suite (test_point_inside_mesh.cpp).
+
+    %% Setup: cube mesh, one face per row [x1 y1 z1  x2 y2 z2  x3 y3 z3], faces numbered from 0
     mesh = [ ...
         -1.0,  1.0,  1.0,   1.0, -1.0,  1.0,   1.0,  1.0,  1.0;   %  0 Top NorthEast
          1.0, -1.0,  1.0,  -1.0, -1.0, -1.0,   1.0, -1.0, -1.0;   %  1 South Lower
@@ -15,75 +22,45 @@ function test_point_inside_mesh
         -1.0,  1.0,  1.0,   1.0,  1.0,  1.0,   1.0,  1.0, -1.0    % 11 North Upper
     ];
 
-    % Define the two query points as a 2×3 array:
     points = [ ...
          0.0,  0.0,  0.5;   % inside
         -1.1,  0.0,  0.0    % outside
     ];
 
-    % Define obj_ind = [2;2;…;2]
+    % All faces belong to object 2
     obj_ind = ones(12,1) * 2;
 
-    % ───────────────────────────────────────────────────────────────
-    % Case 1: Provide (points, mesh, obj_ind) without distance
-    % Expected (from C++/Python reference):
-    %   res should be a 2×1 uint32 vector,
-    %   res(1) == 2, res(2) == 0
-    % ───────────────────────────────────────────────────────────────
+    %% Case 1: (points, mesh, obj_ind) without distance
     res = quadriga_lib.point_inside_mesh(points, mesh, obj_ind);
     assertEqual(2, numel(res), 'Number of results must be 2');
     assertEqual(uint64(2), res(1), 'First point should map to object index 2');
     assertEqual(uint64(0), res(2), 'Second point is outside → 0');
 
-    % ───────────────────────────────────────────────────────────────
-    % Case 2: Provide only (points, mesh), no obj_ind, no distance
-    % Expected:
-    %   res(1) == 1  (face index + 1 of the containing triangle)
-    %   res(2) == 0
-    % ───────────────────────────────────────────────────────────────
+    %% Case 2: (points, mesh), no obj_ind, no distance
     res = quadriga_lib.point_inside_mesh(points, mesh);
     assertEqual(2, numel(res), 'Number of results must be 2');
     assertEqual(uint64(1), res(1), 'Without obj_ind, returns face index+1 = 1');
     assertEqual(uint64(0), res(2), 'Outside → 0');
 
-    % ───────────────────────────────────────────────────────────────
-    % Case 3: Provide (points, mesh, [], distance = 0.12)
-    % Passing empty obj_ind ([]) and specifying distance
-    % Expected:
-    %   res(1) == 1  (within tolerance of face 0)
-    %   res(2) == 1  (second point is within 0.12 of some face)
-    % ───────────────────────────────────────────────────────────────
+    %% Case 3: (points, mesh, [], distance = 0.12): the outside point is 0.1 from the mesh
     res = quadriga_lib.point_inside_mesh(points, mesh, [], 0.12);
     assertEqual(2, numel(res), 'Number of results must be 2');
     assertEqual(uint64(1), res(1), 'First point within 0.12 → face index+1 = 1');
     assertEqual(uint64(1), res(2), 'Second point within 0.12 of face 0 → 1');
 
-    % ───────────────────────────────────────────────────────────────
-    % Case 4: Provide (points, mesh, obj_ind, distance = 0.09)
-    % Expected (tolerance too small to catch either point near face):
-    %   res(1) == 2
-    %   res(2) == 0
-    % ───────────────────────────────────────────────────────────────
+    %% Case 4: (points, mesh, obj_ind, distance = 0.09): too small to reach the outside point
     res = quadriga_lib.point_inside_mesh(points, mesh, obj_ind, 0.09);
     assertEqual(2, numel(res), 'Number of results must be 2');
     assertEqual(uint64(2), res(1), 'First point exactly inside → obj_ind=2');
     assertEqual(uint64(0), res(2), 'Second still outside → 0');
 
-    % ───────────────────────────────────────────────────────────────
-    % Case 5: Provide (points, mesh, obj_ind, distance = 2.0)
-    % With large tolerance, both points are “close enough” to some face.
-    % Expected:
-    %   res(1) == 2
-    %   res(2) == 2
-    % ───────────────────────────────────────────────────────────────
+    %% Case 5: (points, mesh, obj_ind, distance = 2.0): both points are within the distance
     res = quadriga_lib.point_inside_mesh(points, mesh, obj_ind, 2.0);
     assertEqual(2, numel(res), 'Number of results must be 2');
     assertEqual(uint64(2), res(1), 'First point → obj_ind = 2');
     assertEqual(uint64(2), res(2), 'Second point within 2.0 → obj_ind = 2');
 
-    % ───────────────────────────────────────────────────────────────
-    % obj_ind is 1-based in MATLAB and 0-based in C++: 0 and non-integers are rejected
-    % ───────────────────────────────────────────────────────────────
+    %% Errors: obj_ind is 1-based in MATLAB and 0-based in C++; 0 and non-integers are rejected
     assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, zeros(12,1)), 'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
     assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, [ones(11,1); 0]), 'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
     assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, ones(12,1)*1.5), 'Entries in ''obj_ind'' must be positive integers.' );

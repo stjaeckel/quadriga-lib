@@ -7,20 +7,6 @@
 #include "qd_helpers_mex.hpp"
 
 #include <cmath>
-#include <string>
-
-// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
-// the argument instead of wrapping around in the conversion to an unsigned type.
-static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
-{
-    const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
-    {
-        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
-    return (arma::uword)v;
-}
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -95,19 +81,17 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 10)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::vec acf = qd_mex_get_Col<double>(prhs[0], false, "acf");
     const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
-    const arma::uword n_coeff = qd_mex_sos_count(prhs[2], "n_coeff", 0.0);
-    const arma::uword n_dim = (nrhs < 4) ? 3 : qd_mex_sos_count(prhs[3], "n_dim", 3.0);
+    const arma::uword n_coeff = qd_mex_get_count(prhs[2], "n_coeff", 0.0);
+    const arma::uword n_dim = (nrhs < 4) ? 3 : qd_mex_get_count(prhs[3], "n_dim", 3.0);
     const bool uniform_smp = (nrhs < 5) ? true : qd_mex_get_scalar<bool>(prhs[4], "uniform_smp", true);
-    const arma::uword n_dir = (nrhs < 6) ? 10 : qd_mex_sos_count(prhs[5], "n_dir", 10.0);
+    const arma::uword n_dir = (nrhs < 6) ? 10 : qd_mex_get_count(prhs[5], "n_dir", 10.0);
     const bool random_init = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "random_init", true);
     const double spatial_freq_min = (nrhs < 8) ? 0.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_min", 0.0);
     const double spatial_freq_max = (nrhs < 9) ? NAN : qd_mex_get_scalar<double>(prhs[8], "spatial_freq_max", NAN);
@@ -119,10 +103,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_ase = (nlhs > 1) ? &ase : nullptr;
     arma::mat *p_test_dir = (nlhs > 2) ? &test_dir : nullptr;
 
-    // Call library function
     CALL_QD(spatial_freq = quadriga_lib::sos_generate<double>(acf, dist, n_coeff, p_ase, p_test_dir, n_dim, uniform_smp, n_dir, random_init, spatial_freq_min, spatial_freq_max, seed));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&spatial_freq);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&ase);

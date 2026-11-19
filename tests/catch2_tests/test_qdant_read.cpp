@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// qdant_read: hand-written QDANT files (magnitudes in dB, phases and grids in degrees) give the expected linear
+// fields, radians, coupling and center frequency; also XML namespaces, the ID lookup and the errors for missing IDs,
+// malformed counts and empty grids. Writing and multi-entry files are covered by test_qdant_write and test_qdant_multi.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -177,7 +181,7 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
 
     std::remove("test.qdant");
 }
-// A request for ID 1 returned the first entry of the file, also when that entry has another ID
+// A requested ID that is not in the file throws, also ID 1 when the first entry has another ID
 TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
 {
     const std::string fn = "test_qdant_missing_id.qdant";
@@ -250,7 +254,7 @@ static std::string qdant_read_exception(const std::string &fn, const std::string
     return "none";
 }
 
-// The reader allocated memory from counts in the file without checking them against the data
+// Counts in the file that the data does not back throw instead of allocating memory
 TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_error")
 {
     const std::string fn = "test_qdant_malformed.qdant";
@@ -258,7 +262,7 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_err
     auto ant = [&](const std::string &body)
     { return "<qdant><arrayant id=\"1\">" + body + "</arrayant></qdant>\n"; };
 
-    // The 138-byte file of the report: 2e8 elements, no data
+    // 2e8 elements, no data
     CHECK(qdant_read_exception(fn, ant("<NoElements>200000000</NoElements>" + grid)) == "runtime_error");
 
     // Element count not backed by positions, coupling or pattern data
@@ -344,7 +348,7 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_err
 
 TEST_CASE("Arrayant reading from QDANT file - Empty grid throws")
 {
-    // An empty grid with pattern nodes present used to reach the pattern copy with empty buffers
+    // An empty grid with pattern nodes present throws an error that names the grid
     const std::string fn = "test_qdant_empty_grid.qdant";
     for (int empty_az = 0; empty_az < 2; ++empty_az)
     {

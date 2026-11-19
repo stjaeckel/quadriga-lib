@@ -1480,7 +1480,7 @@ static const double qd_sos_table_Comb1024[1024] = {
     0.016644191904285465, -0.019294246998407576, 0.066865185835696658, -0.02924014045918346};
 
 // Type (0 = Exp, 1 = Gauss, 2 = Comb) and number of sinusoids of a preset name; false for an unknown name
-// Declared in quadriga_lib_helper_functions.hpp, also used by sos_randn, sos_rand and sos_randi
+// Declared in qd_helpers_sos.hpp
 bool qd_sos_preset_lookup(const std::string &name, int &type, arma::uword &n_coeff)
 {
     type = -1;

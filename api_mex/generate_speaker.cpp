@@ -70,13 +70,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const std::string driver_type = (nrhs < 1) ? "piston" : qd_mex_get_string(prhs[0], "piston", "driver_type");
     const double radius = (nrhs < 2) ? 0.05 : qd_mex_get_scalar<double>(prhs[1], "radius", 0.05);
     const double lower_cutoff = (nrhs < 3) ? 80.0 : qd_mex_get_scalar<double>(prhs[2], "lower_cutoff", 80.0);
@@ -93,7 +91,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec center_freq = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13], false, "center_freq");
     const double angular_resolution_deg = (nrhs < 15) ? 5.0 : qd_mex_get_scalar<double>(prhs[14], "angular_resolution_deg", 5.0);
 
-    // Call library function
     std::vector<quadriga_lib::arrayant<double>> ant;
     CALL_QD(ant = quadriga_lib::generate_speaker<double>(driver_type, radius, lower_cutoff,
                                                          upper_cutoff, lower_rolloff_slope_dB,
@@ -103,6 +100,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          baffle_height, center_freq,
                                                          angular_resolution_deg));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_arrayant2struct_multi(ant);
 }

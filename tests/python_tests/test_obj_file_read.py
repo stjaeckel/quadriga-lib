@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.RTtools.obj_file_read.
+
 import sys
 import os
 import unittest
@@ -20,7 +22,7 @@ import quadriga_lib
 #   mesh, vert_list, face_ind, obj_ind, obj_names,
 #   mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop
 
-# Per-column defaults for absent EM columns (mirrors the consumer-side defaults).
+# Per-column defaults for absent EM columns.
 _EM_DEFAULTS = {"a": 1.0, "b": 0.0, "c": 0.0, "d": 0.0, "att": 0.0,
                 "attB": 0.0, "alpha": 0.0, "alphaB": 0.0, "fRef": 1.0}
 _EM_ORDER = ["a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"]
@@ -31,7 +33,7 @@ def prop_at(csv_prop, key, idx):
     idx == 0 means 'no material' (outside) -> documented transparent defaults.
     Absent columns fall back to their per-column default."""
     if idx == 0:
-        return _EM_DEFAULTS.get(key, 0.0)   # a=1, fRef=1, rest 0
+        return _EM_DEFAULTS.get(key, 0.0)
     arr_idx = idx - 1
     if key in csv_prop:
         return float(csv_prop[key][arr_idx])
@@ -158,7 +160,6 @@ class test_case(unittest.TestCase):
         # No output should be fine
         quadriga_lib.RTtools.obj_file_read(fn)
 
-        # Read all
         (
             mesh,
             vert_list,
@@ -242,7 +243,7 @@ class test_case(unittest.TestCase):
             quadriga_lib.RTtools.obj_file_read(fn)
 
         assert len(obj_names) == 2
-        # Faces 0-1 have no usemtl -> synthetic "default" -> air (a = 1)
+        # Faces 0-1 have no usemtl -> no material (csv_ind 0) -> transparent defaults (a = 1)
         # Faces 2-3 are itu_wood (a = 1.99)
         npt.assert_almost_equal(prop_at(csv_prop, "a", csv_ind[0]), 1.0, decimal=14)
         npt.assert_almost_equal(prop_at(csv_prop, "a", csv_ind[1]), 1.0, decimal=14)

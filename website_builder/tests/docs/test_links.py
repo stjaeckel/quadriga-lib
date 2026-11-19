@@ -94,6 +94,13 @@ def test_mapping_errors(mini_repo, run_docs, toml, message):
     assert code == 1 and "docs_builder/content/api_matching.toml:2: error: " + message in out
 
 
+def test_mapping_error_unknown_python_name(mini_repo, run_docs):
+    (mini_repo / "docs_builder/content/api_matching.toml").write_text('[python_names]\nnosuch = "version"\n', encoding="utf-8")
+    code, out = run_docs(mini_repo)
+    assert code == 1 and ("docs_builder/content/api_matching.toml:2: error: unknown Python function 'nosuch' in "
+                          "[python_names]") in out
+
+
 @pytest.mark.parametrize("target, location, expected", [
     # HTML pages: same page, other page, folder depth, the 404 page (root-absolute)
     ("cpp_api.html#.interpolate", "cpp_api.html", "#.interpolate"),

@@ -69,13 +69,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 4 || nrhs > 9)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string model = qd_mex_get_string(prhs[0], "", "model");
     const arma::vec d2d_out = qd_mex_get_Col<double>(prhs[1], false, "d2d_out");
     const arma::vec h_bs = qd_mex_get_Col<double>(prhs[2], false, "h_bs");
@@ -96,10 +94,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else if (nlhs > 1) // [], or [0, n_freq] for no link: an empty 'rnd_g' is then a valid input
         plhs[1] = mxCreateDoubleMatrix(0, d2d_out.is_empty() ? center_freq.n_elem : 0, mxREAL);
 
-    // Wrap optional pointers
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
-    // Call library function
     CALL_QD(p_los = quadriga_lib::los_probability(model, d2d_out, h_bs, h_ut, d_clutter, r_clutter, h_clutter,
                                                   rnd_g, center_freq, p_los_soft));
     plhs[0] = qd_mex_copy2matlab(&p_los);

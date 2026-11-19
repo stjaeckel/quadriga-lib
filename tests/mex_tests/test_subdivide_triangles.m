@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_subdivide_triangles
+% MEX interface test for quadriga_lib.subdivide_triangles.
 
 tri = rand(12,9);
 
@@ -33,8 +38,8 @@ assertEqual( mtlo0([1:4, 9:48]), mtlo([1:4, 9:48]) );
 % 0 outputs
 quadriga_lib.subdivide_triangles(2, tri, mtli);
 
-
-try % 5 imputs
+%% Errors
+try % 4 inputs
     quadriga_lib.subdivide_triangles(2,tri, mtli, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -44,7 +49,7 @@ catch ME
     end
 end
 
-try % 0 imputs
+try % 0 inputs
     quadriga_lib.subdivide_triangles;
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -54,7 +59,7 @@ catch ME
     end
 end
 
-try % 3outputs
+try % 3 outputs
     [~,~,~] =  quadriga_lib.subdivide_triangles(2,tri, mtli);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -68,7 +73,7 @@ try
     tro = quadriga_lib.subdivide_triangles(1, rand(3,3));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''triangles_in'' must have 9 columns.';
+    expectedErrorMessage = 'Input ''triangles_in'' must have 9 columns containing x,y,z coordinates of 3 vertices.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

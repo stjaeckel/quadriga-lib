@@ -191,7 +191,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
     if (ray_ind != nullptr && ray_ind->n_elem != n_path)
         ray_ind->set_size(n_path);
 
-    const double c0 = 299792458.0, pi2 = 6.283185307179586;
+    const double c0 = qd_speed_of_light, pi2 = 6.283185307179586;
 
     // K rescale per frequency (TR coefficient powers with K' = kf_ratio·K_c, K_c = S_L / S_N the K-factor of the
     // coefficient powers): a_L = r·(S_L + S_N) / (r·S_L + S_N) for LOS and GR, a_N = (S_L + S_N) / (r·S_L + S_N)

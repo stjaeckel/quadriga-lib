@@ -89,13 +89,13 @@
 
 #include "quadriga_tools.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 
 #include <complex>
 #include <unordered_map>
 #include <vector>
 #include <string>
 #include <stdexcept>
-#include <cstring>
 #include <cmath>
 #include <cstdint>
 
@@ -110,6 +110,12 @@ namespace
     constexpr double colocation_dist = 0.001;
 
     constexpr double half_pi = 1.5707963267948966;
+
+    // Material-model frequency in GHz of a public frequency argument in Hz (acoustic Hz in scalar mode)
+    inline double qd_material_fGHz(double f_Hz, bool scalar_mode)
+    {
+        return (scalar_mode ? f_Hz * qd_acoustic_freq_scale : f_Hz) * 1.0e-9;
+    }
 
     // One float ulp at magnitude one, as written (the relaunch offset and the float rounding allowance).
     constexpr double float_ulp = 1.1920929e-7;
@@ -130,7 +136,7 @@ namespace
     // Free-space wavenumber (rad/m) at fGHz.
     inline double k0(double fGHz)
     {
-        return 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
+        return 2.0 * 3.14159265358979323846 * fGHz * 1e9 / qd_speed_of_light;
     }
 
     // A refraction-root argument that is negative real up to rounding, whose root has to be the decaying
@@ -287,26 +293,10 @@ namespace
 
         MaterialCols() = default; // All pointers stay nullptr
 
-        MaterialCols(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
+        // 'state_words': at most 16383 materials, see qd_material_count
+        MaterialCols(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, bool state_words = false)
+            : n_mtl(qd_material_count(mtl_prop, state_words))
         {
-            n_mtl = 0;
-            bool seen = false;
-            for (const auto &kv : mtl_prop)
-            {
-                if (kv.second.empty())
-                    continue;
-                arma::uword len = (arma::uword)kv.second.size();
-                if (!seen)
-                {
-                    n_mtl = len;
-                    seen = true;
-                }
-                else if (len != n_mtl)
-                    throw std::invalid_argument("Material property column '" + kv.first + "' has length " +
-                                                std::to_string(len) + ", expected " + std::to_string(n_mtl) +
-                                                " (all columns must have the same number of materials).");
-            }
-
             auto resolve = [&mtl_prop](const std::string &key) -> const dtype *
             {
                 auto it = mtl_prop.find(key);
@@ -1515,21 +1505,6 @@ namespace
 
     // ---- 6 Face-hit geometry (ray_mesh_interact) ----------------------------------------------------------
 
-    // Normalizes (x, y, z) with the reciprocal of its length above 2e-7, else sets it to (1, 0, 0); returns
-    // the length.
-    inline double normalize_fast(double &x, double &y, double &z)
-    {
-        double len = std::sqrt(x * x + y * y + z * z);
-        if (len > 2e-7)
-        {
-            double scl = 1.0 / len;
-            x *= scl, y *= scl, z *= scl;
-        }
-        else
-            x = 1.0, y = 0.0, z = 0.0;
-        return len;
-    }
-
     // One ray's outputs: element i of a column-major [n, k] matrix (set1, set3, set_row) or column i of a
     // [k, n] matrix (set_col). A null pointer is skipped.
     template <typename dtype>
@@ -1571,24 +1546,6 @@ namespace
         size_t nXPR;
     };
 
-    // First vertex P and unit normal N of mesh face i_face (1-based); the vertex order sets the normal.
-    template <typename dtype>
-    inline void face_plane(const dtype *p_mesh, size_t n_mesh, size_t i_face,
-                           double &Px, double &Py, double &Pz, double &Nx, double &Ny, double &Nz)
-    {
-        Px = (double)p_mesh[i_face - 1];
-        Py = (double)p_mesh[i_face - 1 + n_mesh];
-        Pz = (double)p_mesh[i_face - 1 + 2 * n_mesh];
-        double E1x = (double)p_mesh[i_face - 1 + 3 * n_mesh] - Px,
-               E1y = (double)p_mesh[i_face - 1 + 4 * n_mesh] - Py,
-               E1z = (double)p_mesh[i_face - 1 + 5 * n_mesh] - Pz;
-        double E2x = (double)p_mesh[i_face - 1 + 6 * n_mesh] - Px,
-               E2y = (double)p_mesh[i_face - 1 + 7 * n_mesh] - Py,
-               E2z = (double)p_mesh[i_face - 1 + 8 * n_mesh] - Pz;
-        Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x;
-        normalize_fast(Nx, Ny, Nz);
-    }
-
     // Unit direction of vertex ray k of a tube: from [az el] (tube 1, spherical) or a Cartesian triple (tube 2).
     template <typename dtype>
     inline void tube_vertex_dir(const dtype *p_tridir, int tube, size_t iRx, size_t n_ray, size_t k, double &Vx, double &Vy, double &Vz)
@@ -1604,25 +1561,8 @@ namespace
         {
             size_t o = iRx + 3 * k * n_ray;
             Vx = (double)p_tridir[o], Vy = (double)p_tridir[o + n_ray], Vz = (double)p_tridir[o + 2 * n_ray];
-            normalize_fast(Vx, Vy, Vz);
+            qd_normalize(Vx, Vy, Vz);
         }
-    }
-
-    // Longest edge of the tube triangle tv (three vertices, x y z each), or e0 where that is longer (INFINITY:
-    // a vertex without a usable hit).
-    inline double tube_edge_length(const double tv[9], double e0)
-    {
-        double e = e0, dx, dy, dz, l;
-        dx = tv[3] - tv[0], dy = tv[4] - tv[1], dz = tv[5] - tv[2];
-        l = dx * dx + dy * dy + dz * dz;
-        e = (l > e) ? l : e;
-        dx = tv[6] - tv[0], dy = tv[7] - tv[1], dz = tv[8] - tv[2];
-        l = dx * dx + dy * dy + dz * dz;
-        e = (l > e) ? l : e;
-        dx = tv[6] - tv[3], dy = tv[7] - tv[4], dz = tv[8] - tv[5];
-        l = dx * dx + dy * dy + dz * dz;
-        e = (l > e) ? l : e;
-        return std::sqrt(e);
     }
 
     // A ray that hits nothing: a transparent pass to its destination D (unit direction OD from O), with the
@@ -1680,7 +1620,7 @@ namespace
             w.set_row(out.trivecN, tv, 9);
             w.set_row(out.tridirN, td, (tube == 1) ? 6 : 9);
             if (out.edge_lengthN)
-                out.edge_lengthN[w.i] = (dtype)tube_edge_length(tv, edge_len);
+                out.edge_lengthN[w.i] = (dtype)qd_tube_edge_length(tv, edge_len);
         }
 
         w.set1(out.fbs_angleN, half_pi);
@@ -1998,7 +1938,7 @@ namespace
             else
                 td[3 * k] = Vx, td[3 * k + 1] = Vy, td[3 * k + 2] = Vz;
         }
-        return want_edge ? tube_edge_length(tv, edge_len) : edge_len;
+        return want_edge ? qd_tube_edge_length(tv, edge_len) : edge_len;
     }
 
     // ---- 7 State machine, pure parts (ray_state_update) ---------------------------------------------------
@@ -2813,7 +2753,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     if (dest->n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
     if (dest->n_rows != n_ray)
-        throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' do not match.");
     const dtype *p_dest = dest->memptr();
 
     if (mesh == nullptr)
@@ -2847,11 +2787,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (trivec->n_cols != 9)
             throw std::invalid_argument("Input 'trivec' must have 9 columns.");
         if (trivec->n_rows != n_ray)
-            throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
+            throw std::invalid_argument("Number of rows in 'orig' and 'trivec' do not match.");
         if (tridir->n_cols != 6 && tridir->n_cols != 9)
             throw std::invalid_argument("Input 'tridir' must have 6 or 9 columns.");
         if (tridir->n_rows != n_ray)
-            throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
+            throw std::invalid_argument("Number of rows in 'orig' and 'tridir' do not match.");
         use_ray_tube = (tridir->n_cols == 6) ? 1 : 2;
     }
     else if (tridir && !tridir->is_empty())
@@ -3016,7 +2956,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         Dx -= offset * ODx, Dy -= offset * ODy, Dz -= offset * ODz;
 
         ODx = Dx - Ox, ODy = Dy - Oy, ODz = Dz - Oz; // Update direction O to D
-        const double OD_length = normalize_fast(ODx, ODy, ODz);
+        const double OD_length = qd_normalize(ODx, ODy, ODz);
 
         const size_t iFBS = (size_t)p_fbs_ind[iRx]; // Mesh FBS index, 1-based
         const size_t iSBS = (size_t)p_sbs_ind[iRx]; // Mesh SBS index, 1-based
@@ -3036,7 +2976,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // FBS: the hit point F and the face normal N
         double Fx, Fy, Fz, Nx, Ny, Nz;
         double OF_length = 0.0; // Distance from origin to FBS
-        face_plane(p_mesh, n_mesh, iFBS, Fx, Fy, Fz, Nx, Ny, Nz);
+        qd_face_plane(p_mesh, n_mesh, iFBS, Fx, Fy, Fz, Nx, Ny, Nz);
         double cos_theta = ray_plane_hit(Ox, Oy, Oz, ODx, ODy, ODz, OD_length, Dx, Dy, Dz, Nx, Ny, Nz, 0.0, Ox, Oy, Oz, Fx, Fy, Fz, OF_length);
         cos_theta = (cos_theta < -1.0) ? -1.0 : (cos_theta > 1.0 ? 1.0 : cos_theta); // Boundary fix
         const double theta_fbs = std::acos(cos_theta) - half_pi;                     // Angle between FBS face and incoming ray
@@ -3048,7 +2988,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (iSBS)
         {
             double OS_length = 0.0;
-            face_plane(p_mesh, n_mesh, iSBS, Sx, Sy, Sz, Mx, My, Mz);
+            qd_face_plane(p_mesh, n_mesh, iSBS, Sx, Sy, Sz, Mx, My, Mz);
             double cos_sbs = ray_plane_hit(Ox, Oy, Oz, ODx, ODy, ODz, OD_length, Dx, Dy, Dz, Mx, My, Mz, OF_length, Fx, Fy, Fz, Sx, Sy, Sz, OS_length);
             cos_sbs = (cos_sbs < -1.0) ? -1.0 : (cos_sbs > 1.0 ? 1.0 : cos_sbs);
             theta_sbs = std::acos(cos_sbs) - half_pi;
@@ -3124,7 +3064,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         }
 
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz; // Vector from FBS to destination
-        double FD_length = normalize_fast(FDx, FDy, FDz);   // Length of path from FBS to destination
+        double FD_length = qd_normalize(FDx, FDy, FDz);   // Length of path from FBS to destination
 
         // Per-vertex incidence of a tube. Whole-tube TIR: the tube passes undeviated if the spine OR any
         // vertex is past critical; the coefficient stays the spine's (the verdict is the tube's geometry,
@@ -3530,9 +3470,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Input 'out_typeN' cannot be NULL and have length n_rayN.");
     const uint8_t *p_out_typeN = out_typeN->data();
 
-    MaterialCols<dtype> cols = mtl_prop ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
-    if (cols.n_mtl > 16383) // the state words carry a 14-bit material index
-        throw std::invalid_argument("Number of materials cannot exceed 16383.");
+    MaterialCols<dtype> cols = mtl_prop ? MaterialCols<dtype>(*mtl_prop, true) : MaterialCols<dtype>();
 
     if (mtl_ind_fbsN == nullptr || mtl_ind_fbsN->n_elem != n_rayN)
         throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");

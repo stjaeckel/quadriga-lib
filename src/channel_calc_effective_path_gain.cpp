@@ -41,7 +41,6 @@ arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dt
     if (chan.coeff_re.empty() && chan.polmat.empty())
         throw std::invalid_argument("Neither coefficients nor polarization are provided.");
 
-    // Check if data is valid
     std::string error_message = chan.is_valid();
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());

@@ -1,10 +1,13 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_gbsm_init_phases
 % MEX interface test for quadriga_lib.gbsm_init_phases.
 % Scope: argument and output handling, set types and set index, scenario struct rule, defaults, error paths.
 % Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, _cluster.cpp, _ray.cpp).
 
-% ---- Set type 'lsf' ----
-%% Setup: distinct decorrelation distances, 4 Rx positions, one Tx
+%% Set type 'lsf'. Setup: distinct decorrelation distances, 4 Rx positions, one Tx
 scenpar = struct( 'DS_lambda', 10, 'AS_D_lambda', 18, 'AS_A_lambda', 15 );
 rx_pos = [ 0, 0, 1.5; 20, 5, 1.5; 45, -10, 3; 80, 30, 1.5 ]';
 tx_pos = [ 10; 10; 25 ];
@@ -107,8 +110,7 @@ assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], {1}
 assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], {1} ), ...
     'Input ''rx_pos'' has an unsupported data type.' );
 
-% ---- Set type 'cluster' ----
-%% Setup: UMi LOS file, N = 12 NLOS clusters
+%% Set type 'cluster'. Setup: UMi LOS file, N = 12 NLOS clusters
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_LOS.conf' ) );
 N = sp.NumClusters - 1;

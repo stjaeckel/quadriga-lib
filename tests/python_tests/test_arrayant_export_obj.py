@@ -2,10 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python port of test_arrayant_export_obj_file.m.
-# MEX-only cases are dropped: argument-count / nargout errors, the 1-based `i_element = 0`
-# violation, and the 1-based `freq = 0` error (i_freq = 0 is the valid default in Python).
-# The multi-frequency struct array is replaced by a 4D pattern dict selected via `i_freq`.
+# Python interface test for quadriga_lib.arrayant.export_obj_file.
+# Multi-frequency input is a 4D pattern dict, the entry is selected via `i_freq` (0-based, default 0).
 
 import sys
 import os
@@ -147,7 +145,7 @@ class test_case(unittest.TestCase):
         n_low = self._read(self._export(ant, icosphere_n_div=1))[0].shape[0]
         n_high = self._read(self._export(ant, icosphere_n_div=3))[0].shape[0]
 
-        # Each subdivision step roughly quadruples the triangle count (1 -> 3 gives ~16x).
+        # The triangle count grows with icosphere_n_div^2 (1 -> 3 gives 9x).
         self.assertGreater(n_high, n_low)
         self.assertGreater(n_high, 4 * n_low)
 

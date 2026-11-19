@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// path_to_tube and channel_export_obj_file: the export runs for the minimal ray-tracing channel (positions,
+// polarization matrix, interaction coordinates) with all optional arguments, rejects incomplete channels and
+// invalid arguments, and skips paths with non-finite coordinates. The file content is not compared to an oracle.
+
 #include <catch2/catch_test_macros.hpp>
 #include <fstream>
 #include <iostream>

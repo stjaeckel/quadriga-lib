@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.channel.export_obj_file.
+
 import sys
 import os
 import pathlib
@@ -78,7 +80,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         quadriga_lib.channel.export_obj_file(fn, chan, **kwargs)
         return fn
 
-    # value tests
+    # ---- Value tests ----
     def test_basic(self):
         fn = self._export('basic.obj', _make_chan())
         lines = _significant_lines(fn)
@@ -159,7 +161,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         # zero radius -> paths without a volume
         self.assertTrue(os.path.isfile(self._export('flat.obj', chan, radius_max=0.0, radius_min=0.0)))
 
-    # error tests
+    # ---- Error tests ----
     def test_error_chan_type(self):
         chan = _make_chan()
         with self.assertRaisesRegex(ValueError, "Input 'chan' must be a dict."):

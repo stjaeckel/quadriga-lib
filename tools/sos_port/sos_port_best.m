@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function [best, all] = sos_port_best(type, n_dim, recipe, N, seeds)
 % Returns the table with the best error on the coordinate planes (mse_core) among the seeds, and all of them.
 if nargin < 5, seeds = 1:4; end

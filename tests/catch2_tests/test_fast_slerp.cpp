@@ -2,12 +2,17 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Values of fast_slerp against a scalar double oracle over all its regions (SLERP, the blend to linear interpolation
+// near antipodal inputs, tiny amplitudes), the GENERIC and AVX2 kernels including the vector tail and lane
+// independence, sizes, and input validation. The oracle transcribes the algorithm, so closed-form cases (orthogonal,
+// boundary weights, antipodal, nearly parallel) are checked as well.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_math.hpp"
 #include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 
-// Helper: scalar double-precision SLERP reference (matches qd_slerp_complex logic)
+// Oracle: scalar double transcription of the SLERP in qd_slerp_complex
 static void slerp_ref(double Ar, double Ai, double Br, double Bi, double w,
                       double &Xr, double &Xi)
 {
@@ -64,7 +69,7 @@ static void slerp_ref(double Ar, double Ai, double Br, double Bi, double w,
 
 TEST_CASE("fast_slerp - Basic spherical interpolation")
 {
-    // Orthogonal unit vectors, w=0.5 → result should be on the unit circle at 45 degrees
+    // Orthogonal unit vectors, w=0.5: on the unit circle at 45 degrees
     arma::fvec Ar = {1.0f}, Ai = {0.0f};
     arma::fvec Br = {0.0f}, Bi = {1.0f};
     arma::fvec w = {0.5f};
@@ -75,7 +80,6 @@ TEST_CASE("fast_slerp - Basic spherical interpolation")
     REQUIRE(Xr.n_elem == 1);
     REQUIRE(Xi.n_elem == 1);
 
-    // Expected: (1/sqrt(2), 1/sqrt(2))
     float expected = 1.0f / std::sqrt(2.0f);
     CHECK(std::abs(Xr(0) - expected) < 1e-5f);
     CHECK(std::abs(Xi(0) - expected) < 1e-5f);
@@ -109,7 +113,6 @@ TEST_CASE("fast_slerp - Identical inputs")
 
     quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
 
-    // Result should be very close to the input (identical A and B)
     CHECK(std::abs(Xr(0) - 1.5f) < 1e-5f);
     CHECK(std::abs(Xi(0) - (-0.7f)) < 1e-5f);
 }
@@ -124,7 +127,6 @@ TEST_CASE("fast_slerp - Near-antipodal (transition zone)")
 
     quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
 
-    // Validate against double-precision reference
     double refXr, refXi;
     slerp_ref(1.0, 0.01, -1.0, 0.01, 0.5, refXr, refXi);
     CHECK(std::abs(Xr(0) - (float)refXr) < 1e-4f);
@@ -178,7 +180,6 @@ TEST_CASE("fast_slerp - Double-precision input")
     REQUIRE(Xr.n_elem == 2);
     REQUIRE(Xi.n_elem == 2);
 
-    // Check against double-precision reference
     for (arma::uword i = 0; i < 2; ++i)
     {
         double refXr, refXi;
@@ -190,8 +191,7 @@ TEST_CASE("fast_slerp - Double-precision input")
 
 TEST_CASE("fast_slerp - Accuracy bounds on larger vector")
 {
-    // Generate a vector large enough to exercise both AVX2 bulk and scalar tail paths
-    // 8*13 + 5 = 109 elements (13 full AVX2 vectors + 5-element tail)
+    // 109 = 13 full AVX2 vectors of 8 + a tail of 5
     const arma::uword n = 109;
 
     arma::fvec Ar(n), Ai(n), Br(n), Bi(n), w(n);
@@ -227,16 +227,12 @@ TEST_CASE("fast_slerp - Accuracy bounds on larger vector")
     double max_ulp = 0.0;
     for (arma::uword i = 0; i < n; ++i)
     {
-        // Double-precision reference
         double refXr, refXi;
         slerp_ref((double)Ar(i), (double)Ai(i), (double)Br(i), (double)Bi(i), (double)w(i), refXr, refXi);
 
-        // AVX2/generic result as double for error computation
         double dXr = (double)Xr(i);
         double dXi = (double)Xi(i);
 
-        // ULP distance per component: |result - ref| / (|ref| * 2^-23)
-        // Use max(|ref|, min_normal) to handle near-zero gracefully
         double ulp_r = std::abs(dXr - refXr) / std::max(std::abs(refXr) * ulp_scale, floor_val);
         double ulp_i = std::abs(dXi - refXi) / std::max(std::abs(refXi) * ulp_scale, floor_val);
         double ulp = std::max(ulp_r, ulp_i);
@@ -244,13 +240,8 @@ TEST_CASE("fast_slerp - Accuracy bounds on larger vector")
             max_ulp = ulp;
     }
 
-    // Uncomment exactly one of the following lines (keep the tightest that passes):
-    // Note: SLERP chains acos → 3× sincos → division, so compound error is much larger
-    // than a single transcendental. 96 ULP ≈ 1.1e-5 relative error ≈ 5.5 bits lost of 23.
-    // CHECK(max_ulp < 50.0);  // 50 ULP
-    // CHECK(max_ulp < 100.0); // 100 ULP
-    // CHECK(max_ulp < 150.0); // 150 ULP
-    CHECK(max_ulp < 400.0); // 400 ULP
+    // SLERP chains acos, three sincos and a division, so the error compounds far beyond one transcendental
+    CHECK(max_ulp < 400.0);
 }
 
 TEST_CASE("fast_slerp - Empty input")

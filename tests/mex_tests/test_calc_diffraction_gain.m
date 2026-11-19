@@ -1,5 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_calc_diffraction_gain
-% MEX integration tests for quadriga_lib.calc_diffraction_gain.
+% MEX interface test for quadriga_lib.calc_diffraction_gain.
 % Scope: MEX interface plumbing, argument/output handling, and error paths,
 % plus light physics sanity. Full physics validation lives in the Catch2 suite
 % (test_calc_diffraction_gain.cpp) and is intentionally not duplicated here.
@@ -186,7 +190,7 @@ assertTrue( g_on > g_off + 1e-3 );   % half-wave resonance enhances transmission
 
 %% apply_fspl / apply_phase
 
-% Both flags default to false: omitting them reproduces the legacy result.
+% Both flags default to false.
 [g_def, x_def, c_def] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 2 );
 [g_exp, x_exp, c_exp] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 2, 0, [], 0, 0, false, 0.0, false, false );
 assertElementsAlmostEqual( g_def, g_exp, 'absolute', 1e-14 );
@@ -286,31 +290,30 @@ assert_throws( @() out4( orig, dest, cube, mtl_ind, mtl_st, 1e9, 5 ), ...
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, 0 ), ...
     'Entries in ''sub_mesh_ind'' cannot be 0 (1-based index).' );                % sub_mesh entry 0
 
-% Library-layer guards. Strings marked (guess) are best-effort and may need
-% updating to match the refactored library messages.
+% Library-layer guards.
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest(1,:), cube, mtl_ind, mtl_st, 1e9, 0 ), ...
-    'Number of rows in ''orig'' and ''dest'' don''t match.' );
+    'Number of rows in ''orig'' and ''dest'' do not match.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind(1), mtl_st, 1e9, 0 ), ...
     'Length of ''mtl_ind'' must match the number of mesh faces.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, 2 ), ...
-    'First sub-mesh must start at the first face.' );
+    'Input ''sub_mesh_ind'' must start at the first mesh face.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, [1,33] ), ...
-    'Sub-mesh indices cannot exceed number of faces.' );
+    'Entries of ''sub_mesh_ind'' cannot point beyond the last mesh face.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig(:,1:2), dest, cube, mtl_ind, mtl_st, 1e9, 0 ), ...
-    'orig' );                                                                      % (guess) orig not 3 columns
+    'orig' );                                                                      % orig not 3 columns
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest(:,1:2), cube, mtl_ind, mtl_st, 1e9, 0 ), ...
-    'dest' );                                                                      % (guess) dest not 3 columns
+    'dest' );                                                                      % dest not 3 columns
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube(:,1:8), mtl_ind, mtl_st, 1e9, 0 ), ...
-    'mesh' );                                                                      % (guess) mesh not 9 columns
+    'mesh' );                                                                      % mesh not 9 columns
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 0, 0 ), ...
-    'center_freq' );                                                               % (guess) center_freq <= 0
+    'center_freq' );                                                               % center_freq <= 0
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 8 ), ...
     'Input ''lod'' must be 0-7.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, -1 ), ...
     'Input ''lod'' must be 0-7.' );
 assert_throws( @() quadriga_lib.calc_diffraction_gain( zeros(0,3), zeros(0,3), cube, mtl_ind, mtl_st, 1e9 ), ...
     'Inputs ''orig'' and ''dest'' cannot be empty.' );
-% center_freq is mandatory: an empty value is an error (it became 1 GHz)
+% center_freq is mandatory: an empty value is an error
 failed = false;
 try
     [~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, [], 0 );
@@ -320,7 +323,7 @@ end
 assertTrue( failed );
 mtl_ind_big = mtl_ind; mtl_ind_big(1) = 40000;
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind_big, mtl_st, 1e9, 0 ), ...
-    '16383' );                                                                     % (guess) material index > 16383
+    '16383' );                                                                     % material index > 16383
 
 end
 

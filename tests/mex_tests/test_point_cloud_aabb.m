@@ -1,30 +1,27 @@
-function test_point_cloud_aabb
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% Create a 4x3 matrix initialized to zeros
+function test_point_cloud_aabb
+% MEX interface test for quadriga_lib.point_cloud_aabb.
+
+%% Setup: 16 points in four blocks (x = 0..0.3 or 40..40.3, y = -50 or +50, z = 1)
 points = zeros(4, 3);
 
-% Fill the first column with values from 0.0 to 0.3 with a step of 0.1
 points(:, 1) = 0.0:0.1:0.3;
 
-% Repeat the matrix vertically twice
 points = repmat(points, 2, 1);
 
-% Add 40.0 to the first column of the second block of 4 rows
 points(5:8, 1) = points(5:8, 1) + 40.0;
 
-% Repeat the matrix vertically twice
 points = repmat(points, 2, 1);
 
-% Subtract 50.0 from the second column of the first 8 rowssub_mesh_index
 points(1:8, 2) = points(1:8, 2) - 50.0;
 
-% Add 50.0 to the second column of rows 9 to 16
 points(9:16, 2) = points(9:16, 2) + 50.0;
 
-% Add 1.0 to all elements in the third column
 points(:, 3) = points(:, 3) + 1.0;
 
-% Calculate bounding box
 aabb = quadriga_lib.point_cloud_aabb(points);
 
 T = [0.0, 40.3, -50.0, 50.0, 1.0, 1.0];
@@ -32,12 +29,13 @@ assertElementsAlmostEqual( aabb, T, 'absolute', 1e-14 );
 
 sub_cloud_ind =  uint32([1 9])';
 
-% Calculate bounding box
+% One box per sub-cloud
 aabb = quadriga_lib.point_cloud_aabb(points, sub_cloud_ind);
 
 T = [0.0, 40.3, -50.0, -50.0, 1.0, 1.0 ; 0.0, 40.3, 50.0, 50.0, 1.0, 1.0  ];
 assertElementsAlmostEqual( aabb, T, 'absolute', 1e-14 );
 
+%% Errors
 try % 2 outputs
     [~,~] = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -68,7 +66,7 @@ catch ME
     end
 end
 
-try % Wrong foramt
+try % Wrong format
     aabb = quadriga_lib.point_cloud_aabb( points(:,1:2)  );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -82,7 +80,7 @@ try % Wrong sub index
     aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind + uint32([1;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-cloud must start at the first point.';
+    expectedErrorMessage = 'Input ''sub_cloud_ind'' must start at the first point.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -92,7 +90,7 @@ try % Wrong sub index
     aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind + uint32([0;1000]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sub-cloud indices cannot exceed number of points.';
+    expectedErrorMessage = 'Entries of ''sub_cloud_ind'' cannot point beyond the last point.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -119,11 +117,3 @@ catch ME
 end
 
 end
-
-
-
-
-
-
-
-

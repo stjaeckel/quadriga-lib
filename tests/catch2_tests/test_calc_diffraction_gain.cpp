@@ -2,6 +2,13 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of calc_diffraction_gain: the path coordinates per lod, the material transitions along the paths (Fresnel loss,
+// penetration and in-medium loss, thin-slab resonance, refraction path length, material stacks, index 0 = no material),
+// the xprmat Jones matrices, apply_fspl and apply_phase, the verbose print, input validation and aliasing. Scalar-mode
+// units are in test_calc_diffraction_gain_scalar_units.cpp.
+// Oracles typed in this file: an ITU-R P.2040 transition gain, Fresnel and Airy closed forms, ISO 9613-1 air absorption.
+// Geometry: mostly the library cube with faces at x = -1 and 1 m; materials as {a,b,c,d,att,attB,alpha,alphaB,fRef} rows.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 
@@ -80,7 +87,7 @@ static inline double calc_transition_gain(int interaction_type,       // (0) Ref
 // Convert a per-face material matrix [n_face, 9] with columns
 // {a,b,c,d,att,attB,alpha,alphaB,fRef} into the (mtl_ind, mtl_prop-map) pair.
 // Identical rows are deduplicated and mtl_ind is 1-based (0 = no material), so the
-// result matches what obj_file_read emits and the current calc_diffraction_gain API.
+// result matches what obj_file_read emits and calc_diffraction_gain takes.
 static inline void mtl_matrix_to_map(const arma::mat &M,
                                      arma::uvec &mtl_ind,
                                      std::unordered_map<std::string, std::vector<double>> &mtl_prop)
@@ -133,11 +140,9 @@ static inline void fresnel(std::complex<double> eta1, std::complex<double> eta2,
 }
 
 // Geometry (path coordinates) and normal-incidence transmission against the ITU reference.
-// Ported to the new API: inputs by reference, the xprmat output occupies the slot between
-// gain and coord (passed as nullptr here). Coordinates are pure ellipsoid geometry and are
-// unchanged by the physics refactor; the transmission case is normal incidence into a single
-// interface (dest inside the cube), where refraction and Fabry-Perot are dormant, so the
-// value still equals the independent reference.
+// Coordinates are pure ellipsoid geometry; the transmission case is normal incidence into a
+// single interface (dest inside the cube), where refraction and Fabry-Perot are dormant, so
+// the value equals the independent reference.
 TEST_CASE("Calc Diffraction Gain")
 {
     arma::mat cube = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
@@ -280,8 +285,7 @@ TEST_CASE("Calc Diffraction Gain - fRef parameterization equivalence")
 
 // Scalar transmission (interaction_type 4) vs EM TE/TM averaging (type 1). Single wall
 // crossing (dest inside), so refraction/Fabry-Perot stay dormant and the energy-conserving
-// partition is exercised in isolation. Migrated: xprmat nullptr slot inserted between gain
-// and coord in the fully positional call.
+// partition is exercised in isolation.
 TEST_CASE("Calc Diffraction Gain - Scalar mode")
 {
     arma::mat cube = quadriga_lib::cube<double>({}, {}, {0.0, 0.0, 0.001});
@@ -806,8 +810,7 @@ static inline void fspl_test_scene(arma::mat &cube, arma::uvec &mtl_ind,
 }
 
 // apply_fspl on an unobstructed path: the diffraction gain is exactly 1, so the returned gain
-// must equal the bare free-space term. Also pins the default (apply_fspl = false) to 1, which
-// is the regression guard for existing callers.
+// must equal the bare free-space term. Also pins the default (apply_fspl = false) to 1.
 TEST_CASE("Calc Diffraction Gain - FSPL EM mode on clear path")
 {
     arma::mat cube;
@@ -825,7 +828,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL EM mode on clear path")
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
                                                 &g_abs, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, true, false);
 
-    CHECK(std::abs(g_rel(0) - 1.0) < 1e-13); // default is unchanged: relative to FSPL
+    CHECK(std::abs(g_rel(0) - 1.0) < 1e-13); // default: relative to FSPL
 
     double expect = ref_spreading_gain(freq, dist, false);
     CHECK(std::abs(g_abs(0) / expect - 1.0) < 1e-12);
@@ -1182,7 +1185,7 @@ TEST_CASE("Calc Diffraction Gain - Metal solid with a sheet glued to its exit fa
     }
 }
 
-// Single-precision instantiation of the new flags. Float carries ~7 significant digits, so the
+// Single-precision instantiation of apply_fspl and apply_phase. Float carries ~7 significant digits, so the
 // phase is checked at a short distance and a low frequency to keep the argument small, and the
 // tolerances are loosened accordingly.
 TEST_CASE("Calc Diffraction Gain - Float instantiation with FSPL and phase")
@@ -1277,7 +1280,7 @@ TEST_CASE("Calc Diffraction Gain - verbose debug output with one position")
 {
     // verbose = 2 with one position prints one line per ray and interaction. Two cubes beside the direct path: the
     // inner rays pass between them and leave the R-set first, so in the next iteration of a segment the R-set index
-    // of a ray differs from its G-set index. The print used the G-set index for the R-set matrices (out of bounds).
+    // of a ray differs from its G-set index, and the print must index the R-set matrices with the R-set index.
     // Check: the print does not throw, and the destination printed for a ray is the same in every iteration of a
     // segment (it is the waypoint of that segment). The summary lines "iG <i> segP(...)" at the end are skipped.
     arma::uvec mtl_ind;

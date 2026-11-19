@@ -3,93 +3,43 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
-#include <cstring>   // std::memcpy
-#include <iomanip>   // std::setprecision
-#include <algorithm> // std::replace
-#include <iostream>
+#include <cstring>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 #include "quadriga_channel.hpp"
 #include "qd_helpers_shared.hpp"
 #include "qd_helpers_arrayant.hpp"
 #include "qd_helpers_channel.hpp"
 
-#if BUILD_WITH_AVX2
-#include "quadriga_lib_avx2_functions.hpp"
-#endif
-
-// Calculate Geographic coordinates from Cartesian coordinates
+// Cartesian unit vectors (x, y, z) from azimuth and elevation angles
 template <typename dtype>
-static inline void qd_geo2cart(size_t N,                  // Number of values
-                               const dtype *az,           // Input azimuth angles
-                               dtype *x, dtype *y,        // 2D Output coordinates (x, y)
-                               const dtype *el = nullptr, // Input elevation angles (optional)
-                               dtype *z = nullptr,        // Output z-coordinate (optional)
-                               const dtype *r = nullptr)  // Input vector length (optional)
+static inline void qd_geo2cart(size_t N, const dtype *az, const dtype *el, dtype *x, dtype *y, dtype *z)
 {
-    bool use_3D = (el != nullptr);
-    bool has_length = (r != nullptr);
-    bool has_z = (z != nullptr);
-
     for (size_t i = 0; i < N; ++i)
     {
-        double ca = (double)az[i];
-        double sa = std::sin(ca);
-        ca = std::cos(ca);
-
-        double ce = 1.0, se = 0.0;
-        if (use_3D)
-        {
-            ce = (double)el[i];
-            se = std::sin(ce);
-            ce = std::cos(ce);
-        }
-
-        double le = has_length ? (double)r[i] : 1.0;
-
-        x[i] = dtype(le * ce * ca);
-        y[i] = dtype(le * ce * sa);
-
-        if (has_z)
-            z[i] = dtype(le * se);
+        const double ca = std::cos((double)az[i]), sa = std::sin((double)az[i]);
+        const double ce = std::cos((double)el[i]), se = std::sin((double)el[i]);
+        x[i] = dtype(ce * ca), y[i] = dtype(ce * sa), z[i] = dtype(se);
     }
 }
 
-// Calculate Cartesian coordinates from Geographic coordinates
+// Azimuth and elevation angles of the vectors (x, y, z); az or el may be nullptr
 template <typename dtype>
-static inline void qd_cart2geo(size_t n,                       // Number of values
-                               dtype *az,                      // Output azimuth angles
-                               const dtype *x, const dtype *y, // 2D Input coordinates (x, y)
-                               dtype *el = nullptr,            // Output elevation angles (optional)
-                               const dtype *z = nullptr,       // Input z-coordinate (optional)
-                               dtype *r = nullptr)             // Output vector length (optional)
+static inline void qd_cart2geo(size_t N, const dtype *x, const dtype *y, const dtype *z, dtype *az, dtype *el)
 {
-    bool use_3D = (el != nullptr);
-    bool has_length = (r != nullptr);
-    bool has_z = (z != nullptr);
-    bool has_az = (az != nullptr);
-
-    for (size_t in = 0; in < n; ++in)
+    for (size_t i = 0; i < N; ++i)
     {
-        double xx = (double)x[in];
-        double yy = (double)y[in];
-        double zz = has_z ? (double)z[in] : 0.0;
-
-        double le = std::sqrt(xx * xx + yy * yy + zz * zz);
-
-        if (has_length)
-            r[in] = (dtype)le;
-
-        le = 1.0 / le;
-        xx *= le, yy *= le, zz *= le;
-        xx = (xx > 1.0) ? 1.0 : xx;
-        yy = (yy > 1.0) ? 1.0 : yy;
-        zz = (zz > 1.0) ? 1.0 : zz;
-
-        if (has_az)
-            az[in] = (dtype)std::atan2(yy, xx);
-
-        if (use_3D)
-            el[in] = (dtype)std::asin(zz);
+        const double xx = (double)x[i], yy = (double)y[i], zz = (double)z[i];
+        const double le = 1.0 / std::sqrt(xx * xx + yy * yy + zz * zz);
+        if (az != nullptr)
+            az[i] = (dtype)std::atan2(yy * le, xx * le);
+        if (el != nullptr)
+        {
+            const double zn = zz * le;
+            el[i] = (dtype)std::asin(zn > 1.0 ? 1.0 : zn);
+        }
     }
 }
 
@@ -191,7 +141,6 @@ void quadriga_lib::get_channels_spherical(
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/
 
-// Calculate channel coefficients for spherical waves
 template <typename dtype>
 void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
                                           const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
@@ -203,20 +152,16 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                           int use_kernel)
 {
-    // Constants
-    constexpr dtype los_limit = (dtype)1.0e-4;
     constexpr dtype zero = (dtype)0.0;
-    constexpr dtype rC = dtype(1.0 / 299792458.0); // 1 / (Speed of light)
-    dtype wavelength = (center_freq > zero) ? (dtype)299792458.0 / center_freq : (dtype)1.0;
-    dtype wave_number = (dtype)2.095845021951682e-08 * center_freq; // 2 * pi / C
+    constexpr dtype rC = dtype(1.0 / qd_speed_of_light);
+    dtype wavelength = (center_freq > zero) ? (dtype)qd_speed_of_light / center_freq : (dtype)1.0;
+    dtype wave_number = dtype(2.0 * arma::datum::pi / qd_speed_of_light) * center_freq;
 
     // Positions and orientations
     const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
     const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
-    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
-    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
-
-    std::string error_message;
+    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2];
+    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2];
 
     // Kernel of the antenna interpolation and the coefficient computation, checked before any early return
     const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
@@ -231,10 +176,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     if (add_fake_los_path && fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
         path_length.n_elem == 0 && polmat.n_elem == 0)
     {
-        const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
         const arma::Mat<dtype> fbs_d = pos_d.t();
-        const arma::Col<dtype> gain_d = {(dtype)1.0}, length_d = {std::sqrt(x * x + y * y + z * z) + (dtype)1.0};
+        const arma::Col<dtype> gain_d = {(dtype)1.0}, length_d = {qd_calc_length(Tx, Ty, Tz, Rx, Ry, Rz) + (dtype)1.0};
         arma::Mat<dtype> M_d(8, 1, arma::fill::zeros);
         M_d.at(0) = (dtype)1.0, M_d.at(6) = (dtype)-1.0;
 
@@ -260,19 +204,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
         return;
     }
 
-    // Check if the antennas are valid
-    error_message = qd_arrayant_is_valid_quick(tx_array);
-    if (error_message.length() != 0)
-    {
-        error_message = "Transmit antenna: " + error_message;
-        throw std::invalid_argument(error_message.c_str());
-    }
-    error_message = qd_arrayant_is_valid_quick(rx_array);
-    if (error_message.length() != 0)
-    {
-        error_message = "Receive antenna: " + error_message;
-        throw std::invalid_argument(error_message.c_str());
-    }
+    qd_arrayant_check_tx_rx(tx_array, rx_array);
 
     // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
     if (fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 && path_length.n_elem == 0 && polmat.n_elem == 0)
@@ -286,17 +218,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
 
     // Check if the number of paths is consistent in all inputs
     if (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 || path_length.n_elem == 0 || polmat.n_elem == 0)
-    {
-        error_message = "Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, polmat";
-        throw std::invalid_argument(error_message.c_str());
-    }
+        throw std::invalid_argument("Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, polmat");
     if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || polmat.n_rows != 8)
-    {
-        error_message = "Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'polmat' must have 8 rows.";
-        throw std::invalid_argument(error_message.c_str());
-    }
+        throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'polmat' must have 8 rows.");
 
-    // 64-bit integers used by Armadillo
     const arma::uword n_path = fbs_pos.n_cols;                         // Number of paths
     const arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
     const arma::uword n_tx = tx_array.e_theta_re.n_slices;             // Number of TX antenna elements before coupling
@@ -307,30 +232,16 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     const arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
     if (lbs_pos.n_cols != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
-    {
-        error_message = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).";
-        throw std::invalid_argument(error_message.c_str());
-    }
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).");
 
     // Set the output size
-    if (coeff_re.n_rows != n_rx_ports || coeff_re.n_cols != n_tx_ports || coeff_re.n_slices != n_out)
-        coeff_re.set_size(n_rx_ports, n_tx_ports, n_out);
-    if (coeff_im.n_rows != n_rx_ports || coeff_im.n_cols != n_tx_ports || coeff_im.n_slices != n_out)
-        coeff_im.set_size(n_rx_ports, n_tx_ports, n_out);
-    if (delay.n_rows != n_rx_ports || delay.n_cols != n_tx_ports || delay.n_slices != n_out)
-        delay.set_size(n_rx_ports, n_tx_ports, n_out);
-    if (aod != nullptr && (aod->n_rows != n_rx_ports || aod->n_cols != n_tx_ports || aod->n_slices != n_out))
-        aod->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (eod != nullptr && (eod->n_rows != n_rx_ports || eod->n_cols != n_tx_ports || eod->n_slices != n_out))
-        eod->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (aoa != nullptr && (aoa->n_rows != n_rx_ports || aoa->n_cols != n_tx_ports || aoa->n_slices != n_out))
-        aoa->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (eoa != nullptr && (eoa->n_rows != n_rx_ports || eoa->n_cols != n_tx_ports || eoa->n_slices != n_out))
-        eoa->set_size(n_rx_ports, n_tx_ports, n_out);
+    for (arma::Cube<dtype> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
+        if (out != nullptr && (out->n_rows != n_rx_ports || out->n_cols != n_tx_ports || out->n_slices != n_out))
+            out->set_size(n_rx_ports, n_tx_ports, n_out);
 
     // Map output memory to internal representation
     arma::Cube<dtype> CR, CI, DL;        // Internal map for delays and coefficients
-    arma::Mat<dtype> AOD, EOD, AOA, EOA; // Antenna interpolation requires matrix of size [n_out, n_ang]
+    arma::Mat<dtype> AOD, EOD, AOA, EOA; // Angles [n_links, n_out], used when not written to the outputs
 
     bool different_output_size = n_tx != n_tx_ports || n_rx != n_rx_ports;
     if (different_output_size) // Temporary internal data storage
@@ -356,224 +267,24 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     dtype *p_aoa = (different_output_size || aoa == nullptr) ? AOA.memptr() : aoa->memptr();
     dtype *p_eoa = (different_output_size || eoa == nullptr) ? EOA.memptr() : eoa->memptr();
 
-    // Get pointers
-    const dtype *p_fbs = fbs_pos.memptr();
-    const dtype *p_lbs = lbs_pos.memptr();
+    // Angles and element-pair path lengths, element index lists for the interpolation
+    arma::uvec i_tx_element, i_rx_element;
+    arma::Mat<dtype> tx_element_pos_interp, rx_element_pos_interp;
+    dtype dist_rx_tx;
+    const arma::uword true_los_path = qd_channels_spherical_geometry(tx_array.element_pos, rx_array.element_pos, n_tx, n_rx,
+                                                                     p_tp, p_to, p_rp, p_ro, fbs_pos.memptr(), lbs_pos.memptr(),
+                                                                     path_length.memptr(), n_out, add_fake_los_path,
+                                                                     p_aod, p_eod, p_aoa, p_eoa, p_delays,
+                                                                     i_tx_element, tx_element_pos_interp,
+                                                                     i_rx_element, rx_element_pos_interp, dist_rx_tx);
     const dtype *p_gain = path_gain.memptr();
-    const dtype *p_length = path_length.memptr();
 
-    // Convert inputs to orientation vector
-    dtype *ptr;
-    arma::Cube<dtype> tx_ori(3, 1, 1);
-    arma::Cube<dtype> rx_ori(3, 1, 1);
-    bool tx_orientation_not_zero = (Tb != zero || Tt != zero || Th != zero);
-    bool rx_orientation_not_zero = (Rb != zero || Rt != zero || Rh != zero);
+    // Element coupling, skipped when it is the identity
+    const bool apply_element_coupling = different_output_size ||
+                                        !qd_coupling_is_identity(tx_array.coupling_re, tx_array.coupling_im) ||
+                                        !qd_coupling_is_identity(rx_array.coupling_re, rx_array.coupling_im);
 
-    if (tx_orientation_not_zero)
-        ptr = tx_ori.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
-
-    if (rx_orientation_not_zero)
-        ptr = rx_ori.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
-
-    // Calculate the antenna element positions in GCS
-    arma::Mat<dtype> tx_element_pos(3, n_tx), rx_element_pos(3, n_rx);
-    dtype *p_tx = tx_element_pos.memptr(), *p_rx = rx_element_pos.memptr();
-
-    if (tx_array.element_pos.n_elem != 0)
-        std::memcpy(p_tx, tx_array.element_pos.memptr(), 3 * n_tx * sizeof(dtype));
-    if (tx_orientation_not_zero) // Apply TX antenna orientation
-        qd_rotate_inplace(Tb, Tt, Th, p_tx, n_tx);
-    for (arma::uword t = 0ULL; t < 3ULL * n_tx; t += 3ULL) // Add TX position
-        p_tx[t] += Tx, p_tx[t + 1ULL] += Ty, p_tx[t + 2ULL] += Tz;
-
-    if (rx_array.element_pos.n_elem != 0)
-        std::memcpy(p_rx, rx_array.element_pos.memptr(), 3 * n_rx * sizeof(dtype));
-    if (rx_orientation_not_zero) // Apply RX antenna orientation
-        qd_rotate_inplace(Rb, Rt, Rh, p_rx, n_rx);
-    for (arma::uword r = 0ULL; r < 3ULL * n_rx; r += 3ULL) // Add RX position
-        p_rx[r] += Rx, p_rx[r + 1ULL] += Ry, p_rx[r + 2ULL] += Rz;
-
-    // Calculate the Freespace distance
-    dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
-    dtype dist_rx_tx = std::sqrt(x * x + y * y + z * z);
-
-    // There may be multiple LOS paths. We need to find the real one
-    // Detection is done by sing the shortest length difference to the TX-RX line
-    arma::uword true_los_path = 0;
-    dtype shortest_path = los_limit;
-
-    // Calculate angles and delays
-    // Cannot be parallelized due to "true_los_path" and "shortest_path"
-    for (arma::uword i_out = 0ULL; i_out < n_out; ++i_out) // Loop over paths
-    {
-        const arma::uword i = add_fake_los_path ? i_out - 1ULL : i_out;
-        const arma::uword ix = 3ULL * i, iy = ix + 1ULL, iz = ix + 2ULL;
-        const arma::uword o_slice = i_out * n_links; // Slice offset
-
-        // Calculate the shortest possible path length (TX > FBS > LBS > RX)
-        dtype d_shortest = dist_rx_tx, d_length = dist_rx_tx, d_fbs_lbs = zero;
-        if (!add_fake_los_path || i_out != 0ULL)
-        {
-            x = p_fbs[ix] - Tx, y = p_fbs[iy] - Ty, z = p_fbs[iz] - Tz;
-            d_shortest = std::sqrt(x * x + y * y + z * z);
-            x = p_lbs[ix] - p_fbs[ix], y = p_lbs[iy] - p_fbs[iy], z = p_lbs[iz] - p_fbs[iz];
-            d_fbs_lbs = std::sqrt(x * x + y * y + z * z);
-            d_shortest += d_fbs_lbs;
-            x = Rx - p_lbs[ix], y = Ry - p_lbs[iy], z = Rz - p_lbs[iz];
-            d_shortest += std::sqrt(x * x + y * y + z * z);
-            d_length = (p_length[i] < d_shortest) ? d_shortest : p_length[i];
-
-            // Paths with more interactions than FBS and LBS are longer than the TX-FBS-LBS-RX polyline: the extra
-            // length goes into the FBS-LBS segment, so that the phase-centre length equals d_length (= path_length)
-            d_fbs_lbs += d_length - d_shortest;
-        }
-
-        // Calculate path delays, departure angles and arrival angles
-        // Slot 0 of add_fake_los_path is the LOS path by definition, also when the TX-RX distance overflows
-        if ((add_fake_los_path && i_out == 0ULL) || std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
-        {
-            if (!add_fake_los_path || i_out != 0ULL)
-                true_los_path = i_out, shortest_path = std::abs(d_length - dist_rx_tx);
-
-            for (arma::uword t = 0ULL; t < n_tx; ++t)
-            {
-                dtype *pt = &p_tx[3ULL * t];
-                for (arma::uword r = 0ULL; r < n_rx; ++r)
-                {
-                    dtype *pr = &p_rx[3ULL * r];
-                    x = pr[0] - pt[0];
-                    y = pr[1] - pt[1];
-                    z = pr[2] - pt[2];
-                    dtype d = std::sqrt(x * x + y * y + z * z);
-
-                    arma::uword io = o_slice + t * n_rx + r;
-                    p_aod[io] = std::atan2(y, x);
-                    p_eod[io] = (d < los_limit) ? zero : std::asin(z / d);
-                    p_aoa[io] = std::atan2(-y, -x);
-                    p_eoa[io] = -p_eod[io];
-                    p_delays[io] = d;
-                }
-            }
-        }
-        else // NLOS path
-        {
-            dtype *dr = new dtype[n_rx];
-            for (arma::uword r = 0ULL; r < n_rx; ++r)
-            {
-                dtype *pr = &p_rx[3ULL * r];
-                x = p_lbs[ix] - pr[0];
-                y = p_lbs[iy] - pr[1];
-                z = p_lbs[iz] - pr[2];
-                dr[r] = std::sqrt(x * x + y * y + z * z);
-                p_aoa[o_slice + r] = std::atan2(y, x);
-                p_eoa[o_slice + r] = (dr[r] < los_limit) ? zero : std::asin(z / dr[r]);
-            }
-
-            for (arma::uword t = 0ULL; t < n_tx; ++t)
-            {
-                dtype *pt = &p_tx[3ULL * t];
-                x = p_fbs[ix] - pt[0],
-                y = p_fbs[iy] - pt[1],
-                z = p_fbs[iz] - pt[2];
-
-                dtype dt = std::sqrt(x * x + y * y + z * z),
-                      at = std::atan2(y, x),
-                      et = (dt < los_limit) ? zero : std::asin(z / dt);
-
-                for (arma::uword r = 0ULL; r < n_rx; ++r)
-                {
-                    arma::uword io = o_slice + t * n_rx + r;
-                    p_aod[io] = at;
-                    p_eod[io] = et;
-                    p_aoa[io] = p_aoa[o_slice + r];
-                    p_eoa[io] = p_eoa[o_slice + r];
-                    p_delays[io] = dt + d_fbs_lbs + dr[r];
-                }
-            }
-            delete[] dr;
-        }
-    }
-
-    // Calculate TX element indices and positions
-    arma::uvec i_tx_element(n_links, arma::fill::none);
-    arma::uword *p_element = i_tx_element.memptr();
-    arma::Mat<dtype> tx_element_pos_interp(3, n_links, arma::fill::none);
-    ptr = tx_element_pos_interp.memptr();
-    if (tx_array.element_pos.n_elem != 0)
-        std::memcpy(p_tx, tx_array.element_pos.memptr(), 3 * n_tx * sizeof(dtype));
-    else
-        tx_element_pos.zeros();
-    for (arma::uword t = 0; t < n_tx; ++t)
-        for (arma::uword r = 0; r < n_rx; ++r)
-            *p_element++ = t, *ptr++ = p_tx[3 * t], *ptr++ = p_tx[3 * t + 1], *ptr++ = p_tx[3 * t + 2];
-
-    // Calculate RX element indices and positions
-    arma::uvec i_rx_element(n_links, arma::fill::none);
-    p_element = i_rx_element.memptr();
-    arma::Mat<dtype> rx_element_pos_interp(3, n_links, arma::fill::none);
-    ptr = rx_element_pos_interp.memptr();
-    if (rx_array.element_pos.n_elem != 0)
-        std::memcpy(p_rx, rx_array.element_pos.memptr(), 3 * n_rx * sizeof(dtype));
-    else
-        rx_element_pos.zeros();
-    for (arma::uword t = 0; t < n_tx; ++t)
-        for (arma::uword r = 0; r < n_rx; ++r)
-            *p_element++ = r, *ptr++ = p_rx[3 * r], *ptr++ = p_rx[3 * r + 1], *ptr++ = p_rx[3 * r + 2];
-
-    // Determine if we need to apply antenna-element coupling
-    bool apply_element_coupling = false;
-    if (rx_array.coupling_re.n_elem != 0 || rx_array.coupling_im.n_elem != 0 ||
-        tx_array.coupling_re.n_elem != 0 || tx_array.coupling_im.n_elem != 0)
-    {
-        if (n_rx_ports != n_rx || n_tx_ports != n_tx)
-            apply_element_coupling = true;
-
-        // Check if TX coupling real part is identity matrix
-        if (!apply_element_coupling && tx_array.coupling_re.n_rows == n_tx && tx_array.coupling_re.n_cols == n_tx)
-        {
-            const dtype *p = tx_array.coupling_re.memptr();
-            for (arma::uword r = 0ULL; r < n_tx; ++r)
-                for (arma::uword c = 0ULL; c < n_tx; ++c)
-                {
-                    if (r == c && std::abs(p[c * n_tx + r] - (dtype)1.0) > (dtype)1.0e-6)
-                        apply_element_coupling = true;
-                    else if (r != c && std::abs(p[c * n_tx + r]) > (dtype)1.0e-6)
-                        apply_element_coupling = true;
-                }
-        }
-
-        // If TX coupling has imaginary part, check if there is any element not 0
-        if (!apply_element_coupling && tx_array.coupling_im.n_elem != 0)
-        {
-            for (const dtype *p = tx_array.coupling_im.begin(); p < tx_array.coupling_im.end(); ++p)
-                if (std::abs(*p) > (dtype)1.0e-6)
-                    apply_element_coupling = true;
-        }
-
-        // Check if RX coupling real part is identity matrix
-        if (!apply_element_coupling && rx_array.coupling_re.n_rows == n_rx && rx_array.coupling_re.n_cols == n_rx)
-        {
-            const dtype *p = rx_array.coupling_re.memptr();
-            for (arma::uword r = 0ULL; r < n_rx; ++r)
-                for (arma::uword c = 0ULL; c < n_rx; ++c)
-                {
-                    if (r == c && std::abs(p[c * n_rx + r] - (dtype)1.0) > (dtype)1.0e-6)
-                        apply_element_coupling = true;
-                    else if (r != c && std::abs(p[c * n_rx + r]) > (dtype)1.0e-6)
-                        apply_element_coupling = true;
-                }
-        }
-
-        // If RX coupling has imaginary part, check if there is any element not 0
-        if (!apply_element_coupling && rx_array.coupling_im.n_elem != 0)
-        {
-            for (const dtype *p = rx_array.coupling_im.begin(); p < rx_array.coupling_im.end(); ++p)
-                if (std::abs(*p) > (dtype)1.0e-6)
-                    apply_element_coupling = true;
-        }
-    }
-
-    // Calculate abs( cpl )^2 and normalize the row-sum to 1
+    // Coupling powers abs(cpl)^2, each column (port) normalized to sum 1
     arma::Mat<dtype> tx_coupling_pwr(n_tx, n_tx_ports, arma::fill::none);
     arma::Mat<dtype> rx_coupling_pwr(n_rx, n_rx_ports, arma::fill::none);
     if (apply_element_coupling)
@@ -594,7 +305,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     arma::Mat<dtype> Vr_re(n_links, n_out, arma::fill::none), Vr_im(n_links, n_out, arma::fill::none);
     arma::Mat<dtype> Hr_re(n_links, n_out, arma::fill::none), Hr_im(n_links, n_out, arma::fill::none);
 
-    // Interpolate antennas
+    const arma::Cube<dtype> tx_ori(const_cast<dtype *>(p_to), 3, 1, 1), rx_ori(const_cast<dtype *>(p_ro), 3, 1, 1);
     qd_arrayant_interpolate_dispatch<dtype>(tx_array, AOD_all, EOD_all, i_tx_element, tx_ori, tx_element_pos_interp,
                                             Vt_re, Vt_im, Ht_re, Ht_im, nullptr, nullptr, nullptr, nullptr, kernel);
     qd_arrayant_interpolate_dispatch<dtype>(rx_array, AOA_all, EOA_all, i_rx_element, rx_ori, rx_element_pos_interp,
@@ -603,7 +314,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     // Calculate the MIMO channel coefficients for each path
     const int n_out_i = (int)n_out;
 #pragma omp parallel for if (n_out > 1 && n_out * n_links >= 512)
-    for (int i_out = 0; i_out < n_out_i; ++i_out) // Loop over paths
+    for (int i_out = 0; i_out < n_out_i; ++i_out)
     {
         const arma::uword j = (arma::uword)i_out;
         const arma::uword i = add_fake_los_path ? (j == 0 ? 0 : j - 1) : j;
@@ -624,14 +335,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
                                   pM, &p_delays[o_slice], wave_number, wavelength, path_amplitude,
                                   &p_coeff_re[o_slice], &p_coeff_im[o_slice], n_links);
         else
+#endif
             qd_coeff_combine(pVrr, pVri, pHrr, pHri, pVtr, pVti, pHtr, pHti,
                              pM, &p_delays[o_slice], wave_number, wavelength, path_amplitude,
                              &p_coeff_re[o_slice], &p_coeff_im[o_slice], n_links);
-#else
-        qd_coeff_combine(pVrr, pVri, pHrr, pHri, pVtr, pVti, pHtr, pHti,
-                         pM, &p_delays[o_slice], wave_number, wavelength, path_amplitude,
-                         &p_coeff_re[o_slice], &p_coeff_im[o_slice], n_links);
-#endif
 
         // Convert per-link path lengths [m] to propagation delays [s]
         for (arma::uword R = 0ULL; R < n_links; ++R)
@@ -643,93 +350,36 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
         // Apply antenna element coupling
         if (apply_element_coupling)
         {
-            // Allocate memory for temporary data
-            arma::uword N = (n_ports > n_links) ? n_ports : n_links;
-            dtype *tempX = new dtype[N];
-            dtype *tempY = new dtype[N];
-            dtype *tempZ = new dtype[N];
-            dtype *tempT = new dtype[N];
+            const arma::uword N = (n_ports > n_links) ? n_ports : n_links;
+            std::vector<dtype> temp(4 * N);
+            dtype *tempX = temp.data(), *tempY = tempX + N, *tempZ = tempY + N, *tempT = tempZ + N;
 
-            // Process coefficients and delays
-            if (different_output_size) // Data is stored in internal memory, we can write directly to the output
+            // Without different_output_size the data is in the outputs and the coupling runs in place
+            qd_coupling_apply_slot(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
+                                   tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
+                                   rx_coupling_pwr.memptr(), tx_coupling_pwr.memptr(), n_rx, n_rx_ports, n_tx, n_tx_ports,
+                                   &p_coeff_re[o_slice], &p_coeff_im[o_slice], &p_delays[o_slice],
+                                   different_output_size ? coeff_re.slice_memptr(j) : &p_coeff_re[o_slice],
+                                   different_output_size ? coeff_im.slice_memptr(j) : &p_coeff_im[o_slice],
+                                   different_output_size ? delay.slice_memptr(j) : &p_delays[o_slice], temp);
+
+            // Angles: the coupling applies to the x, y, z components of the unit direction vectors
+            auto couple_angles = [&](const dtype *p_az, const dtype *p_el, arma::Cube<dtype> *az, arma::Cube<dtype> *el)
             {
-                // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
-                                          &p_coeff_re[o_slice], &p_coeff_im[o_slice],
-                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
-                                          coeff_re.slice_memptr(j), coeff_im.slice_memptr(j),
-                                          n_rx, n_rx_ports, n_tx, n_tx_ports);
-
-                // Apply coupling to delays
-                qd_multiply_3_mat(rx_coupling_pwr.memptr(), &p_delays[o_slice], tx_coupling_pwr.memptr(), delay.slice_memptr(j),
-                                  n_rx, n_rx_ports, n_tx, n_tx_ports);
-            }
-            else // Data has been written to external memory
-            {
-                // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
-                                          &p_coeff_re[o_slice], &p_coeff_im[o_slice],
-                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
-                                          tempX, tempY,
-                                          n_rx, n_rx_ports, n_tx, n_tx_ports);
-
-                std::memcpy(&p_coeff_re[o_slice], tempX, n_ports * sizeof(dtype));
-                std::memcpy(&p_coeff_im[o_slice], tempY, n_ports * sizeof(dtype));
-
-                // Apply coupling to delays
-                qd_multiply_3_mat(rx_coupling_pwr.memptr(), &p_delays[o_slice], tx_coupling_pwr.memptr(), tempT, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                std::memcpy(&p_delays[o_slice], tempT, n_ports * sizeof(dtype));
-            }
-
-            // Process departure angles
-            if (aod != nullptr || eod != nullptr)
-            {
-                // Convert AOD and EOD to Cartesian coordinates
-                qd_geo2cart(n_links, &p_aod[o_slice], tempX, tempY, &p_eod[o_slice], tempZ);
-
-                // Apply coupling to the x, y, z, component independently
+                if (az == nullptr && el == nullptr)
+                    return;
+                qd_geo2cart(n_links, &p_az[o_slice], &p_el[o_slice], tempX, tempY, tempZ);
                 qd_multiply_3_mat(rx_coupling_pwr.memptr(), tempX, tx_coupling_pwr.memptr(), tempT, n_rx, n_rx_ports, n_tx, n_tx_ports);
                 qd_multiply_3_mat(rx_coupling_pwr.memptr(), tempY, tx_coupling_pwr.memptr(), tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
                 qd_multiply_3_mat(rx_coupling_pwr.memptr(), tempZ, tx_coupling_pwr.memptr(), tempY, n_rx, n_rx_ports, n_tx, n_tx_ports);
 
-                // Convert back to geographic coordinates and save to external memory
-                if (!different_output_size) // External memory is mapped to "p_aod" and "p_eod"
-                    qd_cart2geo(n_ports, &p_aod[o_slice], tempT, tempX, &p_eod[o_slice], tempY);
-                else if (aod == nullptr)
-                    qd_cart2geo<dtype>(n_ports, NULL, tempT, tempX, eod->slice_memptr(j), tempY);
-                else if (eod == nullptr)
-                    qd_cart2geo<dtype>(n_ports, aod->slice_memptr(j), tempT, tempX, NULL, tempY);
-                else
-                    qd_cart2geo<dtype>(n_ports, aod->slice_memptr(j), tempT, tempX, eod->slice_memptr(j), tempY);
-            }
-
-            // Process arrival angles
-            if (aoa != nullptr || eoa != nullptr)
-            {
-                // Convert AOA and EOA to Cartesian coordinates
-                qd_geo2cart(n_links, &p_aoa[o_slice], tempX, tempY, &p_eoa[o_slice], tempZ);
-
-                // Apply coupling to the x, y, z, component independently
-                qd_multiply_3_mat(rx_coupling_pwr.memptr(), tempX, tx_coupling_pwr.memptr(), tempT, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                qd_multiply_3_mat(rx_coupling_pwr.memptr(), tempY, tx_coupling_pwr.memptr(), tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                qd_multiply_3_mat(rx_coupling_pwr.memptr(), tempZ, tx_coupling_pwr.memptr(), tempY, n_rx, n_rx_ports, n_tx, n_tx_ports);
-
-                // Convert back to geographic coordinates and save to external memory
-                if (!different_output_size) // External memory is mapped to "p_aoa" and "p_eoa"
-                    qd_cart2geo(n_ports, &p_aoa[o_slice], tempT, tempX, &p_eoa[o_slice], tempY);
-                else if (aoa == nullptr)
-                    qd_cart2geo<dtype>(n_ports, NULL, tempT, tempX, eoa->slice_memptr(j), tempY);
-                else if (eoa == nullptr)
-                    qd_cart2geo<dtype>(n_ports, aoa->slice_memptr(j), tempT, tempX, NULL, tempY);
-                else
-                    qd_cart2geo<dtype>(n_ports, aoa->slice_memptr(j), tempT, tempX, eoa->slice_memptr(j), tempY);
-            }
-
-            // Free temporary memory
-            delete[] tempX;
-            delete[] tempY;
-            delete[] tempZ;
-            delete[] tempT;
+                // Without different_output_size, p_az / p_el are the outputs (or internal memory)
+                dtype *az_out = different_output_size ? (az ? az->slice_memptr(j) : nullptr) : const_cast<dtype *>(&p_az[o_slice]);
+                dtype *el_out = different_output_size ? (el ? el->slice_memptr(j) : nullptr) : const_cast<dtype *>(&p_el[o_slice]);
+                qd_cart2geo(n_ports, tempT, tempX, tempY, az_out, el_out);
+            };
+            couple_angles(p_aod, p_eod, aod, eod);
+            couple_angles(p_aoa, p_eoa, aoa, eoa);
         }
     }
 

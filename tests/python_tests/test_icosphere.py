@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.RTtools.icosphere: arguments, radius check, flag, output size limit.
+
 import sys
 import os
 import unittest
@@ -13,7 +15,6 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-# Now you can import your package
 from quadriga_lib import RTtools
 
 class test_case(unittest.TestCase):

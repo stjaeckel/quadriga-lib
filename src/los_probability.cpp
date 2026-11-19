@@ -347,7 +347,7 @@ arma::vec quadriga_lib::los_probability(const std::string &model,
             los_soft->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq && n_link > 0; ++k)
         {
-            const double kk = std::sqrt(20.0 * center_freq.at(k) / 299792458.0); // sqrt(20 / lambda)
+            const double kk = std::sqrt(20.0 * center_freq.at(k) / qd_speed_of_light); // sqrt(20 / lambda)
             double *ps = los_soft->colptr(k);
             for (arma::uword l = 0; l < n_link; ++l)
                 ps[l] = 0.5 + std::atan(kk * G[l]) / arma::datum::pi;

@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_scenpar_validate
 % MEX interface test for quadriga_lib.scenpar_validate.
 % Scope: argument and output handling, struct conversion in both directions, defaults, error paths.
@@ -57,7 +61,7 @@ assertTrue( chk );
 assertEqual( out2, out );
 assertEqual( X2, X );
 
-% A struct with the fields of QuaDRiGa (no new keys) is completed with the 33 new fields
+% A struct with only the fields of QuaDRiGa is completed with the 33 fields QuaDRiGa does not have
 legacy = rmfield( out, names(139:171) );
 assertEqual( numel(fieldnames(legacy)), 138 );
 assertEqual( quadriga_lib.scenpar_validate( legacy ), out );

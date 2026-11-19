@@ -72,7 +72,7 @@ namespace
         "asD_kf", "asA_kf", "ds_kf", "sf_kf", "esD_ds", "esA_ds", "esA_sf", "esD_sf", "esD_esA", "esD_asD",
         "esD_asA", "esA_asD", "esA_asA", "esD_kf", "esA_kf", "xpr_ds", "xpr_kf", "xpr_sf", "xpr_asd",
         "xpr_asa", "xpr_esd", "xpr_esa",
-        // New keys for TR 38.901 v19.5.0
+        // Keys for TR 38.901 v19.5.0
         "LSP_fc_min", "ES_D_mu_B", "ES_D_mu_C", "ES_D_mu_D", "EoD_offset_e", "EoD_offset_e_gamma",
         "EoD_offset_a", "EoD_offset_a_gamma", "EoD_offset_b", "EoD_offset_c", "EoD_offset_c_gamma",
         "EoD_offset_c_hUT", "EoD_offset_hcl", "PerClusterDS_fc_min", "PerClusterES_D_scale", "absTOA_Lmax",
@@ -88,7 +88,7 @@ namespace
     }
 
     // Oracle: default value of a key, written as rules read from set_scenario_table.m.
-    // Everything that is not named here is 0, including all 33 new keys.
+    // Everything that is not named here is 0, including all 33 TR 38.901 v19.5.0 keys.
     double ref_default(const std::string &k)
     {
         if (k == "NumClusters") return 6.0;

@@ -2,6 +2,12 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of arrayant_rotate_pattern and arrayant_rotate_pattern_multi: usage modes, element subsets, element positions,
+// grid adjustment, kept metadata, the orientation convention, validation.
+// Oracles: identities (zero and full-turn rotations, composition, inverse rotation), invariants (power per angle,
+// directivity, an omni pattern), exact element-position rotation, and arrayant_interpolate with the same orientation.
+// Tolerances: each rotation interpolates the pattern on the grid, so round trips are compared to 1e-4.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -11,10 +17,7 @@
 #include <string>
 #include <cmath>
 
-// ================================================================================================
-// Helper: compute total radiated power (sum of |E_theta|^2 + |E_phi|^2 over all angles and elements)
-// This should be preserved by any rotation (energy conservation)
-// ================================================================================================
+// Total radiated power, sum of |E_theta|^2 + |E_phi|^2 over all angles and elements; preserved by any rotation
 template <typename dtype>
 dtype total_power(const quadriga_lib::arrayant<dtype> &ant)
 {
@@ -32,9 +35,7 @@ dtype total_power(const quadriga_lib::arrayant<dtype> &ant)
     return power;
 }
 
-// ================================================================================================
-// Helper: maximum absolute difference between two arrayant pattern fields
-// ================================================================================================
+// Maximum absolute difference between the pattern fields of two arrayants
 template <typename dtype>
 dtype max_pattern_diff(const quadriga_lib::arrayant<dtype> &a, const quadriga_lib::arrayant<dtype> &b)
 {
@@ -66,9 +67,7 @@ dtype max_pattern_diff(const quadriga_lib::arrayant<dtype> &a, const quadriga_li
     return max_diff;
 }
 
-// ================================================================================================
-// Section 1: rotate_pattern - Input validation and error handling
-// ================================================================================================
+// ---- Input validation and error handling ----
 
 TEST_CASE("Rotate Pattern - Invalid usage parameter throws")
 {
@@ -95,9 +94,7 @@ TEST_CASE("Rotate Pattern - Valid usage values accepted")
         REQUIRE_NOTHROW(qd_rotate(ant, arma::datum::pi / 18.0, 0.0, 0.0, u));
 }
 
-// ================================================================================================
-// Section 2: rotate_pattern - Identity and near-identity rotations
-// ================================================================================================
+// ---- Identity and near-identity rotations ----
 
 TEST_CASE("Rotate Pattern - Zero rotation is identity (omni, double)")
 {
@@ -206,9 +203,7 @@ TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 4
     CHECK(diff < 1e-6);
 }
 
-// ================================================================================================
-// Section 3: rotate_pattern - Rotation composition
-// ================================================================================================
+// ---- Rotation composition ----
 
 TEST_CASE("Rotate Pattern - 90 + 270 = 360 z-rotation (usage 3)")
 {
@@ -237,9 +232,7 @@ TEST_CASE("Rotate Pattern - 180 + 180 = 360 z-rotation (usage 3)")
     CHECK(diff < 1e-4);
 }
 
-// ================================================================================================
-// Section 4: rotate_pattern - Omni antenna invariance under rotation
-// ================================================================================================
+// ---- Omni antenna invariance under rotation ----
 
 TEST_CASE("Rotate Pattern - Omni pattern invariant under z-rotation (usage 3)")
 {
@@ -280,9 +273,7 @@ TEST_CASE("Rotate Pattern - Omni pattern invariant under z-rotation (usage 4, pa
     CHECK(arma::approx_equal(ant.e_theta_re, ref.e_theta_re, "absdiff", 1e-6));
 }
 
-// ================================================================================================
-// Section 5: rotate_pattern - Directivity preservation
-// ================================================================================================
+// ---- Directivity preservation ----
 
 TEST_CASE("Rotate Pattern - Directivity preserved after rotation (dipole)")
 {
@@ -317,9 +308,7 @@ TEST_CASE("Rotate Pattern - Directivity preserved after rotation (custom beam)")
     CHECK(std::abs(dir_before - dir_after) < 0.2);
 }
 
-// ================================================================================================
-// Section 6: rotate_pattern - Usage modes
-// ================================================================================================
+// ---- Usage modes ----
 
 TEST_CASE("Rotate Pattern - Usage 2 only changes polarization, not power pattern")
 {
@@ -379,9 +368,7 @@ TEST_CASE("Rotate Pattern - Usage 3 and 4 preserve grid size")
     CHECK(ant4.n_azimuth() == n_az);
 }
 
-// ================================================================================================
-// Section 8: rotate_pattern - Single element rotation
-// ================================================================================================
+// ---- Single element rotation ----
 
 TEST_CASE("Rotate Pattern - Single element rotation only affects that element")
 {
@@ -407,9 +394,7 @@ TEST_CASE("Rotate Pattern - Single element rotation only affects that element")
     CHECK((theta_changed || phi_changed));
 }
 
-// ================================================================================================
-// Section 9: rotate_pattern - Element position rotation
-// ================================================================================================
+// ---- Element position rotation ----
 
 TEST_CASE("Rotate Pattern - Element positions are rotated correctly (z-rotation)")
 {
@@ -447,9 +432,7 @@ TEST_CASE("Rotate Pattern - Element positions unchanged for usage 2")
     CHECK(arma::approx_equal(ant.element_pos, ref_pos, "absdiff", 1e-14));
 }
 
-// ================================================================================================
-// Section 10: rotate_pattern - Specific known rotation results
-// ================================================================================================
+// ---- Specific known rotation results ----
 
 TEST_CASE("Rotate Pattern - Dipole 90 deg x-rotation flips pattern to horizontal (usage 3)")
 {
@@ -476,9 +459,7 @@ TEST_CASE("Rotate Pattern - Float precision (custom beam, usage 3)")
     CHECK(diff < 1e-3f); // Float has less precision
 }
 
-// ================================================================================================
-// Section 11: rotate_pattern - Grid adjustment tests (usage 0 and 1)
-// ================================================================================================
+// ---- Grid adjustment (usage 0 and 1) ----
 
 TEST_CASE("Rotate Pattern - Usage 0 may adjust grid for non-uniform antenna")
 {
@@ -493,11 +474,9 @@ TEST_CASE("Rotate Pattern - Usage 0 may adjust grid for non-uniform antenna")
     ant.e_phi_im.zeros(n_el, n_az, 1);
     ant.is_valid();
 
-    // Usage 0 should detect non-uniform grid and resamples
+    // Usage 0 detects the non-uniform grid and resamples
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0, 0);
 
-    // Grid should have been adjusted (different size)
-    // At minimum, it shouldn't crash
     CHECK(ant.n_elevation() > 0);
     CHECK(ant.n_azimuth() > 0);
     CHECK(ant.is_valid().empty());
@@ -522,9 +501,7 @@ TEST_CASE("Rotate Pattern - Usage 0 preserves directivity for non-uniform grid")
     CHECK(std::abs(dir_before - dir_after) < 1.0); // Grid resampling can cause some deviation
 }
 
-// ================================================================================================
-// Section 12: rotate_pattern - Consistency between usage modes
-// ================================================================================================
+// ---- Consistency between usage modes ----
 
 TEST_CASE("Rotate Pattern - Usage 0 and 3 give same result for uniform grid")
 {
@@ -558,18 +535,14 @@ TEST_CASE("Rotate Pattern - Usage 1 and 4 give same result for uniform grid")
     }
 }
 
-// ================================================================================================
-// Section 13: rotate_pattern - Symmetry tests
-// ================================================================================================
+// ---- Symmetry ----
 
 TEST_CASE("Rotate Pattern - Forward and inverse rotation recovers original (usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 60.0);
     auto ref = ant;
 
-    // Rotate forward then backward
-    // Note: Euler rotation composition is NOT simply negating angles due to non-commutativity
-    // But for a single-axis rotation, negation works:
+    // Negated angles invert a single-axis rotation (not a general Euler rotation)
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0, 3);
     qd_rotate(ant, 0.0, 0.0, -arma::datum::pi / 4.0, 3);
 
@@ -595,9 +568,7 @@ TEST_CASE("Rotate Pattern - Multiple small rotations accumulate correctly (usage
     CHECK(std::abs(dir_single - dir_multi) < 0.5);
 }
 
-// ================================================================================================
-// Section 14: rotate_pattern - Edge cases
-// ================================================================================================
+// ---- Edge cases ----
 
 TEST_CASE("Rotate Pattern - Very small rotation angle")
 {
@@ -645,9 +616,7 @@ TEST_CASE("Rotate Pattern - All three axes simultaneously (usage 3)")
     CHECK(ant.is_valid().empty());
 }
 
-// ================================================================================================
-// Section 15: rotate_pattern - Pattern validity after rotation
-// ================================================================================================
+// ---- Pattern validity after rotation ----
 
 TEST_CASE("Rotate Pattern - Result is always valid (multiple usage modes)")
 {
@@ -670,9 +639,7 @@ TEST_CASE("Rotate Pattern - Result is always valid (multiple usage modes)")
     CHECK(ant4.is_valid().empty());
 }
 
-// ================================================================================================
-// Section 16: rotate_pattern - Multi-element antennas
-// ================================================================================================
+// ---- Multi-element antennas ----
 
 TEST_CASE("Rotate Pattern - 3GPP 2x2 array rotation preserves all elements")
 {
@@ -708,9 +675,7 @@ TEST_CASE("Rotate Pattern - Rotating all elements individually matches rotating 
     CHECK(diff < 1e-14);
 }
 
-// ================================================================================================
-// Section 17: arrayant_rotate_pattern_multi - Basic tests
-// ================================================================================================
+// ---- arrayant_rotate_pattern_multi ----
 
 TEST_CASE("Rotate Pattern Multi - Empty vector throws")
 {
@@ -745,10 +710,9 @@ TEST_CASE("Rotate Pattern Multi - Single entry behaves like single rotate_patter
     auto ant_single = quadriga_lib::generate_arrayant_dipole<double>();
     auto ant_multi = ant_single;
 
-    // Single: use internal usage 3 (which is what multi maps usage 0 to)
+    // Multi usage 0 maps to single usage 3
     qd_rotate(ant_single, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 3);
 
-    // Multi with usage 0 -> maps to internal usage 3
     std::vector<quadriga_lib::arrayant<double>> vec = {ant_multi};
     qd_rotate_multi(vec, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 0);
 
@@ -874,9 +838,7 @@ TEST_CASE("Rotate Pattern Multi - Float precision")
     CHECK(diff < 1e-3f);
 }
 
-// ================================================================================================
-// Section 18: rotate_pattern - Stress tests and combined scenarios
-// ================================================================================================
+// ---- Combined scenarios ----
 
 TEST_CASE("Rotate Pattern - Half-wave dipole directivity preserved through rotation")
 {
@@ -903,9 +865,7 @@ TEST_CASE("Rotate Pattern - ULA antenna rotation")
     CHECK(ant.is_valid().empty());
 }
 
-// ================================================================================================
-// Coupling, centre frequency and name are kept (also with a grid update)
-// ================================================================================================
+// ---- Coupling, centre frequency and name are kept (also with a grid update) ----
 
 static quadriga_lib::arrayant<double> rotate_pattern_two_element_one_port()
 {
@@ -967,9 +927,7 @@ TEST_CASE("Rotate Pattern - Non-finite angles throw")
     CHECK(arma::approx_equal(ant.e_theta_re, ref, "absdiff", 0.0)); // Unchanged after the failed calls
 }
 
-// ================================================================================================
-// Orientation convention: the same as arrayant_interpolate, a positive tilt points down (3GPP TR 38.901)
-// ================================================================================================
+// ---- Orientation convention: the same as arrayant_interpolate, a positive tilt points down (3GPP TR 38.901) ----
 
 TEST_CASE("arrayant_rotate_pattern - a positive tilt points the beam and the element positions down")
 {

@@ -54,13 +54,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 4 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
     const double center_freq = qd_mex_get_scalar<double>(prhs[2], "center_freq", 0.0);
@@ -74,7 +72,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::generate_diffraction_paths<double>(orig, dest, center_freq, lod,
                                                              ray_x, ray_y, ray_z, weight, scalar_mode));
 
-    // Rays output as a 4D MATLAB array [n_pos, n_path, n_seg-1, 3], x, y, z stacked along the 4th dimension
+    // rays [n_pos, n_path, n_seg-1, 3]: x, y, z stacked along the 4th dimension
     mwSize dims[4] = {(mwSize)ray_x.n_rows, (mwSize)ray_x.n_cols, (mwSize)ray_x.n_slices, 3};
     plhs[0] = mxCreateNumericArray(4, dims, mxDOUBLE_CLASS, mxREAL);
     double *data = (double *)mxGetData(plhs[0]);
@@ -86,7 +84,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         std::memcpy(&data[2 * offset], ray_z.memptr(), offset * sizeof(double));
     }
 
-    // Weights output [n_pos, n_path, n_seg]
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&weight);
 }

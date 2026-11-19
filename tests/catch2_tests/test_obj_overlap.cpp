@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down obj_overlap_test: which objects overlap (identical, intersecting in 3D, overlapping edges or faces in a
+// shared plane) and which only touch, the reason strings, object IDs returned as given, and reasons that do not depend
+// on the thread count. Fixtures: the cube of quadriga_lib::cube ([-1, 1]^3 by default) and shifted or scaled copies.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"

@@ -3,11 +3,10 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
-#include <cstring>   // std::memcpy
-#include <iomanip>   // std::setprecision
-#include <algorithm> // std::replace
-#include <iostream>
-#include <utility>   // std::move
+#include <cstring>
+#include <algorithm>
+#include <cmath>
+#include <utility>
 
 #include "quadriga_channel.hpp"
 #include "qd_helpers_shared.hpp"
@@ -130,7 +129,6 @@ void quadriga_lib::get_channels_irs(
 - [[arrayant]] (antenna array class)
 MD!*/
 
-// Calculate channels for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
 void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const arrayant<dtype> &rx_array, const arrayant<dtype> &irs_array,
                                     const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
@@ -157,7 +155,6 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
                         &fbs_pos_1, &lbs_pos_1, &path_gain_1, &path_length_1, &polmat_1,
                         &fbs_pos_2, &lbs_pos_2, &path_gain_2, &path_length_2, &polmat_2);
 
-    // Check if IRS array is valid
     std::string error_message = qd_arrayant_is_valid_quick(irs_array);
     if (error_message.length() != 0)
     {
@@ -171,7 +168,6 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
     if (i_irs >= irs_array.coupling_re.n_cols)
         throw std::invalid_argument("IRS codebook index out of bound.");
 
-    // Do we need to calculate the angles?
     bool calc_angles = aod != nullptr || eod != nullptr || aoa != nullptr || eoa != nullptr;
 
     // Optional second IRS array for the RX-facing side
@@ -227,38 +223,20 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
 
     // Calculate the channel coefficients of the first segment from the TX to the IRS
     arma::Cube<dtype> coeff_re_1, coeff_im_1, delay_1, aod_1, eod_1;
-    if (calc_angles)
-    {
-        quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1,
-                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, &aod_1, &eod_1, nullptr, nullptr, use_kernel);
-    }
-    else
-    {
-        quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1,
-                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, use_kernel);
-    }
+    quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1,
+                                                coeff_re_1, coeff_im_1, delay_1, center_freq, true, false,
+                                                calc_angles ? &aod_1 : nullptr, calc_angles ? &eod_1 : nullptr, nullptr, nullptr, use_kernel);
 
     // Calculate channel coefficients of the second segment from the IRS to the RX
     arma::Cube<dtype> coeff_re_2, coeff_im_2, delay_2, aoa_2, eoa_2;
-    if (calc_angles)
-    {
-        quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2,
-                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, use_kernel);
-    }
-    else
-    {
-        quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2,
-                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, use_kernel);
-    }
+    quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2,
+                                                coeff_re_2, coeff_im_2, delay_2, center_freq, true, false,
+                                                nullptr, nullptr, calc_angles ? &aoa_2 : nullptr, calc_angles ? &eoa_2 : nullptr, use_kernel);
 
     // Calculate the LOS delay between TX and RX
     dtype los_delay = dtype(0.0);
     if (!use_absolute_delays)
-    {
-        dtype x = p_rp[0] - p_tp[0], y = p_rp[1] - p_tp[1], z = p_rp[2] - p_tp[2];
-        los_delay = std::sqrt(x * x + y * y + z * z);
-        los_delay *= dtype(3.335640951981520e-09); // 1/C
-    }
+        los_delay = qd_calc_length(p_tp[0], p_tp[1], p_tp[2], p_rp[0], p_rp[1], p_rp[2]) * dtype(1.0 / qd_speed_of_light);
 
     // Combine the two channel segments
     arma::uword n_path_1 = coeff_re_1.n_slices;
@@ -283,7 +261,6 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
     dtype threshold = (dtype)std::pow<double>(10.0, 0.1 * (double)threshold_dB);
     std::vector<bool> keep_path(n_path, false);
 
-    // Do we have a path whichlist?
     bool use_threshold = active_path.empty();
     if (!use_threshold && active_path.size() != n_path)
         throw std::invalid_argument("Optional input 'active_path' does not have the correct number of elements.");
@@ -347,46 +324,17 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
         }
     }
 
-    // Write to output
-    coeff_re.set_size(n_rx, n_tx, i_path);
-    coeff_im.set_size(n_rx, n_tx, i_path);
-    delay.set_size(n_rx, n_tx, i_path);
-
-    arma::uword n_bytes = n_rx * n_tx * i_path * sizeof(dtype);
-    if (n_bytes) // No memcpy for empty outputs (null data pointer)
-    {
-        std::memcpy(coeff_re.memptr(), coeff_re_local.memptr(), n_bytes);
-        std::memcpy(coeff_im.memptr(), coeff_im_local.memptr(), n_bytes);
-        std::memcpy(delay.memptr(), delay_local.memptr(), n_bytes);
-    }
-
-    if (aod != nullptr)
-    {
-        aod->set_size(n_rx, n_tx, i_path);
-        if (n_bytes)
-            std::memcpy(aod->memptr(), aod_local.memptr(), n_bytes);
-    }
-
-    if (eod != nullptr)
-    {
-        eod->set_size(n_rx, n_tx, i_path);
-        if (n_bytes)
-            std::memcpy(eod->memptr(), eod_local.memptr(), n_bytes);
-    }
-
-    if (aoa != nullptr)
-    {
-        aoa->set_size(n_rx, n_tx, i_path);
-        if (n_bytes)
-            std::memcpy(aoa->memptr(), aoa_local.memptr(), n_bytes);
-    }
-
-    if (eoa != nullptr)
-    {
-        eoa->set_size(n_rx, n_tx, i_path);
-        if (n_bytes)
-            std::memcpy(eoa->memptr(), eoa_local.memptr(), n_bytes);
-    }
+    const arma::uword n_bytes = n_rx * n_tx * i_path * sizeof(dtype);
+    const std::pair<arma::Cube<dtype> *, const arma::Cube<dtype> *> outputs[] = {
+        {&coeff_re, &coeff_re_local}, {&coeff_im, &coeff_im_local}, {&delay, &delay_local},
+        {aod, &aod_local}, {eod, &eod_local}, {aoa, &aoa_local}, {eoa, &eoa_local}};
+    for (const auto &o : outputs)
+        if (o.first != nullptr)
+        {
+            o.first->set_size(n_rx, n_tx, i_path);
+            if (n_bytes) // No memcpy for empty outputs (null data pointer)
+                std::memcpy(o.first->memptr(), o.second->memptr(), n_bytes);
+        }
 
     if (active_path_out != nullptr)
         *active_path_out = std::move(keep_path);

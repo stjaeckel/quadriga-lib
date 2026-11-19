@@ -39,16 +39,13 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs != 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    if (!mxIsStruct(prhs[0]))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in' must be a struct.");
+    qd_mex_check_struct(prhs[0], "arrayant_in");
 
-    // Assemble array antenna object (single or multi-frequency)
     auto ant = quadriga_lib::arrayant<double>();
     auto ant_multi = std::vector<quadriga_lib::arrayant<double>>();
     size_t n_freq = (size_t)mxGetNumberOfElements(prhs[0]);
@@ -68,7 +65,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (source.n_elem > 1 && source.n_elem != dest.n_elem)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "When copying multiple elements, 'i_source' and 'i_target' must have the same length.");
 
-    // Dispatch
     if (n_freq > 1)
     {
         if (source.n_elem == 1)
@@ -86,6 +82,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 CALL_QD(quadriga_lib::arrayant_copy_element(ant, source.at(i), arma::uvec{dest.at(i)}));
     }
 
-    // Output as struct (or struct array for multi-frequency)
     plhs[0] = (n_freq > 1) ? qd_mex_arrayant2struct_multi(ant_multi) : qd_mex_arrayant2struct(ant);
 }

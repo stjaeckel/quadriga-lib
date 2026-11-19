@@ -98,13 +98,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
-    if (!mxIsStruct(prhs[2]) || mxGetNumberOfElements(prhs[2]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rays' must be a 1x1 struct.");
 
     // Read inputs; the library validates the arrays
     const auto tx_array = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
     const auto rx_array = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
-    const auto rays = qd_mex_struct2gbsm_rays(prhs[2], 0, false, "rays");
+    const auto rays = qd_mex_struct2gbsm_rays(prhs[2], "rays");
     const arma::vec link_gain_dB = qd_mex_get_Col<double>(prhs[3], false, "link_gain_dB");
     const std::string mobility = (nrhs < 5) ? std::string("auto") : qd_mex_get_string(prhs[4], "auto", "mobility");
     const std::string output = (nrhs < 6) ? std::string("taps") : qd_mex_get_string(prhs[5], "taps", "output");

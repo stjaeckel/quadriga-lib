@@ -1,4 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_obj_file_write
+% MEX interface test for quadriga_lib.obj_file_write.
+% Physics validation lives in the Catch2 suite (test_obj_file_write.cpp).
 
 fn = 'cube.obj';
 mtl_fn = 'cube.mtl';
@@ -350,7 +356,7 @@ catch ME
     end
 end
 
-% Unset or non-string cell elements in name lists (an unset element crashed MATLAB R2026a)
+% Unset or non-string cell elements in name lists are rejected (an unset element must not crash MATLAB)
 assert_cpp_error( @() quadriga_lib.obj_file_write( fn, mesh, ones(12,1), [], cell(1,1) ), ...
     'Cell element 1 of ''obj_names'' is not a string.' );
 assert_cpp_error( @() quadriga_lib.obj_file_write( fn, mesh, [ones(6,1); 2*ones(6,1)], [], {'a', 1} ), ...

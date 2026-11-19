@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 
 #if BUILD_WITH_AVX2
@@ -95,7 +96,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     if (dest.n_cols < 3)
         throw std::invalid_argument("Input 'dest' must have at least 3 columns containing x,y,z coordinates.");
     if (dest.n_rows != n_ray)
-        throw std::invalid_argument("Number of elements in 'orig' and 'dest' dont match.");
+        throw std::invalid_argument("Number of elements in 'orig' and 'dest' do not match.");
 
     if (mesh.n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty.");
@@ -114,75 +115,18 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     qd_check_alias_outputs(n_interact, "n_interact", sbs_ind, "sbs_ind");
     qd_check_alias_outputs(fbs_ind, "fbs_ind", sbs_ind, "sbs_ind");
 
-    // Determine which compute kernel to use
-    // kernel: 1 = GENERIC, 2 = AVX2, 3 = CUDA
-    int kernel = 1;      // Default to GENERIC
-    if (use_kernel == 1) // GENERIC requested
-    {
-        kernel = 1;
-    }
-    else if (use_kernel == 2) // AVX2 requested
-    {
-        if (!quadriga_lib::quadriga_lib_has_AVX2())
-            throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-        kernel = 2;
-    }
-    else if (use_kernel == 3) // CUDA requested
-    {
-        if (!quadriga_lib::quadriga_lib_has_CUDA())
-            throw std::invalid_argument("CUDA kernel requested but not available (compile with BUILD_WITH_CUDA and run on CUDA-capable GPU).");
-        kernel = 3;
-    }
-    else if (use_kernel == 0) // Auto-select
-    {
-        if (n_ray >= 500 && quadriga_lib::quadriga_lib_has_CUDA())
-            kernel = 3;
-        else if (quadriga_lib::quadriga_lib_has_AVX2())
-            kernel = 2;
-        else
-            kernel = 1;
-    }
-    else
-        throw std::invalid_argument("Input 'use_kernel' must be 0, 1, 2 or 3.");
+    const int kernel = qd_kernel_auto_cuda(use_kernel, n_ray);
 
-    // Check if the sub-mesh indices are valid
-    arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
-    arma::u32_vec smi(1, arma::fill::zeros);                      // Sub-mesh-index (local copy)
-    if (sub_mesh_ind.n_elem != 0)     // Input is available
-    {
-        n_sub = sub_mesh_ind.n_elem;
-        const unsigned *p_sub = sub_mesh_ind.memptr();
-
-        if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-mesh must start at the first face.");
-
-        for (arma::uword i = 1ULL; i < n_sub; ++i)
-        {
-            if (p_sub[i] <= p_sub[i - 1ULL])
-                throw std::invalid_argument("Sub-mesh indices must be sorted in ascending order.");
-        }
-
-        if (p_sub[n_sub - 1ULL] >= (unsigned)n_mesh)
-            throw std::invalid_argument("Sub-mesh indices cannot exceed number of mesh elements.");
-
-        smi = sub_mesh_ind;
-    }
+    // Sub-mesh indices; without them the mesh is one sub-mesh
+    arma::uword n_sub = qd_check_sub_ind(sub_mesh_ind, n_mesh, "sub_mesh_ind", "mesh face");
+    const unsigned first_face = 0;
+    const unsigned *p_smi = (n_sub == 0) ? &first_face : sub_mesh_ind.memptr();
+    n_sub = (n_sub == 0) ? 1 : n_sub;
 
     // Compute or validate AABB
-    arma::Mat<dtype> aabb_computed;
-    const arma::Mat<dtype> *p_aabb = &aabb;
-    if (aabb.empty())
-    {
-        aabb_computed = quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_ind);
-        p_aabb = &aabb_computed;
-    }
-    else
-    {
-        if (aabb.n_rows != n_sub)
-            throw std::invalid_argument("Number of rows in 'aabb' must match number of sub-meshes.");
-        if (aabb.n_cols < 6)
-            throw std::invalid_argument("Input 'aabb' must have at least 6 columns [x_min, x_max, y_min, y_max, z_min, z_max].");
-    }
+    qd_check_aabb(aabb, n_sub);
+    const arma::Mat<dtype> aabb_computed = aabb.empty() ? quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_ind) : arma::Mat<dtype>();
+    const arma::Mat<dtype> *p_aabb = aabb.empty() ? &aabb_computed : &aabb;
 
     // AABB data per sub-mesh
     const dtype *Xmin = p_aabb->colptr(0), *Xmax = p_aabb->colptr(1);
@@ -194,24 +138,21 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     const dtype *Ux = mesh.colptr(3), *Uy = mesh.colptr(4), *Uz = mesh.colptr(5);
     const dtype *Vx = mesh.colptr(6), *Vy = mesh.colptr(7), *Vz = mesh.colptr(8);
 
-    // Pointer to origin and destination coordinates
     const dtype *ox = orig.colptr(0), *oy = orig.colptr(1), *oz = orig.colptr(2);
     const dtype *dx = dest.colptr(0), *dy = dest.colptr(1), *dz = dest.colptr(2);
 
-    // Define and initialize temporary variables
-    arma::Col<dtype> Wf(n_ray), Ws(n_ray); // Normalized FBS and SBS hit distances, initialized to 0
-    arma::u32_vec If(n_ray), Is(n_ray);    // Index of mesh element hit at FBS/SBS, initialized to 0
-    arma::u32_vec hit_cnt(n_ray);          // Hit counter
+    // Kernel outputs, every element is written by the kernel
+    arma::Col<dtype> Wf(n_ray), Ws(n_ray); // Normalized FBS and SBS hit distances
+    arma::u32_vec If(n_ray), Is(n_ray);    // Index of mesh element hit at FBS/SBS, 1-based, 0 = no hit
+    arma::u32_vec hit_cnt(n_ray);
 
-    // Pointer to hit counter
     unsigned *p_hit_cnt = (n_interact == nullptr) ? nullptr : hit_cnt.memptr();
 
-    // Dispatch to selected kernel
     if (kernel == 3) // CUDA
     {
 #if BUILD_WITH_CUDA
         qd_RTI_CUDA<dtype>(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
-                           smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                           p_smi, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                            ox, oy, oz, dx, dy, dz,
                            n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt, gpu_id);
 #endif
@@ -220,7 +161,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     {
 #if BUILD_WITH_AVX2
         qd_RTI_AVX2<dtype>(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
-                           smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                           p_smi, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                            ox, oy, oz, dx, dy, dz,
                            n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
 #endif
@@ -228,7 +169,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     else // GENERIC
     {
         qd_RTI_GENERIC<dtype>(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
-                              smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                              p_smi, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                               ox, oy, oz, dx, dy, dz,
                               n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }

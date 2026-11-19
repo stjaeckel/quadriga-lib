@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.RTtools.point_cloud_aabb.
+
 import sys
 import os
 import unittest
@@ -28,7 +30,6 @@ class test_case(unittest.TestCase):
         ], dtype=pts.dtype)
 
     def test(self):
-        # ---------- 1) Whole-cloud AABB (deterministic small set) ----------
         with self.subTest("single sub-cloud / whole cloud"):
             points = np.array([[1.0, 2.0, 3.0],
                                [4.0, -5.0, 6.0],
@@ -37,7 +38,6 @@ class test_case(unittest.TestCase):
             got = RTtools.point_cloud_aabb(points)
             npt.assert_allclose(got, expected, rtol=0, atol=0)
 
-        # ---------- 2) Multiple sub-clouds via explicit sub_cloud_ind ----------
         with self.subTest("multiple sub-clouds explicit indices"):
             g1 = np.array([[0., 0., 0.], [2., 3., -1.], [1., -1., 5.]], dtype=np.float64)
             g2 = np.array([[-4., 2., 9.], [10., 10., -2.]], dtype=np.float64)
@@ -47,7 +47,6 @@ class test_case(unittest.TestCase):
             got = RTtools.point_cloud_aabb(points, sub_cloud_ind)
             npt.assert_allclose(got, expected, rtol=0, atol=0)
 
-        # ---------- 3) vec_size padding for output rows ----------
         with self.subTest("vec_size padding on output rows"):
             vec_size = 4
             got = RTtools.point_cloud_aabb(points, sub_cloud_ind, vec_size=vec_size)
@@ -57,7 +56,6 @@ class test_case(unittest.TestCase):
             npt.assert_allclose(got[:2], expected, rtol=0, atol=0)
             npt.assert_allclose(got[2:], 0.0, rtol=0, atol=0)
 
-        # ---------- 4) Invariance to within-subcloud shuffling ----------
         with self.subTest("order invariance within each sub-cloud"):
             # Shuffle points within each block defined by sub_cloud_ind
             p = points.copy()
@@ -69,13 +67,11 @@ class test_case(unittest.TestCase):
             got = RTtools.point_cloud_aabb(p, sub_cloud_ind)
             npt.assert_allclose(got[:2], expected, rtol=0, atol=0)
 
-        # ---------- 5) Float32 inputs ----------
         with self.subTest("float32 input support"):
             pts32 = points.astype(np.float32)
             got = RTtools.point_cloud_aabb(pts32, sub_cloud_ind)
             npt.assert_allclose(got[:2], expected.astype(np.float32), rtol=0, atol=0)
 
-        # ---------- 6) Integration with point_cloud_segmentation ----------
         with self.subTest("integration with segmentation (padding-aware)"):
             rng = np.random.default_rng(123)
             N = 12345
@@ -109,14 +105,12 @@ class test_case(unittest.TestCase):
             if pad_rows > 0:
                 npt.assert_allclose(aabb_lib[n_sub:], 0.0, rtol=0, atol=0)
 
-        # ---------- 7) Single point edge-case ----------
         with self.subTest("single point edge-case"):
             p = np.array([[3.14, -2.0, 7.0]], dtype=np.float64)
             got = RTtools.point_cloud_aabb(p)
             expected = np.array([[3.14, 3.14, -2.0, -2.0, 7.0, 7.0]], dtype=np.float64)
             npt.assert_allclose(got, expected, rtol=0, atol=0)
 
-        # ---------- 8) vec_size padding when sub_cloud_ind is omitted ----------
         with self.subTest("vec_size padding without sub_cloud_ind"):
             p = np.array([[1., 2., 3.], [4., 5., 6.]], dtype=np.float64)
             vec_size = 8

@@ -1,5 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_obj_file_read
-% Delete file
+% MEX interface test for quadriga_lib.obj_file_read.
+% Physics validation lives in the Catch2 suite (test_obj_file_read.cpp).
 fn = 'cube.obj';
 if exist( fn,'file' )
     delete(fn);
@@ -38,7 +43,7 @@ mesh_correct = [ vert_list_correct( face_ind_correct(:,1),: ), vert_list_correct
 % No output should be fine
 quadriga_lib.obj_file_read(fn);
 
-% Read all (new output order, 11 outputs)
+% Read all 11 outputs
 [ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, ...
     csv_ind, csv_names, csv_prop ] = quadriga_lib.obj_file_read(fn);
 

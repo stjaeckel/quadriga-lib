@@ -7,7 +7,6 @@
 
 namespace py = pybind11;
 
-// Include parts
 #include "qpy_arrayant_ops.cpp"
 #include "qpy_arrayant_io.cpp"
 #include "qpy_arrayant_generate.cpp"

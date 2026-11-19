@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_version
+% MEX interface test for quadriga_lib.version.
 
 v = quadriga_lib.version();
 assertTrue( ischar(v) && ~isempty(v) );

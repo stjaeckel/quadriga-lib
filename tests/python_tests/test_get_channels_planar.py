@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.channel.planar.
+
 import sys
 import os
 import math
@@ -74,9 +76,7 @@ def minimal_paths():
 
 class TestGetChannelsPlanar(unittest.TestCase):
 
-    # -------------------------------------------------------------------------
-    # Minimal test - amplitude, delay, Doppler (mirrors C++ minimal test)
-    # -------------------------------------------------------------------------
+    # ---- Minimal test - amplitude, delay, Doppler (mirrors C++ minimal test) ----
 
     def test_minimal(self):
         ant = minimal_ant()
@@ -103,9 +103,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(rx_Doppler, np.array([-1.0, doppler]), decimal=13)
         self.assertEqual(rx_Doppler.shape, (2,))
 
-    # -------------------------------------------------------------------------
-    # Fake LOS path (mirrors C++ "Fake LOS" test)
-    # -------------------------------------------------------------------------
+    # ---- Fake LOS path (mirrors C++ "Fake LOS" test) ----
 
     def test_fake_los_path(self):
         ant = omni()
@@ -131,7 +129,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         amp = amp2(coeff_re, coeff_im)
         npt.assert_almost_equal(amp[0, 0, 0], 1.0, decimal=6)   # LOS
         npt.assert_almost_equal(amp[0, 0, 1], 0.5, decimal=6)   # NLOS
-        npt.assert_almost_equal(amp[0, 0, 2], 0.0, decimal=6)   # fake (zero power)
+        npt.assert_almost_equal(amp[0, 0, 2], 0.0, decimal=6)   # input slot of the LOS path (zero power)
 
         d0 = 20.0
         e0 = math.hypot(10, 10) + math.sqrt(10 ** 2 + 20 ** 2 + 10 ** 2)
@@ -139,9 +137,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(delay[0, 0, 1], e0 / C, decimal=12)
         npt.assert_almost_equal(delay[0, 0, 2], d0 / C, decimal=13)
 
-    # -------------------------------------------------------------------------
-    # Coupling (mirrors C++ "Coupling" test, 3 sub-cases)
-    # -------------------------------------------------------------------------
+    # ---- Coupling (mirrors C++ "Coupling" test, 3 sub-cases) ----
 
     def test_coupling(self):
         # 3-element array. Only elements 0 and 2 are copies of the omni source;
@@ -161,7 +157,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         path_length = np.array([20.0])
         M = make_M(1)
 
-        # Case 1: identity coupling (from copy_element), relative delays, fake LOS appended
+        # Case 1: identity coupling (from copy_element), relative delays; the LOS path moves to slot 0, slot 1 has zero power
         ant = base_ant()
         cr, ci, delay, _ = re_im(channel.planar(
             ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod, eod, aoa, eoa, path_gain, path_length, M,
@@ -171,7 +167,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         expected = np.array([[1, 0, 1], [0, 0, 0], [1, 0, 1]], dtype=float)
         npt.assert_almost_equal(cr[:, :, 0], expected, decimal=13)
         npt.assert_almost_equal(ci[:, :, 0], np.zeros((3, 3)), decimal=13)
-        npt.assert_almost_equal(cr[:, :, 1], np.zeros((3, 3)), decimal=13)     # fake LOS
+        npt.assert_almost_equal(cr[:, :, 1], np.zeros((3, 3)), decimal=13)     # input slot of the LOS path
         npt.assert_almost_equal(delay[:, :, 0], np.zeros((3, 3)), decimal=13)  # relative, all == LOS
 
         # Case 2: all elements summed into a single port (weight 1)
@@ -200,9 +196,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(ci[0, 0, 0], 0.0, decimal=13)
         npt.assert_almost_equal(delay[0, 0, 0], 20.0 / C, decimal=13)
 
-    # -------------------------------------------------------------------------
-    # rx_Doppler equals cos(aoa)*cos(eoa)
-    # -------------------------------------------------------------------------
+    # ---- rx_Doppler equals cos(aoa)*cos(eoa) ----
 
     def test_doppler_directions(self):
         ant = omni()
@@ -215,9 +209,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 np.array([eoa_v]), path_gain, path_length, M, 0.0, use_absolute_delays=True))
             npt.assert_almost_equal(dop[0], math.cos(aoa_v) * math.cos(eoa_v), decimal=12)
 
-    # -------------------------------------------------------------------------
-    # center_freq = 0 disables phase
-    # -------------------------------------------------------------------------
+    # ---- center_freq = 0 disables phase ----
 
     def test_center_freq_zero_no_phase(self):
         ant = omni()
@@ -227,9 +219,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(ci[0, 0, 0], 0.0, decimal=6)
         npt.assert_almost_equal(amp2(cr, ci)[0, 0, 0], 1.0, decimal=5)
 
-    # -------------------------------------------------------------------------
-    # Absolute vs relative delays
-    # -------------------------------------------------------------------------
+    # ---- Absolute vs relative delays ----
 
     def test_absolute_vs_relative_delays(self):
         ant = omni()
@@ -244,9 +234,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(cr_a[0, 0, 0], cr_r[0, 0, 0], decimal=12)
         npt.assert_almost_equal(ci_a[0, 0, 0], ci_r[0, 0, 0], decimal=12)
 
-    # -------------------------------------------------------------------------
-    # Phase introduced by a non-zero center frequency
-    # -------------------------------------------------------------------------
+    # ---- Phase introduced by a non-zero center frequency ----
 
     def test_phase_with_center_frequency(self):
         ant = omni()
@@ -262,9 +250,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         rotated = (abs(cr_f[0, 0, 0] - cr_0[0, 0, 0]) > 1e-6) or (abs(ci_f[0, 0, 0] - ci_0[0, 0, 0]) > 1e-6)
         self.assertTrue(rotated)
 
-    # -------------------------------------------------------------------------
-    # Complex polarization matrix introduces phase
-    # -------------------------------------------------------------------------
+    # ---- Complex polarization matrix introduces phase ----
 
     def test_complex_M_introduces_phase(self):
         ant = omni()
@@ -280,9 +266,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(amp2(cr, ci)[0, 0, 0], 1.0, decimal=5)
         self.assertGreater(abs(ci[0, 0, 0]), 1e-3)
 
-    # -------------------------------------------------------------------------
-    # Cross-polarization via M
-    # -------------------------------------------------------------------------
+    # ---- Cross-polarization via M ----
 
     def test_xpol_via_M(self):
         probe = xpol()
@@ -307,9 +291,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         self.assertLess(np.sum(amp2(cr_z, ci_z) ** 2), 1e-12)
         self.assertFalse(np.allclose(cr_vh, cr_vv, atol=1e-6))
 
-    # -------------------------------------------------------------------------
-    # RX bank rotation swaps xpol amplitudes
-    # -------------------------------------------------------------------------
+    # ---- RX bank rotation swaps xpol amplitudes ----
 
     def test_rx_rotation_swaps_xpol(self):
         tx = omni()
@@ -329,9 +311,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(a_v0, a_hr, decimal=4)
         npt.assert_almost_equal(a_h0, a_vr, decimal=4)
 
-    # -------------------------------------------------------------------------
-    # Output shapes incl. fake-LOS n_path+1 (regression for the wrapper fix)
-    # -------------------------------------------------------------------------
+    # ---- Output shapes incl. fake-LOS n_path+1 ----
 
     def test_output_shape_mimo(self):
         tx = omni()
@@ -370,9 +350,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
             self.assertEqual(arr.shape, (2, 3, n_path + 1))
         self.assertEqual(dop2.shape, (n_path + 1,))
 
-    # -------------------------------------------------------------------------
-    # Zero path gain produces a zero coefficient
-    # -------------------------------------------------------------------------
+    # ---- Zero path gain produces a zero coefficient ----
 
     def test_zero_path_gain(self):
         ant = omni()
@@ -392,9 +370,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_almost_equal(cr[0, 0, 1], 0.0, decimal=12)
         npt.assert_almost_equal(ci[0, 0, 1], 0.0, decimal=12)
 
-    # -------------------------------------------------------------------------
-    # Error handling (mirrors MEX exception tests)
-    # -------------------------------------------------------------------------
+    # ---- Error handling (mirrors MEX exception tests) ----
 
     def test_element_pos_optional(self):
         ant = minimal_ant()
@@ -450,9 +426,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "Input 'tx_pos' has incorrect number of elements.")
 
 
-    # -------------------------------------------------------------------------
-    # Input checks
-    # -------------------------------------------------------------------------
+    # ---- Input checks ----
 
     def _planar_args(self):
         return (np.zeros(3), np.zeros(3), np.array([10.0, 0, 0]), np.zeros(3),

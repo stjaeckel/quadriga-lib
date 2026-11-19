@@ -1,4 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_get_channels_irs()
+% MEX interface test for quadriga_lib.get_channels_irs.
+% Physics validation lives in the Catch2 suite (test_get_channels_irs.cpp).
 
 % Antenna configs
 n_el=3; n_az=4; n_elem_tx=2; n_ports_tx=2;
@@ -43,7 +49,7 @@ M_2 = M_1;
 all_mask = true(1, numel(path_gain_1)*numel(path_gain_2));
 some_mask = [true true true false]; % length 4
 
-% ---------- 1) Basic call; all paths kept; f0=0 ----------
+%% Basic call; all paths kept; f0=0
 i_irs = 1; thr_keep_all = -300; f0_zero = 0; use_abs=false; active_path_in=[];
 [cr0,ci0,D0,act0,aod0,eod0,aoa0,eoa0] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
@@ -92,7 +98,7 @@ assertTrue(all(aoa0(:)>=-pi & aoa0(:)<=pi));
 assertTrue(all(eod0(:)>=-pi/2 & eod0(:)<=pi/2));
 assertTrue(all(eoa0(:)>=-pi/2 & eoa0(:)<=pi/2));
 
-% ---------- 2) Phase enabled when center_freq>0 ----------
+%% Phase enabled when center_freq>0
 f0 = 3.5e9;
 [~,ci1,~,~,~,~,~,~] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
@@ -102,7 +108,7 @@ f0 = 3.5e9;
     i_irs, thr_keep_all, f0, use_abs, [], active_path_in );
 assertTrue(any(abs(ci1(:))>1e-8));
 
-% ---------- 3) Absolute delays add a constant offset ----------
+%% Absolute delays add a constant offset
 use_abs=true;
 [~,~,D_abs,~,~,~,~,~]= quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
@@ -120,7 +126,7 @@ use_abs=false;
 delta = D_abs - D_rel;
 assertTrue(all(abs(delta(:)-delta(1))<1e-12));  % same offset everywhere
 
-% ---------- 4) active_path selection overrides threshold ----------
+%% active_path selection overrides threshold
 thr_drop_all = +100; % would drop everything if used
 [cr_sel,ci_sel,~,act_sel] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
@@ -135,7 +141,7 @@ assertTrue(islogical(act_sel));
 assertEqual(sum(act_sel), sum(some_mask));
 assertTrue(all(~act_sel | some_mask(:))); % used paths must be a subset of requested
 
-% ---------- 5) i_irs index changes coefficients when IRS has multiple ports ----------
+%% i_irs index changes coefficients when IRS has multiple ports
 i_irs0 = 1;   % 1-based codebook port
 i_irs1 = 2;
 [cr_i0,~,~,~,~,~,~,~] = quadriga_lib.get_channels_irs( ...
@@ -152,7 +158,7 @@ i_irs1 = 2;
     i_irs1, thr_keep_all, f0_zero, false, [], all_mask );
 assertTrue(any(abs(cr_i0(:)-cr_i1(:))>1e-12));
 
-% ---------- 6) Asymmetric IRS (ant_irs_2) changes result ----------
+%% A second IRS array (irs_array_2) changes the result
 [cr_sym,~,~,~,~,~,~,~] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
@@ -168,7 +174,7 @@ assertTrue(any(abs(cr_i0(:)-cr_i1(:))>1e-12));
 assertTrue(any(abs(cr_sym(:)-cr_asym(:))>1e-12));
 assertTrue(isequal(ant_irs, make_ant(n_el,n_az,n_elem_irs,n_ports_irs,1.0)));  % inputs are not changed
 
-% ---------- 7a) Threshold filtering reduces output paths ----------
+%% Threshold filtering reduces output paths
 % The threshold is absolute: with these antennas the combined paths have a peak power of 24, 17, 11 and 4 dB, so
 % 14 dB keeps two of them.
 thr_mid = 14;
@@ -181,7 +187,7 @@ thr_mid = 14;
 assertEqual(size(cr_thr,3), sum(act_thr));   % n_path_irs == #active
 assertTrue(sum(act_thr) >= 1 && sum(act_thr) < 4);  % some kept, some dropped
 
-% ---------- 7b) Absolute delay magnitude matches geometry ----------
+%% Absolute delay magnitude matches geometry
 % Shortest combined path delay = (min(path_length_1) + min(path_length_2)) / c,
 % up to small element-position offsets.
 C = 299792458.0;
@@ -194,7 +200,7 @@ C = 299792458.0;
 expected_min_delay = (min(path_length_1) + min(path_length_2)) / C;
 assertTrue(abs(min(D_abs_chk(:)) - expected_min_delay) < 5e-9);
 
-% ---------- 7c) Optional fields can be omitted on antennas ----------
+%% Optional fields can be omitted on antennas
 ant_tx2 = rmfield(ant_tx,  'element_pos');
 ant_rx2 = rmfield(ant_rx,  'element_pos');
 ant_irs2 = rmfield(ant_irs, 'element_pos');
@@ -214,7 +220,7 @@ ant_tx2 = rmfield(ant_tx2, 'coupling_im');
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     1, thr_keep_all, f0_zero, false, [], [] );
 
-% ---------- 7d) Subset of outputs (only first three) ----------
+%% Subset of outputs (only first three)
 [cr_s, ci_s, D_s] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
@@ -225,7 +231,7 @@ assertEqual(size(cr_s,3), 4);
 assertEqual(size(ci_s,3), 4);
 assertEqual(size(D_s,3),  4);
 
-% ---------- 8) Error: M_1 size mismatch (segment 1 path count mismatch) ----------
+%% Error: M_1 size mismatch (segment 1 path count mismatch)
 M_1_bad = ones(8,1); % should be 8x2
 try
     [~] = quadriga_lib.get_channels_irs( ...
@@ -242,7 +248,7 @@ catch ME
     end
 end
 
-% ---------- 9) Error: segment 2 path count mismatch ----------
+%% Error: segment 2 path count mismatch
 fbs_pos_2_bad = [fbs_pos_2, fbs_pos_2(:,1)]; % 3 cols vs 2 elsewhere
 try
     [~] = quadriga_lib.get_channels_irs( ...
@@ -259,7 +265,7 @@ catch ME
     end
 end
 
-% ---------- 10) Error: wrong size of tx_pos ----------
+%% Error: wrong size of tx_pos
 try
     [~] = quadriga_lib.get_channels_irs( ...
         ant_tx, ant_rx, ant_irs, ...
@@ -275,7 +281,7 @@ catch ME
     end
 end
 
-% ---------- 11) Error: wrong size of irs_pos ----------
+%% Error: wrong size of irs_pos
 try
     [~] = quadriga_lib.get_channels_irs( ...
         ant_tx, ant_rx, ant_irs, ...
@@ -291,7 +297,7 @@ catch ME
     end
 end
 
-% ---------- 12) Error: wrong size of irs_orientation ----------
+%% Error: wrong size of irs_orientation
 try
     [~] = quadriga_lib.get_channels_irs( ...
         ant_tx, ant_rx, ant_irs, ...
@@ -307,7 +313,7 @@ catch ME
     end
 end
 
-% ---------- 13) Error: active_path wrong length ----------
+%% Error: active_path wrong length
 bad_mask = true(1, 3); % should be n_path_1 * n_path_2 = 4
 try
     [~] = quadriga_lib.get_channels_irs( ...
@@ -324,7 +330,7 @@ catch ME
     end
 end
 
-% ---------- 14) Error: TX coupling_im without coupling_re ----------
+%% Error: TX coupling_im without coupling_re
 ant_tx_bad = ant_tx;
 ant_tx_bad = rmfield(ant_tx_bad,'coupling_re');
 try
@@ -342,7 +348,7 @@ catch ME
     end
 end
 
-% ---------- 15) Error: IRS coupling_im without coupling_re ----------
+%% Error: IRS coupling_im without coupling_re
 ant_irs_bad = ant_irs;
 ant_irs_bad = rmfield(ant_irs_bad,'coupling_re');
 try
@@ -361,7 +367,7 @@ catch ME
 end
 
 
-% ---------- 11) i_irs is a 1-based codebook port index, default 1 ----------
+%% i_irs is a 1-based codebook port index, default 1
 args = { ...
     ant_tx, ant_rx, ant_irs_diff, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
@@ -390,7 +396,7 @@ for bad = {{0, 'Input ''i_irs'' cannot be 0 (1-based index).'}, {3, 'Input ''i_i
     assertTrue( failed );
 end
 
-% ---------- 12) A segment without paths gives empty outputs [n_ports_rx, n_ports_tx, 0] ----------
+%% A segment without paths gives empty outputs [n_ports_rx, n_ports_tx, 0]
 o0 = cell(1, 8);
 [o0{:}] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
@@ -403,7 +409,7 @@ for k = [1:3, 5:8]
 end
 assertTrue( isempty(o0{4}) );
 
-% ---------- 13) The IRS coupling holds the IRS weights: a struct without coupling throws ----------
+%% The IRS coupling holds the IRS weights: a struct without coupling throws
 ant_irs_nc = rmfield(ant_irs, {'coupling_re', 'coupling_im'});
 for k = 1:2
     failed = false;
@@ -420,7 +426,7 @@ for k = 1:2
     assertTrue( failed );
 end
 
-% ---------- 14) Each segment reaches its arguments: reference from two get_channels_spherical calls ----------
+%% Each segment reaches its arguments: reference from two get_channels_spherical calls
 % A single unit IRS weight on element 1 makes a pair the product of its segment channels; pair (i_1, i_2) is at
 % (i_1 - 1) * n_path_2 + i_2
 irs_1 = ant_irs; irs_1.coupling_re = ant_irs.coupling_re(:, 1); irs_1.coupling_im = ant_irs.coupling_im(:, 1);
@@ -444,7 +450,7 @@ assertElementsAlmostEqual( o{6}, eod1(:, :, p1) + z, 'absolute', 1e-14 );
 assertElementsAlmostEqual( o{7}, aoa2(:, :, p2) + z, 'absolute', 1e-14 );
 assertElementsAlmostEqual( o{8}, eoa2(:, :, p2) + z, 'absolute', 1e-14 );
 
-% ---------- helpers ----------
+%% Helpers
     function ant = make_ant(nel,naz,nelem,nports,scale)
         ant.e_theta_re = ones(nel,naz,nelem)*scale;
         ant.e_theta_im = zeros(nel,naz,nelem);

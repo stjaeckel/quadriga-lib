@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::cube: the base 2 x 2 x 2 mesh, scaling, rotation (Rz·Ry·Rx), translation and
+// their order, subdivision, float, input validation and the face winding under negative scales.
+// Oracles: a reference cube transformed in scalar double math, the surface area and the bounding box.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"

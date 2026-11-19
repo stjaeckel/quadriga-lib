@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function t = sos_port_table(type, n_dim, recipe, N, seed)
 % Frequency table for the ACF of the paper (200 samples, 0 to 49.75 m, decorrelation distance 10 m).
 % The table is generated with quadriga_lib.sos_generate and cached in results/tables.

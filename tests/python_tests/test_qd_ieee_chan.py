@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.channel.ieee_indoor.
+
 import sys
 import os
 import unittest
@@ -14,13 +16,10 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-# Adjusted according to the Python API
 from quadriga_lib import channel, arrayant
 
 
-# ============================================================================
-# Helpers
-# ============================================================================
+# ---- Helpers ----
 
 def _snap_list(ch, key):
     v = ch[key]
@@ -60,27 +59,13 @@ def _total_power(ch, snap=0):
     return float(np.sum(_path_gain_at(ch, snap)))
 
 
-# ============================================================================
-# Tests
-# ============================================================================
+# ---- Tests ----
 
-# Covered tests:
-# - K-Factor model for Type A (xpol case)
-# - Correctness of TX/RX positions and orientations (TGac default + manual offsets)
-# - LOS Steering matrix (Xpol isolation)
-# - Floors and distances: path counts, floor indicator, relative path gains
-# - Seed consistency
-# - Wall penetration loss (default 5 dB, custom 7 dB, per-user vector)
-# - TGax floor penetration loss formula (n=2,3,4 vs n=1 reference)
-# - Doppler shift on LOS path (moving station)
-# - Uplink-downlink reciprocity (time-domain)
 
 
 class test_case(unittest.TestCase):
 
-    # ------------------------------------------------------------------
-    # 1) Type A, single user, cross-polarised antenna
-    # ------------------------------------------------------------------
+    # ---- 1) Type A, single user, cross-polarised antenna ----
     def test_ieee_chan_a_1user_xpol(self):
         ant = arrayant.generate("xpol", 30.0)
         chan = channel.ieee_indoor(ant, ant, "A")
@@ -132,9 +117,7 @@ class test_case(unittest.TestCase):
         p11 = np.abs(H0[1, 1]) ** 2
         npt.assert_allclose(p00, p11, rtol=0.0, atol=0.0)
 
-    # ------------------------------------------------------------------
-    # 2) Type A, two users, default TGac offset angles
-    # ------------------------------------------------------------------
+    # ---- 2) Type A, two users, default TGac offset angles ----
     def test_ieee_chan_a_2user_default_offsets(self):
         ant = arrayant.generate("omni", 30.0)
         chan = channel.ieee_indoor(ant, ant, "A",
@@ -168,9 +151,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(rx_pos1, np.array([cx, cy, 0.0]), atol=1e-5)
         self.assertLess(abs(ori_deg - np.rad2deg(rx_ori1[2])), 1e-4)
 
-    # ------------------------------------------------------------------
-    # 3) Type A, two users, manual offset angles
-    # ------------------------------------------------------------------
+    # ---- 3) Type A, two users, manual offset angles ----
     def test_ieee_chan_a_2user_manual_offset(self):
         ant = arrayant.generate("omni", 30.0)
         offset_angles = np.full((4, 2), 100.0)
@@ -199,9 +180,7 @@ class test_case(unittest.TestCase):
             npt.assert_allclose(rx_pos, np.array([cx, cy, 0.0]), atol=1e-5)
             self.assertLess(abs(ori_deg - np.rad2deg(rx_ori[2])), 1e-4)
 
-    # ------------------------------------------------------------------
-    # 4) Type B, three users, mixed distances and floors
-    # ------------------------------------------------------------------
+    # ---- 4) Type B, three users, mixed distances and floors ----
     def test_ieee_chan_b_3user_floors_distances(self):
         ant = arrayant.generate("omni", 30.0)
         chan = channel.ieee_indoor(ant, ant, "B",
@@ -261,9 +240,7 @@ class test_case(unittest.TestCase):
         expected_ns = np.array([0, 0, 10, 20, 20, 30, 30, 40, 40, 50, 60, 70, 80])
         npt.assert_allclose(d_per_path_ns, expected_ns, atol=1.5)
 
-    # ------------------------------------------------------------------
-    # 5) Seed consistency: same seed → identical channel
-    # ------------------------------------------------------------------
+    # ---- 5) Seed consistency: same seed → identical channel ----
     def test_ieee_chan_seed_consistency(self):
         ant = arrayant.generate("omni", 30.0)
 
@@ -279,9 +256,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(_delay_at(chan_a[0], 0), _delay_at(chan_b[0], 0))
         npt.assert_array_equal(_path_gain_at(chan_a[0], 0), _path_gain_at(chan_b[0], 0))
 
-    # ------------------------------------------------------------------
-    # 6) Wall penetration loss
-    # ------------------------------------------------------------------
+    # ---- 6) Wall penetration loss ----
     def test_ieee_chan_b_wall_loss(self):
         """Wall loss is a deterministic additive term in the path loss. With a
         fixed seed and otherwise identical inputs (Dist, n_floors, model,
@@ -352,9 +327,7 @@ class test_case(unittest.TestCase):
             expected = -float(u + 1) * 5.0  # 1, 2, 3 walls
             self.assertLess(abs(10.0 * np.log10(pw / pr) - expected), 1e-9)
 
-    # ------------------------------------------------------------------
-    # 7) TGax floor penetration loss formula
-    # ------------------------------------------------------------------
+    # ---- 7) TGax floor penetration loss formula ----
     def test_ieee_chan_b_tgax_floor_formula(self):
         """For TGax (CarrierFreq >= 1 GHz) the per-floor penetration loss is
             FL(n) = 18.3 * n^((n+2)/(n+1) - 0.46)  [dB], for n_floors >= 1
@@ -386,9 +359,7 @@ class test_case(unittest.TestCase):
             expected = -(FL(float(nf)) - FL(1.0))
             self.assertLess(abs(10.0 * np.log10(Pn / P1) - expected), 1e-9)
 
-    # ------------------------------------------------------------------
-    # 8) Doppler shift on the LOS path (moving station)
-    # ------------------------------------------------------------------
+    # ---- 8) Doppler shift on the LOS path (moving station) ----
     def test_ieee_chan_a_doppler_los(self):
         """With a static environment and a station moving towards the AP along
         the LOS axis the LOS path coefficient evolves as exp(+j 2π f_D t), so an
@@ -427,9 +398,7 @@ class test_case(unittest.TestCase):
 
         self.assertLess(abs(f_peak - fD_expected), 5.0)  # positive: approaching
 
-    # ------------------------------------------------------------------
-    # 9) Uplink-downlink reciprocity (time domain)
-    # ------------------------------------------------------------------
+    # ---- 9) Uplink-downlink reciprocity (time domain) ----
     def test_ieee_chan_reciprocity(self):
         """For a fixed seed, the uplink channel must equal the transpose (no
         conjugation) of the downlink channel per path and snapshot, with
@@ -479,9 +448,7 @@ class test_case(unittest.TestCase):
 
         self.assertLess(max_err, 1e-10)
 
-    # ------------------------------------------------------------------
-    # 10) stack option: list mode vs stacked mode are equivalent
-    # ------------------------------------------------------------------
+    # ---- 10) stack option: list mode vs stacked mode are equivalent ----
     def test_ieee_chan_stack_equivalence(self):
         """stack=True must return the same data as stack=False, reshaped into
         a single array with the snapshot as the trailing axis. Tested on a
@@ -546,9 +513,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(np.asarray(ch_l["center_freq"]),
                                np.asarray(ch_s["center_freq"]))
 
-    # ------------------------------------------------------------------
-    # 11) stack option: per-user list is preserved for MU-MIMO
-    # ------------------------------------------------------------------
+    # ---- 11) stack option: per-user list is preserved for MU-MIMO ----
     def test_ieee_chan_stack_multiuser(self):
         """stack mode keeps chan as a list of length n_users; each user's data
         is stacked independently. Static channel here, so n_snap = 1 and the

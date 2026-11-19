@@ -122,8 +122,7 @@ polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatt
 - [[calc_diffraction_gain]] (produces `polmat` in this exact layout)
 MD!*/
 
-// OpenMP is only worthwhile once the ray count amortizes fork/join. Below this the serial path
-// runs with no team setup. Tune to the target machine; the value is a floor, not a promise.
+// Ray count from which the update loop runs in parallel; below it no thread team is started
 #ifndef QD_XPR_OMP_MIN
 #define QD_XPR_OMP_MIN 2048
 #endif
@@ -195,7 +194,7 @@ namespace
             oX[2] *= s, oX[3] *= s, oX[4] *= s, oX[5] *= s, oX[6] *= s, oX[7] *= s;
     }
 
-    // Return one ray's gain (max column 2-norm). If apply == true, also scale the matrix to unit
+    // Return one ray's gain (max column power). If apply == true, also scale the matrix to unit
     // gain in place. A degenerate matrix (squares underflow, or a NaN is present) returns 0; if
     // apply, it is reset to the identity so the state stays well-formed.
     template <typename dtype>
@@ -207,6 +206,8 @@ namespace
             A += oX[2] * oX[2] + oX[3] * oX[3];
             B = oX[4] * oX[4] + oX[5] * oX[5] + oX[6] * oX[6] + oX[7] * oX[7]; // |col 1|^2
         }
+        // The gain is the max column power by convention (as documented for calc_diffraction_gain, qrt_file_read
+        // normalize_polmat and path::calc_gain); apply_gain multiplies by the gain as an amplitude, not by its square root
         dtype gain = A > B ? A : B;
 
         // Guard in the squared domain: AB below the smallest normal means the squares have already
@@ -232,54 +233,6 @@ namespace
         if (apply)
             update_one<dtype>(oX, (const dtype *)nullptr, scalar_mode);
         return (dtype)0.0;
-
-        // ISSUE: max column 2-norm is not the matrix gain.
-        //
-        // "gain" above is max(|col 0|, |col 1|), the larger of the responses to a pure V and a
-        // pure H input. The gain of a Jones matrix is its largest singular value sigma_max, the
-        // response to the worst-case input polarization -- which is generally elliptical, so
-        // sampling only V and H can miss it:
-        //
-        //     sigma_max / sqrt(2) <= max(|col 0|, |col 1|) <= sigma_max
-        //
-        // The two agree only when the columns are orthogonal (M^H M diagonal). That holds for a
-        // bare Fresnel matrix diag(r_perp, r_par) in its own incidence basis, but not for an
-        // accumulated chain that mixes bases. Example: diag(1, 0.1) * R(45 deg) has sigma_max = 1
-        // exactly, yet both column norms are 0.7106. Dividing by that leaves a matrix of gain
-        // 1.407 -- 3 dB of energy created from nothing, from one reflection and one basis rotation.
-        //
-        // Whether this matters depends on what the caller does with the gain:
-        //
-        //   (a) Extract it (mode 3) and later re-impose that same vector via apply_gain (mode 5).
-        //       Removal and re-application share one scalar, so M is restored exactly and the norm
-        //       choice is irrelevant -- uniform scaling out, the same uniform scaling back in.
-        //       This is the intended lossless round-trip.
-        //
-        //   (b) Normalize and impose a *different*, independently tracked gain g (mode 5). The
-        //       normalized matrix has max col norm 1, so the result has max col norm g exactly --
-        //       but sigma_max between g and g*sqrt(2). If g is meant to be the true field gain
-        //       (sigma_max), the field is up to 3 dB high. Use the exact form below to make the
-        //       normalized matrix unit-sigma_max so that g lands on sigma_max.
-        //
-        // Exact sigma_max costs two sqrt and ten mul, via the 2x2 identity
-        // sigma_max +/- sigma_min = sqrt(F +/- 2|det M|), with F = ||M||_F^2 = A + B:
-        //
-        //     dtype F   = A + B;
-        //     dtype dRe = oX[0]*oX[6] - oX[1]*oX[7] - oX[4]*oX[2] + oX[5]*oX[3];
-        //     dtype dIm = oX[0]*oX[7] + oX[1]*oX[6] - oX[4]*oX[3] - oX[5]*oX[2];
-        //     dtype d2  = (dtype)2.0 * std::sqrt(dRe*dRe + dIm*dIm);    // 2 * |det M|
-        //     dtype lo  = F - d2;                                       // >= 0 analytically (AM-GM)
-        //     lo = lo < (dtype)0.0 ? (dtype)0.0 : lo;                   // rounding can dip below 0
-        //     dtype gain = (dtype)0.5 * (std::sqrt(F + d2) + std::sqrt(lo));
-        //
-        // Spot checks: identity -> 1, R(45 deg) -> 1, diag(1, 0) -> 1, diag(1, 0.1)*R(45) -> 1.
-        // F - d2 cancels for near-unitary M, which is the common case; this costs about sqrt(eps)
-        // relative accuracy in the sigma_min term (~3e-4 in float, negligible in double), and can
-        // be removed by accumulating F and d2 in double. Scalar mode is unaffected: |c| is exact.
-        //
-        // Cheaper conservative variant: sqrt(F) (Frobenius) satisfies sigma_max <= sqrt(F) <=
-        // sqrt(2)*sigma_max, so it can only lose up to 3 dB, never create it. The current max
-        // column norm errs in the direction that creates energy.
     }
 }
 
@@ -331,7 +284,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
     const bool have_state = !polmat.is_empty();
     const bool have_update = !update.is_empty();
 
-    // Infer mode (EM = 8 rows, scalar = 2) from whichever operand is present.
+    // Mode (EM = 8 rows, scalar = 2) from whichever operand is present
     arma::uword nXPR = 0;
     if (have_state)
         nXPR = polmat.n_rows;
@@ -344,7 +297,6 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
         throw std::invalid_argument("'polmat'/'update' must have 2 rows (scalar mode) or 8 rows (EM mode).");
     const bool scalar_mode = (nXPR == 2);
 
-    // Interpret the update shape.
     bool broadcast = false;
     if (have_update)
     {

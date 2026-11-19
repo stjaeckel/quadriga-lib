@@ -7,7 +7,6 @@
 
 namespace py = pybind11;
 
-// Declare submodules
 void quadriga_lib_arrayant(py::module_ &m);
 void quadriga_lib_channel(py::module_ &m);
 void quadriga_lib_gbsm(py::module_ &m);
@@ -15,7 +14,6 @@ void quadriga_lib_RTtools(py::module_ &m);
 void quadriga_lib_sos(py::module_ &m);
 void quadriga_lib_tools(py::module_ &m);
 
-// Include parts
 #include "qpy_version.cpp"
 
 PYBIND11_MODULE(quadriga_lib, m)

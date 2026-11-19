@@ -56,13 +56,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 10)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const std::string set_type = qd_mex_get_string(prhs[1], "", "set_type");
     const arma::sword seed = (nrhs < 3) ? -1 : qd_mex_get_seed(prhs[2]);
@@ -80,7 +78,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
     const arma::sword set_id = lsf ? -1 : (arma::sword)set_id_in - 1;
 
-    // Call library function
     arma::cube phase;
     CALL_QD(phase = quadriga_lib::gbsm_init_phases(scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos,
                                                    dual_mobility, remove_bias, horizontal));

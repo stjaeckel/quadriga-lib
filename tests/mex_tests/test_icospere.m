@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_icospere
+% MEX interface test for quadriga_lib.icosphere.
 
 quadriga_lib.icosphere(1, 1);
 
@@ -30,8 +35,8 @@ assertTrue( all(sum(dir(:,1:3).^2,2) - 1 < 1e-14));
 assertTrue( all(sum(dir(:,4:6).^2,2) - 1 < 1e-14));
 assertTrue( all(sum(dir(:,7:9).^2,2) - 1 < 1e-14));
 
-
-try % 4 imputs
+%% Errors
+try % 5 outputs
     [~,~,~,~,~] = quadriga_lib.icosphere(1, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -41,7 +46,7 @@ catch ME
     end
 end
 
-try % 4 imputs
+try % 4 inputs
     quadriga_lib.icosphere(1,2,3,4);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME

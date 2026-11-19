@@ -2,10 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_lib.hpp"
 #include "qd_helpers_python.hpp"
-
-
+#include "quadriga_lib.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -50,10 +48,8 @@ py::array_t<double> cube(py::handle scale,
     const auto rotation_a = qd_python_numpy2arma_Col<double>(rotation, true);
     const auto location_a = qd_python_numpy2arma_Col<double>(location, true);
 
-    // Call library function (returns the mesh by value)
     arma::mat mesh = quadriga_lib::cube<double>(scale_a, rotation_a, location_a, n_div);
 
-    // Copy to numpy
     return qd_python_copy2numpy(&mesh);
 }
 
@@ -98,9 +94,7 @@ py::array_t<double> plane(py::handle scale,
     const auto rotation_a = qd_python_numpy2arma_Col<double>(rotation, true);
     const auto location_a = qd_python_numpy2arma_Col<double>(location, true);
 
-    // Call library function (returns the mesh by value)
     arma::mat mesh = quadriga_lib::plane<double>(scale_a, rotation_a, location_a, n_div);
 
-    // Copy to numpy
     return qd_python_copy2numpy(&mesh);
 }

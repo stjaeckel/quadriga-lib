@@ -67,25 +67,21 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const std::string fn_csv = (nrhs < 2) ? "" : qd_mex_get_string(prhs[1], "", "fn_csv");
     const bool csv_strict = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "csv_strict", false);
 
-    // Output containers
     arma::mat mesh, vert_list, bsdf;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind, csv_ind;
     std::vector<std::string> obj_names, mtl_names, csv_names;
     std::unordered_map<std::string, std::vector<double>> csv_prop;
 
-    // Wrap optional outputs (skip work the user did not request)
     arma::mat *p_vert_list = (nlhs > 1) ? &vert_list : nullptr;
     arma::umat *p_face_ind = (nlhs > 2) ? &face_ind : nullptr;
     arma::uvec *p_obj_ind = (nlhs > 3) ? &obj_ind : nullptr;
@@ -97,13 +93,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_csv_names = (nlhs > 9) ? &csv_names : nullptr;
     std::unordered_map<std::string, std::vector<double>> *p_csv_prop = (nlhs > 10) ? &csv_prop : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, p_vert_list, p_face_ind, p_obj_ind, p_obj_names,
                                                 p_mtl_ind, p_mtl_names, p_bsdf,
                                                 fn_csv, p_csv_ind, p_csv_names, p_csv_prop, csv_strict));
 
-    // Copy to MATLAB. face_ind and obj_ind are 0-based in C++ -> shift to 1-based.
-    // mtl_ind and csv_ind are already 1-based (0 = no material) and pass through unchanged.
+    // face_ind and obj_ind are 0-based in C++ and shifted; mtl_ind and csv_ind are 1-based (0 = no material) already
     plhs[0] = qd_mex_copy2matlab(&mesh);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&vert_list);
@@ -119,13 +113,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     if (nlhs > 4)
         plhs[4] = qd_mex_copy2matlab(&obj_names);
-    if (nlhs > 5) // already 1-based from the library (0 = no material), no shift
+    if (nlhs > 5)
         plhs[5] = qd_mex_copy2matlab(&mtl_ind);
     if (nlhs > 6)
         plhs[6] = qd_mex_copy2matlab(&mtl_names);
     if (nlhs > 7)
         plhs[7] = qd_mex_copy2matlab(&bsdf);
-    if (nlhs > 8) // already 1-based from the library (0 = no material), no shift
+    if (nlhs > 8)
         plhs[8] = qd_mex_copy2matlab(&csv_ind);
     if (nlhs > 9)
         plhs[9] = qd_mex_copy2matlab(&csv_names);

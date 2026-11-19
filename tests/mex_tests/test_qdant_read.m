@@ -1,6 +1,12 @@
-function test_qdant_read
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-%% Minimal test
+function test_qdant_read
+% MEX interface test for quadriga_lib.qdant_read.
+% Physics validation lives in the Catch2 suite (test_qdant_read.cpp).
+
+%% Minimal file: one arrayant, defaults for the missing fields
 f = fopen( 'test.qdant','w' );
 fprintf(f,'%s\n','<qdant><arrayant>');
 fprintf(f,'%s\n','<name>bla</name>');
@@ -44,7 +50,7 @@ ant_scalar = quadriga_lib.qdant_read('test.qdant');
 assertTrue(isstruct(ant_scalar) && numel(ant_scalar) == 1);
 assertTrue(strcmp(ant_scalar.name, 'bla'));
 
-%% More complex test
+%% Namespaced tags, layout and all fields
 f = fopen( 'test.qdant','w' );
 fprintf(f,'%s\n','<?xml version="1.0" encoding="UTF-8"?><qdant xmlns:xx="test">');
 fprintf(f,'%s\n','<xx:layout>1,1 1,1 1,1</xx:layout>');
@@ -149,7 +155,7 @@ catch ME
     end
 end
 
-%% Check error parsing
+%% Errors
 try
     [~,~,~] = quadriga_lib.qdant_read('test.qdant',3);
     error('moxunit:exceptionNotRaised', 'Expected an error!');

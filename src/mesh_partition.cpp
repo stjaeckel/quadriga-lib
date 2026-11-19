@@ -4,8 +4,315 @@
 
 #include "quadriga_tools.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
 #include <vector>
+
+// The point cloud functions (n_col = 3, one point per row) and the triangle mesh functions (n_col = 9, three vertices
+// per row) share their code; column c of a row holds coordinate c % 3.
+
+// Checks 'points' [n_points, 3] (n_col = 3) or 'mesh' [n_mesh, 9] (n_col = 9; further columns allowed unless 'exact')
+template <arma::uword n_col, typename dtype>
+static void qd_check_partition_input(const arma::Mat<dtype> &data, bool exact)
+{
+    if (n_col == 3 && data.n_cols != 3)
+        throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
+    if (n_col == 9 && exact && data.n_cols != 9)
+        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (n_col == 9 && data.n_cols < 9)
+        throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (data.n_rows == 0)
+        throw std::invalid_argument(n_col == 3 ? "Input 'points' cannot be empty." : "Input 'mesh' cannot be empty.");
+}
+
+// Bounding boxes [n_out, 6] of the sub-objects that start at the rows 'p_sub' [n_sub] of 'data' (first n_col columns);
+// rows n_sub to n_out - 1 (padding to a multiple of 'vec_size') are zero
+template <arma::uword n_col, typename dtype>
+static arma::Mat<dtype> qd_partition_aabb(const arma::Mat<dtype> &data, const unsigned *p_sub, arma::uword n_sub, arma::uword vec_size)
+{
+    const arma::uword n_rows = data.n_rows;
+    const arma::uword n_values = n_col * n_rows; // Column-major, further columns are ignored
+    const dtype *p_data = data.memptr();
+
+    arma::uword n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
+    arma::Mat<dtype> aabb(n_out, 6, arma::fill::zeros);
+
+    dtype *x_min = aabb.colptr(0), *x_max = aabb.colptr(1),
+          *y_min = aabb.colptr(2), *y_max = aabb.colptr(3),
+          *z_min = aabb.colptr(4), *z_max = aabb.colptr(5);
+
+    for (arma::uword i = 0; i < n_sub; ++i)
+    {
+        x_min[i] = INFINITY, x_max[i] = -INFINITY,
+        y_min[i] = INFINITY, y_max[i] = -INFINITY,
+        z_min[i] = INFINITY, z_max[i] = -INFINITY;
+    }
+
+    arma::uword i_sub = 0, i_next = n_rows;
+    for (arma::uword i_val = 0; i_val < n_values; ++i_val)
+    {
+        dtype v = p_data[i_val];
+        arma::uword i_col = i_val / n_rows;
+        arma::uword i_row = i_val % n_rows;
+
+        if (i_row == 0)
+        {
+            i_sub = 0;
+            i_next = (i_sub == n_sub - 1) ? n_rows : (arma::uword)p_sub[i_sub + 1];
+        }
+        else if (i_row == i_next)
+        {
+            ++i_sub;
+            i_next = (i_sub == n_sub - 1) ? n_rows : (arma::uword)p_sub[i_sub + 1];
+        }
+
+        if (i_col % 3 == 0)
+        {
+            x_min[i_sub] = (v < x_min[i_sub]) ? v : x_min[i_sub];
+            x_max[i_sub] = (v > x_max[i_sub]) ? v : x_max[i_sub];
+        }
+        else if (i_col % 3 == 1)
+        {
+            y_min[i_sub] = (v < y_min[i_sub]) ? v : y_min[i_sub];
+            y_max[i_sub] = (v > y_max[i_sub]) ? v : y_max[i_sub];
+        }
+        else
+        {
+            z_min[i_sub] = (v < z_min[i_sub]) ? v : z_min[i_sub];
+            z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
+        }
+    }
+    return aabb;
+}
+
+// Splits 'data' (first n_col columns) at the center of its bounding box along 'axis' (0 = longest extent, 1 = x,
+// 2 = y, 3 = z) into A and B; rows with a vertex above the center go to B. Returns the axis, or its negative when one
+// part would be empty (outputs then untouched). 'split_ind' [n_rows] (optional): 1 = A, 2 = B.
+template <arma::uword n_col, typename dtype>
+static int qd_partition_split(const arma::Mat<dtype> &data, arma::Mat<dtype> &A, arma::Mat<dtype> &B, int axis, arma::Col<int> *split_ind)
+{
+    const unsigned first_row = 0;
+    const arma::Mat<dtype> aabb = qd_partition_aabb<n_col>(data, &first_row, 1, 1);
+
+    const size_t n_rows = (size_t)data.n_rows;
+    const size_t n_values = n_col * n_rows;
+    const dtype *p_data = data.memptr();
+
+    // Find longest axis
+    dtype x = aabb.at(0, 1) - aabb.at(0, 0);
+    dtype y = aabb.at(0, 3) - aabb.at(0, 2);
+    dtype z = aabb.at(0, 5) - aabb.at(0, 4);
+
+    if (axis == 0)
+    {
+        if (z >= y && z >= x)
+            axis = 3;
+        else if (y >= x && y >= z)
+            axis = 2;
+        else
+            axis = 1;
+    }
+    else if (axis != 1 && axis != 2 && axis != 3)
+        throw std::invalid_argument("Input 'axis' must have values 0, 1, 2 or 3.");
+
+    // Define bounding box A
+    dtype x_max = (axis == 1) ? aabb.at(0, 0) + (dtype)0.5 * x : aabb.at(0, 1),
+          y_max = (axis == 2) ? aabb.at(0, 2) + (dtype)0.5 * y : aabb.at(0, 3),
+          z_max = (axis == 3) ? aabb.at(0, 4) + (dtype)0.5 * z : aabb.at(0, 5);
+
+    // Rows outside box A
+    std::vector<char> isB(n_rows, 0);
+    for (size_t i_val = 0; i_val < n_values; ++i_val)
+    {
+        dtype v = p_data[i_val];
+        size_t i_col = i_val / n_rows;
+        size_t i_row = i_val % n_rows;
+
+        if (i_col % 3 == 0)
+            isB[i_row] = (v > x_max) ? 1 : isB[i_row];
+        else if (i_col % 3 == 1)
+            isB[i_row] = (v > y_max) ? 1 : isB[i_row];
+        else
+            isB[i_row] = (v > z_max) ? 1 : isB[i_row];
+    }
+
+    size_t n_B = 0;
+    for (size_t i = 0; i < n_rows; ++i)
+        n_B += isB[i] ? 1 : 0;
+    size_t n_A = n_rows - n_B;
+
+    if (n_A == 0 || n_B == 0)
+        return -axis;
+
+    A.set_size(n_A, n_col);
+    B.set_size(n_B, n_col);
+    dtype *p_A = A.memptr(), *p_B = B.memptr();
+
+    int *p_split_ind = nullptr;
+    if (split_ind != nullptr)
+    {
+        if (split_ind->n_elem != data.n_rows)
+            split_ind->zeros(data.n_rows);
+        else
+            split_ind->zeros();
+        p_split_ind = split_ind->memptr();
+    }
+
+    size_t i_A = 0, i_B = 0;
+    for (size_t i_val = 0; i_val < n_values; ++i_val)
+    {
+        dtype v = p_data[i_val];
+        size_t i_row = i_val % n_rows;
+
+        if (isB[i_row])
+            p_B[i_B++] = v;
+        else
+            p_A[i_A++] = v;
+
+        if (p_split_ind)
+            p_split_ind[i_row] = isB[i_row] ? 2 : 1;
+    }
+
+    return axis;
+}
+
+// Splits 'data' [n_rows, n_col] recursively until each sub-object has at most 'target_size' rows (a split must leave
+// at least 10 % on each side) and writes the sub-objects to 'data_out' [n_out, n_col], each padded to a multiple of
+// 'vec_size' with rows at the center of its bounding box. 'sub_ind' [n_sub] gets the 0-based start rows, 'fwd_ind'
+// [n_out] (optional) the 1-based row in 'data' of each output row (0 = padding). Returns n_sub.
+template <arma::uword n_col, typename dtype>
+static arma::uword qd_partition_segmentation(const arma::Mat<dtype> &data, arma::Mat<dtype> &data_out, arma::u32_vec &sub_ind,
+                                             arma::uword target_size, arma::uword vec_size, arma::u32_vec *fwd_ind)
+{
+    std::vector<arma::Mat<dtype>> c; // Sub-objects
+    c.push_back(data);
+
+    std::vector<arma::uvec> row_ind; // 0-based rows in 'data' of each sub-object
+    row_ind.push_back(arma::regspace<arma::uvec>(0, data.n_rows - 1));
+
+    for (auto sub_it = c.begin(); sub_it != c.end();)
+    {
+        arma::uword n_sub_rows = sub_it->n_rows;
+        if (n_sub_rows <= target_size)
+        {
+            ++sub_it;
+            continue;
+        }
+
+        arma::Mat<dtype> A, B;
+        arma::s32_vec split_ind;
+
+        // Split along 'ax'; an unbalanced split (less than 10 / 90) counts as failed
+        auto try_split = [&](int ax)
+        {
+            int s = qd_partition_split<n_col>(*sub_it, A, B, ax, &split_ind);
+            float p = (s > 0) ? (float)A.n_rows / (float)n_sub_rows : 0.5f;
+            return (p < 0.1f || p > 0.9f) ? -s : s;
+        };
+
+        // Longest axis first, then the other two
+        int split_success = try_split(0);
+        int first_test = std::abs(split_success);
+        if (split_success < 0)
+        {
+            split_success = try_split((first_test == 2 || first_test == 3) ? 1 : 2);
+            if ((first_test == 1 && split_success == -2) || (first_test == 2 && split_success == -1))
+                split_success = try_split(3);
+            else if (first_test == 3 && split_success == -1)
+                split_success = try_split(2);
+        }
+
+        if (split_success <= 0)
+        {
+            ++sub_it;
+            continue;
+        }
+
+        const int *ps = split_ind.memptr();
+        arma::uword i_sub = sub_it - c.begin();
+        auto row_it = row_ind.begin() + i_sub;
+        const arma::uword *pi = row_it->memptr();
+
+        arma::uvec A_index(A.n_rows, arma::fill::none), B_index(B.n_rows, arma::fill::none);
+        arma::uword *pA = A_index.memptr(), *pB = B_index.memptr();
+        arma::uword iA = 0, iB = 0;
+        for (arma::uword i_row = 0; i_row < n_sub_rows; ++i_row)
+        {
+            if (ps[i_row] == 1)
+                pA[iA++] = pi[i_row];
+            else if (ps[i_row] == 2)
+                pB[iB++] = pi[i_row];
+        }
+
+        row_ind.erase(row_it);
+        row_ind.push_back(std::move(A_index));
+        row_ind.push_back(std::move(B_index));
+
+        c.erase(sub_it);
+        c.push_back(std::move(A));
+        c.push_back(std::move(B));
+        sub_it = c.begin();
+    }
+
+    arma::uword n_sub = c.size(), n_out = 0;
+    sub_ind.set_size(n_sub);
+    unsigned *p_sub_ind = sub_ind.memptr();
+
+    for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
+    {
+        arma::uword n_sub_rows = c[i_sub].n_rows;
+        arma::uword n_align = (n_sub_rows % vec_size == 0) ? n_sub_rows : (n_sub_rows / vec_size + 1) * vec_size;
+        p_sub_ind[i_sub] = (unsigned)n_out;
+        n_out += n_align;
+    }
+
+    data_out.set_size(n_out, n_col);
+    dtype *p_out = data_out.memptr();
+
+    unsigned *p_fwd = nullptr;
+    if (fwd_ind != nullptr)
+    {
+        fwd_ind->zeros(n_out);
+        p_fwd = fwd_ind->memptr();
+    }
+
+    for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
+    {
+        arma::uword n_sub_rows = c[i_sub].n_rows;
+        const dtype *p_sub_data = c[i_sub].memptr();
+        const arma::uword *pi = row_ind[i_sub].memptr();
+        arma::uword i_start = (arma::uword)p_sub_ind[i_sub];
+
+        for (arma::uword i_col = 0; i_col < n_col; ++i_col)
+            std::memcpy(&p_out[i_col * n_out + i_start], &p_sub_data[i_col * n_sub_rows], n_sub_rows * sizeof(dtype));
+
+        if (p_fwd != nullptr)
+            for (arma::uword i_row = 0; i_row < n_sub_rows; ++i_row)
+                p_fwd[i_start + i_row] = (unsigned)pi[i_row] + 1;
+
+        // Padding rows (for meshes: zero-sized triangles) at the bounding box center of the sub-object
+        if (n_sub_rows % vec_size != 0)
+        {
+            const unsigned first_row = 0;
+            arma::Mat<dtype> aabb = qd_partition_aabb<n_col>(c[i_sub], &first_row, 1, 1);
+            const dtype *p_box = aabb.memptr();
+            const dtype center[3] = {p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]),
+                                     p_box[2] + (dtype)0.5 * (p_box[3] - p_box[2]),
+                                     p_box[4] + (dtype)0.5 * (p_box[5] - p_box[4])};
+
+            arma::uword i_end = (i_sub == n_sub - 1) ? n_out : (arma::uword)p_sub_ind[i_sub + 1];
+            for (arma::uword i_col = 0; i_col < n_col; ++i_col)
+                for (arma::uword i_pad = i_start + n_sub_rows; i_pad < i_end; ++i_pad)
+                    p_out[i_col * n_out + i_pad] = center[i_col % 3];
+        }
+    }
+
+    return n_sub;
+}
 
 /*!SECTION
 Site-specific simulation tools
@@ -46,88 +353,14 @@ arma::Mat<dtype> quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points,
                                                 const arma::u32_vec &sub_cloud_ind,
                                                 arma::uword vec_size)
 {
-    // Input validation
-    if (points.n_cols != 3)
-        throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
-    if (points.n_rows == 0)
-        throw std::invalid_argument("Input 'points' must have at least one entry.");
+    qd_check_partition_input<3>(points, true);
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
 
-    arma::uword n_points = (arma::uword)points.n_rows;
-    arma::uword n_values = (arma::uword)points.n_elem;
-    const dtype *p_points = points.memptr();
-
-    const unsigned first_sub_cloud_ind = 0;
-    const unsigned *p_sub = &first_sub_cloud_ind;
-    arma::uword n_sub = 1;
-
-    if (sub_cloud_ind.n_elem > 0)
-    {
-        n_sub = (arma::uword)sub_cloud_ind.n_elem;
-        p_sub = sub_cloud_ind.memptr();
-
-        if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-cloud must start at the first point.");
-
-        for (arma::uword i = 1; i < n_sub; ++i)
-            if (p_sub[i] <= p_sub[i - 1])
-                throw std::invalid_argument("Sub-cloud indices must be sorted in ascending order.");
-
-        if (p_sub[n_sub - 1] >= (unsigned)n_points)
-            throw std::invalid_argument("Sub-cloud indices cannot exceed number of points.");
-    }
-
-    // Padding rows stay zero
-    arma::uword n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
-    arma::Mat<dtype> aabb(n_out, 6, arma::fill::zeros);
-
-    dtype *x_min = aabb.colptr(0), *x_max = aabb.colptr(1),
-          *y_min = aabb.colptr(2), *y_max = aabb.colptr(3),
-          *z_min = aabb.colptr(4), *z_max = aabb.colptr(5);
-
-    for (arma::uword i = 0; i < n_sub; ++i)
-    {
-        x_min[i] = INFINITY, x_max[i] = -INFINITY,
-        y_min[i] = INFINITY, y_max[i] = -INFINITY,
-        z_min[i] = INFINITY, z_max[i] = -INFINITY;
-    }
-
-    arma::uword i_sub = 0, i_next = n_points;
-    for (arma::uword i_point = 0; i_point < n_values; ++i_point)
-    {
-        dtype v = p_points[i_point];            // Point value
-        arma::uword i_col = i_point / n_points; // Column index in mesh
-        arma::uword i_row = i_point % n_points; // Row index in mesh
-
-        if (i_row == 0)
-        {
-            i_sub = 0;
-            i_next = (i_sub == n_sub - 1) ? n_points : (arma::uword)p_sub[i_sub + 1];
-        }
-        else if (i_row == i_next)
-        {
-            ++i_sub;
-            i_next = (i_sub == n_sub - 1) ? n_points : (arma::uword)p_sub[i_sub + 1];
-        }
-
-        if (i_col == 0)
-        {
-            x_min[i_sub] = (v < x_min[i_sub]) ? v : x_min[i_sub];
-            x_max[i_sub] = (v > x_max[i_sub]) ? v : x_max[i_sub];
-        }
-        else if (i_col == 1)
-        {
-            y_min[i_sub] = (v < y_min[i_sub]) ? v : y_min[i_sub];
-            y_max[i_sub] = (v > y_max[i_sub]) ? v : y_max[i_sub];
-        }
-        else
-        {
-            z_min[i_sub] = (v < z_min[i_sub]) ? v : z_min[i_sub];
-            z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
-        }
-    }
-    return aabb;
+    const unsigned first_row = 0;
+    if (qd_check_sub_ind(sub_cloud_ind, points.n_rows, "sub_cloud_ind", "point") == 0)
+        return qd_partition_aabb<3>(points, &first_row, 1, vec_size);
+    return qd_partition_aabb<3>(points, sub_cloud_ind.memptr(), sub_cloud_ind.n_elem, vec_size);
 }
 
 template arma::Mat<float> quadriga_lib::point_cloud_aabb(const arma::Mat<float> &points,
@@ -172,88 +405,14 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh,
                                                   const arma::u32_vec &sub_mesh_ind,
                                                   arma::uword vec_size)
 {
-    // Input validation
-    if (mesh.n_cols < 9)
-        throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
-    if (mesh.n_rows == 0)
-        throw std::invalid_argument("Input 'mesh' must have at least one face.");
+    qd_check_partition_input<9>(mesh, false);
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
 
-    arma::uword n_face = mesh.n_rows;
-    arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored
-    const dtype *p_mesh = mesh.memptr();
-
-    const unsigned first_sub_mesh_ind = 0;
-    const unsigned *p_sub = &first_sub_mesh_ind;
-    arma::uword n_sub = 1;
-
-    if (sub_mesh_ind.n_elem > 0)
-    {
-        n_sub = sub_mesh_ind.n_elem;
-        p_sub = sub_mesh_ind.memptr();
-
-        if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-mesh must start at the first face.");
-
-        for (arma::uword i = 1; i < n_sub; ++i)
-            if (p_sub[i] <= p_sub[i - 1])
-                throw std::invalid_argument("Sub-mesh indices must be sorted in ascending order.");
-
-        if (p_sub[n_sub - 1] >= (unsigned)n_face)
-            throw std::invalid_argument("Sub-mesh indices cannot exceed number of faces.");
-    }
-
-    // Padding rows stay zero
-    arma::uword n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
-    arma::Mat<dtype> aabb(n_out, 6, arma::fill::zeros);
-
-    dtype *x_min = aabb.colptr(0), *x_max = aabb.colptr(1),
-          *y_min = aabb.colptr(2), *y_max = aabb.colptr(3),
-          *z_min = aabb.colptr(4), *z_max = aabb.colptr(5);
-
-    for (arma::uword i = 0; i < n_sub; ++i)
-    {
-        x_min[i] = INFINITY, x_max[i] = -INFINITY,
-        y_min[i] = INFINITY, y_max[i] = -INFINITY,
-        z_min[i] = INFINITY, z_max[i] = -INFINITY;
-    }
-
-    arma::uword i_sub = 0, i_next = n_face;
-    for (arma::uword i_mesh = 0; i_mesh < n_mesh; ++i_mesh)
-    {
-        dtype v = p_mesh[i_mesh];            // Mesh value
-        arma::uword i_col = i_mesh / n_face; // Column index in mesh
-        arma::uword i_row = i_mesh % n_face; // Row index in mesh
-
-        if (i_row == 0)
-        {
-            i_sub = 0;
-            i_next = (i_sub == n_sub - 1) ? n_face : (arma::uword)p_sub[i_sub + 1];
-        }
-        else if (i_row == i_next)
-        {
-            ++i_sub;
-            i_next = (i_sub == n_sub - 1) ? n_face : (arma::uword)p_sub[i_sub + 1];
-        }
-
-        if (i_col % 3 == 0)
-        {
-            x_min[i_sub] = (v < x_min[i_sub]) ? v : x_min[i_sub];
-            x_max[i_sub] = (v > x_max[i_sub]) ? v : x_max[i_sub];
-        }
-        else if (i_col % 3 == 1)
-        {
-            y_min[i_sub] = (v < y_min[i_sub]) ? v : y_min[i_sub];
-            y_max[i_sub] = (v > y_max[i_sub]) ? v : y_max[i_sub];
-        }
-        else
-        {
-            z_min[i_sub] = (v < z_min[i_sub]) ? v : z_min[i_sub];
-            z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
-        }
-    }
-    return aabb;
+    const unsigned first_row = 0;
+    if (qd_check_sub_ind(sub_mesh_ind, mesh.n_rows, "sub_mesh_ind", "mesh face") == 0)
+        return qd_partition_aabb<9>(mesh, &first_row, 1, vec_size);
+    return qd_partition_aabb<9>(mesh, sub_mesh_ind.memptr(), sub_mesh_ind.n_elem, vec_size);
 }
 
 template arma::Mat<float> quadriga_lib::triangle_mesh_aabb(const arma::Mat<float> &mesh,
@@ -301,7 +460,6 @@ int quadriga_lib::point_cloud_split(
 - [[ray_point_intersect]] (downstream use case)
 MD!*/
 
-// Split a point cloud into two sub-clouds along a given axis
 template <typename dtype>
 int quadriga_lib::point_cloud_split(const arma::Mat<dtype> &points,
                                     arma::Mat<dtype> &pointsA,
@@ -310,106 +468,8 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> &points,
                                     arma::Col<int> *split_ind)
 {
     qd_check_alias_list({&pointsA, &pointsB}, {"pointsA", "pointsB"}, &points);
-
-    // Calculate bounding box
-    const arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(points);
-
-    size_t n_points_t = (size_t)points.n_rows;
-    size_t n_values_t = (size_t)points.n_elem;
-    const dtype *p_points = points.memptr();
-
-    // Find longest axis
-    dtype x = aabb.at(0, 1) - aabb.at(0, 0);
-    dtype y = aabb.at(0, 3) - aabb.at(0, 2);
-    dtype z = aabb.at(0, 5) - aabb.at(0, 4);
-
-    if (axis == 0)
-    {
-        if (z >= y && z >= x)
-            axis = 3;
-        else if (y >= x && y >= z)
-            axis = 2;
-        else
-            axis = 1;
-    }
-    else if (axis != 1 && axis != 2 && axis != 3)
-        throw std::invalid_argument("Input 'axis' must have values 0, 1, 2 or 3.");
-
-    // Define bounding box A
-    dtype x_max = (axis == 1) ? aabb.at(0, 0) + (dtype)0.5 * x : aabb.at(0, 1),
-          y_max = (axis == 2) ? aabb.at(0, 2) + (dtype)0.5 * y : aabb.at(0, 3),
-          z_max = (axis == 3) ? aabb.at(0, 4) + (dtype)0.5 * z : aabb.at(0, 5);
-
-    // Determine all points that are outside box A
-    std::vector<char> isB(n_points_t, 0); // Init to false
-
-    for (size_t i_val = 0; i_val < n_values_t; ++i_val)
-    {
-        dtype v = p_points[i_val];         // Mesh value
-        size_t i_col = i_val / n_points_t; // Column index in mesh
-        size_t i_row = i_val % n_points_t; // Row index in mesh
-
-        if (i_col == 0)
-            isB[i_row] = (v > x_max) ? true : isB[i_row];
-        else if (i_col == 1)
-            isB[i_row] = (v > y_max) ? true : isB[i_row];
-        else
-            isB[i_row] = (v > z_max) ? true : isB[i_row];
-    }
-
-    // Count items in both sub-meshes
-    size_t n_pointsA = 0, n_pointsB = 0;
-    for (size_t i = 0; i < n_points_t; ++i)
-        if (isB[i])
-            ++n_pointsB;
-        else
-            ++n_pointsA;
-
-    // Check if the mesh was split
-    if (n_pointsA == 0 || n_pointsB == 0)
-        return -axis;
-
-    // Adjust output size
-    pointsA.set_size(n_pointsA, 3);
-    pointsB.set_size(n_pointsB, 3);
-
-    dtype *p_pointsA = pointsA.memptr();
-    dtype *p_pointsB = pointsB.memptr();
-
-    bool write_split_ind = false;
-    int *p_split_ind = nullptr;
-    if (split_ind != nullptr)
-    {
-        write_split_ind = true;
-        if (split_ind->n_elem != points.n_rows)
-            split_ind->zeros(points.n_rows);
-        else
-            split_ind->zeros();
-        p_split_ind = split_ind->memptr();
-    }
-
-    // Copy data
-    size_t i_pointA = 0, i_pointB = 0;
-    for (size_t i_val = 0; i_val < n_values_t; ++i_val)
-    {
-        dtype v = p_points[i_val];         // Mesh value
-        size_t i_row = i_val % n_points_t; // Row index in mesh
-
-        if (isB[i_row])
-        {
-            p_pointsB[i_pointB++] = v;
-            if (write_split_ind)
-                p_split_ind[i_row] = 2;
-        }
-        else
-        {
-            p_pointsA[i_pointA++] = v;
-            if (write_split_ind)
-                p_split_ind[i_row] = 1;
-        }
-    }
-
-    return axis;
+    qd_check_partition_input<3>(points, true);
+    return qd_partition_split<3>(points, pointsA, pointsB, axis, split_ind);
 }
 
 template int quadriga_lib::point_cloud_split(const arma::Mat<float> &points, arma::Mat<float> &pointsA, arma::Mat<float> &pointsB, int axis, arma::Col<int> *split_ind);
@@ -460,110 +520,8 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> &mesh,
                                       arma::Col<int> *split_ind)
 {
     qd_check_alias_list({&meshA, &meshB}, {"meshA", "meshB"}, &mesh);
-
-    // Calculate bounding box
-    const arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(mesh);
-
-    arma::uword n_face = mesh.n_rows;
-    arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored
-    const dtype *p_mesh = mesh.memptr();
-
-    // Find longest axis
-    dtype x = aabb.at(0, 1) - aabb.at(0, 0);
-    dtype y = aabb.at(0, 3) - aabb.at(0, 2);
-    dtype z = aabb.at(0, 5) - aabb.at(0, 4);
-
-    if (axis == 0)
-    {
-        if (z >= y && z >= x)
-            axis = 3;
-        else if (y >= x && y >= z)
-            axis = 2;
-        else
-            axis = 1;
-    }
-    else if (axis != 1 && axis != 2 && axis != 3)
-        throw std::invalid_argument("Input 'axis' must have values 0, 1, 2 or 3.");
-
-    // Define bounding box A
-    dtype x_max = (axis == 1) ? aabb.at(0, 0) + (dtype)0.5 * x : aabb.at(0, 1),
-          y_max = (axis == 2) ? aabb.at(0, 2) + (dtype)0.5 * y : aabb.at(0, 3),
-          z_max = (axis == 3) ? aabb.at(0, 4) + (dtype)0.5 * z : aabb.at(0, 5);
-
-    // Determine all mesh elements that are outside box A
-    bool *isB = new bool[n_face](); // Init to false
-
-    for (arma::uword i_mesh = 0; i_mesh < n_mesh; ++i_mesh)
-    {
-        dtype v = p_mesh[i_mesh];            // Mesh value
-        arma::uword i_col = i_mesh / n_face; // Column index in mesh
-        arma::uword i_row = i_mesh % n_face; // Row index in mesh
-
-        if (i_col % 3 == 0)
-            isB[i_row] = (v > x_max) ? true : isB[i_row];
-        else if (i_col % 3 == 1)
-            isB[i_row] = (v > y_max) ? true : isB[i_row];
-        else
-            isB[i_row] = (v > z_max) ? true : isB[i_row];
-    }
-
-    // Count items in both sub-meshes
-    arma::uword n_faceA = 0, n_faceB = 0;
-    for (arma::uword i = 0; i < n_face; ++i)
-        if (isB[i])
-            ++n_faceB;
-        else
-            ++n_faceA;
-
-    // Check if the mesh was split
-    if (n_faceA == 0 || n_faceB == 0)
-    {
-        delete[] isB;
-        return -axis;
-    }
-
-    // Adjust output size
-    meshA.set_size(n_faceA, 9);
-    meshB.set_size(n_faceB, 9);
-
-    dtype *p_meshA = meshA.memptr();
-    dtype *p_meshB = meshB.memptr();
-
-    bool write_split_ind = false;
-    int *p_split_ind = nullptr;
-    if (split_ind != nullptr)
-    {
-        write_split_ind = true;
-        if (split_ind->n_elem != mesh.n_rows)
-            split_ind->zeros(mesh.n_rows);
-        else
-            split_ind->zeros();
-        p_split_ind = split_ind->memptr();
-    }
-
-    // Copy data
-    arma::uword i_meshA = 0, i_meshB = 0;
-    for (arma::uword i_mesh = 0; i_mesh < n_mesh; ++i_mesh)
-    {
-        dtype v = p_mesh[i_mesh];            // Mesh value
-        arma::uword i_row = i_mesh % n_face; // Row index in mesh
-
-        if (isB[i_row])
-        {
-            p_meshB[i_meshB++] = v;
-            if (write_split_ind)
-                p_split_ind[i_row] = 2;
-        }
-        else
-        {
-            p_meshA[i_meshA++] = v;
-            if (write_split_ind)
-                p_split_ind[i_row] = 1;
-        }
-    }
-
-    delete[] isB;
-    return axis;
+    qd_check_partition_input<9>(mesh, false);
+    return qd_partition_split<9>(mesh, meshA, meshB, axis, split_ind);
 }
 
 template int quadriga_lib::triangle_mesh_split(const arma::Mat<float> &mesh,
@@ -619,7 +577,6 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 - [[ray_point_intersect]] (downstream use case)
 MD!*/
 
-// Reorganize a point cloud into smaller sub-clouds for faster processing
 template <typename dtype>
 arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> &points,
                                                    arma::Mat<dtype> &points_out,
@@ -629,15 +586,7 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> &point
                                                    arma::u32_vec *forward_ind,
                                                    arma::u32_vec *reverse_ind)
 {
-
-    // Input validation
-    if (points.n_cols != 3)
-        throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
-    if (points.n_rows == 0)
-        throw std::invalid_argument("Input 'points' must have at least one face.");
-
-    arma::uword n_points = points.n_rows;
-
+    qd_check_partition_input<3>(points, true);
     qd_check_alias(&points_out, "points_out", &points);
     qd_check_alias_list({&sub_cloud_ind, forward_ind, reverse_ind}, {"sub_cloud_ind", "forward_ind", "reverse_ind"});
 
@@ -646,190 +595,19 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> &point
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
 
-    // Create a vector of sub-clouds
-    std::vector<arma::Mat<dtype>> c; // Vector of sub-clouds
+    arma::u32_vec fwd_local;
+    arma::u32_vec *fwd = (forward_ind != nullptr) ? forward_ind : (reverse_ind != nullptr ? &fwd_local : nullptr);
+    arma::uword n_sub = qd_partition_segmentation<3>(points, points_out, sub_cloud_ind, target_size, vec_size, fwd);
 
-    // Add first item (creates a copy of the data)
-    c.push_back(points);
-
-    // Create base index (0-based)
-    std::vector<arma::uvec> fwd_ind; // Index list
-    {
-        arma::uvec base_index(points.n_rows, arma::fill::none);
-        arma::uword *p = base_index.memptr();
-        for (arma::uword i = 0; i < n_points; ++i)
-            p[i] = i;
-        fwd_ind.push_back(base_index);
-    }
-
-    // Iterate through all elements
-    for (auto sub_cloud_it = c.begin(); sub_cloud_it != c.end();)
-    {
-        arma::uword n_sub_points = (arma::uword)(*sub_cloud_it).n_rows;
-        if (n_sub_points > target_size)
-        {
-            arma::Mat<dtype> pointsA, pointsB;
-            arma::s32_vec split_ind;
-
-            // Split on longest axis
-            int split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 0, &split_ind);
-
-            // Check the split proportions, must have at least a 10 / 90 split
-            float p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
-            split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
-
-            // Attempt to split along another axis if failed for longest axis
-            int first_test = std::abs(split_success);
-            if (split_success < 0) // Failed condition
-            {
-                // Test second axis
-                if (first_test == 2 || first_test == 3) // Test x-axis
-                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 1, &split_ind);
-                else // Test y-axis
-                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 2, &split_ind);
-
-                p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
-                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
-
-                // If we still failed, we test the third axis
-                if ((first_test == 1 && split_success == -2) || (first_test == 2 && split_success == -1))
-                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 3, &split_ind);
-                else if (first_test == 3 && split_success == -1)
-                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 2, &split_ind);
-
-                p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
-                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
-            }
-
-            // Update the point cloud data in memory
-            int *ps = split_ind.memptr();
-            if (split_success > 0)
-            {
-                // Split the index list
-                arma::uword i_sub = sub_cloud_it - c.begin(); // Sub-cloud index
-                auto fwd_ind_it = fwd_ind.begin() + i_sub;    // Forward index iterator
-                arma::uword *pi = (*fwd_ind_it).memptr();     // Current cloud index list
-
-                arma::uvec pointsA_index(pointsA.n_rows, arma::fill::none);
-                arma::uvec pointsB_index(pointsB.n_rows, arma::fill::none);
-                arma::uword *pA = pointsA_index.memptr(); // New face index list of mesh A
-                arma::uword *pB = pointsB_index.memptr(); // New face index list of mesh B
-
-                arma::uword iA = 0, iB = 0;
-                for (arma::uword i_point = 0; i_point < n_sub_points; ++i_point)
-                {
-                    if (ps[i_point] == 1)
-                        pA[iA++] = pi[i_point];
-                    else if (ps[i_point] == 2)
-                        pB[iB++] = pi[i_point];
-                }
-
-                fwd_ind.erase(fwd_ind_it);
-                fwd_ind.push_back(std::move(pointsA_index));
-                fwd_ind.push_back(std::move(pointsB_index));
-
-                // Update the vector of sub-meshes
-                c.erase(sub_cloud_it);
-                c.push_back(std::move(pointsA));
-                c.push_back(std::move(pointsB));
-                sub_cloud_it = c.begin();
-            }
-            else
-                ++sub_cloud_it;
-        }
-        else
-            ++sub_cloud_it;
-    }
-
-    // Get the sub-cloud indices
-    arma::uword n_sub = c.size(), n_out = 0;
-    sub_cloud_ind.set_size(n_sub);
-    unsigned *p_sub_ind = sub_cloud_ind.memptr();
-
-    for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
-    {
-        arma::uword n_sub_points = c[i_sub].n_rows;
-        arma::uword n_align = (n_sub_points % vec_size == 0) ? n_sub_points : (n_sub_points / vec_size + 1) * vec_size;
-        p_sub_ind[i_sub] = (unsigned)n_out;
-        n_out += n_align;
-    }
-
-    // Assemble output
-    points_out.set_size(n_out, 3);
-    dtype *p_points_out = points_out.memptr();
-
-    unsigned *p_forward_index = nullptr;
-    if (forward_ind != nullptr || reverse_ind != nullptr)
-        p_forward_index = new unsigned[n_out]();
-
-    for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
-    {
-        arma::uword n_sub_points = c[i_sub].n_rows; // Number of points in the sub-cloud
-        dtype *p_sub_cloud = c[i_sub].memptr();     // Pointer to sub-cloud data
-        arma::uword *pi = fwd_ind[i_sub].memptr();  // Point index list of current sub-cloud
-
-        // Copy sub-cloud data columns by column
-        for (arma::uword i_col = 0; i_col < 3; ++i_col)
-        {
-            arma::uword offset = i_col * n_out + (arma::uword)p_sub_ind[i_sub];
-            std::memcpy(&p_points_out[offset], &p_sub_cloud[i_col * n_sub_points], n_sub_points * sizeof(dtype));
-        }
-
-        // Write index
-        if (p_forward_index != nullptr)
-        {
-            arma::uword offset = (arma::uword)p_sub_ind[i_sub];
-            for (arma::uword i_sub_point = 0; i_sub_point < n_sub_points; ++i_sub_point)
-                p_forward_index[offset + i_sub_point] = (unsigned)pi[i_sub_point] + 1;
-        }
-
-        // Add padding data
-        if (n_sub_points % vec_size != 0)
-        {
-            // Calculate bounding box of current sub-mesh
-            arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(c[i_sub]);
-            dtype *p_box = aabb.memptr();
-
-            dtype x = p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]);
-            dtype y = p_box[2] + (dtype)0.5 * (p_box[3] - p_box[2]);
-            dtype z = p_box[4] + (dtype)0.5 * (p_box[5] - p_box[4]);
-
-            arma::uword i_start = (arma::uword)p_sub_ind[i_sub] + n_sub_points;
-            arma::uword i_end = (i_sub == n_sub - 1) ? n_out : (arma::uword)p_sub_ind[i_sub + 1];
-
-            for (arma::uword i_col = 0; i_col < 3; ++i_col)
-                for (arma::uword i_pad = i_start; i_pad < i_end; ++i_pad)
-                {
-                    arma::uword offset = i_col * n_out + i_pad;
-                    if (i_col == 0)
-                        p_points_out[offset] = x;
-                    else if (i_col == 1)
-                        p_points_out[offset] = y;
-                    else
-                        p_points_out[offset] = z;
-                }
-        }
-    }
-
-    // Copy forward index
-    if (forward_ind != nullptr)
-    {
-        forward_ind->set_size(n_out);
-        std::memcpy(forward_ind->memptr(), p_forward_index, n_out * sizeof(unsigned));
-    }
-
-    // Generate reverse index
     if (reverse_ind != nullptr)
     {
-        reverse_ind->set_size(n_points);
+        reverse_ind->set_size(points.n_rows);
         unsigned *p = reverse_ind->memptr();
-        for (unsigned i = 0; i < n_out; ++i)
-            if (p_forward_index[i] != 0)
-                p[p_forward_index[i] - 1] = i;
+        const unsigned *p_fwd = fwd->memptr();
+        for (arma::uword i = 0; i < fwd->n_elem; ++i)
+            if (p_fwd[i] != 0)
+                p[p_fwd[i] - 1] = (unsigned)i;
     }
-
-    if (forward_ind != nullptr || reverse_ind != nullptr)
-        delete[] p_forward_index;
 
     return n_sub;
 }
@@ -892,14 +670,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
                                                      arma::uvec *mtl_ind_out,
                                                      arma::u32_vec *mesh_ind)
 {
-    // Input validation
-    if (mesh.n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-    if (mesh.n_rows == 0)
-        throw std::invalid_argument("Input 'mesh' must have at least one face.");
-
-    arma::uword n_mesh = mesh.n_rows;
-
+    qd_check_partition_input<9>(mesh, true);
     qd_check_alias(&mesh_out, "mesh_out", &mesh);
     qd_check_alias(mtl_ind_out, "mtl_ind_out", &mtl_ind);
     qd_check_alias_outputs(&sub_mesh_ind, "sub_mesh_ind", mesh_ind, "mesh_ind");
@@ -914,194 +685,19 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
     if (process_mtl_ind && mtl_ind.n_elem != mesh.n_rows)
         throw std::invalid_argument("Number of faces in 'mesh' and length of 'mtl_ind' do not match.");
 
-    // Create a vector of meshes
-    std::vector<arma::Mat<dtype>> c; // Vector of sub-meshes
+    arma::u32_vec fwd_local;
+    arma::u32_vec *fwd = (mesh_ind != nullptr) ? mesh_ind : (process_mtl_ind ? &fwd_local : nullptr);
+    arma::uword n_sub = qd_partition_segmentation<9>(mesh, mesh_out, sub_mesh_ind, target_size, vec_size, fwd);
 
-    // Add first mesh (creates a copy of the data)
-    c.push_back(mesh);
-
-    // Create base index (0-based)
-    std::vector<arma::uvec> face_ind; // Index list
-    {
-        arma::uvec base_index(mesh.n_rows, arma::fill::none);
-        arma::uword *p = base_index.memptr();
-        for (arma::uword i = 0; i < n_mesh; ++i)
-            p[i] = (arma::uword)i;
-        face_ind.push_back(std::move(base_index));
-    }
-
-    // Iterate through all elements
-    for (auto sub_mesh_it = c.begin(); sub_mesh_it != c.end();)
-    {
-        arma::uword n_sub_faces = (*sub_mesh_it).n_rows;
-        if (n_sub_faces > target_size)
-        {
-            arma::Mat<dtype> meshA, meshB;
-            arma::s32_vec split_ind;
-
-            // Split the mesh on its longest axis
-            int split_success = quadriga_lib::triangle_mesh_split(*sub_mesh_it, meshA, meshB, 0, &split_ind);
-
-            // Check the split proportions, must have at least a 10 / 90 split
-            float p = (split_success > 0) ? (float)meshA.n_rows / (float)n_sub_faces : 0.5f;
-            split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
-
-            // Attempt to split along another axis if failed for longest axis
-            int first_test = std::abs(split_success);
-            if (split_success < 0) // Failed condition
-            {
-                // Test second axis
-                if (first_test == 2 || first_test == 3) // Test x-axis
-                    split_success = quadriga_lib::triangle_mesh_split(*sub_mesh_it, meshA, meshB, 1, &split_ind);
-                else // Test y-axis
-                    split_success = quadriga_lib::triangle_mesh_split(*sub_mesh_it, meshA, meshB, 2, &split_ind);
-
-                p = (split_success > 0) ? (float)meshA.n_rows / (float)n_sub_faces : 0.5f;
-                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
-
-                // If we still failed, we test the third axis
-                if ((first_test == 1 && split_success == -2) || (first_test == 2 && split_success == -1))
-                    split_success = quadriga_lib::triangle_mesh_split(*sub_mesh_it, meshA, meshB, 3, &split_ind);
-                else if (first_test == 3 && split_success == -1)
-                    split_success = quadriga_lib::triangle_mesh_split(*sub_mesh_it, meshA, meshB, 2, &split_ind);
-
-                p = (split_success > 0) ? (float)meshA.n_rows / (float)n_sub_faces : 0.5f;
-                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
-            }
-
-            // Update the mesh data in memory
-            int *ps = split_ind.memptr();
-            if (split_success > 0)
-            {
-                // Split the index list
-                arma::uword i_sub = sub_mesh_it - c.begin(); // Sub-mesh index
-                auto face_ind_it = face_ind.begin() + i_sub; // Face index iterator
-                arma::uword *pi = (*face_ind_it).memptr();   // Current face index list
-
-                arma::uvec meshA_index(meshA.n_rows, arma::fill::none);
-                arma::uvec meshB_index(meshB.n_rows, arma::fill::none);
-                arma::uword *pA = meshA_index.memptr(); // New face index list of mesh A
-                arma::uword *pB = meshB_index.memptr(); // New face index list of mesh B
-
-                arma::uword iA = 0, iB = 0;
-                for (arma::uword i_face = 0; i_face < n_sub_faces; ++i_face)
-                {
-                    if (ps[i_face] == 1)
-                        pA[iA++] = pi[i_face];
-                    else if (ps[i_face] == 2)
-                        pB[iB++] = pi[i_face];
-                }
-
-                face_ind.erase(face_ind_it);
-                face_ind.push_back(std::move(meshA_index));
-                face_ind.push_back(std::move(meshB_index));
-
-                // Update the vector of sub-meshes
-                c.erase(sub_mesh_it);
-                c.push_back(std::move(meshA));
-                c.push_back(std::move(meshB));
-                sub_mesh_it = c.begin();
-            }
-            else
-                ++sub_mesh_it;
-        }
-        else
-            ++sub_mesh_it;
-    }
-
-    // Get the sub-mesh indices
-    arma::uword n_sub = c.size(), n_out = 0;
-    sub_mesh_ind.set_size(n_sub);
-    unsigned *p_sub_ind = sub_mesh_ind.memptr();
-
-    for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
-    {
-        arma::uword n_sub_faces = c[i_sub].n_rows;
-        arma::uword n_align = (n_sub_faces % vec_size == 0) ? n_sub_faces : (n_sub_faces / vec_size + 1) * vec_size;
-        p_sub_ind[i_sub] = (unsigned)n_out;
-        n_out += n_align;
-    }
-
-    // Assemble output
-    mesh_out.set_size(n_out, 9);
-    dtype *p_mesh_out = mesh_out.memptr();
-
-    const arma::uword *p_mtl_in = process_mtl_ind ? mtl_ind.memptr() : nullptr;
-    arma::uword *p_mtl_out = nullptr;
+    // Padding rows get material index 0 (transparent fallback / air)
     if (process_mtl_ind)
     {
-        mtl_ind_out->set_size(n_out);
-        p_mtl_out = mtl_ind_out->memptr();
-    }
-
-    unsigned *p_mesh_index = nullptr;
-    if (mesh_ind != nullptr)
-    {
-        mesh_ind->zeros(n_out);
-        p_mesh_index = mesh_ind->memptr();
-    }
-
-    for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
-    {
-        arma::uword n_sub_faces = c[i_sub].n_rows;  // Number of faces in the sub-mesh
-        dtype *p_sub_mesh = c[i_sub].memptr();      // Pointer to sub-mesh data
-        arma::uword *pi = face_ind[i_sub].memptr(); // Face index list of current sub-mesh
-
-        // Copy sub-mesh data columns by column
-        for (arma::uword i_col = 0; i_col < 9; ++i_col)
-        {
-            arma::uword offset = i_col * n_out + (arma::uword)p_sub_ind[i_sub];
-            std::memcpy(&p_mesh_out[offset], &p_sub_mesh[i_col * n_sub_faces], n_sub_faces * sizeof(dtype));
-        }
-
-        // Copy material indices
-        if (process_mtl_ind)
-        {
-            arma::uword offset_out = (arma::uword)p_sub_ind[i_sub];
-            for (arma::uword i_sub_face = 0; i_sub_face < n_sub_faces; ++i_sub_face)
-                p_mtl_out[offset_out + i_sub_face] = p_mtl_in[pi[i_sub_face]];
-        }
-
-        // Write mesh index
-        if (p_mesh_index != nullptr)
-        {
-            arma::uword offset = (arma::uword)p_sub_ind[i_sub];
-            for (arma::uword i_sub_face = 0; i_sub_face < n_sub_faces; ++i_sub_face)
-                p_mesh_index[offset + i_sub_face] = (unsigned)pi[i_sub_face] + 1;
-        }
-
-        // Add padding data
-        if (n_sub_faces % vec_size != 0)
-        {
-            // Calculate bounding box of current sub-mesh
-            arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(c[i_sub]);
-            dtype *p_box = aabb.memptr();
-
-            dtype x = p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]);
-            dtype y = p_box[2] + (dtype)0.5 * (p_box[3] - p_box[2]);
-            dtype z = p_box[4] + (dtype)0.5 * (p_box[5] - p_box[4]);
-
-            arma::uword i_start = (arma::uword)p_sub_ind[i_sub] + n_sub_faces;
-            arma::uword i_end = (i_sub == n_sub - 1) ? n_out : (arma::uword)p_sub_ind[i_sub + 1];
-
-            // Geometry padding: dummy triangle collapsed to the AABB center
-            for (arma::uword i_col = 0; i_col < 9; ++i_col)
-                for (arma::uword i_pad = i_start; i_pad < i_end; ++i_pad)
-                {
-                    arma::uword offset = i_col * n_out + i_pad;
-                    if (i_col % 3 == 0)
-                        p_mesh_out[offset] = x;
-                    else if (i_col % 3 == 1)
-                        p_mesh_out[offset] = y;
-                    else
-                        p_mesh_out[offset] = z;
-                }
-
-            // Material padding: index 0 (transparent fallback / air)
-            if (process_mtl_ind)
-                for (arma::uword i_pad = i_start; i_pad < i_end; ++i_pad)
-                    p_mtl_out[i_pad] = 0;
-        }
+        mtl_ind_out->set_size(fwd->n_elem);
+        arma::uword *p_mtl_out = mtl_ind_out->memptr();
+        const arma::uword *p_mtl_in = mtl_ind.memptr();
+        const unsigned *p_fwd = fwd->memptr();
+        for (arma::uword i = 0; i < fwd->n_elem; ++i)
+            p_mtl_out[i] = p_fwd[i] ? p_mtl_in[p_fwd[i] - 1] : 0;
     }
 
     return n_sub;

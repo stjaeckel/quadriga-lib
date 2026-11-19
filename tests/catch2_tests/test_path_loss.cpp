@@ -66,8 +66,7 @@ namespace
 
     bool close_rel(double a, double b, double tol) { return std::abs(a - b) <= tol * std::max(1.0, std::abs(b)); }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // TR 38.901 v19.5.0, Table 7.4.1-1 (f in GHz, distances and heights in m)
+    // ---- TR 38.901 v19.5.0, Table 7.4.1-1 (f in GHz, distances and heights in m) ----
 
     // RMa / SMa LOS with building height h, break point of note 5: dBP = 2 pi hBS hUT fc / c.
     // PL2 = PL1(dBP) + 40 lg(d3D / dBP) as in the TR (form3d = false), or with the 3D breakpoint distance
@@ -192,8 +191,8 @@ namespace
         return pl;
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Model formulas, typed from their definition. [X|v] is the first value of key X if present, else v.
+    // ---- Model formulas, typed from their definition ----
+    // [X|v] is the first value of key X if present, else v.
 
     double pv(const plpar_t &p, const char *k, double def = 0.0)
     {

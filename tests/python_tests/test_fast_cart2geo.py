@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.tools.fast_cart2geo: shapes, values, kernels, error paths.
+
 import sys
 import os
 import unittest
@@ -13,7 +15,6 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-# Now you can import your package
 import quadriga_lib
 
 v = 1.0 / np.sqrt(2.0)
@@ -30,8 +31,6 @@ class test_case(unittest.TestCase):
         for a in out:
             self.assertEqual(a.shape, (6, 2))
             self.assertEqual(a.dtype, np.float64)
-
-    # --- Known values ---
 
     def test_known_values(self):
         # point 0: (-v, -v, 0) -> az=-3pi/4, el=0,    len=1
@@ -69,8 +68,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(length.shape, (0, 3))
 
     # Outputs equal the reference formulas element-wise, for Fortran-ordered inputs (aliased by the wrapper),
-    # C-ordered and float32 inputs (copied) and large n (formerly the separate-input branch read freed memory,
-    # wrong values for n > 16, segfault for large n)
+    # C-ordered and float32 inputs (copied), and small and large n
     def test_values_equal_reference(self):
         rng = np.random.default_rng(1)
         for n, m in ((5, 1), (100, 3), (100000, 1)):
@@ -85,8 +83,6 @@ class test_case(unittest.TestCase):
         out = quadriga_lib.tools.fast_cart2geo(x.astype(np.float32), y.astype(np.float32), z.astype(np.float32),
                                                use_kernel=1)
         np.testing.assert_allclose(out[2], ln_ref, rtol=1e-6)
-
-    # --- use_kernel variants ---
 
     def test_use_kernel(self):
         np.random.seed(0)
@@ -114,14 +110,12 @@ class test_case(unittest.TestCase):
         xs, ys, zs = (np.repeat(a, 2, axis=0)[::2] for a in (x, y, z))
         np.testing.assert_array_equal(quadriga_lib.tools.fast_cart2geo(xs, ys, zs, use_kernel=1), ref)
 
-    # Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
+    # Kernel values outside 0, 1, 2 are rejected, not run with the auto kernel
     def test_invalid_use_kernel(self):
         x, y, z = np.random.rand(3, 2, 2)
         for k in (3, 99, -1):
             with self.assertRaises(ValueError, msg="use_kernel=%d" % k):
                 quadriga_lib.tools.fast_cart2geo(x, y, z, use_kernel=k)
-
-    # --- Error paths ---
 
     def test_errors(self):
         x = np.random.rand(4, 1)
@@ -151,7 +145,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.tools.fast_cart2geo(None, x, x)
 
-    # The combined (3, n, m) form is gone: no combine flag, and a stacked array is no single input
+    # There is no combined (3, n, m) form: no combine flag, and a stacked array is not a single input
     def test_combined_form_removed(self):
         cart = np.random.rand(3, 4, 2)
         with self.assertRaises(TypeError):

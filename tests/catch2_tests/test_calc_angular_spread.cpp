@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::calc_angular_spread: azimuth and elevation spreads, the mean-direction orientation
+// (heading, tilt, bank) and the rotated path angles phi and theta, for symmetric path pairs with closed-form
+// spreads, variable path counts, wrapping, quantization, float, the optional outputs and input validation.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 #include "quadriga_arrayant.hpp"

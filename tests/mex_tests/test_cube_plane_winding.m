@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_cube_plane_winding
+% MEX test of the face winding of quadriga_lib.cube and quadriga_lib.plane with negative scales.
 
 % Cube: a negative product of the scales swaps the winding, so the normals stay outward
 scales = { -1, [1,1,-2], [-1,-1,1], [-1,-2,-0.5] };

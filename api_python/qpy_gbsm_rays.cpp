@@ -4,8 +4,6 @@
 
 #include "qd_helpers_python_types.hpp"
 
-
-
 /*!SECTION
 Geometry-based stochastic model
 SECTION!*/

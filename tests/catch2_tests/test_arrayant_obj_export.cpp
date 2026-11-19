@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down arrayant_export_obj_file: input validation (file extension, folder, non-finite range, radius and field
+// values, all-zero pattern) and the structure of the written OBJ file (finite vertices, each vertex written once,
+// face indices in range). The rendered shape itself is not compared against an oracle.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -52,7 +56,7 @@ TEST_CASE("Arrayant OBJ Export")
     std::remove("testantenna.mtl");
 }
 
-// A subnormal directivity range and a pattern whose peak power is subnormal used to overflow the scale factors to Inf
+// A subnormal directivity range and a pattern whose peak power is subnormal must not overflow the scale factors to Inf
 TEST_CASE("Arrayant OBJ Export - tiny range and tiny pattern give finite vertices")
 {
     auto vertices_finite = [](const std::string &fn)
@@ -85,7 +89,7 @@ TEST_CASE("Arrayant OBJ Export - tiny range and tiny pattern give finite vertice
 
 TEST_CASE("Arrayant OBJ Export - every vertex is written once per element")
 {
-    // Vertex 0 of an element used to be written again for every face that uses it
+    // Each vertex is written once, not again for every face that uses it
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
     quadriga_lib::arrayant_copy_element(ant, 0, {1}); // two elements
     ant.element_pos(0, 1) = 2.0;

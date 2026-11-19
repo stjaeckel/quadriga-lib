@@ -36,9 +36,6 @@ quadriga_lib.channel.export_obj_file( fn, chan, *, max_paths, gain_max_dB, gain_
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
-
-## Outputs:
-- None; the OBJ file is written directly to disk
 MD!*/
 
 void channel_export_obj_file(const py::handle &fn,

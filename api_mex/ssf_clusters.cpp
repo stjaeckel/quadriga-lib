@@ -100,13 +100,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 5 || nrhs > 14)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[1], false, "tx_pos");
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[2], false, "rx_pos");
@@ -149,7 +147,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             plhs[6] = qd_mex_init_output(&n_active, n_link);
     }
 
-    // Call library function
     arma::u32_vec *p_n_active = (nlhs > 6) ? &n_active : nullptr;
     CALL_QD(quadriga_lib::ssf_clusters(scenpar, tx_pos, rx_pos, lsp, rnd, delay, power, aod, eod, aoa, eoa, method,
                                        rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re,

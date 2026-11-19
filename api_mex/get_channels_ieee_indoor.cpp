@@ -98,11 +98,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Parse antenna objects
     auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "ap_array");
     auto ant_rx = qd_mex_struct2arrayant(prhs[1], false, false, "sta_array");
 
-    // Read model parameters
     std::string channel_type = qd_mex_get_string(prhs[2], "", "channel_type");
     double center_freq = (nrhs < 4) ? 5.25e9 : qd_mex_get_scalar<double>(prhs[3], "center_freq", 5.25e9);
     double tap_spacing = (nrhs < 5) ? 10.0e-9 : qd_mex_get_scalar<double>(prhs[4], "tap_spacing", 10.0e-9);
@@ -126,10 +124,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec n_walls = (nrhs < 23) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[22], false, "n_walls");
     double wall_loss_dB = (nrhs < 24) ? 5.0 : qd_mex_get_scalar<double>(prhs[23], "wall_loss_dB", 5.0);
 
-    // Declare outputs
     std::vector<quadriga_lib::channel<double>> chan;
 
-    // Call library function (empty inputs select the defaults)
+    // Empty inputs select the C++ defaults
     CALL_QD(chan = quadriga_lib::get_channels_ieee_indoor(ant_tx, ant_rx, channel_type, center_freq, tap_spacing, n_users,
                                                           observation_time, update_interval, speed_station_kmh, speed_env_kmh,
                                                           dist, n_floors, uplink, offset_angles_deg, n_subpath, doppler_effect,

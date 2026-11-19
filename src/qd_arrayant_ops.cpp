@@ -3,11 +3,11 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
-#include <cstring>   // std::memcpy
-#include <iomanip>   // std::setprecision
-#include <algorithm> // std::replace
+#include <cstring>
+#include <iomanip>
+#include <algorithm>
 #include <fstream>
-#include <limits> // std::numeric_limits
+#include <limits>
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
@@ -206,7 +206,6 @@ void qd_arrayant_calc_beamwidth_element(const quadriga_lib::arrayant<dtype> &ant
 template <typename dtype>
 dtype qd_arrayant_calc_directivity_element(const quadriga_lib::arrayant<dtype> &ant, arma::uword i_element)
 {
-    // Constants
     double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
     arma::uword naz = ant.azimuth_grid.n_elem, nel = ant.elevation_grid.n_elem;
 
@@ -455,7 +454,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
                                                                      const arma::Col<dtype> &elevation_grid_new,
                                                                      dtype propagation_speed)
 {
-    // Check if the arrayant object is valid
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
@@ -598,7 +596,6 @@ MD!*/
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_concat(const arrayant<dtype> &ant_1, const arrayant<dtype> &ant_2)
 {
-    // Check if arrayant objects are valid
     std::string error_message = qd_arrayant_is_valid_quick(ant_1);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
@@ -608,9 +605,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_concat(const arrayant<dtype
 
     // Check if grids are identical
     if (!arma::approx_equal(ant_1.azimuth_grid, ant_2.azimuth_grid, "absdiff", (dtype)1.0e-6))
-        throw std::invalid_argument("Azimuth sampling grids don't match.");
+        throw std::invalid_argument("Azimuth sampling grids do not match.");
     if (!arma::approx_equal(ant_1.elevation_grid, ant_2.elevation_grid, "absdiff", (dtype)1.0e-6))
-        throw std::invalid_argument("Elevation sampling grids don't match.");
+        throw std::invalid_argument("Elevation sampling grids do not match.");
 
     arma::uword n_elevation = ant_1.n_elevation();
     arma::uword n_azimuth = ant_1.n_azimuth();
@@ -701,8 +698,7 @@ void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword i_sou
     if (i_target.max() == std::numeric_limits<arma::uword>::max())
         throw std::invalid_argument("Destination index out of bound.");
 
-    // Check if arrayant object is valid
-    std::string error_message = qd_arrayant_check(ant); // Deep check
+    std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -796,12 +792,10 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                                             const std::string &colormap, dtype object_radius,
                                             arma::uword icosphere_n_div, const arma::uvec &i_element_in)
 {
-    // Check if arrayant object is valid
     std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    // Input validation
     std::string fn_suffix = ".obj";
     std::string fn_mtl;
 
@@ -813,7 +807,6 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     else
         throw std::invalid_argument("OBJ-File name must end with .obj");
 
-    // Replace spaces in ant_name
     std::string ant_name = ant.name;
     std::replace(ant_name.begin(), ant_name.end(), ' ', '_');
 
@@ -851,7 +844,6 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     if (!outFile.is_open())
         throw std::runtime_error("Cannot open file '" + fn_mtl + "' for writing.");
     {
-        // Write some text to the file
         outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
         for (size_t i = 0; i < n_cmap; ++i)
         {
@@ -865,7 +857,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     }
 
     // Generate vertices and faces
-    arma::mat vertices_icosphere; // double precision
+    arma::mat vertices_icosphere;
     arma::u32_mat faces_icosphere;
     size_t n_faces, n_vert;
     {
@@ -937,7 +929,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                                               {}, {}, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
     dtype *vr = V_re.memptr(), *vi = V_im.memptr(), *hr = H_re.memptr(), *hi = H_im.memptr();
 
-    // Calculate maximum Power in the Pattern
+    // Maximum power of the pattern
     double max_pow = 0.0;
     bool has_nan = false;
     auto find_max_pow = [&]()
@@ -963,7 +955,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     if (!(max_pow > 0.0))
         throw std::invalid_argument("Pattern is zero in all directions for the exported elements.");
 
-    // Write OBJ File
+    // Write OBJ file
     outFile = std::ofstream(fn);
     if (!outFile.is_open())
         throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
@@ -980,7 +972,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
             arma::uword i_array_element = i_element(i_el);
             outFile << "\no " << "QuaDRiGa_ANT_" << ant_name << "_" << std::setfill('0') << std::setw(3) << i_array_element << "\n";
 
-            // Calculate Shape
+            // Shape
             arma::vec pow(n_vert);
             double *pp = pow.memptr();
             for (size_t i_vert = 0; i_vert < n_vert; ++i_vert)
@@ -997,8 +989,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
             // Scale vertices
             arma::mat scaled_vertices(n_vert, 3);
-            double *v_scale = scaled_vertices.memptr();  // Scaled vertices
-            double *v_ico = vertices_icosphere.memptr(); // Icosphere vertices
+            double *v_scale = scaled_vertices.memptr();
+            double *v_ico = vertices_icosphere.memptr();
             for (size_t i_vert = 0; i_vert < n_vert; ++i_vert)
             {
                 v_scale[i_vert] = v_ico[i_vert] * pp[i_vert];                             // x
@@ -1014,12 +1006,12 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
             arma::u32_mat vert_index(n_faces, 3);
             arma::u32_vec cmap_index(n_faces);
 
-            double *v_final = final_vertices.memptr(); // Final vertices
-            unsigned *f_final = vert_index.memptr();   // Final face indices
-            unsigned *i_cmap = cmap_index.memptr();    // Colormap index
+            double *v_final = final_vertices.memptr();
+            unsigned *f_final = vert_index.memptr();
+            unsigned *i_cmap = cmap_index.memptr();
 
-            size_t no_final_vert = 0; // Number of final vertices
-            size_t no_final_face = 0; // Number of final faces
+            size_t no_final_vert = 0;
+            size_t no_final_face = 0;
 
             for (size_t i_face = 0; i_face < n_faces; ++i_face)
             {
@@ -1055,7 +1047,6 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                 if (dd < eps)
                     continue;
 
-                // Do for each of the 3 vertices
                 for (size_t i3 = 0; i3 < 3; ++i3)
                 {
                     double x = x0, y = y0, z = z0;
@@ -1065,7 +1056,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                         x = x2, y = y2, z = z2;
 
                     // Add the vertices to the final list
-                    size_t i_vert_final = 0; // Face index
+                    size_t i_vert_final = 0; // Index in the final vertex list
                     bool found = false;
 
                     // Get vertex ID
@@ -1177,8 +1168,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant)
 {
-    // Check if arrayant object is valid
-    std::string error_message = qd_arrayant_check(ant); // Deep check
+    std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -1336,8 +1326,7 @@ template <typename dtype>
 void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat<dtype> &orientation,
                                            unsigned usage, const arma::uvec &i_element)
 {
-    // Check if arrayant object is valid
-    std::string error_message = qd_arrayant_check(ant); // Deep check
+    std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -1511,7 +1500,6 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
         elevation_grid_update = ant.elevation_grid;
     }
 
-    // Initiate output variables
     arma::Mat<dtype> V_re(n_out, n_ang, arma::fill::none), V_im(n_out, n_ang, arma::fill::none);
     arma::Mat<dtype> H_re(n_out, n_ang, arma::fill::none), H_im(n_out, n_ang, arma::fill::none);
     arma::Mat<dtype> azimuth_loc, elevation_loc, gamma;
@@ -1661,7 +1649,6 @@ MD!*/
 template <typename dtype>
 unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> &ant, unsigned id, const arma::u32_mat &layout)
 {
-    // Check if arrayant object is valid
     std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());

@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_gbsm.hpp"
+#include "qd_helpers_shared.hpp"
 #include "qd_helpers_arrayant.hpp"
 #include "qd_helpers_gbsm.hpp"
 
@@ -129,12 +130,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                                                                      bool use_absolute_delays)
 {
     // Validation; the ground-reflection checks of ssf_paths for "drift" follow in the snapshot loop
-    for (int e = 0; e < 2; ++e)
-    {
-        const std::string msg = (e == 0) ? qd_arrayant_is_valid_quick(tx_array) : qd_arrayant_is_valid_quick(rx_array);
-        if (!msg.empty())
-            throw std::invalid_argument((e == 0 ? "Transmit antenna: " : "Receive antenna: ") + msg);
-    }
+    qd_arrayant_check_tx_rx(tx_array, rx_array);
     const std::string err = rays.is_valid();
     if (!err.empty())
         throw std::invalid_argument(err);
@@ -180,7 +176,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         throw std::invalid_argument("Mobility 'drift' needs 'rays.fbs_pos' and 'rays.lbs_pos'; solve the scatterers "
                                     "first.");
     const bool taps = output == "taps";
-    const double c0 = 299792458.0, fc = rays.center_freq(i_freq), k0 = 6.283185307179586 * fc / c0;
+    const double c0 = qd_speed_of_light, fc = rays.center_freq(i_freq), k0 = 6.283185307179586 * fc / c0;
 
     // The rays kept at i_freq (LOS, GR, NLOS with power > 0 there) as ray data of one frequency: ssf_paths keeps
     // all of them in ray order and returns the same values as for all frequencies (the dropped rays add 0 to the

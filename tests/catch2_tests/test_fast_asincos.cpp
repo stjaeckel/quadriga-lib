@@ -2,12 +2,18 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::fast_asin and fast_acos: accuracy against std::asin / std::acos for float and
+// double input, identities, endpoints and symmetries, the region boundary at |x| = 0.5 and the endpoints,
+// lengths that are not a multiple of 8, output sizing, aliasing, and the GENERIC and AVX2 kernels.
+// Double input is rounded to float by the function, so the sweeps compare with the exact value of the
+// float-rounded input; 3e-7 is about 2 ULP of single precision.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_math.hpp"
 #include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 
-// Helper: compute max absolute error between fast result (float) and reference (double)
+// Max absolute error of a float result against a double reference
 static double max_abs_error(const arma::fvec &fast, const arma::vec &ref)
 {
     double max_err = 0.0;
@@ -126,7 +132,7 @@ TEST_CASE("fast_asin - Sweep accuracy (double input, error against float-cast re
 
     REQUIRE(s.n_elem == N);
 
-    // Reference: cast to float first (matching what the AVX2 path does), then compute in double
+    // Reference: cast to float first (as both kernels do), then compute in double
     arma::vec ref(N);
     for (arma::uword i = 0; i < N; ++i)
         ref(i) = std::asin((double)(float)x(i));
@@ -278,7 +284,7 @@ TEST_CASE("fast_acos - Symmetry: acos(-x) == pi - acos(x)")
 
 TEST_CASE("fast_asin - Non-multiple-of-8 length (tail handling)")
 {
-    // 13 elements: 8 via AVX2 bulk + 5 via generic tail
+    // 13 elements: one full 8-wide block and a 5-element tail
     arma::vec x(13);
     for (arma::uword i = 0; i < 13; ++i)
         x(i) = -1.0 + 2.0 * (double)i / 12.0;

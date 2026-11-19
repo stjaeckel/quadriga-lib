@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::calc_rician_k_factor: the split of the path powers into LOS (path length within
+// window_size of the TX-RX distance) and NLOS, the K-factor and total power per snapshot, the optional
+// outputs, float, and input validation. Oracles are hand sums of the path powers; TX and RX are placed so
+// that the TX-RX distance is a round number.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 #include <cmath>
@@ -230,7 +235,7 @@ TEST_CASE("calc_rician_k_factor - Empty and zero-power snapshot")
     CHECK(pg(0) == 0.0);
 }
 
-// --- Error handling tests ---
+// ---- Error handling ----
 
 TEST_CASE("calc_rician_k_factor - Error: empty powers vector")
 {

@@ -4,8 +4,6 @@
 
 #include "qd_helpers_python_types.hpp"
 
-
-
 /*!SECTION
 Array antenna functions
 SECTION!*/
@@ -186,12 +184,12 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     const auto azimuth_grid_a = qd_python_numpy2arma_Col<double>(azimuth_grid, true);
     const auto elevation_grid_a = qd_python_numpy2arma_Col<double>(elevation_grid, true);
 
-    // Optional frequency override: accepts a scalar or a 1D array.
+    // A scalar freq_new <= 0 is no override
     arma::vec freq_new_a = qd_python_numpy2arma_Col<double>(freq_new, false); // Copy: may be reset below
     if (freq_new_a.n_elem == 1 && freq_new_a[0] <= 0.0)
         freq_new_a.reset();
 
-    // Parse the (possibly frequency-dependent) input antenna; length 1 for a single-freq dict.
+    // Length 1 for a single-frequency dict
     auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 
     // Multi-frequency branch: frequency-dependent input, or a freq_new vector with > 1 entry
@@ -201,7 +199,6 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
         return qd_python_arrayant2dict_multi(out);
     }
 
-    // Single-frequency branch
     if (freq_new_a.n_elem == 1)
         ant[0].center_freq = freq_new_a[0];
 
@@ -243,7 +240,6 @@ MD!*/
 py::dict arrayant_concat(const py::dict &arrayant1,
                          const py::dict &arrayant2)
 {
-    // Parse both inputs via the unified multi-freq reader
     auto ant1 = qd_python_dict2arrayant_multi(arrayant1, false, false, true, false);
     auto ant2 = qd_python_dict2arrayant_multi(arrayant2, true, false, true, false);
 
@@ -260,7 +256,6 @@ py::dict arrayant_concat(const py::dict &arrayant1,
         return qd_python_arrayant2dict_multi(out);
     }
 
-    // Single-frequency: append the elements of in2 onto in1
     auto out = quadriga_lib::arrayant_concat(ant1[0], ant2[0]);
     return qd_python_arrayant2dict(out);
 }
@@ -316,7 +311,6 @@ py::dict arrayant_copy_element(const py::dict &arrayant,
     if (source.n_elem > 1 && source.n_elem != dest.n_elem)
         throw std::invalid_argument("When copying multiple elements, 'i_source' and 'i_target' must have the same length.");
 
-    // Parse the (possibly frequency-dependent) input antenna (copy)
     auto ant = qd_python_dict2arrayant_multi(arrayant, false, false, true, false);
 
     // Apply the copy to every frequency entry
@@ -382,7 +376,7 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
     // Element indices (0-based); empty = rotate all elements
     const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");
 
-    // Parse the (possibly frequency-dependent) antenna (copy, the user's arrays are not changed)
+    // A copy: the caller's arrays are not changed
     auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, false, false);
 
     if (ant_vec.size() > 1) // Frequency-dependent: rotate every entry

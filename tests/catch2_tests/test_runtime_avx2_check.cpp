@@ -2,6 +2,9 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// quadriga_lib_has_AVX2 and the internal runtime_AVX2_Check agree with the CPU features reported by the GCC/clang
+// builtins and give the same answer from many threads. The AVX2 kernels themselves are tested in their own suites.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
 

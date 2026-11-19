@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Fig. 4 of the paper: ACF estimated from the generated values, for one device (3-D) and two devices (6-D).
 % Paper: 300 sinusoids, 6000 positions in a cube of 56 m edge length, groups of 2 m, 10 initialisations.
 % Here: preset Comb256, bin centers 1:2:69 m (cube edge 0.8 * 69 = 55.2 m), 3000 positions per device.

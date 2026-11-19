@@ -42,26 +42,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     (void)plhs; // No outputs
 
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    if (!mxIsStruct(prhs[1]))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be a struct.");
+    qd_mex_check_struct(prhs[1], "arrayant");
 
-    // Parse scalar / string inputs
     std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     double directivity_range_dB = (nrhs < 3) ? 30.0 : qd_mex_get_scalar<double>(prhs[2], "directivity_range_dB", 30.0);
     std::string colormap = (nrhs < 4) ? "jet" : qd_mex_get_string(prhs[3], "jet", "colormap");
     double object_radius = (nrhs < 5) ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "object_radius", 1.0);
     arma::uword icosphere_n_div = (nrhs < 6) ? 4 : qd_mex_get_scalar<arma::uword>(prhs[5], "icosphere_n_div", 4);
 
-    // i_element: 1-based input, convert to 0-based
-    const arma::uvec element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_index_Col(prhs[6], "i_element");
+    const arma::uvec element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_index_Col(prhs[6], "i_element"); // 1-based -> 0-based
 
-    // freq: 1-based frequency index for multi-frequency models
     size_t n_freq = (size_t)mxGetNumberOfElements(prhs[1]);
     const size_t i_freq = (nrhs < 8) ? 0 : qd_mex_get_index<size_t>(prhs[7], "i_freq"); // 1-based -> 0-based
     if (i_freq >= n_freq)

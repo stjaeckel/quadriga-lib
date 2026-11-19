@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of mitsuba_xml_file_write: the XML and PLY files of a scene (objects split per material, shared vertices, face
+// order), PLY paths relative to the XML file, 1-based material indices and input validation.
+// Oracle: a byte-exact XML and PLY reference typed in this file; an OBJ from tests/data for a smoke run.
+// Each case writes its own files into the working directory and removes them.
+
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <fstream>
@@ -11,9 +16,6 @@
 
 TEST_CASE("Test Mitsuba XML File Write")
 {
-    // ---------------------------------------------------------------------
-    // 1. Read reference OBJ
-    // ---------------------------------------------------------------------
     arma::mat vert_list, bsdf;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind;
@@ -25,9 +27,6 @@ TEST_CASE("Test Mitsuba XML File Write")
         &vert_list, &face_ind, &obj_ind, &obj_names,
         &mtl_ind, &mtl_names, &bsdf);
 
-    // ---------------------------------------------------------------------
-    // 2. Write the Mitsuba XML scene
-    // ---------------------------------------------------------------------
     const std::filesystem::path xml_file = "test_scene_x.xml";
     quadriga_lib::mitsuba_xml_file_write<double>(
         xml_file.string(),
@@ -37,16 +36,10 @@ TEST_CASE("Test Mitsuba XML File Write")
 
     const std::filesystem::path mesh_folder = xml_file.stem().string() + "_meshes";
 
-    // ---------------------------------------------------------------------
-    // 3. Assertions
-    // ---------------------------------------------------------------------
-    REQUIRE(std::filesystem::exists(xml_file));          // XML file created
-    REQUIRE(std::filesystem::is_directory(mesh_folder)); // mesh folder exists
+    REQUIRE(std::filesystem::exists(xml_file));
+    REQUIRE(std::filesystem::is_directory(mesh_folder));
     REQUIRE_FALSE(std::filesystem::is_empty(mesh_folder));
 
-    // ---------------------------------------------------------------------
-    // 4. Clean-up (delete XML + folder)
-    // ---------------------------------------------------------------------
     std::error_code ec; // swallow any I/O errors
     std::filesystem::remove_all(mesh_folder, ec);
     std::filesystem::remove(xml_file, ec);
@@ -86,7 +79,7 @@ TEST_CASE("Test Mitsuba XML File Write - 1-based material indices")
         std::invalid_argument);
 }
 
-// Byte-exact output of the writer before the index map rewrite, for a scene with a split object, a vertex
+// Byte-exact reference output for a scene with a split object, a vertex
 // shared by two objects and faces whose vertex order differs from the ascending global order
 TEST_CASE("Test Mitsuba XML File Write - XML and PLY output are byte-identical to the reference")
 {

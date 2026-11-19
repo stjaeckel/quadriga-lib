@@ -2,9 +2,39 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "qd_helpers_python_types.hpp" // qd_python_flag
-#include "quadriga_lib.hpp"
-#include "qd_helpers_shared.hpp"
+#include "qd_helpers_python_types.hpp"
+#include "qd_helpers_shared.hpp" // qd_batch_loop, qd_snapshot_list
+
+// One numpy array (e.g. a list item) as typed array with element strides, its data pointer and shape (see
+// qd_python_get_shape; a 4th dimension gives n_frames frames, stride_frames elements apart). Reading it needs the GIL;
+// copying from 'data' with qd_python_copy2arma does not, so the copies of many items can run in parallel.
+namespace // Internal linkage, like the pybind11 types it holds
+{
+    template <typename dtype>
+    struct qd_python_item
+    {
+        py::array_t<dtype> array; // Keeps the data alive
+        const dtype *data = nullptr;
+        std::array<size_t, 9> shape{};
+        size_t n_frames = 1, stride_frames = 0;
+        int ndim = 0;
+    };
+}
+
+template <typename dtype>
+static inline qd_python_item<dtype> qd_python_get_item(const py::handle &obj)
+{
+    qd_python_item<dtype> item;
+    const py::array array = py::cast<py::array>(obj);
+    if (py::detail::npy_format_descriptor<dtype>::dtype().is(array.dtype()))
+        item.array = qd_python_element_strided(array.cast<py::array_t<dtype>>());
+    else
+        item.array = qd_python_element_strided(py::array_t<dtype>(array)); // Converting copy
+    item.ndim = (int)item.array.ndim();
+    item.shape = qd_python_get_shape(item.array, false, &item.n_frames, &item.stride_frames);
+    item.data = item.array.data();
+    return item;
+}
 
 /*!SECTION
 Channel functions
@@ -70,12 +100,7 @@ static void qd_python_baseband_read(const py::handle &coeff, const py::handle &d
     if (delay_list.size() != n_snap_total)
         throw std::invalid_argument("Length of 'delay' list does not match coefficient list length.");
 
-    snap = qd_python_numpy2arma_Col<arma::uword>(i_snap, true, false, "i_snap");
-    if (snap.is_empty() && n_snap_total != 0)
-        snap = arma::regspace<arma::uvec>(0, (arma::uword)n_snap_total - 1);
-    for (arma::uword j : snap)
-        if (j >= (arma::uword)n_snap_total)
-            throw std::invalid_argument("Snapshot index " + std::to_string(j) + " exceeds list length (" + std::to_string(n_snap_total) + ").");
+    snap = qd_snapshot_list(qd_python_numpy2arma_Col<arma::uword>(i_snap, true, false, "i_snap"), n_snap_total);
     const arma::uvec src = arma::unique(snap);
     const size_t n_src = src.n_elem;
 

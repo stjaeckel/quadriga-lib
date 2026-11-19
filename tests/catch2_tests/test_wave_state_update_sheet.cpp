@@ -4489,10 +4489,8 @@ TEST_CASE("Lumped columns - an ordered stack: what the core carries, by matrix a
                 }
             }
 
-    // ------------------------------------------------------------------------------------------
-    // alpha against produce mode. The core's two-layer stack and produce mode's single sheet are
-    // the same object, so the two solvers are measured against each other through the library.
-    // ------------------------------------------------------------------------------------------
+    // ---- alpha against produce mode ----
+    // The core's two-layer stack and produce mode's single sheet are the same object, so the two solvers are measured against each other through the library.
     QD_DIAG("\n# diag: alpha, the core against produce mode. stack 6 mm at 100 dB/m | 6 mm at 0,\n");
     QD_DIAG("# eps 5.24 - 0.63j, against one 12 mm sheet at 50 dB/m. moved_dB is what the column\n");
     QD_DIAG("# is worth on the stack's transmit gain\n");

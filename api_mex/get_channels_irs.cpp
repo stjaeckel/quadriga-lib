@@ -101,15 +101,6 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - [[arrayant_generate]] (antenna array generator)
 MD!*/
 
-// Cube output; an empty result keeps its [n_rx, n_tx, 0] shape (the generic copy returns 0x0)
-static mxArray *copy_cube(const arma::cube &c)
-{
-    if (c.n_elem != 0)
-        return qd_mex_copy2matlab(&c);
-    mwSize dims[3] = {(mwSize)c.n_rows, (mwSize)c.n_cols, (mwSize)c.n_slices};
-    return mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
-}
-
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 19 || nrhs > 26)
@@ -118,12 +109,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Antenna arrays
     const auto tx_array = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
     const auto rx_array = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
     const auto irs_array = qd_irs_struct2arrayant(prhs[2], "irs_array");
 
-    // Positions and orientations
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[3], "tx_pos", 3);
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[4], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[5], "rx_pos", 3);
@@ -145,7 +134,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto path_length_2 = qd_mex_get_Col<double>(prhs[17], false, "path_length_2");
     const auto polmat_2 = qd_mex_get_Mat<double>(prhs[18], false, "polmat_2");
 
-    // Configuration parameters
     const arma::uword i_irs = (nrhs < 20) ? 0 : qd_mex_get_index(prhs[19], "i_irs"); // 1-based -> 0-based
     double threshold_dB = (nrhs < 21) ? -140.0 : qd_mex_get_scalar<double>(prhs[20], "threshold_dB", -140.0);
     double center_freq = (nrhs < 22) ? 0.0 : qd_mex_get_scalar<double>(prhs[21], "center_freq", 0.0);
@@ -159,7 +147,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto active_path = (nrhs < 25 || mxIsEmpty(prhs[24])) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[24], "active_path");
     const int use_kernel = (nrhs < 26) ? 0 : qd_mex_get_scalar<int>(prhs[25], "use_kernel", 0);
 
-    // Codebook port index: 1-based (MATLAB) -> 0-based (C++)
     const arma::uword n_codebook = irs_array.coupling_re.n_cols; // 0 = missing coupling, reported by C++
     if (n_codebook != 0 && i_irs >= n_codebook)
     {
@@ -168,14 +155,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
 
-    // Output containers — size is runtime-dependent (filtered by threshold_dB / active_path)
+    // Output sizes depend on threshold_dB and active_path and are set by C++
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
     arma::cube *p_aod = (nlhs > 4) ? &aod : nullptr;
     arma::cube *p_eod = (nlhs > 5) ? &eod : nullptr;
     arma::cube *p_aoa = (nlhs > 6) ? &aoa : nullptr;
     arma::cube *p_eoa = (nlhs > 7) ? &eoa : nullptr;
 
-    // Call library function
     std::vector<bool> active_path_out;
     std::vector<bool> *p_active_path_out = (nlhs > 3) ? &active_path_out : nullptr;
     CALL_QD(quadriga_lib::get_channels_irs<double>(tx_array, rx_array, irs_array,
@@ -188,20 +174,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                    p_aod, p_eod, p_aoa, p_eoa, irs_array_2, active_path,
                                                    p_active_path_out, use_kernel));
 
-    // Write to MATLAB
-    plhs[0] = copy_cube(coeff_re);
+    // Write to MATLAB; empty results keep their [n_rx, n_tx, 0] shape
+    plhs[0] = qd_mex_copy2matlab_keep_shape(coeff_re);
     if (nlhs > 1)
-        plhs[1] = copy_cube(coeff_im);
+        plhs[1] = qd_mex_copy2matlab_keep_shape(coeff_im);
     if (nlhs > 2)
-        plhs[2] = copy_cube(delay);
+        plhs[2] = qd_mex_copy2matlab_keep_shape(delay);
     if (nlhs > 3)
         plhs[3] = qd_mex_copy2matlab(&active_path_out);
     if (nlhs > 4)
-        plhs[4] = copy_cube(aod);
+        plhs[4] = qd_mex_copy2matlab_keep_shape(aod);
     if (nlhs > 5)
-        plhs[5] = copy_cube(eod);
+        plhs[5] = qd_mex_copy2matlab_keep_shape(eod);
     if (nlhs > 6)
-        plhs[6] = copy_cube(aoa);
+        plhs[6] = qd_mex_copy2matlab_keep_shape(aoa);
     if (nlhs > 7)
-        plhs[7] = copy_cube(eoa);
+        plhs[7] = qd_mex_copy2matlab_keep_shape(eoa);
 }

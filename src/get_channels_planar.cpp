@@ -3,10 +3,10 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
-#include <cstring>   // std::memcpy
-#include <iomanip>   // std::setprecision
-#include <algorithm> // std::replace
-#include <iostream>
+#include <cstring>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 #include "quadriga_channel.hpp"
 #include "qd_helpers_shared.hpp"
@@ -105,7 +105,6 @@ void quadriga_lib::get_channels_planar(
 - [[arrayant]] (antenna array class)
 MD!*/
 
-// Calculate channel coefficients for planar waves
 template <typename dtype>
 void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
                                        const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
@@ -116,20 +115,18 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
                                        dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                        arma::Col<dtype> *rx_Doppler, int use_kernel)
 {
-    // Constants
     constexpr dtype los_limit = dtype(1.0e-4);
     constexpr dtype zero = dtype(0.0);
     constexpr dtype one = dtype(1.0);
-    constexpr dtype rC = dtype(1.0 / 299792458.0); // 1 / (Speed of light)
-    dtype wavelength = center_freq > zero ? dtype(299792458.0) / center_freq : one;
-    dtype wave_number = dtype(2.095845021951682e-08) * center_freq; // 2 * pi / C
+    constexpr dtype rC = dtype(1.0 / qd_speed_of_light);
+    dtype wavelength = center_freq > zero ? dtype(qd_speed_of_light) / center_freq : one;
+    dtype wave_number = dtype(2.0 * arma::datum::pi / qd_speed_of_light) * center_freq;
 
     // Positions and orientations
     const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
     const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
-    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
-    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
-    std::string error_message;
+    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2];
+    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2];
 
     // Kernel of the antenna interpolation, checked before any early return
     const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
@@ -151,7 +148,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
         const dtype d_xy = std::sqrt(x * x + y * y);
         const arma::Col<dtype> aod_d = {std::atan2(y, x)}, eod_d = {std::atan2(z, d_xy)};
         const arma::Col<dtype> aoa_d = {std::atan2(-y, -x)}, eoa_d = {-eod_d.at(0)};
-        const arma::Col<dtype> gain_d = {one}, length_d = {std::sqrt(x * x + y * y + z * z) + one};
+        const arma::Col<dtype> gain_d = {one}, length_d = {qd_calc_length(Tx, Ty, Tz, Rx, Ry, Rz) + one};
         arma::Mat<dtype> M_d(8, 1, arma::fill::zeros);
         M_d.at(0) = one, M_d.at(6) = -one;
 
@@ -162,16 +159,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
                                                  cr, ci, dl, center_freq, use_absolute_delays, true,
                                                  rx_Doppler == nullptr ? nullptr : &doppler, kernel);
 
-        const arma::uword n_ports = cr.n_rows * cr.n_cols;
-        if (coeff_re.n_rows != cr.n_rows || coeff_re.n_cols != cr.n_cols || coeff_re.n_slices != 1ULL)
-            coeff_re.set_size(cr.n_rows, cr.n_cols, 1ULL);
-        if (coeff_im.n_rows != cr.n_rows || coeff_im.n_cols != cr.n_cols || coeff_im.n_slices != 1ULL)
-            coeff_im.set_size(cr.n_rows, cr.n_cols, 1ULL);
-        if (delay.n_rows != cr.n_rows || delay.n_cols != cr.n_cols || delay.n_slices != 1ULL)
-            delay.set_size(cr.n_rows, cr.n_cols, 1ULL);
-        std::memcpy(coeff_re.memptr(), cr.memptr(), n_ports * sizeof(dtype));
-        std::memcpy(coeff_im.memptr(), ci.memptr(), n_ports * sizeof(dtype));
-        std::memcpy(delay.memptr(), dl.memptr(), n_ports * sizeof(dtype));
+        // Copy slot 0 to the outputs
+        auto copy_slot = [](const arma::Cube<dtype> &src, arma::Cube<dtype> &dst)
+        {
+            if (dst.n_rows != src.n_rows || dst.n_cols != src.n_cols || dst.n_slices != 1ULL)
+                dst.set_size(src.n_rows, src.n_cols, 1ULL);
+            std::memcpy(dst.memptr(), src.memptr(), src.n_rows * src.n_cols * sizeof(dtype));
+        };
+        copy_slot(cr, coeff_re), copy_slot(ci, coeff_im), copy_slot(dl, delay);
         if (rx_Doppler != nullptr)
         {
             if (rx_Doppler->n_elem != 1ULL)
@@ -181,19 +176,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
         return;
     }
 
-    // Check if the antennas are valid
-    error_message = qd_arrayant_is_valid_quick(tx_array);
-    if (error_message.length() != 0)
-    {
-        error_message = "Transmit antenna: " + error_message;
-        throw std::invalid_argument(error_message.c_str());
-    }
-    error_message = qd_arrayant_is_valid_quick(rx_array);
-    if (error_message.length() != 0)
-    {
-        error_message = "Receive antenna: " + error_message;
-        throw std::invalid_argument(error_message.c_str());
-    }
+    qd_arrayant_check_tx_rx(tx_array, rx_array);
 
     arma::uword n_path = aod.n_elem;                                // Number of paths
     arma::uword n_out = add_fake_los_path ? n_path + 1ULL : n_path; // Number of output paths
@@ -202,19 +185,12 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     arma::uword n_links = n_rx * n_tx;                              // Number of MIMO channel coefficients per path (n_rx * n_tx)
     arma::uword n_tx_ports = tx_array.n_ports();                    // Number of TX antenna elements after coupling
     arma::uword n_rx_ports = rx_array.n_ports();                    // Number of RX antenna elements after coupling
-    arma::uword n_ports = n_tx_ports * n_rx_ports;                  // Total number of ports
 
     // Check if the number of paths is consistent in all inputs
     if (eod.n_elem != n_path || aoa.n_elem != n_path || eoa.n_elem != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
-    {
-        error_message = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).";
-        throw std::invalid_argument(error_message.c_str());
-    }
+        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).");
     if (polmat.n_rows != 8ULL && n_path != 0ULL)
-    {
-        error_message = "Polarization transfer matrix 'polmat' must have 8 rows.";
-        throw std::invalid_argument(error_message.c_str());
-    }
+        throw std::invalid_argument("Polarization transfer matrix 'polmat' must have 8 rows.");
 
     // Set the output size
     if (coeff_re.n_rows != n_rx_ports || coeff_re.n_cols != n_tx_ports || coeff_re.n_slices != n_out)
@@ -254,20 +230,11 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     const arma::Mat<dtype> AOA = arma::Mat<dtype>(const_cast<dtype *>(aoa.memptr()), 1, n_path, false, true);
     const arma::Mat<dtype> EOA = arma::Mat<dtype>(const_cast<dtype *>(eoa.memptr()), 1, n_path, false, true);
 
-    // Get pointers
     const dtype *p_gain = path_gain.memptr();
     const dtype *p_length = path_length.memptr();
 
-    // Convert inputs to orientation vector
-    dtype *ptr;
-    arma::Cube<dtype> tx_ori(3, 1, 1);
-    arma::Cube<dtype> rx_ori(3, 1, 1);
-    ptr = tx_ori.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
-    ptr = rx_ori.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
-
-    // Calculate the Freespace distance
-    dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
-    dtype dist_rx_tx = std::sqrt(x * x + y * y + z * z);
+    const arma::Cube<dtype> tx_ori(const_cast<dtype *>(p_to), 3, 1, 1), rx_ori(const_cast<dtype *>(p_ro), 3, 1, 1);
+    const dtype dist_rx_tx = qd_calc_length(Tx, Ty, Tz, Rx, Ry, Rz);
 
     // Interpolate the antenna patterns for all paths
     arma::Mat<dtype> Vt_re(n_tx, n_path, arma::fill::none), Vt_im(n_tx, n_path, arma::fill::none),
@@ -319,7 +286,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     // Calculate the MIMO channel coefficients for each path
     arma::uword true_los_path = 0ULL;
     dtype true_los_power = zero;
-    for (arma::uword j = 0ULL; j < n_out; ++j) // Loop over paths
+    for (arma::uword j = 0ULL; j < n_out; ++j)
     {
         arma::uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
@@ -370,7 +337,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     // Set the true LOS path as the first path
     if (add_fake_los_path && true_los_path != 0ULL)
     {
-        // --- coefficient swap ---
+        // Coefficients
         dtype *ptrR = different_output_size ? CR.slice_memptr(true_los_path) : coeff_re.slice_memptr(true_los_path);
         dtype *ptrI = different_output_size ? CI.slice_memptr(true_los_path) : coeff_im.slice_memptr(true_los_path);
         std::memcpy(p_coeff_re, ptrR, n_links * sizeof(dtype));
@@ -378,74 +345,38 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
         for (arma::uword i = 0ULL; i < n_links; ++i)
             ptrR[i] = zero, ptrI[i] = zero;
 
-        // --- delay swap ---
+        // Delays
         dtype *ptrD = different_output_size ? DL.slice_memptr(true_los_path) : delay.slice_memptr(true_los_path);
-        std::vector<dtype> tmp(p_delays, p_delays + n_links);   // save slot-0 delays
-        std::memcpy(p_delays, ptrD, n_links * sizeof(dtype));   // copy true-LOS delays to slot 0
-        std::memcpy(ptrD, tmp.data(), n_links * sizeof(dtype)); // put old slot-0 delays at true_los_path
+        std::vector<dtype> tmp(p_delays, p_delays + n_links);
+        std::memcpy(p_delays, ptrD, n_links * sizeof(dtype));
+        std::memcpy(ptrD, tmp.data(), n_links * sizeof(dtype));
 
-        // --- Doppler swap ---
+        // Doppler weights
         if (rx_Doppler != nullptr)
             std::swap(rx_Doppler->at(0), rx_Doppler->at(true_los_path));
     }
 
-    // Apply antenna element coupling
+    // Apply antenna element coupling; without different_output_size the data is in the outputs and the coupling runs
+    // in place
     if (rx_array.coupling_re.n_elem != 0ULL || rx_array.coupling_im.n_elem != 0ULL ||
         tx_array.coupling_re.n_elem != 0ULL || tx_array.coupling_im.n_elem != 0ULL)
     {
-        // Calculate abs( cpl )^2 and normalize the row-sum to 1
-        dtype *p_rx_cpl = new dtype[n_rx * n_rx_ports];
-        dtype *p_tx_cpl = new dtype[n_tx * n_tx_ports];
-        qd_power_mat(n_rx, n_rx_ports, p_rx_cpl, true, rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr());
-        qd_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr());
+        // Coupling powers abs(cpl)^2, each column (port) normalized to sum 1
+        std::vector<dtype> rx_cpl(n_rx * n_rx_ports), tx_cpl(n_tx * n_tx_ports), temp;
+        qd_power_mat(n_rx, n_rx_ports, rx_cpl.data(), true, rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr());
+        qd_power_mat(n_tx, n_tx_ports, tx_cpl.data(), true, tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr());
 
-        // Process coefficients and delays
-        if (different_output_size) // Data is stored in internal memory, we can write directly to the output
+        for (arma::uword j = 0ULL; j < n_out; ++j)
         {
-            for (arma::uword j = 0ULL; j < n_out; ++j) // Loop over paths
-            {
-                arma::uword o = j * n_links; // Slice offset
-
-                // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
-                                          &p_coeff_re[o], &p_coeff_im[o],
-                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
-                                          coeff_re.slice_memptr(j), coeff_im.slice_memptr(j),
-                                          n_rx, n_rx_ports, n_tx, n_tx_ports);
-
-                // Apply coupling to delays
-                qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay.slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
-            }
+            const arma::uword o = j * n_links; // Slice offset
+            qd_coupling_apply_slot(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
+                                   tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
+                                   rx_cpl.data(), tx_cpl.data(), n_rx, n_rx_ports, n_tx, n_tx_ports,
+                                   &p_coeff_re[o], &p_coeff_im[o], &p_delays[o],
+                                   different_output_size ? coeff_re.slice_memptr(j) : &p_coeff_re[o],
+                                   different_output_size ? coeff_im.slice_memptr(j) : &p_coeff_im[o],
+                                   different_output_size ? delay.slice_memptr(j) : &p_delays[o], temp);
         }
-        else // Data has been written to external memory
-        {
-            // Allocate memory for temporary data
-            dtype *tempX = new dtype[n_ports];
-            dtype *tempY = new dtype[n_ports];
-
-            for (arma::uword o = 0ULL; o < n_links * n_out; o += n_links) // Loop over paths
-            {
-                // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
-                                          &p_coeff_re[o], &p_coeff_im[o],
-                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
-                                          tempX, tempY,
-                                          n_rx, n_rx_ports, n_tx, n_tx_ports);
-
-                std::memcpy(&p_coeff_re[o], tempX, n_ports * sizeof(dtype));
-                std::memcpy(&p_coeff_im[o], tempY, n_ports * sizeof(dtype));
-
-                // Apply coupling to delays
-                qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                std::memcpy(&p_delays[o], tempX, n_ports * sizeof(dtype));
-            }
-            delete[] tempX;
-            delete[] tempY;
-        }
-
-        // Free temporary memory
-        delete[] p_rx_cpl;
-        delete[] p_tx_cpl;
     }
 }
 

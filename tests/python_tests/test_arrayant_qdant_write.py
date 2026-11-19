@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.arrayant.qdant_write.
+
 import sys
 import os
 import pathlib
@@ -69,4 +71,3 @@ class test_case(unittest.TestCase):
         self.assertIn("Input 'fn' must be a str or path-like object.", str(ctx.exception))
         with self.assertRaises(TypeError):
             arrayant.qdant_read(5)
-

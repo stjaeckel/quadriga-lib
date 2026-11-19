@@ -6,31 +6,8 @@
 #include "qd_helpers_shared.hpp"
 #include "qd_helpers_site.hpp"
 
-// Rotate a vector around an arbitrary axis
-static inline void rotate_vector_around_axis(double vx, double vy, double vz,    // The vector to rotate
-                                             double kx, double ky, double kz,    // The axis of rotation
-                                             double theta,                       // Rotation angle
-                                             double *rx, double *ry, double *rz, // Result
-                                             bool k_is_normalized = false)
-{
-    // Step 1: Precompute values
-    double cos_theta = std::cos(theta);
-    double sin_theta = std::sin(theta);
-
-    if (!k_is_normalized)
-    {
-        double scl = kx * kx + ky * ky + kz * kz;
-        scl = 1.0 / std::sqrt(scl);
-        kx *= scl, ky *= scl, kz *= scl;
-    }
-
-    double dot = vx * kx + vy * ky + vz * kz; // Dot product of V and K
-
-    // Step 2: Rodrigues' rotation formula components
-    *rx = vx * cos_theta + (ky * vz - kz * vy) * sin_theta + kx * dot * (1.0 - cos_theta);
-    *ry = vy * cos_theta + (kz * vx - kx * vz) * sin_theta + ky * dot * (1.0 - cos_theta);
-    *rz = vz * cos_theta + (kx * vy - ky * vx) * sin_theta + kz * dot * (1.0 - cos_theta);
-}
+#include <cmath>
+#include <stdexcept>
 
 /*!SECTION
 Site-specific simulation tools
@@ -100,18 +77,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
 
     for (arma::uword i_seg = 0ULL; i_seg < n_segments_in; ++i_seg)
     {
-        // Read "v0"
-        dtype x = p_coord[3ULL * i_seg];
-        dtype y = p_coord[3ULL * i_seg + 1ULL];
-        dtype z = p_coord[3ULL * i_seg + 2ULL];
-
-        // Vector from "v1" to "v0"
-        x -= p_coord[3ULL * (i_seg + 1ULL)];
-        y -= p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
-        z -= p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
-
-        // Length
-        x = std::sqrt((x * x) + (y * y) + (z * z));
+        const dtype *v0 = &p_coord[3ULL * i_seg], *v1 = v0 + 3;
+        dtype x = qd_calc_length(v1[0], v1[1], v1[2], v0[0], v0[1], v0[2]);
         n_segments = (x > length_limit) ? n_segments + 1ULL : n_segments;
         p_seg_length[i_seg] = x;
     }
@@ -192,37 +159,21 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
     n_coord = n_segments + 1ULL;
 
     // At steep angles between path segments, the path is split and an additional ring of vertices is added
-    // Wee need to determine the number of splits
+    // Count the splits first
     double angle_limit = 0.939692620785908; // cosd(20)
     arma::uword n_split = 0ULL;
     arma::uvec subseg_indices(n_segments, arma::fill::zeros);
     arma::uword *i_subseg = subseg_indices.memptr();
     for (arma::uword i_seg = 1ULL; i_seg < n_segments; ++i_seg)
     {
-        // Pointer to the coordinates
-        const double *p_coord_seg = &p_coord_local[3ULL * (i_seg - 1ULL)];
+        // Vertices v0, v1, v2
+        const double *v = &p_coord_local[3ULL * (i_seg - 1ULL)];
 
-        // Read "v0"
-        double x0 = p_coord_seg[0];
-        double y0 = p_coord_seg[1];
-        double z0 = p_coord_seg[2];
-
-        // Read "v1"
-        double x1 = p_coord_seg[3];
-        double y1 = p_coord_seg[4];
-        double z1 = p_coord_seg[5];
-
-        // Read "v2"
-        double x2 = p_coord_seg[6];
-        double y2 = p_coord_seg[7];
-        double z2 = p_coord_seg[8];
-
-        // Calculate the vectors "d" and "f"
-        double dx = x0 - x1, dy = y0 - y1, dz = z0 - z1; // From v1 to v0
-        double fx = x2 - x1, fy = y2 - y1, fz = z2 - z1; // From v1 to v2
+        double dx = v[0] - v[3], dy = v[1] - v[4], dz = v[2] - v[5]; // From v1 to v0
+        double fx = v[6] - v[3], fy = v[7] - v[4], fz = v[8] - v[5]; // From v1 to v2
 
         // Calculate the angle between vectors "d" and "f"
-        double cos_ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+        double cos_ang_df = qd_dotp(dx, dy, dz, fx, fy, fz, true);
 
         if (cos_ang_df > angle_limit)
             ++n_split;
@@ -241,9 +192,9 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
     dtype *p_vert = vert.memptr();
     arma::uword *p_face = faces.memptr();
 
-    double x0 = 0.0, x1 = 0.0, x2 = 0.0;              // Point v0
-    double y0 = 0.0, y1 = 0.0, y2 = 0.0;              // Point v1
-    double z0 = 0.0, z1 = 0.0, z2 = 0.0;              // Point v2
+    double x0 = 0.0, x1 = 0.0, x2 = 0.0;              // x of the points v0, v1, v2
+    double y0 = 0.0, y1 = 0.0, y2 = 0.0;              // y of the points v0, v1, v2
+    double z0 = 0.0, z1 = 0.0, z2 = 0.0;              // z of the points v0, v1, v2
     double dx = 0.0, dy = 0.0, dz = 0.0, len_d = 0.0; // Vector from v0 to v1
     double fx = 0.0, fy = 0.0, fz = 0.0, len_f = 0.0; // Vector from v1 to v2
 
@@ -277,15 +228,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
         // Get start and end point of the current segment
         if (i_seg == 0ULL)
         {
-            // Read "v0"
-            x0 = p_coord_seg[0];
-            y0 = p_coord_seg[1];
-            z0 = p_coord_seg[2];
-
-            // Read "v1"
-            x1 = p_coord_seg[3];
-            y1 = p_coord_seg[4];
-            z1 = p_coord_seg[5];
+            x0 = p_coord_seg[0], y0 = p_coord_seg[1], z0 = p_coord_seg[2]; // "v0"
+            x1 = p_coord_seg[3], y1 = p_coord_seg[4], z1 = p_coord_seg[5]; // "v1"
 
             // Calculate "d"
             dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
@@ -311,10 +255,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
 
         if (i_seg < n_segments - 1ULL)
         {
-            // Read "v2"
-            x2 = p_coord_seg[6];
-            y2 = p_coord_seg[7];
-            z2 = p_coord_seg[8];
+            x2 = p_coord_seg[6], y2 = p_coord_seg[7], z2 = p_coord_seg[8]; // "v2"
 
             // Calculate "f"
             fx = x2 - x1, fy = y2 - y1, fz = z2 - z1;
@@ -325,7 +266,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
             // Calculate a normal-vector "g" that is orthogonal to "-d" and "f"
             // - For (nearly) collinear "d" and "f" the cross product vanishes and has no direction; "u" is then used,
             //   which is orthogonal to "d" (any normal works: the ring is carried over without rotation)
-            crossp(-dx, -dy, -dz, fx, fy, fz, &gx, &gy, &gz);
+            qd_crossp(-dx, -dy, -dz, fx, fy, fz, &gx, &gy, &gz);
             double len_g = std::sqrt(gx * gx + gy * gy + gz * gz);
             collinear = !(len_g > 1.0e-10);
             if (collinear)
@@ -337,11 +278,11 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
             }
 
             // Calculate the angle between vectors "-d" and "f"
-            ang_df = dotp(-dx, -dy, -dz, fx, fy, fz, true);
+            ang_df = qd_dotp(-dx, -dy, -dz, fx, fy, fz, true);
             ang_df = std::acos(ang_df > 1.0 ? 1.0 : (ang_df < -1.0 ? -1.0 : ang_df));
 
             // Calculate vector "h" that lies in between "-d" and "f"
-            rotate_vector_around_axis(-dx, -dy, -dz, gx, gy, gz, 0.5 * ang_df, &hx, &hy, &hz, true);
+            qd_rotate_around_axis(-dx, -dy, -dz, gx, gy, gz, 0.5 * ang_df, &hx, &hy, &hz);
         }
 
         // Generate origin points for the edges by rotating "u" around "d"
@@ -351,7 +292,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
             if (i_edge != 0ULL)
             {
                 double theta = (double)i_edge * 6.283185307179586 / (double)n_edges;
-                rotate_vector_around_axis(ux, uy, uz, dx, dy, dz, theta, &ex, &ey, &ez, true);
+                qd_rotate_around_axis(ux, uy, uz, dx, dy, dz, theta, &ex, &ey, &ez);
             }
 
             // Scale by radius
@@ -375,7 +316,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
             p_orig[i_edge + n_edges] = ey;
             p_orig[i_edge + 2ULL * n_edges] = ez;
 
-            // For the first segment of a new sub-segment, these origin points ara also the starting points of the tube
+            // For the first segment of a new sub-segment, these origin points are also the starting points of the tube
             if (i_seg == 0ULL || i_subseg[i_seg - 1ULL] != i_subseg[i_seg])
             {
                 p_vert[i_vert] = (dtype)ex;
@@ -400,7 +341,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
 
             // Build a projection plane (triangle) to calculate the destination points of the tube
             // - Triangle has an inner radius of "0.5 * radius"
-            // - When hitting at an incident angle of 10°, we need to scale by at lest 0.5 / sin(10°) = 2.9
+            // - When hitting at an incident angle of 10°, we need to scale by at least 0.5 / sin(10°) = 2.9
             d = 20.0 * radius_d;
             arma::mat proj_plane = {d * gx + x1, d * gy + y1, d * gz + z1,
                                     d * (hx - gx) + x1, d * (hy - gy) + y1, d * (hz - gz) + z1,
@@ -423,9 +364,9 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
         // - Collinear segments keep "u", which is orthogonal to the next segment as well
         if (!collinear)
         {
-            ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+            ang_df = qd_dotp(dx, dy, dz, fx, fy, fz, true);
             ang_df = std::acos(ang_df > 1.0 ? 1.0 : (ang_df < -1.0 ? -1.0 : ang_df));
-            rotate_vector_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz, true);
+            qd_rotate_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz);
         }
 
         // Build face matrix

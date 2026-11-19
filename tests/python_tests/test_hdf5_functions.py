@@ -164,9 +164,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(r.dtype, typ, name)
             npt.assert_array_equal(r, expected, err_msg=name)
 
-    # ------------------------------------------------------------------
-    # hdf5_create_file
-    # ------------------------------------------------------------------
+    # ---- hdf5_create_file ----
     def test_create_file(self):
         fn = self.fn('create.hdf5')
         self.assertIsNone(channel.hdf5_create_file(fn))  # default layout, no return value
@@ -208,9 +206,7 @@ class test_case(unittest.TestCase):
             with self.assertRaises(TypeError):
                 channel.hdf5_create_file(*args, **kwargs)
 
-    # ------------------------------------------------------------------
-    # hdf5_read_layout
-    # ------------------------------------------------------------------
+    # ---- hdf5_read_layout ----
     def test_read_layout(self):
         fn = self.fn('layout.hdf5')
 
@@ -245,9 +241,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             channel.hdf5_read_layout()
 
-    # ------------------------------------------------------------------
-    # hdf5_reshape_layout
-    # ------------------------------------------------------------------
+    # ---- hdf5_reshape_layout ----
     def test_reshape_layout(self):
         fn = self.fn('reshape.hdf5')
         channel.hdf5_create_file(fn, 4, 3)
@@ -286,9 +280,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             channel.hdf5_reshape_layout()
 
-    # ------------------------------------------------------------------
-    # hdf5_write_channel
-    # ------------------------------------------------------------------
+    # ---- hdf5_write_channel ----
     def test_write_channel(self):
         # A single dict goes to slot 0 of a new file sized for it; one code per channel
         fn = self.fn('write_single.hdf5')
@@ -405,7 +397,7 @@ class test_case(unittest.TestCase):
             with self.assertRaises(ValueError, msg=msg) as ctx:
                 channel.hdf5_write_channel(fn, chan, **kwargs)
             self.assertIn(msg, str(ctx.exception))
-        # The complex (4, n_path) form used before is rejected, not reinterpreted
+        # A complex (4, n_path) polmat (instead of the real (8, n_path) form) is rejected, not reinterpreted
         old = dict(c, polmat=[np.ones((4, 1), complex)])
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', getattr(np, 'exceptions', np).ComplexWarning)  # numpy casts the complex input
@@ -421,9 +413,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             channel.hdf5_write_channel(fn, c, no_such_argument=1)
 
-    # ------------------------------------------------------------------
-    # Channel dict: all keys, both layouts, input types
-    # ------------------------------------------------------------------
+    # ---- Channel dict: all keys, both layouts, input types ----
     def test_channel_dict_round_trip(self):
         fn = self.fn('dict.hdf5')
         chan_in = full_channel()
@@ -487,9 +477,7 @@ class test_case(unittest.TestCase):
         for i, c in enumerate(chan):
             self.assert_same(c, ref, 'variant %d' % i)
 
-    # ------------------------------------------------------------------
-    # hdf5_read_channel
-    # ------------------------------------------------------------------
+    # ---- hdf5_read_channel ----
     def test_read_channel_selection(self):
         fn = self.fn('select.hdf5')
         channel.hdf5_create_file(fn, 3, 2, 1, 2)
@@ -588,9 +576,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             channel.hdf5_read_channel(fn, no_such_argument=1)
 
-    # ------------------------------------------------------------------
-    # hdf5_write_dset, hdf5_read_dset, hdf5_read_dset_names
-    # ------------------------------------------------------------------
+    # ---- hdf5_write_dset, hdf5_read_dset, hdf5_read_dset_names ----
     def test_dset_functions(self):
         fn = self.fn('dset.hdf5')
         channel.hdf5_create_file(fn, 2, 2, 2, 2)

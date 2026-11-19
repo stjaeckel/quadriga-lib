@@ -70,18 +70,16 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
     const arma::mat mesh = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1], false, "mesh");
 
-    // Object index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    // Object index: MATLAB 1-based -> C++ 0-based
     const arma::uvec obj_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_index_Col(prhs[2], "obj_ind");
 
     // mtl_ind is 1-based on both sides (0 = no material): no shift intended
@@ -98,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat bsdf = (nrhs < 9) ? arma::mat() : qd_mex_get_Mat<double>(prhs[8], false, "bsdf");
     const double threshold = (nrhs < 10) ? 0.001 : qd_mex_get_scalar<double>(prhs[9], "threshold", 0.001);
 
-    // CSV material-table inputs (EM/acoustic side). csv_ind is 1-based on both sides (0 = no material).
+    // csv_ind is 1-based on both sides (0 = no material): no shift intended
     arma::uvec csv_ind = (nrhs < 11) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[10], false, "csv_ind");
     std::vector<std::string> csv_names = (nrhs < 12) ? std::vector<std::string>() : qd_mex_get_strings(prhs[11], "csv_names");
     std::unordered_map<std::string, std::vector<double>> csv_prop;
@@ -106,21 +104,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         csv_prop = qd_mex_struct2map<double>(prhs[12]);
     const bool csv_write_defaults = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "csv_write_defaults", false);
 
-    // Split objects into connected components ("separate by loose parts")
     const bool split_loose_parts = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "split_loose_parts", false);
 
-    // Outputs (size determined by the C++ call); face_ind_out only when requested
     arma::mat vert_list_out;
     arma::umat face_ind_out;
     arma::umat *p_face_ind_out = (nlhs > 1) ? &face_ind_out : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::obj_file_write<double>(fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
                                                  &vert_list_out, p_face_ind_out, vert_list, face_ind,
                                                  bsdf, threshold, csv_ind, csv_names, csv_prop,
                                                  csv_write_defaults, split_loose_parts));
 
-    // Copy to MATLAB (convert face indices back to 1-based)
     plhs[0] = qd_mex_copy2matlab(&vert_list_out);
 
     if (nlhs > 1)

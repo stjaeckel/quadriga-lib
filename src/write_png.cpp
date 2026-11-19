@@ -116,7 +116,7 @@ void quadriga_lib::write_png(const std::string &fn, const arma::Mat<dtype> &data
             i_cmap = (i_cmap >= n_cmap) ? n_cmap - 1 : i_cmap;
         }
 
-        size_t i_png_row = i_val % height; // height - (i_val % height) - 1;
+        size_t i_png_row = i_val % height;
         size_t i_png_col = i_val / height;
         size_t i_png = 4 * (i_png_row * width + i_png_col);
 

@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function acf = sos_port_acf(type, dist, d_lambda)
 % Target ACF of the paper: 'Exp' (2), 'Gauss', 'Comb' (22), for the decorrelation distance d_lambda.
 x = dist / d_lambda;

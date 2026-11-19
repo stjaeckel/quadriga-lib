@@ -112,13 +112,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 9 || nrhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const auto interaction_type = qd_mex_get_scalar<int>(prhs[0], "interaction_type", 0);
     const auto center_freq = qd_mex_get_scalar<double>(prhs[1], "center_freq", 0.0);
     const auto orig = qd_mex_get_Mat<double>(prhs[2], false, "orig");
@@ -142,7 +140,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             n_rayN += p_fbs[i_ray] ? 1 : 0;
     }
 
-    // Wrap optional input pointers
     const arma::mat *p_trivec = trivec.empty() ? nullptr : &trivec;
     const arma::mat *p_tridir = tridir.empty() ? nullptr : &tridir;
     const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
@@ -183,7 +180,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 13)
         plhs[13] = qd_mex_init_output(&path_dirN, n_rayN, 3);
 
-    // Wrap optional output pointers based on requested outputs
     arma::mat *p_origN = &origN;
     arma::mat *p_destN = (nlhs > 1) ? &destN : nullptr;
     arma::mat *p_fbsN = (nlhs > 2) ? &fbsN : nullptr;
@@ -200,7 +196,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_path_dirN = (nlhs > 13) ? &path_dirN : nullptr;
     arma::u32_vec *p_ray_indN = (nlhs > 14) ? &ray_indN : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::ray_mesh_interact<double>(
         interaction_type, center_freq,
         &orig, &dest, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
@@ -210,7 +205,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_out_typeN,
         p_path_dirN, compact, p_ray_indN));
 
-    // Copy post-processed outputs to MATLAB
     if (nlhs > 12) // out_typeN: bit-encoded uint8 -> uint32
     {
         arma::u32_vec out_type_u32;

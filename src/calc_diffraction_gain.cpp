@@ -4,11 +4,11 @@
 
 #include "quadriga_tools.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 
-// Helper functions
 namespace
 {
-    // Number formatter
+    // Ray counts for the verbose output, e.g. "1.25 Mio."
     static std::string MioNum(size_t number)
     {
         std::string str;
@@ -154,7 +154,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
     // Check for correct number of rows
     if (dest.n_rows != n_pos)
-        throw std::invalid_argument("Number of rows in 'orig' and 'dest' don't match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' do not match.");
     if (mtl_ind.n_elem != n_mesh)
         throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
 
@@ -189,7 +189,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     const arma::uword n_seg = weight.n_slices; // Number of segments
     const arma::uword G = n_pos * n_path;      // Global ray set
 
-    if (n_path > 61) // Just to be sure for future updates
+    if (n_path > 61) // lod 4 gives the most arcs (61)
         throw std::invalid_argument("Max. number of paths is currently fixed to 61.");
 
     if (verbose)
@@ -287,7 +287,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                     short mtl_cur = g_cur[iG] & (short)0x3FFF;
                     if (mtl_cur)
                     {
-                        double Ax = Uy * Vz - Uz * Vy, Ay = Uz * Vx - Ux * Vz, Az = Ux * Vy - Uy * Vx; // U x V
+                        double Ax, Ay, Az;
+                        qd_crossp(Ux, Uy, Uz, Vx, Vy, Vz, &Ax, &Ay, &Az);
                         double axis_len = NORMALIZE(Ax, Ay, Az);
                         double dot = Ux * Vx + Uy * Vy + Uz * Vz;
                         dot = dot > 1.0 ? 1.0 : (dot < -1.0 ? -1.0 : dot);
@@ -298,12 +299,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                             double c = (double)g_cosair[iG]; // cos(theta_air) at entry
                             double s2 = 1.0 - (1.0 - c * c) / (n * n);
                             double C = (s2 > 1.0e-12) ? c / (n * std::sqrt(s2)) : 0.0; // s2<=0 => exit-side TIR
-                            double beta = C * (double)alpha, cb = std::cos(beta), sb = std::sin(beta);
-                            double gx = (double)g_dir.at(iG, 0), gy = (double)g_dir.at(iG, 1), gz = (double)g_dir.at(iG, 2);
-                            double kg = (double)(Ax * gx + Ay * gy + Az * gz); // Rodrigues about (Ax,Ay,Az)
-                            g_dir.at(iG, 0) = (dtype)(gx * cb + (Ay * gz - Az * gy) * sb + Ax * kg * (1.0 - cb));
-                            g_dir.at(iG, 1) = (dtype)(gy * cb + (Az * gx - Ax * gz) * sb + Ay * kg * (1.0 - cb));
-                            g_dir.at(iG, 2) = (dtype)(gz * cb + (Ax * gy - Ay * gx) * sb + Az * kg * (1.0 - cb));
+                            double rx, ry, rz;
+                            qd_rotate_around_axis((double)g_dir.at(iG, 0), (double)g_dir.at(iG, 1), (double)g_dir.at(iG, 2),
+                                                  Ax, Ay, Az, C * (double)alpha, &rx, &ry, &rz);
+                            g_dir.at(iG, 0) = (dtype)rx, g_dir.at(iG, 1) = (dtype)ry, g_dir.at(iG, 2) = (dtype)rz;
                         }
                     }
                 }
@@ -351,9 +350,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                                         &n_interact, &fbs_ind, &sbs_ind,
                                                         sub_mesh_ind, aabb, use_kernel, gpu_id);
 
-            unsigned *p_no_interact = n_interact.memptr(); // Pointer to 'n_interact'
-            unsigned *p_fbs_ind = fbs_ind.memptr();         // Pointer to 'fbs_ind'
-            unsigned *p_sbs_ind = sbs_ind.memptr();         // Pointer to 'fbs_ind'
+            unsigned *p_no_interact = n_interact.memptr();
+            unsigned *p_fbs_ind = fbs_ind.memptr();
+            unsigned *p_sbs_ind = sbs_ind.memptr();
 
             // Declare outputs of ray_mesh_interact
             arma::Mat<dtype> fbsN, sbsN;   // FBS and SBS
@@ -389,7 +388,6 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 arma::Col<dtype> acc_geo_in(R, arma::fill::none); // Accumulated geometric distance
                 arma::Col<dtype> acc_ref_in(R, arma::fill::none); // Accumulated refracted distance
 
-                // Direct pointer access
                 short *p_prev_in = prev_in.memptr();
                 short *p_cur_in = cur_in.memptr();
                 short *p_buf_in = buf_in.memptr();
@@ -432,10 +430,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                                       thin_slab_threshold);
             }
 
-            // Pointers
-            dtype *p_gainN = gainN.memptr();             // Pointer to 'gainN'
-            dtype *p_xprmatN = polmatN.memptr();         // Pointer to 'polmatN'
-            const uint8_t *p_hit_type = hit_type.data(); // pointer to 'hit_type'
+            dtype *p_gainN = gainN.memptr();
+            dtype *p_xprmatN = polmatN.memptr();
+            const uint8_t *p_hit_type = hit_type.data();
 
             // Update path weights, taking material effects into account
             arma::uword n_continue = 0, n_spine = 0;
@@ -622,7 +619,6 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     // Finalize XPRMAT: normalize (remove gain)
     if (polmat)
     {
-        // Normalize XPRMAT to remove the gain
         quadriga_lib::polmat_update<dtype>(*polmat, {}, nullptr, false, true);
 
         if (verbose == 2 && n_pos == 1) // Debug output
@@ -651,10 +647,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
         for (arma::uword iR = 0; iR < n_pos; ++iR)
         {
-            double dx = (double)dest.at(iR, 0) - (double)orig.at(iR, 0);
-            double dy = (double)dest.at(iR, 1) - (double)orig.at(iR, 1);
-            double dz = (double)dest.at(iR, 2) - (double)orig.at(iR, 2);
-            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+            double dist = qd_calc_length((double)orig.at(iR, 0), (double)orig.at(iR, 1), (double)orig.at(iR, 2),
+                                         (double)dest.at(iR, 0), (double)dest.at(iR, 1), (double)dest.at(iR, 2));
 
             if (dist < 1.0e-9) // Co-located TX and RX, path loss and phase are undefined
                 continue;

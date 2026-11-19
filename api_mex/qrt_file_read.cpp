@@ -81,13 +81,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 18)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_cir"); // 1-based -> 0-based
     const arma::uword i_orig = (nrhs < 3) ? 0 : qd_mex_get_index(prhs[2], "i_orig"); // 1-based -> 0-based

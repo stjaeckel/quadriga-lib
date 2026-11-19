@@ -167,8 +167,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
             ++n_valid;
 
-            // Clamp Inf-like values
-            // Find the appropriate bin using edge midpoints
+            // Values outside the bin range go to the first or last bin; others to the nearest bin center
             if (val <= p_bins[0])
             {
                 p_cdf[0] += (dtype)1.0;
@@ -348,8 +347,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     dtype mean_val = sum_val / (dtype)count;
                     mu_local(q) = mean_val;
 
-                    // Use population std for consistency with MATLAB's std (which uses N-1),
-                    // but we are computing over a window, so use sample std
+                    // Sample std (N - 1), as MATLAB's std
                     dtype n_f = (dtype)count;
                     dtype sample_var = (sum_sq - sum_val * sum_val / n_f) / (n_f - (dtype)1.0);
                     sig_local(q) = (sample_var > (dtype)0.0) ? std::sqrt(sample_var) : (dtype)0.0;

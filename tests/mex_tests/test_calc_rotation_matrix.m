@@ -1,4 +1,9 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_calc_rotation_matrix
+% MEX interface test for quadriga_lib.calc_rotation_matrix.
 
 try
     quadriga_lib.calc_rotation_matrix;
@@ -53,12 +58,12 @@ catch ME
     end
 end
 
-% int32 input — now silently cast to double
+% int32 input is cast to double
 R = quadriga_lib.calc_rotation_matrix(int32([0;0;0]));
 assert( isa(R,'double') );
 assertElementsAlmostEqual( R, [1,0,0, 0,1,0, 0,0,1]', 'absolute', 1e-5 );
 
-% transpose
+% transposed flag: numeric and logical values are accepted
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],0);
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],2);
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],false);
@@ -72,7 +77,7 @@ assert( isa(R,'double') );
 assertElementsAlmostEqual( R, [1,0,0, 0,1,0, 0,0,1]', 'absolute', 1e-5 );
 
 R = quadriga_lib.calc_rotation_matrix(single([pi/8;0;0]));
-assert( isa(R,'double') );      % was: 'single'
+assert( isa(R,'double') );
 assertElementsAlmostEqual( R, [1,0,0,0,c,s,0,-s,c]', 'absolute', 1e-5 );
 
 R = quadriga_lib.calc_rotation_matrix([0,pi/8,0;0,0,pi/8]');

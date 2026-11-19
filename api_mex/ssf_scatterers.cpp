@@ -58,8 +58,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
-    if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rays' must be a 1x1 struct.");
 
     // The input is borrowed (read-only); the solver writes into the three new fields of the output
     auto rays = qd_mex_struct2gbsm_rays(prhs[0]);

@@ -5,6 +5,7 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex.hpp"
+#include "qd_helpers_shared.hpp"
 
 /*!SECTION
 Channel functions
@@ -89,7 +90,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const int use_kernel = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "use_kernel", 0);
 
     // Output [n_rx, n_tx, n_carrier, n_out]: the selected snapshots must share n_rx and n_tx; C++ checks the rest
-    const arma::uvec snap = qd_mex_snapshot_list(i_snap, coeff_re.size());
+    arma::uvec snap;
+    CALL_QD(snap = qd_snapshot_list(i_snap, coeff_re.size()));
     const arma::uword n_rx = snap.is_empty() ? 0 : coeff_re[snap[0]].n_rows;
     const arma::uword n_tx = snap.is_empty() ? 0 : coeff_re[snap[0]].n_cols;
     for (arma::uword s : snap)

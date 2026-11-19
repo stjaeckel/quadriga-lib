@@ -8,7 +8,7 @@
 
 // Verification suite for the "lsf" set of quadriga_lib::gbsm_init_phases and quadriga_lib::gbsm_draw (test cases
 // "gbsm_init_phases - lsf: ..." and "gbsm_draw - lsf: ...") and for the input validation of gbsm_init_phases
-// ("gbsm_init_phases - input validation", all set types). The golden values of the previous version are in
+// ("gbsm_init_phases - input validation", all set types). Golden values that keep stored seeds reproducible:
 // test_gbsm_phases_golden.cpp.
 //
 // gbsm_init_phases ("lsf") pins down: the size of the phase cube per preset, the raw phases (slice 0 equals

@@ -40,23 +40,18 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read input data
     const arma::mat mesh = qd_mex_get_Mat<double>(prhs[0], false, "mesh");
     const arma::u32_vec sub_mesh_ind = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_index_Col<unsigned>(prhs[1], "sub_mesh_ind"); // 1-based -> 0-based
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Output (size determined at runtime)
     arma::mat aabb;
 
-    // Call library function
     CALL_QD(aabb = quadriga_lib::triangle_mesh_aabb<double>(mesh, sub_mesh_ind, vec_size));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&aabb);
 }

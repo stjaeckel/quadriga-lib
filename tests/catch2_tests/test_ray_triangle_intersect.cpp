@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Hits, hit order and argument handling of ray_triangle_intersect: FBS/SBS positions and face indices on the
+// Blender-style 2x2x2 cube, the sub-mesh path, ties at equal distance, rays lying in an AABB plane, float accuracy of
+// the AVX2 kernel for double input far from the origin, aliasing and mesh/ray size checks. Expectations are exact by
+// construction (axis-aligned rays and faces); the GENERIC kernel is the reference for AVX2.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
 #include "quadriga_lib.hpp"
@@ -57,47 +62,40 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
                       {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
                       {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
 
-    // Subdivide the mesh into smaller chunks
     arma::mat cube_sub = cube;
     quadriga_lib::subdivide_triangles(3, cube, cube_sub);
 
-    // Build sub-meshes
     arma::mat cube_re;
     arma::u32_vec cube_index;
 
     auto n_sub = quadriga_lib::triangle_mesh_segmentation(cube_sub, cube_re, cube_index, 64, 8);
     CHECK(n_sub == 3);
 
-    // Single ray
     arma::mat orig = {{0.9, -10.0, 0.5}};
     arma::mat dest = {{0.9, 10.0, 0.5}};
 
     arma::mat fbs, sbs;
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
-    // Run intersect algorithm without sub-mesh
+    // Without sub-mesh index
     quadriga_lib::ray_triangle_intersect(orig, dest, cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
 
-    // Check results
     arma::mat T = {{0.9, -1.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
     T = {{0.9, 1.0, 0.5}};
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
 
-    // Store FBS and SBS indices
     unsigned fbs_0 = fbs_ind.at(0);
     unsigned sbs_0 = sbs_ind.at(0);
     
-    // Run intersect algorithm with sub-mesh
+    // With sub-mesh index
     quadriga_lib::ray_triangle_intersect(orig, dest, cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, cube_index);
 
-    // Check results
     T = {{0.9, -1.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
     T = {{0.9, 1.0, 0.5}};
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
 
-    // Store FBS and SBS indices
     unsigned fbs_1 = fbs_ind.at(0);
     unsigned sbs_1 = sbs_ind.at(0);
 
@@ -298,8 +296,8 @@ TEST_CASE("ray_triangle_intersect - outputs that alias inputs")
 
 TEST_CASE("Ray-Triangle Intersect - Mesh with extra columns and row count of dest")
 {
-    // A mesh with more than 9 columns is accepted with and without 'aabb' (the first 9 columns are used); the
-    // internal bounding box used to require exactly 9 columns. 'dest' must have as many rows as 'orig'.
+    // A mesh with more than 9 columns is accepted with and without 'aabb' (the first 9 columns are used).
+    // 'dest' must have as many rows as 'orig'.
     arma::mat mesh9 = quadriga_lib::cube<double>();
     arma::mat mesh10 = arma::join_rows(mesh9, arma::vec(mesh9.n_rows, arma::fill::value(1.0e6)));
     arma::mat orig = {{-10.0, 0.0, 0.5}, {-10.0, 5.0, 0.5}};

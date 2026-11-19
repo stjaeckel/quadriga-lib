@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Tests of quadriga_lib.RTtools.mitsuba_xml_file_write: export of an OBJ scene, keyword names, flags, error paths.
+
 import sys
 import os
 import unittest
@@ -19,11 +21,7 @@ import quadriga_lib
 class test_case(unittest.TestCase):
 
     def test(self):
-        # Test
-
-        # -----------------------------------------------------------------
-        # 1. Read reference OBJ
-        # -----------------------------------------------------------------
+        # ---- 1. Read reference OBJ ----
         obj_file = os.path.join(current_dir, '../data/test_scene_pbr.obj')
 
         mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, *_, = quadriga_lib.RTtools.obj_file_read(obj_file)
@@ -31,9 +29,7 @@ class test_case(unittest.TestCase):
         # Minimal sanity check
         self.assertTrue(vert_list.size, "No vertices loaded from OBJ")
 
-        # -----------------------------------------------------------------
-        # 2. Write the Mitsuba XML scene
-        # -----------------------------------------------------------------
+        # ---- 2. Write the Mitsuba XML scene ----
         xml_file = os.path.join(current_dir, 'test_scene_x.xml')
 
         quadriga_lib.RTtools.mitsuba_xml_file_write(
@@ -45,29 +41,25 @@ class test_case(unittest.TestCase):
             obj_names,
             mtl_names,
             bsdf,
-            map_to_itu_materials=True        # map_to_itu_materials
+            map_to_itu_materials=True
         )
 
         xml_stem = os.path.splitext(os.path.basename(xml_file))[0]
         mesh_folder = os.path.join(current_dir, f'{xml_stem}_meshes')
 
-        # -----------------------------------------------------------------
-        # 3. Assertions
-        # -----------------------------------------------------------------
+        # ---- 3. Assertions ----
         self.assertTrue(os.path.exists(xml_file),       "XML file was not created")
         self.assertTrue(os.path.isdir(mesh_folder),     "Mesh folder does not exist")
         self.assertTrue(os.listdir(mesh_folder),        "Mesh folder is empty")
 
-        # Optionally, check that the number of mesh files equals objects
+        # One mesh file per object
         self.assertEqual(
             16, 
             len([f for f in os.listdir(mesh_folder) if os.path.isfile(os.path.join(mesh_folder, f))]),
             "Unexpected number of mesh files",
         )
 
-        # -----------------------------------------------------------------
-        # 4. Clean-up (delete XML + folder)
-        # -----------------------------------------------------------------
+        # ---- 4. Clean-up (delete XML + folder) ----
         # Recursively remove everything in mesh_folder without shutil
         if os.path.isdir(mesh_folder):
             for root, dirs, files in os.walk(mesh_folder, topdown=False):
@@ -86,7 +78,6 @@ class test_case(unittest.TestCase):
             except OSError:
                 pass
 
-        # Remove the XML file
         try:
             os.remove(xml_file)
         except OSError:

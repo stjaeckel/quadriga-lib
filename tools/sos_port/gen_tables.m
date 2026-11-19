@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function gen_tables(type, n_dim, recipe, N, seeds)
 % Generates and caches the tables of one configuration, and appends their error measures to
 % results/tables.csv. Called by run_all and usable as a job for parallel runs.

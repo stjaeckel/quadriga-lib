@@ -70,13 +70,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 5 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "powers");
     const std::vector<arma::mat> polmat = qd_mex_matlab2vector_Mat<double>(prhs[1], 2, "polmat");
     const std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[2], 1, "path_length");
@@ -86,16 +84,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool include_los = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "include_los", false);
     const double window_size = (nrhs < 7) ? 0.01 : qd_mex_get_scalar<double>(prhs[6], "window_size", 0.01);
 
-    // Declare outputs
     arma::mat xpr;
     arma::vec pg;
     arma::vec *p_pg = (nlhs > 1) ? &pg : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::calc_cross_polarization_ratio<double>(
         powers, polmat, path_length, tx_pos, rx_pos, &xpr, p_pg, include_los, window_size));
 
-    // Write outputs
     plhs[0] = qd_mex_copy2matlab(&xpr);
 
     if (nlhs > 1)

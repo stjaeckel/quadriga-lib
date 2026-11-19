@@ -225,7 +225,7 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &spatial_freq,
     std::vector<double> zr(n_coeff, 0.0), zi(n_coeff, 0.0);
     if (two_devices && !two_maps)
     {
-        // Same map: both devices enter with the normalisation of the pair
+        // Same map: both devices enter with the normalization of the pair
         const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
         std::vector<double> w(pos.n_rows);
         for (arma::uword i = 0; i < pos.n_rows; ++i)

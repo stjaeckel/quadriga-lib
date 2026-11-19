@@ -1875,7 +1875,8 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
         const bytes A = load(fn_a), B = load(fn_b);
         const auto states = interrupted_states(A, B, {block(A, B), superblock, link_chunk(fn_b, 1), ref_entry(0), order_entry(0), link_chunk(fn_b, 0)});
 
-        // State i: the library reads the new channel from step 4a (ChannelRef) and its ID from step 4b (Order)
+        // State i: the library reads the new channel once ChannelRef is written (i >= 3) and its ID once Order is
+        // written (i >= 4)
         for (size_t i = 0; i < states.size(); ++i)
         {
             INFO("state after step " << i + 1);
@@ -1924,7 +1925,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
             save(fn, states[i]);
             arma::u32_vec id;
             quadriga_lib::hdf5_read_layout(fn, &id);
-            CHECK(id(50) == (i >= 4 ? 51u : 0u)); // Stale after step 4a
+            CHECK(id(50) == (i >= 4 ? 51u : 0u)); // Stale while ChannelRef is written and Order is not
             const std::any v = quadriga_lib::hdf5_read_dset(fn, "x", 50);
             CHECK(v.has_value() == (i >= 3));
             if (i >= 3)
@@ -1977,7 +1978,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
             save(fn, states[i]);
             const std::vector<std::string> before = i >= 3 ? std::vector<std::string>({"a", "b", "c"}) : std::vector<std::string>({"a", "b"});
             CHECK(dset_names(fn, 2) == before);
-            quadriga_lib::hdf5_write_dset(fn, "d", y, 2); // After step 3a, the creation index has a gap
+            quadriga_lib::hdf5_write_dset(fn, "d", y, 2); // With chunk 0 written and the link not, the creation index has a gap
             std::vector<std::string> after = before;
             after.push_back("d");
             CHECK(dset_names(fn, 2) == after);

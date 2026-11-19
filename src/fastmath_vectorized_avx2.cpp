@@ -7,8 +7,7 @@
 
 #include <immintrin.h>
 #include <limits.h>
-#include <cstring> // std::memcpy
-#include <algorithm>
+#include <cstring>
 
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
@@ -94,7 +93,7 @@ static inline void qd_sincos_ps_vectors(const float *x, float *s, float *c, long
     const long long n_blk = (n_vec + QD_SPLIT_BLOCK - 1) / QD_SPLIT_BLOCK;
 #pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
     for (long long b = 0; b < n_blk; ++b)
-        qd_sincos_ps_range<do_sin, do_cos>(x, s, c, b * QD_SPLIT_BLOCK, std::min((b + 1) * QD_SPLIT_BLOCK, n_vec));
+        qd_sincos_ps_range<do_sin, do_cos>(x, s, c, b * QD_SPLIT_BLOCK, ((b + 1) * QD_SPLIT_BLOCK < n_vec ? (b + 1) * QD_SPLIT_BLOCK : n_vec));
 }
 
 template <> // float
@@ -637,7 +636,7 @@ void qd_GEO2CART_AVX2(const float *az, const float *el, const float *len,
 #pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
     for (long long b = 0; b < n_blk; ++b)
         qd_geo2cart_ps_range(az, el, len, x, y, z, sAZ, cAZ, sEL, cEL, b * QD_SPLIT_BLOCK,
-                             std::min((b + 1) * QD_SPLIT_BLOCK, n_vec));
+                             ((b + 1) * QD_SPLIT_BLOCK < n_vec ? (b + 1) * QD_SPLIT_BLOCK : n_vec));
 
     const size_t n_tail = n_val & 7;
     if (n_tail)

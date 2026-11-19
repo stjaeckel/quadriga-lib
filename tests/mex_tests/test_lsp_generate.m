@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_lsp_generate
 % MEX interface test for quadriga_lib.lsp_generate.
 % Scope: argument and output handling, optional outputs, defaults, error paths.

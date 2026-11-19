@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.tools.calc_cross_polarization_ratio.
+
 import sys
 import os
 import unittest
@@ -82,13 +84,13 @@ class test_case(unittest.TestCase):
         xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
 
         abs2_vv = 0.8**2 + 0.2**2   # 0.68
-        abs2_hv = 0.1**2 + 0.1**2   # 0.02
-        abs2_vh = 0.05**2 + 0.05**2  # 0.005
+        abs2_vh = 0.1**2 + 0.1**2   # 0.02
+        abs2_hv = 0.05**2 + 0.05**2  # 0.005
         abs2_hh = 0.7**2 + 0.3**2   # 0.58
 
         npt.assert_allclose(pg[0], 0.5*(abs2_vv + abs2_hv + abs2_vh + abs2_hh), atol=1e-14, rtol=0)
-        npt.assert_allclose(xpr[0, 1], abs2_vv / abs2_hv, atol=1e-10, rtol=0)
-        npt.assert_allclose(xpr[0, 2], abs2_hh / abs2_vh, atol=1e-10, rtol=0)
+        npt.assert_allclose(xpr[0, 1], abs2_vv / abs2_vh, atol=1e-10, rtol=0)
+        npt.assert_allclose(xpr[0, 2], abs2_hh / abs2_hv, atol=1e-10, rtol=0)
         npt.assert_allclose(xpr[0, 0], (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh), atol=1e-10, rtol=0)
 
     def test_multiple_cirs(self):

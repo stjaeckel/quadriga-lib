@@ -84,7 +84,7 @@ namespace
     }
 
     // Oracle: TR 38.901 clause 7.5 steps 5 to 7 for link l, one frequency; outputs per cluster n < N_l
-    // - kstar_db: K-factor in [dB] for the polynomials; NaN = max(10·lg(K), -5)
+    // - kstar_db: K-factor in [dB] for the polynomials; NaN (default): max(10·lg(K), -5)
     struct ref_t
     {
         std::vector<double> delay, power, aod, eod, aoa, eoa; // power: coefficient power, 0 if removed

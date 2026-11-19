@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_sos_val
 % MEX interface test for quadriga_lib.sos_val.
 % Scope: argument and output handling, defaults, error paths.
@@ -70,7 +74,7 @@ assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], ac
 assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 3 ), 'use_kernel' ); % thrown by C++
 assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], [1, -1, -1], dist ), 'acf' );           % thrown by C++
 
-%% Type handling of the shared MEX helpers, pinned as it is today so that a change is noticed
+%% Type handling of the shared MEX helpers, pinned so that a change is noticed
 % Complex arrays are rejected, also when their class matches the type the wrapper reads in place
 assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, complex(pos, pos + 1) ), 'Complex datatypes are not supported.' );
 assert_throws( @() quadriga_lib.sos_val( spatial_freq, complex(phase, 1), pos ), 'Complex datatypes are not supported.' );

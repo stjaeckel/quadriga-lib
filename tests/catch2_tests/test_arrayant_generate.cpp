@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Array antenna generators: grid sizes, field values at the main lobe and directivities (short dipole 1.76 dBi,
+// half-wave dipole 2.15 dBi, stored values for the custom and multibeam patterns); TR 38.901 Model-1 polarization
+// (eq. 7.3-3) and the half-wave dipole pattern as closed-form oracles; multibeam weights, ports and defaults, and the
+// resolution checks.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -124,7 +129,7 @@ TEST_CASE("Generate Arrayant - 3GPP")
     CHECK(std::abs(ant.e_phi_re.at(90, 180, 0)) < 1.0e-5);
     CHECK(std::abs(ant.e_phi_re.at(90, 180, 1) - 2.51188f) < 1.0e-5);
 
-    // 45 deg polarizaion
+    // 45 deg polarization
     ant = quadriga_lib::generate_arrayant_3GPP<float>(1, 1, 3e8, 3);
     REQUIRE(ant.n_elements() == 2);
     CHECK(std::abs(ant.e_theta_re.at(90, 180, 0) - 1.776172f) < 1.0e-5);
@@ -199,7 +204,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     CHECK(arma::approx_equal(comb.e_theta_re, comb2.e_theta_re, "absdiff", 1e-6));
     CHECK(arma::approx_equal(comb.e_theta_im, comb2.e_theta_im, "absdiff", 1e-6));
 
-    // Test if generating the patterns at 1 de resolution generates similar results as at 10 degree
+    // Generated at 1 deg with the weights applied: close to the 15 deg pattern combined onto the 1 deg grid
     auto comb3 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 1.0, false, true);
 
     CHECK(comb3.n_elements() == 1);
@@ -213,7 +218,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     CHECK(std::abs(a + 34.7096) < 0.5);
     CHECK(std::abs(b + 50.0993) < 0.5);
 
-    // Test generation of separate beams
+    // Separate beams: one port per beam
     auto ant4 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 15.0, true);
 
     CHECK(ant4.n_elements() == 36);
@@ -246,8 +251,8 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
 }
 
 
-// A beam towards a pole, where the element pattern is exactly 0, used to leave the beam weights unset:
-// pol = 1 returned one port per element, pol = 2 and 3 crashed (null pointer in memcpy).
+// A beam towards a pole, where the element pattern is exactly 0, still gets finite, non-zero beam weights and one
+// port per polarization
 TEST_CASE("Generate Arrayant - Multi-Beam towards the poles")
 {
     for (double el : {90.0, -90.0})
@@ -311,7 +316,7 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     CHECK(arma::approx_equal(g2.element_pos.row(2), z, "absdiff", 1e-12));
 }
 
-// The header defaults were M = N = 2, the documentation and the MATLAB / Python wrappers say 1
+// The defaults are those of the documentation and the MATLAB / Python wrappers
 TEST_CASE("Generate Arrayant - Multi-Beam defaults are 1 x 1")
 {
     auto a = quadriga_lib::generate_arrayant_multibeam<double>();

@@ -91,7 +91,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Parse multi-frequency antenna struct arrays
     auto ant_tx = qd_mex_struct2arrayant_multi(prhs[0], false, false, "tx_array");
     auto ant_rx = qd_mex_struct2arrayant_multi(prhs[1], false, false, "rx_array");
 
@@ -100,7 +99,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (ant_rx.empty())
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "rx_array must not be empty.");
 
-    // Parse other arguments
     const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6], false, "fbs_pos");
     const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");
     const auto path_gain = qd_mex_get_Mat<double>(prhs[8], false, "path_gain");
@@ -117,13 +115,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double propagation_speed = (nrhs < 16) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[15], "propagation_speed", 299792458.0);
     const int use_kernel = (nrhs < 17) ? 0 : qd_mex_get_scalar<int>(prhs[16], "use_kernel", 0);
 
-    // Derived sizes
     arma::uword n_ports_tx = ant_tx[0].n_ports();
     arma::uword n_ports_rx = ant_rx[0].n_ports();
     arma::uword n_path = add_fake_los_path ? fbs_pos.n_cols + 1 : fbs_pos.n_cols;
     arma::uword n_freq_new = freq_new.n_elem;
 
-    // Initialize 4D output memory
+    // 4D outputs, one cube per entry of freq_new
     std::vector<arma::cube> coeff_re, coeff_im, delay;
 
     plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path, n_freq_new);
@@ -132,7 +129,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path, n_freq_new);
 
-    // Call the C++ function
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_multifreq<double>(ant_tx, ant_rx,
                                                          tx_pos, tx_orientation, rx_pos, rx_orientation,

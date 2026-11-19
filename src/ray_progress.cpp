@@ -4,38 +4,27 @@
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <vector>
 
 // This is supposed to run on 64-bit only
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
 static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned long long have different sizes");
 static_assert(std::is_nothrow_move_constructible_v<quadriga_lib::path>, "path must have a noexcept move ctor, otherwise vector deep-copies on realloc");
 
-// HELPER: Calculate length
-static inline float calc_length(float Dx, float Dy, float Dz, // Destination
-                                float Ox, float Oy, float Oz) // Origin
-{
-    float a = Dx - Ox;
-    float b = a * a;
-    a = Dy - Oy, b += a * a;
-    a = Dz - Oz, b += a * a;
-    return std::sqrt(b);
-}
-
-// HELPER: Calculate direction from O to D
-static inline float calc_direction(float Dx, float Dy, float Dz,    // Destination
-                                   float Ox, float Oy, float Oz,    // Origin
-                                   float &Vx, float &Vy, float &Vz) // Out: normalized direction
-{
-    Vx = Dx - Ox, Vy = Dy - Oy, Vz = Dz - Oz;
-    float len = std::sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
-    float scl = (len < 1.0e-30f) ? 0.0f : 1.0f / len;
-    Vx *= scl, Vy *= scl, Vz *= scl;
-    return len;
-}
-
-// HELPER: Vector compaction
+// Elements data[ind[0 .. ind_count-1]] as a new vector (compaction onto the kept rays)
 template <typename dtype>
-static inline arma::Col<dtype> compact(const arma::Col<dtype> &data,
+static inline arma::Col<dtype> qd_compact(const arma::Col<dtype> &data,
                                        const arma::u32_vec &ind,
                                        arma::uword ind_count)
 {
@@ -56,9 +45,9 @@ static inline arma::Col<dtype> compact(const arma::Col<dtype> &data,
     return out;
 }
 
-// HELPER: std::vector compaction
+// std::vector form of qd_compact
 template <typename dtype>
-static inline std::vector<dtype> compact(const std::vector<dtype> &data,
+static inline std::vector<dtype> qd_compact(const std::vector<dtype> &data,
                                          const arma::u32_vec &ind,
                                          arma::uword ind_count)
 {
@@ -79,12 +68,12 @@ static inline std::vector<dtype> compact(const std::vector<dtype> &data,
     return out;
 }
 
-// Helper: Matrix compaction
+// Rows (or columns) ind[0 .. ind_count-1] of data as a new matrix
 template <typename dtype>
-static inline arma::Mat<dtype> compact(const arma::Mat<dtype> &data,
-                                       const arma::u32_vec &ind, // row or col indices
-                                       arma::uword ind_count,    // number of used indices
-                                       bool compact_rows = true) // switch for dimension
+static inline arma::Mat<dtype> qd_compact(const arma::Mat<dtype> &data,
+                                       const arma::u32_vec &ind, // 0-based row or column indices
+                                       arma::uword ind_count,    // Number of used indices
+                                       bool compact_rows = true) // true: select rows, false: select columns
 {
     if (data.empty())
         return arma::Mat<dtype>();
@@ -123,11 +112,11 @@ static inline arma::Mat<dtype> compact(const arma::Mat<dtype> &data,
     return out;
 }
 
-// HELPER: commit a [k, n_out] ray-major launch buffer into an [n_out, k] Armadillo object.
+// Commit a [k, n_out] ray-major launch buffer into an [n_out, k] Armadillo object.
 // Source ray i occupies src[k*i .. k*i+k-1]; destination element (i, c) lands at d[i + c*n_out].
 // Blocked so the k output streams stay resident while a tile of the source is hot in L1.
 template <typename dtype, typename outT>
-static inline void commit(outT &out, const dtype *src, arma::uword k, arma::uword n_out)
+static inline void qd_commit(outT &out, const dtype *src, arma::uword k, arma::uword n_out)
 {
     out.set_size(n_out, k);
     if (n_out == 0 || src == nullptr)
@@ -349,12 +338,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     qd_check_alias_list({&mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer},
                         {"mtl_ind_prev", "mtl_ind_current", "mtl_ind_buffer"});
 
-    // Mesh validation
-    const arma::uword n_mesh = mesh.n_rows;
-    if (n_mesh == 0)
-        throw std::invalid_argument("Input 'mesh' cannot be empty.");
-    if (mesh.n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    const arma::uword n_mesh = qd_check_mesh(mesh);
     if (mtl_ind.n_elem != n_mesh)
         throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
 
@@ -363,37 +347,15 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (!run_intersector && (n_interact_in.empty() || fbs_ind_in.empty() || sbs_ind_in.empty()))
         throw std::invalid_argument("Inputs 'n_interact_in', 'fbs_ind_in' and 'sbs_ind_in' must be provided together.");
 
-    // Validate mtl_prop
-    arma::uword n_mtl = 0;
-    for (const auto &kv : mtl_prop)
-        if (!kv.second.empty())
-        {
-            n_mtl = (arma::uword)kv.second.size();
-            break;
-        }
-    if (n_mtl > 16383) // the state words carry a 14-bit material index
-        throw std::invalid_argument("Number of materials cannot exceed 16383.");
+    const arma::uword n_mtl = qd_material_count(mtl_prop);
     if (mtl_ind.max() > n_mtl)
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
-    // Frequencies; the path storage layout supports 1 to 127 frequencies
-    const arma::uword n_freq = center_freq.n_elem;
-    if (n_freq == 0)
-        throw std::invalid_argument("Input 'center_freq' cannot be empty.");
-    if (n_freq > 127)
-        throw std::invalid_argument("Input 'center_freq' cannot have more than 127 elements.");
-    if (center_freq.min() <= 0.0f)
-        throw std::invalid_argument("Input 'center_freq' must be > 0.");
+    const arma::uword n_freq = qd_check_center_freq(center_freq);
     float fRef_Hz = center_freq[0];
 
     // Ray count is defined by 'orig'; all other per-ray inputs must match it
-    const arma::uword n_ray = orig.n_rows;
-    if (n_ray == 0)
-        throw std::invalid_argument("Input 'orig' cannot be empty.");
-    if (orig.n_cols != 3)
-        throw std::invalid_argument("Input 'orig' must have 3 columns.");
-    if (n_ray > 4294967295ull)
-        throw std::invalid_argument("Number of rays cannot exceed 2^32-1.");
+    const arma::uword n_ray = qd_check_orig(orig);
 
     if (dest.n_rows != n_ray || dest.n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have size [n_ray, 3].");
@@ -441,35 +403,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             throw std::invalid_argument("Input 'tridir' must have size [n_ray, 9] (Cartesian).");
     }
 
-    // Optional sub-mesh partitioning, 0-based start indices into the mesh rows
-    arma::uword n_sub = 0;
-    if (run_intersector && sub_mesh_ind.n_elem != 0)
-    {
-        n_sub = sub_mesh_ind.n_elem;
-        const unsigned *p_sub = sub_mesh_ind.memptr();
-
-        if (p_sub[0] != 0u)
-            throw std::invalid_argument("First element of 'sub_mesh_ind' must be 0.");
-
-        for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
-        {
-            if ((arma::uword)p_sub[i_sub] >= n_mesh)
-                throw std::invalid_argument("Entries of 'sub_mesh_ind' cannot exceed the number of mesh faces.");
-            if (i_sub != 0 && p_sub[i_sub] <= p_sub[i_sub - 1])
-                throw std::invalid_argument("Entries of 'sub_mesh_ind' must be strictly increasing.");
-        }
-    }
-
-    // Optional axis-aligned bounding boxes, one per sub-mesh
+    // Optional sub-mesh partitioning and bounding boxes, used only when the intersector runs here
     arma::fmat aabb_local; // Computed here when only 'sub_mesh_ind' is given; empty without sub-meshes
+    const arma::uword n_sub = run_intersector ? qd_check_sub_ind(sub_mesh_ind, n_mesh, "sub_mesh_ind", "mesh face") : 0;
     const bool has_aabb = run_intersector && aabb.n_elem != 0;
     if (has_aabb)
-    {
-        if (n_sub == 0)
-            throw std::invalid_argument("Input 'aabb' requires 'sub_mesh_ind'.");
-        if (aabb.n_rows != n_sub || aabb.n_cols != 6)
-            throw std::invalid_argument("Input 'aabb' must have size [n_sub, 6].");
-    }
+        qd_check_aabb(aabb, n_sub);
     else if (n_sub)
         aabb_local = quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_ind);
     const arma::fmat &aabb_use = has_aabb ? aabb : aabb_local;
@@ -659,7 +598,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     // Buffer for the next state
     // Worst case: every sub-beam plus a reflected and a transmitted continuation per kept ray.
-    // n_subdiv is no longer a subset of the rays that hit, so the two counts are independent.
+    // n_subdiv is not a subset of the rays that hit (a delegated flag may flag a miss), so the two counts add up.
     arma::uword n_out_max = 4 * n_subdiv + 2 * n_keep;
     auto L = launch_config(n_out_max, (size_t)n_freq, beam_mode); // Allocate worst case, commit lazily
 
@@ -729,7 +668,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 }
 
                 // Update length
-                float length = (n_seg <= 1) ? calc_length(Sx, Sy, Sz, Ox, Oy, Oz)
+                float length = (n_seg <= 1) ? qd_calc_length(Ox, Oy, Oz, Sx, Sy, Sz)
                                             : L.paths[i_out].calc_length(Sx, Sy, Sz, Ox, Oy, Oz);
                 L.paths[i_out].set_length(length);
 
@@ -750,8 +689,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
                 if (outside)
                 {
-                    float Vx, Vy, Vz;
-                    calc_direction(p_dest[i_out3], p_dest[i_out3 + 1], p_dest[i_out3 + 2], Sx, Sy, Sz, Vx, Vy, Vz);
+                    float Vx = p_dest[i_out3] - Sx, Vy = p_dest[i_out3 + 1] - Sy, Vz = p_dest[i_out3 + 2] - Sz;
+                    float len = std::sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
+                    float scl = (len < 1.0e-30f) ? 0.0f : 1.0f / len;
+                    Vx *= scl, Vy *= scl, Vz *= scl;
                     p_acc[abase] = 0.0f;
                     for (arma::uword f = 0; f < n_freq; ++f) // Outside, every frequency shares the geometric direction
                     {
@@ -785,32 +726,32 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // subdivided. This is the only compaction in the pipeline. Because it is unconditional, no ray
     // in the compacted set is subdivided, so the subdivision flag is not needed downstream.
     // Source and target are the same object for n_interact / fbs_ind / sbs_ind when the intersector
-    // ran here; compact() completes its result before the move-assignment, so the read finishes
+    // ran here; qd_compact() completes its result before the move-assignment, so the read finishes
     // first. p_ni / p_fi / p_si are dangling after this point.
-    orig = compact(orig, keep_ind, n_keep);
-    dest = compact(dest, keep_ind, n_keep);
-    mtl_ind_prev = compact(mtl_ind_prev, keep_ind, n_keep);
-    mtl_ind_current = compact(mtl_ind_current, keep_ind, n_keep);
-    mtl_ind_buffer = compact(mtl_ind_buffer, keep_ind, n_keep);
+    orig = qd_compact(orig, keep_ind, n_keep);
+    dest = qd_compact(dest, keep_ind, n_keep);
+    mtl_ind_prev = qd_compact(mtl_ind_prev, keep_ind, n_keep);
+    mtl_ind_current = qd_compact(mtl_ind_current, keep_ind, n_keep);
+    mtl_ind_buffer = qd_compact(mtl_ind_buffer, keep_ind, n_keep);
     // path_dir_prev is a cube [n_ray, 3, n_freq] whose memory is identical to an [n_ray, 3*n_freq]
     // matrix, so compact it through an alias and work on the matrix from here on. Slice f then lives
     // in columns 3f..3f+2, which stays contiguous and lets each per-frequency call take a view.
     arma::fmat dir_prev;
     {
         const arma::fmat dir_view(path_dir_prev.memptr(), n_ray, 3 * n_freq, false, true);
-        dir_prev = compact(dir_view, keep_ind, n_keep);
+        dir_prev = qd_compact(dir_view, keep_ind, n_keep);
     }
     path_dir_prev.reset(); // Rebuilt from the launch buffer at the end
-    acc_dist = compact(acc_dist, keep_ind, n_keep);
-    n_interact = compact(*p_ni, keep_ind, n_keep);
-    fbs_ind = compact(*p_fi, keep_ind, n_keep);
-    sbs_ind = compact(*p_si, keep_ind, n_keep);
+    acc_dist = qd_compact(acc_dist, keep_ind, n_keep);
+    n_interact = qd_compact(*p_ni, keep_ind, n_keep);
+    fbs_ind = qd_compact(*p_fi, keep_ind, n_keep);
+    sbs_ind = qd_compact(*p_si, keep_ind, n_keep);
     p_ni = nullptr, p_fi = nullptr, p_si = nullptr;
 
     if (beam_mode)
     {
-        *trivec = compact(*trivec, keep_ind, n_keep);
-        *tridir = compact(*tridir, keep_ind, n_keep);
+        *trivec = qd_compact(*trivec, keep_ind, n_keep);
+        *tridir = qd_compact(*tridir, keep_ind, n_keep);
     }
 
     // Path storage, moved in place: keep_ind is strictly increasing, so source >= target. Every
@@ -903,8 +844,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 // line from the point source, so measure from O directly; after the first interaction
                 // the accumulated polyline plus the current leg is the only correct form.
                 float length = (paths[i_int].n_seg() == 0)
-                                   ? calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz)
-                                   : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length();
+                                   ? qd_calc_length(Ox, Oy, Oz, p_fbs[i_int], p_fbs[iY], p_fbs[iZ])
+                                   : qd_calc_length(p_orig[i_int], p_orig[iY], p_orig[iZ], p_fbs[i_int], p_fbs[iY], p_fbs[iZ]) + paths[i_int].length();
 
                 p_gain[i_int] = paths[i_int].calc_gain(fRef_Hz, 0, length);
             }
@@ -1037,7 +978,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             // Add new segment to path storage and left-multiply XPR matrix at base frequency
             paths[iX].extend(p_path[i_out], p_fbs[iX], p_fbs[iY], p_fbs[iZ], p_type[iX]);
             if (paths[iX].n_seg() == 0) // source -> new interaction point: derive the first leg (no previous coordinate)
-                p_path[i_out].set_length(calc_length(p_fbs[iX], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz));
+                p_path[i_out].set_length(qd_calc_length(Ox, Oy, Oz, p_fbs[iX], p_fbs[iY], p_fbs[iZ]));
 
             p_path[i_out].polmat_update(&p_xpr[nXPR * iX]);
             if (reflect_pass)
@@ -1050,8 +991,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         scatter_freq(0);
 
         // Update xprmat for other frequencies. Each one re-evaluates the interface from its own
-        // direction slice and refracted accumulator, so a dispersive medium now bends and attenuates
-        // correctly per band instead of inheriting the base-frequency Snell angle.
+        // direction slice and refracted accumulator, so a dispersive medium bends and attenuates
+        // each band by its own Snell angle.
         //
         // With refraction_mode the traced polyline was bent at the base frequency, and it is the one
         // path of every frequency: at f != f0 the wave leaves a medium beside it. Each coefficient
@@ -1064,7 +1005,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         for (arma::uword i_freq = 1; i_freq < n_freq; ++i_freq)
         {
             // Note: fbsN, sbsN, fbs_angleN, normal_vecN are re-used from the reflection / subdivision pass
-            // trivec and tridir are needed as input to evaluate TIR conditions for the entire ray tube and not just he spine
+            // trivec and tridir are needed as input to evaluate TIR conditions for the entire ray tube and not just the spine
             quadriga_lib::ray_mesh_interact<float>(interaction_type, center_freq[i_freq], &orig, &dest,
                                                    &mesh, &mtl_ind, &mtl_prop, &fbs_ind, &sbs_ind,
                                                    (beam_mode ? trivec : nullptr), (beam_mode ? tridir : nullptr),
@@ -1114,7 +1055,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                &fbs_angleN, nullptr, nullptr,
                                                &normal_vecN, &interact_type, &path_dirN, false);
 
-        if (fbsN.n_rows != n_active) // Check that stream compaction is really OFF
+        if (fbsN.n_rows != n_active) // ray_mesh_interact must not compact the stream here
             throw std::runtime_error("ray_mesh_interact compacted the stream.");
 
         // Resolve ray state for reflection pass
@@ -1177,7 +1118,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         update_launch_config(false);     // Add paths
     }
 
-    // Free memory
     std::vector<uint8_t>().swap(interact_type); // deallocate
     pre_interaction_gains.reset();
     orig.reset(), dest.reset(), dir_prev.reset(), acc_dist.reset();
@@ -1193,40 +1133,40 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // Copy paths to new launch config
     const arma::uword n_out = (arma::uword)L.size();
 
-    commit(orig, L.origP(), 3, n_out);
+    qd_commit(orig, L.origP(), 3, n_out);
     L.orig.reset();
 
-    commit(dest, L.destP(), 3, n_out);
+    qd_commit(dest, L.destP(), 3, n_out);
     L.dest.reset();
 
-    commit(mtl_ind_prev, L.prevP(), 1, n_out);
+    qd_commit(mtl_ind_prev, L.prevP(), 1, n_out);
     L.mtl_ind_prev.reset();
 
-    commit(mtl_ind_current, L.currentP(), 1, n_out);
+    qd_commit(mtl_ind_current, L.currentP(), 1, n_out);
     L.mtl_ind_current.reset();
 
-    commit(mtl_ind_buffer, L.bufferP(), 1, n_out);
+    qd_commit(mtl_ind_buffer, L.bufferP(), 1, n_out);
     L.mtl_ind_buffer.reset();
 
     // Rebuild the cube from the ray-major launch buffer through an [n_out, 3*n_freq] alias, so the
-    // blocked transpose in commit() is reused unchanged.
+    // blocked transpose in qd_commit() is reused unchanged.
     path_dir_prev.set_size(n_out, 3, n_freq);
     if (n_out)
     {
         arma::fmat dir_out(path_dir_prev.memptr(), n_out, 3 * n_freq, false, true);
-        commit(dir_out, L.dirP(), 3 * n_freq, n_out);
+        qd_commit(dir_out, L.dirP(), 3 * n_freq, n_out);
     }
     L.path_dir_prev.reset();
 
-    commit(acc_dist, L.accP(), 1 + n_freq, n_out);
+    qd_commit(acc_dist, L.accP(), 1 + n_freq, n_out);
     L.acc_dist.reset();
 
     paths = std::move(L.paths);
     if (beam_mode)
     {
-        commit(*trivec, L.trivecP(), 9, n_out);
+        qd_commit(*trivec, L.trivecP(), 9, n_out);
         L.trivec.reset();
-        commit(*tridir, L.tridirP(), 9, n_out);
+        qd_commit(*tridir, L.tridirP(), 9, n_out);
         L.tridir.reset();
     }
 

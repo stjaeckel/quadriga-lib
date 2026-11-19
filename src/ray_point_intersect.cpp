@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 
 #if BUILD_WITH_AVX2
@@ -112,9 +113,9 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         throw std::invalid_argument("Number of rays exceeds maximum supported number.");
 
     if (trivec.n_rows != n_ray_t)
-        throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'trivec' do not match.");
     if (tridir.n_rows != n_ray_t)
-        throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'tridir' do not match.");
     qd_check_alias(hit_offset, "hit_offset", &sub_cloud_ind);
     qd_check_alias(hit_count, "hit_count", &sub_cloud_ind);
     qd_check_alias_outputs(hit_offset, "hit_offset", hit_count, "hit_count");
@@ -122,72 +123,29 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         for (const auto &h : *hits_per_point)
             qd_check_alias(&h, "hits_per_point", &sub_cloud_ind);
 
-    // Determine which compute kernel to use
-    // kernel: 1 = GENERIC, 2 = AVX2, 3 = CUDA
-    int kernel = 1;      // Default to GENERIC
-    if (use_kernel == 1) // GENERIC requested
-    {
-        kernel = 1;
-    }
-    else if (use_kernel == 2) // AVX2 requested
-    {
-        if (!quadriga_lib::quadriga_lib_has_AVX2())
-            throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-        kernel = 2;
-    }
-    else if (use_kernel == 3) // CUDA requested
-    {
-        if (!quadriga_lib::quadriga_lib_has_CUDA())
-            throw std::invalid_argument("CUDA kernel requested but not available (compile with BUILD_WITH_CUDA and run on CUDA-capable GPU).");
-        kernel = 3;
-    }
-    else if (use_kernel == 0) // Auto-select
-    {
-        if (n_point_t >= 500 && quadriga_lib::quadriga_lib_has_CUDA())
-            kernel = 3;
-        else if (quadriga_lib::quadriga_lib_has_AVX2())
-            kernel = 2;
-        else
-            kernel = 1;
-    }
-    else
-        throw std::invalid_argument("Input 'use_kernel' must be 0, 1, 2 or 3.");
+    const int kernel = qd_kernel_auto_cuda(use_kernel, n_point_t);
 
-    // Determine SIMD vector size based on selected kernel
-    size_t vec_size = (kernel == 2) ? 8ULL : 1ULL;
+#if BUILD_WITH_AVX2
+    const size_t vec_size = (kernel == 2) ? qd_avx2_vec_size : 1;
+#else
+    const size_t vec_size = 1;
+#endif
 
-    // Check if the sub-cloud indices are valid
-    size_t n_sub_t = 1;                                             // Number of sub-clouds (at least 1)
-    arma::u32_vec sci(1, arma::fill::zeros);                        // Sub-cloud-index (local copy)
-    if (sub_cloud_ind.n_elem != 0)     // Input is available
-    {
-        n_sub_t = (size_t)sub_cloud_ind.n_elem;
-        const unsigned *p_sub = sub_cloud_ind.memptr();
-
-        if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-cloud must start at the first point.");
-
-        for (size_t i = 1; i < n_sub_t; ++i)
-        {
-            if (p_sub[i] <= p_sub[i - 1])
-                throw std::invalid_argument("Sub-cloud indices must be sorted in ascending order.");
-        }
-
-        if (p_sub[n_sub_t - 1] >= (unsigned)n_point_t)
-            throw std::invalid_argument("Sub-cloud indices cannot exceed number of points.");
-
-        sci = sub_cloud_ind;
-    }
+    // Sub-cloud indices; without them the point cloud is one sub-cloud
+    size_t n_sub_t = (size_t)qd_check_sub_ind(sub_cloud_ind, n_point_t, "sub_cloud_ind", "point");
+    const unsigned first_point = 0;
+    const unsigned *p_sub = (n_sub_t == 0) ? &first_point : sub_cloud_ind.memptr();
+    n_sub_t = (n_sub_t == 0) ? 1 : n_sub_t;
 
     // Prepare ray data
     auto trivecA = arma::fmat(n_ray_t, 9, arma::fill::none); // Vertex origins in GCS
     auto normalA = arma::fmat(n_ray_t, 3, arma::fill::none); // Normal vector
     auto dirA = arma::fmat(n_ray_t, 9, arma::fill::none);    // Vertex directions (Cartesian)
-    auto invDotA = arma::fmat(n_ray_t, 3, arma::fill::none); // Inverse dot product
+    auto invDotA = arma::fmat(n_ray_t, 3, arma::fill::none); // 1 / dot(direction, normal) per vertex
     {
-        const dtype *p_orig = orig.memptr();     // Origin pointer
-        const dtype *p_trivec = trivec.memptr(); // Trivec pointer
-        const dtype *p_tridir = tridir.memptr(); // Direction pointer
+        const dtype *p_orig = orig.memptr();
+        const dtype *p_trivec = trivec.memptr();
+        const dtype *p_tridir = tridir.memptr();
 
         float *p_trivecA = trivecA.memptr();
         float *p_normalA = normalA.memptr();
@@ -238,72 +196,29 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
             p_trivecA[i_ray + 8 * n_ray_i] = float(Nz + tmp);
             Vz = tmp - Vz;
 
-            // Calculate Normal Vector
-            Nx = Uy * Vz - Uz * Vy;
-            Ny = Uz * Vx - Ux * Vz;
-            Nz = Ux * Vy - Uy * Vx;
-
-            // Convert to float
+            // Normal vector
+            qd_crossp(Ux, Uy, Uz, Vx, Vy, Vz, &Nx, &Ny, &Nz);
             p_normalA[i_ray] = float(Nx);
             p_normalA[i_ray + n_ray_i] = float(Ny);
             p_normalA[i_ray + 2 * n_ray_i] = float(Nz);
 
-            // Load first vertex direction
-            Vx = p_tridir[i_ray];
-            Vy = p_tridir[i_ray + n_ray_i];
-            Vz = p_tridir[i_ray + 2 * n_ray_i];
+            // Vertex directions, normalized if needed, and the inverse dot product with the normal vector
+            for (int k = 0; k < 3; ++k)
+            {
+                const int o = i_ray + 3 * k * n_ray_i;
+                Vx = p_tridir[o], Vy = p_tridir[o + n_ray_i], Vz = p_tridir[o + 2 * n_ray_i];
 
-            // Normalize it, if needed
-            tmp = Vx * Vx + Vy * Vy + Vz * Vz;
-            if (std::abs(tmp - (dtype)1.0) > (dtype)2e-7)
-                tmp = std::sqrt((dtype)1.0 / tmp), Vx *= tmp, Vy *= tmp, Vz *= tmp;
+                tmp = Vx * Vx + Vy * Vy + Vz * Vz;
+                if (std::abs(tmp - (dtype)1.0) > (dtype)2e-7)
+                    tmp = std::sqrt((dtype)1.0 / tmp), Vx *= tmp, Vy *= tmp, Vz *= tmp;
 
-            // Store as float
-            p_dirA[i_ray] = float(Vx);
-            p_dirA[i_ray + n_ray_i] = float(Vy);
-            p_dirA[i_ray + 2 * n_ray_i] = float(Vz);
+                p_dirA[o] = float(Vx);
+                p_dirA[o + n_ray_i] = float(Vy);
+                p_dirA[o + 2 * n_ray_i] = float(Vz);
 
-            // Calculate inverse DotProduct from Normal Vector and Vertex direction
-            tmp = Vx * Nx + Vy * Ny + Vz * Nz;
-            p_invDotA[i_ray] = float((dtype)1.0 / tmp);
-
-            // Load second vertex direction
-            Vx = p_tridir[i_ray + 3 * n_ray_i];
-            Vy = p_tridir[i_ray + 4 * n_ray_i];
-            Vz = p_tridir[i_ray + 5 * n_ray_i];
-
-            // Normalize it, if needed
-            tmp = Vx * Vx + Vy * Vy + Vz * Vz;
-            if (std::abs(tmp - (dtype)1.0) > (dtype)2e-7)
-                tmp = std::sqrt((dtype)1.0 / tmp), Vx *= tmp, Vy *= tmp, Vz *= tmp;
-
-            // Store as float
-            p_dirA[i_ray + 3 * n_ray_i] = float(Vx);
-            p_dirA[i_ray + 4 * n_ray_i] = float(Vy);
-            p_dirA[i_ray + 5 * n_ray_i] = float(Vz);
-
-            // Calculate inverse DotProduct from Normal Vector and Vertex direction
-            tmp = Vx * Nx + Vy * Ny + Vz * Nz;
-            p_invDotA[i_ray + n_ray_i] = float((dtype)1.0 / tmp);
-
-            // Load third vertex direction
-            Vx = p_tridir[i_ray + 6 * n_ray_i];
-            Vy = p_tridir[i_ray + 7 * n_ray_i];
-            Vz = p_tridir[i_ray + 8 * n_ray_i];
-
-            // Normalize it, if needed
-            tmp = Vx * Vx + Vy * Vy + Vz * Vz;
-            if (std::abs(tmp - (dtype)1.0) > (dtype)2e-7)
-                tmp = std::sqrt((dtype)1.0 / tmp), Vx *= tmp, Vy *= tmp, Vz *= tmp;
-
-            // Store as float
-            p_dirA[i_ray + 6 * n_ray_i] = float(Vx);
-            p_dirA[i_ray + 7 * n_ray_i] = float(Vy);
-            p_dirA[i_ray + 8 * n_ray_i] = float(Vz);
-
-            // Calculate inverse DotProduct from Normal Vector and Vertex direction
-            tmp = Vx * Nx + Vy * Ny + Vz * Nz;
-            p_invDotA[i_ray + 2 * n_ray_i] = float((dtype)1.0 / tmp);
+                tmp = Vx * Nx + Vy * Ny + Vz * Nz;
+                p_invDotA[i_ray + k * n_ray_i] = float((dtype)1.0 / tmp);
+            }
         }
     }
 
@@ -324,10 +239,8 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     float *Ymin = Ymin_vec.memptr(), *Ymax = Ymax_vec.memptr();
     float *Zmin = Zmin_vec.memptr(), *Zmax = Zmax_vec.memptr();
 
-    // Convert points to float and compute bounding boxes
-    // Calculate bounding box for each sub-cloud
+    // Convert points to float and compute the bounding box of each sub-cloud
     const dtype *p_points = points.memptr();
-    const unsigned *p_sub = sci.memptr();
 
     // Set parameters for the first AABB
     size_t i_sub = 0, i_next = (n_sub_t == 1) ? n_point_t - 1 : (size_t)p_sub[1] - 1;
@@ -337,7 +250,6 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
 
     for (size_t i_point = 0; i_point < n_point_t; ++i_point)
     {
-        // Load point
         dtype x = p_points[i_point],
               y = p_points[i_point + n_point_t],
               z = p_points[i_point + 2 * n_point_t];
@@ -348,7 +260,6 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         y_min = (yf < y_min) ? yf : y_min, y_max = (yf > y_max) ? yf : y_max;
         z_min = (zf < z_min) ? zf : z_min, z_max = (zf > z_max) ? zf : z_max;
 
-        // Write to float buffer
         Px[i_point] = xf, Py[i_point] = yf, Pz[i_point] = zf;
 
         // Update sub-cloud data for the next AABB
@@ -359,12 +270,10 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
             Ymin[i_sub] = y_min, Ymax[i_sub] = y_max;
             Zmin[i_sub] = z_min, Zmax[i_sub] = z_max;
 
-            // Reset registers
             x_min = INFINITY, x_max = -INFINITY,
             y_min = INFINITY, y_max = -INFINITY,
             z_min = INFINITY, z_max = -INFINITY;
 
-            // Update counters
             ++i_sub;
             if (i_sub < n_sub_t)
                 i_next = (i_sub == n_sub_t - 1) ? n_point_t - 1 : (size_t)p_sub[i_sub + 1] - 1;
@@ -399,12 +308,11 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     std::vector<unsigned> idx_local;
     std::vector<unsigned> *p_idx_vec = (hit_ind != nullptr) ? hit_ind : &idx_local;
 
-    // Dispatch to selected kernel
     if (kernel == 3) // CUDA
     {
 #if BUILD_WITH_CUDA
         qd_RPI_CUDA(Px, Py, Pz, n_point_t,
-                    sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+                    p_sub, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                     trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
                     trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
                     trivecA.colptr(6), trivecA.colptr(7), trivecA.colptr(8),
@@ -420,7 +328,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     {
 #if BUILD_WITH_AVX2
         qd_RPI_AVX2(Px, Py, Pz, n_point_t,
-                    sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+                    p_sub, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                     trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
                     trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
                     trivecA.colptr(6), trivecA.colptr(7), trivecA.colptr(8),
@@ -435,7 +343,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     else // GENERIC
     {
         qd_RPI_GENERIC(Px, Py, Pz, n_point_t,
-                       sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+                       p_sub, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                        trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
                        trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
                        trivecA.colptr(6), trivecA.colptr(7), trivecA.colptr(8),

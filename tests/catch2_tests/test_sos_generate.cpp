@@ -274,7 +274,7 @@ TEST_CASE("sos_generate - input validation")
         CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(one, dist, 4), std::invalid_argument);
         CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, start, 4), std::invalid_argument);
         CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, order, 4), std::invalid_argument);
-        // Non-finite table: before the fix an Inf sample point ended in std::length_error
+        // Non-finite table: an Inf sample point or a NaN ACF value throws invalid_argument
         arma::vec inf_dist = dist, nan_acf = acf;
         inf_dist(20) = arma::datum::inf, nan_acf(3) = std::nan("");
         CHECK_THROWS_AS(spatial_freq = quadriga_lib::sos_generate(acf, inf_dist, 4, no_vec, no_mat, 3, true, 5, true, 0.0, 1.0, 1), std::invalid_argument);

@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// arrayant_combine_pattern and arrayant_rotate_pattern (through qd_rotate): exact patterns from omni and custom
+// antennas, so the expected main-lobe indices and amplitudes are known; the propagation-speed case uses the
+// two-element array factor 2 |cos(pi f d / c)| for a wave along the array axis.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -124,7 +128,7 @@ TEST_CASE("Arrayant rotation - Partial sphere, inplace")
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.e_theta_re.slice(1) = ant.e_theta_re.slice(0) * 2.0f;
     ant.element_pos.col(1) = 10.0 * T.t();
-    // Check error message if trying to rotate single element
+    // The sampling grid of a partial-sphere pattern cannot be updated for a single element
     REQUIRE_THROWS_AS(qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 2.0, 0, 0), std::invalid_argument);
 
     // Both elements
@@ -144,7 +148,6 @@ TEST_CASE("Arrayant rotation - Partial sphere, inplace")
     CHECK(arma::approx_equal(ant.element_pos, T, "absdiff", 1e-5));
 }
 
-// The position phase used the speed of light; acoustic arrays were combined without it
 TEST_CASE("Arrayant combine pattern - Propagation speed")
 {
     // Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port

@@ -1,6 +1,12 @@
-function test_get_channels_planar
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% Generate test antenna
+function test_get_channels_planar
+% MEX interface test for quadriga_lib.get_channels_planar.
+% Physics validation lives in the Catch2 suite (test_get_channels_planar.cpp).
+
+%% Setup: test antenna
 ant = quadriga_lib.arrayant_generate('omni');
 ant.e_theta_re(:,:,2) = 2;
 ant.e_theta_im(:,:,2) = 0;
@@ -40,9 +46,8 @@ assertElementsAlmostEqual( delay(:,:,2), [e0,e2;e1,e3]/C, 'absolute', 1.2e-10 );
 Doppler = cos(aoa(2)) * cos(eoa(2));
 assertElementsAlmostEqual( rx_Doppler, [-1, Doppler], 'absolute', 1e-13 );
 
-% Rectangular coupling with omitted imaginary part (regression: the default
-% coupling_im must match coupling_re's shape, not n_elements x n_elements).
-% Omitting coupling_im must behave identically to a matching-shape zero block.
+% Rectangular coupling with omitted imaginary part: the default coupling_im has coupling_re's shape,
+% not n_elements x n_elements, so omitting it equals a matching-shape zero block.
 ant_a = ant;
 ant_a.coupling_re = [1; 1];        % 2 elements -> 1 port
 ant_a = rmfield(ant_a, 'coupling_im');
@@ -60,7 +65,7 @@ assertElementsAlmostEqual( cra, crb, 'absolute', 1e-14 );
 assertElementsAlmostEqual( cia, cib, 'absolute', 1e-14 );
 assertElementsAlmostEqual( dla, dlb, 'absolute', 1e-14 );
 
-% Exception handling
+%% Errors
 [~] = quadriga_lib.get_channels_planar( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod, eod, aoa, eoa, path_gain, path_length, M, 2997924580.0, 1);
 
 ant = rmfield(ant,'element_pos');

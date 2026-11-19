@@ -82,13 +82,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 5 || nrhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const std::string set_type = qd_mex_get_string(prhs[1], "", "set_type");
     const arma::cube phase = qd_mex_get_Cube<double>(prhs[2], false, "phase");
@@ -111,7 +109,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat rnd;
     plhs[0] = qd_mex_init_output(&rnd, qd_gbsm_n_link(rx_pos), phase.n_cols);
 
-    // Call library function
     CALL_QD(quadriga_lib::gbsm_draw(scenpar, set_type, phase, tx_pos, rx_pos, rnd, set_id, preset, floor_id,
                                     center_freq, dual_mobility, horizontal));
 }

@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Internal ray-triangle kernels qd_RTI_GENERIC, qd_RTI_AVX2 and qd_RTI_CUDA on the 12-triangle cube with vertices
+// at +/-1: first and second hit (fraction W of the segment origin-destination, 1-based triangle index), sub-mesh AABB
+// culling, and agreement of float with double and of AVX2 and CUDA with GENERIC. The public ray_triangle_intersect
+// is tested in test_ray_triangle_intersect.cpp.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"
@@ -64,7 +69,6 @@ static void fill_cube_soa(T *Tx, T *Ty, T *Tz,
     }
 }
 
-// --- Test 1: Single ray, west to east, passes through cube (FBS + SBS) ---
 TEST_CASE("RTI Internal - Cube west-east hit")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
@@ -99,7 +103,6 @@ TEST_CASE("RTI Internal - Cube west-east hit")
     CHECK(hit_cnt[0] == 2);
 }
 
-// --- Test 2: Single ray, misses the cube entirely ---
 TEST_CASE("RTI Internal - Miss")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
@@ -130,7 +133,6 @@ TEST_CASE("RTI Internal - Miss")
     CHECK(hit_cnt[0] == 0);
 }
 
-// --- Test 3: Ray starting inside the cube (single exit hit) ---
 TEST_CASE("RTI Internal - Ray starting inside cube")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
@@ -164,7 +166,6 @@ TEST_CASE("RTI Internal - Ray starting inside cube")
     CHECK(hit_cnt[0] == 1);
 }
 
-// --- Test 4: Multiple rays in a single call ---
 TEST_CASE("RTI Internal - Multiple rays")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 4;
@@ -176,9 +177,9 @@ TEST_CASE("RTI Internal - Multiple rays")
     double Ymin[1] = {-1.0}, Ymax[1] = {1.0};
     double Zmin[1] = {-1.0}, Zmax[1] = {1.0};
 
-    // Ray 0: west→east (same as test 1)
-    // Ray 1: miss (same as test 2)
-    // Ray 2: start inside (same as test 3)
+    // Ray 0: west→east (as in the west-east hit case)
+    // Ray 1: miss (as in the miss case)
+    // Ray 2: start inside (as in the inside-start case)
     // Ray 3: south→north at x=1, z=0.5
     double Ox[4] = {-10.0, -10.0, 0.0, 1.0};
     double Oy[4] = {0.0, 5.0, 0.0, -10.0};
@@ -224,7 +225,6 @@ TEST_CASE("RTI Internal - Multiple rays")
     CHECK(hit_cnt[3] == 2);
 }
 
-// --- Test 5: Sub-mesh AABB filtering ---
 TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
 {
     const size_t n_mesh = 12, n_ray = 1;
@@ -241,7 +241,7 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
     double Wf[1], Ws[1];
     unsigned If[1], Is[1], hit_cnt[1];
 
-    // 5a: Exclude sub 1 by placing its AABB far away
+    // Exclude sub 1 by placing its AABB far away
     {
         double Xmin[2] = {-1.0, 100.0}, Xmax[2] = {1.0, 200.0};
         double Ymin[2] = {-1.0, 100.0}, Ymax[2] = {1.0, 200.0};
@@ -260,7 +260,7 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
         CHECK(hit_cnt[0] == 0);
     }
 
-    // 5b: Both sub-meshes with correct AABB → same result as test 1
+    // Both sub-meshes with correct AABB → same result as the west-east hit case
     {
         double Xmin[2] = {-1.0, -1.0}, Xmax[2] = {1.0, 1.0};
         double Ymin[2] = {-1.0, -1.0}, Ymax[2] = {1.0, 1.0};
@@ -279,7 +279,6 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
     }
 }
 
-// --- Test 6: hit_cnt = nullptr (optional output omitted) ---
 TEST_CASE("RTI Internal - hit_cnt nullptr")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
@@ -308,7 +307,6 @@ TEST_CASE("RTI Internal - hit_cnt nullptr")
     CHECK(Is[0] == 11);
 }
 
-// --- Test 7: Generic float vs. double ---
 TEST_CASE("RTI Internal - Float vs Double")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 4;
@@ -326,7 +324,7 @@ TEST_CASE("RTI Internal - Float vs Double")
     double Xmind[1] = {-1.0}, Xmaxd[1] = {1.0}, Ymind[1] = {-1.0}, Ymaxd[1] = {1.0}, Zmind[1] = {-1.0}, Zmaxd[1] = {1.0};
     float Xminf[1] = {-1.0f}, Xmaxf[1] = {1.0f}, Yminf[1] = {-1.0f}, Ymaxf[1] = {1.0f}, Zminf[1] = {-1.0f}, Zmaxf[1] = {1.0f};
 
-    // Same 4 rays as test 4
+    // Same 4 rays as the multiple-rays case
     double Oxd[4] = {-10.0, -10.0, 0.0, 1.0};
     double Oyd[4] = {0.0, 5.0, 0.0, -10.0};
     double Ozd[4] = {0.5, 5.0, 0.5, 0.5};
@@ -366,7 +364,6 @@ TEST_CASE("RTI Internal - Float vs Double")
     }
 }
 
-// --- Test 8: AVX2 vs. Generic (float, padded to VEC_SIZE=8) ---
 #ifdef BUILD_WITH_AVX2
 TEST_CASE("RTI Internal - AVX2 comparison")
 {
@@ -383,7 +380,6 @@ TEST_CASE("RTI Internal - AVX2 comparison")
     float Tx[16], Ty[16], Tz[16], Ux[16], Uy[16], Uz[16], Vx[16], Vy[16], Vz[16];
     fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded);
 
-    // Sub-mesh index
     unsigned SMI[1] = {0};
 
     // AABB arrays, padded to n_sub_s=8; slots [1,7] set to miss-guaranteeing values
@@ -404,7 +400,7 @@ TEST_CASE("RTI Internal - AVX2 comparison")
         Zmax[i] = -1e20f;
     }
 
-    // Same 4 rays as tests 4 and 7
+    // Same 4 rays as the multiple-rays case
     float Ox[4] = {-10.0f, -10.0f, 0.0f, 1.0f};
     float Oy[4] = {0.0f, 5.0f, 0.0f, -10.0f};
     float Oz[4] = {0.5f, 5.0f, 0.5f, 0.5f};
@@ -421,7 +417,6 @@ TEST_CASE("RTI Internal - AVX2 comparison")
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf_ref, Ws_ref, If_ref, Is_ref, hit_cnt_ref);
 
-    // AVX2
     float Wf_avx[4], Ws_avx[4];
     unsigned If_avx[4], Is_avx[4], hit_cnt_avx[4];
 
@@ -441,7 +436,6 @@ TEST_CASE("RTI Internal - AVX2 comparison")
 }
 #endif
 
-// --- Test 9: CUDA vs. Generic (float, padded to VEC_SIZE=8) ---
 #ifdef BUILD_WITH_CUDA
 TEST_CASE("RTI Internal - CUDA comparison")
 {
@@ -490,7 +484,6 @@ TEST_CASE("RTI Internal - CUDA comparison")
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf_ref, Ws_ref, If_ref, Is_ref, hit_cnt_ref);
 
-    // CUDA
     float Wf_cuda[4], Ws_cuda[4];
     unsigned If_cuda[4], Is_cuda[4], hit_cnt_cuda[4];
 

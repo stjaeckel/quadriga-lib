@@ -47,13 +47,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
     const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
 
@@ -65,10 +63,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1 && valid)
         plhs[1] = qd_mex_init_output(&dist_2d, n_grid);
 
-    // Wrap optional pointers
     arma::vec *p_dist_2d = dist_2d.empty() ? nullptr : &dist_2d;
 
-    // Call library function
     CALL_QD(acf_approx = quadriga_lib::sos_acf_approx<double>(spatial_freq, dist, p_dist_2d));
     plhs[0] = qd_mex_copy2matlab(&acf_approx);
 }

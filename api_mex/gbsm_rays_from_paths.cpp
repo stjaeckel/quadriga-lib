@@ -61,7 +61,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0], false, "center_freq");
     const arma::vec tx_pos = qd_mex_get_Col<double>(prhs[1], false, "tx_pos");
     const arma::vec rx_pos = qd_mex_get_Col<double>(prhs[2], false, "rx_pos");

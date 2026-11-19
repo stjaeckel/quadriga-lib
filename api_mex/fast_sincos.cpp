@@ -49,7 +49,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read first input as cube, convert to single precision if needed
+    // Double and single inputs are aliased, other classes are converted to single
     arma::fcube Xs;
     arma::cube Xd;
     bool use_double_input = mxIsDouble(prhs[0]);
@@ -57,12 +57,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (use_double_input)
     {
         Xd.~Cube<double>();
-        ::new (&Xd) arma::cube(qd_mex_reinterpret_Cube<double>(prhs[0], false, "x"));
+        ::new (&Xd) arma::cube(qd_mex_reinterpret_Cube<double>(prhs[0], "x"));
     }
     else if (mxIsSingle(prhs[0]))
     {
         Xs.~Cube<float>();
-        ::new (&Xs) arma::fcube(qd_mex_reinterpret_Cube<float>(prhs[0], false, "x"));
+        ::new (&Xs) arma::fcube(qd_mex_reinterpret_Cube<float>(prhs[0], "x"));
     }
     else
         Xs = qd_mex_typecast_Cube<float>(prhs[0], "x");
@@ -72,11 +72,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_slices = use_double_input ? Xd.n_slices : Xs.n_slices;
     arma::uword n_elem = use_double_input ? Xd.n_elem : Xs.n_elem;
 
-    // Check if we want to get only the cosine
     bool cos_only = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "cos_only", false);
     const int use_kernel = (nrhs < 3) ? 0 : qd_mex_get_scalar<int>(prhs[2], "use_kernel", 0);
 
-    // Allocate memory for the outputs
     arma::fcube P, Q;
     plhs[0] = qd_mex_init_output(&P, n_rows, n_cols, n_slices);
 
@@ -85,7 +83,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else if (nlhs > 1 && cos_only)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Cannot have 2 outputs in cosine-only mode.");
 
-    // Serialize cubes to vectors (map memory)
+    // Flat vector views on the cube memory
     arma::fvec xs;
     arma::vec xd;
     if (use_double_input)
@@ -108,7 +106,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ::new (&q) arma::fvec(Q.memptr(), n_elem, false, true);
     }
 
-    // Call Quadriga-Lib C++ API
     if (use_double_input)
     {
         if (cos_only)

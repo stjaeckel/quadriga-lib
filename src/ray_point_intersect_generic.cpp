@@ -5,6 +5,8 @@
 #include "quadriga_lib_generic_functions.hpp"
 
 #include <cstring>
+#include <limits>
+#include <stdexcept>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -192,10 +194,10 @@ template <typename dtype>
 void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Point coordinates, length n_point
                     const size_t n_point,                                 // Number of points
                     const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
-                    const dtype *Xmin, const dtype *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
-                    const dtype *Ymin, const dtype *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
-                    const dtype *Zmin, const dtype *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
-                    const size_t n_sub,                                   // Number of sub-clouds (n_sub <= n_sub_s)
+                    const dtype *Xmin, const dtype *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub
+                    const dtype *Ymin, const dtype *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub
+                    const dtype *Zmin, const dtype *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub
+                    const size_t n_sub,                                   // Number of sub-clouds
                     const dtype *T1x, const dtype *T1y, const dtype *T1z, // First ray vertex coordinate in GCS, length n_ray
                     const dtype *T2x, const dtype *T2y, const dtype *T2z, // Second ray vertex coordinate in GCS, length n_ray
                     const dtype *T3x, const dtype *T3y, const dtype *T3z, // Third ray vertex coordinate in GCS, length n_ray
@@ -203,7 +205,7 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     const dtype *D1x, const dtype *D1y, const dtype *D1z, // First ray direction in GCS, length n_ray
                     const dtype *D2x, const dtype *D2y, const dtype *D2z, // Second ray direction in GCS, length n_ray
                     const dtype *D3x, const dtype *D3y, const dtype *D3z, // Third ray direction in GCS, length n_ray
-                    const dtype *rD1, const dtype *rD2, const dtype *rD3, // Inverse Dot product of ray direction and normal vector
+                    const dtype *rD1, const dtype *rD2, const dtype *rD3, // 1 / dot(D, N) per ray vertex, length n_ray
                     const size_t n_ray,                                   // Number of rays
                     std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                     unsigned *hit_offset)                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller

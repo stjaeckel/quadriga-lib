@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// obj_file_read on hand-written OBJ, MTL and CSV files (fixture: the 2x2x2 cube, 12 faces): geometry outputs with
+// 0-based face and object indices, materials resolved against the built-in or a custom CSV table (csv_ind 1-based,
+// 0 = no material; absent columns default to a = 1, fRef = 1, others 0), Blender name suffixes, strict mode, line
+// endings, relative and invalid face indices, and aliasing outputs.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_tools.hpp"
@@ -85,11 +90,9 @@ TEST_CASE("Test OBJ File Read - Simple test")
 {
     REQUIRE(my_fancy_cube("cube.obj"));
 
-    // Verify number of faces
     auto n_faces = quadriga_lib::obj_file_read<double>("cube.obj");
     CHECK(n_faces == 12ULL);
 
-    // Containers for data
     arma::mat mesh, vert_list;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind, csv_ind;
@@ -101,7 +104,6 @@ TEST_CASE("Test OBJ File Read - Simple test")
                                         &mtl_ind, &mtl_names, nullptr,
                                         "", &csv_ind, &csv_names, &csv_prop);
 
-    // Expected values
     arma::mat vert_list_correct = {
         {1.0, 1.0, 1.0},
         {1.0, 1.0, -1.0},
@@ -134,7 +136,6 @@ TEST_CASE("Test OBJ File Read - Simple test")
         vert_list_correct.rows(face_ind_correct.col(1)),
         vert_list_correct.rows(face_ind_correct.col(2)));
 
-    // Geometry checks
     CHECK(mesh.n_rows == 12);
     CHECK(mesh.n_cols == 9);
 
@@ -157,7 +158,6 @@ TEST_CASE("Test OBJ File Read - Simple test")
     CHECK(csv_names[0] == "air");    // air is the first table entry
     CHECK(csv_prop.count("a") == 1); // table has at least the 'a' column
 
-    // Geometry equality
     CHECK(arma::approx_equal(vert_list, vert_list_correct, "absdiff", 1e-14));
     CHECK(arma::approx_equal(face_ind, face_ind_correct_u32, "absdiff", 1e-14));
     CHECK(arma::approx_equal(mesh, mesh_correct, "absdiff", 1e-14));
@@ -275,7 +275,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
     std::vector<std::string> mtl_names, csv_names;
     std::unordered_map<std::string, std::vector<double>> csv_prop;
 
-    // Test 1: Basic custom materials
+    // Basic custom materials
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -304,7 +304,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 2: Jumbled column order (key-by-name, so order is irrelevant)
+    // Jumbled column order (key-by-name, so order is irrelevant)
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -328,7 +328,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 3: Missing 'name' column -> error (name is the mandatory join key)
+    // Missing 'name' column -> error (name is the mandatory join key)
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -348,7 +348,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 4: CSV with only name+a; all other columns absent -> consumer defaults
+    // CSV with only name+a; all other columns absent -> consumer defaults
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -373,7 +373,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 5: Duplicate material names -> error
+    // Duplicate material names -> error
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -394,7 +394,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 6: Non-existent CSV file -> error
+    // Non-existent CSV file -> error
     {
         REQUIRE(my_fancy_cube("cube.obj", "custom_material_1"));
 
@@ -406,7 +406,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("cube.obj");
     }
 
-    // Test 7: Frequency-dependent columns populated
+    // Frequency-dependent columns populated
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -428,7 +428,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 8: Subset of optional columns; unspecified ones take defaults
+    // Subset of optional columns; unspecified ones take defaults
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -451,7 +451,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         std::remove("custom_materials.csv");
     }
 
-    // Test 9: Empty cells in optional columns parse as 0
+    // Empty cells in optional columns parse as 0
     {
         std::ofstream csv_file("custom_materials.csv");
         REQUIRE(csv_file.is_open());
@@ -599,7 +599,7 @@ TEST_CASE("Test OBJ File Read - Relative (negative) face indices")
         for (arma::uword c = 0; c < 3; ++c)
             CHECK(arma::approx_equal(mesh.row(f).cols(3 * c, 3 * c + 2), vert.row(F_expected(f, c)), "absdiff", 0.0));
 
-    // Only face_ind requested (the case that returned 2^64 - 3 ... before)
+    // Only face_ind requested
     arma::umat face2;
     quadriga_lib::obj_file_read<double>("rel.obj", nullptr, nullptr, &face2);
     CHECK(arma::all(arma::vectorise(face2) == arma::vectorise(F_expected)));

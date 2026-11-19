@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down get_channels_spherical and get_channels_spherical_vec: per-element delays, angles, amplitudes and phases
+// of spherical waves, TX and RX orientation, antenna coupling, the polarisation matrix M, path_length against the
+// TX-FBS-LBS-RX polyline, add_fake_los_path, agreement of the AVX2 and generic antenna interpolation, empty and
+// invalid inputs. Oracles: closed-form geometry of small layouts with omni and xpol antennas on axis-aligned links.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -17,7 +22,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
 {
     float pi = 3.141592653589793f;
 
-    // Generate test antenna
     auto ant = quadriga_lib::generate_arrayant_omni<float>();
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 1.0;
@@ -55,7 +59,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     aoa *= 180.0f / pi;
     eoa *= 180.0f / pi;
 
-    // Check departure azimuth angles
     float alpha = std::atan(2.0 / 20.0) * 180.0f / pi, beta = 90.0f;
     CHECK(std::abs(aod.at(0, 0, 0) - 0.0f) < 1.0e-6f);
     CHECK(std::abs(aod.at(1, 0, 0) + alpha) < 1.0e-6f);
@@ -66,7 +69,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     CHECK(std::abs(aod.at(0, 1, 1) - beta) < 1.0e-6f);
     CHECK(std::abs(aod.at(1, 1, 1) - beta) < 1.0e-6f);
 
-    // Check arrival azimuth angles
     alpha = 180.0 - alpha;
     CHECK(std::abs(std::abs(std::cos(aoa.at(0, 0, 0) * pi / 180.0)) - 1.0) < 1.0e-4f);
     CHECK(std::abs(aoa.at(1, 0, 0) - alpha) < 1.0e-4f);
@@ -78,7 +80,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     CHECK(std::abs(aoa.at(0, 1, 1) - alpha) < 1.0e-4f);
     CHECK(std::abs(aoa.at(1, 1, 1) - beta) < 1.0e-4f);
 
-    // Check departure elevation angles
     alpha = std::atan(10.0 / 11.0) * 180.0f / pi, beta = std::atan(10.0 / 9.0) * 180.0f / pi;
     CHECK(std::abs(eod.at(0, 0, 0) - 0.0f) < 1.0e-6f);
     CHECK(std::abs(eod.at(1, 0, 0) - 0.0f) < 1.0e-6f);
@@ -89,7 +90,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     CHECK(std::abs(eod.at(0, 1, 1) - alpha) < 1.0e-6f);
     CHECK(std::abs(eod.at(1, 1, 1) - alpha) < 1.0e-6f);
 
-    // Check arrival elevation angles
     alpha = std::atan(10.0 / std::sqrt(9.0 * 9.0 + 20.0 * 20.0)) * 180.0f / pi;
     beta = std::atan(10.0 / std::sqrt(11.0 * 11.0 + 20.0 * 20.0)) * 180.0f / pi;
     CHECK(std::abs(eoa.at(0, 0, 0) - 0.0f) < 1.0e-6f);
@@ -101,7 +101,7 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     CHECK(std::abs(eoa.at(0, 1, 1) - alpha) < 1.0e-4f);
     CHECK(std::abs(eoa.at(1, 1, 1) - beta) < 1.0e-4f);
 
-    // Check amplitude (relaxed tolerance for AVX2 float interpolation)
+    // Amplitude: relaxed tolerance for the AVX2 float interpolation
     arma::fcube amp = arma::sqrt(coeff_re % coeff_re + coeff_im % coeff_im);
     CHECK(std::abs(amp.at(0, 0, 0) - 1.0f) < 1.0e-5f);
     CHECK(std::abs(amp.at(1, 0, 0) - 2.0f) < 1.0e-5f);
@@ -112,7 +112,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     CHECK(std::abs(amp.at(0, 1, 1) - 1.0f) < 1.0e-4f);
     CHECK(std::abs(amp.at(1, 1, 1) - 2.0f) < 1.0e-4f);
 
-    // Check delays
     float C = 299792458.0;
     float d0 = 20.0, d1 = std::sqrt(20.0 * 20.0 + 2.0 * 2.0);
     float e0 = (std::sqrt(9.0 * 9.0 + 10.0 * 10.0) + std::sqrt(9.0 * 9.0 + 20.0 * 20.0 + 10.0 * 10.0));
@@ -128,7 +127,6 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     CHECK(std::abs(delay.at(0, 1, 1) - e2 / C) < 1.0e-13f);
     CHECK(std::abs(delay.at(1, 1, 1) - e3 / C) < 1.0e-13f);
 
-    // Check phases
     arma::fcube phase = arma::atan2(-coeff_im / amp, coeff_re / amp);
     for (float *val = phase.begin(); val < phase.end(); val++)
         *val = *val < 0.0f ? *val + 2.0f * pi : *val;
@@ -147,7 +145,6 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
 {
     double pi = 3.141592653589793f;
 
-    // Generate test antenna
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 15;
@@ -285,35 +282,29 @@ TEST_CASE("Get Channels Spherical - Fake LOS")
     REQUIRE(aoa.n_slices == 3);
     REQUIRE(eoa.n_slices == 3);
 
-    // Check departure azimuth angles
     CHECK(std::abs(aod.at(0, 0, 0) - 0.0f) < 1.0e-6f);
     CHECK(std::abs(aod.at(0, 0, 1) - 90.0f) < 1.0e-6f);
     CHECK(std::abs(aod.at(0, 0, 2) - 0.0f) < 1.0e-6f);
 
-    // Check arrival azimuth angles
     float alpha = 180.0 - std::atan(10.0 / 20.0) * 180.0f / pi;
     CHECK(std::abs(std::abs(aoa.at(0, 0, 0)) - 180.0f) < 1.0e-4f);
     CHECK(std::abs(aoa.at(0, 0, 1) - alpha) < 1.0e-4f);
     CHECK(std::abs(std::abs(aoa.at(0, 0, 2)) - 180.0f) < 1.0e-4f);
 
-    // Check departure elevation angles
     CHECK(std::abs(eod.at(0, 0, 0) - 0.0f) < 1.0e-4f);
     CHECK(std::abs(eod.at(0, 0, 1) - 45.0f) < 1.0e-4f);
     CHECK(std::abs(eod.at(0, 0, 2) - 0.0f) < 1.0e-4f);
 
-    // Check arrival elevation angles
     alpha = std::atan(10.0 / std::sqrt(10.0 * 10.0 + 20.0 * 20.0)) * 180.0f / pi;
     CHECK(std::abs(eoa.at(0, 0, 0) - 0.0f) < 1.0e-4f);
     CHECK(std::abs(eoa.at(0, 0, 1) - alpha) < 1.0e-4f);
     CHECK(std::abs(eoa.at(0, 0, 2) - 0.0f) < 1.0e-4f);
 
-    // Check amplitude
     arma::fcube amp = arma::sqrt(coeff_re % coeff_re + coeff_im % coeff_im);
     CHECK(std::abs(amp.at(0, 0, 0) - 1.0f) < 1.0e-6f);
     CHECK(std::abs(amp.at(0, 0, 1) - 0.5f) < 1.0e-6f);
     CHECK(std::abs(amp.at(0, 0, 2) - 0.0f) < 1.0e-6f);
 
-    // Check delays
     float C = 299792458.0;
     float d0 = 20.0;
     float e0 = (std::sqrt(10.0 * 10.0 + 10.0 * 10.0) + std::sqrt(10.0 * 10.0 + 20.0 * 20.0 + 10.0 * 10.0));
@@ -432,10 +423,6 @@ TEST_CASE("Get Channels Spherical - Coupling")
     CHECK(std::abs(eod.at(0, 0, 0) - 0.0) < 1.0e-14f);
     CHECK(std::abs(std::cos(aoa.at(0, 0, 0)) + 1.0) < 1.0e-14f);
 }
-
-// ================================================================================================
-// New tests below
-// ================================================================================================
 
 TEST_CASE("Get Channels Spherical - Error handling: Dimension mismatches")
 {
@@ -1007,7 +994,6 @@ TEST_CASE("Get Channels Spherical - Diagonal path (non-trivial azimuth + elevati
     double expected_aoa = std::atan2(-d, -d);
     CHECK(std::abs(aoa.at(0, 0, 0) - expected_aoa) < 1.0e-6);
 
-    // Delay
     double C = 299792458.0;
     double dist = std::sqrt(d * d + d * d);
     CHECK(std::abs(delay.at(0, 0, 0) - dist / C) < 1.0e-14);
@@ -1049,7 +1035,6 @@ TEST_CASE("Get Channels Spherical - Complex polarization transfer matrix M")
     CHECK(std::abs(amp - 1.0) < 1.0e-6);
 
     // The imaginary component of M should introduce phase even without center_freq
-    // coeff_im should be non-zero
     CHECK(std::abs(coeff_im.at(0, 0, 0)) > 1.0e-3);
 }
 
@@ -1342,7 +1327,6 @@ TEST_CASE("Get Channels Spherical - Output size with MIMO and multiple paths")
 
 TEST_CASE("Get Channels Spherical - Physical consistency: delays positive and monotonic ordering")
 {
-    // All absolute delays should be positive
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
 
     arma::mat fbs_pos(3, 3, arma::fill::zeros);
@@ -1656,7 +1640,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS swaps true LOS to first slice")
     CHECK(std::abs(amp0 - 1.0f) < 1.0e-4f);
 
     // The original slot of the LOS path should now have zero coefficients
-    // (true_los_path was at index 2 in the output, i.e. path 1 + fake offset)
+    // (output slot 2: input path 1 behind the fake LOS slot)
     float amp2 = std::sqrt(coeff_re.at(0, 0, 2) * coeff_re.at(0, 0, 2) +
                            coeff_im.at(0, 0, 2) * coeff_im.at(0, 0, 2));
     CHECK(std::abs(amp2) < 1.0e-6f);

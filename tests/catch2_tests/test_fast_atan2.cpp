@@ -2,13 +2,17 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// fast_atan2 against std::atan2 of the float-rounded inputs: at most 3 ULP over the quadrants, special values, a dense
+// grid and the tail of the 8-wide blocks; the documented absolute error (~3.6e-7) for both the GENERIC and AVX2
+// kernels; the IEEE results for NaN, Inf and signed zeros; output sizing and argument checks.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_math.hpp"
 #include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 #include <cstdint>
 
-// Helper: compute ULP distance between two floats
+// ULP distance between two floats
 static int32_t ulp_dist(float a, float b)
 {
     if (std::isnan(a) || std::isnan(b))
@@ -32,7 +36,6 @@ TEST_CASE("fast_atan2 - Basic quadrant coverage with float input")
 
     REQUIRE(a.n_elem == 8);
 
-    // Compare against std::atan2f with tight tolerance
     for (arma::uword i = 0; i < 8; ++i)
     {
         float ref = std::atan2(y(i), x(i));
@@ -120,7 +123,6 @@ TEST_CASE("fast_atan2 - Accuracy bound over dense sweep (float)")
             max_ulp = d;
     }
 
-    // Accuracy bound: must be <= 3 ULP everywhere
     CHECK(max_ulp <= 3);
 }
 
@@ -208,7 +210,7 @@ TEST_CASE("fast_atan2 - Error: mismatched input lengths")
 
 TEST_CASE("fast_atan2 - Consistency: atan2(sin(t), cos(t)) recovers t")
 {
-    // For angles in (-pi, pi], atan2(sin(t), cos(t)) should recover t
+    // Unit-circle inputs; the reference is std::atan2 of the same float inputs, not t
     const arma::uword N = 1000;
     arma::fvec angles = arma::linspace<arma::fvec>(-3.14f, 3.14f, N);
     arma::fvec y(N), x(N);
@@ -224,8 +226,6 @@ TEST_CASE("fast_atan2 - Consistency: atan2(sin(t), cos(t)) recovers t")
 
     REQUIRE(a.n_elem == N);
 
-    // The recovered angle should be close to the original
-    // Allow slightly larger tolerance due to sin/cos approximation compounding
     for (arma::uword i = 0; i < N; ++i)
     {
         float ref = std::atan2(y(i), x(i));
@@ -304,7 +304,6 @@ TEST_CASE("fast_atan2 - Outputs that alias inputs")
 
 TEST_CASE("fast_atan2 - GENERIC and AVX2 meet the documented error, auto is AVX2 if available")
 {
-    // Both kernels stay within the documented error of the exact values; auto is AVX2 when available, else GENERIC
     const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
     const arma::vec phi = arma::linspace<arma::vec>(-3.14, 3.14, 1003);
     const arma::vec y = arma::sin(phi) * 3.0, x = arma::cos(phi) * 3.0;

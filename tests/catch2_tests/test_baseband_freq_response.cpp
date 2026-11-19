@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down baseband_freq_response and baseband_freq_response_vec: values for delays of 1 and 1.5 wavelengths at a
+// bandwidth equal to c, snapshot selection, phases of long delays, carrier counts that are not a multiple of 8,
+// agreement of the kernels, outputs that alias inputs, and input validation.
+// Oracle: H_k = sum_p c_p · exp(-j·2·pi·B·p_k·tau_p) in double precision, the cycle count reduced by x - round(x).
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_channel.hpp"
@@ -257,7 +262,7 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
     quadriga_lib::baseband_freq_response<double>(cr, ci, dlx, pg, B, nullptr, nullptr, &hx);
     CHECK(arma::approx_equal(h1, hx, "absdiff", 1e-12));
 
-    // Non-finite delays give NaN (as before); a phase beyond 2^50 cycles (1e8 s at 100 MHz) stays finite
+    // Non-finite delays give NaN; a phase beyond 2^50 cycles (1e8 s at 100 MHz) stays finite
     arma::cube c1(1, 1, 1, arma::fill::ones), c0(1, 1, 1, arma::fill::zeros), d1(1, 1, 1);
     arma::vec pg2 = {0.25, 0.5, 1.0};
     for (double d : {arma::datum::nan, arma::datum::inf, 1.0e8})

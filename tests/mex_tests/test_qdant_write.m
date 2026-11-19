@@ -1,6 +1,12 @@
-function test_qdant_write
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-%% Simple test
+function test_qdant_write
+% MEX interface test for quadriga_lib.qdant_write.
+% Physics validation lives in the Catch2 suite (test_qdant_write.cpp).
+
+%% Single arrayant: write and read back
 if exist( 'testm.qdant','file' )
     delete('testm.qdant');
 end
@@ -42,7 +48,7 @@ assertEqual( layout, uint32(1) );
 
 delete('testm.qdant');
 
-%% Complex test
+%% Append to an existing file; ids and layout
 
 f = fopen( 'testm.qdant','w' );
 fprintf(f,'%s\n','<qdant><arrayant>');
@@ -129,7 +135,7 @@ catch ME
     end
 end
 
-% Test error: too few inputs
+% Test error: missing fields in the arrayant struct
 ant = struct;
 ant.azimuth_grid    = [-1.5,0,1.5,2] * pi/2;
 ant.elevation_grid  = [-0.9,0,0.9] * pi/2;

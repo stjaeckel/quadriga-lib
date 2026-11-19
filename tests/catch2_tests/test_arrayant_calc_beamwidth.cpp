@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Beamwidth and pointing angles of arrayant_calc_beamwidth and its vector and _multi forms: threshold dependence,
+// rotated and tilted patterns, element selection, the main-lobe search across +-180 deg and the poles. Oracles:
+// generate_arrayant_custom patterns, whose FWHM equals the requested beamwidth, rotated by arrayant_rotate_pattern
+// (helpers in qd_test_arrayant.hpp); results in degrees.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -105,12 +110,10 @@ TEST_CASE("Arrayant calc_beamwidth - Selective output pointers")
     // All-null call must be a no-op (no crash, early return).
     CHECK_NOTHROW(qd_beamwidth(ant, 0, 3.0f, nullptr, nullptr, nullptr, nullptr));
 
-    // Request only azimuth beamwidth
     float bw_az = -1.0f;
     qd_beamwidth(ant, 0, 3.0f, &bw_az, nullptr, nullptr, nullptr);
     CHECK(std::abs(bw_az - 30.0f) < 0.1f);
 
-    // Request only elevation pointing angle
     float el_pt = 999.0f;
     qd_beamwidth(ant, 0, 3.0f, nullptr, nullptr, nullptr, &el_pt);
     CHECK(std::abs(el_pt) < 0.1f);

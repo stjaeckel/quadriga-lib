@@ -12,16 +12,14 @@
 
 #include <cub/cub.cuh>
 
-#include "cuda_common.hpp" // replaces local CUDA_CHECK + cuda_runtime.h
+#include "cuda_common.hpp"
 #include "quadriga_lib_cuda_functions.hpp"
-#include "quadriga_lib_generic_functions.hpp" // qd_RPI_assemble
+#include "quadriga_lib_generic_functions.hpp"
 
 namespace
-{ // ---------------------------------------------------------------
+{
 
-    // ============================================================================
-    // Configuration constants
-    // ============================================================================
+    // ---- Configuration constants ----
 
     constexpr int K1_BLOCK_SIZE = 256;
     constexpr int K1B_BLOCK_SIZE = 256;
@@ -34,10 +32,8 @@ namespace
     static_assert(K1_BLOCK_SIZE % 32 == 0, "Kernel 1 block size must be a multiple of 32");
     static_assert(K2_BLOCK_SIZE % 32 == 0, "Kernel 2 block size must be a multiple of 32");
 
-    // ============================================================================
-    // RAII cleanup struct (Section 8)
+    // ---- RAII cleanup struct ----
     // Holds all device and pinned-host pointers; destructor frees non-null ones.
-    // ============================================================================
 
     struct CudaBuffers
     {
@@ -180,11 +176,9 @@ namespace
         }
     };
 
-    // ============================================================================
-    // Device helper: warp-level enqueue (Section 7.2)
+    // ---- Device helper: warp-level enqueue ----
     // All 32 lanes in the warp MUST execute this function.
     // Invalid threads (past batch end) must pass has_hit = false.
-    // ============================================================================
 
     __device__ __forceinline__ void RPI_enqueue_warp(bool has_hit, uint32_t ray_idx, uint16_t sub_idx,
                                                      uint32_t *wq_ray, uint16_t *wq_sub, uint32_t *queue_tail,
@@ -214,11 +208,9 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Kernel 1: AABB test + enqueue (Section 4.1)
+    // ---- Kernel 1: AABB test + enqueue ----
     // Launch: <<<ceil(batch_count / K1_BLOCK_SIZE), K1_BLOCK_SIZE, 0, stream>>>
     // Each thread = one ray. Loops over all AABBs.
-    // ============================================================================
 
     __global__ void RPI_aabb_test_and_enqueue(
         // Ray data (SoA, length >= batch_count)
@@ -302,7 +294,7 @@ namespace
 
             if (valid)
             {
-                // Load AABB bounds with slack (Section 4.1)
+                // Load AABB bounds with slack
                 float b0_low = Xmin[i_sub] - 1e-5f;
                 float b0_high = Xmax[i_sub] + 1e-5f;
                 float b1_low = Ymin[i_sub] - 1e-5f;
@@ -389,10 +381,8 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Kernel 1b: Compute chunks_per_segment + write sentinels (Section 6.3)
+    // ---- Kernel 1b: Compute chunks_per_segment + write sentinels ----
     // Launch: <<<ceil((num_segments+1) / K1B_BLOCK_SIZE), K1B_BLOCK_SIZE, 0, stream>>>
-    // ============================================================================
 
     __global__ void RPI_compute_chunks_per_segment(
         const uint32_t *__restrict__ run_len,
@@ -408,20 +398,17 @@ namespace
         // Write sentinel values at position [num_segments] for the ExclusiveSum calls
         if (i == num_segments)
         {
-            // Modifying run_len requires a non-const cast. The plan specifies this
-            // sentinel write (Section 6.3, Step 2). The array is only consumed by
-            // ExclusiveSum after this kernel completes (same-stream ordering).
+            // run_len is const in the signature, so the sentinel write needs a cast; ExclusiveSum
+            // reads the array only after this kernel completes (same-stream ordering)
             ((uint32_t *)run_len)[num_segments] = 0u;
             chunks_per_seg[num_segments] = 0u;
         }
     }
 
-    // ============================================================================
-    // Kernel 2: Point intersection (Section 4.2)
+    // ---- Kernel 2: Point intersection ----
     // Launch: <<<total_chunks, K2_BLOCK_SIZE, smem_bytes, stream>>>
     // Each block = one chunk of up to RAYS_PER_BLOCK rays within one segment.
     // 256 threads cooperatively process all points in the sub-cloud for each ray.
-    // ============================================================================
 
     __global__ void __launch_bounds__(K2_BLOCK_SIZE, 4)
         RPI_point_intersect(
@@ -595,7 +582,7 @@ namespace
                     PQ = e1y * tx - e1x * ty;
                     V_bary += nz * PQ;
 
-                    // Normalize (fast approximate division — Section 7.1)
+                    // Normalize (fast approximate division)
                     DT = __fdividef(1.0f, DT);
                     U *= DT;
                     V_bary *= DT;
@@ -652,13 +639,11 @@ namespace
         }
     }
 
-    // ============================================================================
-    // Host helper: stage one batch of ray data from user arrays into pinned memory
+    // ---- Host helper: stage one batch of ray data from user arrays into pinned memory ----
     // The 24 SoA arrays are packed contiguously:
     //   h_pinned[0 * batch_size .. 1 * batch_size) = T1x
     //   h_pinned[1 * batch_size .. 2 * batch_size) = T1y
     //   ...
-    // ============================================================================
 
     static void RPI_stage_ray_batch(
         float *h_pinned,
@@ -682,9 +667,8 @@ namespace
             memcpy(h_pinned + (size_t)a * batch_size, src[a] + batch_offset, count * sizeof(float));
     }
 
-} // end anonymous namespace --------------------------------------------------
+} // namespace
 
-// Public entry point — external linkage
 void qd_RPI_CUDA(
     const float *Px, const float *Py, const float *Pz,
     const size_t n_point,
@@ -706,7 +690,6 @@ void qd_RPI_CUDA(
     unsigned *hit_offset,
     int gpu_id)
 {
-    // --- Early returns (Section 8) ---
     // An empty run still has to produce a valid, all-zero CSR list
     if (n_ray == 0 || n_sub == 0 || n_point == 0)
     {
@@ -718,19 +701,15 @@ void qd_RPI_CUDA(
     // batch. Nothing is ever reallocated or copied after it is written.
     std::vector<std::vector<unsigned long long>> stage;
 
-    // --- Range checks ---
     if (n_sub > 65535)
         throw std::invalid_argument("qd_RPI_CUDA: n_sub > 65535 is not supported (uint16_t sub_idx).");
 
-    // --- GPU selection ---
     CUDA_CHECK(cudaSetDevice(gpu_id));
 
     // RAII cleanup struct — destructor frees everything on any exit path
     CudaBuffers buf;
 
-    // ====================================================================
-    // Step 1: Upload scene data (resident for the entire run)
-    // ====================================================================
+    // ---- Step 1: Upload scene data (resident for the entire run) ----
 
     // Point cloud
     CUDA_CHECK(cudaMalloc(&buf.d_Px, n_point * sizeof(float)));
@@ -765,9 +744,7 @@ void qd_RPI_CUDA(
     CUDA_CHECK(cudaMemcpy(buf.d_Zmin, Zmin, n_sub * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(buf.d_Zmax, Zmax, n_sub * sizeof(float), cudaMemcpyHostToDevice));
 
-    // ====================================================================
-    // Step 2: Compute batch size (Section 5.1)
-    // ====================================================================
+    // ---- Step 2: Compute batch size ----
 
     size_t free_mem = 0, total_mem = 0;
     CUDA_CHECK(cudaMemGetInfo(&free_mem, &total_mem));
@@ -860,9 +837,7 @@ void qd_RPI_CUDA(
     buf.queue_capacity = queue_capacity;
     buf.hit_capacity = hit_capacity;
 
-    // ====================================================================
-    // Step 3: Allocate per-stream buffers + streams + pinned memory
-    // ====================================================================
+    // ---- Step 3: Allocate per-stream buffers + streams + pinned memory ----
 
     CUDA_CHECK(cudaStreamCreate(&buf.stream[0]));
     CUDA_CHECK(cudaStreamCreate(&buf.stream[1]));
@@ -911,9 +886,7 @@ void qd_RPI_CUDA(
         CUDA_CHECK(cudaMallocHost(&buf.h_hit_point_pinned[s], hit_capacity * sizeof(uint32_t)));
     }
 
-    // ====================================================================
-    // Step 4: Batch loop with double-buffered pipeline (Section 5.2)
-    // ====================================================================
+    // ---- Step 4: Batch loop with double-buffered pipeline ----
 
     size_t n_batches = (n_ray + batch_size - 1) / batch_size;
 
@@ -930,7 +903,7 @@ void qd_RPI_CUDA(
 
     // Runtime tuning parameters for Kernel 2 (may change on overflow retry)
     uint32_t tile_size = 2;
-    uint32_t max_local_hits = tile_size * K2_BLOCK_SIZE; // 512
+    uint32_t max_local_hits = tile_size * K2_BLOCK_SIZE; // initially 512
 
     // End_bit for CUB radix sort
     int num_sub_bits = std::max(1, (int)std::ceil(std::log2((double)n_sub)));
@@ -1002,7 +975,7 @@ void qd_RPI_CUDA(
             N_RAY_ATTRS * sizeof(float *),
             cudaMemcpyHostToDevice, buf.stream[s]));
 
-        // --- Reset counters (Section 4.0) ---
+        // --- Reset counters ---
         CUDA_CHECK(cudaMemsetAsync(buf.d_queue_tail[s], 0, sizeof(uint32_t), buf.stream[s]));
         CUDA_CHECK(cudaMemsetAsync(buf.d_hit_count[s], 0, sizeof(uint32_t), buf.stream[s]));
         CUDA_CHECK(cudaMemsetAsync(buf.d_overflow_flag[s], 0, sizeof(uint32_t), buf.stream[s]));
@@ -1125,10 +1098,8 @@ void qd_RPI_CUDA(
         {
             if (n_sub == 1)
             {
-                // ============================================================
-                // Fast path for n_sub == 1 (Section 6.4)
+                // ---- Fast path for n_sub == 1 ----
                 // Skip sort + segment table entirely.
-                // ============================================================
 
                 h_total_chunks[s] = (h_queue_tail[s] + RAYS_PER_BLOCK - 1) / RAYS_PER_BLOCK;
 
@@ -1146,9 +1117,7 @@ void qd_RPI_CUDA(
             }
             else
             {
-                // ============================================================
-                // CUB sort + segment table (Sections 6.2–6.3)
-                // ============================================================
+                // ---- CUB sort + segment table ----
 
                 // --- CUB radix sort by sub_idx ---
                 cub::DoubleBuffer<uint16_t> d_keys(buf.d_wq_sub_idx_A[s], buf.d_wq_sub_idx_B[s]);
@@ -1261,7 +1230,7 @@ void qd_RPI_CUDA(
                                    sizeof(uint32_t), cudaMemcpyDeviceToHost, buf.stream[s]));
         CUDA_CHECK(cudaStreamSynchronize(buf.stream[s]));
 
-        // --- Check for tile-level hit buffer overflow → auto-retry (Section 5.2) ---
+        // --- Check for tile-level hit buffer overflow → auto-retry ---
         if (h_overflow_flag[s] != 0)
         {
             tile_size *= 2;

@@ -113,10 +113,7 @@ void quadriga_lib::calc_rician_k_factor(const std::vector<arma::Col<dtype>> &pow
         const dtype *rx_col = rx_fixed ? rx_ptr : rx_ptr + i * 3;
 
         // Compute direct distance between TX and RX
-        dtype dx = tx_col[0] - rx_col[0];
-        dtype dy = tx_col[1] - rx_col[1];
-        dtype dz = tx_col[2] - rx_col[2];
-        dtype dTR = std::sqrt(dx * dx + dy * dy + dz * dz);
+        dtype dTR = qd_calc_length(rx_col[0], rx_col[1], rx_col[2], tx_col[0], tx_col[1], tx_col[2]);
 
         // LOS threshold
         dtype threshold = dTR + window_size;

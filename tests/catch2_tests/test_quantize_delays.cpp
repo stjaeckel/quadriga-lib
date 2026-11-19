@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down quantize_delays: the split of an off-grid path onto two taps with weights (1 - delta)^alpha and
+// delta^alpha (alpha = power_exponent), pass-through of on-grid paths, max_taps, the fix_taps grid modes, snapshots
+// without paths, negative relative delays, large delay offsets and tap counts, aliasing outputs and input validation.
+// Oracles: hand-computed tap values for single paths on a 5 ns grid; results shifted by an exact binary offset.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
 #include "quadriga_lib.hpp"
@@ -55,7 +60,7 @@ TEST_CASE("quantize_delays - Input validation")
     CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, -1.0e-9),
                     std::invalid_argument);
 
-    // Invalid power_exponent (NaN passed the "<= 0" check and gave NaN coefficients)
+    // Invalid power_exponent, NaN included
     CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 0.0),
                     std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, NAN),
@@ -195,7 +200,6 @@ TEST_CASE("quantize_delays - Multiple paths, basic correctness")
 
     REQUIRE(cre_q.size() == 1);
 
-    // Count non-zero taps
     int n_nonzero = 0;
     for (arma::uword k = 0; k < cre_q[0].n_slices; ++k) {
         if (std::abs(cre_q[0](0, 0, k)) > 1e-10 || std::abs(cim_q[0](0, 0, k)) > 1e-10)
@@ -247,6 +251,8 @@ TEST_CASE("quantize_delays - Already quantized input passes through")
         } else if (std::abs(d - 50.0e-9) < 1e-20) {
             CHECK(std::abs(re - 0.1) < 1e-12);
             CHECK(std::abs(im - 0.0) < 1e-12);
+        } else {
+            FAIL("Tap " << k << " has the unexpected delay " << d);
         }
     }
 }
@@ -684,7 +690,7 @@ TEST_CASE("quantize_delays - Unlimited taps (max_taps=0)")
     CHECK(n_nonzero == 4);
 }
 
-// Helper: element-wise identity of two quantize_delays results
+// Element-wise identity of two quantize_delays results
 template <typename dtype>
 static bool qd_same(const std::vector<arma::Cube<dtype>> &a, const std::vector<arma::Cube<dtype>> &b, double tol = 0.0)
 {
@@ -895,8 +901,8 @@ TEST_CASE("quantize_delays - Delay offset gives the same taps")
                     }
                 }
 
-    // Timing guard (generous): with the old dense vectors over the absolute delay range, a 20 ms offset on 16x16
-    // antennas took about 4 s; now it is a few ms
+    // Timing guard (generous): a 20 ms offset on 16x16 antennas takes a few ms; dense vectors over the absolute delay
+    // range would take seconds
     std::vector<arma::Cube<double>> c2(1), i2(1), d2(1), re_q, im_q, dl_q;
     c2[0] = arma::cube(16, 16, 20, arma::fill::randn);
     i2[0] = arma::cube(16, 16, 20, arma::fill::randn);

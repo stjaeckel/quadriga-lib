@@ -1,12 +1,17 @@
-function test_arrayant_export_obj_file
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% --- Basic file creation: .obj and .mtl produced ---
+function test_arrayant_export_obj_file
+% MEX interface test for quadriga_lib.arrayant_export_obj_file.
+
+%% Basic file creation: .obj and .mtl produced
 ant = quadriga_lib.arrayant_generate('xpol');  % 2 elements
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant);
 assertTrue(exist('test_mex.obj', 'file') == 2);
 assertTrue(exist('test_mex.mtl', 'file') == 2);
 
-% --- Read back and validate content ---
+%% Read back and validate content
 [mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind] = ...
     quadriga_lib.obj_file_read('test_mex.obj');
 
@@ -26,7 +31,7 @@ assert( numel(obj_names) == 2 );
 
 delete('test_mex.obj'); delete('test_mex.mtl');
 
-% --- icosphere_n_div: higher subdivision -> roughly 4x more triangles per step ---
+%% icosphere_n_div: an icosphere has 20 * n_div^2 faces
 ant_c = quadriga_lib.arrayant_generate('custom', [], [], 30, 20, 0.1);  % 1 element
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 1.0, 1);
@@ -37,11 +42,11 @@ quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 1.0, 3);
 mesh_high = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
-% n_div=1 -> 80 faces/icosphere, n_div=3 -> 1280 -> ratio 16x (allow slack)
-assert( size(mesh_high, 1), 180 );
-assert( size(mesh_low, 1), 20 );
+% n_div = 1 -> 20 faces, n_div = 3 -> 180 faces
+assertEqual( size(mesh_high, 1), 180 );
+assertEqual( size(mesh_low, 1), 20 );
 
-% --- object_radius scales the mesh linearly ---
+%% object_radius scales the mesh linearly
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 1.0, 2);
 [~, vert_r1] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
@@ -54,7 +59,7 @@ max_r1 = max(abs(vert_r1(:)));
 max_r3 = max(abs(vert_r3(:)));
 assertElementsAlmostEqual( max_r3 / max_r1, 3.0, 'relative', 0.05 );
 
-% --- i_element: all elements vs single element ---
+%% i_element: all elements vs single element
 ant_xp = quadriga_lib.arrayant_generate('xpol');  % 2 elements
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_xp, 30, 'jet', 1.0, 2, []);
@@ -69,21 +74,21 @@ assert( max(obj_ind_all) == 2 );
 assert( max(obj_ind_one) == 1 );
 assert( numel(obj_ind_one) < numel(obj_ind_all) );
 
-% --- Colormap parameter: every supported colormap loads without error ---
+%% Colormap parameter: every supported colormap loads without error
 for cmap = {'jet', 'parula', 'winter', 'hot', 'turbo', 'copper', 'spring', 'cool', 'gray', 'autumn', 'summer'}
     quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, cmap{1}, 1.0, 2);
     assertTrue(exist('test_mex.obj', 'file') == 2);
     delete('test_mex.obj'); delete('test_mex.mtl');
 end
 
-% --- directivity_range_dB: different range values, file still valid ---
+%% directivity_range_dB: different range values, file still valid
 for drange = [10, 30, 50]
     quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, drange, 'jet', 1.0, 2);
     assertTrue(exist('test_mex.obj', 'file') == 2);
     delete('test_mex.obj'); delete('test_mex.mtl');
 end
 
-% --- No return value: an output request is an error and writes no file ---
+%% No return value: an output request is an error and writes no file
 try
     ok = quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -95,7 +100,7 @@ catch ME
 end
 assertFalse( exist('test_mex.obj', 'file') == 2 );
 
-% --- Multi-frequency dispatch via 'freq' input ---
+%% Multi-frequency dispatch via 'freq' input
 ant_a = quadriga_lib.arrayant_generate('custom', [], [], 30, 20, 0);
 ant_b = quadriga_lib.arrayant_generate('custom', [], [], 90, 60, 0);
 ant_mf = [ant_a, ant_b];
@@ -137,7 +142,7 @@ quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2,
 delete('test_mex.obj'); delete('test_mex.mtl');
 assertElementsAlmostEqual( vert_empty, vert_freq1, 'absolute', 1e-12 );
 
-% --- Errors ---
+%% Errors
 
 % Too few input arguments (filename only)
 try
@@ -227,7 +232,7 @@ catch ME
     end
 end
 
-% --- Cleanup any leftovers ---
+%% Cleanup any leftovers
 if exist('test_mex.obj', 'file'), delete('test_mex.obj'); end
 if exist('test_mex.mtl', 'file'), delete('test_mex.mtl'); end
 

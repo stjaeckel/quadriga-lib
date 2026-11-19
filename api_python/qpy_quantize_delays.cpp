@@ -84,10 +84,8 @@ py::tuple quantize_delays(const py::handle &coeff,
         throw std::invalid_argument("'delay' must be a list.");
     auto delay_a = qd_python_list2vector_Cube<double>(py::cast<py::list>(delay));
 
-    // Output vectors (size set by the C++ call)
     std::vector<arma::Cube<double>> coeff_re_q, coeff_im_q, delay_q;
 
-    // Call library function
     quadriga_lib::quantize_delays<double>(coeff_re_a, coeff_im_a, delay_a,
                                           coeff_re_q, coeff_im_q, delay_q,
                                           tap_spacing, max_taps, power_exponent, fix_taps);

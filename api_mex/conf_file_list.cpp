@@ -50,7 +50,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 3)
@@ -66,17 +65,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'dirs' must be a string or a cell array of strings.");
     const bool parse_shortnames = (nrhs < 2) ? true : qd_mex_get_scalar<bool>(prhs[1], "parse_shortnames", true);
 
-    // Output allocation
     std::vector<std::string> scenarios, file_names, file_dirs;
 
-    // Wrap optional pointers
     std::vector<std::string> *p_file_names = (nlhs > 1) ? &file_names : nullptr;
     std::vector<std::string> *p_file_dirs = (nlhs > 2) ? &file_dirs : nullptr;
 
-    // Call library function
     CALL_QD(scenarios = quadriga_lib::conf_file_list(dirs, p_file_names, p_file_dirs, parse_shortnames));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&scenarios);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&file_names);

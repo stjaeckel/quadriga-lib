@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.arrayant.qdant_write and qdant_read: round trips.
+
 import sys
 import os
 import unittest
@@ -110,9 +112,7 @@ def make_multi_freq_xpol(n_freq=2, res=10.0):
 class TestQdantWriteReadSingleFreq(unittest.TestCase):
     """Tests for qdant_write and qdant_read with single-frequency (3D) arrayants."""
 
-    # ================================================================================
-    # Basic round-trip
-    # ================================================================================
+    # ---- Basic round-trip ----
 
     def test_dipole_round_trip(self):
         """Write and read a dipole antenna; pattern data should survive the round-trip."""
@@ -154,9 +154,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Grid and metadata preservation
-    # ================================================================================
+    # ---- Grid and metadata preservation ----
 
     def test_grids_preserved(self):
         """Azimuth and elevation grids should survive the round-trip."""
@@ -215,9 +213,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Output structure
-    # ================================================================================
+    # ---- Output structure ----
 
     def test_output_is_3d(self):
         """Single-freq read should produce 3D pattern arrays."""
@@ -258,9 +254,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # ID parameter
-    # ================================================================================
+    # ---- ID parameter ----
 
     def test_write_returns_id(self):
         """qdant_write should return the ID of the written entry."""
@@ -295,9 +289,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Fortran contiguity
-    # ================================================================================
+    # ---- Fortran contiguity ----
 
     def test_output_is_fortran_contiguous(self):
         """Pattern arrays from qdant_read should be Fortran-contiguous."""
@@ -314,9 +306,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
 class TestQdantWriteReadMultiFreq(unittest.TestCase):
     """Tests for qdant_write and qdant_read with multi-frequency (4D) arrayants."""
 
-    # ================================================================================
-    # Basic round-trip
-    # ================================================================================
+    # ---- Basic round-trip ----
 
     def test_dipole_multi_round_trip(self):
         """Write and read a multi-freq dipole; 4D pattern data should survive the round-trip."""
@@ -356,9 +346,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Output structure
-    # ================================================================================
+    # ---- Output structure ----
 
     def test_output_is_4d(self):
         """Multi-freq read (all entries, the default) should produce 4D pattern arrays."""
@@ -413,9 +401,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Grid and metadata preservation
-    # ================================================================================
+    # ---- Grid and metadata preservation ----
 
     def test_grids_preserved(self):
         """Azimuth and elevation grids should survive the multi-freq round-trip."""
@@ -486,9 +472,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Write return value
-    # ================================================================================
+    # ---- Write return value ----
 
     def test_write_returns_zero_for_multi(self):
         """qdant_write with 4D input should return 0."""
@@ -500,9 +484,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Per-frequency data integrity
-    # ================================================================================
+    # ---- Per-frequency data integrity ----
 
     def test_per_frequency_data_distinct(self):
         """Scaled per-frequency patterns should remain distinct after round-trip."""
@@ -535,9 +517,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Cross-path compatibility
-    # ================================================================================
+    # ---- Cross-path compatibility ----
 
     def test_multi_write_single_read(self):
         """Entries written via multi-freq path should be individually readable."""
@@ -553,9 +533,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Integration with generate_speaker
-    # ================================================================================
+    # ---- Integration with generate_speaker ----
 
     def test_speaker_round_trip(self):
         """A generated speaker (multi-freq) should survive write/read round-trip."""
@@ -571,9 +549,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    # ================================================================================
-    # Edge cases
-    # ================================================================================
+    # ---- Edge cases ----
 
     def test_two_frequencies(self):
         """Minimal multi-freq case (n_freq=2) should work."""

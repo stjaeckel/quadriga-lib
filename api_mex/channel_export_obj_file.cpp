@@ -36,9 +36,6 @@ quadriga_lib.channel_export_obj_file( fn, chan, max_paths, gain_max_dB, gain_min
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
-
-## Outputs:
-- This function writes the OBJ file directly to disk and does not return any data
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -52,8 +49,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const auto fn = qd_mex_get_string(prhs[0], "", "fn");
 
-    if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'chan' must be a 1x1 struct.");
+    qd_mex_check_struct(prhs[1], "chan", true);
     const auto chan = qd_mex_struct2channel(prhs[1], false, false, "chan"); // C++ validates
 
     const auto max_paths = (nrhs < 3) ? arma::uword(0) : qd_mex_get_scalar<arma::uword>(prhs[2], "max_paths", 0);

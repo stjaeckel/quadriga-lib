@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.arrayant.rotate_pattern.
+
 import sys
 import os
 import unittest
@@ -99,9 +101,7 @@ def make_dipole_multi(n_freq=3, res=10.0):
 class TestRotatePatternSingleFreq(unittest.TestCase):
     """Tests for rotate_pattern with single-frequency (3D) arrayants."""
 
-    # ================================================================================
-    # Basic rotation
-    # ================================================================================
+    # ---- Basic rotation ----
 
     def test_zero_rotation_is_identity(self):
         """Zero rotation should return an identical pattern."""
@@ -136,9 +136,7 @@ class TestRotatePatternSingleFreq(unittest.TestCase):
         out = arrayant.rotate_pattern(ant, [0.0, np.pi / 6, 0.0], usage=3)
         self.assertFalse(np.allclose(out['e_theta_re'], ant['e_theta_re'], atol=0.01))
 
-    # ================================================================================
-    # Usage modes
-    # ================================================================================
+    # ---- Usage modes ----
 
     def test_usage_2_polarization_only_on_omni(self):
         """Usage 2 (polarization only) on omni should change e_phi but keep e_theta power."""
@@ -155,9 +153,7 @@ class TestRotatePatternSingleFreq(unittest.TestCase):
         npt.assert_array_almost_equal(out['azimuth_grid'], ant['azimuth_grid'])
         npt.assert_array_almost_equal(out['elevation_grid'], ant['elevation_grid'])
 
-    # ================================================================================
-    # Element selection
-    # ================================================================================
+    # ---- Element selection ----
 
     def test_rotate_specific_element_only(self):
         """Rotating only element 0 should leave element 1 unchanged."""
@@ -176,9 +172,7 @@ class TestRotatePatternSingleFreq(unittest.TestCase):
         self.assertFalse(np.allclose(out['e_theta_re'][:, :, 0], ant['e_theta_re'][:, :, 0], atol=0.01))
         self.assertFalse(np.allclose(out['e_phi_re'][:, :, 1], ant['e_phi_re'][:, :, 1], atol=0.01))
 
-    # ================================================================================
-    # Output structure
-    # ================================================================================
+    # ---- Output structure ----
 
     def test_output_is_3d(self):
         """Single-freq input should produce 3D output."""
@@ -202,9 +196,7 @@ class TestRotatePatternSingleFreq(unittest.TestCase):
         _ = arrayant.rotate_pattern(ant, [0.0, 0.0, np.pi / 2], usage=3)
         npt.assert_array_equal(ant['e_theta_re'], original)
 
-    # ================================================================================
-    # Energy conservation
-    # ================================================================================
+    # ---- Energy conservation ----
 
     def test_total_power_conserved(self):
         """Total power (sum of squared magnitudes) should be conserved under polarization rotation."""
@@ -216,9 +208,7 @@ class TestRotatePatternSingleFreq(unittest.TestCase):
                             out['e_phi_re'] ** 2 + out['e_phi_im'] ** 2))
         npt.assert_almost_equal(power_out, power_in, decimal=10)
 
-    # ================================================================================
-    # Inverse rotation
-    # ================================================================================
+    # ---- Inverse rotation ----
 
     def test_inverse_rotation_restores_pattern(self):
         """Rotating by +angle then -angle (usage 3, no grid adjust) should restore pattern."""
@@ -231,9 +221,7 @@ class TestRotatePatternSingleFreq(unittest.TestCase):
 class TestRotatePatternMultiFreq(unittest.TestCase):
     """Tests for rotate_pattern with multi-frequency (4D) arrayants."""
 
-    # ================================================================================
-    # Basic rotation
-    # ================================================================================
+    # ---- Basic rotation ----
 
     def test_zero_rotation_is_identity(self):
         """Zero rotation should return an identical pattern at all frequencies."""
@@ -265,9 +253,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
         npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
 
 
-    # ================================================================================
-    # Usage modes (multi-freq: grid adjust disabled automatically)
-    # ================================================================================
+    # ---- Usage modes (multi-freq: grid adjust disabled automatically) ----
 
     def test_usage_0_no_grid_adjust_multi(self):
         """Usage 0 on multi-freq should not adjust grids (mapped to usage 3 internally)."""
@@ -282,9 +268,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
         out = arrayant.rotate_pattern(ant, [np.pi / 4, 0.0, 0.0], usage=2)
         self.assertGreater(np.max(np.abs(out['e_phi_re'])), 0.1)
 
-    # ================================================================================
-    # Element selection
-    # ================================================================================
+    # ---- Element selection ----
 
     def test_rotate_specific_element_multi(self):
         """Rotating element 0 should leave element 1 unchanged at all frequencies."""
@@ -305,9 +289,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
             self.assertFalse(np.allclose(out['e_theta_re'][:, :, 0, f],
                                          ant['e_theta_re'][:, :, 0, f], atol=0.01))
 
-    # ================================================================================
-    # Output structure
-    # ================================================================================
+    # ---- Output structure ----
 
     def test_output_is_4d(self):
         """Multi-freq input should produce 4D output."""
@@ -342,9 +324,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
         _ = arrayant.rotate_pattern(ant, [0.0, 0.0, np.pi / 2], usage=3)
         npt.assert_array_equal(ant['e_theta_re'], original)
 
-    # ================================================================================
-    # Energy conservation
-    # ================================================================================
+    # ---- Energy conservation ----
 
     def test_total_power_conserved_multi(self):
         """Total power should be conserved under polarization rotation at each frequency."""
@@ -361,9 +341,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
                                 out['e_phi_im'][:, :, :, f] ** 2))
             npt.assert_almost_equal(power_out, power_in, decimal=10)
 
-    # ================================================================================
-    # Inverse rotation
-    # ================================================================================
+    # ---- Inverse rotation ----
 
     def test_inverse_rotation_restores_pattern_multi(self):
         """Rotate +angle then -angle should restore pattern at all frequencies."""
@@ -372,9 +350,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
         back = arrayant.rotate_pattern(fwd, [0.0, -np.pi / 2, 0.0], usage=3)
         npt.assert_array_almost_equal(back['e_theta_re'], ant['e_theta_re'], decimal=3)
 
-    # ================================================================================
-    # Integration with generate_speaker
-    # ================================================================================
+    # ---- Integration with generate_speaker ----
 
     def test_rotate_generated_speaker(self):
         """Rotate a generated speaker and verify output structure."""
@@ -385,9 +361,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
         self.assertEqual(out['e_theta_re'].shape, speaker['e_theta_re'].shape)
         npt.assert_array_almost_equal(out['center_freq'], speaker['center_freq'])
 
-    # ================================================================================
-    # Combined axes
-    # ================================================================================
+    # ---- Combined axes ----
 
     def test_combined_rotation_multi(self):
         """Combined x+y+z rotation should produce a different pattern than single-axis y rotation."""

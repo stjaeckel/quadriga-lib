@@ -47,16 +47,13 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs != 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 13)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read filename
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
-    // Declare outputs
     arma::uword n_cir, n_orig, n_dest, n_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
@@ -64,7 +61,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fvec center_freq;
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
-    // Wrap optional output pointers based on nlhs
     arma::uword *p_no_orig = (nlhs > 1) ? &n_orig : nullptr;
     arma::uword *p_no_dest = (nlhs > 2) ? &n_dest : nullptr;
     arma::uword *p_no_freq = (nlhs > 3) ? &n_freq : nullptr;
@@ -78,13 +74,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fmat *p_orig_pos = (nlhs > 11) ? &orig_pos : nullptr;
     arma::fmat *p_orig_orientation = (nlhs > 12) ? &orig_orientation : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::qrt_file_parse(fn, &n_cir, p_no_orig, p_no_dest, p_no_freq,
                                          p_cir_offset, p_orig_names, p_dest_names, p_version,
                                          p_center_freq, p_cir_pos, p_cir_orientation, p_orig_pos,
                                          p_orig_orientation));
 
-    // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&n_cir);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&n_orig);

@@ -154,7 +154,6 @@ py::ssize_t qdant_write(const py::handle &fn,
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    // Parse the (possibly frequency-dependent) antenna via the unified multi-freq reader
     auto ant_vec = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 
     if (ant_vec.empty())
@@ -214,7 +213,6 @@ void arrayant_export_obj_file(const py::handle &fn,
     // Element indices (0-based); empty uvec = export all elements
     const arma::uvec i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");
 
-    // Parse the (possibly frequency-dependent) input antenna
     const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);
 
     if (i_freq >= ant.size())

@@ -8,7 +8,9 @@
 #define qd_helpers_sos_hpp
 
 #include <armadillo>
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 

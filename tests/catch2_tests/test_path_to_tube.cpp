@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of quadriga_lib::path_to_tube: the tube rings at straight, nearly straight and reversed path points,
+// the finiteness of the mesh, and the rejection of non-finite inputs and of outputs that alias inputs.
+// Oracle: each ring vertex lies at the tube radius from its path point, in the plane orthogonal to the path
+// direction (distance and projection in scalar double math).
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_tools.hpp"

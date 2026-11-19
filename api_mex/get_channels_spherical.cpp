@@ -103,7 +103,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Parse antenna objects
     auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
     auto ant_rx = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
 
@@ -154,7 +153,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         return;
     }
 
-    // Single snapshot
     const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6], false, "fbs_pos");
     const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");
     const auto path_gain = qd_mex_get_Col<double>(prhs[8], false, "path_gain");
@@ -165,10 +163,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
     const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[5], "rx_orientation", 3);
 
-    // Derived inputs
     arma::uword n_path = add_fake_los_path ? fbs_pos.n_cols + 1 : fbs_pos.n_cols;
 
-    // Initialize output memory
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
     arma::cube *p_aod = nullptr, *p_eod = nullptr, *p_aoa = nullptr, *p_eoa = nullptr;
 
@@ -186,7 +182,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 6)
         plhs[6] = qd_mex_init_output(&eoa, n_ports_rx, n_ports_tx, n_path), p_eoa = &eoa;
 
-    // Call the C++ function
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_spherical<double>(ant_tx, ant_rx,
                                                          tx_pos, tx_orientation, rx_pos, rx_orientation,

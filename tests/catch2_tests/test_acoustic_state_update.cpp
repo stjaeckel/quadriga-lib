@@ -3325,11 +3325,9 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
         std::complex<double> t01, t10, r10, n, c1, nc; // nc = n c1, the normal wavenumber over k0
     };
 
-    // ------------------------------------------------------------------------------------------
-    // F. The legs the exact form does not take: a mass-law solid, dense and rigid. A mass-law body is a lumped plate
-    // with no wave inside; it holds the wave undeviated whatever its permittivity and the tracer, so both are measured
+    // ---- F. The legs the exact form does not take: a mass-law solid, dense and rigid ----
+    // A mass-law body is a lumped plate with no wave inside; it holds the wave undeviated whatever its permittivity and the tracer, so both are measured
     // against the walk-off form
-    // ------------------------------------------------------------------------------------------
     {
         std::unordered_map<std::string, std::vector<double>> pal;
         pal["a"] = {2.1609e-8, 1.5};

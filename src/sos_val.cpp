@@ -3,7 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_sos.hpp"
-#include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
 #include "qd_helpers_sos.hpp"
 #include "quadriga_lib_generic_functions.hpp"
@@ -402,20 +401,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
 
     qd_check_alias(&val, "val", &spatial_freq, &phase, &pos, &pos_b, &phase_b, &acf, &dist);
 
-    // kernel: 1 = GENERIC, 2 = AVX2
-    int kernel = 1;
-    if (use_kernel == 1)
-        kernel = 1;
-    else if (use_kernel == 2)
-    {
-        if (!quadriga_lib::quadriga_lib_has_AVX2())
-            throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-        kernel = 2;
-    }
-    else if (use_kernel == 0)
-        kernel = quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1;
-    else
-        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+    const int kernel = qd_kernel_auto_avx2(use_kernel); // 1 = GENERIC, 2 = AVX2
 
     const arma::uword n_pos = pos.n_rows, n_gen = phase.n_cols, n_elem = n_pos * n_gen;
     const bool is_double = std::is_same<dtype, double>::value;
@@ -468,7 +454,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
         }
         else
         {
-            // Normalisation per position
+            // Normalization per position
             const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
             const double *pa = acf_d.memptr(), *pd = dist_d.memptr();
             const arma::uword n_acf = acf_d.n_elem;

@@ -4,9 +4,17 @@
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 #include "bits.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <vector>
 
 // This is supposed to run on 64-bit only
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
@@ -142,42 +150,13 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
 {
     qd_check_alias(&paths_commit, "paths_commit", &paths);
 
-    // Mesh validation
-    const arma::uword n_mesh = mesh.n_rows;
-    if (n_mesh == 0)
-        throw std::invalid_argument("Input 'mesh' cannot be empty.");
-    if (mesh.n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-
-    // Validate mtl_prop, needed for the in-medium attenuation of the last leg
-    size_t n_mtl = 0;
-    for (const auto &kv : mtl_prop)
-        if (!kv.second.empty())
-        {
-            n_mtl = kv.second.size();
-            break;
-        }
-    if (n_mtl > 16383) // the state words carry a 14-bit material index
-        throw std::invalid_argument("Number of materials cannot exceed 16383.");
-
-    // Frequencies; the path storage layout supports 1 to 127 frequencies
-    const arma::uword n_freq = center_freq.n_elem;
-    if (n_freq == 0)
-        throw std::invalid_argument("Input 'center_freq' cannot be empty.");
-    if (n_freq > 127)
-        throw std::invalid_argument("Input 'center_freq' cannot have more than 127 elements.");
-    if (center_freq.min() <= 0.0f)
-        throw std::invalid_argument("Input 'center_freq' must be > 0.");
+    const arma::uword n_mesh = qd_check_mesh(mesh);
+    const size_t n_mtl = (size_t)qd_material_count(mtl_prop); // for the in-medium attenuation of the last leg
+    const arma::uword n_freq = qd_check_center_freq(center_freq);
     float fRef_Hz = center_freq[0];
 
     // Ray count is defined by 'orig'; all other per-ray inputs must match it
-    const arma::uword n_ray = orig.n_rows;
-    if (n_ray == 0)
-        throw std::invalid_argument("Input 'orig' cannot be empty.");
-    if (orig.n_cols != 3)
-        throw std::invalid_argument("Input 'orig' must have 3 columns.");
-    if (n_ray > 4294967295ull)
-        throw std::invalid_argument("Number of rays cannot exceed 2^32-1.");
+    const arma::uword n_ray = qd_check_orig(orig);
 
     if (fbs_ind.n_elem != n_ray)
         throw std::invalid_argument("Input 'fbs_ind' must have n_ray elements.");
@@ -358,8 +337,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             const float Ox = p_orig[iR], Oy = p_orig[iR + n_ray], Oz = p_orig[iR + 2 * n_ray];
 
             // Length of the final leg and the resulting total path length
-            const float dx = Rx - Ox, dy = Ry - Oy, dz = Rz - Oz;
-            const float seg_length = std::sqrt(dx * dx + dy * dy + dz * dz);
+            const float seg_length = qd_calc_length(Ox, Oy, Oz, Rx, Ry, Rz);
             const float len = paths[iR].length() + seg_length;
             if (len >= max_path_length)
                 continue;
@@ -383,15 +361,9 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                 {
                     cache_face = iF;
                     Fx = p_mesh[iF], Fy = p_mesh[iF + n_mesh], Fz = p_mesh[iF + 2 * n_mesh];
-                    const float E1x = p_mesh[iF + 3 * n_mesh] - Fx,
-                                E1y = p_mesh[iF + 4 * n_mesh] - Fy,
-                                E1z = p_mesh[iF + 5 * n_mesh] - Fz;
-                    const float E2x = p_mesh[iF + 6 * n_mesh] - Fx,
-                                E2y = p_mesh[iF + 7 * n_mesh] - Fy,
-                                E2z = p_mesh[iF + 8 * n_mesh] - Fz;
-                    Nx = E1y * E2z - E1z * E2y;
-                    Ny = E1z * E2x - E1x * E2z;
-                    Nz = E1x * E2y - E1y * E2x;
+                    qd_crossp(p_mesh[iF + 3 * n_mesh] - Fx, p_mesh[iF + 4 * n_mesh] - Fy, p_mesh[iF + 5 * n_mesh] - Fz,
+                           p_mesh[iF + 6 * n_mesh] - Fx, p_mesh[iF + 7 * n_mesh] - Fy, p_mesh[iF + 8 * n_mesh] - Fz,
+                           &Nx, &Ny, &Nz);
                 }
 
                 const float sO = Nx * (Ox - Fx) + Ny * (Oy - Fy) + Nz * (Oz - Fz);
@@ -429,7 +401,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
         const size_t k0 = (size_t)i_block * BLOCK;
         const size_t k1 = (k0 + BLOCK < n_hit) ? k0 + BLOCK : n_hit;
 
-        // Same walk as pass B, the mask decides which pairs are written
+        // Same walk as the survivor pass above, the mask decides which pairs are written
         size_t i_point = size_t(std::upper_bound(p_off, p_off + n_points + 1, (unsigned)k0) - p_off) - 1;
         size_t i_out = commit_offset + block_offset[(size_t)i_block];
 
@@ -457,8 +429,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
 
             // Length of the final leg, needed for the in-medium attenuation
             const float Rx = p_points[i_point], Ry = p_points[i_point + n_points], Rz = p_points[i_point + 2 * n_points];
-            const float dx = Rx - p_orig[iR], dy = Ry - p_orig[iR + n_ray], dz = Rz - p_orig[iR + 2 * n_ray];
-            const float seg_length = std::sqrt(dx * dx + dy * dy + dz * dz);
+            const float seg_length = qd_calc_length(p_orig[iR], p_orig[iR + n_ray], p_orig[iR + 2 * n_ray], Rx, Ry, Rz);
             const unsigned material = unsigned(p_current[iR] & 0x3FFFu);
 
             // One coefficient update per frequency: mirror and medium loss in a single call

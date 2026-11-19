@@ -158,10 +158,8 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
         // --- Calculate TX-RX distance ---
         arma::uword tx_col = fixed_tx ? 0 : i;
         arma::uword rx_col = fixed_rx ? 0 : i;
-        dtype dx = pTX[tx_col * 3] - pRX[rx_col * 3];
-        dtype dy = pTX[tx_col * 3 + 1] - pRX[rx_col * 3 + 1];
-        dtype dz = pTX[tx_col * 3 + 2] - pRX[rx_col * 3 + 2];
-        dtype dTR = std::sqrt(dx * dx + dy * dy + dz * dz);
+        const dtype *tx_c = &pTX[tx_col * 3], *rx_c = &pRX[rx_col * 3];
+        dtype dTR = qd_calc_length(rx_c[0], rx_c[1], rx_c[2], tx_c[0], tx_c[1], tx_c[2]);
         dtype threshold = dTR + window_size;
 
         // --- Accumulate polarization powers ---
@@ -186,7 +184,7 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
             dtype h = pM[offset + 7]; // Im(M_hh)
 
             dtype abs2_vv = a * a + b * b;
-            // Local names keep the old labels: abs2_vh / P_vh = rows 2-3 (H rx, V tx) = M_hv of the docs,
+            // The local names are swapped against the docs: abs2_vh / P_vh = rows 2-3 (H rx, V tx) = M_hv of the docs,
             // abs2_hv / P_hv = rows 4-5 (V rx, H tx) = M_vh of the docs
             dtype abs2_vh = c * c + d * d;
             dtype abs2_hv = e * e + f * f;

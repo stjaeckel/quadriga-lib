@@ -168,7 +168,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
     for (arma::uword p = 0; p < n_path; ++p)
     {
         const double *F = fbs_pos.colptr(p), *B = lbs_pos.colptr(p);
-        rays.delay(p) = (path_length(p) - d3D) / 299792458.0;
+        rays.delay(p) = (path_length(p) - d3D) / qd_speed_of_light;
         if (type(p) == 1) // GR: towards the image points, also defined for an end on the ground
             qd_gbsm_direction(T, {R_img}, rays.aod(p), rays.eod(p)),
                 qd_gbsm_direction(R, {T_img}, rays.aoa(p), rays.eoa(p));

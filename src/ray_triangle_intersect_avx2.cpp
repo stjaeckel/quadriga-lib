@@ -5,9 +5,6 @@
 #include <immintrin.h>
 #include "quadriga_lib_avx2_functions.hpp"
 
-// Vector size for AVX2
-#define VEC_SIZE 8
-
 // ---- Double-to-float load helpers ------------------------------------------
 
 // Load 8 doubles into two registers
@@ -160,13 +157,12 @@ static inline void rti_moller_trumbore_update(__m256 tx, __m256 ty, __m256 tz,
     C2 = _mm256_cmp_ps(U, r1, _CMP_LE_OQ);                  // (U + V) <= 1
     C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1
     C2 = _mm256_cmp_ps(W, r0, _CMP_GE_OQ);                  // W >= 0
-    C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1 & W > 0
+    C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1 & W >= 0
     C2 = _mm256_cmp_ps(W, r1, _CMP_LT_OQ);                  // W < 1
-    C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1 & W > 0 & W < 1
+    C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1 & W >= 0 & W < 1
     C1 = _mm256_and_ps(C1, _mm256_castsi256_ps(tail_mask)); // kill invalid lanes
 
-    // Fast exit if no hit was detected
-    // this should be the case in 99.9% of the time
+    // Fast exit if no hit was detected (the common case)
     __m256i Ip = _mm256_castps_si256(C1); // Cast C1 to __m256i
     if (_mm256_testz_si256(Ip, Ip) != 0)  // any( hit ) == false
         return;
@@ -300,7 +296,7 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
     bool count_hits = hit_cnt != nullptr;
 
     // Constant values needed for some operations
-    const size_t n_sub_pad = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
+    const size_t n_sub_pad = (n_sub % qd_avx2_vec_size == 0) ? n_sub : qd_avx2_vec_size * (n_sub / qd_avx2_vec_size + 1);
     const int n_ray_int = (int)n_ray;
     const int n_mesh_int = (int)n_mesh;
     const __m256 r0 = _mm256_set1_ps(0.0f);
@@ -339,13 +335,13 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
             __m256 dy_i = _mm256_div_ps(r1, _mm256_add_ps(dy, r0));
             __m256 dz_i = _mm256_div_ps(r1, _mm256_add_ps(dz, r0));
 
-            for (size_t i_sub = 0; i_sub < n_sub; i_sub += VEC_SIZE)
+            for (size_t i_sub = 0; i_sub < n_sub; i_sub += qd_avx2_vec_size)
             {
                 int remaining = (int)(n_sub - i_sub);
                 __m256i aabb_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
 
                 __m256 xmin_v, xmax_v, ymin_v, ymax_v, zmin_v, zmax_v;
-                if (remaining >= VEC_SIZE)
+                if (remaining >= (int)qd_avx2_vec_size)
                 {
                     xmin_v = _mm256_loadu_ps(&Xmin[i_sub]);
                     xmax_v = _mm256_loadu_ps(&Xmax[i_sub]);
@@ -369,7 +365,7 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
                                               _mm256_sub_ps(zmin_v, oz), _mm256_sub_ps(zmax_v, oz),
                                               dx_i, dy_i, dz_i, r0, r1, aabb_mask);
 
-                if (remaining >= VEC_SIZE)
+                if (remaining >= (int)qd_avx2_vec_size)
                     _mm256_storeu_ps((float *)&p_sub_mesh_hit[i_sub], M);
                 else
                     _mm256_maskstore_ps((float *)&p_sub_mesh_hit[i_sub], aabb_mask, M);
@@ -384,12 +380,12 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
                 int i_mesh_start = (int)SMI[i_sub];
                 int i_mesh_end = (i_sub == n_sub - 1) ? n_mesh_int : (int)SMI[i_sub + 1];
 
-                for (int i_mesh = i_mesh_start; i_mesh < i_mesh_end; i_mesh += VEC_SIZE)
+                for (int i_mesh = i_mesh_start; i_mesh < i_mesh_end; i_mesh += qd_avx2_vec_size)
                 {
                     int remaining = i_mesh_end - i_mesh;
                     __m256i tail_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
                     __m256 tx, ty, tz, e1x, e1y, e1z, e2x, e2y, e2z;
-                    if (remaining >= VEC_SIZE)
+                    if (remaining >= (int)qd_avx2_vec_size)
                     {
                         tx = _mm256_loadu_ps(&Tx[i_mesh]);
                         ty = _mm256_loadu_ps(&Ty[i_mesh]);
@@ -472,7 +468,7 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
 
     bool count_hits = hit_cnt != nullptr;
 
-    const size_t n_sub_pad = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
+    const size_t n_sub_pad = (n_sub % qd_avx2_vec_size == 0) ? n_sub : qd_avx2_vec_size * (n_sub / qd_avx2_vec_size + 1);
     const int n_ray_int = (int)n_ray;
     const int n_mesh_int = (int)n_mesh;
     const __m256 r0 = _mm256_set1_ps(0.0f);
@@ -530,13 +526,13 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
             __m256 dy_i = _mm256_div_ps(r1, _mm256_add_ps(dy, r0));
             __m256 dz_i = _mm256_div_ps(r1, _mm256_add_ps(dz, r0));
 
-            for (size_t i_sub = 0; i_sub < n_sub; i_sub += VEC_SIZE)
+            for (size_t i_sub = 0; i_sub < n_sub; i_sub += qd_avx2_vec_size)
             {
                 int remaining = (int)(n_sub - i_sub);
                 __m256i aabb_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
 
                 __m256d xmin_lo, xmin_hi, xmax_lo, xmax_hi, ymin_lo, ymin_hi, ymax_lo, ymax_hi, zmin_lo, zmin_hi, zmax_lo, zmax_hi;
-                if (remaining >= VEC_SIZE)
+                if (remaining >= (int)qd_avx2_vec_size)
                 {
                     _load8_pd(&Xmin[i_sub], xmin_lo, xmin_hi);
                     _load8_pd(&Xmax[i_sub], xmax_lo, xmax_hi);
@@ -562,7 +558,7 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
                                               _sub8_cvt_pd_ps(zmin_lo, zmin_hi, oz, oz), _sub8_cvt_pd_ps(zmax_lo, zmax_hi, oz, oz),
                                               dx_i, dy_i, dz_i, r0, r1, aabb_mask);
 
-                if (remaining >= VEC_SIZE)
+                if (remaining >= (int)qd_avx2_vec_size)
                     _mm256_storeu_ps((float *)&p_sub_mesh_hit[i_sub], M);
                 else
                     _mm256_maskstore_ps((float *)&p_sub_mesh_hit[i_sub], aabb_mask, M);
@@ -577,7 +573,7 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
                 int i_mesh_start = (int)SMI[i_sub];
                 int i_mesh_end = (i_sub == n_sub - 1) ? n_mesh_int : (int)SMI[i_sub + 1];
 
-                for (int i_mesh = i_mesh_start; i_mesh < i_mesh_end; i_mesh += VEC_SIZE)
+                for (int i_mesh = i_mesh_start; i_mesh < i_mesh_end; i_mesh += qd_avx2_vec_size)
                 {
                     int remaining = i_mesh_end - i_mesh;
                     __m256i tail_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
@@ -585,7 +581,7 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
                     // Vector from the first vertex T to the origin (O - T) and edges (U - T, V - T), one axis at a time
                     __m256d t_lo, t_hi, u_lo, u_hi, v_lo, v_hi;
                     __m256 tx, ty, tz, e1x, e1y, e1z, e2x, e2y, e2z;
-                    if (remaining >= VEC_SIZE && cache_edges)
+                    if (remaining >= (int)qd_avx2_vec_size && cache_edges)
                     {
                         _load8_pd(&Tx[i_mesh], t_lo, t_hi), tx = _sub8_cvt_pd_ps(ox, ox, t_lo, t_hi);
                         _load8_pd(&Ty[i_mesh], t_lo, t_hi), ty = _sub8_cvt_pd_ps(oy, oy, t_lo, t_hi);
@@ -593,7 +589,7 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
                         e1x = _mm256_loadu_ps(&E1x[i_mesh]), e1y = _mm256_loadu_ps(&E1y[i_mesh]), e1z = _mm256_loadu_ps(&E1z[i_mesh]);
                         e2x = _mm256_loadu_ps(&E2x[i_mesh]), e2y = _mm256_loadu_ps(&E2y[i_mesh]), e2z = _mm256_loadu_ps(&E2z[i_mesh]);
                     }
-                    else if (remaining >= VEC_SIZE)
+                    else if (remaining >= (int)qd_avx2_vec_size)
                     {
                         _load8_pd(&Tx[i_mesh], t_lo, t_hi), _load8_pd(&Ux[i_mesh], u_lo, u_hi), _load8_pd(&Vx[i_mesh], v_lo, v_hi);
                         tx = _sub8_cvt_pd_ps(ox, ox, t_lo, t_hi), e1x = _sub8_cvt_pd_ps(u_lo, u_hi, t_lo, t_hi), e2x = _sub8_cvt_pd_ps(v_lo, v_hi, t_lo, t_hi);

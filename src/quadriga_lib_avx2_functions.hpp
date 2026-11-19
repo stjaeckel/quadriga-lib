@@ -22,6 +22,9 @@
 #include <stdexcept>
 #include <cstdint>
 
+// Number of float values in one AVX2 register: the AVX2 kernels process blocks of this many values
+constexpr size_t qd_avx2_vec_size = 8;
+
 // Zero-filled heap buffer of n values of elem_size bytes, released by the destructor; no allocation for n = 0 (ptr is
 // then nullptr). The members are defined in the plain file qd_avx2_buffer.cpp, compiled without AVX2 flags.
 class qd_avx2_buffer
@@ -42,19 +45,19 @@ public:
 
 // Perform a simple test calculation
 void qd_TEST_AVX2(const float *X, // Aligned memory, 16 floats
-                  float *Z);      // Aligned memory, 8 floats
+                  float *Z);      // 8 floats
 
 // Ray-Triangle Intersection test with BVH acceleration
 template <typename dtype>
 void qd_RTI_AVX2(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First vertex coordinate in GCS, length n_mesh
                  const dtype *Ux, const dtype *Uy, const dtype *Uz, // Second vertex coordinate in GCS, length n_mesh
                  const dtype *Vx, const dtype *Vy, const dtype *Vz, // Third vertex coordinate in GCS, length n_mesh
-                 const size_t n_mesh,                               // Number of triangles (multiple of VEC_SIZE)
+                 const size_t n_mesh,                               // Number of triangles
                  const unsigned *SMI,                               // List of sub-mesh indices, length n_sub
-                 const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub_s
-                 const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub_s
-                 const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub_s
-                 const size_t n_sub,                                // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                 const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub
+                 const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub
+                 const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub
+                 const size_t n_sub,                                // Number of sub-meshes
                  const dtype *Ox, const dtype *Oy, const dtype *Oz, // Ray origin in GCS, length n_ray
                  const dtype *Dx, const dtype *Dy, const dtype *Dz, // Ray destination in GCS, length n_ray
                  const size_t n_ray,                                // Number of rays
@@ -65,13 +68,13 @@ void qd_RTI_AVX2(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First ver
                  unsigned *hit_cnt = nullptr);                      // Number of hits between orig and dest, length n_ray, uninitialized, optional
 
 // AVX2 accelerated implementation of RayPointIntersect
-void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (allocated n_point + 7)
-                 const size_t n_point,                                 // Number of points, the arrays must be allocated up to n_point + 7
+void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (allocated n_point + qd_avx2_vec_size - 1)
+                 const size_t n_point,                                 // Number of points
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
-                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const size_t n_sub,                                   // Number of sub-clouds (not aligned, i.e. n_sub <= n_sub_s)
+                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
+                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
+                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
+                 const size_t n_sub,                                   // Number of sub-clouds, n_sub_s = n_sub rounded up to a multiple of qd_avx2_vec_size
                  const float *T1x, const float *T1y, const float *T1z, // First ray vertex coordinate in GCS, length n_ray
                  const float *T2x, const float *T2y, const float *T2z, // Second ray vertex coordinate in GCS, length n_ray
                  const float *T3x, const float *T3y, const float *T3z, // Third ray vertex coordinate in GCS, length n_ray
@@ -79,7 +82,7 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                  const float *D1x, const float *D1y, const float *D1z, // First ray direction in GCS, length n_ray
                  const float *D2x, const float *D2y, const float *D2z, // Second ray direction in GCS, length n_ray
                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
-                 const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
+                 const float *rD1, const float *rD2, const float *rD3, // 1 / dot(D, N) per ray vertex, length n_ray
                  const size_t n_ray,                                   // Number of rays
                  std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                  unsigned *hit_offset);                                // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
@@ -90,15 +93,15 @@ void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Siz
                  const dtype *CFi,       // Channel coefficients, imaginary part, Size [n_ant, n_path]
                  const dtype *DL,        // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
                  const size_t n_ant,     // Number of MIMO sub-links
-                 const size_t n_path,    // Number multipath components
+                 const size_t n_path,    // Number of multipath components
                  const bool planar_wave, // Indicator that same delays are used for all antennas
                  const double *freq,     // Carrier frequencies -bandwidth * pilot_grid in [Hz], Size [ n_carrier ] (no alignment needed)
-                 const size_t n_carrier, // Number of carriers, mutiple of 8
+                 const size_t n_carrier, // Number of carriers, multiple of qd_avx2_vec_size
                  float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
                  float *Hi);             // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 
 // Combine interpolated TX/RX antenna patterns with the polarization transfer
-// matrix and applies the propagation phase to produce one slice of MIMO
+// matrix and apply the propagation phase to produce one slice of MIMO
 // channel coefficients (one path, all TX-RX element pairs).
 template <typename dtype>
 void qd_coeff_combine_avx2(const dtype *__restrict pVrr, const dtype *__restrict pVri, // RX V-pol pattern (real, imag), length n_links
@@ -106,9 +109,9 @@ void qd_coeff_combine_avx2(const dtype *__restrict pVrr, const dtype *__restrict
                            const dtype *__restrict pVtr, const dtype *__restrict pVti, // TX V-pol pattern (real, imag), length n_links
                            const dtype *__restrict pHtr, const dtype *__restrict pHti, // TX H-pol pattern (real, imag), length n_links
                            const dtype *__restrict pM,                                 // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}, labels <rx><tx>
-                           const dtype *__restrict p_delays,                           // Per-link path lengths in [m], length n_links  (read-only)
+                           const dtype *__restrict p_delays,                           // Per-link path lengths in [m] (the caller's delay buffer before conversion to [s]), length n_links
                            dtype wave_number,                                          // 2*pi*f/c
-                           dtype wavelength,                                           // wavelength  : c/f
+                           dtype wavelength,                                           // c/f in [m]
                            dtype path_amplitude,                                       // sqrt(path_gain) scaling factor (set 0 for fake LOS path)
                            dtype *__restrict p_coeff_re,                               // Output real part of coefficients, length n_links
                            dtype *__restrict p_coeff_im,                               // Output imag part of coefficients, length n_links

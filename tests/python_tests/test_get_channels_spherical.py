@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.channel.spherical.
+
 import sys
 import os
 import math
@@ -48,9 +50,7 @@ def amp2(cr, ci):
 
 class TestGetChannelsSpherical(unittest.TestCase):
 
-    # -------------------------------------------------------------------------
-    # Minimal test — angles, amplitude, delay, phase (mirrors C++ minimal test)
-    # -------------------------------------------------------------------------
+    # ---- Minimal test — angles, amplitude, delay, phase (mirrors C++ minimal test) ----
 
     def test_minimal(self):
         ant = omni()
@@ -181,9 +181,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
             aod = out[2][1] if args is batch else out[2]
             npt.assert_allclose(aod.ravel(), [0.0], atol=1e-14)  # the FBS is straight ahead of the TX
 
-    # -------------------------------------------------------------------------
-    # TX rotation
-    # -------------------------------------------------------------------------
+    # ---- TX rotation ----
 
     def test_tx_rotation_bank(self):
         ant = omni()
@@ -226,14 +224,12 @@ class TestGetChannelsSpherical(unittest.TestCase):
         npt.assert_almost_equal(cr2[0, 0, 0], -1.0, decimal=5)
         npt.assert_almost_equal(cr2[0, 1, 0], -2.0, decimal=5)
 
-    # -------------------------------------------------------------------------
-    # Fake LOS path
-    # -------------------------------------------------------------------------
+    # ---- Fake LOS path ----
 
     def test_fake_los_path(self):
         ant = omni()
 
-        # LOS path first, NLOS second (reversed vs minimal test)
+        # NLOS path first, LOS path second
         fbs_pos = np.array([[0, 10], [10, 0], [11, 1]], order='F')
         path_gain = np.array([0.25, 1.0])
         path_length = np.zeros(2)
@@ -252,7 +248,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         aoa_d = np.degrees(aoa)
         eoa_d = np.degrees(eoa)
 
-        # Slice 0: LOS path (prepended fake → real LOS is now first real path)
+        # The LOS path moves to slot 0; its input slot (output slot 2) holds a zero-power path
         npt.assert_almost_equal(aod_d[0, 0, 0], 0.0, decimal=4)
         npt.assert_almost_equal(aod_d[0, 0, 1], 90.0, decimal=4)
         npt.assert_almost_equal(aod_d[0, 0, 2], 0.0, decimal=4)
@@ -300,9 +296,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         # Real path slice 1 must be non-zero
         self.assertGreater(amp2(cr, ci)[0, 0, 1], 0.0)
 
-    # -------------------------------------------------------------------------
-    # Coupling
-    # -------------------------------------------------------------------------
+    # ---- Coupling ----
 
     def test_coupling_identity(self):
         ant = omni()
@@ -357,9 +351,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         npt.assert_almost_equal(eod[0, 0, 0], 0.0, decimal=12)
         npt.assert_almost_equal(math.cos(aoa[0, 0, 0]), -1.0, decimal=12)
 
-    # -------------------------------------------------------------------------
-    # SISO LOS scenarios
-    # -------------------------------------------------------------------------
+    # ---- SISO LOS scenarios ----
 
     def test_siso_los_along_x(self):
         tx = omni(); rx = omni()
@@ -468,9 +460,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertAlmostEqual(aod[0, 0, 0], 0.0, places=5)
         self.assertAlmostEqual(eod[0, 0, 0], 0.0, places=5)
 
-    # -------------------------------------------------------------------------
-    # FBS != LBS (two-bounce)
-    # -------------------------------------------------------------------------
+    # ---- FBS != LBS (two-bounce) ----
 
     def test_fbs_lbs_different(self):
         ant = omni()
@@ -510,9 +500,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
             self.assertAlmostEqual(cr[0, 0, 0], math.cos(k * L_exp), places=6)
             self.assertAlmostEqual(ci[0, 0, 0], -math.sin(k * L_exp), places=6)
 
-    # -------------------------------------------------------------------------
-    # Zero center frequency disables phase
-    # -------------------------------------------------------------------------
+    # ---- Zero center frequency disables phase ----
 
     def test_zero_center_freq_no_phase(self):
         ant = omni()
@@ -529,9 +517,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertGreater(cr[0, 0, 0], 0.0)
         self.assertAlmostEqual(cr[0, 0, 0], 1.0, places=5)
 
-    # -------------------------------------------------------------------------
-    # Absolute vs relative delays
-    # -------------------------------------------------------------------------
+    # ---- Absolute vs relative delays ----
 
     def test_absolute_vs_relative_delays(self):
         ant = omni()
@@ -555,9 +541,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertAlmostEqual(cr_abs[0, 0, 0], cr_rel[0, 0, 0], places=12)
         self.assertAlmostEqual(ci_abs[0, 0, 0], ci_rel[0, 0, 0], places=12)
 
-    # -------------------------------------------------------------------------
-    # Phase with center frequency
-    # -------------------------------------------------------------------------
+    # ---- Phase with center frequency ----
 
     def test_phase_with_center_frequency(self):
         ant = omni()
@@ -590,9 +574,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
             diff = 2 * PI - diff
         self.assertLess(diff, 1e-4)
 
-    # -------------------------------------------------------------------------
-    # Complex M matrix introduces phase
-    # -------------------------------------------------------------------------
+    # ---- Complex M matrix introduces phase ----
 
     def test_complex_M_introduces_phase(self):
         ant = omni()
@@ -613,9 +595,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         # Imaginary part must be non-zero (phase from complex M)
         self.assertGreater(abs(ci[0, 0, 0]), 1e-3)
 
-    # -------------------------------------------------------------------------
-    # Cross-polarization via M
-    # -------------------------------------------------------------------------
+    # ---- Cross-polarization via M ----
 
     def test_xpol_M_matrix(self):
         probe = xpol()
@@ -645,9 +625,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         # VH and VV must produce different channel matrices
         self.assertFalse(np.allclose(cr_vh, cr_vv, atol=1e-6))
 
-    # -------------------------------------------------------------------------
-    # RX rotation swaps xpol amplitudes
-    # -------------------------------------------------------------------------
+    # ---- RX rotation swaps xpol amplitudes ----
 
     def test_rx_rotation_swaps_xpol(self):
         ant = omni(); probe = xpol()
@@ -676,9 +654,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertAlmostEqual(a_v0, a_hr, places=4)
         self.assertAlmostEqual(a_h0, a_vr, places=4)
 
-    # -------------------------------------------------------------------------
-    # Output shapes
-    # -------------------------------------------------------------------------
+    # ---- Output shapes ----
 
     def test_output_shape_mimo(self):
         tx = omni()
@@ -737,9 +713,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertEqual(cr.shape, (1, 2, 1))
         self.assertEqual(delay.shape, (1, 2, 1))
 
-    # -------------------------------------------------------------------------
-    # Multiple NLOS paths, relative delays
-    # -------------------------------------------------------------------------
+    # ---- Multiple NLOS paths, relative delays ----
 
     def test_multiple_paths_relative_delays(self):
         ant = omni()
@@ -772,9 +746,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertAlmostEqual(amp[0, 0, 1], math.sqrt(0.5), places=5)
         self.assertAlmostEqual(amp[0, 0, 2], 0.5, places=5)
 
-    # -------------------------------------------------------------------------
-    # Zero path gain
-    # -------------------------------------------------------------------------
+    # ---- Zero path gain ----
 
     def test_zero_path_gain(self):
         ant = omni()
@@ -792,9 +764,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertAlmostEqual(cr[0, 0, 1], 0.0, places=12)
         self.assertAlmostEqual(ci[0, 0, 1], 0.0, places=12)
 
-    # -------------------------------------------------------------------------
-    # Large number of paths (stress test)
-    # -------------------------------------------------------------------------
+    # ---- Large number of paths (stress test) ----
 
     def test_large_number_of_paths(self):
         ant = omni()
@@ -816,9 +786,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertEqual(cr.shape[2], n_path)
         self.assertTrue(np.all(delay > 0.0))
 
-    # -------------------------------------------------------------------------
-    # Physical consistency: absolute delays all positive, LOS shortest
-    # -------------------------------------------------------------------------
+    # ---- Physical consistency: absolute delays all positive, LOS shortest ----
 
     def test_delay_physical_consistency(self):
         ant = omni()
@@ -839,9 +807,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertLessEqual(delay[0, 0, 0], delay[0, 0, 1])
         self.assertLessEqual(delay[0, 0, 0], delay[0, 0, 2])
 
-    # -------------------------------------------------------------------------
-    # Kernel selection: use_kernel (after freq)
-    # -------------------------------------------------------------------------
+    # ---- Kernel selection: use_kernel (after freq) ----
 
     def test_use_kernel(self):
         ant = arrayant.generate('3gpp', M=1, N=2, pol=3, res=10.0)
@@ -871,9 +837,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
             channel.spherical(*args, use_kernel=3)
         self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
 
-    # -------------------------------------------------------------------------
-    # Error handling
-    # -------------------------------------------------------------------------
+    # ---- Error handling ----
 
     def test_error_mismatched_n_path(self):
         ant = omni()
@@ -953,10 +917,8 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertEqual(len(result), 3)
 
 
-    # -------------------------------------------------------------------------
-    # Input memory layouts: F-contiguous float64 inputs are aliased, all
+    # ---- Input memory layouts: F-contiguous float64 inputs are aliased, all ----
     # other inputs are copied; the results must be identical in every case
-    # -------------------------------------------------------------------------
 
     def test_input_memory_layouts_give_equal_results(self):
         rng = np.random.default_rng(7)

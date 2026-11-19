@@ -2,6 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Internal ray-point kernels qd_RPI_GENERIC, qd_RPI_AVX2 and qd_RPI_CUDA and the CSR assembly qd_RPI_assemble: each
+// point inside a ray tube is hit exactly once by full icosphere coverage, single parallel tubes miss far points, the
+// sub-cloud AABBs skip clusters outside a tube, and AVX2 and CUDA agree with GENERIC. The public ray_point_intersect
+// (padding, validation, optional outputs) is tested in test_ray_point_intersect.cpp.
+
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"
@@ -14,7 +19,7 @@
 #include "quadriga_lib_cuda_functions.hpp"
 #endif
 
-// --- Helper: Compute ray tube SoA data from icosphere outputs ---
+// Compute ray tube SoA data from icosphere outputs
 // Converts the matrix-based icosphere outputs (orig, trivec, tridir) into the
 // separate SoA arrays needed by the internal qd_RPI functions.
 template <typename dtype>
@@ -59,7 +64,7 @@ static void compute_ray_tube_data(const arma::Mat<dtype> &orig,    // [n_ray, 3]
     rD3 = dtype(1.0) / (D3x % Nx + D3y % Ny + D3z % Nz);
 }
 
-// --- Helper: Compute AABBs from pointsR and sub_cloud_ind ---
+// Compute AABBs from pointsR and sub_cloud_ind
 // Allocates AABB arrays of size n_sub_s (padded to vec_size) and fills them
 // by scanning points within each sub-cloud range.
 template <typename dtype>
@@ -104,18 +109,17 @@ static void compute_aabb(const arma::Mat<dtype> &pointsR,
     }
 }
 
-// --- Helper: Build one packed hit record for qd_RPI_assemble ---
+// Build one packed hit record for qd_RPI_assemble
 // The upper 32 bit hold the point index, the lower 32 bit the ray index.
 static inline unsigned long long rpi_record(unsigned i_point, unsigned i_ray)
 {
     return ((unsigned long long)i_point << 32) | (unsigned long long)i_ray;
 }
 
-// --- Helper: Rebuild the per-ray point lists from the CSR output ---
-// The qd_RPI kernels now produce a point-major CSR list: hit_ind holds ray
+// Rebuild the per-ray point lists from the CSR output
+// The qd_RPI kernels produce a point-major CSR list: hit_ind holds ray
 // indices grouped by point, hit_offset marks the start of each point's block.
-// The checks below were written against the older ray-major layout, so this
-// transposes the CSR back into that form and leaves the checks untouched.
+// The checks below compare per-ray lists, so this transposes the CSR.
 static std::vector<std::vector<unsigned>> hit_lists_from_csr(const std::vector<unsigned> &hit_ind,
                                                              const arma::u32_vec &hit_offset,
                                                              size_t n_ray, size_t n_point)
@@ -127,7 +131,7 @@ static std::vector<std::vector<unsigned>> hit_lists_from_csr(const std::vector<u
     return hit_lists;
 }
 
-// --- Helper: Count hits per point from the per-ray hit lists ---
+// Count hits per point from the per-ray hit lists
 // Returns a vector of length n_point where each element counts how many rays hit that point.
 static arma::u32_vec count_hits_per_point(const std::vector<unsigned> *p_hit, size_t n_ray, size_t n_point)
 {
@@ -139,10 +143,7 @@ static arma::u32_vec count_hits_per_point(const std::vector<unsigned> *p_hit, si
     return hit_count;
 }
 
-// ============================================================================
-// Test Case 1: Simple Mode - float, GENERIC
 // Mirrors the public API "Simple Mode" test but calls qd_RPI_GENERIC directly.
-// ============================================================================
 TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
 {
     // Generate set of points (identical to public API test)
@@ -163,11 +164,9 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
-    // Compute AABBs
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
     compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
-    // Generate ray beams from icosphere
     arma::fmat orig, trivec, tridir;
     quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
@@ -175,7 +174,6 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
     orig.col(2) -= 30.0f;
     size_t n_ray = orig.n_rows;
 
-    // Compute ray tube SoA data
     arma::fvec T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z;
     arma::fvec Nx, Ny, Nz;
     arma::fvec D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z;
@@ -186,11 +184,9 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
                           D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z,
                           rD1, rD2, rD3);
 
-    // Allocate output
     std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
 
-    // Call GENERIC implementation
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
                           sub_cloud_ind.memptr(),
                           Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
@@ -218,10 +214,6 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
         CHECK(hit_count.at(reverse_ind.at(i)) >= 1);
 }
 
-// ============================================================================
-// Test Case 2: Simple Mode - double, GENERIC
-// Validates the double-precision path.
-// ============================================================================
 TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
 {
     // Generate set of points (same layout, double precision)
@@ -241,9 +233,8 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
     arma::u32_vec sci(1);
     sci.at(0) = 0;
     size_t n_sub = 1;
-    size_t n_sub_s = 8; // Padded to VEC_SIZE
+    size_t n_sub_s = 8; // Padded to the AVX2 vector size
 
-    // Compute AABB for the single sub-cloud
     arma::vec Xmin(n_sub_s, arma::fill::zeros), Xmax(n_sub_s, arma::fill::zeros);
     arma::vec Ymin(n_sub_s, arma::fill::zeros), Ymax(n_sub_s, arma::fill::zeros);
     arma::vec Zmin(n_sub_s, arma::fill::zeros), Zmax(n_sub_s, arma::fill::zeros);
@@ -251,7 +242,6 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
     Ymin.at(0) = points.col(1).min(); Ymax.at(0) = points.col(1).max();
     Zmin.at(0) = points.col(2).min(); Zmax.at(0) = points.col(2).max();
 
-    // Generate ray beams
     arma::mat orig, trivec, tridir;
     quadriga_lib::icosphere<double>(2, 1.0, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0;
@@ -260,7 +250,6 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
     size_t n_ray = orig.n_rows;
     size_t n_point = points.n_rows;
 
-    // Compute ray tube SoA data
     arma::vec T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z;
     arma::vec Nx, Ny, Nz;
     arma::vec D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z;
@@ -271,7 +260,6 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
                           D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z,
                           rD1, rD2, rD3);
 
-    // Allocate output and call
     std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
     qd_RPI_GENERIC<double>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
@@ -295,10 +283,7 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
     CHECK(arma::all(hit_count == 1));
 }
 
-// ============================================================================
-// Test Case 3: AVX2 vs GENERIC - Simple Mode
 // Compares hit lists element-by-element. Skipped if AVX2 not available.
-// ============================================================================
 TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
 {
 #ifdef BUILD_WITH_AVX2
@@ -325,7 +310,6 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
     compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
-    // Generate ray beams
     arma::fmat orig, trivec, tridir;
     quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
@@ -343,7 +327,6 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
                           D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z,
                           rD1, rD2, rD3);
 
-    // Run GENERIC
     std::vector<unsigned> hit_index_generic;
     arma::u32_vec hit_offset_generic(n_point + 1);
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
@@ -362,7 +345,6 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
 
     std::vector<std::vector<unsigned>> hit_generic = hit_lists_from_csr(hit_index_generic, hit_offset_generic, n_ray, n_point);
 
-    // Run AVX2
     std::vector<unsigned> hit_index_avx2;
     arma::u32_vec hit_offset_avx2(n_point + 1);
     qd_RPI_AVX2(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
@@ -398,10 +380,7 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
 #endif
 }
 
-// ============================================================================
-// Test Case 4: CUDA vs GENERIC - Simple Mode
 // Same comparison pattern as AVX2. Skipped if CUDA not available.
-// ============================================================================
 TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
 {
 #ifdef BUILD_WITH_CUDA
@@ -428,7 +407,6 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
     compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
-    // Generate ray beams
     arma::fmat orig, trivec, tridir;
     quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
@@ -446,7 +424,6 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
                           D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z,
                           rD1, rD2, rD3);
 
-    // Run GENERIC
     std::vector<unsigned> hit_index_generic;
     arma::u32_vec hit_offset_generic(n_point + 1);
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
@@ -465,7 +442,6 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
 
     std::vector<std::vector<unsigned>> hit_generic = hit_lists_from_csr(hit_index_generic, hit_offset_generic, n_ray, n_point);
 
-    // Run CUDA
     std::vector<unsigned> hit_index_cuda;
     arma::u32_vec hit_offset_cuda(n_point + 1);
     qd_RPI_CUDA(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
@@ -501,11 +477,8 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
 #endif
 }
 
-// ============================================================================
-// Test Case 5: Dense Point Grid - double, GENERIC (no sub-clouds)
 // A coarser version of the public "Ray Subdivision" test, using a single
 // sub-cloud (no segmentation) to exercise that code path.
-// ============================================================================
 TEST_CASE("RPI Internal - Dense Grid (double, GENERIC)")
 {
     // Generate a 2D grid of points at z=0.1
@@ -556,7 +529,6 @@ TEST_CASE("RPI Internal - Dense Grid (double, GENERIC)")
                           D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z,
                           rD1, rD2, rD3);
 
-    // Call GENERIC
     std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
     qd_RPI_GENERIC<double>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
@@ -580,10 +552,7 @@ TEST_CASE("RPI Internal - Dense Grid (double, GENERIC)")
     CHECK(arma::all(hit_count == 1));
 }
 
-// ============================================================================
-// Test Case 6: Dense Point Grid - AVX2 vs GENERIC
 // Uses segmented sub-clouds with vec_size=8.
-// ============================================================================
 TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
 {
 #ifdef BUILD_WITH_AVX2
@@ -617,7 +586,6 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
     compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
-    // Generate ray beams
     arma::fmat orig, trivec, tridir;
     quadriga_lib::icosphere<float>(8, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
@@ -635,7 +603,6 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
                           D1x, D1y, D1z, D2x, D2y, D2z, D3x, D3y, D3z,
                           rD1, rD2, rD3);
 
-    // Run GENERIC
     std::vector<unsigned> hit_index_generic;
     arma::u32_vec hit_offset_generic(n_point + 1);
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
@@ -654,7 +621,6 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
 
     std::vector<std::vector<unsigned>> hit_generic = hit_lists_from_csr(hit_index_generic, hit_offset_generic, n_ray, n_point);
 
-    // Run AVX2
     std::vector<unsigned> hit_index_avx2;
     arma::u32_vec hit_offset_avx2(n_point + 1);
     qd_RPI_AVX2(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
@@ -690,15 +656,11 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
 #endif
 }
 
-// ============================================================================
-// Test Case 7: No Hits - points far from ray coverage
 // A single ray tube pointing in +z has a fixed cross-section (~1 unit wide).
 // Points placed far off to the side (x=1000) are outside this tube and the
 // AABB pre-filter should reject the sub-cloud entirely.
-// NOTE: The original test used a full icosphere, but a full icosphere tiles
-// the entire sphere — every external point is inside exactly one ray tube,
-// so "no hits" is impossible with omnidirectional coverage.
-// ============================================================================
+// A full icosphere tiles the entire sphere — every external point is inside
+// exactly one ray tube — so "no hits" needs a single tube.
 TEST_CASE("RPI Internal - No Hits")
 {
     // Points far off to the side (x = 1000..1003, y = 1000, z = 1000)
@@ -708,7 +670,6 @@ TEST_CASE("RPI Internal - No Hits")
     points.col(2).fill(1000.0f);
     size_t n_point = points.n_rows;
 
-    // Single sub-cloud
     arma::u32_vec sci(1);
     sci.at(0) = 0;
     size_t n_sub = 1, n_sub_s = 8;
@@ -725,7 +686,7 @@ TEST_CASE("RPI Internal - No Hits")
     // so points at x=1000 are well outside.
     size_t n_ray = 1;
     float s = 0.5f;
-    float s32 = s * std::sqrt(3.0f) / 2.0f; // s * sqrt(3)/2
+    float s32 = s * std::sqrt(3.0f) / 2.0f;
 
     arma::fvec T1x = {s},     T1y = {0.0f},  T1z = {0.0f};
     arma::fvec T2x = {-s/2},  T2y = {s32},   T2z = {0.0f};
@@ -769,15 +730,11 @@ TEST_CASE("RPI Internal - No Hits")
         CHECK(hit_lists[r].empty());
 }
 
-// ============================================================================
-// Test Case 8: Sub-cloud AABB Filtering
 // Two widely separated point clusters. A single ray tube pointing +z covers
 // cluster A (near origin) but not cluster B (far off to the side).
 // Confirms the AABB pre-filter correctly skips cluster B.
-// NOTE: The original test used a full icosphere, but a full icosphere tiles
-// the entire sphere — every external point is inside exactly one ray tube,
-// so "cluster B not hit" is impossible with omnidirectional coverage.
-// ============================================================================
+// A full icosphere tiles the entire sphere — every external point is inside
+// exactly one ray tube — so "cluster B not hit" needs a single tube.
 TEST_CASE("RPI Internal - Sub-cloud AABB Filtering")
 {
     // Cluster A: centered at (0, 0, 1) — directly ahead of the +z ray tube
@@ -802,7 +759,6 @@ TEST_CASE("RPI Internal - Sub-cloud AABB Filtering")
     sci.at(1) = 8;
     size_t n_sub = 2, n_sub_s = 8;
 
-    // Compute AABBs
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
     compute_aabb(points, sci, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
@@ -867,10 +823,7 @@ TEST_CASE("RPI Internal - Sub-cloud AABB Filtering")
     unsigned total_B = arma::accu(hit_count.subvec(8, 15));
     CHECK(total_B == 0);
 }
-// ============================================================================
-// Test Case 9: qd_RPI_assemble - single buffer
 // Unit test of the shared CSR assembly with hand-computed expectations.
-// ============================================================================
 TEST_CASE("RPI Internal - Assemble (single buffer)")
 {
     const size_t n_point = 5;
@@ -898,11 +851,8 @@ TEST_CASE("RPI Internal - Assemble (single buffer)")
     CHECK(hit_ind[2] == 0); // point 3, ray 0
 }
 
-// ============================================================================
-// Test Case 10: qd_RPI_assemble - buffer order defines the output order
 // The ray indices are deliberately not sorted, the output must follow the
 // order in which the buffers are passed.
-// ============================================================================
 TEST_CASE("RPI Internal - Assemble (buffer order)")
 {
     const size_t n_point = 3;
@@ -929,9 +879,6 @@ TEST_CASE("RPI Internal - Assemble (buffer order)")
     CHECK(hit_ind[3] == 9); // point 2, from buffer 0
 }
 
-// ============================================================================
-// Test Case 11: qd_RPI_assemble - degenerate inputs
-// ============================================================================
 TEST_CASE("RPI Internal - Assemble (edge cases)")
 {
     const size_t n_point = 4;
@@ -970,11 +917,8 @@ TEST_CASE("RPI Internal - Assemble (edge cases)")
                     std::invalid_argument);
 }
 
-// ============================================================================
-// Test Case 12: qd_RPI_assemble - many buffers
 // Exercises the parallel assembly path: the buffers are split into runs, each
 // worker histograms its own run and scatters through its own cursors.
-// ============================================================================
 TEST_CASE("RPI Internal - Assemble (many buffers)")
 {
     const size_t n_point = 1000;
@@ -1026,14 +970,11 @@ TEST_CASE("RPI Internal - Assemble (many buffers)")
     CHECK(each_once);
 }
 
-// ============================================================================
-// Test Case 13: Staging chunk boundary
 // A single wide ray tube over a dense grid. All hits come from one ray, so a
 // single worker stages them and the internal chunk size is crossed repeatedly.
 // GENERIC only: the point count is not a multiple of 8, and qd_RPI_AVX2 reads
 // the point arrays in blocks of 8, which would run past a tightly allocated
 // arma matrix column. The public wrapper pads for that case.
-// ============================================================================
 TEST_CASE("RPI Internal - Chunk Boundary (GENERIC)")
 {
     const float res = 0.05f;

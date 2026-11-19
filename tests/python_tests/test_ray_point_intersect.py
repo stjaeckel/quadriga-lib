@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.RTtools.ray_point_intersect.
+
 import sys
 import os
 import unittest
@@ -29,7 +31,7 @@ class test_case(unittest.TestCase):
                    are hit_ind[hit_offset[i]:hit_offset[i+1]]
     """
 
-    # ---------------- helpers ----------------
+    # ---- Helpers ----
 
     def _csr_to_sets(self, hit_ind, hit_offset, n_points):
         """Convert the CSR outputs to list[set[int]] for set-equality checks."""
@@ -108,7 +110,7 @@ class test_case(unittest.TestCase):
         pts[:, 2] += 1.0
         return orig, trivec, tridir, pts
 
-    # ---------------- tests ----------------
+    # ---- Tests ----
 
     def test_two_beams_specific_geometry(self):
         """Two overlapping beams + 16 points; verify per-point hit membership."""
@@ -171,17 +173,14 @@ class test_case(unittest.TestCase):
             points, orig, trivec, tridir)
         n_points = points.shape[0]
 
-        # hit_count
         self.assertIsInstance(hit_count, np.ndarray)
         self.assertEqual(hit_count.shape, (n_points,))
         self.assertEqual(hit_count.dtype, np.uint32)
 
-        # hit_offset
         self.assertIsInstance(hit_offset, np.ndarray)
         self.assertEqual(hit_offset.shape, (n_points + 1,))
         self.assertEqual(hit_offset.dtype, np.uint32)
 
-        # hit_ind
         self.assertIsInstance(hit_ind, np.ndarray)
         self.assertEqual(hit_ind.ndim, 1)
         self.assertTrue(

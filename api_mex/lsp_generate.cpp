@@ -91,13 +91,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 5 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[1], false, "center_freq");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2], false, "tx_pos");
@@ -127,7 +125,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 6)
         plhs[6] = qd_mex_init_output(&lsp_sigma, n_link, n_freq, 8);
 
-    // Wrap optional pointers
     arma::vec *p_abs_toa = (nlhs > 1) ? &abs_toa : nullptr;
     arma::mat *p_gr_eps_re = (nlhs > 2) ? &gr_eps_re : nullptr;
     arma::mat *p_gr_eps_im = (nlhs > 3) ? &gr_eps_im : nullptr;
@@ -135,7 +132,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube *p_lsp_mu = (nlhs > 5) ? &lsp_mu : nullptr;
     arma::cube *p_lsp_sigma = (nlhs > 6) ? &lsp_sigma : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, sf_sigma_dB, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_eod_offset_deg, p_lsp_mu, p_lsp_sigma, cholesky, clip_spreads));
 }

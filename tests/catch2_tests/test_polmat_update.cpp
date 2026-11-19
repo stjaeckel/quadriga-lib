@@ -2,6 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Pins down the parallel paths of polmat_update with ray_ind: duplicate indices give bitwise the single-thread
+// result for any thread count, unique scattered indices match the serial result, and outputs that alias inputs are
+// rejected. Oracle: the same updates applied in serial chunks; one case checks the product of rotations in closed form.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_tools.hpp"
@@ -43,7 +47,7 @@ TEST_CASE("polmat_update - duplicate ray_ind entries give the single-thread resu
 {
     const int n_threads_before = omp_get_max_threads();
 
-    // Repro: 200 000 updates, all to column 0, each a rotation by 1e-5 rad; the product is a rotation by 2 rad
+    // 200 000 updates, all to column 0, each a rotation by 1e-5 rad; the product is a rotation by 2 rad
     const arma::uword N = 200000;
     arma::uvec idx(N, arma::fill::zeros);
     arma::mat U(8, N, arma::fill::zeros);

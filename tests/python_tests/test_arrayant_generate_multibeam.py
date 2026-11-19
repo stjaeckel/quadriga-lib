@@ -2,6 +2,8 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.arrayant.generate with the 'multibeam' type.
+
 import sys
 import os
 import unittest
@@ -19,7 +21,6 @@ from quadriga_lib import arrayant
 class test_case(unittest.TestCase):
 
     def test(self):
-        # Helper constants
         deg2rad = np.pi / 180.0
         freq = 3.75e9
 

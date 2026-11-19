@@ -4,32 +4,13 @@
 
 #include "quadriga_lib.hpp"
 
-#if defined(_MSC_VER) // Windows
-#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
-#endif
-
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
-#else // AVX2 disabled
 #endif
 
 #if BUILD_WITH_CUDA
 #include "quadriga_lib_cuda_functions.hpp"
-#else // CUDA disabled
 #endif
-
-// Template for time measuring:
-// #include <chrono>
-//
-// Init:
-// std::chrono::high_resolution_clock::time_point ts = std::chrono::high_resolution_clock::now(), te;
-// uword dur = 0;
-//
-// Read:
-// te = std::chrono::high_resolution_clock::now();
-// dur = (uword)std::chrono::duration_cast<std::chrono::nanoseconds>(te - ts).count();
-// ts = te;
-// std::cout << "A = " << 1.0e-9 * double(dur) << std::endl;
 
 /*!SECTION
 Miscellaneous / Tools

@@ -17,7 +17,7 @@
 //     scatterers give positive Doppler shifts in the convention of get_channels_spherical (coefficients proportional
 //     to exp(-j k d)). The report's Doppler figures were computed with an IFFT over time, which mirrors the Doppler
 //     axis, so the published spectra (positive Jakes peak and vehicle spike) are reproduced here with an FFT over
-//     time; the report's script now shows them at negative frequencies.
+//     time; the report's script (IFFT over time) shows them at negative frequencies.
 //   - Section 3.4, Table 3-3: the code assigns the four LCG seeds to AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; the
 //     table lists them for AoD LOS, AoA LOS, AoD NLOS, AoA NLOS.
 //   - Section 3.6: the Jones matrix has no cross-circular coupling (the report claims XPR_circ = XPR).
@@ -526,7 +526,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.3, Figure 4.3: Jakes Doppler of a mo
     // Model C, v_sta = 5 km/h towards the AP, no environment motion: |f| <= f_max = 11.12 Hz, peak near +f_max and
     // most power at positive Doppler (report: peak at +10.6 Hz on its axis, i.e. the bin at +10.89 Hz).
     // 8 realisations; measured over 1000: fraction at f > 0 = 0.897, std over batches of 8: 0.0095.
-    // The report's script (IFFT over time) now shows this spectrum mirrored, see the header.
+    // The report's script (IFFT over time) shows this spectrum mirrored, see the header.
     auto omni = quadriga_lib::generate_arrayant_omni<double>(30.0);
     const double fmax = 5.0 / 3.6 / (c0 / 2.4e9), dt = 0.02;
     arma::vec S_sum(101, arma::fill::zeros), Sh_sum(101, arma::fill::zeros);

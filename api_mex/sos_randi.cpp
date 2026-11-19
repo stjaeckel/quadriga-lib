@@ -6,21 +6,7 @@
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex.hpp"
 
-#include <cmath>
 #include <string>
-
-// Count argument: read as double, so that a negative, non-finite or non-integer value is rejected with the name of
-// the argument instead of wrapping around in the conversion to an unsigned type.
-static arma::uword qd_mex_sos_count(const mxArray *input, const char *name, double default_value)
-{
-    const double v = qd_mex_get_scalar<double>(input, name, default_value);
-    if (!(v >= 1.0) || !(v < 9.0e18) || v != std::floor(v))
-    {
-        const std::string msg = std::string("Input '") + name + "' must be an integer >= 1.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
-    return (arma::uword)v;
-}
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -89,25 +75,21 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::vec dist_decorr = qd_mex_get_Col<double>(prhs[0], false, "dist_decorr");
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[1], false, "pos");
-    const arma::uword imax = qd_mex_sos_count(prhs[2], "imax", 0.0);
+    const arma::uword imax = qd_mex_get_count(prhs[2], "imax", 0.0);
     const arma::mat pos_b = (nrhs < 4) ? arma::mat() : qd_mex_get_Mat<double>(prhs[3], false, "pos_b");
     const arma::vec dist_decorr_b = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4], false, "dist_decorr_b");
     const std::string preset = (nrhs < 6) ? std::string("Comb256") : qd_mex_get_string(prhs[5], "Comb256", "preset");
     const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_get_seed(prhs[6]);
 
-    // Output allocation
     arma::mat val;
     plhs[0] = qd_mex_init_output(&val, pos.n_rows, dist_decorr.n_elem);
 
-    // Call library function
     CALL_QD(quadriga_lib::sos_randi<double>(dist_decorr, pos, imax, val, pos_b, dist_decorr_b, preset, seed));
 }

@@ -7,7 +7,6 @@
 
 namespace py = pybind11;
 
-// Include parts
 #include "qpy_conf_file.cpp"
 #include "qpy_gbsm_phases.cpp"
 #include "qpy_large_scale.cpp"

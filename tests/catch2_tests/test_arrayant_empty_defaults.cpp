@@ -2,6 +2,9 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// An empty element_pos stands for zeros, an empty coupling_re for identity and an empty coupling_im for zeros. Every
+// function that takes an arrayant must give the same result for the empty members as for the explicit values.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -12,9 +15,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
-// An empty element_pos stands for zeros, an empty coupling_re for identity and an empty coupling_im for zeros. Every
-// function that takes an arrayant must give the same result for the empty members as for the explicit values.
 
 // Three-element arrayant on a 30 degree grid with distinct, deterministic patterns; element_pos, coupling_re and
 // coupling_im filled with zeros, identity and zeros

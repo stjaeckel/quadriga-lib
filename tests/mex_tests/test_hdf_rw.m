@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_hdf_rw
 % MEX interface test for the HDF5 functions: quadriga_lib.hdf5_create_file, hdf5_read_layout,
 % hdf5_reshape_layout, hdf5_write_channel, hdf5_read_channel, hdf5_write_dset, hdf5_read_dset and
@@ -20,7 +24,7 @@ fn3 = 'hdf_mex_dims.hdf5';
 non_hdf5 = 'not_hdf5.txt';
 delete_files( fn, fn2, fn3, non_hdf5 );
 
-%% ===== hdf5_create_file =====
+%% hdf5_create_file
 
 % Default layout; no output
 quadriga_lib.hdf5_create_file(fn);
@@ -62,7 +66,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 65536, 65536), 'too many
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(5), 'Input ''fn'' must be a string' );
 assertTrue( ~exist(fn, 'file') );
 
-%% ===== hdf5_reshape_layout =====
+%% hdf5_reshape_layout
 
 % Reshape layout (preserve total slot count)
 quadriga_lib.hdf5_create_file(fn, 12, 12);
@@ -107,7 +111,7 @@ chanR = quadriga_lib.hdf5_read_channel(fn, 2, 2, 1, 2);
 assertEqual(chanR.name, 'keep');
 delete(fn);
 
-%% ===== hdf5_read_layout =====
+%% hdf5_read_layout
 
 % Non-existent file: returns [0,0,0,0] and empty has_data
 [storage_space, has_data] = quadriga_lib.hdf5_read_layout('does_not_exist.hdf5');
@@ -139,7 +143,7 @@ fclose(fid);
 assert_cpp_error( @() quadriga_lib.hdf5_read_layout(non_hdf5), 'Not an HDF5 file' );
 delete(non_hdf5);
 
-%% ===== Unstructured data (par) round-trip =====
+%% Unstructured data (par) round-trip
 
 % Build par struct covering all supported types and shapes
 par = struct;
@@ -246,7 +250,7 @@ assertEqual(val, pi);
 parC = struct('complex', 1 + 21i);
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, dummy_chan, parC, 8), 'Complex datatypes are not supported' );
 
-%% ===== hdf5_write_dset, hdf5_read_dset, hdf5_read_dset_names: arguments =====
+%% hdf5_write_dset, hdf5_read_dset, hdf5_read_dset_names: arguments
 
 % ix, iy, iz, iw: omitted or [] are 1; non-double classes
 quadriga_lib.hdf5_write_dset(fn, 'loc_a', 1, [], []);
@@ -314,7 +318,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_read_dset(1, 'x'), 'Input ''fn'' must be
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset(fn2, 'x'), 'File does not exist.' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset_names(fn2), 'File does not exist.' );
 
-%% ===== Structured (chan) round-trip =====
+%% Structured (chan) round-trip
 % File stores structured data in single precision; wrapper reads back as double.
 % So expected values for round-trip are double(single(input)).
 
@@ -379,7 +383,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 4), 'exceed
 assertTrue(~isfield(chanR, 'coeff_re'));
 assertEqual(parR.string, par.string);
 
-% 2D-delay shorthand was removed; explicit reshape works
+% A delay of size [1, 1, n_path, n_snap] (one value per path and snapshot) applies to all antenna pairs
 delay_2d = rand(5, 3);
 chan = struct;
 chan.rx_pos = rx_pos;
@@ -516,9 +520,9 @@ assertTrue(isempty(lastwarn));
 [~, parR] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 2);
 assertTrue(isempty(fieldnames(parR)));   % the datasets of the old slot are removed
 
-%% ===== Layout / has_data inspection =====
+%% Layout / has_data inspection
 
-% has_data is logical (was uint32 in old API)
+% has_data is logical
 [storage_space, has_data] = quadriga_lib.hdf5_read_layout(fn);
 assertEqual(storage_space, uint32([128, 8, 8, 8]));
 assertTrue(islogical(has_data));
@@ -534,7 +538,7 @@ assertTrue(has_data(6, 1, 1, 2));
 % A slot we did not touch
 assertTrue(~has_data(20, 1, 1, 1));
 
-%% ===== hdf5_write_channel: wrapper-level input validation =====
+%% hdf5_write_channel: wrapper-level input validation
 
 % par size must match chan size
 chan2 = repmat(chan, 2, 1);
@@ -570,7 +574,7 @@ assertEqual(quadriga_lib.hdf5_read_layout(fn2), uint32([2, 3, 1, 1]));
 assertEqual(quadriga_lib.hdf5_read_dset(fn2, 'foo', 2, 3), pi);
 delete(fn2);
 
-%% ===== Multi-channel writes (struct array) =====
+%% Multi-channel writes (struct array)
 
 % Build a 3-element chan struct array
 N = 3;
@@ -689,7 +693,7 @@ for k = 1:2
     assertEqual(chansR(k).coeff_re, double(single(chans(k).coeff_re(:, :, :, 2))));
 end
 
-%% ===== hdf5_read_channel: errors =====
+%% hdf5_read_channel: errors
 
 % An i_snap index beyond the snapshots of a selected slot (thrown by C++)
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, [], [], [], [], 3), 'exceed the number of snapshots' );
@@ -708,7 +712,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_read_channel(), 'Wrong number of input a
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1, 1, 1, 1, 1, 1), 'Wrong number of input arguments.' );
 assert_cpp_error( @() out3(@quadriga_lib.hdf5_read_channel, fn2), 'Wrong number of output arguments.' );
 
-%% ===== Datasets with more dimensions than supported, sparse data =====
+%% Datasets with more dimensions than supported, sparse data
 quadriga_lib.hdf5_create_file(fn3, 2, 2);
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, 'd4', rand(2,3,4,2), 1, 1), ...
     'Input ''data'' has more than 3 dimensions.' );
@@ -722,7 +726,7 @@ quadriga_lib.hdf5_write_dset(fn3, 'd3', reshape(1:24, 2, 3, 4), 1, 1);     % 3-D
 assertEqual( quadriga_lib.hdf5_read_dset(fn3, 'd3', 1, 1), reshape(1:24, 2, 3, 4) );
 assertEqual( numel(quadriga_lib.hdf5_read_dset_names(fn3, 1, 1)), 1 );   % nothing else was written
 
-%% ===== Final cleanup =====
+%% Cleanup
 delete_files( fn, fn2, fn3, non_hdf5 );
 
 end

@@ -1,7 +1,12 @@
-function test_calc_angular_spread()
-% MOxUnit tests for quadriga_lib.calc_angular_spread
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
 
-% --- Single path returns zero spread ---
+function test_calc_angular_spread()
+% MEX interface test for quadriga_lib.calc_angular_spread.
+% Physics validation lives in the Catch2 suite (test_calc_angular_spread.cpp).
+
+%% Single path returns zero spread
 az = 0.5;
 el = 0.3;
 powers = 1.0;
@@ -11,7 +16,7 @@ assertElementsAlmostEqual(es, 0.0, 'absolute', 1e-10);
 assertElementsAlmostEqual(orient(3,1), 0.5, 'absolute', 1e-10);   % heading ~ azimuth
 assertElementsAlmostEqual(orient(2,1), -0.3, 'absolute', 1e-10);  % tilt = -elevation (a positive tilt points down)
 
-% --- Two symmetric azimuth paths ---
+%% Two symmetric azimuth paths
 az = [0.1; -0.1];
 el = [0.0; 0.0];
 powers = [1.0; 1.0];
@@ -25,7 +30,7 @@ as1 = quadriga_lib.calc_angular_spread(az, el, powers, 1);
 quadriga_lib.calc_angular_spread(az, el, powers, 1);
 assertEqual( ans, as1 );
 
-% --- Two symmetric elevation paths ---
+%% Two symmetric elevation paths
 az = [0.0; 0.0];
 el = [0.2; -0.2];
 powers = [1.0; 1.0];
@@ -38,7 +43,7 @@ assertTrue(as >= es - 1e-6);
 total = sqrt(as^2 + es^2);
 assertElementsAlmostEqual(total, 0.2, 'absolute', 1e-4);
 
-% --- Pole paths (near zenith) ---
+%% Pole paths (near zenith)
 az = [0.0; pi/2; pi; -pi/2];
 el = [1.4; 1.4; 1.4; 1.4];
 powers = [1.0; 1.0; 1.0; 1.0];
@@ -46,7 +51,7 @@ powers = [1.0; 1.0; 1.0; 1.0];
 assertTrue(as < 0.5);
 assertTrue(es < 0.5);
 
-% --- Multiple CIRs with same path count (2 CIRs, 3 paths each) ---
+%% Multiple CIRs with same path count (2 CIRs, 3 paths each)
 az = [0.1, 0.2; -0.1, -0.2; 0.0, 0.0];
 el = zeros(3, 2);
 powers = ones(3, 2);
@@ -56,7 +61,7 @@ assertEqual(size(orient), [3, 2]);
 assertEqual(size(phi), [3, 2]);
 assertTrue(as(2) > as(1));
 
-% --- No bank angle calculation ---
+%% No bank angle calculation
 az = [0.0; 0.0];
 el = [0.2; -0.2];
 powers = [1.0; 1.0];
@@ -65,7 +70,7 @@ powers = [1.0; 1.0];
 assertElementsAlmostEqual(orient_nobank(1,1), 0.0, 'absolute', 1e-10);
 assertTrue(as_bank >= as_nobank - 1e-6);
 
-% --- Without wrapping ---
+%% Without wrapping
 az = [0.1; -0.1; 0.05];
 el = [0.2; -0.2; 0.0];
 powers = [1.0; 1.0; 1.0];
@@ -74,7 +79,7 @@ assertElementsAlmostEqual(orient_raw(:,1), [0; 0; 0], 'absolute', 1e-10);
 assertElementsAlmostEqual(phi_raw, az, 'absolute', 1e-14);
 assertElementsAlmostEqual(theta_raw, el, 'absolute', 1e-14);
 
-% --- Quantization groups nearby paths ---
+%% Quantization groups nearby paths
 az = [0.0; 0.01];
 el = [0.0; 0.0];
 powers = [1.0; 1.0];
@@ -82,7 +87,7 @@ powers = [1.0; 1.0];
 [as_quant] = quadriga_lib.calc_angular_spread(az, el, powers, 1, 1, 3.0);
 assertTrue(as_quant <= as_raw + 1e-8);
 
-% --- Wrap-around at +/- pi ---
+%% Wrap-around at +/- pi
 az = [3.0; -3.0];
 el = [0.0; 0.0];
 powers = [1.0; 1.0];
@@ -91,7 +96,7 @@ gap = 2 * (pi - 3.0);
 assertTrue(as < gap);
 assertTrue(as > 0);
 
-% --- Output shapes for 1 CIR, 5 paths ---
+%% Output shapes for 1 CIR, 5 paths
 az = [0.3; -0.2; 0.1; -0.4; 0.0];
 el = [0.1; -0.1; 0.05; -0.05; 0.0];
 powers = ones(5, 1);
@@ -102,13 +107,13 @@ assertEqual(size(orient), [3, 1]);
 assertEqual(size(phi), [5, 1]);
 assertEqual(size(theta), [5, 1]);
 
-% --- Rotated angles in valid range ---
+%% Rotated angles in valid range
 assertTrue(all(phi >= -pi - 0.01));
 assertTrue(all(phi <= pi + 0.01));
 assertTrue(all(theta >= -pi/2 - 0.01));
 assertTrue(all(theta <= pi/2 + 0.01));
 
-% --- Error: too few arguments ---
+%% Error: too few arguments
 failed = false;
 try
     [~] = quadriga_lib.calc_angular_spread(az, el);
@@ -117,7 +122,7 @@ catch ME
 end
 assertTrue( failed );
 
-% --- quantize_deg must be 0 or a finite value >= 1e-3 deg ---
+%% quantize_deg must be 0 or a finite value >= 1e-3 deg
 failed = false;
 try
     [as_q] = quadriga_lib.calc_angular_spread([0.1; 0.2], [0; 0.05], [1; 1], 1, 1, 1e-8);
@@ -128,7 +133,7 @@ assertTrue( failed );
 as_q = quadriga_lib.calc_angular_spread([0.1; 0.2], [0; 0.05], [1; 1], 1, 1, 1e-3);
 assertTrue( isfinite(as_q) );
 
-% --- Defaults: wrapping off, bank angle off (the C++ defaults; same values in C++ and Python) ---
+%% Defaults: wrapping off, bank angle off (the C++ defaults; same values in C++ and Python)
 az = [0.1; 2.9; -3.0]; el = [0.1; -0.2; 0.3]; pw = [1; 0.8; 0.5];
 [as, es] = quadriga_lib.calc_angular_spread(az, el, pw);
 [as0, es0] = quadriga_lib.calc_angular_spread(az, el, pw, false, false);

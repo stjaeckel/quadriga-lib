@@ -4,6 +4,12 @@
 
 #include "quadriga_lib.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
+
+#include <cmath>
+#include <cstring>
+#include <stdexcept>
+#include <vector>
 
 /*!SECTION
 Site-specific simulation tools
@@ -144,33 +150,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     // Validate the sub-mesh partition and its bounding boxes. Both only accelerate the probe, so
     // they are ignored outright when there is no mesh to probe against.
     if (has_mesh)
-    {
-        arma::uword n_sub = 0;
-        if (sub_mesh_ind.n_elem != 0)
-        {
-            n_sub = sub_mesh_ind.n_elem;
-            const unsigned *p_sub = sub_mesh_ind.memptr();
-
-            if (p_sub[0] != 0u)
-                throw std::invalid_argument("First element of 'sub_mesh_ind' must be 0.");
-
-            for (arma::uword i = 1; i < n_sub; ++i)
-            {
-                if ((arma::uword)p_sub[i] >= mesh.n_rows)
-                    throw std::invalid_argument("Entries of 'sub_mesh_ind' cannot exceed the number of mesh faces.");
-                if (p_sub[i] <= p_sub[i - 1])
-                    throw std::invalid_argument("Entries of 'sub_mesh_ind' must be strictly increasing.");
-            }
-        }
-
-        if (aabb.n_elem != 0)
-        {
-            if (n_sub == 0)
-                throw std::invalid_argument("Input 'aabb' requires 'sub_mesh_ind'.");
-            if (aabb.n_rows != n_sub || aabb.n_cols != 6)
-                throw std::invalid_argument("Input 'aabb' must have size [n_sub, 6].");
-        }
-    }
+        qd_check_aabb(aabb, qd_check_sub_ind(sub_mesh_ind, mesh.n_rows, "sub_mesh_ind", "mesh face"));
 
     // Enforce minimum path length
     max_path_length = max_path_length < 0.01f ? 0.01f : max_path_length;
@@ -263,7 +243,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     }
 
     // Generate rays
-    arma::fmat orig_local, dest_local;
+    arma::fmat orig_local;
     arma::fvec orig_length_local;
     quadriga_lib::icosphere<float>(n_div, r0, orig_local, &orig_length_local, trivec, tridir, true);
     const float *p_orig_local = orig_local.memptr(), *p_length_local = orig_length_local.memptr();

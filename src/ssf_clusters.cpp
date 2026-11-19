@@ -18,21 +18,6 @@
 
 namespace
 {
-    // Azimuth wrap to [-pi, pi)
-    inline double qd_wrap(double x)
-    {
-        const double pi = arma::datum::pi;
-        return x - 2.0 * pi * std::floor((x + pi) / (2.0 * pi));
-    }
-
-    // Zenith angle in [deg] to elevation in [rad]: wrapped to [0, 360), [180, 360) -> 360 - t (TR 38.901 clause 7.5
-    // step 7), elevation = 90 - zenith
-    inline double qd_elev(double t)
-    {
-        t -= 360.0 * std::floor(t / 360.0);
-        return (90.0 - (t > 180.0 ? 360.0 - t : t)) * arma::datum::pi / 180.0;
-    }
-
     // Clusters of one link by TR 38.901 clause 7.5 steps 5 to 7, one frequency (method "38.901")
     // - x: values of the shared set of the link, column b·N + n; z: shadowing values, [N]; N_l active clusters
     // - ds in [s]; kf linear (0 in NLOS); as = {ASD, ASA, ZSD, ZSA} in [deg]
@@ -59,7 +44,7 @@ namespace
         const double k2 = k_db * k_db, k3 = k2 * k_db;
         const double c_tau = 0.7705 - 0.0433 * k_db + 0.0002 * k2 + 0.000017 * k3;
 
-        // Step 6: powers, eqs. (7.5-5) to (7.5-8), normalised in the log domain
+        // Step 6: powers, eqs. (7.5-5) to (7.5-8), normalized in the log domain
         const double p_th = 0.0031622776601683794; // 10^(-2.5): -25 dB removal threshold
         double l_max = -INFINITY;
         for (arma::uword n = 0; n < N_l; ++n)
@@ -75,7 +60,7 @@ namespace
         for (arma::uword n = 0; n < N_l; ++n)
             P[n] /= sum, p_max = std::max(p_max, P[n]);
         const double k1 = 1.0 / (kf + 1.0), kk = kf / (kf + 1.0);
-        // -25 dB removal without renormalisation; removed clusters keep delay and angles and stay in max(Pa) and rho
+        // -25 dB removal without renormalization; removed clusters keep delay and angles and stay in max(Pa) and rho
         for (arma::uword n = 0; n < N_l; ++n)
         {
             Pa[n] = los ? P[n] * k1 + (n == f ? kk : 0.0) : P[n];
@@ -107,7 +92,7 @@ namespace
             for (arma::uword n = 0; n < N_l; ++n)
             {
                 const double t = centre[a] + (los ? v[n] - v_f : v[n]); // eqs. (7.5-12), (7.5-17) align cluster f
-                ang[a * N_l + n] = (a < 2) ? qd_wrap(t * arma::datum::pi / 180.0) : qd_elev(t);
+                ang[a * N_l + n] = (a < 2) ? qd_gbsm_wrap(t * arma::datum::pi / 180.0) : qd_gbsm_elev(t);
             }
         }
     }
@@ -130,7 +115,7 @@ namespace
                    double *delay, double *power, double *ang)
     {
         const double r = 1.5, s2 = std::sqrt(2.0);
-        auto wrap180 = [](double v) // principal value in degrees, the domain of step 5' (qd_wrap works in rad)
+        auto wrap180 = [](double v) // principal value in degrees, the domain of step 5' (qd_gbsm_wrap works in rad)
         { return v - 360.0 * std::floor((v + 180.0) / 360.0); };
 
         // Step 5': nominal delays and angles; arg(exp(-j·v)) = wrap180(-v); the Laplacian term of the TR,
@@ -151,7 +136,7 @@ namespace
 
         for (arma::uword k = 0; k < F; ++k)
         {
-            // Step 6': eqs. (7.6.30a) to (7.6.30h), normalised in the log domain; the LOS power is in slot 0
+            // Step 6': eqs. (7.6.30a) to (7.6.30h), normalized in the log domain; the LOS power is in slot 0
             const double *s = sp + 5 * k;
             double g[5];
             g[0] = std::max(r * sp0[0] - s[0], 0.0) / (s[0] * r * sp0[0]);
@@ -179,7 +164,7 @@ namespace
                 for (arma::uword a = 0; a < 4; ++a)
                 {
                     const double t = centre[a] + c_ang * a0[a * N_l + n];
-                    ang[(k * 4 + a) * N_l + n] = (a < 2) ? qd_wrap(t * arma::datum::pi / 180.0) : qd_elev(t);
+                    ang[(k * 4 + a) * N_l + n] = (a < 2) ? qd_gbsm_wrap(t * arma::datum::pi / 180.0) : qd_gbsm_elev(t);
                 }
             }
         }
@@ -216,7 +201,7 @@ namespace
         const double pi = arma::datum::pi;
         auto efold = [pi](double e) // elevation mirrored at the poles
         {
-            e = qd_wrap(e);
+            e = qd_gbsm_wrap(e);
             return e > 0.5 * pi ? pi - e : (e < -0.5 * pi ? -pi - e : e);
         };
 
@@ -260,7 +245,7 @@ namespace
                 }
             }
 
-            // Scaling powers, paper eqs. (6), (12), normalised in the log domain; the LOS power split into LOS and
+            // Scaling powers, paper eqs. (6), (12), normalized in the log domain; the LOS power split into LOS and
             // ground reflection
             double l_max = -INFINITY, sum = 0.0, e = 0.0, c = 0.0;
             for (arma::uword n = 0; n < N_l; ++n)
@@ -298,7 +283,7 @@ namespace
                     double m1 = 0.0, m2 = 0.0;
                     for (arma::uword i = 0; i < n0 + N_l; ++i)
                     {
-                        const double v = wrapped ? qd_wrap(A[i] - mu) : (i < n0 ? A[i] : f * A[i]);
+                        const double v = wrapped ? qd_gbsm_wrap(A[i] - mu) : (i < n0 ? A[i] : f * A[i]);
                         m1 += wt[i] * v, m2 += wt[i] * v * v;
                     }
                     return std::sqrt(std::max(m2 - m1 * m1, 0.0));
@@ -333,7 +318,7 @@ namespace
             for (arma::uword n = 0; n < N_l; ++n)
             {
                 const double b = s * at[a * N_l + n];
-                ang[a * N_l + n] = (a < 2) ? qd_wrap(cen[a] + b) : efold(cen[a] + (a == 2 ? delta : 0.0) + efold(b));
+                ang[a * N_l + n] = (a < 2) ? qd_gbsm_wrap(cen[a] + b) : efold(cen[a] + (a == 2 ? delta : 0.0) + efold(b));
             }
         }
 
@@ -602,7 +587,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         const double vz = rx(2, l) - tx(2, t);
         const double d2D = std::sqrt(vx * vx + vy * vy), d3D = std::sqrt(vx * vx + vy * vy + vz * vz);
         const double aod_l = std::atan2(vy, vx), eod_l = std::atan2(vz, d2D);
-        const double los_ang[4] = {aod_l, qd_wrap(aod_l + arma::datum::pi), eod_l, -eod_l}; // AOD, AOA, EOD, EOA
+        const double los_ang[4] = {aod_l, qd_gbsm_wrap(aod_l + arma::datum::pi), eod_l, -eod_l}; // AOD, AOA, EOD, EOA
 
         // Ground reflection (TR 38.901 clause 7.6.8, ground at z = 0): delay (d_GR - d3D)/c in the cancellation-free
         // form 4·h_t·h_r/((d_GR + d3D)·c), elevation -atan2(h_t + h_r, d2D), the power factor (TR methods
@@ -615,7 +600,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         {
             const double ht = tx(2, t), hr = rx(2, l);
             const double d_gr = std::sqrt(d2D * d2D + (ht + hr) * (ht + hr)), d_gr1 = std::max(d_gr, 1e-5);
-            tau_gr = (d_gr + d3D > 0.0) ? 4.0 * ht * hr / ((d_gr + d3D) * 299792458.0) : 0.0;
+            tau_gr = (d_gr + d3D > 0.0) ? 4.0 * ht * hr / ((d_gr + d3D) * qd_speed_of_light) : 0.0;
             e_gr = -std::atan2(ht + hr, d2D);
             g_gr = m_qd ? 1.0 : (d3D / d_gr1) * (d3D / d_gr1);
             const double ct = -(ht + hr) / d_gr1, s2 = (d2D / d_gr1) * (d2D / d_gr1);

@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Table I of the paper: cost of the sum-of-sinusoids method, measured with the library.
 res_dir = sos_port_init();
 fid = fopen(fullfile(res_dir, 'tab1_complexity.csv'), 'w');

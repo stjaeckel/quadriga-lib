@@ -1,3 +1,7 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 % Fig. 5 of the paper: CDF of the output values against the Gaussian CDF.
 % Paper: 1e4 random positions in 1000 m x 1000 m x 50 m, equations (4) and (19). Here: preset Comb256.
 res_dir = sos_port_init();

@@ -3,19 +3,22 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib_generic_functions.hpp"
+
+#include <cstdint>
 #include <limits>
+#include <stdexcept>
 
 // Generic C++ implementation of RayTriangleIntersect
 template <typename dtype>
 void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First vertex coordinate in GCS, length n_mesh
                     const dtype *Ux, const dtype *Uy, const dtype *Uz, // Second vertex coordinate in GCS, length n_mesh
                     const dtype *Vx, const dtype *Vy, const dtype *Vz, // Third vertex coordinate in GCS, length n_mesh
-                    const size_t n_mesh,                               // Number of triangles (multiple of VEC_SIZE)
+                    const size_t n_mesh,                               // Number of triangles
                     const unsigned *SMI,                               // List of sub-mesh indices, length n_sub
-                    const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub_s
-                    const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub_s
-                    const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub_s
-                    const size_t n_sub,                                // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                    const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub
+                    const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub
+                    const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub
+                    const size_t n_sub,                                // Number of sub-meshes
                     const dtype *Ox, const dtype *Oy, const dtype *Oz, // Ray origin in GCS, length n_ray
                     const dtype *Dx, const dtype *Dy, const dtype *Dz, // Ray destination in GCS, length n_ray
                     const size_t n_ray,                                // Number of rays
@@ -51,7 +54,7 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First 
         // Initialize local variables
         dtype W_fbs = dtype(1.0);        // Set FBS location equal to dest
         dtype W_sbs = W_fbs;             // Set SBS location equal to FBS location
-        unsigned I_fbs = 0U, I_sbs = 0U; // Set FBS index to 0
+        unsigned I_fbs = 0U, I_sbs = 0U; // 0 = no hit
         unsigned hit_counter = 0U;       // Hit counter
 
         // Step 1 - Check intersection with the AABBs of the sub-meshes (slab-method)

@@ -2,6 +2,12 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Values of baseband_freq_response_multi and its _vec form: the delay phase per output carrier, SLERP of the
+// envelope between input frequencies with constant extrapolation, removal and re-application of the baked-in delay
+// phase, planar and spherical delays, MIMO, outputs, float, kernels and validation. Oracles: closed-form phase
+// rotations of hand-built envelopes; baseband_freq_response for one input frequency; get_channels_multifreq
+// evaluated directly at the output frequencies.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_channel.hpp"
@@ -83,10 +89,6 @@ static void bake_delay_phase(std::vector<arma::Cube<double>> &cre, std::vector<a
             }
     }
 }
-
-// ================================================================================================
-// Error handling tests
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Error handling")
 {
@@ -188,10 +190,6 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
     }
 }
 
-// ================================================================================================
-// Zero paths - output should be zeros
-// ================================================================================================
-
 TEST_CASE("baseband_freq_response_multi - Zero paths")
 {
     arma::Col<double> freq = {1.0e9};
@@ -217,10 +215,7 @@ TEST_CASE("baseband_freq_response_multi - Zero paths")
     REQUIRE(Hc.n_slices == 3);
 }
 
-// ================================================================================================
-// Single input frequency, single path, zero delay - simplest case
 // H(f_out) = coeff * exp(-j*2*pi*f_out*0) = coeff at all output carriers
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Single freq, single path, zero delay, no phase removal")
 {
@@ -249,10 +244,7 @@ TEST_CASE("baseband_freq_response_multi - Single freq, single path, zero delay, 
     }
 }
 
-// ================================================================================================
-// Single input frequency, single path, nonzero delay - verify delay phase rotation
 // H(f_out) = amp * exp(j*env_phase) * exp(-j*2*pi*f_out*tau)
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Single freq, nonzero delay, no phase removal")
 {
@@ -282,10 +274,7 @@ TEST_CASE("baseband_freq_response_multi - Single freq, nonzero delay, no phase r
     }
 }
 
-// ================================================================================================
-// Two-path superposition - verify accumulation
 // H(f) = A1*exp(-j*2*pi*f*tau1) + A2*exp(-j*2*pi*f*tau2)
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Two-path superposition, no phase removal")
 {
@@ -320,9 +309,7 @@ TEST_CASE("baseband_freq_response_multi - Two-path superposition, no phase remov
     }
 }
 
-// ================================================================================================
-// SLERP interpolation - magnitude varies linearly across 2 input frequencies
-// ================================================================================================
+// The magnitude varies linearly between 2 input frequencies
 
 TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phase removal")
 {
@@ -356,10 +343,6 @@ TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phas
         CHECK(std::abs(Hi(0, 0, k)) < 1e-6);
     }
 }
-
-// ================================================================================================
-// Constant extrapolation - output freq outside input range
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input range")
 {
@@ -396,11 +379,8 @@ TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input r
     CHECK(std::abs(Hr(0, 0, 4) - 2.0) < 1e-6);
 }
 
-// ================================================================================================
-// remove_delay_phase - baked-in phase undo/re-apply
 // Construct envelopes, bake in delay phase, then verify that remove_delay_phase=true
 // produces the same result as the pure-envelope case with remove_delay_phase=false
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - remove_delay_phase correctness")
 {
@@ -438,10 +418,6 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase correctness")
         CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-6);
     }
 }
-
-// ================================================================================================
-// remove_delay_phase with multiple paths and varying amplitudes
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
 {
@@ -500,10 +476,6 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
     }
 }
 
-// ================================================================================================
-// SLERP phase interpolation - verify phase unwrapping across pi boundary
-// ================================================================================================
-
 TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
 {
     arma::Col<double> freq = {1.0e9, 2.0e9};
@@ -535,7 +507,6 @@ TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
     // Unwrapped phase at 2 GHz: 2.8 + wrap(-2.8 - 2.8) = 2.8 + (-5.6 + 2*pi) ≈ 2.8 + 0.683 = 3.483
     // Midpoint phase: (2.8 + 3.483) / 2 ≈ 3.1416 ≈ pi
     double unwrapped_hi = phi_lo + (phi_hi - phi_lo + 6.283185307179586); // Shortest arc through +pi
-    // Actually let's compute it properly
     double d = phi_hi - phi_lo; // -5.6
     while (d > 3.141592653589793) d -= 6.283185307179586;
     while (d < -3.141592653589793) d += 6.283185307179586;
@@ -551,10 +522,6 @@ TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
     // The result should be near phase = pi, i.e. Re ≈ -1.0
     CHECK(Hr(0, 0, 0) < -0.99);
 }
-
-// ================================================================================================
-// Planar wave vs spherical wave delays
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
 {
@@ -596,9 +563,7 @@ TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
     }
 }
 
-// ================================================================================================
-// MIMO (2x2) - verify output dimensions and per-link processing
-// ================================================================================================
+// Output dimensions and per-link processing
 
 TEST_CASE("baseband_freq_response_multi - 2x2 MIMO")
 {
@@ -633,9 +598,7 @@ TEST_CASE("baseband_freq_response_multi - 2x2 MIMO")
     CHECK(std::abs(Hr(1, 1, 0) - 4.0) < 1e-6);
 }
 
-// ================================================================================================
-// Complex output matches real + j*imag
-// ================================================================================================
+// hmat equals hmat_re + j·hmat_im
 
 TEST_CASE("baseband_freq_response_multi - Complex output consistency")
 {
@@ -667,10 +630,6 @@ TEST_CASE("baseband_freq_response_multi - Complex output consistency")
         CHECK(std::abs(Hc(0, 0, k).imag() - Hi(0, 0, k)) < 1e-6);
     }
 }
-
-// ================================================================================================
-// Only request subset of outputs (hmat_re only, hmat_im only, hmat only)
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Selective output pointers")
 {
@@ -713,10 +672,6 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
     }
 }
 
-// ================================================================================================
-// Float precision template instantiation
-// ================================================================================================
-
 TEST_CASE("baseband_freq_response_multi - Float precision")
 {
     arma::Col<float> freq = {1.0e9f, 2.0e9f};
@@ -743,10 +698,6 @@ TEST_CASE("baseband_freq_response_multi - Float precision")
     CHECK(std::abs(Hr(0, 0, 1) - 1.5f) < 1e-5f);
     CHECK(std::abs(Hr(0, 0, 2) - 2.0f) < 1e-5f);
 }
-
-// ================================================================================================
-// Multiple input frequencies (3 segments) - verify correct segment selection
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selection")
 {
@@ -782,10 +733,7 @@ TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selec
     CHECK(std::abs(Hr(0, 0, 2) - 5.0) < 1e-6);
 }
 
-// ================================================================================================
-// Physical consistency with the narrowband DFT: one input frequency with remove_delay_phase = true gives the complex
-// result of baseband_freq_response with pilot_grid * bandwidth = freq_new - freq
-// ================================================================================================
+// One input frequency with remove_delay_phase = true gives the complex result of baseband_freq_response with pilot_grid * bandwidth = freq_new - freq
 
 TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_response")
 {
@@ -858,10 +806,6 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
     CHECK(arma::abs(Hi_nb - Hi_multi).max() < tol);
 }
 
-// ================================================================================================
-// remove_delay_phase with spherical wave delays (per-antenna delays)
-// ================================================================================================
-
 TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical delays")
 {
     arma::Col<double> freq = {1.0e9, 2.0e9};
@@ -909,10 +853,7 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical dela
         }
 }
 
-// ================================================================================================
-// Frequency-dependent envelope (amplitude ramp) with baked delay phase
-// Verifies full pipeline: undo → SLERP → re-apply
-// ================================================================================================
+// Full pipeline: undo → SLERP → re-apply
 
 TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with baked phase")
 {
@@ -964,10 +905,6 @@ TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with bake
     }
 }
 
-// ================================================================================================
-// Output size auto-allocation
-// ================================================================================================
-
 TEST_CASE("baseband_freq_response_multi - Output auto-resize")
 {
     arma::Col<double> freq = {1.0e9};
@@ -994,11 +931,6 @@ TEST_CASE("baseband_freq_response_multi - Output auto-resize")
     REQUIRE(Hc.n_cols == 3);
     REQUIRE(Hc.n_slices == 4);
 }
-
-// ================================================================================================
-// Large-delay acoustic scenario (speed of sound ≈ 343 m/s → large delays in seconds)
-// Verify that double-precision phase computation handles this correctly
-// ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
 {

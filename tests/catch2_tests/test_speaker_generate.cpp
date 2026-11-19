@@ -2,6 +2,12 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+// Tests of generate_speaker (driver and radiation types, frequency response, sensitivity, horn and baffle
+// parameters, auto-generated bands, validation) and of the *_multi arrayant functions on speaker models
+// (is_valid_multi, set_element_pos_multi, concat_multi, copy_element_multi, rotate_pattern_multi).
+// Oracles: the closed-form directivities and Butterworth responses written out in each case, evaluated at the
+// grid points listed below.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -48,7 +54,6 @@ TEST_CASE("Speaker - Default call, basic structure")
         CHECK(spk[i].name == "speaker_piston");
         CHECK(spk[i].center_freq > 0.0);
 
-        // Validate arrayant structure
         std::string err = spk[i].is_valid();
         CHECK(err.empty());
     }
@@ -184,7 +189,7 @@ TEST_CASE("Speaker - Omni + Hemisphere: frequency-dependent front/back ratio")
     REQUIRE(spk.size() == 3);
 
     // --- 50 Hz: well below f_baffle, nearly omnidirectional ---
-    // alpha = (50/565.5)^2 / (1 + (50/565.5)^2) = 0.00781 / 1.00781 = 0.00775
+    // alpha = (50/563.8)^2 / (1 + (50/563.8)^2) = 0.0078
     double alpha_50 = std::pow(50.0 / f_baffle, 2.0) / (1.0 + std::pow(50.0 / f_baffle, 2.0));
     double rear_50_expected = (1.0 - alpha_50); // ct=-1: (1-a) + a*0.5*(1-1) = (1-a)
     double on_axis_50 = spk[0].e_theta_re(9, 18, 0);
@@ -468,10 +473,8 @@ TEST_CASE("Speaker - Piston + Dipole combined")
     // Side (az=90°): dipole null regardless of piston directivity
     CHECK(std::abs(side) < 1e-10);
 
-    // Rear: dipole gives |ct|=1 but phase flip, piston gives 2*J1(ka*0)/ka*0 = 1
-    // (rear is also on the piston axis with st = sin(180°) = 0)
-    // Wait: at rear, ct = -1 but st = sin(theta_off) = sin(180°) = 0
-    // So piston D = piston_directivity(ka*0) = 1.0, dipole R = |-1| = 1 with flip
+    // Rear: dipole R = |ct| = 1 with phase flip; the rear is on the piston axis (sin(theta_off) = 0), so the piston
+    // factor 2*J1(x)/x at x = 0 is 1
     CHECK(std::abs(rear + on_axis) < 0.001); // Equal magnitude, opposite sign
 }
 
@@ -556,7 +559,6 @@ TEST_CASE("Speaker - All 12 driver x radiation combinations produce valid output
 
             for (size_t i = 0; i < spk.size(); ++i)
             {
-                // Validate structure
                 std::string err = spk[i].is_valid();
                 INFO("driver=" << drv << " radiation=" << rad << " freq_idx=" << i << " error=" << err);
                 CHECK(err.empty());
@@ -612,7 +614,6 @@ TEST_CASE("Speaker - Third-octave auto-generation covers passband")
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 200.0, 8000.0, 12.0, 12.0, 85.0,
                                                       "monopole");
 
-    // Check that we have a reasonable number of samples
     CHECK(spk.size() >= 10);
     CHECK(spk.size() <= 40);
 
@@ -627,9 +628,7 @@ TEST_CASE("Speaker - Third-octave auto-generation covers passband")
         CHECK(spk[i].center_freq > spk[i - 1].center_freq);
 }
 
-// ================================================================================================
-// is_valid_multi tests
-// ================================================================================================
+// ---- is_valid_multi tests ----
 
 TEST_CASE("Speaker - is_valid_multi: generated speaker passes")
 {
@@ -899,9 +898,7 @@ TEST_CASE("Speaker - is_valid_multi: different center frequencies are allowed")
     CHECK(err.empty());
 }
 
-// ================================================================================================
-// arrayant_set_element_pos_multi tests
-// ================================================================================================
+// ---- arrayant_set_element_pos_multi tests ----
 
 TEST_CASE("Speaker - set_element_pos_multi: update all elements")
 {
@@ -993,9 +990,7 @@ TEST_CASE("Speaker - set_element_pos_multi: float template")
     CHECK(std::abs(spk[0].element_pos(0, 0) - 0.5f) < 1e-6f);
 }
 
-// ================================================================================================
-// arrayant_concat_multi tests
-// ================================================================================================
+// ---- arrayant_concat_multi tests ----
 
 TEST_CASE("Speaker - concat_multi: basic two-driver concatenation")
 {
@@ -1195,7 +1190,6 @@ TEST_CASE("Speaker - concat_multi: documentation example 2-way speaker")
     // Combine into a single 2-way speaker model
     auto speaker_2way = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
 
-    // Validate structure
     REQUIRE(speaker_2way.size() == 7);
     for (size_t i = 0; i < speaker_2way.size(); ++i)
     {
@@ -1218,14 +1212,11 @@ TEST_CASE("Speaker - concat_multi: documentation example 2-way speaker")
     double tweeter_10k = speaker_2way[6].e_theta_re(9, 18, 1);
     CHECK(tweeter_10k > woofer_10k * 2.0); // Tweeter >> woofer at 10 kHz
 
-    // Multi-validation passes
     std::string err = quadriga_lib::arrayant_is_valid_multi(speaker_2way);
     CHECK(err.empty());
 }
 
-// ================================================================================================
-// arrayant_copy_element_multi tests
-// ================================================================================================
+// ---- arrayant_copy_element_multi tests ----
 
 TEST_CASE("Speaker - copy_element_multi: single destination")
 {
@@ -1349,7 +1340,6 @@ TEST_CASE("Speaker - copy_element_multi: valid after operation")
     arma::uvec dest = {1, 2, 3};
     quadriga_lib::arrayant_copy_element_multi(spk, 0, dest);
 
-    // Individual validation
     for (size_t i = 0; i < spk.size(); ++i)
     {
         std::string err = spk[i].is_valid();
@@ -1446,7 +1436,6 @@ TEST_CASE("Speaker - copy_element_multi: documentation example line array")
     positions(2, 3) = 0.225;  // z = +22.5 cm
     quadriga_lib::arrayant_set_element_pos_multi(driver, positions);
 
-    // Validate structure
     REQUIRE(driver.size() == 4);
     for (size_t i = 0; i < driver.size(); ++i)
     {
@@ -1464,7 +1453,6 @@ TEST_CASE("Speaker - copy_element_multi: documentation example line array")
             CHECK(arma::approx_equal(driver[i].e_theta_re.slice(0), driver[i].e_theta_re.slice(e), "absdiff", 1e-12));
     }
 
-    // Multi-validation passes
     std::string err = quadriga_lib::arrayant_is_valid_multi(driver);
     CHECK(err.empty());
 
@@ -1483,9 +1471,7 @@ TEST_CASE("Speaker - copy_element_multi: documentation example line array")
     std::filesystem::remove("test_line_array.qdant");
 }
 
-// ================================================================================================
-// arrayant_rotate_pattern_multi tests
-// ================================================================================================
+// ---- arrayant_rotate_pattern_multi tests ----
 
 TEST_CASE("Speaker - rotate_pattern_multi: z-rotation shifts on-axis direction")
 {
@@ -1515,7 +1501,6 @@ TEST_CASE("Speaker - rotate_pattern_multi: 360° rotation is identity")
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                        "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
 
-    // Save original patterns
     std::vector<arma::cube> orig_theta_re, orig_theta_im;
     for (size_t i = 0; i < spk.size(); ++i)
     {
@@ -1523,7 +1508,6 @@ TEST_CASE("Speaker - rotate_pattern_multi: 360° rotation is identity")
         orig_theta_im.push_back(spk[i].e_theta_im);
     }
 
-    // Rotate 360° around z
     qd_rotate_multi(spk, 0.0, 0.0, 2.0 * arma::datum::pi, 1);
 
     for (size_t i = 0; i < spk.size(); ++i)
@@ -1588,9 +1572,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: usage 0 pattern+polarization")
     // e_theta_re should be identical (same pattern rotation)
     CHECK(arma::approx_equal(spk0[0].e_theta_re, spk1[0].e_theta_re, "absdiff", 0.01));
 
-    // But e_phi_re may differ because usage 0 also rotates polarization
-    // For a speaker with only e_theta data, the difference is in e_phi
-    // (usage 0 may mix theta into phi via polarization rotation)
+    // e_phi is not compared: usage 0 also rotates the polarization, which may mix theta into phi
 }
 
 TEST_CASE("Speaker - rotate_pattern_multi: usage 2 polarization only")
@@ -1756,7 +1738,6 @@ TEST_CASE("Speaker - rotate_pattern_multi: two opposite rotations cancel")
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                        "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
-    // Save original
     std::vector<arma::cube> orig;
     for (size_t i = 0; i < spk.size(); ++i)
         orig.push_back(spk[i].e_theta_re);
@@ -1808,7 +1789,6 @@ TEST_CASE("Speaker - rotate_pattern_multi: documentation example 2-way speaker")
     // Tweeter (element 1) should have changed
     CHECK(!arma::approx_equal(speaker[4].e_theta_re.slice(1), tweeter_10k_before, "absdiff", 0.01));
 
-    // Validation passes
     std::string err = quadriga_lib::arrayant_is_valid_multi(speaker);
     CHECK(err.empty());
 }

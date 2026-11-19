@@ -68,13 +68,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     (void)plhs;
 
-    // Validate argument counts
     if (nrhs < 2 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
     const auto scenpar = qd_mex_struct2scenpar(prhs[1], "scenpar");
@@ -105,7 +103,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat valid_range = (nrhs < 7) ? arma::mat() : qd_mex_typecast_Mat<double>(prhs[6], "valid_range");
     const bool write_defaults = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "write_defaults", false);
 
-    // Call library function
     CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, pl_model, plpar, pl_order, short_names,
                                           ref, ref_sec, valid_range, write_defaults));
 }

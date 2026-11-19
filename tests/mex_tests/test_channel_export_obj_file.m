@@ -1,4 +1,10 @@
+% SPDX-License-Identifier: Apache-2.0
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+% Part of quadriga-lib — see LICENSE for terms.
+
 function test_channel_export_obj_file
+% MEX interface test for quadriga_lib.channel_export_obj_file.
+% Physics validation lives in the Catch2 suite (test_channel_export_obj_file.cpp).
 
 fn = 'test.obj';
 if exist( fn,'file' ), delete(fn); end

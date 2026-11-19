@@ -37,18 +37,15 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 3 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const arma::vec acf = qd_mex_get_Col<double>(prhs[0], false, "acf");
     const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
     const arma::vec d = qd_mex_get_Col<double>(prhs[2], false, "d");
 
-    // Call library function
     arma::vec val;
     CALL_QD(val = quadriga_lib::sos_acfi<double>(acf, dist, d));
     plhs[0] = qd_mex_copy2matlab(&val);

@@ -126,7 +126,6 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        double wall_loss_dB)
 
 {
-    // Check if the antennas are valid
     auto error_message = qd_arrayant_is_valid_quick(ap_array);
     if (error_message.length() != 0)
     {
@@ -160,16 +159,15 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     arma::uword n_snap = 1 + (arma::uword)n_snap_d;
     long long n_snap_ll = (long long)n_snap;
 
-    const double V_PI = 3.141592653589793;  // PI
-    const double V_2PI = 6.283185307179586; // 2 * PI
-    const double V_C = 299792458.0;         // Speed of light
+    const double V_PI = 3.141592653589793;
+    const double V_2PI = 6.283185307179586;
 
     // Generate IEEE model parameters
     // This validates all other inputs and throws an error if invalid input was given
     arma::mat rx_pos, rx_orientation;     // Size: [3, n_users]
     std::vector<arma::mat> aod, aoa, pow; // Size: [n_subpath, n_path_out], per user
     std::vector<arma::vec> delay;         // Length: n_path_out
-    std::vector<arma::cube> M;            // Size: Size: [8, n_subpath, n_path_out]
+    std::vector<arma::cube> M;            // Size: [8, n_subpath, n_path_out]
 
     qd_ieee_indoor_param(rx_pos, rx_orientation, aod, aoa, pow, delay, M,
                          channel_type, center_freq, tap_spacing, n_users, dist, n_floors, offset_angles_deg, n_subpath, seed,
@@ -180,7 +178,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
     arma::uword bw_factor = (arma::uword)std::round(10.0e-9 / tap_spacing); // bandwidth expansion factor
 
-    // ---------- HELPER FUNCTIONS ----------
+    // ---- Helper functions ----
 
     auto find_index = [](size_t n_data, const double *data, double val) -> size_t
     {
@@ -193,7 +191,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     // Random number generator; the draws use the portable helpers qd_rng_uniform and qd_rng_normal
     std::mt19937_64 rng;
     if (seed != -1)
-        rng.seed((unsigned long long)seed + 1ULL); // Use different seed as for "qd_ieee_indoor_param"
+        rng.seed((unsigned long long)seed + 1ULL); // Different seed than qd_ieee_indoor_param
     else
     {
         std::random_device rd;
@@ -201,10 +199,10 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         rng.seed(seq);
     }
 
-    // Fisher–Yates shuffle using std::mt19937_64 RNG
+    // Fisher-Yates shuffle
     auto shuffle_uvec = [&](const arma::uvec &in) -> arma::uvec
     {
-        arma::uvec out = in; // copy
+        arma::uvec out = in;
         for (arma::uword i = out.n_elem; i > 1; --i)
         {
             arma::uword j = std::min((arma::uword)(qd_rng_uniform(rng) * (double)i), i - 1); // 0 ... i-1
@@ -213,7 +211,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         return out;
     };
 
-    // ---------- CHANNEL GENERATION ----------
+    // ---- Channel generation ----
 
     // Initialize output
     std::vector<quadriga_lib::channel<double>> result;
@@ -231,7 +229,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     const double v_station = speed_station_kmh / 3.6;      // Speed of the station
     const double v_env = speed_env_kmh / 3.6;              // Speed of the environment
     const double v_spike = doppler_effect / 3.6;           // Moving vehicle reflection in model F
-    const double lambda = V_C / center_freq;               // Wavelength [m]
+    const double lambda = qd_speed_of_light / center_freq;               // Wavelength [m]
     const double f_d_env = v_env / lambda;                 // Max env Doppler (≈3 Hz at 2.4 GHz)
     const double f_spike = v_spike / lambda;               // Spike center frequency (model F)
     const double gamma_bell = f_d_env / 3.0;               // scale parameter (A=9 → 3*gamma = f_d)
@@ -258,7 +256,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         // Number of "lamps" to approximate realistic jitter
         const int N_lamp = 10;
         // Small frequency jitter (Hz) around each harmonic
-        const double sigma_f = 0.3; // tweak 0.2–0.5 Hz as you like
+        const double sigma_f = 0.3;
 
         double dt = update_interval;
 
@@ -308,13 +306,11 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         const arma::vec path_gain_user = arma::vec(pow[i_user].memptr(), n_subpath * n_path_out, false, true);
         const arma::mat M_user = arma::mat(M[i_user].memptr(), 8, n_subpath * n_path_out, false, true);
 
-        // Determine the the path indices that should be modified with Doppler effects based on IEEE 802.11-03/940r4
-        // For TGac interpolation, assume that all interpolated taps are effected as well (maintains total interference power)
+        // Path indices with Doppler effects (fluorescent-light modulation or the vehicle spike) as in IEEE 802.11-03/940r4;
+        // with TGac interpolation all interpolated taps are affected as well (maintains the total interference power)
         arma::uvec mod_paths;
         if (use_fluor)
         {
-            // Determine the the path indices that should be modulated baes on IEEE 802.11-03/940r4
-            // For TGac interpolation, assume that all interpolated taps are effected as well (maintains total interference power)
             if (channel_type == "D")
             {
                 mod_paths.zeros(3 * bw_factor);
@@ -351,8 +347,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                 mod_paths[i_path_interpol] = mod_paths[i_path_interpol - 1] + 1; // 1 cluster @ 20 ns
         }
 
-        // Sanity check mod_paths to avoid downstream out-of range issues and construct boolean mask
-        // This should not happen with the default parameter tables, but users might edit them and recompile the project, causing seg-faults.
+        // Boolean mask of mod_paths; indices out of range (only possible with edited parameter tables) are skipped
         std::vector<bool> mod_paths_mask(n_path_out, false);
         if (!mod_paths.empty())
         {
@@ -443,7 +438,6 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
                         if (std::abs(f) <= 0.1 * f_spike)
                             break; // accept sample
-                        // else: redraw
                     }
                     f_env[j_sub] = f_spike + f; // Hz
                     continue;
@@ -459,7 +453,6 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
                 if (std::abs(f) <= 5.0 * f_d_env)
                     break; // accept sample
-                // else: redraw
             }
             f_env[j_sub] = f; // Hz
         }
@@ -474,14 +467,13 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         double *p_length = path_length.memptr();
         for (arma::uword i_path = 0; i_path < n_path_out; ++i_path)
         {
-            double len = Dist + delay[i_user].at(i_path) * V_C;
+            double len = Dist + delay[i_user].at(i_path) * qd_speed_of_light;
             for (arma::uword i_sub = 0; i_sub < n_subpath; ++i_sub)
                 p_length[i_path * n_subpath + i_sub] = len;
         }
 
-        // Variables
-        arma::cube coeff_re, coeff_im, coeff_delay; // Size: [n_tx, n_rx, n_sub * n_path]
-        arma::vec Doppler_Jakes;                    // Length: [n_sub * n_path]
+                arma::cube coeff_re, coeff_im, coeff_delay; // Size: [n_rx, n_tx, n_subpath * n_path_out]
+        arma::vec Doppler_Jakes;                    // Length: [n_subpath * n_path_out]
 
         // Compute coefficients for the first snapshot for the probe antenna
         quadriga_lib::get_channels_planar(probe_antenna, probe_antenna, arma::vec{Tx, Ty, Tz}, arma::vec{Tb, Tt, Th},
@@ -622,7 +614,6 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         chan_user.delay.resize(n_snap);
         chan_user.path_gain.resize(n_snap);
 
-        // Allocate memory
         for (arma::uword i_snap = 0; i_snap < n_snap; ++i_snap)
         {
             if (uplink)
@@ -752,7 +743,6 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
             }
         }
 
-        // Add user channel to result list
         result.push_back(chan_user);
     }
 

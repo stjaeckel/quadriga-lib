@@ -39,29 +39,23 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 4 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
     const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "powers");
     const std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[1], 1, "path_length");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2], false, "tx_pos");
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3], false, "rx_pos");
     const double window_size = (nrhs < 5) ? 0.01 : qd_mex_get_scalar<double>(prhs[4], "window_size", 0.01);
 
-    // Declare outputs
     arma::vec kf, pg;
 
-    // Set up optional output pointers based on nlhs
     arma::vec *p_pg = (nlhs > 1) ? &pg : nullptr;
 
-    // Call library function
     CALL_QD(quadriga_lib::calc_rician_k_factor<double>(powers, path_length, tx_pos, rx_pos, &kf, p_pg, window_size));
 
-    // Write outputs to MATLAB
     plhs[0] = qd_mex_copy2matlab(&kf);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&pg);
