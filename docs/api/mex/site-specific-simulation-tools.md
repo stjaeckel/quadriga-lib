@@ -8,6 +8,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-site-s
 | [cube](#cube) | Construct a triangulated cube mesh |
 | [generate_diffraction_paths](#generate_diffraction_paths) | Generate elliptic propagation paths and weights for diffraction gain estimation |
 | [icosphere](#icosphere) | Construct a geodesic polyhedron from recursive icosahedron subdivision |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Write a triangular mesh to a Mitsuba 3 XML scene file |
 | [obj_file_read](#obj_file_read) | Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials |
 | [obj_file_write](#obj_file_write) | Write a Wavefront .obj file |
 | [plane](#plane) | Construct a triangulated plane mesh |
@@ -201,6 +202,43 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#icosphere) · [Python](.
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_faces, 9]`
 - **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
+
+---
+<a id="mitsuba_xml_file_write"></a>
+## mitsuba_xml_file_write
+Write a triangular mesh to a Mitsuba 3 XML scene file
+
+Also in: [C++](../cpp/site-specific-simulation-tools.md#mitsuba_xml_file_write) · [Python](../python/site-specific-simulation-tools.md#mitsuba_xml_file_write)
+
+- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
+  differentiable radio-propagation simulations
+- Supports grouping faces into named objects with per-face material assignments
+- Optionally maps material names to ITU-defined presets used by Sionna RT
+- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
+  both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
+  relative to the XML file (`<stem>_meshes/<object>.ply`)
+- Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
+  and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+
+### Usage:
+```matlab
+quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, ...
+    mtl_names, bsdf, map_to_itu_materials );
+```
+
+### Inputs:
+- **`fn`** — Output file path including `.xml` extension
+- **`vert_list`** — Vertex coordinates (x, y, z); `[n_vert, 3]`
+- **`face_ind`** — Triangle definitions as 1-based vertex indices; `[n_mesh, 3]`
+- **`obj_ind`** — 1-based object index per triangle; `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle; every face must reference a material (0 is rejected); `[n_mesh]`
+- **`obj_names`** — Object names; cell array of strings; length must equal `max(obj_ind)`
+- **`mtl_names`** — Material names; cell array of strings; length must equal `max(mtl_ind)`
+- **`bsdf`** — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[numel(mtl_names), 17]`; default: `[]` (none)
+- **`map_to_itu_materials`** — If `true`, maps material names to ITU presets recognised by Sionna RT; default: `false`
+
+### See also:
+- [obj_file_read](#obj_file_read) (source for mesh data and BSDF field layout)
 
 ---
 <a id="obj_file_read"></a>

@@ -115,8 +115,7 @@ void quadriga_lib::mitsuba_xml_file_write(
 - **`vert_list`** — Vertex coordinates (x, y, z); `[n_vert, 3]`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
 - **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
-- **`mtl_ind`** — 1-based material index per triangle (0 = no material; every face must reference a 
-  material — 0 is rejected); `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle; every face must reference a material (0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
 - **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `[mtl_names.size(), 17]`; empty: none

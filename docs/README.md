@@ -42,7 +42,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 16 functions
 - [MATLAB / Octave: Math functions](api/mex/math-functions.md): 5 functions
 - [MATLAB / Octave: Miscellaneous / Tools](api/mex/miscellaneous-tools.md): 2 functions
-- [MATLAB / Octave: Site-specific simulation tools](api/mex/site-specific-simulation-tools.md): 16 functions
+- [MATLAB / Octave: Site-specific simulation tools](api/mex/site-specific-simulation-tools.md): 17 functions
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](api/python/general-usage-notes.md)
 - [Python: Array antenna functions](api/python/array-antenna-functions.md): 12 functions

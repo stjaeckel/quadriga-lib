@@ -3531,7 +3531,7 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
 ## mitsuba_xml_file_write
 Write a triangular mesh to a Mitsuba 3 XML scene file
 
-Also in: [C++](quadriga_lib_api_cpp.md#mitsuba_xml_file_write) · Not in: MATLAB
+Also in: [C++](quadriga_lib_api_cpp.md#mitsuba_xml_file_write) · [MATLAB](quadriga_lib_api_mex.md#mitsuba_xml_file_write)
 
 - Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
   differentiable radio-propagation simulations
@@ -3556,9 +3556,9 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`vert_list`** — Vertex coordinates (x, y, z); `(n_vert, 3)`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; uint64; `(n_mesh, 3)`
 - **`obj_ind`** — 0-based object index per triangle; length `obj_names` must equal `max(obj_ind) + 1`; uint64; `(n_mesh,)`
-- **`mtl_ind`** — 1-based material index per triangle (0 = no material); length `mtl_names` must be ≥ `max(mtl_ind)`; uint64; `(n_mesh,)`
+- **`mtl_ind`** — 1-based material index per triangle; every face must reference a material (0 is rejected); uint64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
-- **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
+- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`; default: `None`
 - **`map_to_itu_materials`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
