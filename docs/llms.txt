@@ -34,7 +34,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Sum-of-sinusoids random number generator](http://quadriga-lib.org/api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](http://quadriga-lib.org/api/mex/general-usage-notes.md)
 - [MATLAB / Octave: Array antenna functions](http://quadriga-lib.org/api/mex/array-antenna-functions.md): 12 functions
-- [MATLAB / Octave: Channel functions](http://quadriga-lib.org/api/mex/channel-functions.md): 13 functions
+- [MATLAB / Octave: Channel functions](http://quadriga-lib.org/api/mex/channel-functions.md): 14 functions
 - [MATLAB / Octave: Channel generation functions](http://quadriga-lib.org/api/mex/channel-generation-functions.md): 5 functions
 - [MATLAB / Octave: Channel statistics](http://quadriga-lib.org/api/mex/channel-statistics.md): 5 functions
 - [MATLAB / Octave: Geometry-based stochastic model](http://quadriga-lib.org/api/mex/geometry-based-stochastic-model.md): 16 functions
@@ -44,7 +44,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](http://quadriga-lib.org/api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](http://quadriga-lib.org/api/python/general-usage-notes.md)
 - [Python: Array antenna functions](http://quadriga-lib.org/api/python/array-antenna-functions.md): 12 functions
-- [Python: Channel functions](http://quadriga-lib.org/api/python/channel-functions.md): 13 functions
+- [Python: Channel functions](http://quadriga-lib.org/api/python/channel-functions.md): 14 functions
 - [Python: Channel generation functions](http://quadriga-lib.org/api/python/channel-generation-functions.md): 5 functions
 - [Python: Channel statistics](http://quadriga-lib.org/api/python/channel-statistics.md): 5 functions
 - [Python: Geometry-based stochastic model](http://quadriga-lib.org/api/python/geometry-based-stochastic-model.md): 16 functions

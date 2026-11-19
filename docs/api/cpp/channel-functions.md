@@ -129,7 +129,7 @@ void quadriga_lib::baseband_freq_response(
 ## baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
-Not in: MATLAB, Python
+Also in: [MATLAB](../mex/channel-functions.md#baseband_freq_response_multi) · Not in: Python
 
 - Interpolates complex channel coefficients from a coarse input frequency grid (`freq`) to a dense
   output grid (`freq_new`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc

@@ -1430,6 +1430,20 @@ inline std::vector<obj> qd_mex_read_cell(const mxArray *input, const char *var_n
     return out;
 }
 
+// Batch snapshot selection: all 'n_snap' snapshots for an empty 'i_snap' (0-based), else 'i_snap' after a range check
+inline arma::uvec qd_mex_snapshot_list(const arma::uvec &i_snap, size_t n_snap, const char *var_name = "i_snap")
+{
+    if (i_snap.is_empty())
+        return n_snap == 0 ? arma::uvec() : arma::regspace<arma::uvec>(0, (arma::uword)n_snap - 1);
+    for (arma::uword i : i_snap)
+        if (i >= n_snap)
+        {
+            const std::string msg = "Entries in '" + std::string(var_name) + "' cannot exceed the number of snapshots (" + std::to_string(n_snap) + ").";
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+        }
+    return i_snap;
+}
+
 // Batch positions and orientations: a 3-element vector (row or column) applies to all snapshots, else [3, n_snap]
 inline arma::mat qd_mex_get_xyz_batch(const mxArray *input, const char *var_name)
 {

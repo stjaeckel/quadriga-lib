@@ -39,7 +39,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
   adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
   0.75 m. Use `use_absolute_delays = true` in that case
 - The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
-  [[baseband_freq_response]] in multi-frequency mode removes the phase of `delay` before it interpolates across
+  [[baseband_freq_response_multi]] removes the phase of `delay` before it interpolates across
   `center_freq`, so it needs channels generated with `use_absolute_delays = true`; with relative delays, the phase of
   the TX-RX distance stays in the coefficients, is interpolated across the frequency grid and gives wrong phases
 

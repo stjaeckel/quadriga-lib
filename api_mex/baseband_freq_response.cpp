@@ -14,222 +14,94 @@ SECTION!*/
 # BASEBAND_FREQ_RESPONSE
 Compute the baseband frequency response of a MIMO channel
 
-- Three dispatch modes depending on the dimensionality of coeff_re / coeff_im / delay  and the
-  presence of `i_snap` — see the table below
-- Single-frequency mode: computes the frequency-domain channel matrix at the carrier positions via
-  DFT over time-domain path coefficients and delays
-- Multi-frequency mode: interpolates complex channel coefficients from the input frequency grid `center_freq` to the
-  output grid using SLERP, then applies delay-induced phase rotation per output carrier; only the first frequency slab
-  of `delay` is used. The delay-induced phase is removed from the input coefficients before the interpolation, so
-  channels from [[get_channels_multifreq]] / [[get_channels_spherical]] must be generated with
-  `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also when `delay` is
-  relative, and with relative delays the phase of the TX-RX distance is interpolated across `center_freq`, which gives
-  wrong phases (magnitudes stay right)
-- Multi-snapshot mode: applies the single-frequency backend in parallel across snapshots via OpenMP;
-  `i_snap` (1-based MATLAB indices) optionally selects a subset
-- Carrier positions are specified one of two ways: as a normalized `pilot_grid` paired with `bandwidth`
-  (where `0.0` corresponds to `center_freq(1)` and `1.0` to `center_freq(1) + bandwidth`), or as absolute
-  frequencies via `carrier_freq`; supplying both pairs is an error
-- Single-frequency and multi-snapshot modes with `carrier_freq` (same rules as the Python wrapper): the carriers may
-  come in any order and the output keeps that order; the phase reference is `center_freq(1)` when given, else the
-  lowest carrier; more than one carrier with a zero span (e.g. duplicates only) is an error
-- Multi-frequency inputs always require `center_freq`; if `carrier_freq` is omitted it is derived as
-  `center_freq(1) + pilot_grid · bandwidth`
-- Multi-snapshot inputs require `center_freq` to be omitted or scalar (no combined multi-freq + multi-snap)
-- Single-frequency inputs ignore `center_freq` when `pilot_grid` + `bandwidth` are given
-- `delay` supports broadcasting: shape `[1, 1, n_path, ...]` applies the same delays to all RX/TX pairs
-- Single-frequency and multi-snapshot modes: the phase `bandwidth · pilot_grid · delay` (in cycles) is computed in
-  double precision and reduced to one period before sin / cos are evaluated in single precision; coefficients and sums
-  are single precision; uses AVX2 where supported; double inputs are narrowed to float internally, results widened
-  back. Multi-frequency mode computes in double precision
+- Computes the frequency-domain channel matrix at the carrier positions `pilot_grid` by a DFT over the time-domain
+  path coefficients and delays
+- One snapshot is a 3D array; a batch of snapshots is a cell array of such arrays (`coeff_re`, `coeff_im` and `delay`
+  cell arrays of the same length), processed in parallel; the number of paths may differ between snapshots
+- A channel struct (e.g. from [[hdf5_read_channel]]) holds its snapshots on the 4th dimension, zero-padded;
+  `num2cell(ch.coeff_re, [1 2 3])`, and the same for `coeff_im` and `delay`, gives the cell arrays (the zero-padded
+  paths do not change the result)
+- Multi-frequency coefficients (e.g. from [[get_channels_multifreq]]) and absolute carrier frequencies are handled by
+  [[baseband_freq_response_multi]]; the two functions take different arguments, so they are two functions, while
+  [[arrayant_interpolate]] serves both of its cases with one argument set
+- `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
+- The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
+  before sin / cos are evaluated in single precision; coefficients and sums are single precision; double inputs are
+  narrowed to float internally, results widened back
 
 ## Usage:
 ```
-[ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, ...
-    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap, use_kernel );
+[ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, pilot_grid, bandwidth, ...
+    i_snap, use_kernel );
 ```
 
-## Dispatch modes:<br>
-| Mode             | Triggered by                             | `coeff_re` shape                  | Output shape                       |
-|------------------|------------------------------------------|-----------------------------------|------------------------------------|
-| Single-frequency | 3D `coeff_re` and `i_snap` omitted       | `[n_rx, n_tx, n_path]`            | `[n_rx, n_tx, n_carrier]`          |
-| Multi-frequency  | 4D `coeff_re` and `i_snap` omitted       | `[n_rx, n_tx, n_path, n_freq]`    | `[n_rx, n_tx, n_carrier]`          |
-| Multi-snapshot   | `i_snap` supplied (may be 0 for all)     | `[n_rx, n_tx, n_path, n_snap]`    | `[n_rx, n_tx, n_carrier, n_out]`   |
-
 ## Inputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path]` (single-freq) or
-  `[n_rx, n_tx, n_path, n_freq]` (multi-freq) or `[n_rx, n_tx, n_path, n_snap]` (multi-snap)
-- **`coeff_im`** — Imaginary part of channel coefficients; same shape as `coeff_re`
-- **`delay`** — Path delays in seconds; same shape as `coeff_re`, optionally broadcast over RX/TX with
-  shape `[1, 1, n_path]` or `[1, 1, n_path, ...]`
-- **`pilot_grid`** — Normalized sub-carrier positions; `0.0` = center, `1.0` = center + bandwidth;
-  must be paired with `bandwidth`; `[n_carrier, 1]`
-- **`bandwidth`** — Total baseband bandwidth in Hz; must be paired with `pilot_grid`
-- **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal
-  the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; with `carrier_freq` in single-frequency
-  and multi-snap mode, `center_freq(1)` is the phase reference (default: the lowest carrier); `[n_freq, 1]`
-- **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with
-  `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
-- **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
-  indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
+- **`coeff_re`** — Real part of the channel coefficients; `[n_rx, n_tx, n_path]`, or a cell array of length `n_snap`
+  with one such array per snapshot
+- **`coeff_im`** — Imaginary part of the channel coefficients; same layout as `coeff_re`
+- **`delay`** — Path delays in seconds; same layout as `coeff_re`, each array `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
+- **`pilot_grid`** — Sub-carrier positions relative to the bandwidth, `0.0` = carrier, `1.0` = carrier + `bandwidth`;
+  `[n_carrier, 1]`
+- **`bandwidth`** — Baseband bandwidth in Hz
+- **`i_snap`** — Snapshots to process, 1-based; `[n_out, 1]`; default: `[]` (all snapshots)
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ## Outputs:
-- **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
-  (single/multi-freq) or `[n_rx, n_tx, n_carrier, n_out]` (multi-snap)
-- **`hmat_im`** — Imaginary part of the frequency-domain channel matrix; same shape as `hmat_re`
+- **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier, n_out]`
+- **`hmat_im`** — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier, n_out]`
 
 ## See also:
+- [[baseband_freq_response_multi]] (multi-frequency coefficients, absolute carrier frequencies)
 - [[get_channels_spherical]] (single-frequency channel generator)
-- [[get_channels_multifreq]] (multi-frequency channel generator)
 MD!*/
-
-// Output carriers given as frequencies -> pilot grid and bandwidth, with the rules of the Python wrapper:
-// bandwidth = span (max - min), pilot 0 at 'f_ref', output order = input order, a single carrier uses bandwidth 1 Hz
-static void carriers_to_pilot_grid(const arma::vec &carrier_freq, double f_ref, arma::vec &pilot_grid, double &bandwidth)
-{
-    bandwidth = carrier_freq.max() - carrier_freq.min();
-    if (bandwidth <= 0.0 && carrier_freq.n_elem > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'carrier_freq' must span a positive range.");
-    if (bandwidth <= 0.0)
-        bandwidth = 1.0; // Single carrier: avoid division by zero
-    pilot_grid = (carrier_freq - f_ref) / bandwidth;
-}
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 5 || nrhs > 9)
+    if (nrhs < 5 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs (3D -> vec of length 1, 4D -> vec of length n_freq)
-    const auto coeff_re = qd_mex_get_CubeVec<double>(prhs[0], false, "coeff_re");
-    const auto coeff_im = qd_mex_get_CubeVec<double>(prhs[1], false, "coeff_im");
-    const auto delay = qd_mex_get_CubeVec<double>(prhs[2], false, "delay");
-    const auto pilot_grid_in = qd_mex_get_Col<double>(prhs[3], false, "pilot_grid");
-    const double bandwidth = qd_mex_get_scalar<double>(prhs[4], "bandwidth", 0.0);
-    const auto center_freq = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "center_freq");
-    const auto carrier_freq_in = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "carrier_freq");
-    const int use_kernel = (nrhs < 9) ? 0 : qd_mex_get_scalar<int>(prhs[8], "use_kernel", 0);
-
-    // i_snap signals multi-snap mode. Scalar 0 = all snapshots; non-empty
-    // positive vector = subset (1-based). Omitted or [] -> single/multi-freq mode.
-    arma::uvec i_snap;
-    bool has_isnap = false;
-    if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
+    // One snapshot as a 3D array or a batch as cell arrays; data of class double is not copied
+    auto get_Cube = [](const mxArray *a, const char *name)
     {
-        has_isnap = true;
-        if (mxGetNumberOfElements(prhs[7]) != 1 || qd_mex_get_scalar<double>(prhs[7], "i_snap") != 0.0)
-            i_snap = qd_mex_get_index_Col(prhs[7], "i_snap"); // 1-based -> 0-based; scalar 0 = all snapshots
-    }
-
-    // Identify which carrier source(s) the user supplied
-    bool has_cf = !center_freq.is_empty();
-    bool has_xf = !carrier_freq_in.is_empty();
-    bool has_grid_pair = !pilot_grid_in.is_empty() && bandwidth > 0.0;
-
-    if (coeff_re.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "coeff_re must not be empty.");
-    if (has_grid_pair && has_xf)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Specify either pilot_grid+bandwidth or carrier_freq, not both.");
-
-    arma::uword n_slab = coeff_re.size(); // 4th dim if 4D, else 1
-
-    if (has_isnap)
+        qd_mex_check_input(a, name, 3);
+        return qd_mex_get_Cube<double>(a, false, name);
+    };
+    std::vector<arma::cube> coeff_re, coeff_im, delay;
+    if (mxIsCell(prhs[0]) || mxIsCell(prhs[1]) || mxIsCell(prhs[2]))
     {
-        // Multi-snapshot mode: 4th dim is snapshots
-        if (has_cf && center_freq.n_elem != 1)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "In multi-snap mode, center_freq must be omitted or scalar.");
-        if (!has_grid_pair && !has_xf)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Provide pilot_grid+bandwidth or carrier_freq.");
-    }
-    else if (n_slab == 1)
-    {
-        // Single-frequency mode
-        if (!has_grid_pair && !has_xf)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Provide pilot_grid+bandwidth or carrier_freq.");
+        const char *error = "Inputs 'coeff_re', 'coeff_im' and 'delay' must all be cell arrays.";
+        coeff_re = qd_mex_read_cell<arma::cube>(prhs[0], "coeff_re", error, get_Cube);
+        coeff_im = qd_mex_read_cell<arma::cube>(prhs[1], "coeff_im", error, get_Cube);
+        delay = qd_mex_read_cell<arma::cube>(prhs[2], "delay", error, get_Cube);
     }
     else
     {
-        // Multi-frequency mode
-        if (!has_cf)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "center_freq is required for multi-frequency input.");
-        if (center_freq.n_elem != n_slab)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Length of center_freq must match the 4th dimension of coeff_re.");
-        if (!has_grid_pair && !has_xf)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Provide pilot_grid+bandwidth or carrier_freq.");
+        coeff_re.push_back(get_Cube(prhs[0], "coeff_re"));
+        coeff_im.push_back(get_Cube(prhs[1], "coeff_im"));
+        delay.push_back(get_Cube(prhs[2], "delay"));
     }
 
-    // Output dimensions
-    arma::uword n_rx = coeff_re[0].n_rows;
-    arma::uword n_tx = coeff_re[0].n_cols;
-    arma::uword n_carrier = has_xf ? carrier_freq_in.n_elem : pilot_grid_in.n_elem;
+    const auto pilot_grid = qd_mex_get_Col<double>(prhs[3], false, "pilot_grid");
+    const double bandwidth = qd_mex_get_scalar<double>(prhs[4], "bandwidth");
+    const arma::uvec i_snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_index_Col(prhs[5], "i_snap");
+    const int use_kernel = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "use_kernel", 0);
 
-    // 3D outputs for single/multi-freq, 4D (cube vector) for multi-snap
-    arma::cube hmat_re, hmat_im;
-    std::vector<arma::cube> hmat_re_v, hmat_im_v;
+    // Output [n_rx, n_tx, n_carrier, n_out]: the selected snapshots must share n_rx and n_tx; C++ checks the rest
+    const arma::uvec snap = qd_mex_snapshot_list(i_snap, coeff_re.size());
+    const arma::uword n_rx = snap.is_empty() ? 0 : coeff_re[snap[0]].n_rows;
+    const arma::uword n_tx = snap.is_empty() ? 0 : coeff_re[snap[0]].n_cols;
+    for (arma::uword s : snap)
+        if (coeff_re[s].n_rows != n_rx || coeff_re[s].n_cols != n_tx)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "All snapshots of 'coeff_re' must have the same number of rows and columns.");
 
-    if (has_isnap)
-    {
-        arma::uword n_out = i_snap.is_empty() ? n_slab : i_snap.n_elem;
-        plhs[0] = qd_mex_init_output(&hmat_re_v, n_rx, n_tx, n_carrier, n_out);
-        if (nlhs > 1)
-            plhs[1] = qd_mex_init_output(&hmat_im_v, n_rx, n_tx, n_carrier, n_out);
-    }
-    else
-    {
-        plhs[0] = qd_mex_init_output(&hmat_re, n_rx, n_tx, n_carrier);
-        if (nlhs > 1)
-            plhs[1] = qd_mex_init_output(&hmat_im, n_rx, n_tx, n_carrier);
-    }
-    arma::cube *p_hmat_im = (nlhs > 1) ? &hmat_im : nullptr;
-    std::vector<arma::cube> *p_hmat_im_v = (nlhs > 1) ? &hmat_im_v : nullptr;
+    std::vector<arma::cube> hmat_re, hmat_im;
+    plhs[0] = qd_mex_init_output(&hmat_re, n_rx, n_tx, pilot_grid.n_elem, snap.n_elem);
+    if (nlhs > 1)
+        plhs[1] = qd_mex_init_output(&hmat_im, n_rx, n_tx, pilot_grid.n_elem, snap.n_elem);
 
-    // Dispatch
-    if (has_isnap) // Multi-snapshot backend
-    {
-        arma::vec pilot_grid;
-        double bw;
-
-        if (has_grid_pair)
-        {
-            bw = bandwidth;
-            pilot_grid = pilot_grid_in;
-        }
-        else // has_xf: pilot_grid = 0 at the carrier (center_freq), else at the lowest output carrier
-            carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
-
-        CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(coeff_re, coeff_im, delay,
-                                                                 pilot_grid, bw, &hmat_re_v, p_hmat_im_v, nullptr,
-                                                                 i_snap, use_kernel));
-    }
-    else if (n_slab == 1) // Single-frequency backend
-    {
-        arma::vec pilot_grid;
-        double bw;
-
-        if (has_grid_pair)
-        {
-            bw = bandwidth;
-            pilot_grid = pilot_grid_in;
-        }
-        else // has_xf: pilot_grid = 0 at the carrier (center_freq), else at the lowest output carrier
-            carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
-
-        CALL_QD(quadriga_lib::baseband_freq_response<double>(coeff_re[0], coeff_im[0], delay[0],
-                                                             pilot_grid, bw, &hmat_re, p_hmat_im, nullptr, use_kernel));
-    }
-    else // Multi-frequency backend
-    {
-        arma::vec carrier_freq;
-
-        if (has_xf)
-            carrier_freq = carrier_freq_in;
-        else // has_grid_pair
-            carrier_freq = center_freq.at(0) + pilot_grid_in * bandwidth;
-
-        CALL_QD(quadriga_lib::baseband_freq_response_multi<double>(coeff_re, coeff_im, delay,
-                                                                   center_freq, carrier_freq, &hmat_re, p_hmat_im, nullptr, true, use_kernel));
-    }
+    CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(coeff_re, coeff_im, delay, pilot_grid, bandwidth,
+                                                             &hmat_re, (nlhs > 1) ? &hmat_im : nullptr, nullptr,
+                                                             i_snap, use_kernel));
 }

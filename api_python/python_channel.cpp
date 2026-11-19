@@ -8,7 +8,7 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_baseband_freq_response.cpp"
+#include "qpy_baseband_freq_response.cpp" // also baseband_freq_response_multi
 #include "qpy_channel_export_obj_file.cpp"
 #include "qpy_hdf5_create_file.cpp"
 #include "qpy_hdf5_read_channel.cpp"
@@ -32,14 +32,20 @@ void quadriga_lib_channel(py::module_ &m)
     m.def("baseband_freq_response", &baseband_freq_response,
           py::arg("coeff").none(false),
           py::arg("delay").none(false),
+          py::arg("pilot_grid").none(false),
+          py::arg("bandwidth"),
           py::kw_only(),
-          py::arg("bandwidth") = 0.0,
-          py::arg("carriers") = 128,
-          py::arg("pilot_grid") = py::none(),
-          py::arg("snap") = py::none(),
-          py::arg("freq") = py::none(),
-          py::arg("freq_new") = py::none(),
+          py::arg("i_snap") = py::none(),
+          py::arg("use_kernel") = 0);
+
+    m.def("baseband_freq_response_multi", &baseband_freq_response_multi,
+          py::arg("coeff").none(false),
+          py::arg("delay").none(false),
+          py::arg("freq").none(false),
+          py::arg("freq_new").none(false),
+          py::kw_only(),
           py::arg("remove_delay_phase") = true,
+          py::arg("i_snap") = py::none(),
           py::arg("use_kernel") = 0);
 
     m.def("export_obj_file", &channel_export_obj_file,

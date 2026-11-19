@@ -4,7 +4,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 - `md/SPEC_CPP_API.md` applies to wrappers and tests as well and is not repeated here: "GENERAL CONVENTIONS" (types, citations, lean code, MSVC), "Names, units and layouts" (the glossary), "Input validation" (exceptions), "File-local helpers" (helper scoping), "License statement" (`#` comments in Python files) and "Documentation block".
 
 # REPOSITORY LAYOUT AND BUILD
-- `api_python/qpy_<function_name>.cpp` — Python wrappers, one file per Python function.
+- `api_python/qpy_<function_name>.cpp` — Python wrappers, one file per Python function. Variants of one function that share helpers (e.g. `_multi`) may share the file, as in C++; it is named after the first one.
 - The Python module is built from 7 dispatcher files: `python_main.cpp` (top-level module, `version`, `components`) and one file per submodule: `python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`, `python_gbsm.cpp`. Each dispatcher `#include`s its `qpy_*.cpp` files and registers the functions with `m.def(...)`.
   - A new wrapper is NOT picked up automatically: it must be included and registered in the dispatcher of its submodule (see "pybind11 registration").
   - All wrappers of one submodule are compiled into a single translation unit. Names of wrapper functions and of `static` helper functions must therefore be unique within the submodule.

@@ -783,9 +783,8 @@ TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selec
 }
 
 // ================================================================================================
-// Physical consistency: verify against direct DFT for narrowband case
-// When input coefficients are identical at all input frequencies and remove_delay_phase=false,
-// the result should match the classic DFT baseband_freq_response (up to phase convention)
+// Physical consistency with the narrowband DFT: one input frequency with remove_delay_phase = true gives the complex
+// result of baseband_freq_response with pilot_grid * bandwidth = freq_new - freq
 // ================================================================================================
 
 TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_response")
@@ -794,10 +793,10 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
     double bandwidth = 100.0e6; // 100 MHz
     arma::uword n_carrier = 16;
 
-    // Build pilot grid for narrowband function: carrier offsets relative to bandwidth
+    // Build pilot grid for narrowband function: carrier offsets relative to bandwidth, also below the carrier
     arma::Col<double> pilot_grid(n_carrier);
     for (arma::uword k = 0; k < n_carrier; ++k)
-        pilot_grid(k) = (double)k / (double)n_carrier;
+        pilot_grid(k) = ((double)k - 4.0) / (double)n_carrier;
 
     // Build freq_new for multi function: absolute frequencies
     arma::Col<double> freq_new(n_carrier);
@@ -809,7 +808,7 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
 
     // Channel: 2 RX, 1 TX, 2 paths
     arma::uword n_rx = 2, n_tx = 1, n_path = 2;
-    double tau1 = 0.0e-9, tau2 = 50.0e-9; // relative delays
+    double tau1 = 3.1e-9, tau2 = 37.3e-9; // relative delays; center_freq * tau is not an integer
 
     // Narrowband coefficients with delay phase baked in at center_freq
     arma::Cube<double> coeff_re_nb(n_rx, n_tx, n_path);
@@ -826,10 +825,11 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
     double phase2 = -6.283185307179586 * center_freq * tau2;
     for (arma::uword r = 0; r < n_rx; ++r)
     {
-        coeff_re_nb(r, 0, 0) = A1 * std::cos(phase1);
-        coeff_im_nb(r, 0, 0) = A1 * std::sin(phase1);
-        coeff_re_nb(r, 0, 1) = A2 * std::cos(phase2);
-        coeff_im_nb(r, 0, 1) = A2 * std::sin(phase2);
+        const double phase_rx = 0.7 * (double)r; // Envelope phase per receive antenna
+        coeff_re_nb(r, 0, 0) = A1 * std::cos(phase1 + phase_rx);
+        coeff_im_nb(r, 0, 0) = A1 * std::sin(phase1 + phase_rx);
+        coeff_re_nb(r, 0, 1) = A2 * std::cos(phase2 - phase_rx);
+        coeff_im_nb(r, 0, 1) = A2 * std::sin(phase2 - phase_rx);
     }
 
     // --- Run narrowband DFT ---
@@ -851,16 +851,11 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
     REQUIRE(Hr_nb.n_slices == n_carrier);
     REQUIRE(Hr_multi.n_slices == n_carrier);
 
-    // The power |H|^2 should match between both methods
-    for (arma::uword k = 0; k < n_carrier; ++k)
-    {
-        for (arma::uword r = 0; r < n_rx; ++r)
-        {
-            double power_nb = Hr_nb(r, 0, k) * Hr_nb(r, 0, k) + Hi_nb(r, 0, k) * Hi_nb(r, 0, k);
-            double power_multi = Hr_multi(r, 0, k) * Hr_multi(r, 0, k) + Hi_multi(r, 0, k) * Hi_multi(r, 0, k);
-            CHECK(std::abs(power_nb - power_multi) / (power_nb + 1e-30) < 1e-5);
-        }
-    }
+    // Same complex values: the wrappers have no absolute-carrier form of baseband_freq_response and point to
+    // baseband_freq_response_multi with one input frequency instead. Narrowband sums are single precision.
+    const double tol = 1.0e-5 * (A1 + A2);
+    CHECK(arma::abs(Hr_nb - Hr_multi).max() < tol);
+    CHECK(arma::abs(Hi_nb - Hi_multi).max() < tol);
 }
 
 // ================================================================================================

@@ -261,8 +261,10 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
 {
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
     qd_kernel_auto_avx2(use_kernel);
-    if (coeff_re.size() == 0 || pilot_grid.n_elem == 0)
-        throw std::invalid_argument("Inputs cannot be empty");
+    if (coeff_re.size() == 0)
+        throw std::invalid_argument("Input 'coeff_re' must contain at least one snapshot.");
+    if (pilot_grid.n_elem == 0)
+        throw std::invalid_argument("Pilot grid must have at least one element.");
     if (!pilot_grid.is_finite())
         throw std::invalid_argument("Pilot grid must contain finite values only.");
     if (!(bandwidth >= 0.0) || !std::isfinite(bandwidth))

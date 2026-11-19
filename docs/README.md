@@ -36,7 +36,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](api/mex/general-usage-notes.md)
 - [MATLAB / Octave: Array antenna functions](api/mex/array-antenna-functions.md): 12 functions
-- [MATLAB / Octave: Channel functions](api/mex/channel-functions.md): 13 functions
+- [MATLAB / Octave: Channel functions](api/mex/channel-functions.md): 14 functions
 - [MATLAB / Octave: Channel generation functions](api/mex/channel-generation-functions.md): 5 functions
 - [MATLAB / Octave: Channel statistics](api/mex/channel-statistics.md): 5 functions
 - [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 16 functions
@@ -46,7 +46,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](api/python/general-usage-notes.md)
 - [Python: Array antenna functions](api/python/array-antenna-functions.md): 12 functions
-- [Python: Channel functions](api/python/channel-functions.md): 13 functions
+- [Python: Channel functions](api/python/channel-functions.md): 14 functions
 - [Python: Channel generation functions](api/python/channel-generation-functions.md): 5 functions
 - [Python: Channel statistics](api/python/channel-statistics.md): 5 functions
 - [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 16 functions

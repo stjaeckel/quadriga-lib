@@ -1,4 +1,7 @@
 function test_baseband_freq_response
+% MEX interface test for quadriga_lib.baseband_freq_response.
+% Scope: argument and output handling, index conversion, cell-array batches, kernels, error paths.
+% Physics validation lives in the Catch2 suite (test_baseband_freq_response.cpp).
 
 % ---- Common single-frequency test data --------------------------------
 % [n_rx=4, n_tx=3, n_path=2]
@@ -17,7 +20,7 @@ delay(2) = 1.5/fc;
 
 pilots = 0:0.1:2;   % 21 pilot positions, range 0..2
 
-% ---- Test 1: legacy API (pilot_grid + bandwidth) ----------------------
+% ---- Test 1: one snapshot ---------------------------------------------
 [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc );
 
 assertEqual( size(hmat_re), [4 3 21] );
@@ -37,377 +40,109 @@ assertElementsAlmostEqual( hmat_re(:,:,11), T, 'absolute', 1.5e-6 );
 % Linearity: col 2 of coeff is 4x col 1
 assertElementsAlmostEqual( hmat_re(:,1,:)*4, hmat_re(:,2,:), 'absolute', 1.5e-6 );
 
-% ---- Test 2: new API (center_freq + carrier_freq) ---------------------
-% Wrapper derives: bw = carrier(end)-carrier(1), pilot = (carrier-carrier(1))/bw
-% Choosing carrier_freq = anything + pilots*fc makes pilot*bw = pilots*fc -> same H
-center_freq  = 28e9;                       % ignored under this derivation
-carrier_freq = center_freq + (pilots(:))*fc;
-
-[ hmat_re2, hmat_im2 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [], [], center_freq, carrier_freq );
-
-assertEqual( size(hmat_re2), [4 3 21] );
-assertElementsAlmostEqual( hmat_re2, hmat_re, 'absolute', 3e-6 );
-assertElementsAlmostEqual( hmat_im2, hmat_im, 'absolute', 3e-6 );
-
-% ---- Test 3: center_freq alongside pilot+bw is silently ignored -------
-[ hmat_re3, hmat_im3 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, 28e9 );
-assertElementsAlmostEqual( hmat_re3, hmat_re, 'absolute', 1e-12 );
-assertElementsAlmostEqual( hmat_im3, hmat_im, 'absolute', 1e-12 );
-
-% ---- Common multi-frequency setup -------------------------------------
-% Replicate envelope (= coeff) across 3 input frequencies and bake in the
-% delay phase exp(-j 2pi freq tau), simulating get_channels_multifreq output.
-freq  = [1e9 ; 2e9 ; 3e9];
-
-coeff_re_4d = zeros(4, 3, 2, 3);
-coeff_im_4d = zeros(4, 3, 2, 3);
-delay_4d    = repmat(delay, [1 1 1 3]);  % [1, 1, 2, 3]
-for f = 1:3
-    for p = 1:2
-        rot = exp(-1j*2*pi*freq(f)*delay(1,1,p));
-        c   = (real(coeff(:,:,p)) + 1j*imag(coeff(:,:,p))) * rot;
-        coeff_re_4d(:,:,p,f) = real(c);
-        coeff_im_4d(:,:,p,f) = imag(c);
-    end
-end
-
-% ---- Test 3b: single carrier via pilot + bandwidth -------------------
-% pilot=0.5, bw=fc -> pilot*bw = 0.5*fc. Must match slice from a multi-carrier call.
+% ---- Test 2: single carrier -------------------------------------------
 [ hmat_re_s1, hmat_im_s1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, 0.5, fc );
-
 assertEqual( size(hmat_re_s1), [4 3] );
-assertEqual( size(hmat_im_s1), [4 3] );
-
-pilots_ref = [0.4, 0.5, 0.6];
-[ hmat_re_ref, hmat_im_ref ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots_ref, fc );
-
+[ hmat_re_ref, hmat_im_ref ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [0.4, 0.5, 0.6], fc );
 assertElementsAlmostEqual( hmat_re_s1, hmat_re_ref(:,:,2), 'absolute', 1e-6 );
 assertElementsAlmostEqual( hmat_im_s1, hmat_im_ref(:,:,2), 'absolute', 1e-6 );
 
-% ---- Test 3c: single carrier via center_freq + carrier_freq ----------
-% Wrapper takes the absolute offset (carrier-center) path because span=0.
-% Pick offset = 0.5*fc -> must equal the pilot=0.5, bw=fc result above.
-center_freq_s  = 28e9;
-carrier_freq_s = center_freq_s + 0.5*fc;
-
-[ hmat_re_s2, hmat_im_s2 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [], [], center_freq_s, carrier_freq_s );
-
-assertEqual( size(hmat_re_s2), [4 3] );
-assertEqual( size(hmat_im_s2), [4 3] );
-assertElementsAlmostEqual( hmat_re_s2, hmat_re_s1, 'absolute', 1e-6 );
-assertElementsAlmostEqual( hmat_im_s2, hmat_im_s1, 'absolute', 1e-6 );
-
-% Degenerate: carrier == center -> pilot=0, expected = sum of path-0 slice
-% (slice 1 has tau=1.5/fc, but pilot*bw=0 means zero rotation, so H = coeff(:,:,1) + coeff(:,:,2) = 0)
-[ hmat_re_s3, hmat_im_s3 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [], [], center_freq_s, center_freq_s );
-T = zeros(4, 3);
-assertElementsAlmostEqual( hmat_re_s3, T, 'absolute', 1e-6 );
-assertElementsAlmostEqual( hmat_im_s3, T, 'absolute', 1e-6 );
-
-% ---- Test 4: multi-freq output, cross-check against single-freq ------
-% Constant envelope across freq -> SLERP is identity. Multi-freq H must
-% match a single-freq call with pilot*bandwidth = absolute freq_new.
-freq_new = linspace(1e9, 3e9, 11)';
-
-[ hmat_re_m,  hmat_im_m  ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq, freq_new );
-[ hmat_re_sf, hmat_im_sf ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, freq_new/fc, fc );
-
-assertEqual( size(hmat_re_m), [4 3 11] );
-assertElementsAlmostEqual( hmat_re_m, hmat_re_sf, 'absolute', 1e-4 );
-assertElementsAlmostEqual( hmat_im_m, hmat_im_sf, 'absolute', 1e-4 );
-
-% ---- Test 5: multi-freq via derived carrier (pilot+bw+center) --------
-% carrier = center_freq(1) + pilot*bw  must reproduce freq_new
-pilot_d = (freq_new - freq(1)) / (freq_new(end) - freq(1));
-bw_d    = freq_new(end) - freq(1);
-
-[ hmat_re_d, hmat_im_d ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, pilot_d, bw_d, freq );
-
-assertElementsAlmostEqual( hmat_re_d, hmat_re_m, 'absolute', 1e-6 );
-assertElementsAlmostEqual( hmat_im_d, hmat_im_m, 'absolute', 1e-6 );
-
-% ---- Test 6: SLERP magnitude interpolation across freq ------------
-% Envelope amplitude ramps 1, 2, 3 across freq; expect linear interp.
-ramp_re = zeros(1, 1, 1, 3);
-ramp_im = zeros(1, 1, 1, 3);
-ramp_dl = zeros(1, 1, 1, 3);
-amps  = [1 2 3];
-tau_r = 100e-9;
-for f = 1:3
-    rot = exp(-1j*2*pi*freq(f)*tau_r);
-    c   = amps(f) * rot;
-    ramp_re(1,1,1,f) = real(c);
-    ramp_im(1,1,1,f) = imag(c);
-    ramp_dl(1,1,1,f) = tau_r;
-end
-
-[ hmat_re_r, hmat_im_r ] = quadriga_lib.baseband_freq_response( ramp_re, ramp_im, ramp_dl, [], [], freq, freq_new );
-
-mags = squeeze( sqrt(hmat_re_r.^2 + hmat_im_r.^2) );
-expected_mags = interp1(freq, amps, freq_new);
-assertElementsAlmostEqual( mags, expected_mags, 'absolute', 1e-5 );
-
-% ---- Test 4b: multi-freq with a single output carrier ----------------
-% Same setup as Test 4 (constant envelope -> SLERP is identity).
-% Multi-freq H at one carrier must match single-freq H at pilot*bw = carrier.
-fx = 1.5e9;
-[ hmat_re_m1, hmat_im_m1 ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq, fx );
-[ hmat_re_r1, hmat_im_r1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, fx/fc, fc );
-
-assertEqual( size(hmat_re_m1), [4 3] );
-assertEqual( size(hmat_im_m1), [4 3] );
-assertElementsAlmostEqual( hmat_re_m1, hmat_re_r1, 'absolute', 1e-4 );
-assertElementsAlmostEqual( hmat_im_m1, hmat_im_r1, 'absolute', 1e-4 );
-
-% ============ Multi-snapshot tests =====================================
-% Build n_snap=3 snapshots where snapshot s has coefficients scaled by s.
+% ---- Batch: cell arrays, snapshot s has its coefficients scaled by s ----
 n_snap = 3;
-coeff_re_ms = zeros(4, 3, 2, n_snap);
-coeff_im_ms = zeros(4, 3, 2, n_snap);
-delay_ms    = repmat(delay, [1 1 1 n_snap]);  % [1, 1, n_path, n_snap]
+cre = cell(n_snap, 1); cim = cell(n_snap, 1); dl = cell(n_snap, 1);
 for s = 1:n_snap
-    coeff_re_ms(:,:,:,s) = s * real(coeff);
-    coeff_im_ms(:,:,:,s) = s * imag(coeff);
+    cre{s} = s * real(coeff);
+    cim{s} = s * imag(coeff);
+    dl{s} = delay;
 end
 
-% ---- Test 7: multi-snap, all snapshots (empty i_snap) -----------------
-[ hmat_re_ms, hmat_im_ms ] = quadriga_lib.baseband_freq_response( ...
-    coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], [], 0 );
-
+% ---- Test 3: all snapshots (i_snap omitted) ----------------------------
+[ hmat_re_ms, hmat_im_ms ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
 assertEqual( size(hmat_re_ms), [4 3 21 3] );
 assertEqual( size(hmat_im_ms), [4 3 21 3] );
-
-% Each snapshot must match the (scaled) single-freq result.
 for s = 1:n_snap
-    [ hr_s, hi_s ] = quadriga_lib.baseband_freq_response( ...
-        s*real(coeff), s*imag(coeff), delay, pilots, fc );
-    assertElementsAlmostEqual( hmat_re_ms(:,:,:,s), hr_s, 'absolute', 1e-5 );
-    assertElementsAlmostEqual( hmat_im_ms(:,:,:,s), hi_s, 'absolute', 1e-5 );
+    assertElementsAlmostEqual( hmat_re_ms(:,:,:,s), s * hmat_re, 'absolute', 1e-5 );
+    assertElementsAlmostEqual( hmat_im_ms(:,:,:,s), s * hmat_im, 'absolute', 1e-5 );
 end
 
-% ---- Test 8: explicit i_snap = [1 2 3] reproduces "all snapshots" -----
-[ hmat_re_a, hmat_im_a ] = quadriga_lib.baseband_freq_response( ...
-    coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], [], [1 2 3] );
-assertEqual( size(hmat_re_a), [4 3 21 3] );
-assertElementsAlmostEqual( hmat_re_a, hmat_re_ms, 'absolute', 1e-12 );
-assertElementsAlmostEqual( hmat_im_a, hmat_im_ms, 'absolute', 1e-12 );
+% ---- Test 4: i_snap ----------------------------------------------------
+[ hmat_re_a, hmat_im_a ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 2 3] );
+assertEqual( hmat_re_a, hmat_re_ms );
+assertEqual( hmat_im_a, hmat_im_ms );
 
-% ---- Test 9: subset + reordering (i_snap = [3 1]) ---------------------
-[ hmat_re_sub, hmat_im_sub ] = quadriga_lib.baseband_freq_response( ...
-    coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], [], [3 1] );
-
+[ hmat_re_sub, hmat_im_sub ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [3 1] );
 assertEqual( size(hmat_re_sub), [4 3 21 2] );
-assertEqual( size(hmat_im_sub), [4 3 21 2] );
-assertElementsAlmostEqual( hmat_re_sub(:,:,:,1), hmat_re_ms(:,:,:,3), 'absolute', 1e-12 );
-assertElementsAlmostEqual( hmat_re_sub(:,:,:,2), hmat_re_ms(:,:,:,1), 'absolute', 1e-12 );
-assertElementsAlmostEqual( hmat_im_sub(:,:,:,1), hmat_im_ms(:,:,:,3), 'absolute', 1e-12 );
-assertElementsAlmostEqual( hmat_im_sub(:,:,:,2), hmat_im_ms(:,:,:,1), 'absolute', 1e-12 );
+assertEqual( hmat_re_sub, hmat_re_ms(:,:,:,[3 1]) );
+assertEqual( hmat_im_sub, hmat_im_ms(:,:,:,[3 1]) );
 
-% ---- Test 10: multi-snap via carrier_freq + scalar center_freq --------
-center_ms  = 28e9;
-carrier_ms = center_ms + (pilots(:))*fc;
-[ hmat_re_c, hmat_im_c ] = quadriga_lib.baseband_freq_response( ...
-    coeff_re_ms, coeff_im_ms, delay_ms, [], [], center_ms, carrier_ms, 0 );
+% One array is one snapshot
+[ hmat_re_1, hmat_im_1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, [1 1] );
+assertEqual( size(hmat_re_1), [4 3 21 2] );
+assertEqual( hmat_re_1(:,:,:,2), hmat_re );
+assertEqual( hmat_im_1(:,:,:,1), hmat_im );
 
-assertEqual( size(hmat_re_c), [4 3 21 3] );
-assertElementsAlmostEqual( hmat_re_c, hmat_re_ms, 'absolute', 3e-6 );
-assertElementsAlmostEqual( hmat_im_c, hmat_im_ms, 'absolute', 3e-6 );
+% Only the first output; without assignment it is ans
+hmat_re_o = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
+assertEqual( hmat_re_o, hmat_re_ms );
+quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
+assertEqual( ans, hmat_re_ms );
 
-% ---- Test 11: multi-snap, only first output requested -----------------
-[ hmat_re_o ] = quadriga_lib.baseband_freq_response( ...
-    coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], [], 0 );
-assertEqual( size(hmat_re_o), [4 3 21 3] );
-assertElementsAlmostEqual( hmat_re_o, hmat_re_ms, 'absolute', 1e-12 );
+% [] equals an omitted optional input
+assertEqual( quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [], [] ), hmat_re_ms );
 
+% Single-precision inputs give double outputs
+[ hr_sp, hi_sp ] = quadriga_lib.baseband_freq_response( single(real(coeff)), single(imag(coeff)), single(delay), ...
+    single(pilots), single(fc) );
+assertTrue( isa(hr_sp, 'double') );
+assertElementsAlmostEqual( hr_sp + 1j*hi_sp, hmat_re + 1j*hmat_im, 'absolute', 1e-5 );
 
-% Same via derived carrier (pilot+bw+center, single pilot)
-[ hmat_re_m2, hmat_im_m2 ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, (fx-freq(1))/fc, fc, freq );
+% ---- Test 5: the number of paths may differ between snapshots ----------
+cre_v = { real(coeff), real(coeff(:,:,1)) };
+cim_v = { imag(coeff), imag(coeff(:,:,1)) };
+dl_v = { delay, delay(1) };
+[ hr_v, hi_v ] = quadriga_lib.baseband_freq_response( cre_v, cim_v, dl_v, pilots, fc );
+[ hr_1, hi_1 ] = quadriga_lib.baseband_freq_response( cre_v{2}, cim_v{2}, dl_v{2}, pilots, fc );
+assertEqual( size(hr_v), [4 3 21 2] );
+assertEqual( hr_v(:,:,:,1), hmat_re );
+assertEqual( hr_v(:,:,:,2), hr_1 );
+assertEqual( hi_v(:,:,:,2), hi_1 );
 
-assertEqual( size(hmat_re_m2), [4 3] );
-assertElementsAlmostEqual( hmat_re_m2, hmat_re_m1, 'absolute', 1e-6 );
-assertElementsAlmostEqual( hmat_im_m2, hmat_im_m1, 'absolute', 1e-6 );
+% ---- Errors -------------------------------------------------------------
+assert_throws( @() quadriga_lib.baseband_freq_response( cat(4, real(coeff), real(coeff)), ...
+    cat(4, imag(coeff), imag(coeff)), delay, pilots, fc ), 'more than 3 dimensions' );
+assert_throws( @() quadriga_lib.baseband_freq_response( cre, imag(coeff), dl, pilots, fc ), 'must all be cell arrays' );
+assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), cim, dl, pilots, fc ), 'must all be cell arrays' );
+assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [0 1] ), '1-based' );
+assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 5] ), 'cannot exceed the number of snapshots' );
+assert_throws( @() quadriga_lib.baseband_freq_response( {real(coeff), zeros(2,3,2)}, {imag(coeff), zeros(2,3,2)}, ...
+    {delay, delay}, pilots, fc ), 'same number of rows and columns' );
+assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl(1:2), pilots, fc ), 'same number of snapshots' );
+assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots ), 'Wrong number of input arguments' );
+assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, [], 0, 1 ), ...
+    'Wrong number of input arguments' );
+assert_throws( @() three_outputs( real(coeff), imag(coeff), delay, pilots, fc ), 'Wrong number of output arguments' );
 
-% ---- Error: 3D coeff with no carrier source --------------------------
-try
-    quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [], [] );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Provide pilot_grid+bandwidth or carrier_freq';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: 4D coeff with center_freq but no carrier source ----------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Provide pilot_grid+bandwidth or carrier_freq';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-
-% ---- Error: all four carrier-spec inputs given ------------------------
-try
-    quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, 28e9, carrier_freq );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Specify either';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: multi-freq input without center_freq ----------------------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, pilots, fc );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'center_freq is required';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: center_freq length does not match 4th dim of coeff -------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], [1e9; 2e9], freq_new );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Length of center_freq';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: too many output arguments ---------------------------------
-try
-    [~,~,~] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of output arguments';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: too many input arguments ---------------------------------
-try
-    quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, 28e9, carrier_freq, [], 0, true );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of input arguments';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: center_freq must be scalar in multi-snap mode -------------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [1e9; 2e9; 3e9], [], 0 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'center_freq must be omitted or scalar';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: multi-snap with both pilot+bw and carrier_freq ------------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], carrier_ms, 0 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Specify either';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: multi-snap without any carrier source ---------------------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_ms, coeff_im_ms, delay_ms, [], [], [], [], 0 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Provide pilot_grid+bandwidth or carrier_freq';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: i_snap index 0 (must be 1-based) --------------------------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], [], [0 1] );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = '1-based';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Error: i_snap index exceeds n_snap -------------------------------
-try
-    quadriga_lib.baseband_freq_response( coeff_re_ms, coeff_im_ms, delay_ms, pilots, fc, [], [], [1 5] );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Snapshot indices';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% ---- Carriers as frequencies: same rules as Python ---------------------
-% span = max - min; reference = center_freq(1) when given, else min(carrier_freq); output in input order;
-% more than one carrier with a zero span is an error. Expected values from the closed form
-% H(f) = sum_p c_p * exp(-j 2 pi (f - f_ref) tau_p), the same expectation as in the Python test.
-cre = reshape([1 0.5], 1, 1, 2); cim = zeros(1, 1, 2); dl = reshape([10e-9 35e-9], 1, 1, 2);
-f0 = 3e9; fa = f0 + [0; 10e6; 20e6];
-Hx = @(f, fr) sum(squeeze(cre + 1j*cim) .* exp(-2j*pi*(f(:).' - fr) .* squeeze(dl)), 1).';
-for snap = [false true]   % single-frequency and multi-snapshot branch
-    if snap, xa = {0}; else, xa = {}; end
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, fa, xa{:});
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(fa, f0), 'absolute', 1e-5 );
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, flipud(fa), xa{:});
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(flipud(fa), f0), 'absolute', 1e-5 );
-    fu = f0 + [10e6; 0; 20e6];   % unsorted
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, fu, xa{:});
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(fu, f0), 'absolute', 1e-5 );
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], [], flipud(fa), xa{:});   % reference: min
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(flipud(fa), f0), 'absolute', 1e-5 );
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, f0 + 10e6, xa{:});   % one carrier
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(f0 + 10e6, f0), 'absolute', 1e-5 );
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, f0 - 10e6, xa{:});   % below the reference
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), Hx(f0 - 10e6, f0), 'absolute', 1e-5 );
-    [hr, hi] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], [], f0 + 10e6, xa{:});   % one carrier, no reference
-    assertElementsAlmostEqual( squeeze(hr + 1j*hi), 1.5, 'absolute', 1e-6 );
-    failed = false;
-    try
-        [~] = quadriga_lib.baseband_freq_response(cre, cim, dl, [], [], f0, [f0; f0], xa{:});
-    catch ME
-        failed = ~isempty(strfind(ME.message, 'carrier_freq')) && ~isempty(strfind(ME.message, 'positive range'));
-    end
-    assertTrue( failed );
-end
-
-
-% use_kernel (input 9) reaches C++ in all three modes: 1 is accepted, 3 is rejected by C++
-cr = reshape(sin(1:24), 2, 3, 4); ci = reshape(cos(1:24), 2, 3, 4); dl = reshape((1:4) * 1e-8, 1, 1, 4);
-pg = linspace(0, 1, 5)'; fr = [3e9; 3.2e9]; fo = [3e9; 3.1e9];
-modes = { {cr, ci, dl, pg, 1e8, [], [], []}, {cat(4, cr, cr), cat(4, ci, ci), cat(4, dl, dl), pg, 1e8, [], [], 0}, ...
-    {cat(4, cr, cr), cat(4, ci, ci), cat(4, dl, dl), [], [], fr, fo, []} };
-for m = 1:3
+% use_kernel (input 7) reaches C++ for one snapshot and a batch: 1 is accepted, 3 is rejected by C++
+cr = reshape(sin(1:24), 2, 3, 4); ci = reshape(cos(1:24), 2, 3, 4); d4 = reshape((1:4) * 1e-8, 1, 1, 4);
+pg = linspace(0, 1, 5)';
+modes = { {cr, ci, d4, pg, 1e8, []}, {{cr, cr}, {ci, ci}, {d4, d4}, pg, 1e8, []} };
+for m = 1:2
     [~] = quadriga_lib.baseband_freq_response( modes{m}{:}, 1 );
-    try
-        quadriga_lib.baseband_freq_response( modes{m}{:}, 3 );
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
-    catch ME
-        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Input ''use_kernel'' must be 0, 1 or 2.')) %#ok<STREMP>
-            error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
-        end
+    assert_throws( @() quadriga_lib.baseband_freq_response( modes{m}{:}, 3 ), 'Input ''use_kernel'' must be 0, 1 or 2.' );
+end
+end
+
+function three_outputs( varargin )
+[~, ~, ~] = quadriga_lib.baseband_freq_response( varargin{:} );
+end
+
+function assert_throws( fn, expected )
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
     end
 end
 end

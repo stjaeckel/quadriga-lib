@@ -35,6 +35,7 @@ lang: en-US
 | [qdant_write](#qdant_write) | Array antenna functions | Writes array antenna data to QDANT files |
 | [rotate_pattern](#rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns using Euler rotations |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [channel.export_obj_file](#channel.export_obj_file) | Channel functions | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a custom storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | Reads channel data from HDF5 files |
@@ -755,59 +756,88 @@ Compute the baseband frequency response of a MIMO channel
 
 Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response)
 
-- Transforms time-domain channel coefficients into the frequency-domain transfer function H(f)
-- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel via OpenMP in C++
-- Two per-snapshot modes, selected by the ndim of the coefficient arrays:
-  - single-freq: 3D items `(n_rx, n_tx, n_path)`; DFT over path delays at the requested carriers (AVX2)
-  - multi-freq: 4D items `(n_rx, n_tx, n_path, n_freq)`; SLERP interpolation across `freq`,
-    then delay-induced phase applied per output carrier
-- All list items must share ndim, `n_rx`, `n_tx` (and `n_freq` for 4D); `n_path` may vary per snapshot
-- Output carriers are defined one of two mutually exclusive ways:
-  - `bandwidth` paired with `pilot_grid` (or `carriers` for an evenly spaced grid) — single-freq only
-  - `freq` + `freq_new` as absolute frequencies — required for multi-freq, optional for single-freq
-- For single-freq with `freq` + `freq_new`, the baseband grid is derived internally; the phase is
-  referenced to `freq[0]` when given, else to `min(freq_new)`
-- `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair;
-  for multi-freq a 3D delay item is reused for all input frequencies
-- single-freq: the phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to
-  one period before sin / cos are evaluated in single precision; coefficients and sums are single precision, double
-  inputs are narrowed to float, results widened back; multi-freq computes in double precision
+- Computes the frequency-domain channel matrix at the carrier positions `pilot_grid` by a DFT over the time-domain
+  path coefficients and delays
+- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel; the number of paths
+  may differ between snapshots, `n_rx` and `n_tx` may not
+- Multi-frequency coefficients (e.g. from [channel.multifreq](#channel.multifreq)) and absolute carrier frequencies are handled by
+  [baseband_freq_response_multi](#baseband_freq_response_multi); the two functions take different arguments, so they are two functions,
+  while [interpolate](#interpolate) serves both of its cases with one argument set
+- `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair
+- The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
+  before sin / cos are evaluated in single precision; coefficients and sums are single precision, double inputs are
+  narrowed to float, results widened back
 
 ### Usage:
 ```python
-hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, *, bandwidth, carriers, pilot_grid, \
-    snap, freq, freq_new, remove_delay_phase, use_kernel )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, pilot_grid, bandwidth, *, i_snap, use_kernel )
 ```
 
 ### Inputs:
 - **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
-  (single-freq) or `(n_rx, n_tx, n_path, n_freq)` (multi-freq)
-- **`delay`** — Path delays in seconds; list of length `n_snap`; each item shaped like the matching
-  `coeff` item or broadcast as `(1, 1, n_path)` (with an optional 4th dimension `n_freq`)
-- **`bandwidth`** — Baseband bandwidth in Hz; paired with `pilot_grid` or `carriers`; single-freq only;
-  cannot be combined with `freq_new`; default: `0.0`
-- **`carriers`** — Number of evenly spaced carriers on `[0, 1]`; used only when both `pilot_grid` and
-  `freq_new` are omitted; default: 128
-- **`pilot_grid`** — Normalized sub-carrier positions, `0.0` = center, `1.0` = center + `bandwidth`;
-  1D array of length `n_carrier`; default: `None`
-- **`snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
-- **`freq`** — Input sample frequencies in Hz; 1D array; required for multi-freq input; for
-  single-freq input used together with `freq_new` as the phase reference; default: `None`
-- **`freq_new`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;
-  required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
-- **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel generator before SLERP,
-  then re-apply it analytically per output carrier; multi-freq only; needs channels generated with
-  `use_absolute_delays = True`: the coefficients of the generators carry the phase of the absolute path length also
-  when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`,
-  which gives wrong phases (magnitudes stay right); default: `True`
+- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`
+- **`pilot_grid`** — Sub-carrier positions relative to the bandwidth, `0.0` = carrier, `1.0` = carrier + `bandwidth`;
+  1D array of length `n_carrier`; `np.linspace(0, 1, n)` gives `n` evenly spaced carriers
+- **`bandwidth`** — Baseband bandwidth in Hz
+- **`i_snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
 
 ### Outputs:
-- **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`,
-  where `n_out` is the number of processed snapshots
+- **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
 
 ### See also:
+- [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-frequency coefficients, absolute carrier frequencies)
 - [channel.spherical](#channel.spherical) (single-frequency channel generator)
+
+---
+<a id="baseband_freq_response_multi"></a>
+## baseband_freq_response_multi
+Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
+
+Not in: C++, MATLAB
+
+- Interpolates the complex channel coefficients from the input frequencies `freq` to the output carrier
+  frequencies `freq_new` using SLERP (magnitude and unwrapped phase each linear), then applies the delay-induced
+  phase `exp(-j·2π·freq_new·delay)` per output carrier in double precision
+- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel; the number of paths
+  may differ between snapshots, `n_rx` and `n_tx` may not
+- Single-frequency coefficients with absolute output carriers: items `(n_rx, n_tx, n_path)`, `freq` the frequency
+  the coefficients were generated at; with `remove_delay_phase = True` (the default) and coefficients that carry the
+  delay phase at `freq`, as the channel generators return them, this gives the result of [baseband_freq_response](#baseband_freq_response)
+  with `pilot_grid · bandwidth = freq_new - freq`
+- `delay` is frequency-independent: items `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`; of a 4D item (as returned by
+  [channel.multifreq](#channel.multifreq)) only the first frequency is used
+- With `remove_delay_phase`, the channels from [channel.multifreq](#channel.multifreq) / [channel.spherical](#channel.spherical) must be generated with
+  `use_absolute_delays = True`: their coefficients carry the phase of the absolute path length also when `delay` is
+  relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`, which gives
+  wrong phases (magnitudes stay right)
+- Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
+
+### Usage:
+```python
+hmat = quadriga_lib.channel.baseband_freq_response_multi( coeff, delay, freq, freq_new, *, remove_delay_phase, \
+    i_snap, use_kernel )
+```
+
+### Inputs:
+- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path, n_freq)`; for
+  `n_freq = 1` also `(n_rx, n_tx, n_path)`
+- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`,
+  with an optional 4th dimension of length `n_freq` (only the first frequency is used)
+- **`freq`** — Input sample frequencies in Hz, sorted ascending; 1D array of length `n_freq`
+- **`freq_new`** — Output carrier frequencies in Hz; 1D array of length `n_carrier`
+- **`remove_delay_phase`** — Remove the delay phase `exp(-j·2π·freq·delay)` from the coefficients before the
+  interpolation and apply it again at `freq_new`; `True` for the output of the channel generators, `False` for pure
+  envelope coefficients; default: `True`
+- **`i_snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else GENERIC),
+  1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
+
+### Outputs:
+- **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
+
+### See also:
+- [baseband_freq_response](#baseband_freq_response) (single-frequency coefficients, relative carrier positions)
 - [channel.multifreq](#channel.multifreq) (multi-frequency channel generator)
 
 ---
@@ -1531,7 +1561,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
   adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
   0.75 m. Use `use_absolute_delays = true` in that case
 - The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
-  [baseband_freq_response](#baseband_freq_response) with multi-frequency input and `remove_delay_phase = True` removes the phase of `delay`
+  [baseband_freq_response_multi](#baseband_freq_response_multi) with `remove_delay_phase = True` removes the phase of `delay`
   before it interpolates across `freq`, so it needs channels generated with `use_absolute_delays = True`; with
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
