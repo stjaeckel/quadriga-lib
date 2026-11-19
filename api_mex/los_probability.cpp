@@ -98,11 +98,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[1] = mxCreateDoubleMatrix(0, d2d_out.is_empty() ? center_freq.n_elem : 0, mxREAL);
 
     // Wrap optional pointers
-    const arma::vec *p_rnd_g = rnd_g.empty() ? nullptr : &rnd_g;
-    const arma::vec *p_center_freq = center_freq.empty() ? nullptr : &center_freq;
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::los_probability(model, d2d_out, h_bs, h_ut, p_los, d_clutter, r_clutter, h_clutter,
-                                          p_rnd_g, p_center_freq, p_los_soft));
+                                          rnd_g, center_freq, p_los_soft));
 }

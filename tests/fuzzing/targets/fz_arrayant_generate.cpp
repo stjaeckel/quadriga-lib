@@ -88,7 +88,7 @@ static void run(fz::input &in)
         T fc = in.value<T>(), spacing = in.value<T>();
         bool use;
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_arrayant_ula<T>(N, fc, spacing, use ? &p : nullptr, res); });
+        fz::clean([&] { quadriga_lib::generate_arrayant_ula<T>(N, fc, spacing, fz::opt(use, p), res); });
         break;
     }
     case 6:
@@ -99,7 +99,7 @@ static void run(fz::input &in)
         bool use;
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
         fz::clean([&] { quadriga_lib::generate_arrayant_3GPP<T>(M, N, fc, pol, tilt, spacing, Mg, Ng, dgv, dgh,
-                                                                use ? &p : nullptr, res); });
+                                                                fz::opt(use, p), res); });
         break;
     }
     case 7:
@@ -127,7 +127,7 @@ static void run(fz::input &in)
             f_low = in.ConsumeFloatingPointInRange<T>(T(10), T(30000)), f_high = in.ConsumeFloatingPointInRange<T>(T(10), T(30000));
         arma::Col<T> freq = in.col<T>(in.size(6));
         fz::clean([&] { quadriga_lib::generate_speaker<T>(driver, radius, f_low, f_high, s_low, s_high, sens, type, hor, ver,
-                                                          f_ctrl, bw, bh, &freq, res); });
+                                                          f_ctrl, bw, bh, freq, res); });
     }
     }
 }

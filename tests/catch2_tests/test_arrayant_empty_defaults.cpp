@@ -100,8 +100,8 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         const arma::mat az = {{0.3, -1.2, 2.5}}, el = {{0.1, -0.4, 0.7}};
         const arma::cube ori(3, 1, 1, arma::fill::value(0.2));
         arma::mat vr[2], vi[2], hr[2], hi[2], d[2];
-        quadriga_lib::arrayant_interpolate<double>(F, az, el, vr[0], vi[0], hr[0], hi[0], nullptr, &ori, nullptr, &d[0]);
-        quadriga_lib::arrayant_interpolate<double>(E, az, el, vr[1], vi[1], hr[1], hi[1], nullptr, &ori, nullptr, &d[1]);
+        quadriga_lib::arrayant_interpolate<double>(F, az, el, vr[0], vi[0], hr[0], hi[0], {}, ori, {}, &d[0]);
+        quadriga_lib::arrayant_interpolate<double>(E, az, el, vr[1], vi[1], hr[1], hi[1], {}, ori, {}, &d[1]);
         CHECK(arma::approx_equal(vr[0], vr[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(vi[0], vi[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(hr[0], hr[1], "absdiff", 0.0));
@@ -261,8 +261,8 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
         auto f = F, e = E;
         const arma::mat p = arma::vec{0.1, 0.2, 0.3};
         const arma::uvec i_el = {1};
-        quadriga_lib::arrayant_set_element_pos_multi(f, p, &i_el);
-        quadriga_lib::arrayant_set_element_pos_multi(e, p, &i_el);
+        quadriga_lib::arrayant_set_element_pos_multi(f, p, i_el);
+        quadriga_lib::arrayant_set_element_pos_multi(e, p, i_el);
         check_same_multi(f, e);
     }
 
@@ -271,8 +271,8 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
         const arma::mat az = {{0.3, -1.2}}, el = {{0.1, -0.4}};
         const arma::vec freq = {1.5e9};
         arma::cube vr[2], vi[2], hr[2], hi[2];
-        quadriga_lib::arrayant_interpolate_multi(F, az, el, vr[0], vi[0], hr[0], hi[0], &freq);
-        quadriga_lib::arrayant_interpolate_multi(E, az, el, vr[1], vi[1], hr[1], hi[1], &freq);
+        quadriga_lib::arrayant_interpolate_multi(F, az, el, vr[0], vi[0], hr[0], hi[0], freq);
+        quadriga_lib::arrayant_interpolate_multi(E, az, el, vr[1], vi[1], hr[1], hi[1], freq);
         CHECK(arma::approx_equal(vr[0], vr[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(vi[0], vi[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(hr[0], hr[1], "absdiff", 0.0));

@@ -237,7 +237,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     arma::vec dist = {4.0, 8.0, 2.0};
     arma::uvec n_floors = {0, 0, 1};
 
-    auto ant = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, nullptr, 30.0);
+    auto ant = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, {}, 30.0);
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", ant.center_freq,
                                                        tap_spacing, n_users, observation_time, update_interval,
                                                        speed_station_kmh, speed_env_kmh, dist, n_floors);

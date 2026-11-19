@@ -12,7 +12,7 @@ lang: en-US
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
 - Template parameter `dtype` is `float` or `double` unless stated.
-- Mandatory arguments are references; optional ones are pointers with a `nullptr` default (input not given, output not computed). `ray_mesh_interact` and `ray_state_update` still take mandatory arguments by pointer and throw on `nullptr`.
+- Mandatory arguments are references. Optional inputs are references with an empty default; an empty container (`{}`) means "not given". Optional outputs are pointers with a `nullptr` default (not computed). The few optional inputs whose empty value has its own meaning are pointers with a `nullptr` default; their documentation says so. `ray_mesh_interact` and `ray_state_update` still take mandatory arguments by pointer and throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation.
 - Invalid inputs (shape/domain, an index outside the layout of a file) cause a `std::invalid_argument`; a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) a `std::runtime_error`.
@@ -37,7 +37,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 - Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
-- Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
+- Not given / all: an omitted optional input (C++ an empty container, or `nullptr` for an input passed by pointer, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
 - Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity is a setting for which <= 0 means "not set" (a size, an angle range, a frequency limit), values <= 0 select it too. A physical model parameter (a ratio, a distance, a spread) throws for values outside its range instead. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
 - Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_polmat`, `fix_taps`, `axis`) or strings, each documented by its function.
 - Results (C++): a computed array goes into an output argument, so that the wrappers can write into MATLAB / numpy memory without a copy. Returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
@@ -357,7 +357,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](q
 ```cpp
 void quadriga_lib::arrayant_calc_beamwidth(
     const arrayant<dtype> &ant,
-    const arma::uvec *i_element = nullptr,
+    const arma::uvec &i_element = arma::uvec(),
     dtype threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
@@ -367,7 +367,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 
 ### Inputs:
 - **`ant`** — Valid arrayant
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 - **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
 
 ### Outputs:
@@ -380,7 +380,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 ```cpp
 auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 20.0);
 arma::vec bw_az, bw_el;
-quadriga_lib::arrayant_calc_beamwidth(ant, nullptr, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
+quadriga_lib::arrayant_calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
 ```
 
 ### See also:
@@ -403,7 +403,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](q
 ```cpp
 void quadriga_lib::arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
-        const arma::uvec *i_element = nullptr,
+        const arma::uvec &i_element = arma::uvec(),
         dtype threshold_dB = 3.0,
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,
@@ -413,7 +413,7 @@ void quadriga_lib::arrayant_calc_beamwidth_multi(
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 - **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
 
 ### Outputs:
@@ -442,12 +442,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python]
 void quadriga_lib::arrayant_calc_directivity(
     const arrayant<dtype> &ant,
     arma::Col<dtype> &directivity_dBi,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
 - **`ant`** — Valid arrayant
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ### Outputs:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out]`
@@ -480,12 +480,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python]
 void quadriga_lib::arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
         arma::Mat<dtype> &directivity_dBi,
-        const arma::uvec *i_element = nullptr);
+        const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ### Outputs:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
@@ -512,8 +512,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_combine_pattern) · [Python](
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
     const arrayant<dtype> &ant,
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -540,7 +540,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_combine_pattern) · [Python](
 
 - Multi-frequency counterpart to [arrayant_combine_pattern](#arrayant_combine_pattern)
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
-- Output length = `freq_new->n_elem` if provided; otherwise one entry per input arrayant
+- Output length = `freq_new.n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [arrayant_interpolate_multi](#arrayant_interpolate_multi) (SLERP with linear-interpolation fallback)
 - Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
 - Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
@@ -551,9 +551,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_combine_pattern) · [Python](
 ```cpp
 std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
-    const arma::Col<dtype> *freq_new = nullptr,
+    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -705,7 +705,7 @@ void quadriga_lib::arrayant_copy_element_multi(
 arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
+    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
@@ -733,7 +733,7 @@ void quadriga_lib::arrayant_export_obj_file(
     const std::string &colormap = "jet",
     dtype object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
@@ -743,7 +743,7 @@ void quadriga_lib::arrayant_export_obj_file(
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
 - **`object_radius`** *(optional)* — Radius of the exported object
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
-- **`i_element`** *(optional)* — 0-based element indices to export; `nullptr` or empty exports all elements
+- **`i_element`** *(optional)* — 0-based element indices to export; empty exports all elements
 
 ### See also:
 - [colormap](#colormap) (Used for setting the colormap)
@@ -787,9 +787,9 @@ void quadriga_lib::arrayant_interpolate(
     arma::Mat<dtype> &V_im,
     arma::Mat<dtype> &H_re,
     arma::Mat<dtype> &H_im,
-    const arma::uvec *i_element = nullptr,
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos = nullptr,
+    const arma::uvec &i_element = arma::uvec(),
+    const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
+    const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Mat<dtype> *dist = nullptr,
     arma::Mat<dtype> *azimuth_loc = nullptr,
     arma::Mat<dtype> *elevation_loc = nullptr,
@@ -803,13 +803,13 @@ void quadriga_lib::arrayant_interpolate(
 - **`ant`** — Array antenna with `n_elements` elements; see [arrayant](#arrayant)
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements in
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in
   order (`n_out = n_elements`); `[n_out]`
 - **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the antenna, for all outputs and angles,
-  per output, per angle, or both; `nullptr` or empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
+  per output, per angle, or both; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
   `[3, n_out, n_ang]`
-- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; `nullptr` or
-  empty: the columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
+- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the
+  columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
 - **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern
   has more than `INT_MAX` samples); other values throw
 
@@ -867,10 +867,10 @@ void quadriga_lib::arrayant_interpolate_multi(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> *freq_new = nullptr,
-    const arma::uvec *i_element = nullptr,
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos = nullptr,
+    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const arma::uvec &i_element = arma::uvec(),
+    const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
+    const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Cube<std::complex<dtype>> *V = nullptr,
     arma::Cube<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
@@ -881,9 +881,9 @@ void quadriga_lib::arrayant_interpolate_multi(
   frequency
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`freq_new`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
+- **`freq_new`** *(optional)* — Target frequencies in Hz; empty: the center frequencies of the entries
   in vector order; `[n_freq]`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements;
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements;
   `[n_out]`
 - **`orientation`** *(optional)* — Euler angles (bank, tilt, heading), applied at all frequencies; shapes as in
   [arrayant_interpolate](#arrayant_interpolate)
@@ -904,7 +904,7 @@ arma::mat az = {0.0, 1.5708, -1.5708, 3.14159};
 arma::mat el(1, 4, arma::fill::zeros);
 arma::vec freq = {250.0, 1500.0, 8000.0};
 arma::cube V_re, V_im, H_re, H_im;
-quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, &freq);
+quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, freq);
 ```
 
 ### See also:
@@ -986,7 +986,7 @@ void quadriga_lib::arrayant_rotate_pattern(
     arrayant<dtype> &ant,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
@@ -1000,7 +1000,7 @@ void quadriga_lib::arrayant_rotate_pattern(
    | 2    | No      | Yes          | No              |
    | 3    | Yes     | Yes          | No              |
    | 4    | Yes     | No           | No              |
-- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; empty: all elements
 
 ### Example:
 ```cpp
@@ -1031,14 +1031,14 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &orientation,
         unsigned usage = 0,
-        const arma::uvec *i_element = nullptr)
+        const arma::uvec &i_element = arma::uvec())
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; empty: all elements
 
 ### See also:
 - [arrayant_rotate_pattern](#arrayant_rotate_pattern) (per-entry operation called internally)
@@ -1053,7 +1053,7 @@ Set element positions for all entries in a multi-frequency arrayant vector
 Not in: MATLAB, Python
 
 - Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is nullptr or empty, all positions are replaced and `element_pos` must have `n_elements` columns.
+- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
 - If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
@@ -1062,13 +1062,13 @@ Not in: MATLAB, Python
 void quadriga_lib::arrayant_set_element_pos_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        const arma::uvec *i_element = nullptr);
+        const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; nullptr or empty: all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; empty: all elements are replaced
 
 ### See also:
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (replicate elements before setting positions)
@@ -1098,7 +1098,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
     arma::uword Ng = 1, 
     dtype dgv = 0.5, 
     dtype dgh = 0.5,
-    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
     dtype res = 1.0);
 ```
 
@@ -1121,7 +1121,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`Ng`** *(optional)* — Number of horizontally stacked panels
 - **`dgv`** *(optional)* — Panel spacing in vertical direction in wavelengths
 - **`dgh`** *(optional)* — Panel spacing in horizontal direction in wavelengths
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern; empty (no elements): default
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ### Returns:
@@ -1289,7 +1289,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
     arma::uword N = 1, 
     dtype center_freq = 299792458.0, 
     dtype spacing = 0.5,
-    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
     dtype res = 1.0);
 ```
 
@@ -1297,7 +1297,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 - **`N`** *(optional)* — Number of elements
 - **`center_freq`** *(optional)* — Center frequency
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern; empty (no elements): default
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ### Returns:
@@ -1337,7 +1337,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
-- If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 343 m/s.
 - **Driver models** (`driver_type`):
@@ -1368,7 +1368,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        const arma::Col<dtype> *center_freq = nullptr,
+        const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
         dtype angular_resolution_deg = 5.0);
 ```
 
@@ -1386,7 +1386,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
-- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
+- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; empty: third-octave bands
 - **`angular_resolution_deg`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
@@ -1396,11 +1396,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 ```cpp
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
 arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &sub_freqs, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
 ```
 
 ---
@@ -1478,7 +1478,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_write) · [Python](quadriga_lib_
 
 - Multiple antennas can be stored in the same file using distinct `id` values
 - If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (`nullptr` or empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
+- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
   in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
 - The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
   pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
@@ -1499,7 +1499,7 @@ unsigned quadriga_lib::qdant_write(
     const std::string &fn,
     const arrayant<dtype> &ant,
     unsigned id = 0,
-    const arma::u32_mat *layout = nullptr);
+    const arma::u32_mat &layout = arma::u32_mat());
 ```
 
 ### Inputs:
@@ -1680,7 +1680,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     dtype gain_max_dB = -60.0,
     dtype gain_min_dB = -140.0,
     const std::string &colormap = "jet",
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     dtype radius_max = 0.05,
     dtype radius_min = 0.01,
     arma::uword n_edges = 5) const;
@@ -1692,7 +1692,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
 - **`radius_min`** *(optional)* — Tube radius at minimum gain
 - **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
@@ -1881,7 +1881,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     bool remove_delay_phase = true,
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     int use_kernel = 0);
 ```
 
@@ -1929,7 +1929,7 @@ void quadriga_lib::baseband_freq_response_vec(
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     int use_kernel = 0);
 ```
 
@@ -2023,7 +2023,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec &i_snap = arma::uvec());
 ```
 
 ### Inputs:
@@ -2032,7 +2032,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; `nullptr` or empty = all snapshots; `[n_out]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
 
 ### Returns:
 - Channel object at the specified slot; empty if no data is present
@@ -2059,13 +2059,13 @@ Not in: MATLAB, Python
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
     const std::string &fn,
     const arma::Mat<unsigned> &slots,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec &i_snap = arma::uvec());
 ```
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`slots`** — Slot indices `(ix, iy, iz, iw)`, 0-based, one column per slot; `[4, n_slot]`
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; `nullptr` or empty = all snapshots; `[n_out]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
 
 ### Returns:
 - Channel objects, one per slot; `[n_slot]`
@@ -2497,7 +2497,7 @@ size_t quadriga_lib::qrt_file_append(
     const std::string &fn,
     const std::vector<quadriga_lib::path> &path_data,
     const arma::Mat<dtype> &orig_pos,
-    const arma::Mat<dtype> *orig_orientation = nullptr,
+    const arma::Mat<dtype> &orig_orientation = arma::Mat<dtype>(),
     const std::string &orig_name = "TX");
 ```
 
@@ -2505,7 +2505,7 @@ size_t quadriga_lib::qrt_file_append(
 - **`fn`** — Path to an existing QRT file created by [qrt_file_init](#qrt_file_init)
 - **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
-- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
+- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
 
 ### Returns:
@@ -3090,8 +3090,8 @@ void quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *eod = nullptr,
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
-    const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
-    const std::vector<bool> *active_path = nullptr,
+    const quadriga_lib::arrayant<dtype> &irs_array_2 = quadriga_lib::arrayant<dtype>(),
+    const std::vector<bool> &active_path = std::vector<bool>(),
     std::vector<bool> *active_path_out = nullptr,
     int use_kernel = 0);
 ```
@@ -3122,7 +3122,7 @@ void quadriga_lib::get_channels_irs(
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](#arrayant)
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; empty (no elements): `irs_array` on both sides; see [arrayant](#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 - **`use_kernel`** *(optional)* — Kernel of both segments, passed to [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
@@ -4063,12 +4063,12 @@ void quadriga_lib::conf_file_write(
     const std::string &fn,
     const std::unordered_map<std::string, double> &scenpar,
     const std::string &pl_model = "",
-    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
-    const std::vector<std::string> *pl_order = nullptr,
-    const std::vector<std::string> *short_names = nullptr,
+    const std::unordered_map<std::string, std::vector<double>> &plpar = std::unordered_map<std::string, std::vector<double>>(),
+    const std::vector<std::string> &pl_order = std::vector<std::string>(),
+    const std::vector<std::string> &short_names = std::vector<std::string>(),
     const std::string &ref = "",
-    const std::vector<std::string> *ref_sec = nullptr,
-    const arma::mat *valid_range = nullptr,
+    const std::vector<std::string> &ref_sec = std::vector<std::string>(),
+    const arma::mat &valid_range = arma::mat(),
     bool write_defaults = false);
 ```
 
@@ -4137,8 +4137,8 @@ void quadriga_lib::gbsm_draw(
     arma::mat &rnd,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::u32_vec *floor_id = nullptr,
-    const arma::vec *center_freq = nullptr,
+    const arma::u32_vec &floor_id = arma::u32_vec(),
+    const arma::vec &center_freq = arma::vec(),
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -4197,8 +4197,8 @@ void quadriga_lib::gbsm_init_phases(
     arma::sword seed = -1,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
     bool dual_mobility = false,
     bool remove_bias = true,
     bool horizontal = true);
@@ -4309,10 +4309,10 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::cube &polmat,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
-    const arma::u32_vec *path_type = nullptr,
-    const arma::u32_vec *tap = nullptr,
-    const arma::vec *gr_eps_re = nullptr,
-    const arma::vec *gr_eps_im = nullptr);
+    const arma::u32_vec &path_type = arma::u32_vec(),
+    const arma::u32_vec &tap = arma::u32_vec(),
+    const arma::vec &gr_eps_re = arma::vec(),
+    const arma::vec &gr_eps_im = arma::vec());
 ```
 
 ### Inputs:
@@ -4377,11 +4377,11 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const std::string &mobility = "auto",
     const std::string &output = "taps",
     arma::uword i_freq = 0,
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
-    const arma::mat *tx_orientation = nullptr,
-    const arma::mat *rx_orientation = nullptr,
-    const arma::vec *kf_ratio = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
+    const arma::mat &tx_orientation = arma::mat(),
+    const arma::mat &rx_orientation = arma::mat(),
+    const arma::vec &kf_ratio = arma::vec(),
     bool oxygen = false,
     bool use_absolute_delays = false);
 ```
@@ -4460,8 +4460,8 @@ void quadriga_lib::los_probability(
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
-    const arma::vec *rnd_g = nullptr,
-    const arma::vec *center_freq = nullptr,
+    const arma::vec &rnd_g = arma::vec(),
+    const arma::vec &center_freq = arma::vec(),
     arma::mat *los_soft = nullptr);
 ```
 
@@ -4535,7 +4535,7 @@ void quadriga_lib::lsp_generate(
     const arma::mat &rx_pos,
     const arma::mat &rnd,
     arma::cube &lsp,
-    const arma::mat *sf_sigma_dB = nullptr,
+    const arma::mat &sf_sigma_dB = arma::mat(),
     arma::vec *abs_toa = nullptr,
     arma::mat *gr_eps_re = nullptr,
     arma::mat *gr_eps_im = nullptr,
@@ -4694,8 +4694,8 @@ void quadriga_lib::path_loss(
     const arma::mat &rx_pos,
     arma::mat &pl_dB,
     arma::mat *sf_sigma_dB = nullptr,
-    const arma::vec *d2d_in = nullptr,
-    const arma::vec *rnd_he = nullptr);
+    const arma::vec &d2d_in = arma::vec(),
+    const arma::vec &rnd_he = arma::vec());
 ```
 
 ### Inputs:
@@ -4835,14 +4835,14 @@ void quadriga_lib::ssf_clusters(
     arma::cube &aoa,
     arma::cube &eoa,
     const std::string &method = "38.901",
-    const arma::cube *rnd_freq = nullptr,
-    const arma::cube *lsp_anchor = nullptr,
-    const arma::mat *eod_offset_deg = nullptr,
-    const arma::vec *abs_toa = nullptr,
-    const arma::mat *gr_eps_re = nullptr,
-    const arma::mat *gr_eps_im = nullptr,
-    const std::vector<bool> *o2i = nullptr,
-    const arma::u32_vec *n_cluster = nullptr,
+    const arma::cube &rnd_freq = arma::cube(),
+    const arma::cube &lsp_anchor = arma::cube(),
+    const arma::mat &eod_offset_deg = arma::mat(),
+    const arma::vec &abs_toa = arma::vec(),
+    const arma::mat &gr_eps_re = arma::mat(),
+    const arma::mat &gr_eps_im = arma::mat(),
+    const std::vector<bool> &o2i = std::vector<bool>(),
+    const arma::u32_vec &n_cluster = arma::u32_vec(),
     arma::u32_vec *n_active = nullptr);
 ```
 
@@ -4932,9 +4932,9 @@ void quadriga_lib::ssf_paths(
     arma::vec &path_length,
     arma::cube &polmat,
     const std::string &mobility = "auto",
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
-    const arma::vec *kf_ratio = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
+    const arma::vec &kf_ratio = arma::vec(),
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
     arma::vec *aoa = nullptr,
@@ -5034,8 +5034,8 @@ void quadriga_lib::ssf_rays(
     arma::uword i_freq = 0,
     const std::string &angle_model = "additive",
     const std::string &pol_model = "38.901",
-    const arma::mat *gr_eps_re = nullptr,
-    const arma::mat *gr_eps_im = nullptr,
+    const arma::mat &gr_eps_re = arma::mat(),
+    const arma::mat &gr_eps_im = arma::mat(),
     bool pol_variability = false,
     bool random_phase = true);
 ```
@@ -5276,7 +5276,7 @@ void fast_geo2cart(
     arma::Col<dtype> *cos_az = nullptr,
     arma::Col<dtype> *sin_el = nullptr,
     arma::Col<dtype> *cos_el = nullptr,
-    const arma::Col<dtype> *len = nullptr,
+    const arma::Col<dtype> &len = arma::Col<dtype>(),
     int use_kernel = 0);
 ```
 
@@ -5523,7 +5523,7 @@ void calc_diffraction_gain(
     arma::Mat<dtype> *polmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
@@ -5631,7 +5631,7 @@ void quadriga_lib::combine_irs_coord(
     arma::Mat<dtype> &interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
-    const std::vector<bool> *active_path = nullptr);
+    const std::vector<bool> &active_path = std::vector<bool>());
 ```
 
 ### Inputs:
@@ -5933,7 +5933,7 @@ void quadriga_lib::mitsuba_xml_file_write(
     const arma::uvec &mtl_ind,
     const std::vector<std::string> &obj_names,
     const std::vector<std::string> &mtl_names,
-    const arma::Mat<dtype> *bsdf = nullptr,
+    const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
     bool map_to_itu_materials = false);
 ```
 
@@ -5946,7 +5946,7 @@ void quadriga_lib::mitsuba_xml_file_write(
   material — 0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
 - **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`; nullptr or empty: none
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`; empty: none
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ### See also:
@@ -6045,7 +6045,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_write) · [Python](quadriga_l
 - With `split_loose_parts`: objects are separated into connected components ("separate by loose parts"); connectivity
   follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
-  1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
+  1-based material index (0 = no material, leaving that face unassigned); leave `mtl_ind` empty to omit materials entirely
 - A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
   `usemtl (null)`, which [obj_file_read](#obj_file_read) reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
   are unchanged. A material named `(null)` that is used by a face is therefore rejected (`std::invalid_argument`);
@@ -6062,20 +6062,20 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_write) · [Python](quadriga_l
 ```cpp
 void obj_file_write(
     const std::string &fn,
-    const arma::Mat<dtype> *mesh = nullptr,
-    const arma::uvec *obj_ind = nullptr,
-    const arma::uvec *mtl_ind = nullptr,
-    const std::vector<std::string> *obj_names = nullptr,
-    const std::vector<std::string> *mtl_names = nullptr,
+    const arma::Mat<dtype> &mesh = arma::Mat<dtype>(),
+    const arma::uvec &obj_ind = arma::uvec(),
+    const arma::uvec &mtl_ind = arma::uvec(),
+    const std::vector<std::string> &obj_names = std::vector<std::string>(),
+    const std::vector<std::string> &mtl_names = std::vector<std::string>(),
     arma::Mat<dtype> *vert_list_out = nullptr,
     arma::umat *face_ind_out = nullptr,
-    const arma::Mat<dtype> *vert_list = nullptr,
-    const arma::umat *face_ind = nullptr,
-    const arma::Mat<dtype> *bsdf = nullptr,
+    const arma::Mat<dtype> &vert_list = arma::Mat<dtype>(),
+    const arma::umat &face_ind = arma::umat(),
+    const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
     const dtype threshold = 0.001,
-    const arma::uvec *csv_ind = nullptr,
-    const std::vector<std::string> *csv_names = nullptr,
-    const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
+    const arma::uvec &csv_ind = arma::uvec(),
+    const std::vector<std::string> &csv_names = std::vector<std::string>(),
+    const std::unordered_map<std::string, std::vector<dtype>> &csv_prop = std::unordered_map<std::string, std::vector<dtype>>(),
     bool csv_write_defaults = false,
     bool split_loose_parts = false);
 ```
@@ -6084,9 +6084,9 @@ void obj_file_write(
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
 - **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; omit (`nullptr`) for no materials
+- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
 - **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `mtl_ind` is given
+- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
 - **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [obj_file_read](#obj_file_read) for columns
@@ -6223,7 +6223,7 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_aabb) · [Python](quadriga_lib_api_python.md#point_cloud_aabb)
 
 - Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
-- If `sub_cloud_ind` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- If `sub_cloud_ind` is empty, the entire input is treated as a single cloud; last index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ### Declaration:
@@ -6231,7 +6231,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_aabb) · [Python](quadriga
 void quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> &points,
     arma::Mat<dtype> &aabb,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
 
@@ -6352,7 +6352,7 @@ void quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
     arma::uvec &result,
-    const arma::uvec *obj_ind = nullptr,
+    const arma::uvec &obj_ind = arma::uvec(),
     dtype distance = 0.0);
 ```
 
@@ -6394,7 +6394,7 @@ Not in: MATLAB, Python
 ```cpp
 void polmat_update(
     arma::Mat<dtype> &polmat,
-    const arma::Mat<dtype> *update = nullptr,
+    const arma::Mat<dtype> &update = arma::Mat<dtype>(),
     arma::Col<dtype> *gain = nullptr,
     bool initialize = false,
     bool normalize = false,
@@ -6410,7 +6410,7 @@ void polmat_update(
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
-  broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
+  broadcasts one matrix to every update; empty applies the identity (no multiply).
 - **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
   - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
     normalization. With `normalize == false` this measures the gain without modifying the matrix
@@ -6426,7 +6426,8 @@ void polmat_update(
   Untouched columns of `polmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
 - **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `polmat`.
-  Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
+  Length `n_rayU`. Default (`nullptr`) is the identity map, which requires `n_ray == n_rayU`; an empty
+  `ray_ind` means zero updates (`n_rayU = 0`), which is why it stays a pointer. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
   so the result is the same as a single-threaded run for any thread count. With duplicates the call
@@ -6440,27 +6441,27 @@ initialize -> update -> normalize -> apply_gain. Argument order is
 arma::Mat<dtype> polmat;                            // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 
 // (1) Initialization
-polmat_update(polmat, &U0);                         // empty polmat: sized from U0, seeded, polmat := U0
-polmat_update(polmat, nullptr, nullptr, true);      // pre-sized polmat: reset every column to unity
-polmat_update(polmat, &U0, nullptr, true);          // pre-sized polmat: copy-through, polmat := U0 (ignores old)
+polmat_update(polmat, U0);                          // empty polmat: sized from U0, seeded, polmat := U0
+polmat_update(polmat, {}, nullptr, true);           // pre-sized polmat: reset every column to unity
+polmat_update(polmat, U0, nullptr, true);           // pre-sized polmat: copy-through, polmat := U0 (ignores old)
 
 // (2) Updating (accumulate onto existing state)
-polmat_update(polmat, &U);                          // polmat := U * polmat
-polmat_update(polmat, &Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
+polmat_update(polmat, U);                           // polmat := U * polmat
+polmat_update(polmat, Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
 
 // (3) Gain extraction (measure, leave the matrix part untouched)
 arma::Col<dtype> g;
-polmat_update(polmat, nullptr, &g);                 // g[k] = gain( polmat[:,k] )
-polmat_update(polmat, &U, &g);                      // apply U, then measure into g (no normalize)
+polmat_update(polmat, {}, &g);                      // g[k] = gain( polmat[:,k] )
+polmat_update(polmat, U, &g);                       // apply U, then measure into g (no normalize)
 
 // (4) Normalizing (scale each column to unit gain; optionally update first)
-polmat_update(polmat, nullptr, nullptr, false, true); // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
-polmat_update(polmat, &U, nullptr, false, true);    // update, then normalize, one pass
+polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, U, nullptr, false, true);     // update, then normalize, one pass
 
 // (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
 //     'g' is read here (apply_gain = true):
-polmat_update(polmat, nullptr, &g, false, true, true); // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
-polmat_update(polmat, &U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
+polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
 ```
 
 ### Storage layout (column-major, interleaved complex):
@@ -6521,9 +6522,9 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
-    const arma::u32_vec *point_ind = nullptr,
-    const std::vector<bool> *subdiv_flag_in = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
+    const arma::u32_vec &point_ind = arma::u32_vec(),
+    const std::vector<bool> &subdiv_flag_in = std::vector<bool>(),
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
     uint8_t min_segments = 0,
@@ -6547,15 +6548,15 @@ arma::uword quadriga_lib::ray_commit(
   flags in bits 14 and 15); `[n_ray]`
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
-  [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. NULL → no partitioning
+  [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. Empty → no partitioning
 - **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
-  indexing. NULL → `points` is used as passed in and `i_cir` indexes it directly
+  indexing. Empty → `points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
-  same launch configuration. NULL / empty → no ray is excluded on these grounds
+  same launch configuration. Empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
@@ -6625,10 +6626,10 @@ arma::uword ray_init(
     arma::fcube *path_dir_prev = nullptr,
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
-    const arma::fmat *mesh = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::fmat *aabb = nullptr,
-    const arma::fmat *rx_points = nullptr,
+    const arma::fmat &mesh = arma::fmat(),
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::fmat &aabb = arma::fmat(),
+    const arma::fmat &rx_points = arma::fmat(),
     bool scalar_mode = false);
 ```
 
@@ -6639,15 +6640,15 @@ arma::uword ray_init(
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
-  the launch sphere `r0`. NULL → the mesh does not bound `r0`.
+  the launch sphere `r0`. Empty → the mesh does not bound `r0`.
 - **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
-  strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
+  strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Unlike [ray_progress](#ray_progress), boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
   so building them here would usually cost more than it saves. Pass the [triangle_mesh_aabb](#triangle_mesh_aabb) result the
   caller already holds for the tracing loop.
 - **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
-  sphere `r0`, so that no receiver starts inside it. NULL → receivers are not considered.
+  sphere `r0`, so that no receiver starts inside it. Empty → receivers are not considered.
 - **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
   coefficient per frequency), `false` = EM (2×2 Jones matrix per frequency)
 
@@ -6855,7 +6856,7 @@ void quadriga_lib::ray_point_intersect(
     arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
     std::vector<arma::u32_vec> *hits_per_point = nullptr,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -6943,8 +6944,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     std::vector<quadriga_lib::path> &paths,
     arma::fmat *trivec = nullptr,
     arma::fmat *tridir = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::fmat *aabb = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::fmat &aabb = arma::fmat(),
     uint8_t max_interactions = 20,
     uint8_t max_reflections = 10,
     uint8_t max_transmissions = 10,
@@ -6954,10 +6955,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
-    const arma::u32_vec *n_interact_in = nullptr,
-    const arma::u32_vec *fbs_ind_in = nullptr,
-    const arma::u32_vec *sbs_ind_in = nullptr,
-    const std::vector<bool> *subdiv_flag_in = nullptr);
+    const arma::u32_vec &n_interact_in = arma::u32_vec(),
+    const arma::u32_vec &fbs_ind_in = arma::u32_vec(),
+    const arma::u32_vec &sbs_ind_in = arma::u32_vec(),
+    const std::vector<bool> &subdiv_flag_in = std::vector<bool>());
 ```
 
 ### Inputs:
@@ -6967,9 +6968,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`center_freq`** — Center frequencies in [Hz], in scalar mode the acoustic frequencies; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
 - **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
-  first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
+  first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
-  NULL with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
+  Empty with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
 - **`max_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
 - **`max_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
 - **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
@@ -7335,8 +7336,8 @@ void quadriga_lib::ray_triangle_intersect(
     arma::u32_vec *n_interact = nullptr,
     arma::u32_vec *fbs_ind = nullptr,
     arma::u32_vec *sbs_ind = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::Mat<dtype> *aabb = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::Mat<dtype> &aabb = arma::Mat<dtype>(),
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -7346,7 +7347,7 @@ void quadriga_lib::ray_triangle_intersect(
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
 - **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
@@ -7428,12 +7429,12 @@ arma::uword quadriga_lib::subdivide_rays(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &trivec,
     const arma::Mat<dtype> &tridir,
-    const arma::Mat<dtype> *dest = nullptr,
+    const arma::Mat<dtype> &dest = arma::Mat<dtype>(),
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
-    const arma::u32_vec *index = nullptr);
+    const arma::u32_vec &index = arma::u32_vec());
 ```
 
 ### Inputs:
@@ -7452,7 +7453,7 @@ arma::uword quadriga_lib::subdivide_rays(
 - **`origN`** — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 - **`trivecN`** — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
 - **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
-- **`destN`** — Subdivided destinations, left untouched if `dest` was `nullptr` or empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`destN`** — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 
 ### Returns:
 - `n_rayN` — Number of rays written to the output, `4 * n_subdiv`
@@ -7480,7 +7481,7 @@ arma::uword quadriga_lib::subdivide_triangles(
     arma::uword n_div,
     const arma::Mat<dtype> &triangles_in,
     arma::Mat<dtype> &triangles_out,
-    const arma::uvec *mtl_ind = nullptr,
+    const arma::uvec &mtl_ind = arma::uvec(),
     arma::uvec *mtl_ind_out = nullptr);
 ```
 
@@ -7513,7 +7514,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_aabb) · [Python](quadri
 void quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> &mesh,
     arma::Mat<dtype> &aabb,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
 
@@ -7548,7 +7549,7 @@ arma::uword triangle_mesh_segmentation(
     arma::u32_vec &sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    const arma::uvec *mtl_ind = nullptr,
+    const arma::uvec &mtl_ind = arma::uvec(),
     arma::uvec *mtl_ind_out = nullptr,
     arma::u32_vec *mesh_ind = nullptr);
 ```
@@ -7678,12 +7679,12 @@ arma::vec dist_decorr = {10.0, 50.0};
 
 // Normal distributed values with zero mean and unit variance, size [1000, 2]
 arma::mat val;
-quadriga_lib::sos_randn<double>(dist_decorr, pos, val, nullptr, nullptr, "Comb256", 42);
+quadriga_lib::sos_randn<double>(dist_decorr, pos, val, {}, {}, "Comb256", 42);
 
 // Uniform values between 0 and 1, and integers from 1 to 6
 arma::mat uni, dice;
-quadriga_lib::sos_rand<double>(dist_decorr, pos, uni, nullptr, nullptr, "Comb256", 42);
-quadriga_lib::sos_randi<double>(dist_decorr, pos, 6, dice, nullptr, nullptr, "Comb256", 42);
+quadriga_lib::sos_rand<double>(dist_decorr, pos, uni, {}, {}, "Comb256", 42);
+quadriga_lib::sos_randi<double>(dist_decorr, pos, 6, dice, {}, {}, "Comb256", 42);
 ```
 
 The last argument is the seed. With the same seed, decorrelation distances and preset, a later call returns the same
@@ -7720,12 +7721,12 @@ quadriga_lib::sos_val(spatial_freq, phase, pos_new, val_new);
 
 // Uniform distributed output
 arma::mat val_uni;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, {}, {}, {}, 1.0, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
 std::vector<arma::cube> grid;
-quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
+quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, y);
 ```
 
 - **Presets:** `Exp`, `Gauss` and `Comb`, each with 128, 256, 512 or 1024 sinusoids, e.g. `"Exp512"`. `Exp`
@@ -7741,7 +7742,7 @@ quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
 // Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
 pos_rx *= 100.0;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, &pos_rx, nullptr, &acf, &dist);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx, {}, acf, dist);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -7907,8 +7908,8 @@ void quadriga_lib::sos_acf_estimate(
     arma::Col<dtype> &acf_est,
     arma::Col<dtype> *dist_est = nullptr,
     arma::Col<dtype> *acf_est_dual = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::sword seed = -1);
 ```
 
@@ -8178,8 +8179,8 @@ void quadriga_lib::sos_map(
     const arma::Mat<dtype> &phase,
     const arma::Col<dtype> &x,
     std::vector<arma::Cube<dtype>> &map,
-    const arma::Col<dtype> *y = nullptr,
-    const arma::Col<dtype> *z = nullptr,
+    const arma::Col<dtype> &y = arma::Col<dtype>(),
+    const arma::Col<dtype> &z = arma::Col<dtype>(),
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -8289,8 +8290,8 @@ void quadriga_lib::sos_rand(
     const arma::Col<dtype> &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Col<dtype> *dist_decorr_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -8354,8 +8355,8 @@ void quadriga_lib::sos_randi(
     const arma::Mat<dtype> &pos,
     arma::uword imax,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Col<dtype> *dist_decorr_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -8417,8 +8418,8 @@ void quadriga_lib::sos_randn(
     const arma::Col<dtype> &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Col<dtype> *dist_decorr_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -8492,10 +8493,10 @@ void quadriga_lib::sos_remove_bias(
     const arma::Mat<dtype> &spatial_freq,
     arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
-    const arma::Mat<dtype> *pos_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
     arma::Mat<dtype> *phase_b = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
     dtype spatial_freq_scale_b = 1.0);
@@ -8583,10 +8584,10 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Mat<dtype> *phase_b = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     dtype spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);

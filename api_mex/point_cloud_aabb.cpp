@@ -51,15 +51,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::u32_vec sub_cloud_ind = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_index_Col<unsigned>(prhs[1], "sub_cloud_ind"); // 1-based -> 0-based
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-
-    // Wrap optional input pointer
-    const arma::u32_vec *p_sub_cloud_index = sub_cloud_ind.empty() ? nullptr : &sub_cloud_ind;
-
     // Output (size determined at runtime)
     arma::mat aabb;
 
     // Call library function
-    CALL_QD(quadriga_lib::point_cloud_aabb<double>(points, aabb, p_sub_cloud_index, vec_size));
+    CALL_QD(quadriga_lib::point_cloud_aabb<double>(points, aabb, sub_cloud_ind, vec_size));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&aabb);

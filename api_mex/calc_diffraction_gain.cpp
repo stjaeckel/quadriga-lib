@@ -125,11 +125,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_gain = gain.empty() ? nullptr : &gain;
     arma::mat *p_polmat = polmat.empty() ? nullptr : &polmat;
     arma::cube *p_coord = (nlhs > 2) ? &coord : nullptr; // Size depends on lod, set by C++
-    arma::u32_vec *p_sub_mesh_index = sub_mesh_ind.empty() ? nullptr : &sub_mesh_ind;
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
                                                 center_freq, lod, p_gain, p_polmat, p_coord, verbose,
-                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
+                                                sub_mesh_ind, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase));
 
     if (nlhs > 2) // Keep the [3, 0, n_pos] shape for lod 0

@@ -58,7 +58,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth) · 
 ```cpp
 void quadriga_lib::arrayant_calc_beamwidth(
     const arrayant<dtype> &ant,
-    const arma::uvec *i_element = nullptr,
+    const arma::uvec &i_element = arma::uvec(),
     dtype threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
@@ -68,7 +68,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 
 ### Inputs:
 - **`ant`** — Valid arrayant
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 - **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
 
 ### Outputs:
@@ -81,7 +81,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 ```cpp
 auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 20.0);
 arma::vec bw_az, bw_el;
-quadriga_lib::arrayant_calc_beamwidth(ant, nullptr, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
+quadriga_lib::arrayant_calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
 ```
 
 ### See also:
@@ -104,7 +104,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth) · 
 ```cpp
 void quadriga_lib::arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
-        const arma::uvec *i_element = nullptr,
+        const arma::uvec &i_element = arma::uvec(),
         dtype threshold_dB = 3.0,
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,
@@ -114,7 +114,7 @@ void quadriga_lib::arrayant_calc_beamwidth_multi(
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 - **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
 
 ### Outputs:
@@ -143,12 +143,12 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity) �
 void quadriga_lib::arrayant_calc_directivity(
     const arrayant<dtype> &ant,
     arma::Col<dtype> &directivity_dBi,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
 - **`ant`** — Valid arrayant
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ### Outputs:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out]`
@@ -181,12 +181,12 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity) �
 void quadriga_lib::arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
         arma::Mat<dtype> &directivity_dBi,
-        const arma::uvec *i_element = nullptr);
+        const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ### Outputs:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
@@ -213,8 +213,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern) ·
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
     const arrayant<dtype> &ant,
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -241,7 +241,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern) ·
 
 - Multi-frequency counterpart to [arrayant_combine_pattern](#arrayant_combine_pattern)
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
-- Output length = `freq_new->n_elem` if provided; otherwise one entry per input arrayant
+- Output length = `freq_new.n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [arrayant_interpolate_multi](#arrayant_interpolate_multi) (SLERP with linear-interpolation fallback)
 - Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
 - Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
@@ -252,9 +252,9 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern) ·
 ```cpp
 std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
-    const arma::Col<dtype> *freq_new = nullptr,
+    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -406,7 +406,7 @@ void quadriga_lib::arrayant_copy_element_multi(
 arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
+    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
@@ -434,7 +434,7 @@ void quadriga_lib::arrayant_export_obj_file(
     const std::string &colormap = "jet",
     dtype object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
@@ -444,7 +444,7 @@ void quadriga_lib::arrayant_export_obj_file(
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
 - **`object_radius`** *(optional)* — Radius of the exported object
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](site-specific-simulation-tools.md#icosphere)
-- **`i_element`** *(optional)* — 0-based element indices to export; `nullptr` or empty exports all elements
+- **`i_element`** *(optional)* — 0-based element indices to export; empty exports all elements
 
 ### See also:
 - [colormap](site-specific-simulation-tools.md#colormap) (Used for setting the colormap)
@@ -488,9 +488,9 @@ void quadriga_lib::arrayant_interpolate(
     arma::Mat<dtype> &V_im,
     arma::Mat<dtype> &H_re,
     arma::Mat<dtype> &H_im,
-    const arma::uvec *i_element = nullptr,
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos = nullptr,
+    const arma::uvec &i_element = arma::uvec(),
+    const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
+    const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Mat<dtype> *dist = nullptr,
     arma::Mat<dtype> *azimuth_loc = nullptr,
     arma::Mat<dtype> *elevation_loc = nullptr,
@@ -504,13 +504,13 @@ void quadriga_lib::arrayant_interpolate(
 - **`ant`** — Array antenna with `n_elements` elements; see [arrayant](array-antenna-class.md#arrayant)
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements in
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in
   order (`n_out = n_elements`); `[n_out]`
 - **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the antenna, for all outputs and angles,
-  per output, per angle, or both; `nullptr` or empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
+  per output, per angle, or both; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
   `[3, n_out, n_ang]`
-- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; `nullptr` or
-  empty: the columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
+- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the
+  columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
 - **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern
   has more than `INT_MAX` samples); other values throw
 
@@ -568,10 +568,10 @@ void quadriga_lib::arrayant_interpolate_multi(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> *freq_new = nullptr,
-    const arma::uvec *i_element = nullptr,
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos = nullptr,
+    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const arma::uvec &i_element = arma::uvec(),
+    const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
+    const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Cube<std::complex<dtype>> *V = nullptr,
     arma::Cube<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
@@ -582,9 +582,9 @@ void quadriga_lib::arrayant_interpolate_multi(
   frequency
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`freq_new`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
+- **`freq_new`** *(optional)* — Target frequencies in Hz; empty: the center frequencies of the entries
   in vector order; `[n_freq]`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements;
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements;
   `[n_out]`
 - **`orientation`** *(optional)* — Euler angles (bank, tilt, heading), applied at all frequencies; shapes as in
   [arrayant_interpolate](#arrayant_interpolate)
@@ -605,7 +605,7 @@ arma::mat az = {0.0, 1.5708, -1.5708, 3.14159};
 arma::mat el(1, 4, arma::fill::zeros);
 arma::vec freq = {250.0, 1500.0, 8000.0};
 arma::cube V_re, V_im, H_re, H_im;
-quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, &freq);
+quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, freq);
 ```
 
 ### See also:
@@ -687,7 +687,7 @@ void quadriga_lib::arrayant_rotate_pattern(
     arrayant<dtype> &ant,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
@@ -701,7 +701,7 @@ void quadriga_lib::arrayant_rotate_pattern(
    | 2    | No      | Yes          | No              |
    | 3    | Yes     | Yes          | No              |
    | 4    | Yes     | No           | No              |
-- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; empty: all elements
 
 ### Example:
 ```cpp
@@ -732,14 +732,14 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &orientation,
         unsigned usage = 0,
-        const arma::uvec *i_element = nullptr)
+        const arma::uvec &i_element = arma::uvec())
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; empty: all elements
 
 ### See also:
 - [arrayant_rotate_pattern](#arrayant_rotate_pattern) (per-entry operation called internally)
@@ -754,7 +754,7 @@ Set element positions for all entries in a multi-frequency arrayant vector
 Not in: MATLAB, Python
 
 - Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is nullptr or empty, all positions are replaced and `element_pos` must have `n_elements` columns.
+- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
 - If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
@@ -763,13 +763,13 @@ Not in: MATLAB, Python
 void quadriga_lib::arrayant_set_element_pos_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        const arma::uvec *i_element = nullptr);
+        const arma::uvec &i_element = arma::uvec());
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; nullptr or empty: all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; empty: all elements are replaced
 
 ### See also:
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (replicate elements before setting positions)
@@ -799,7 +799,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
     arma::uword Ng = 1, 
     dtype dgv = 0.5, 
     dtype dgh = 0.5,
-    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
     dtype res = 1.0);
 ```
 
@@ -822,7 +822,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`Ng`** *(optional)* — Number of horizontally stacked panels
 - **`dgv`** *(optional)* — Panel spacing in vertical direction in wavelengths
 - **`dgh`** *(optional)* — Panel spacing in horizontal direction in wavelengths
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern; empty (no elements): default
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ### Returns:
@@ -990,7 +990,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
     arma::uword N = 1, 
     dtype center_freq = 299792458.0, 
     dtype spacing = 0.5,
-    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
     dtype res = 1.0);
 ```
 
@@ -998,7 +998,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 - **`N`** *(optional)* — Number of elements
 - **`center_freq`** *(optional)* — Center frequency
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern; empty (no elements): default
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ### Returns:
@@ -1038,7 +1038,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
-- If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 343 m/s.
 - **Driver models** (`driver_type`):
@@ -1069,7 +1069,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        const arma::Col<dtype> *center_freq = nullptr,
+        const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
         dtype angular_resolution_deg = 5.0);
 ```
 
@@ -1087,7 +1087,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
-- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
+- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; empty: third-octave bands
 - **`angular_resolution_deg`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
@@ -1097,11 +1097,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 ```cpp
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
 arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &sub_freqs, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
 ```
 
 ---
@@ -1179,7 +1179,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#qdant_write) · [Python](../
 
 - Multiple antennas can be stored in the same file using distinct `id` values
 - If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (`nullptr` or empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
+- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
   in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
 - The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
   pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
@@ -1200,7 +1200,7 @@ unsigned quadriga_lib::qdant_write(
     const std::string &fn,
     const arrayant<dtype> &ant,
     unsigned id = 0,
-    const arma::u32_mat *layout = nullptr);
+    const arma::u32_mat &layout = arma::u32_mat());
 ```
 
 ### Inputs:

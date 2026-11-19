@@ -140,7 +140,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     dtype gain_max_dB = -60.0,
     dtype gain_min_dB = -140.0,
     const std::string &colormap = "jet",
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     dtype radius_max = 0.05,
     dtype radius_min = 0.01,
     arma::uword n_edges = 5) const;
@@ -152,7 +152,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
 - **`radius_min`** *(optional)* — Tube radius at minimum gain
 - **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3

@@ -145,17 +145,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool random_phase = (nrhs < 22) ? true : qd_mex_get_scalar<bool>(prhs[21], "random_phase", true);
 
 
-    // An omitted or empty input selects the default; with zero links an empty input other than [] counts as given
-    auto given = [&](int i)
-    {
-        if (nrhs <= i)
-            return false;
-        const bool shaped = mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0; // not [] (0 x 0)
-        return !mxIsEmpty(prhs[i]) || (rx_pos.n_elem == 0 && shaped);
-    };
-    const arma::mat *p_gr_eps_re = given(18) ? &gr_eps_re : nullptr;
-    const arma::mat *p_gr_eps_im = given(19) ? &gr_eps_im : nullptr;
-
     // Output struct array in MATLAB memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the
     // library call throws its message before any output is needed
     std::vector<quadriga_lib::gbsm_rays> rays;
@@ -178,8 +167,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     CALL_QD(quadriga_lib::ssf_rays(scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, aod,
-                                   eod, aoa, eoa, rnd_ray, rays, method, i_freq, angle_model, pol_model, p_gr_eps_re,
-                                   p_gr_eps_im, pol_variability, random_phase));
+                                   eod, aoa, eoa, rnd_ray, rays, method, i_freq, angle_model, pol_model, gr_eps_re,
+                                   gr_eps_im, pol_variability, random_phase));
 
     // The method string cannot be aliased
     for (size_t l = 0; l < rays.size(); ++l)

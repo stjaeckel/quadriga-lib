@@ -37,7 +37,7 @@ Existing wrappers that show the patterns:
 - `qpy_o2i_loss.cpp` — a complete recent example: array and string-list inputs, a default, outputs of known size, an integer index output; registered in `python_gbsm.cpp`, test in `tests/python_tests/test_o2i_loss.py` (its documentation block predates the lean rules)
 - `qpy_acdf.cpp` — array inputs, optional array input, outputs of known and unknown size
 - `qpy_obj_file_read.cpp` — outputs of runtime size, integer index outputs, string lists, map-to-dict
-- `qpy_obj_file_write.cpp` — many optional inputs passed to C++ as `nullptr` when absent
+- `qpy_obj_file_write.cpp` — many optional inputs, passed to C++ as (possibly empty) objects
 - `qpy_calc_delay_spread.cpp` — ragged inputs as lists of arrays
 - `qpy_arrayant_rotate_pattern.cpp` — arrayant dict in / dict out, in-place modification
 - `qpy_get_channels_multifreq.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, zero-copy complex output
@@ -362,11 +362,11 @@ const auto bins_in_a = qd_python_numpy2arma_Col<double>(bins, true);
 - Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object`. The same holds for optional containers (`list`, `dict`): `py::handle` with default `py::none()`, not `py::list()` / `py::dict()`.
 
 ### Optional inputs and `nullptr`
+- An optional C++ input that is a `const` reference with an empty default takes the converted object directly; `None` converts to an empty object, which means "not given".
 - If the C++ function takes an optional input by pointer and distinguishes `nullptr` from an empty object, pass `nullptr` when the user did not provide the input:
 ```
-const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
+const arma::uvec *p_ray_ind = ray_ind.is_none() ? nullptr : &ray_ind_a;
 ```
-- If the C++ documentation states that an empty object and `nullptr` behave the same, pass the address of the (possibly empty) object directly.
 
 ### 4D arrays and lists of arrays
 - A regular 4D shape `[d1, d2, d3, d4]` is read with `qd_python_numpy2arma_vecCube<dtype>(input, true)` (a 3D input yields a vector of length 1); `qd_python_list2vector_*` is only for ragged lists of arrays, which the user passes as a `list`.

@@ -167,12 +167,12 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
 
     // Layout can only contain valid entries (error expected)
     layout = {{1, 2, 112}, {112, 112, 6}};
-    REQUIRE_THROWS_AS(quadriga_lib::qdant_write("test.qdant", ant, 5, &layout), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_write("test.qdant", ant, 5, layout), std::invalid_argument);
 
     // A file that cannot be written (the folder does not exist)
     REQUIRE_THROWS_AS(quadriga_lib::qdant_write("test_no_such_dir_qdant/test.qdant", ant), std::runtime_error);
 
-    id = quadriga_lib::qdant_write("test.qdant", ant, 6, &layout);
+    id = quadriga_lib::qdant_write("test.qdant", ant, 6, layout);
     CHECK(id == 6);
 
     antI = quadriga_lib::qdant_read<float>("test.qdant", 6, &layout2);
@@ -401,7 +401,7 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     auto a = quadriga_lib::generate_arrayant_omni<double>(30.0);
     quadriga_lib::qdant_write(fn, a, 1), quadriga_lib::qdant_write(fn, a, 2), quadriga_lib::qdant_write(fn, a, 3);
     arma::u32_mat L = {{1, 2}, {3, 3}};
-    quadriga_lib::qdant_write(fn, a, 3, &L);
+    quadriga_lib::qdant_write(fn, a, 3, L);
 
     arma::u32_mat L1;
     quadriga_lib::qdant_read<double>(fn, 1, &L1);
@@ -416,7 +416,7 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     CHECK(arma::all(arma::vectorise(L1 == L_reset)));
 
     // Overwriting an entry without layout also resets a custom layout
-    quadriga_lib::qdant_write(fn, a, 4, &L);
+    quadriga_lib::qdant_write(fn, a, 4, L);
     quadriga_lib::qdant_write(fn, a, 2);
     quadriga_lib::qdant_read<double>(fn, 1, &L1);
     REQUIRE(arma::size(L1) == arma::size(L_reset));

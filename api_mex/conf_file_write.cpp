@@ -106,6 +106,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool write_defaults = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "write_defaults", false);
 
     // Call library function
-    CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, pl_model, &plpar, &pl_order, &short_names,
-                                          ref, &ref_sec, &valid_range, write_defaults));
+    CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, pl_model, plpar, pl_order, short_names,
+                                          ref, ref_sec, valid_range, write_defaults));
 }

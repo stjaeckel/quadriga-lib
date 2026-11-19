@@ -129,7 +129,7 @@ void quadriga_lib::lsp_generate(
     const arma::mat &rx_pos,
     const arma::mat &rnd,
     arma::cube &lsp,
-    const arma::mat *sf_sigma_dB = nullptr,
+    const arma::mat &sf_sigma_dB = arma::mat(),
     arma::vec *abs_toa = nullptr,
     arma::mat *gr_eps_re = nullptr,
     arma::mat *gr_eps_im = nullptr,
@@ -179,7 +179,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                 const arma::mat &rx_pos,
                                 const arma::mat &rnd,
                                 arma::cube &lsp,
-                                const arma::mat *sf_sigma_dB,
+                                const arma::mat &sf_sigma_dB,
                                 arma::vec *abs_toa,
                                 arma::mat *gr_eps_re,
                                 arma::mat *gr_eps_im,
@@ -199,20 +199,20 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         throw std::invalid_argument("Input 'rnd' must have size [n_link, 11].");
     if (!rnd.is_finite())
         throw std::invalid_argument("Input 'rnd' must be finite.");
-    if (sf_sigma_dB != nullptr)
+    if (!sf_sigma_dB.empty())
     {
-        if (sf_sigma_dB->n_rows != n_link || sf_sigma_dB->n_cols != n_freq)
+        if (sf_sigma_dB.n_rows != n_link || sf_sigma_dB.n_cols != n_freq)
             throw std::invalid_argument("Input 'sf_sigma_dB' must have size [n_link, n_freq].");
-        if (!sf_sigma_dB->is_finite() || arma::any(arma::vectorise(*sf_sigma_dB) < 0.0))
+        if (!sf_sigma_dB.is_finite() || arma::any(arma::vectorise(sf_sigma_dB) < 0.0))
             throw std::invalid_argument("Input 'sf_sigma_dB' must be finite and >= 0.");
     }
-    qd_check_alias(&lsp, "lsp", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
-    qd_check_alias(abs_toa, "abs_toa", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
-    qd_check_alias(gr_eps_re, "gr_eps_re", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
-    qd_check_alias(gr_eps_im, "gr_eps_im", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
-    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
-    qd_check_alias(lsp_mu, "lsp_mu", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
-    qd_check_alias(lsp_sigma, "lsp_sigma", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(&lsp, "lsp", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
+    qd_check_alias(abs_toa, "abs_toa", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
+    qd_check_alias(gr_eps_re, "gr_eps_re", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
+    qd_check_alias(gr_eps_im, "gr_eps_im", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
+    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
+    qd_check_alias(lsp_mu, "lsp_mu", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
+    qd_check_alias(lsp_sigma, "lsp_sigma", &center_freq, &tx_pos, &rx_pos, &rnd, &sf_sigma_dB);
     qd_check_alias_outputs(&lsp, "lsp", lsp_mu, "lsp_mu");
     qd_check_alias_outputs(&lsp, "lsp", lsp_sigma, "lsp_sigma");
     qd_check_alias_outputs(lsp_mu, "lsp_mu", lsp_sigma, "lsp_sigma");
@@ -314,8 +314,8 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
             {
                 double mu = 0.0, sigma = 0.0;
                 stats.get(i, k, mu, sigma);
-                if (i == 2 && sf_sigma_dB != nullptr)
-                    sigma = (*sf_sigma_dB)(l, k);
+                if (i == 2 && !sf_sigma_dB.empty())
+                    sigma = sf_sigma_dB(l, k);
                 const double v = mu + sigma * x[i];
                 double val = in_db[i] ? std::pow(10.0, 0.1 * v) : std::pow(10.0, v);
                 if (clip_spreads && clip[i] > 0.0)

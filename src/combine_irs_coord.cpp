@@ -33,7 +33,7 @@ void quadriga_lib::combine_irs_coord(
     arma::Mat<dtype> &interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
-    const std::vector<bool> *active_path = nullptr);
+    const std::vector<bool> &active_path = std::vector<bool>());
 ```
 
 ## Inputs:
@@ -63,7 +63,7 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
                                      const arma::u32_vec &n_interact_1, const arma::Mat<dtype> &interact_coord_1,
                                      const arma::u32_vec &n_interact_2, const arma::Mat<dtype> &interact_coord_2,
                                      arma::u32_vec &n_interact, arma::Mat<dtype> &interact_coord,
-                                     bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path)
+                                     bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> &active_path)
 {
     const dtype *p_irs = qd_xyz(irs_pos, "irs_pos");
     const dtype Ix = p_irs[0], Iy = p_irs[1], Iz = p_irs[2];
@@ -97,14 +97,14 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
         throw std::invalid_argument("Input 'interact_coord_2' must have 3 rows and sum(n_interact_2) = " + std::to_string(sum_2) + " columns.");
     arma::uword n_path_irs = n_path;
 
-    bool get_subset = active_path != nullptr;
+    bool get_subset = !active_path.empty();
     if (get_subset)
     {
-        if (active_path->size() != n_path)
+        if (active_path.size() != n_path)
             throw std::invalid_argument("Number of entries in 'active_path' must match n_path_1 * n_path_2.");
 
         n_path_irs = 0ULL;
-        for (bool active : *active_path)
+        for (bool active : active_path)
             if (active)
                 ++n_path_irs;
 
@@ -130,7 +130,7 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
         unsigned i1 = pI1[i_path_1] + 1U;
         for (arma::uword i_path_2 = 0ULL; i_path_2 < n_path_2; ++i_path_2)
         {
-            if (!get_subset || active_path->at(i_path))
+            if (!get_subset || active_path.at(i_path))
             {
                 unsigned i = i1 + pI2[i_path_2];
                 pI[i_path_irs] = i;
@@ -165,7 +165,7 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
         {
             arma::uword n_int_2 = (arma::uword)pI2[i_path_2];
 
-            if (!get_subset || active_path->at(i_path))
+            if (!get_subset || active_path.at(i_path))
             {
                 arma::Mat<dtype> seg_2;
                 if (n_int_2 != 0ULL)
@@ -202,10 +202,10 @@ template void quadriga_lib::combine_irs_coord(const arma::Mat<float> &irs_pos,
                                               const arma::u32_vec &n_interact_1, const arma::Mat<float> &interact_coord_1,
                                               const arma::u32_vec &n_interact_2, const arma::Mat<float> &interact_coord_2,
                                               arma::u32_vec &n_interact, arma::Mat<float> &interact_coord,
-                                              bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);
+                                              bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> &active_path);
 
 template void quadriga_lib::combine_irs_coord(const arma::Mat<double> &irs_pos,
                                               const arma::u32_vec &n_interact_1, const arma::Mat<double> &interact_coord_1,
                                               const arma::u32_vec &n_interact_2, const arma::Mat<double> &interact_coord_2,
                                               arma::u32_vec &n_interact, arma::Mat<double> &interact_coord,
-                                              bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);
+                                              bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> &active_path);

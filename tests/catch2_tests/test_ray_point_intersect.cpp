@@ -112,7 +112,7 @@ TEST_CASE("Ray-Point Intersect - Simple Mode")
     // Call intersect
     arma::u32_vec hit_count;
     std::vector<arma::u32_vec> ind;
-    quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir, nullptr, nullptr, &hit_count, &ind, &sub_cloud_ind);
+    quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir, nullptr, nullptr, &hit_count, &ind, sub_cloud_ind);
     CHECK(arma::all(hit_count == 1));
 }
 
@@ -160,7 +160,7 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
 
     // Subdivide all rays
     arma::mat origN, trivecN, tridirN;
-    quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN);
+    quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN);
     CHECK(origN.n_rows == 4 * orig.n_rows);
 
     // Call intersect
@@ -179,7 +179,7 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
     origN.reset();
     trivecN.reset();
     tridirN.reset();
-    quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    quadriga_lib::subdivide_rays<double>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN, nullptr, index);
     CHECK(origN.n_rows == 4 * index.n_elem);
 
     // Call intersect
@@ -216,7 +216,7 @@ TEST_CASE("Ray-Point Intersect - CSR Outputs")
 
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
                                       &hit_ind, &hit_offset, &hit_count, &hits_per_point,
-                                      &sub_cloud_ind, 1);
+                                      sub_cloud_ind, 1);
 
     CHECK(csr_is_consistent(hit_ind, hit_offset, hit_count, hits_per_point,
                             pointsR.n_rows, orig.n_rows, true));
@@ -253,13 +253,13 @@ TEST_CASE("Ray-Point Intersect - Optional Outputs")
     std::vector<arma::u32_vec> hits_per_point;
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
                                       &hit_ind, &hit_offset, &hit_count, &hits_per_point,
-                                      &sub_cloud_ind, 1);
+                                      sub_cloud_ind, 1);
 
     // Flat list only
     std::vector<unsigned> idx_only;
     arma::u32_vec off_only;
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                      &idx_only, &off_only, nullptr, nullptr, &sub_cloud_ind, 1);
+                                      &idx_only, &off_only, nullptr, nullptr, sub_cloud_ind, 1);
     CHECK(idx_only == hit_ind);
     CHECK(off_only.n_elem == hit_offset.n_elem);
     CHECK(arma::all(off_only == hit_offset));
@@ -267,14 +267,14 @@ TEST_CASE("Ray-Point Intersect - Optional Outputs")
     // Hit counter only
     arma::u32_vec cnt_only;
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                      nullptr, nullptr, &cnt_only, nullptr, &sub_cloud_ind, 1);
+                                      nullptr, nullptr, &cnt_only, nullptr, sub_cloud_ind, 1);
     CHECK(cnt_only.n_elem == hit_count.n_elem);
     CHECK(arma::all(cnt_only == hit_count));
 
     // Split form only
     std::vector<arma::u32_vec> pp_only;
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                      nullptr, nullptr, nullptr, &pp_only, &sub_cloud_ind, 1);
+                                      nullptr, nullptr, nullptr, &pp_only, sub_cloud_ind, 1);
     REQUIRE(pp_only.size() == hits_per_point.size());
     bool same = true;
     for (size_t i = 0; i < pp_only.size(); ++i)
@@ -287,13 +287,13 @@ TEST_CASE("Ray-Point Intersect - Optional Outputs")
 
     // Reusing a populated output container must not leave stale entries behind
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                      &idx_only, &off_only, &cnt_only, &pp_only, &sub_cloud_ind, 1);
+                                      &idx_only, &off_only, &cnt_only, &pp_only, sub_cloud_ind, 1);
     CHECK(idx_only == hit_ind);
     CHECK(pp_only.size() == hits_per_point.size());
 
     // Nothing requested at all must still be well-formed
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                      nullptr, nullptr, nullptr, nullptr, &sub_cloud_ind, 1);
+                                      nullptr, nullptr, nullptr, nullptr, sub_cloud_ind, 1);
 }
 
 TEST_CASE("Ray-Point Intersect - Kernel Equivalence")
@@ -321,7 +321,7 @@ TEST_CASE("Ray-Point Intersect - Kernel Equivalence")
     std::vector<unsigned> idx_gen;
     arma::u32_vec off_gen, cnt_gen;
     quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                      &idx_gen, &off_gen, &cnt_gen, nullptr, &sub_cloud_ind, 1);
+                                      &idx_gen, &off_gen, &cnt_gen, nullptr, sub_cloud_ind, 1);
     REQUIRE(idx_gen.size() > 0);
 
     if (quadriga_lib::quadriga_lib_has_AVX2())
@@ -329,7 +329,7 @@ TEST_CASE("Ray-Point Intersect - Kernel Equivalence")
         std::vector<unsigned> idx_avx2;
         arma::u32_vec off_avx2, cnt_avx2;
         quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                          &idx_avx2, &off_avx2, &cnt_avx2, nullptr, &sub_cloud_ind, 2);
+                                          &idx_avx2, &off_avx2, &cnt_avx2, nullptr, sub_cloud_ind, 2);
         CHECK(idx_avx2 == idx_gen);
         CHECK(arma::all(off_avx2 == off_gen));
         CHECK(arma::all(cnt_avx2 == cnt_gen));
@@ -340,7 +340,7 @@ TEST_CASE("Ray-Point Intersect - Kernel Equivalence")
         std::vector<unsigned> idx_cuda;
         arma::u32_vec off_cuda, cnt_cuda;
         quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir,
-                                          &idx_cuda, &off_cuda, &cnt_cuda, nullptr, &sub_cloud_ind, 3);
+                                          &idx_cuda, &off_cuda, &cnt_cuda, nullptr, sub_cloud_ind, 3);
         CHECK(arma::all(cnt_cuda == cnt_gen));
         CHECK(arma::all(off_cuda == off_gen));
 
@@ -380,7 +380,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned Point Count")
     arma::u32_vec off_gen, cnt_gen;
     std::vector<arma::u32_vec> pp_gen;
     quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                      &idx_gen, &off_gen, &cnt_gen, &pp_gen, nullptr, 1);
+                                      &idx_gen, &off_gen, &cnt_gen, &pp_gen, {}, 1);
 
     CHECK(off_gen.n_elem == points.n_rows + 1);
     CHECK(csr_is_consistent(idx_gen, off_gen, cnt_gen, pp_gen, points.n_rows, orig.n_rows, true));
@@ -392,7 +392,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned Point Count")
         arma::u32_vec off_avx2, cnt_avx2;
         std::vector<arma::u32_vec> pp_avx2;
         quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                          &idx_avx2, &off_avx2, &cnt_avx2, &pp_avx2, nullptr, 2);
+                                          &idx_avx2, &off_avx2, &cnt_avx2, &pp_avx2, {}, 2);
 
         CHECK(off_avx2.n_elem == points.n_rows + 1);
         CHECK(csr_is_consistent(idx_avx2, off_avx2, cnt_avx2, pp_avx2, points.n_rows, orig.n_rows, true));
@@ -419,7 +419,7 @@ TEST_CASE("Ray-Point Intersect - No Hits")
     std::vector<arma::u32_vec> hits_per_point;
 
     quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                      &hit_ind, &hit_offset, &hit_count, &hits_per_point, nullptr, 1);
+                                      &hit_ind, &hit_offset, &hit_count, &hits_per_point, {}, 1);
 
     CHECK(hit_ind.empty());
     CHECK(hit_offset.n_elem == points.n_rows + 1);
@@ -436,7 +436,7 @@ TEST_CASE("Ray-Point Intersect - No Hits")
         std::vector<unsigned> idx_avx2;
         arma::u32_vec off_avx2, cnt_avx2;
         quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                          &idx_avx2, &off_avx2, &cnt_avx2, nullptr, nullptr, 2);
+                                          &idx_avx2, &off_avx2, &cnt_avx2, nullptr, {}, 2);
         CHECK(idx_avx2.empty());
         CHECK(arma::all(cnt_avx2 == 0));
     }
@@ -465,7 +465,7 @@ TEST_CASE("Ray-Point Intersect - Padding Discard")
     arma::u32_vec off_gen, cnt_gen;
     std::vector<arma::u32_vec> pp_gen;
     quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                      &idx_gen, &off_gen, &cnt_gen, &pp_gen, nullptr, 1);
+                                      &idx_gen, &off_gen, &cnt_gen, &pp_gen, {}, 1);
 
     CHECK(idx_gen.size() == n_point);
     CHECK(arma::all(cnt_gen == 1));
@@ -477,7 +477,7 @@ TEST_CASE("Ray-Point Intersect - Padding Discard")
         arma::u32_vec off_avx2, cnt_avx2;
         std::vector<arma::u32_vec> pp_avx2;
         quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                          &idx_avx2, &off_avx2, &cnt_avx2, &pp_avx2, nullptr, 2);
+                                          &idx_avx2, &off_avx2, &cnt_avx2, &pp_avx2, {}, 2);
 
         CHECK(idx_avx2.size() == n_point);
         CHECK(off_avx2.n_elem == n_point + 1);
@@ -516,7 +516,7 @@ TEST_CASE("Ray-Point Intersect - Large Hit Count")
     std::vector<arma::u32_vec> hits_per_point;
 
     quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                      &hit_ind, &hit_offset, &hit_count, &hits_per_point, nullptr, 1);
+                                      &hit_ind, &hit_offset, &hit_count, &hits_per_point, {}, 1);
 
     CHECK(hit_ind.size() == points.n_rows);
     CHECK(arma::all(hit_count == 1));
@@ -533,7 +533,7 @@ TEST_CASE("Ray-Point Intersect - Large Hit Count")
         std::vector<unsigned> idx_avx2;
         arma::u32_vec off_avx2, cnt_avx2;
         quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                          &idx_avx2, &off_avx2, &cnt_avx2, nullptr, nullptr, 2);
+                                          &idx_avx2, &off_avx2, &cnt_avx2, nullptr, {}, 2);
         CHECK(idx_avx2.size() == points.n_rows);
         CHECK(idx_avx2 == hit_ind);
         CHECK(arma::all(off_avx2 == hit_offset));
@@ -565,19 +565,19 @@ TEST_CASE("Ray-Point Intersect - Input Validation")
     arma::u32_vec bad_start(2);
     bad_start.at(0) = 1, bad_start.at(1) = 4;
     CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                      nullptr, nullptr, nullptr, nullptr, &bad_start, 1),
+                                                      nullptr, nullptr, nullptr, nullptr, bad_start, 1),
                     std::invalid_argument);
 
     arma::u32_vec bad_order(2);
     bad_order.at(0) = 0, bad_order.at(1) = 0;
     CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                      nullptr, nullptr, nullptr, nullptr, &bad_order, 1),
+                                                      nullptr, nullptr, nullptr, nullptr, bad_order, 1),
                     std::invalid_argument);
 
     arma::u32_vec too_large(2);
     too_large.at(0) = 0, too_large.at(1) = 99;
     CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                      nullptr, nullptr, nullptr, nullptr, &too_large, 1),
+                                                      nullptr, nullptr, nullptr, nullptr, too_large, 1),
                     std::invalid_argument);
 
     // Sub-clouds need not be aligned to the SIMD vector size, the AVX2 kernel accepts them
@@ -587,15 +587,15 @@ TEST_CASE("Ray-Point Intersect - Input Validation")
         misaligned.at(0) = 0, misaligned.at(1) = 3;
         arma::u32_vec cnt_avx2, cnt_gen;
         CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                        nullptr, nullptr, &cnt_avx2, nullptr, &misaligned, 2));
-        quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, nullptr, nullptr, &cnt_gen, nullptr, &misaligned, 1);
+                                                        nullptr, nullptr, &cnt_avx2, nullptr, misaligned, 2));
+        quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, nullptr, nullptr, &cnt_gen, nullptr, misaligned, 1);
         CHECK(arma::all(cnt_avx2 == cnt_gen));
     }
 
     // Requesting a kernel that is not available must be rejected
     if (!quadriga_lib::quadriga_lib_has_CUDA())
         CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                          nullptr, nullptr, nullptr, nullptr, nullptr, 3),
+                                                          nullptr, nullptr, nullptr, nullptr, {}, 3),
                         std::invalid_argument);
 }
 TEST_CASE("Ray-Point Intersect - Invalid use_kernel")
@@ -608,18 +608,18 @@ TEST_CASE("Ray-Point Intersect - Invalid use_kernel")
     {
         INFO("use_kernel = " << k);
         CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                          nullptr, nullptr, nullptr, nullptr, nullptr, k),
+                                                          nullptr, nullptr, nullptr, nullptr, {}, k),
                         std::invalid_argument);
     }
 
     // 2 = AVX2 throws when AVX2 is not available
     if (!quadriga_lib::quadriga_lib_has_AVX2())
         CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                          nullptr, nullptr, nullptr, nullptr, nullptr, 2),
+                                                          nullptr, nullptr, nullptr, nullptr, {}, 2),
                         std::invalid_argument);
 
     CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir,
-                                                    nullptr, nullptr, nullptr, nullptr, nullptr, 1));
+                                                    nullptr, nullptr, nullptr, nullptr, {}, 1));
 }
 
 TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
@@ -646,7 +646,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
 
     std::vector<unsigned> idx_ref;
     arma::u32_vec off_ref;
-    quadriga_lib::ray_point_intersect<double>(pR, orig, trivec, tridir, &idx_ref, &off_ref, nullptr, nullptr, nullptr, 1);
+    quadriga_lib::ray_point_intersect<double>(pR, orig, trivec, tridir, &idx_ref, &off_ref, nullptr, nullptr, {}, 1);
     REQUIRE(idx_ref.size() > 2900);
 
     std::vector<int> kernels = {1};
@@ -659,7 +659,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
             INFO("use_kernel = " << kernel << ", " << (sci == &sci_seg ? "point_cloud_segmentation" : "hand-made") << " sub-clouds");
             std::vector<unsigned> idx;
             arma::u32_vec off;
-            REQUIRE_NOTHROW(quadriga_lib::ray_point_intersect<double>(pR, orig, trivec, tridir, &idx, &off, nullptr, nullptr, sci, kernel));
+            REQUIRE_NOTHROW(quadriga_lib::ray_point_intersect<double>(pR, orig, trivec, tridir, &idx, &off, nullptr, nullptr, *sci, kernel));
             CHECK(idx == idx_ref);
             CHECK(arma::all(off == off_ref));
         }
@@ -672,17 +672,17 @@ TEST_CASE("ray_point_intersect - outputs that alias inputs")
     std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset, hit_count, sci = {0};
     std::vector<arma::u32_vec> hpp;
-    CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, &hit_offset, &hit_count, &hpp, &sci));
+    CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, &hit_offset, &hit_count, &hpp, sci));
 
     arma::u32_vec s = sci;
     CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, &hit_offset, &hit_offset), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, &s, nullptr, nullptr, &s), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, nullptr, &s, nullptr, &s), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, &s, nullptr, nullptr, s), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, nullptr, &s, nullptr, s), std::invalid_argument);
     CHECK(arma::all(s == sci));
 
     // The sub-cloud index is an element of the output vector
     std::vector<arma::u32_vec> h2(1, sci);
-    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, nullptr, nullptr, &h2, &h2[0]), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, nullptr, nullptr, &h2, h2[0]), std::invalid_argument);
 
     arma::u32_vec view(hit_offset.memptr(), 1, false, true);
     CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_ind, &hit_offset, &view), std::invalid_argument);

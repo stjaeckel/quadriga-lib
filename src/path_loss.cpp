@@ -152,8 +152,8 @@ void quadriga_lib::path_loss(
     const arma::mat &rx_pos,
     arma::mat &pl_dB,
     arma::mat *sf_sigma_dB = nullptr,
-    const arma::vec *d2d_in = nullptr,
-    const arma::vec *rnd_he = nullptr);
+    const arma::vec &d2d_in = arma::vec(),
+    const arma::vec &rnd_he = arma::vec());
 ```
 
 ## Inputs:
@@ -185,26 +185,26 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                              const arma::mat &rx_pos,
                              arma::mat &pl_dB,
                              arma::mat *sf_sigma_dB,
-                             const arma::vec *d2d_in,
-                             const arma::vec *rnd_he)
+                             const arma::vec &d2d_in,
+                             const arma::vec &rnd_he)
 {
     // Validation, before any output is touched
     const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
     qd_gbsm_check_links(&tx, &rx);
     qd_gbsm_check_fc(center_freq);
     const arma::uword n_link = rx.n_cols, n_freq = center_freq.n_elem;
-    if (d2d_in != nullptr && d2d_in->n_elem != n_link)
+    if (!d2d_in.empty() && d2d_in.n_elem != n_link)
         throw std::invalid_argument("Number of elements in 'd2d_in' does not match number of columns in 'rx_pos'.");
-    if (rnd_he != nullptr && rnd_he->n_elem != n_link)
+    if (!rnd_he.empty() && rnd_he.n_elem != n_link)
         throw std::invalid_argument("Number of elements in 'rnd_he' does not match number of columns in 'rx_pos'.");
-    if (d2d_in != nullptr && (!d2d_in->is_finite() || arma::any(*d2d_in < 0.0)))
+    if (!d2d_in.empty() && (!d2d_in.is_finite() || arma::any(d2d_in < 0.0)))
         throw std::invalid_argument("Input 'd2d_in' must be finite and >= 0.");
-    if (rnd_he != nullptr)
+    if (!rnd_he.empty())
         for (arma::uword l = 0; l < n_link; ++l)
-            if (!((*rnd_he)(l) >= 0.0 && (*rnd_he)(l) <= 1.0))
+            if (!(rnd_he(l) >= 0.0 && rnd_he(l) <= 1.0))
                 throw std::invalid_argument("Input 'rnd_he' must be in the range from 0 to 1.");
-    qd_check_alias(&pl_dB, "pl_dB", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
-    qd_check_alias(sf_sigma_dB, "sf_sigma_dB", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias(&pl_dB, "pl_dB", &center_freq, &tx_pos, &rx_pos, &d2d_in, &rnd_he);
+    qd_check_alias(sf_sigma_dB, "sf_sigma_dB", &center_freq, &tx_pos, &rx_pos, &d2d_in, &rnd_he);
     qd_check_alias_outputs(&pl_dB, "pl_dB", sf_sigma_dB, "sf_sigma_dB");
 
     // Model, index into 'names'; the empty name is "no model"
@@ -418,9 +418,9 @@ void quadriga_lib::path_loss(const std::string &pl_model,
             sf_stats.set_link(d2, hBS, hUT);
         // Legacy outdoor distance (QuaDRiGa): the indoor part d3in = d3·din/d2 is removed from both distances, with a
         // minimum outdoor distance of 10 m; outdoor links (d2d_in = 0) keep the geometric distances
-        if (d2d_in != nullptr && (*d2d_in)(l) > 0.0)
+        if (!d2d_in.empty() && d2d_in(l) > 0.0)
         {
-            const double din = std::min((*d2d_in)(l), d2);
+            const double din = std::min(d2d_in(l), d2);
             double d3in = (d2 > 0.0) ? d3 * din / d2 : d3;
             d3in = std::min(d3in, d3);
             if (d3 - d3in < 10.0)
@@ -434,8 +434,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         const double lg_d3 = std::log10(d3), lg_d2 = std::log10(d2);
 
         // Environment height of the dual-slope model
-        const bool random_hE = dual.hE_rand && rnd_he != nullptr;
-        const double hE = random_hE ? draw_hE((*rnd_he)(l), d2, hUT) : dual.hE;
+        const bool random_hE = dual.hE_rand && !rnd_he.empty();
+        const double hE = random_hE ? draw_hE(rnd_he(l), d2, hUT) : dual.hE;
 
         for (arma::uword k = 0; k < n_freq; ++k)
         {

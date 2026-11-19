@@ -94,8 +94,8 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
                                          &phase);
 
     // Call library function
-    quadriga_lib::gbsm_init_phases(scenpar_a, set_type, phase, (arma::sword)seed, (arma::sword)set_id, preset, &tx_pos_a,
-                                   &rx_pos_a, dual_mobility_b, remove_bias_b, horizontal_b);
+    quadriga_lib::gbsm_init_phases(scenpar_a, set_type, phase, (arma::sword)seed, (arma::sword)set_id, preset, tx_pos_a,
+                                   rx_pos_a, dual_mobility_b, remove_bias_b, horizontal_b);
 
     return phase_py;
 }

@@ -163,8 +163,8 @@ class test_case(unittest.TestCase):
         self.assertIn("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'.",
                       str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, center_freq=np.zeros(0))
-        self.assertIn("Input 'center_freq' cannot be empty.", str(ctx.exception))
+            f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, center_freq=np.zeros(0))  # empty = omitted
+        self.assertIn("Output 'los_soft' requires 'rnd_g' and 'center_freq'.", str(ctx.exception))
         with self.assertRaises(TypeError):
             f("38.901_UMi", self.d, 10.0)
         with self.assertRaises(TypeError):

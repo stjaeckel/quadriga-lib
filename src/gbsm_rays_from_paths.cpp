@@ -41,10 +41,10 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::cube &polmat,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
-    const arma::u32_vec *path_type = nullptr,
-    const arma::u32_vec *tap = nullptr,
-    const arma::vec *gr_eps_re = nullptr,
-    const arma::vec *gr_eps_im = nullptr);
+    const arma::u32_vec &path_type = arma::u32_vec(),
+    const arma::u32_vec &tap = arma::u32_vec(),
+    const arma::vec &gr_eps_re = arma::vec(),
+    const arma::vec &gr_eps_im = arma::vec());
 ```
 
 ## Inputs:
@@ -80,10 +80,10 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
                                         const arma::cube &polmat,
                                         gbsm_rays &rays,
                                         const std::string &method,
-                                        const arma::u32_vec *path_type,
-                                        const arma::u32_vec *tap,
-                                        const arma::vec *gr_eps_re,
-                                        const arma::vec *gr_eps_im)
+                                        const arma::u32_vec &path_type,
+                                        const arma::u32_vec &tap,
+                                        const arma::vec &gr_eps_re,
+                                        const arma::vec &gr_eps_im)
 {
     const arma::uword n_freq = center_freq.n_elem, n_path = fbs_pos.n_cols;
     if (n_freq == 0)
@@ -114,15 +114,15 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
 
     // Path types: given, or LOS where FBS = LBS on the direct line (the LOS tolerance 0.1 mm of get_channels_*)
     arma::u32_vec type(n_path);
-    if (path_type)
+    if (!path_type.empty())
     {
-        if (path_type->n_elem != n_path)
+        if (path_type.n_elem != n_path)
             throw std::invalid_argument("Input 'path_type' must have n_path elements.");
-        if (arma::any(*path_type > 2))
+        if (arma::any(path_type > 2))
             throw std::invalid_argument("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS).");
-        if (arma::accu(*path_type == 0) > 1 || arma::accu(*path_type == 1) > 1)
+        if (arma::accu(path_type == 0) > 1 || arma::accu(path_type == 1) > 1)
             throw std::invalid_argument("Input 'path_type' can hold at most one LOS and one GR path.");
-        type = *path_type;
+        type = path_type;
     }
     else
     {
@@ -133,16 +133,16 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
         if (arma::accu(type == 0) > 1)
             throw std::invalid_argument("More than one path matches the LOS geometry; pass 'path_type'.");
     }
-    if (tap && tap->n_elem != n_path)
+    if (!tap.empty() && tap.n_elem != n_path)
         throw std::invalid_argument("Input 'tap' must have n_path elements.");
-    if ((gr_eps_re == nullptr) != (gr_eps_im == nullptr))
+    if (gr_eps_re.empty() != gr_eps_im.empty())
         throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must both be given or both be omitted.");
-    if (gr_eps_re)
+    if (!gr_eps_re.empty())
     {
-        if (gr_eps_re->n_elem != n_freq || gr_eps_im->n_elem != n_freq)
+        if (gr_eps_re.n_elem != n_freq || gr_eps_im.n_elem != n_freq)
             throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must have n_freq elements.");
-        if (!gr_eps_re->is_finite() || !gr_eps_im->is_finite() || arma::any(*gr_eps_re < 1.0) ||
-            arma::any(*gr_eps_im < 0.0))
+        if (!gr_eps_re.is_finite() || !gr_eps_im.is_finite() || arma::any(gr_eps_re < 1.0) ||
+            arma::any(gr_eps_im < 0.0))
             throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
     }
     // 1 mm: float32 keeps z = 0 of a GR point for any x, y offset; a larger z means coordinates shifted in z
@@ -154,7 +154,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
     auto check = [&](const auto &m)
     {
         qd_check_alias(&m, "rays", &center_freq, &tx_pos, &rx_pos, &fbs_pos, &lbs_pos, &path_gain, &path_length, &polmat,
-                       path_type, tap, gr_eps_re, gr_eps_im);
+                       &path_type, &tap, &gr_eps_re, &gr_eps_im);
     };
     check(rays.tx_pos), check(rays.rx_pos), check(rays.center_freq), check(rays.delay), check(rays.power);
     check(rays.aod), check(rays.eod), check(rays.aoa), check(rays.eoa), check(rays.polmat), check(rays.path_type);
@@ -180,8 +180,8 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
     rays.center_freq = center_freq, rays.tx_pos = arma::mat(tx_pos.memptr(), 3, 1), rays.rx_pos = arma::mat(rx_pos.memptr(), 3, 1);
     rays.power = path_gain, rays.polmat = polmat, rays.fbs_pos = fbs_pos, rays.lbs_pos = lbs_pos;
     rays.path_type = type;
-    if (tap)
-        rays.tap = *tap;
+    if (!tap.empty())
+        rays.tap = tap;
     else // One slot per path: LOS 0, GR 3, the others 6, 9, ... in path order
     {
         rays.tap.set_size(n_path);
@@ -189,8 +189,8 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
         for (arma::uword p = 0; p < n_path; ++p)
             rays.tap(p) = (type(p) == 0) ? 0 : (type(p) == 1) ? 3 : 3 * slot++;
     }
-    if (gr_eps_re)
-        rays.gr_eps_re = *gr_eps_re, rays.gr_eps_im = *gr_eps_im;
+    if (!gr_eps_re.empty())
+        rays.gr_eps_re = gr_eps_re, rays.gr_eps_im = gr_eps_im;
     else
     {
         if (!rays.gr_eps_re.empty())

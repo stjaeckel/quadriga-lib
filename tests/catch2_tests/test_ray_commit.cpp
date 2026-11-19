@@ -120,9 +120,9 @@ namespace
     // The optional block of ray_commit, so a scenario reads as one call
     struct Opt
     {
-        const arma::u32_vec *sci = nullptr;
-        const arma::u32_vec *pt_ind = nullptr;
-        const std::vector<bool> *sf_in = nullptr;
+        arma::u32_vec sci;
+        arma::u32_vec pt_ind;
+        std::vector<bool> sf_in;
         float max_len = 10e3f;
         float min_gain_dB = -140.0f;
         uint8_t min_seg = 0;
@@ -225,7 +225,7 @@ namespace
     {
         arma::u32_vec ni, si;
         quadriga_lib::ray_triangle_intersect<float>(C.orig, C.dest, S.mesh, nullptr, nullptr,
-                                                    &ni, &C.fbs_ind, &si, nullptr, nullptr);
+                                                    &ni, &C.fbs_ind, &si, {}, {});
     }
 
     // Receivers as rows of a [n_point, 3] matrix
@@ -451,19 +451,19 @@ TEST_CASE("ray_commit - subdiv_flag_in excludes flagged rays")
 
     std::vector<bool> f = {true, false};
     Opt o;
-    o.sf_in = &f;
+    o.sf_in = f;
     REQUIRE(C.commit(S, P, out, o) == 1);
     CHECK(out[0].i_cir == 1u); // the ray along +y, hitting the second receiver
 
     out.clear();
     std::vector<bool> all = {true, true};
-    o.sf_in = &all;
+    o.sf_in = all;
     CHECK(C.commit(S, P, out, o) == 0);
 
     // An empty flag vector is treated as "no ray excluded"
     out.clear();
     std::vector<bool> none;
-    o.sf_in = &none;
+    o.sf_in = none;
     CHECK(C.commit(S, P, out, o) == 2);
 }
 
@@ -726,7 +726,7 @@ TEST_CASE("ray_commit - sub-cloud partitioning does not change the result")
     // Ascending, first entry 0, aligned to the AVX2 vector size
     arma::u32_vec sci = {0u, 16u, 32u, 48u};
     Opt o;
-    o.sci = &sci;
+    o.sci = sci;
     const arma::uword nb = C.commit(S, P, b, o);
 
     REQUIRE(na == nb);
@@ -758,7 +758,7 @@ TEST_CASE("ray_commit - point_ind drops padding rows")
 
     arma::u32_vec fwd = {1u, 0u, 2u};
     Opt o;
-    o.pt_ind = &fwd;
+    o.pt_ind = fwd;
 
     REQUIRE(C.commit(S, P, out, o) == 2);
     CHECK(out[0].i_cir == 0u); // row 0 maps to original point 0
@@ -767,7 +767,7 @@ TEST_CASE("ray_commit - point_ind drops padding rows")
     // An empty map is treated as absent
     out.clear();
     arma::u32_vec none;
-    o.pt_ind = &none;
+    o.pt_ind = none;
     CHECK(C.commit(S, P, out, o) == 3);
 }
 
@@ -782,7 +782,7 @@ TEST_CASE("ray_commit - point_ind remaps i_cir into the original ordering")
     arma::u32_vec fwd = {3u, 2u, 1u};
 
     Opt o;
-    o.pt_ind = &fwd;
+    o.pt_ind = fwd;
     std::vector<quadriga_lib::path> out;
     REQUIRE(C.commit(S, P, out, o) == 3);
 
@@ -820,8 +820,8 @@ TEST_CASE("ray_commit - point_ind agrees with point_cloud_segmentation")
     REQUIRE(na > 0);
 
     Opt o;
-    o.sci = &sci;
-    o.pt_ind = &fwd;
+    o.sci = sci;
+    o.pt_ind = fwd;
     const arma::uword nb = C.commit(S, PR, b, o);
 
     CHECK(na == nb);
@@ -847,8 +847,8 @@ TEST_CASE("ray_commit - padding is committed when point_ind is omitted")
     REQUIRE(PR.n_rows > n_pt);
 
     Opt with_map, without_map;
-    with_map.sci = &sci, with_map.pt_ind = &fwd;
-    without_map.sci = &sci;
+    with_map.sci = sci, with_map.pt_ind = fwd;
+    without_map.sci = sci;
 
     std::vector<quadriga_lib::path> a, b;
     const arma::uword na = C.commit(S, PR, a, with_map);
@@ -1035,7 +1035,7 @@ TEST_CASE("ray_commit - input validation")
     {
         std::vector<bool> f = {false, false};
         Opt o;
-        o.sf_in = &f;
+        o.sf_in = f;
         CHECK_THROWS_AS(C.commit(S, P, out, o), std::invalid_argument);
     }
 
@@ -1044,16 +1044,16 @@ TEST_CASE("ray_commit - input validation")
         // P has one row, so a two-element map does not describe it
         arma::u32_vec bad = {1u, 2u};
         Opt o;
-        o.pt_ind = &bad;
+        o.pt_ind = bad;
         CHECK_THROWS_AS(C.commit(S, P, out, o), std::invalid_argument);
 
         arma::u32_vec good = {1u};
-        o.pt_ind = &good;
+        o.pt_ind = good;
         CHECK_NOTHROW(C.commit(S, P, out, o));
 
         // Empty is absent, not a length mismatch
         arma::u32_vec none;
-        o.pt_ind = &none;
+        o.pt_ind = none;
         CHECK_NOTHROW(C.commit(S, P, out, o));
     }
 

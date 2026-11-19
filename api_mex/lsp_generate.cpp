@@ -128,7 +128,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[6] = qd_mex_init_output(&lsp_sigma, n_link, n_freq, 8);
 
     // Wrap optional pointers
-    const arma::mat *p_sf_sigma = sf_sigma_dB.empty() ? nullptr : &sf_sigma_dB;
     arma::vec *p_abs_toa = (nlhs > 1) ? &abs_toa : nullptr;
     arma::mat *p_gr_eps_re = (nlhs > 2) ? &gr_eps_re : nullptr;
     arma::mat *p_gr_eps_im = (nlhs > 3) ? &gr_eps_im : nullptr;
@@ -137,6 +136,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube *p_lsp_sigma = (nlhs > 6) ? &lsp_sigma : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, p_sf_sigma, p_abs_toa, p_gr_eps_re,
+    CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, sf_sigma_dB, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_eod_offset_deg, p_lsp_mu, p_lsp_sigma, cholesky, clip_spreads));
 }

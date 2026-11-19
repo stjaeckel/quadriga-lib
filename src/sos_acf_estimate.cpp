@@ -57,8 +57,8 @@ void quadriga_lib::sos_acf_estimate(
     arma::Col<dtype> &acf_est,
     arma::Col<dtype> *dist_est = nullptr,
     arma::Col<dtype> *acf_est_dual = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::sword seed = -1);
 ```
 
@@ -91,8 +91,8 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,
                                     arma::Col<dtype> &acf_est,
                                     arma::Col<dtype> *dist_est,
                                     arma::Col<dtype> *acf_est_dual,
-                                    const arma::Col<dtype> *acf,
-                                    const arma::Col<dtype> *dist,
+                                    const arma::Col<dtype> &acf,
+                                    const arma::Col<dtype> &dist,
                                     arma::sword seed)
 {
     if (spatial_freq.n_elem == 0)
@@ -116,13 +116,13 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,
         throw std::invalid_argument("Input 'seed' must be >= -1.");
     if (acf_est_dual != nullptr)
     {
-        if (acf == nullptr || dist == nullptr || acf->is_empty() || dist->is_empty())
+        if (acf.is_empty() || dist.is_empty())
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for output 'acf_est_dual'.");
-        qd_sos_check_acf_same_map(*acf, *dist);
+        qd_sos_check_acf_same_map(acf, dist);
     }
-    qd_check_alias(&acf_est, "acf_est", &spatial_freq, &phase, &bins, acf, dist);
-    qd_check_alias(dist_est, "dist_est", &spatial_freq, &phase, &bins, acf, dist);
-    qd_check_alias(acf_est_dual, "acf_est_dual", &spatial_freq, &phase, &bins, acf, dist);
+    qd_check_alias(&acf_est, "acf_est", &spatial_freq, &phase, &bins, &acf, &dist);
+    qd_check_alias(dist_est, "dist_est", &spatial_freq, &phase, &bins, &acf, &dist);
+    qd_check_alias(acf_est_dual, "acf_est_dual", &spatial_freq, &phase, &bins, &acf, &dist);
     qd_check_alias_outputs(&acf_est, "acf_est", dist_est, "dist_est");
     qd_check_alias_outputs(&acf_est, "acf_est", acf_est_dual, "acf_est_dual");
     qd_check_alias_outputs(dist_est, "dist_est", acf_est_dual, "acf_est_dual");
@@ -185,9 +185,9 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,
     const arma::mat freq_d = arma::conv_to<arma::mat>::from(spatial_freq), phase_d = arma::conv_to<arma::mat>::from(phase);
     arma::vec acf_d, dist_d;
     if (acf_est_dual != nullptr)
-        acf_d = arma::conv_to<arma::vec>::from(*acf), dist_d = arma::conv_to<arma::vec>::from(*dist);
+        acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
     arma::mat val;
-    quadriga_lib::sos_val<double>(freq_d, phase_d, pos, val, nullptr, nullptr, nullptr, nullptr, 1.0, false, 1);
+    quadriga_lib::sos_val<double>(freq_d, phase_d, pos, val, {}, {}, {}, {}, 1.0, false, 1);
 
     // Sums over all pairs (i, j > i) of the first n_rows positions. Finding the pairs of a row (distance and
     // bin) is the expensive part and runs in parallel for a block of rows, each row writing its pairs to its
@@ -251,7 +251,7 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,
     if (acf_est_dual != nullptr)
     {
         const arma::mat pos_a = pos.rows(0, n_pos - 1), pos_b = pos.rows(n_pos, n_all - 1);
-        quadriga_lib::sos_val<double>(freq_d, phase_d, pos_a, val, &pos_b, nullptr, &acf_d, &dist_d, 1.0, false, 1);
+        quadriga_lib::sos_val<double>(freq_d, phase_d, pos_a, val, pos_b, {}, acf_d, dist_d, 1.0, false, 1);
 
         pv = val.memptr();
         pair_sums(n_pos, true, acc);
@@ -269,7 +269,7 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,
 
 template void quadriga_lib::sos_acf_estimate(const arma::Mat<float> &spatial_freq, const arma::Col<float> &phase, const arma::Col<float> &bins, arma::uword n_pos,
                                              arma::Col<float> &acf_est, arma::Col<float> *dist_est, arma::Col<float> *acf_est_dual,
-                                             const arma::Col<float> *acf, const arma::Col<float> *dist, arma::sword seed);
+                                             const arma::Col<float> &acf, const arma::Col<float> &dist, arma::sword seed);
 template void quadriga_lib::sos_acf_estimate(const arma::Mat<double> &spatial_freq, const arma::Col<double> &phase, const arma::Col<double> &bins, arma::uword n_pos,
                                              arma::Col<double> &acf_est, arma::Col<double> *dist_est, arma::Col<double> *acf_est_dual,
-                                             const arma::Col<double> *acf, const arma::Col<double> *dist, arma::sword seed);
+                                             const arma::Col<double> &acf, const arma::Col<double> &dist, arma::sword seed);

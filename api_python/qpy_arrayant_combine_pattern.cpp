@@ -81,7 +81,7 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     // Multi-frequency branch: frequency-dependent input, or a freq_new vector with > 1 entry
     if (ant.size() > 1 || freq_new_a.n_elem > 1)
     {
-        auto out = quadriga_lib::arrayant_combine_pattern_multi(ant, &azimuth_grid_a, &elevation_grid_a, &freq_new_a, propagation_speed);
+        auto out = quadriga_lib::arrayant_combine_pattern_multi(ant, azimuth_grid_a, elevation_grid_a, freq_new_a, propagation_speed);
         return qd_python_arrayant2dict_multi(out);
     }
 
@@ -89,6 +89,6 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     if (freq_new_a.n_elem == 1)
         ant[0].center_freq = freq_new_a[0];
 
-    auto arrayant_out = quadriga_lib::arrayant_combine_pattern(ant[0], &azimuth_grid_a, &elevation_grid_a, propagation_speed);
+    auto arrayant_out = quadriga_lib::arrayant_combine_pattern(ant[0], azimuth_grid_a, elevation_grid_a, propagation_speed);
     return qd_python_arrayant2dict(arrayant_out);
 }

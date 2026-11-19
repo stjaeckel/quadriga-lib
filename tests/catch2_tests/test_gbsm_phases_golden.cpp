@@ -132,7 +132,7 @@ namespace
     void init(const spmap &sp, const golden_set &g, arma::sword seed, arma::cube &ph)
     {
         if (g.bias)
-            quadriga_lib::gbsm_init_phases(sp, g.type, ph, seed, g.set_id, "Comb256", &TX5, &RX5);
+            quadriga_lib::gbsm_init_phases(sp, g.type, ph, seed, g.set_id, "Comb256", TX5, RX5);
         else
             quadriga_lib::gbsm_init_phases(sp, g.type, ph, seed, g.set_id);
     }
@@ -179,8 +179,8 @@ namespace
             init(sp, g, 7, ph);
             arma::mat rnd[3];
             quadriga_lib::gbsm_draw(sp, g.type, ph, TX1, rx3, rnd[0], g.set_id);
-            quadriga_lib::gbsm_draw(sp, g.type, ph, tx3, rx3, rnd[1], g.set_id, "Comb256", nullptr, nullptr, true);
-            quadriga_lib::gbsm_draw(sp, g.type, ph, TX1, rx3, rnd[2], g.set_id, "Comb256", &fl);
+            quadriga_lib::gbsm_draw(sp, g.type, ph, tx3, rx3, rnd[1], g.set_id, "Comb256", {}, {}, true);
+            quadriga_lib::gbsm_draw(sp, g.type, ph, TX1, rx3, rnd[2], g.set_id, "Comb256", fl);
             const char *mode[3] = {"single", "dual", "floor"};
             for (int m = 0; m < 3; ++m)
             {

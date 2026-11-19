@@ -109,13 +109,10 @@ py::tuple sos_remove_bias(const py::array_t<double> &spatial_freq,
 
     // Wrap optional pointers
     arma::mat offset, mean_before;
-    const arma::mat *p_pos_b = pos_b_a.is_empty() ? nullptr : &pos_b_a;
     arma::mat *p_phase_b = phase_b_out.is_empty() ? nullptr : &phase_b_out;
-    const arma::vec *p_acf = acf_a.is_empty() ? nullptr : &acf_a;
-    const arma::vec *p_dist = dist_a.is_empty() ? nullptr : &dist_a;
 
     // Call library function
-    quadriga_lib::sos_remove_bias<double>(freq_a, phase_out, pos_a, p_pos_b, p_phase_b, p_acf, p_dist,
+    quadriga_lib::sos_remove_bias<double>(freq_a, phase_out, pos_a, pos_b_a, p_phase_b, acf_a, dist_a,
                                           &offset, &mean_before, spatial_freq_scale_b);
 
     // Copy to python

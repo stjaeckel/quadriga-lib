@@ -204,7 +204,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     bool remove_delay_phase = true,
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     int use_kernel = 0);
 ```
 
@@ -252,7 +252,7 @@ void quadriga_lib::baseband_freq_response_vec(
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     int use_kernel = 0);
 ```
 
@@ -346,7 +346,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec &i_snap = arma::uvec());
 ```
 
 ### Inputs:
@@ -355,7 +355,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; `nullptr` or empty = all snapshots; `[n_out]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
 
 ### Returns:
 - Channel object at the specified slot; empty if no data is present
@@ -382,13 +382,13 @@ Not in: MATLAB, Python
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
     const std::string &fn,
     const arma::Mat<unsigned> &slots,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec &i_snap = arma::uvec());
 ```
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`slots`** — Slot indices `(ix, iy, iz, iw)`, 0-based, one column per slot; `[4, n_slot]`
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; `nullptr` or empty = all snapshots; `[n_out]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
 
 ### Returns:
 - Channel objects, one per slot; `[n_slot]`
@@ -820,7 +820,7 @@ size_t quadriga_lib::qrt_file_append(
     const std::string &fn,
     const std::vector<quadriga_lib::path> &path_data,
     const arma::Mat<dtype> &orig_pos,
-    const arma::Mat<dtype> *orig_orientation = nullptr,
+    const arma::Mat<dtype> &orig_orientation = arma::Mat<dtype>(),
     const std::string &orig_name = "TX");
 ```
 
@@ -828,7 +828,7 @@ size_t quadriga_lib::qrt_file_append(
 - **`fn`** — Path to an existing QRT file created by [qrt_file_init](#qrt_file_init)
 - **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
-- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
+- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
 
 ### Returns:

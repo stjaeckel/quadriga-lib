@@ -101,7 +101,7 @@ static void run(fz::input &in)
     if (aabb_mode == 1)
         aabb = geo<T>(in, near(in, std::max(sub_mesh_ind.n_elem, (arma::uword)1)), near(in, 6));
     if (aabb_mode == 2)
-        fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(mesh, aabb, &sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 8)); });
+        fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(mesh, aabb, sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 8)); });
 
     // Outputs: missing, pre-sized wrongly, or the same objects as the inputs
     const int kernel = in.ConsumeIntegralInRange<int>(-1, 4);
@@ -124,8 +124,8 @@ static void run(fz::input &in)
     const bool all = in.ConsumeBool();
     fz::clean([&]
               { quadriga_lib::ray_triangle_intersect<T>(orig_copy, dest_copy, mesh, fbs, sbs, all ? &n_interact : nullptr,
-                                                        all ? &fbs_ind : nullptr, &sbs_ind, smi_mode ? &sub_mesh_ind : nullptr,
-                                                        aabb_mode ? &aabb : nullptr, kernel); });
+                                                        all ? &fbs_ind : nullptr, &sbs_ind, fz::opt(smi_mode, sub_mesh_ind),
+                                                        fz::opt(aabb_mode, aabb), kernel); });
 
     // Point cloud: fuzzed, or reorganized by the library
     arma::Mat<T> points = geo<T>(in, in.size(64), near(in, 3));
@@ -146,7 +146,7 @@ static void run(fz::input &in)
     fz::clean([&]
               { quadriga_lib::ray_point_intersect<T>(points, orig, trivec, tridir, (out_mask & 1) ? &hit_ind : nullptr,
                                                      (out_mask & 2) ? &hit_offset : nullptr, (out_mask & 4) ? &hit_count : nullptr,
-                                                     (out_mask & 8) ? &hits_per_point : nullptr, sci_mode ? &sub_cloud_ind : nullptr, kernel_p); });
+                                                     (out_mask & 8) ? &hits_per_point : nullptr, fz::opt(sci_mode, sub_cloud_ind), kernel_p); });
 
     // Subdivision: spherical or Cartesian directions, fuzzed indices, outputs of fuzzed sizes
     arma::Mat<T> tridir_s = in.ConsumeBool() ? tridir : geo<T>(in, near(in, orig.n_rows), near(in, 6));
@@ -164,8 +164,8 @@ static void run(fz::input &in)
         destN.set_size(transposed ? 3 : n, transposed ? n : 3);
     }
     fz::clean([&]
-              { quadriga_lib::subdivide_rays<T>(orig, trivec, tridir_s, use_dest ? &dest : nullptr, &origN, &trivecN, &tridirN,
-                                                &destN, use_index ? &index : nullptr, transposed); });
+              { quadriga_lib::subdivide_rays<T>(orig, trivec, tridir_s, fz::opt(use_dest, dest), &origN, &trivecN, &tridirN,
+                                                &destN, fz::opt(use_index, index), transposed); });
 }
 
 void fuzz_one(const uint8_t *data, size_t size)

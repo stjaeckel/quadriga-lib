@@ -64,7 +64,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const int n_out = (nlhs == 0) ? 1 : nlhs;
     arma::mat out[4];
     const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant"); // Validated by the C++ function
-    CALL_QD(quadriga_lib::arrayant_calc_beamwidth_multi(ant_multi, &i_element, threshold_dB, &out[0],
+    CALL_QD(quadriga_lib::arrayant_calc_beamwidth_multi(ant_multi, i_element, threshold_dB, &out[0],
                                                         n_out > 1 ? &out[1] : nullptr, n_out > 2 ? &out[2] : nullptr,
                                                         n_out > 3 ? &out[3] : nullptr));
     for (int k = 0; k < n_out; ++k)

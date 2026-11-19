@@ -39,7 +39,7 @@ void quadriga_lib::ray_point_intersect(
     arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
     std::vector<arma::u32_vec> *hits_per_point = nullptr,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -77,7 +77,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
                                        arma::u32_vec *hit_offset,
                                        arma::u32_vec *hit_count,
                                        std::vector<arma::u32_vec> *hits_per_point,
-                                       const arma::u32_vec *sub_cloud_ind,
+                                       const arma::u32_vec &sub_cloud_ind,
                                        int use_kernel, int gpu_id)
 {
     // Suppress unused-parameter warning when CUDA support is disabled at compile time
@@ -115,12 +115,12 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
     if (tridir.n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
-    qd_check_alias(hit_offset, "hit_offset", sub_cloud_ind);
-    qd_check_alias(hit_count, "hit_count", sub_cloud_ind);
+    qd_check_alias(hit_offset, "hit_offset", &sub_cloud_ind);
+    qd_check_alias(hit_count, "hit_count", &sub_cloud_ind);
     qd_check_alias_outputs(hit_offset, "hit_offset", hit_count, "hit_count");
     if (hits_per_point != nullptr)
         for (const auto &h : *hits_per_point)
-            qd_check_alias(&h, "hits_per_point", sub_cloud_ind);
+            qd_check_alias(&h, "hits_per_point", &sub_cloud_ind);
 
     // Determine which compute kernel to use
     // kernel: 1 = GENERIC, 2 = AVX2, 3 = CUDA
@@ -159,10 +159,10 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     // Check if the sub-cloud indices are valid
     size_t n_sub_t = 1;                                             // Number of sub-clouds (at least 1)
     arma::u32_vec sci(1, arma::fill::zeros);                        // Sub-cloud-index (local copy)
-    if (sub_cloud_ind != nullptr && sub_cloud_ind->n_elem != 0)     // Input is available
+    if (sub_cloud_ind.n_elem != 0)     // Input is available
     {
-        n_sub_t = (size_t)sub_cloud_ind->n_elem;
-        const unsigned *p_sub = sub_cloud_ind->memptr();
+        n_sub_t = (size_t)sub_cloud_ind.n_elem;
+        const unsigned *p_sub = sub_cloud_ind.memptr();
 
         if (*p_sub != 0U)
             throw std::invalid_argument("First sub-cloud must start at the first point.");
@@ -176,7 +176,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         if (p_sub[n_sub_t - 1] >= (unsigned)n_point_t)
             throw std::invalid_argument("Sub-cloud indices cannot exceed number of points.");
 
-        sci = *sub_cloud_ind;
+        sci = sub_cloud_ind;
     }
 
     // Prepare ray data
@@ -490,7 +490,7 @@ template void quadriga_lib::ray_point_intersect(const arma::Mat<float> &points,
                                                 arma::u32_vec *hit_offset,
                                                 arma::u32_vec *hit_count,
                                                 std::vector<arma::u32_vec> *hits_per_point,
-                                                const arma::u32_vec *sub_cloud_ind,
+                                                const arma::u32_vec &sub_cloud_ind,
                                                 int use_kernel, int gpu_id);
 
 template void quadriga_lib::ray_point_intersect(const arma::Mat<double> &points,
@@ -501,5 +501,5 @@ template void quadriga_lib::ray_point_intersect(const arma::Mat<double> &points,
                                                 arma::u32_vec *hit_offset,
                                                 arma::u32_vec *hit_count,
                                                 std::vector<arma::u32_vec> *hits_per_point,
-                                                const arma::u32_vec *sub_cloud_ind,
+                                                const arma::u32_vec &sub_cloud_ind,
                                                 int use_kernel, int gpu_id);

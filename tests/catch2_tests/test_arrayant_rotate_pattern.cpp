@@ -994,8 +994,7 @@ TEST_CASE("arrayant_rotate_pattern - the rotated pattern equals arrayant_interpo
             az(k) = ant.azimuth_grid(a), el(k) = ant.elevation_grid(e);
     const arma::cube O(o.memptr(), 3, 1, 1);
     arma::mat Vr, Vi, Hr, Hi;
-    const arma::uvec *i_el = nullptr;
-    quadriga_lib::arrayant_interpolate(ant, az, el, Vr, Vi, Hr, Hi, i_el, &O);
+    quadriga_lib::arrayant_interpolate(ant, az, el, Vr, Vi, Hr, Hi, {}, O);
     for (unsigned usage : {0u, 3u})
     {
         auto rot = ant;
@@ -1013,14 +1012,14 @@ TEST_CASE("arrayant_rotate_pattern - the rotated pattern equals arrayant_interpo
 
 TEST_CASE("arrayant_rotate_pattern - an element subset is rotated in one call")
 {
-    auto ant = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0);
+    auto ant = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos = {{0.0, 0.1, 0.2}, {0.3, 0.4, 0.5}, {0.6, 0.7, 0.8}};
     const arma::vec o = {0.1, 0.2, 0.3};
     auto all = ant, sub = ant;
     quadriga_lib::arrayant_rotate_pattern(all, o, 3);
     const arma::uvec i_element = {2, 0};
-    quadriga_lib::arrayant_rotate_pattern(sub, o, 3, &i_element);
+    quadriga_lib::arrayant_rotate_pattern(sub, o, 3, i_element);
     for (arma::uword s : {0, 2})
     {
         CHECK(arma::approx_equal(sub.e_theta_re.slice(s), all.e_theta_re.slice(s), "absdiff", 0.0));
@@ -1036,9 +1035,9 @@ TEST_CASE("arrayant_rotate_pattern - an element subset is rotated in one call")
     auto a = nonuniform, b = nonuniform;
     const arma::uvec perm = {1, 2, 0}, part = {1, 2};
     quadriga_lib::arrayant_rotate_pattern(a, o, 0);
-    quadriga_lib::arrayant_rotate_pattern(b, o, 0, &perm);
+    quadriga_lib::arrayant_rotate_pattern(b, o, 0, perm);
     CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0));
-    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(b, o, 0, &part), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(b, o, 0, part), std::invalid_argument);
 }
 
 TEST_CASE("arrayant_rotate_pattern - invalid orientation and element indices throw")
@@ -1049,10 +1048,10 @@ TEST_CASE("arrayant_rotate_pattern - invalid orientation and element indices thr
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(2, arma::fill::zeros)), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec{0.0, arma::datum::nan, 0.0}), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(4, arma::fill::zeros)), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, &dup), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, &out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, dup), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, out), std::invalid_argument);
     std::vector<quadriga_lib::arrayant<double>> vec = {ant, ant};
-    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(vec, arma::vec(3, arma::fill::zeros), 0, &dup), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(vec, arma::vec(3, arma::fill::zeros), 0, dup), std::invalid_argument);
     CHECK(arma::approx_equal(ant.e_theta_re, ref.e_theta_re, "absdiff", 0.0));
     CHECK(arma::approx_equal(vec[0].e_theta_re, ref.e_theta_re, "absdiff", 0.0));
 }

@@ -1033,8 +1033,8 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
     {
         set_dataspace("channel_2/Snap_2/delay", {400});
         const arma::uvec i_ok = {1, 0}, i_bad = {2};
-        CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, &i_ok).n_snap() == 2);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, &i_bad), std::runtime_error);
+        CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, i_ok).n_snap() == 2);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, i_bad), std::runtime_error);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 1), std::runtime_error);
     }
     SECTION("snapshot group names with a leading zero, beyond 2^32 - 1, with 25 digits")

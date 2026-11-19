@@ -109,7 +109,7 @@ TEST_CASE("Generate Arrayant - 3GPP")
     CHECK(std::abs(ant.e_theta_re.at(0, 0, 0) - 0.0794328f) < 1.0e-5);
 
     // Low-Res
-    ant = quadriga_lib::generate_arrayant_3GPP<float>(1, 1, 299792458.0, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0);
+    ant = quadriga_lib::generate_arrayant_3GPP<float>(1, 1, 299792458.0, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0);
     CHECK(ant.n_elements() == 1);
     REQUIRE(ant.n_azimuth() == 37);
     REQUIRE(ant.n_elevation() == 19);
@@ -141,7 +141,7 @@ TEST_CASE("Generate Arrayant - 3GPP")
     gain = std::sqrt(2.0 * gain * gain);
 
     ant = quadriga_lib::generate_arrayant_3GPP<float>(2, 2, pattern.center_freq,
-                                                      4, 0.0, 0.5, 1, 1, 0.0, 0.0, &pattern);
+                                                      4, 0.0, 0.5, 1, 1, 0.0, 0.0, pattern);
     CHECK(ant.n_elements() == 6);
 
     CHECK(std::abs(ant.e_theta_re.at(90, 180, 0) - gain) < 1.0e-5);
@@ -174,7 +174,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     arma::vec azg = arma::regspace<arma::vec>(-180.0, 1.0, 180.0) * 0.017453292519943;
     arma::vec elg = arma::regspace<arma::vec>(-90.0, 1.0, 90.0) * 0.017453292519943;
 
-    auto comb = quadriga_lib::arrayant_combine_pattern(ant, &azg, &elg);
+    auto comb = quadriga_lib::arrayant_combine_pattern(ant, azg, elg);
 
     CHECK(comb.n_elements() == 1);
     CHECK(comb.n_elevation() == 181);
@@ -191,7 +191,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     az = {20.0, 0.0, 20.0};
     el = {-7.0, 30.0, -7.0};
     auto ant2 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 15.0);
-    auto comb2 = quadriga_lib::arrayant_combine_pattern(ant2, &azg, &elg);
+    auto comb2 = quadriga_lib::arrayant_combine_pattern(ant2, azg, elg);
 
     CHECK(arma::approx_equal(ant.coupling_re, ant2.coupling_re, "absdiff", 1e-6));
     CHECK(arma::approx_equal(ant.coupling_im, ant2.coupling_im, "absdiff", 1e-6));
@@ -285,7 +285,7 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     p.center_freq = 1e9;
 
     const double lambda = 299792458.0 / 3e9;
-    auto u = quadriga_lib::generate_arrayant_ula<double>(2, 3e9, 0.5, &p);
+    auto u = quadriga_lib::generate_arrayant_ula<double>(2, 3e9, 0.5, p);
     CHECK(u.n_elements() == 4);
     CHECK(u.n_ports() == 4);
     CHECK(arma::approx_equal(u.coupling_re, arma::mat(4, 4, arma::fill::eye), "absdiff", 0.0));
@@ -296,14 +296,14 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     CHECK(arma::approx_equal(u.element_pos.row(1), y, "absdiff", 1e-12));
     CHECK(u.center_freq == 3e9);
 
-    auto g = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, &p);
+    auto g = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, p);
     CHECK(g.n_elements() == 2);
     CHECK(g.n_ports() == 2);
     CHECK(arma::approx_equal(g.coupling_re, arma::mat(2, 2, arma::fill::eye), "absdiff", 0.0));
     CHECK(arma::all(arma::vectorise(g.element_pos) == 0.0));
 
     // Vertical stacking: z positions come from the array geometry only
-    auto g2 = quadriga_lib::generate_arrayant_3GPP<double>(2, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, &p);
+    auto g2 = quadriga_lib::generate_arrayant_3GPP<double>(2, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, p);
     CHECK(g2.n_elements() == 4);
     CHECK(g2.n_ports() == 4);
     CHECK(arma::all(g2.element_pos.row(0) == 0.0));
@@ -358,8 +358,8 @@ TEST_CASE("Generate Arrayant - Invalid resolution")
         REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, res), std::invalid_argument);
     }
     REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_omni<float>(std::numeric_limits<float>::denorm_min()), std::invalid_argument);
-    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_ula<double>(2, 3.0e9, 0.5, nullptr, nan), std::invalid_argument);
-    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.0e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, nan), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_ula<double>(2, 3.0e9, 0.5, {}, nan), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.0e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, nan), std::invalid_argument);
 
     CHECK(quadriga_lib::generate_arrayant_omni<double>(0.0).n_azimuth() == 361);
     CHECK(quadriga_lib::generate_arrayant_omni<double>(-5.0).n_azimuth() == 361);

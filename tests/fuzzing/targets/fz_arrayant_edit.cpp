@@ -62,14 +62,14 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
             {
                 arma::Col<T> bw_az, bw_el, p_az, p_el;
-                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth(a, &i_el, threshold, &bw_az, all ? &bw_el : nullptr,
+                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth(a, i_el, threshold, &bw_az, all ? &bw_el : nullptr,
                                                                       all ? &p_az : nullptr, &p_el); });
             }
             else
             {
                 auto vec = fuzzed_vector<T>(in, a);
                 arma::Mat<T> bw_az, bw_el, p_az, p_el;
-                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth_multi(vec, &i_el, threshold, &bw_az, all ? &bw_el : nullptr,
+                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth_multi(vec, i_el, threshold, &bw_az, all ? &bw_el : nullptr,
                                                                             all ? &p_az : nullptr, &p_el); });
             }
             break;
@@ -82,13 +82,13 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
             {
                 arma::Col<T> d;
-                fz::clean([&] { quadriga_lib::arrayant_calc_directivity(a, d, &i_el); });
+                fz::clean([&] { quadriga_lib::arrayant_calc_directivity(a, d, i_el); });
             }
             else
             {
                 auto vec = fuzzed_vector<T>(in, a);
                 arma::Mat<T> d;
-                fz::clean([&] { quadriga_lib::arrayant_calc_directivity_multi(vec, d, &i_el); });
+                fz::clean([&] { quadriga_lib::arrayant_calc_directivity_multi(vec, d, i_el); });
             }
             break;
         }
@@ -99,7 +99,7 @@ static void run(fz::input &in)
                 az = arma::sort(az), el = arma::sort(el);
             const int mode = in.ConsumeIntegralInRange<int>(0, 3);
             T speed = in.ConsumeBool() ? T(299792458.0) : in.value<T>();
-            fz::clean([&] { a = quadriga_lib::arrayant_combine_pattern(a, mode & 1 ? &az : nullptr, mode & 2 ? &el : nullptr, speed); });
+            fz::clean([&] { a = quadriga_lib::arrayant_combine_pattern(a, fz::opt(mode & 1, az), fz::opt(mode & 2, el), speed); });
             break;
         }
         case 6:
@@ -126,7 +126,7 @@ static void run(fz::input &in)
                 i = in.index(n_e);
             const char *maps[] = {"jet", "parula", "winter", "hot", "turbo", "copper", "spring", "cool", "gray", "autumn", "summer", ""};
             std::string cmap = in.ConsumeBool() ? maps[in.ConsumeIntegralInRange<int>(0, 11)] : in.ConsumeRandomLengthString(12);
-            fz::clean([&] { quadriga_lib::arrayant_export_obj_file(obj, a, range, cmap, radius, n_div, &i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_export_obj_file(obj, a, range, cmap, radius, n_div, i_el); });
             break;
         }
         case 9:
@@ -137,7 +137,7 @@ static void run(fz::input &in)
                 l = in.ConsumeIntegralInRange<unsigned>(0, 4);
             if (in.ConsumeBool())
                 std::filesystem::remove(qdant);
-            fz::clean([&] { quadriga_lib::qdant_write(qdant, a, id, &layout); });
+            fz::clean([&] { quadriga_lib::qdant_write(qdant, a, id, layout); });
             fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read<T>(qdant, in.ConsumeIntegralInRange<unsigned>(0, 4), &lay); });
             break;
         }
@@ -154,7 +154,7 @@ static void run(fz::input &in)
             arma::uvec i_el(in.size(3));
             for (auto &i : i_el)
                 i = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern(a, orientation, usage, &i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern(a, orientation, usage, i_el); });
             break;
         }
         case 12:
@@ -201,7 +201,7 @@ static void run(fz::input &in)
             arma::uvec i_el(in.size(3));
             for (auto &i : i_el)
                 i = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern_multi(vec, orientation, usage, &i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern_multi(vec, orientation, usage, i_el); });
             break;
         }
         case 17:
@@ -212,7 +212,7 @@ static void run(fz::input &in)
                 i = in.index(n_e);
             arma::Mat<T> pos = in.ConsumeBool() ? in.mat<T>(3, i_el.is_empty() ? n_e : i_el.n_elem)
                                                 : in.mat<T>(in.size(4), in.size(7));
-            fz::clean([&] { quadriga_lib::arrayant_set_element_pos_multi(vec, pos, &i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_set_element_pos_multi(vec, pos, i_el); });
             break;
         }
         case 18:
@@ -221,8 +221,8 @@ static void run(fz::input &in)
             arma::Col<T> az = in.col<T>(in.size(16)), el = in.col<T>(in.size(16)), fr = in.col<T>(in.size(4));
             const int mode = in.ConsumeIntegralInRange<int>(0, 7);
             T speed = in.ConsumeBool() ? T(343.0) : in.value<T>();
-            fz::clean([&] { quadriga_lib::arrayant_combine_pattern_multi(vec, mode & 1 ? &az : nullptr, mode & 2 ? &el : nullptr,
-                                                                         mode & 4 ? &fr : nullptr, speed); });
+            fz::clean([&] { quadriga_lib::arrayant_combine_pattern_multi(vec, fz::opt(mode & 1, az), fz::opt(mode & 2, el),
+                                                                         fz::opt(mode & 4, fr), speed); });
             break;
         }
         default:

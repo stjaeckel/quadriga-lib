@@ -994,7 +994,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec &i_snap = arma::uvec());
 ```
 
 ## Inputs:
@@ -1003,7 +1003,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; `nullptr` or empty = all snapshots; `[n_out]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
 
 ## Returns:
 - Channel object at the specified slot; empty if no data is present
@@ -1014,13 +1014,13 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - [[hdf5_read_layout]] (inspect slot occupancy before reading)
 MD!*/
 
-// Read the channel group at 'ref' (not 0) of an open file; 'i_snap' selects snapshots (nullptr or empty: all). Each
+// Read the channel group at 'ref' (not 0) of an open file; 'i_snap' selects snapshots (empty: all). Each
 // selected snapshot group is read once; repeated or unsorted indices are arranged afterwards.
 template <typename dtype>
-static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, const arma::uvec *i_snap)
+static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, const arma::uvec &i_snap)
 {
     h.bytes_read = 0; // The limit applies to each channel
-    const bool select = i_snap != nullptr && i_snap->n_elem != 0;
+    const bool select = i_snap.n_elem != 0;
 
     qHDF_group channel;
     qHDF_read_group(h, ref, channel);
@@ -1060,7 +1060,7 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
     const uint32_t n_snapshots = read_u32(g, "NumSnap", true);
     if (const uint8_t *v = attribute(g, "Initial_position", h5::int32, 1, false))
         c.initial_position = (int)(int32_t)h5::get_le(v, 4);
-    if (select && arma::any(*i_snap >= (arma::uword)n_snapshots))
+    if (select && arma::any(i_snap >= (arma::uword)n_snapshots))
         throw std::invalid_argument("Input 'i_snap' contains indices that exceed the number of snapshots (" +
                                     std::to_string(n_snapshots) + ").");
 
@@ -1171,13 +1171,13 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
     if (select)
     {
         if (n_snap > 1 && c.center_freq.n_elem == n_snap)
-            c.center_freq = arma::Col<dtype>(c.center_freq.elem(*i_snap));
+            c.center_freq = arma::Col<dtype>(c.center_freq.elem(i_snap));
         for (arma::Mat<dtype> *p : {&c.tx_pos, &c.rx_pos, &c.tx_orientation, &c.rx_orientation})
             if (n_snap > 1 && p->n_cols == n_snap)
-                *p = arma::Mat<dtype>(p->cols(*i_snap));
-        sel = arma::unique(*i_snap);
-        if (sel.n_elem != i_snap->n_elem || arma::any(sel != *i_snap))
-            for (arma::uword k : *i_snap)
+                *p = arma::Mat<dtype>(p->cols(i_snap));
+        sel = arma::unique(i_snap);
+        if (sel.n_elem != i_snap.n_elem || arma::any(sel != i_snap))
+            for (arma::uword k : i_snap)
                 pos.push_back((size_t)(std::lower_bound(sel.begin(), sel.end(), k) - sel.begin()));
     }
 
@@ -1323,7 +1323,7 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
 
 template <typename dtype>
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                             const arma::uvec *i_snap)
+                                                             const arma::uvec &i_snap)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
@@ -1333,10 +1333,10 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
 }
 
 template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                                      const arma::uvec *i_snap);
+                                                                      const arma::uvec &i_snap);
 
 template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                                       const arma::uvec *i_snap);
+                                                                       const arma::uvec &i_snap);
 
 /*!MD
 # hdf5_read_channel_vec
@@ -1352,13 +1352,13 @@ Read the channels of several slots of an HDF5 file
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
     const std::string &fn,
     const arma::Mat<unsigned> &slots,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec &i_snap = arma::uvec());
 ```
 
 ## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`slots`** — Slot indices `(ix, iy, iz, iw)`, 0-based, one column per slot; `[4, n_slot]`
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; `nullptr` or empty = all snapshots; `[n_out]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
 
 ## Returns:
 - Channel objects, one per slot; `[n_slot]`
@@ -1370,7 +1370,7 @@ MD!*/
 
 template <typename dtype>
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::Mat<unsigned> &slots,
-                                                                              const arma::uvec *i_snap)
+                                                                              const arma::uvec &i_snap)
 {
     if (slots.n_cols != 0 && slots.n_rows != 4)
         throw std::invalid_argument("Input 'slots' must have 4 rows.");
@@ -1389,10 +1389,10 @@ std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(co
 }
 
 template std::vector<quadriga_lib::channel<float>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::Mat<unsigned> &slots,
-                                                                                       const arma::uvec *i_snap);
+                                                                                       const arma::uvec &i_snap);
 
 template std::vector<quadriga_lib::channel<double>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::Mat<unsigned> &slots,
-                                                                                        const arma::uvec *i_snap);
+                                                                                        const arma::uvec &i_snap);
 
 /*!MD
 # hdf5_reshape_layout

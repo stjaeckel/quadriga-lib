@@ -14,7 +14,7 @@ SECTION!*/
 Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 - Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
-- If `sub_cloud_ind` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- If `sub_cloud_ind` is empty, the entire input is treated as a single cloud; last index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ## Declaration:
@@ -22,7 +22,7 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 void quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> &points,
     arma::Mat<dtype> &aabb,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
 
@@ -42,7 +42,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dtype> &aabb,
-                                    const arma::u32_vec *sub_cloud_ind,
+                                    const arma::u32_vec &sub_cloud_ind,
                                     arma::uword vec_size)
 {
     // Input validation
@@ -52,7 +52,7 @@ void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dt
         throw std::invalid_argument("Input 'points' must have at least one entry.");
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
-    qd_check_alias(&aabb, "aabb", &points, sub_cloud_ind);
+    qd_check_alias(&aabb, "aabb", &points, &sub_cloud_ind);
 
     arma::uword n_points = (arma::uword)points.n_rows;
     arma::uword n_values = (arma::uword)points.n_elem;
@@ -62,10 +62,10 @@ void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dt
     const unsigned *p_sub = &first_sub_cloud_ind;
     arma::uword n_sub = 1;
 
-    if (sub_cloud_ind != nullptr && sub_cloud_ind->n_elem > 0)
+    if (sub_cloud_ind.n_elem > 0)
     {
-        n_sub = (arma::uword)sub_cloud_ind->n_elem;
-        p_sub = sub_cloud_ind->memptr();
+        n_sub = (arma::uword)sub_cloud_ind.n_elem;
+        p_sub = sub_cloud_ind.memptr();
 
         if (*p_sub != 0U)
             throw std::invalid_argument("First sub-cloud must start at the first point.");
@@ -132,9 +132,9 @@ void quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> &points, arma::Mat<dt
 }
 
 template void quadriga_lib::point_cloud_aabb(const arma::Mat<float> &points, arma::Mat<float> &aabb,
-                                             const arma::u32_vec *sub_cloud_ind,
+                                             const arma::u32_vec &sub_cloud_ind,
                                              arma::uword vec_size);
 
 template void quadriga_lib::point_cloud_aabb(const arma::Mat<double> &points, arma::Mat<double> &aabb,
-                                             const arma::u32_vec *sub_cloud_ind,
+                                             const arma::u32_vec &sub_cloud_ind,
                                              arma::uword vec_size);

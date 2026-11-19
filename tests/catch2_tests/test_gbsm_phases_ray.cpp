@@ -249,12 +249,12 @@ TEST_CASE("gbsm_init_phases - ray: input validation")
                          Message("Input 'set_id' must be >= -1."));
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb999"), std::invalid_argument,
                          Message("Input 'preset' is not a known preset."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", &pos), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", pos), std::invalid_argument,
                          Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", nullptr, &pos), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", {}, pos), std::invalid_argument,
                          Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
     const arma::mat empty_pos; // empty = omitted
-    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", &empty_pos, &empty_pos));
+    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", empty_pos, empty_pos));
     auto bad = sp;
     bad["NumSubPaths"] = 0.0;
     CHECK_THROWS_AS(quadriga_lib::gbsm_init_phases(bad, "ray", phase, 1), std::invalid_argument);
@@ -282,7 +282,7 @@ TEST_CASE("gbsm_draw - ray: single mobility values equal the sum of sinusoids")
     {
         const arma::cube phase = make_phase(N, M, 51 + set);
         arma::mat rnd, rnd2;
-        quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", nullptr, &fc);
+        quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", {}, fc);
         REQUIRE(rnd.n_rows == 5);
         REQUIRE(rnd.n_cols == n_gen);
         const double d_normal = max_dev(rnd, phase, rx, 15.0, 0, 13 * NM + N, false);
@@ -294,7 +294,7 @@ TEST_CASE("gbsm_draw - ray: single mobility values equal the sum of sinusoids")
         for (arma::uword g = 0; g < n_gen; ++g)
             if (is_uniform(g, N, M))
                 CHECK((rnd.col(g).min() > 0.0 && rnd.col(g).max() < 1.0));
-        quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd2, set, "Comb256", nullptr, &fc);
+        quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd2, set, "Comb256", {}, fc);
         CHECK(qd_equal(rnd, rnd2)); // determinism
     }
 }
@@ -311,7 +311,7 @@ TEST_CASE("gbsm_draw - ray: block 14 of the shared set uses lambda_tau")
         {
             const arma::cube phase = make_phase(N, M, 81 + set);
             arma::mat rnd;
-            quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", nullptr, &fc);
+            quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", {}, fc);
             REQUIRE(rnd.n_cols == n_gen);
             INFO("set " << set << ", lambda_tau " << lt << ", SC_lambda " << sc);
             CHECK(max_dev(rnd, phase, rx, sc, 0, b14, false) < 2e-5);
@@ -380,8 +380,8 @@ TEST_CASE("gbsm_draw - ray: swapping Tx and Rx exchanges the mirror blocks")
             arma::cube phase;
             quadriga_lib::gbsm_init_phases(sp, "ray", phase, 61, set);
             arma::mat ab, ba;
-            quadriga_lib::gbsm_draw(sp, "ray", phase, B, A, ab, set, "Comb256", f ? &fl : nullptr, &fc, true);
-            quadriga_lib::gbsm_draw(sp, "ray", phase, A, B, ba, set, "Comb256", f ? &fl : nullptr, &fc, true);
+            quadriga_lib::gbsm_draw(sp, "ray", phase, B, A, ab, set, "Comb256", f ? fl : arma::u32_vec(), fc, true);
+            quadriga_lib::gbsm_draw(sp, "ray", phase, A, B, ba, set, "Comb256", f ? fl : arma::u32_vec(), fc, true);
             REQUIRE(ab.n_cols == n_gen_of(N, M));
             REQUIRE(ba.n_cols == n_gen_of(N, M));
             for (arma::uword g = 0; g < ab.n_cols; ++g)
@@ -408,7 +408,7 @@ TEST_CASE("gbsm_draw - ray: marginal distributions")
         arma::cube phase;
         quadriga_lib::gbsm_init_phases(sp, "ray", phase, 68, set);
         arma::mat rnd;
-        quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", nullptr, &fc);
+        quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, set, "Comb256", {}, fc);
         REQUIRE(rnd.n_cols == n_gen_of(N, M));
         for (arma::uword g = 0; g < rnd.n_cols; ++g)
         {
@@ -446,8 +446,8 @@ TEST_CASE("gbsm_draw - ray: center_freq is required by the shared set and ignore
 
     // Shared set: another frequency list changes block 14 only
     const arma::vec f1 = {3.5e9}, f2 = {3.5e9, 28e9};
-    quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, a, -1, "Comb256", nullptr, &f1);
-    quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, b, -1, "Comb256", nullptr, &f2);
+    quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, a, -1, "Comb256", {}, f1);
+    quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, b, -1, "Comb256", {}, f2);
     CHECK(lambda_tau(sp, f1) != lambda_tau(sp, f2));
     CHECK(qd_equal(arma::mat(a.cols(0, b14 - 1)), arma::mat(b.cols(0, b14 - 1))));
     for (arma::uword g = b14; g < a.n_cols; ++g)
@@ -459,7 +459,7 @@ TEST_CASE("gbsm_draw - ray: center_freq is required by the shared set and ignore
     for (const arma::vec &fc : {arma::vec{}, arma::vec{-1.0, NAN}, arma::vec{3.5e9}, arma::vec{28e9}})
     {
         arma::mat c;
-        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, c, 4, "Comb256", nullptr, &fc));
+        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, c, 4, "Comb256", {}, fc));
         CHECK(qd_equal(c, ref));
     }
 }
@@ -472,11 +472,11 @@ TEST_CASE("gbsm_draw - ray: n_link = 0 and N = 0")
     const arma::vec fc = {3.5e9};
     arma::mat rnd(4, 4, arma::fill::ones);
 
-    quadriga_lib::gbsm_draw(sp, "ray", phase, tx1, rx0, rnd, -1, "Comb256", nullptr, &fc);
+    quadriga_lib::gbsm_draw(sp, "ray", phase, tx1, rx0, rnd, -1, "Comb256", {}, fc);
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 86);
     rnd.ones(4, 4);
-    quadriga_lib::gbsm_draw(sp, "ray", phase, rx0, rx0, rnd, 1, "Comb256", nullptr, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "ray", phase, rx0, rx0, rnd, 1, "Comb256", {}, {}, true);
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 86);
 
@@ -487,7 +487,7 @@ TEST_CASE("gbsm_draw - ray: n_link = 0 and N = 0")
     for (const arma::cube *p : {&ph0, &empty})
     {
         rnd.ones(4, 4);
-        quadriga_lib::gbsm_draw(sp0, "ray", *p, tx1, rx, rnd, -1, "Comb256", nullptr, &fc);
+        quadriga_lib::gbsm_draw(sp0, "ray", *p, tx1, rx, rnd, -1, "Comb256", {}, fc);
         CHECK(rnd.n_rows == 5);
         CHECK(rnd.n_cols == 0);
         rnd.ones(4, 4);
@@ -508,8 +508,8 @@ TEST_CASE("gbsm_draw - ray: input validation")
     const arma::u32_vec fl = {0, 1, 2}, fl_bad = {0, 1};
     arma::mat rnd;
 
-    CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", &fl, &fc, true));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -2, "Comb256", nullptr, &fc),
+    CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", fl, fc, true));
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -2, "Comb256", {}, fc),
                          std::invalid_argument, Message("Input 'set_id' must be >= -1."));
 
     // Checks 6 to 9 come before the frequency checks 10 and 11
@@ -520,9 +520,9 @@ TEST_CASE("gbsm_draw - ray: input validation")
     bad(3, 80, 1) = NAN;
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", bad, tx, rx, rnd), std::invalid_argument,
                          Message("Input 'phase' must be finite."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", &fl_bad), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", fl_bad), std::invalid_argument,
                          Message("Number of elements in 'floor_id' does not match number of columns in 'rx_pos'."));
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", &fl, nullptr, false, false),
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", fl, {}, false, false),
                          std::invalid_argument,
                          Message("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors."));
 
@@ -530,11 +530,11 @@ TEST_CASE("gbsm_draw - ray: input validation")
     arma::mat keep(2, 2, arma::fill::ones);
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep), std::invalid_argument,
                          Message("Input 'center_freq' is required for the shared 'ray' set."));
-    const arma::vec f_empty;
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep, -1, "Comb256", nullptr, &f_empty),
-                         std::invalid_argument, Message("Input 'center_freq' cannot be empty."));
+    const arma::vec f_empty; // an empty 'center_freq' is an omitted one
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep, -1, "Comb256", {}, f_empty),
+                         std::invalid_argument, Message("Input 'center_freq' is required for the shared 'ray' set."));
     for (const arma::vec &f : {arma::vec{3.5e9, 0.0}, arma::vec{-1.0}, arma::vec{NAN}, arma::vec{INFINITY}})
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep, -1, "Comb256", nullptr, &f),
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep, -1, "Comb256", {}, f),
                              std::invalid_argument, Message("Input 'center_freq' must be finite and > 0."));
     CHECK(keep.n_rows == 2);
     CHECK(arma::all(arma::vectorise(keep) == 1.0));

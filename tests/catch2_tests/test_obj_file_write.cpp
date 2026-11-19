@@ -120,7 +120,7 @@ TEST_CASE("Test OBJ File Write - Mesh round-trip (geometry only)")
     // Write from mesh; no objects, no materials
     arma::mat vlo;
     arma::umat fio;
-    quadriga_lib::obj_file_write<double>("cube.obj", &mesh, nullptr, nullptr, nullptr, nullptr, &vlo, &fio);
+    quadriga_lib::obj_file_write<double>("cube.obj", mesh, {}, {}, {}, {}, &vlo, &fio);
 
     // The derived outputs should weld the cube down to 8 unique vertices
     CHECK(vlo.n_rows == 8);
@@ -170,8 +170,8 @@ TEST_CASE("Test OBJ File Write - vert_list / face_ind round-trip")
     // Write directly from vertex list + face indices (no mesh)
     arma::mat vlo;
     arma::umat fio;
-    quadriga_lib::obj_file_write<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
-                                         &vlo, &fio, &V, &F);
+    quadriga_lib::obj_file_write<double>("cube.obj", {}, {}, {}, {}, {},
+                                         &vlo, &fio, V, F);
 
     // In this mode the outputs are exact copies of the inputs
     CHECK(arma::approx_equal(vlo, V, "absdiff", 1e-14));
@@ -207,7 +207,7 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
         mtl_ind.subvec(4, 11).fill(2); // faces 0-3 = material 1, 4-11 = material 2 (1-based)
         std::vector<std::string> mtl_names = {"itu_concrete", "itu_wood"};
 
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &vlo, &fio);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names, &vlo, &fio);
         CHECK(std::filesystem::exists("cube.mtl"));
 
         // Read back; resolve EM properties from the built-in default table (names are ITU materials)
@@ -238,7 +238,7 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
         arma::uvec mtl_ind = arma::ones<arma::uvec>(12); // 1-based: material 1 = "glass"
         std::vector<std::string> mtl_names = {"glass"};
 
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &vlo, &fio);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names, &vlo, &fio);
 
         // EM properties come from a CSV, not from the OBJ/MTL
         std::ofstream csv_file("custom_materials.csv");
@@ -295,8 +295,8 @@ TEST_CASE("Test OBJ File Write - BSDF round-trip")
 
     arma::mat vlo;
     arma::umat fio;
-    quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                         &vlo, &fio, nullptr, nullptr, &bsdf);
+    quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                         &vlo, &fio, {}, {}, bsdf);
     REQUIRE(std::filesystem::exists("cube.mtl"));
 
     arma::mat bsdf_rd;
@@ -330,7 +330,7 @@ TEST_CASE("Test OBJ File Write - Multiple objects")
 
     arma::mat vlo;
     arma::umat fio;
-    quadriga_lib::obj_file_write<double>("cubes.obj", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &fio);
+    quadriga_lib::obj_file_write<double>("cubes.obj", mesh, obj_ind, {}, obj_names, {}, &vlo, &fio);
 
     // No cross-object merging -> 8 + 8 vertices
     CHECK(vlo.n_rows == 16);
@@ -367,18 +367,18 @@ TEST_CASE("Test OBJ File Write - Error handling")
     arma::umat fio;
 
     // Both mesh and vert_list/face_ind given
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", &mesh, nullptr, nullptr, nullptr, nullptr,
-                                                         nullptr, nullptr, &V, &F),
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", mesh, {}, {}, {}, {},
+                                                         nullptr, nullptr, V, F),
                     std::invalid_argument);
 
     // Neither geometry source given
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                         nullptr, nullptr, nullptr, nullptr),
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", {}, {}, {}, {}, {},
+                                                         nullptr, nullptr, {}, {}),
                     std::invalid_argument);
 
     // vert_list without face_ind
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                         nullptr, nullptr, &V, nullptr),
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", {}, {}, {}, {}, {},
+                                                         nullptr, nullptr, V, {}),
                     std::invalid_argument);
 
     // Non-contiguous obj_ind: {0,0,1,1,0,...} -> object 0 reappears
@@ -387,26 +387,26 @@ TEST_CASE("Test OBJ File Write - Error handling")
         obj_bad(2) = 1;
         obj_bad(3) = 1;
         std::vector<std::string> on = {"A", "B"};
-        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", &mesh, &obj_bad, nullptr, &on, nullptr,
+        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", mesh, obj_bad, {}, on, {},
                                                              nullptr, nullptr),
                         std::invalid_argument);
     }
 
     // File name does not end in .obj
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("cube.txt", &mesh, nullptr, nullptr, nullptr, nullptr,
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("cube.txt", mesh, {}, {}, {}, {},
                                                          &vlo, &fio),
                     std::invalid_argument);
 
     // The folder does not exist: a file problem, not an argument error
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("test_no_such_dir_obj/cube.obj", &mesh, nullptr, nullptr,
-                                                         nullptr, nullptr, &vlo, &fio),
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("test_no_such_dir_obj/cube.obj", mesh, {}, {},
+                                                         {}, {}, &vlo, &fio),
                     std::runtime_error);
 
     // obj_names too short for obj_ind (0-based: max index 1 needs 2 names)
     {
         arma::uvec obj_ind = arma::join_cols(arma::zeros<arma::uvec>(6), arma::ones<arma::uvec>(6));
         std::vector<std::string> on = {"OnlyOne"};
-        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", &mesh, &obj_ind, nullptr, &on, nullptr,
+        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", mesh, obj_ind, {}, on, {},
                                                              &vlo, &fio),
                         std::invalid_argument);
     }
@@ -416,7 +416,7 @@ TEST_CASE("Test OBJ File Write - Error handling")
         arma::uvec mtl_ind = arma::ones<arma::uvec>(12);
         mtl_ind.subvec(6, 11).fill(2);
         std::vector<std::string> mn = {"OnlyOne"};
-        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", &mesh, nullptr, &mtl_ind, nullptr, &mn,
+        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", mesh, {}, mtl_ind, {}, mn,
                                                              &vlo, &fio),
                         std::invalid_argument);
     }
@@ -424,8 +424,8 @@ TEST_CASE("Test OBJ File Write - Error handling")
     // bsdf given without mtl_ind / mtl_names
     {
         arma::mat bsdf(1, 17, arma::fill::zeros);
-        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", &mesh, nullptr, nullptr, nullptr, nullptr,
-                                                             &vlo, &fio, nullptr, nullptr, &bsdf),
+        CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", mesh, {}, {}, {}, {},
+                                                             &vlo, &fio, {}, {}, bsdf),
                         std::invalid_argument);
     }
 
@@ -443,7 +443,7 @@ TEST_CASE("Test OBJ File Write - Outputs only (empty filename)")
     // Empty filename: derive vert_list / face_ind from mesh, write no file
     arma::mat vlo;
     arma::umat fio;
-    CHECK_NOTHROW(quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vlo, &fio));
+    CHECK_NOTHROW(quadriga_lib::obj_file_write<double>("", mesh, {}, {}, {}, {}, &vlo, &fio));
 
     CHECK(vlo.n_rows == 8);
     CHECK(vlo.n_cols == 3);
@@ -480,9 +480,9 @@ TEST_CASE("Test OBJ File Write - CSV material table round-trip")
 
     arma::mat vlo;
     arma::umat fio;
-    quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                         &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                         &csv_ind, &csv_names, &csv_prop, /*csv_write_defaults=*/false);
+    quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                         &vlo, &fio, {}, {}, {}, 0.001,
+                                         csv_ind, csv_names, csv_prop, /*csv_write_defaults=*/false);
 
     REQUIRE(std::filesystem::exists("cube.obj"));
     REQUIRE(std::filesystem::exists("cube.mtl"));
@@ -535,9 +535,9 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
 
     SECTION("csv_write_defaults = false -> only present columns, canonical order then extras")
     {
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, &csv_names, &csv_prop, /*csv_write_defaults=*/false);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, {}, 0.001,
+                                             {}, csv_names, csv_prop, /*csv_write_defaults=*/false);
         REQUIRE(std::filesystem::exists("cube.csv"));
 
         std::ifstream f("cube.csv");
@@ -556,9 +556,9 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
 
     SECTION("csv_write_defaults = true -> full canonical set with defaults")
     {
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, &csv_names, &csv_prop, /*csv_write_defaults=*/true);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, {}, 0.001,
+                                             {}, csv_names, csv_prop, /*csv_write_defaults=*/true);
         REQUIRE(std::filesystem::exists("cube.csv"));
 
         std::ifstream f("cube.csv");
@@ -582,9 +582,9 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
         prop_thk["att"] = {3.0};
         prop_thk["thk"] = {0.2};
         prop_thk["h"] = {0.5};
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, &csv_names, &prop_thk, /*csv_write_defaults=*/false);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, {}, 0.001,
+                                             {}, csv_names, prop_thk, /*csv_write_defaults=*/false);
         std::ifstream f("cube.csv");
         std::string header, row;
         std::getline(f, header);
@@ -612,9 +612,9 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
         std::unordered_map<std::string, std::vector<double>> bad_prop;
         bad_prop["a"] = {1.0, 2.0}; // length 2, csv_names has 1 entry
         CHECK_THROWS_AS(
-            quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                                 &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                                 nullptr, &csv_names, &bad_prop, false),
+            quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                                 &vlo, &fio, {}, {}, {}, 0.001,
+                                                 {}, csv_names, bad_prop, false),
             std::invalid_argument);
     }
 
@@ -623,18 +623,18 @@ TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
         arma::uvec csv_ind_bad = arma::ones<arma::uvec>(12);
         csv_ind_bad(0) = 5; // csv_names has 1 entry -> max valid index is 1
         CHECK_THROWS_AS(
-            quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                                 &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                                 &csv_ind_bad, &csv_names, &csv_prop, false),
+            quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                                 &vlo, &fio, {}, {}, {}, 0.001,
+                                                 csv_ind_bad, csv_names, csv_prop, false),
             std::invalid_argument);
     }
 
     SECTION("Validation: csv inputs without csv_names throw")
     {
         CHECK_THROWS_AS(
-            quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                                 &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                                 nullptr, nullptr, &csv_prop, false),
+            quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                                 &vlo, &fio, {}, {}, {}, 0.001,
+                                                 {}, {}, csv_prop, false),
             std::invalid_argument);
     }
 }
@@ -660,7 +660,7 @@ TEST_CASE("Test OBJ File Write - Duplicate material names")
     {
         std::vector<std::string> mtl_names = {"concrete", "concrete", "steel"};
 
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &vlo, &fio);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names, &vlo, &fio);
         REQUIRE(std::filesystem::exists("cube.mtl"));
 
         // Both "concrete" entries share one .mtl block
@@ -705,8 +705,8 @@ TEST_CASE("Test OBJ File Write - Duplicate material names")
         bsdf.col(7).fill(0.5);                                               // Ks
         bsdf(2, 4) = 0.9;                                                    // steel differs, rows 0 and 1 identical
 
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, &bsdf);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, bsdf);
         REQUIRE(std::filesystem::exists("cube.mtl"));
 
         auto written = collect_after("cube.mtl", "newmtl ");
@@ -748,8 +748,8 @@ TEST_CASE("Test OBJ File Write - Duplicate material names")
         bsdf(1, 4) = 0.2; // second "concrete" has a different roughness
         bsdf(2, 4) = 0.9;
 
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, &bsdf);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, bsdf);
         REQUIRE(std::filesystem::exists("cube.mtl"));
 
         // Written in material-row order: rows 0, 1, 2
@@ -810,8 +810,8 @@ TEST_CASE("Test OBJ File Write - Duplicate material names")
         bsdf(1, 4) = 0.2;
         bsdf(2, 4) = 0.9;
 
-        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, &bsdf);
+        quadriga_lib::obj_file_write<double>("cube.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, bsdf);
         REQUIRE(std::filesystem::exists("cube.mtl"));
 
         auto written = collect_after("cube.mtl", "newmtl ");
@@ -864,9 +864,9 @@ TEST_CASE("Test OBJ File Write - Separate by loose parts")
 
     SECTION("Disabled -> single object, faces in input order")
     {
-        quadriga_lib::obj_file_write<double>("cubes.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, nullptr, nullptr, false, /*split_loose_parts=*/false);
+        quadriga_lib::obj_file_write<double>("cubes.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, {}, 0.001,
+                                             {}, {}, {}, false, /*split_loose_parts=*/false);
 
         auto blocks = collect_after("cubes.obj", "o ");
         REQUIRE(blocks.size() == 1);
@@ -883,9 +883,9 @@ TEST_CASE("Test OBJ File Write - Separate by loose parts")
 
     SECTION("Enabled -> one object per connected component")
     {
-        quadriga_lib::obj_file_write<double>("cubes.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, nullptr, nullptr, false, /*split_loose_parts=*/true);
+        quadriga_lib::obj_file_write<double>("cubes.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             &vlo, &fio, {}, {}, {}, 0.001,
+                                             {}, {}, {}, false, /*split_loose_parts=*/true);
 
         // The split object is renamed; parts are numbered by their first face
         auto blocks = collect_after("cubes.obj", "o ");
@@ -947,9 +947,9 @@ TEST_CASE("Test OBJ File Write - Separate by loose parts")
         arma::uvec obj_ind2 = arma::join_cols(arma::zeros<arma::uvec>(24), arma::ones<arma::uvec>(12));
         std::vector<std::string> obj_names2 = {"Multi", "Single"};
 
-        quadriga_lib::obj_file_write<double>("cubes.obj", &mesh2, &obj_ind2, nullptr, &obj_names2, nullptr,
-                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, nullptr, nullptr, false, /*split_loose_parts=*/true);
+        quadriga_lib::obj_file_write<double>("cubes.obj", mesh2, obj_ind2, {}, obj_names2, {},
+                                             &vlo, &fio, {}, {}, {}, 0.001,
+                                             {}, {}, {}, false, /*split_loose_parts=*/true);
 
         auto blocks = collect_after("cubes.obj", "o ");
         REQUIRE(blocks.size() == 3);
@@ -988,7 +988,7 @@ TEST_CASE("Test OBJ File Write - Vertex welding")
                 mesh.row(r++) = arma::rowvec{x, y, 0.0, x + 1.0, y + 1.0, 0.0, x, y + 1.0, 0.0};
             }
 
-        quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vlo, &fio);
+        quadriga_lib::obj_file_write<double>("", mesh, {}, {}, {}, {}, &vlo, &fio);
 
         CHECK(vlo.n_rows == (N + 1) * (N + 1)); // 3721 unique lattice points
         CHECK(fio.n_rows == 2 * N * N);
@@ -1004,15 +1004,15 @@ TEST_CASE("Test OBJ File Write - Vertex welding")
         mesh.row(1) = arma::rowvec{1.0004, 0.0, 0.0, 2.0, 0.0, 0.0, 2.0, 1.0, 0.0};
 
         // 0.9 mm apart -> merged at a 1 mm threshold
-        quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vlo, &fio, nullptr,
-                                             nullptr, nullptr, 0.001);
+        quadriga_lib::obj_file_write<double>("", mesh, {}, {}, {}, {}, &vlo, &fio, {},
+                                             {}, {}, 0.001);
         CHECK(vlo.n_rows == 3);
         CHECK(fio(0, 0) == fio(1, 0));
         CHECK(vlo(0, 0) == 0.9995); // the first vertex seen wins
 
         // Same geometry, tighter threshold -> kept apart
-        quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vlo, &fio, nullptr,
-                                             nullptr, nullptr, 0.0005);
+        quadriga_lib::obj_file_write<double>("", mesh, {}, {}, {}, {}, &vlo, &fio, {},
+                                             {}, {}, 0.0005);
         CHECK(vlo.n_rows == 4);
         CHECK(fio(0, 0) != fio(1, 0));
     }
@@ -1023,8 +1023,8 @@ TEST_CASE("Test OBJ File Write - Vertex welding")
         mesh.row(0) = arma::rowvec{-0.0004, 0.0, 0.0, -2.0, 0.0, 0.0, -2.0, 1.0, 0.0};
         mesh.row(1) = arma::rowvec{-0.0013, 0.0, 0.0, -2.0, 0.0, 0.0, -2.0, 1.0, 0.0};
 
-        quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vlo, &fio, nullptr,
-                                             nullptr, nullptr, 0.001);
+        quadriga_lib::obj_file_write<double>("", mesh, {}, {}, {}, {}, &vlo, &fio, {},
+                                             {}, {}, 0.001);
         CHECK(vlo.n_rows == 3);
         CHECK(fio(0, 0) == fio(1, 0));
     }
@@ -1039,7 +1039,7 @@ TEST_CASE("Test OBJ File Write - Vertex welding")
         arma::uvec obj_ind = {0, 1};
         std::vector<std::string> obj_names = {"A", "B"};
 
-        quadriga_lib::obj_file_write<double>("", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &fio);
+        quadriga_lib::obj_file_write<double>("", mesh, obj_ind, {}, obj_names, {}, &vlo, &fio);
         CHECK(vlo.n_rows == 6);
     }
 }
@@ -1060,7 +1060,7 @@ TEST_CASE("Test OBJ File Write - Faces without material keep mtl_ind 0 in the ro
     {
         arma::uvec obj_ind = {0, 0, 0}, mtl_ind = {1, 0, 2};
         std::vector<std::string> obj_names = {"box"};
-        quadriga_lib::obj_file_write<double>("null_mtl.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names);
         CHECK(count_null("null_mtl.obj") == 1);
         CHECK(collect_after("null_mtl.mtl", "newmtl ") == mtl_names); // no "(null)" entry in the .mtl
 
@@ -1089,7 +1089,7 @@ TEST_CASE("Test OBJ File Write - Faces without material keep mtl_ind 0 in the ro
         // Faces without material before the first material, and an object start, need no marker
         arma::uvec obj_ind = {0, 1, 1}, mtl_ind = {1, 0, 2};
         std::vector<std::string> obj_names = {"a", "b"};
-        quadriga_lib::obj_file_write<double>("null_mtl.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", mesh, obj_ind, mtl_ind, obj_names, mtl_names);
         CHECK(count_null("null_mtl.obj") == 0);
 
         arma::uvec mi;
@@ -1102,7 +1102,7 @@ TEST_CASE("Test OBJ File Write - Faces without material keep mtl_ind 0 in the ro
         arma::mat mesh6 = arma::join_cols(mesh, mesh + 20.0);
         arma::uvec obj_ind(6, arma::fill::zeros), mtl_ind = {1, 0, 0, 2, 0, 2}; // read back in order of first use
         std::vector<std::string> obj_names = {"box"};
-        quadriga_lib::obj_file_write<double>("null_mtl.obj", &mesh6, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", mesh6, obj_ind, mtl_ind, obj_names, mtl_names);
         CHECK(count_null("null_mtl.obj") == 2);
 
         arma::uvec mi;
@@ -1117,9 +1117,9 @@ TEST_CASE("Test OBJ File Write - Faces without material keep mtl_ind 0 in the ro
         m3.row(2) = arma::rowvec{1, 0, 0, 2, 0, 0, 1, 1, 0};
         arma::uvec obj_ind = {0, 0, 0}, mtl_ind = {1, 2, 0};
         std::vector<std::string> obj_names = {"box"};
-        quadriga_lib::obj_file_write<double>("null_mtl.obj", &m3, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
-                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0.001,
-                                             nullptr, nullptr, nullptr, false, /*split_loose_parts=*/true);
+        quadriga_lib::obj_file_write<double>("null_mtl.obj", m3, obj_ind, mtl_ind, obj_names, mtl_names,
+                                             nullptr, nullptr, {}, {}, {}, 0.001,
+                                             {}, {}, {}, false, /*split_loose_parts=*/true);
         CHECK(collect_after("null_mtl.obj", "o ") == std::vector<std::string>{"box.001", "box.002"});
         CHECK(count_null("null_mtl.obj") == 1);
 
@@ -1147,14 +1147,14 @@ TEST_CASE("Test OBJ File Write - A used material named '(null)' is rejected")
 
     // Material 2 "(null)" is used: throws before any file is written
     arma::uvec mtl_used = {1, 2, 0};
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("null_name.obj", &mesh, &obj_ind, &mtl_used, &obj_names, &mtl_names),
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("null_name.obj", mesh, obj_ind, mtl_used, obj_names, mtl_names),
                     std::invalid_argument);
     CHECK_FALSE(std::filesystem::exists("null_name.obj"));
     CHECK_FALSE(std::filesystem::exists("null_name.mtl"));
 
     // The same list with "(null)" unused writes fine and reads back
     arma::uvec mtl_unused = {1, 0, 1};
-    quadriga_lib::obj_file_write<double>("null_name.obj", &mesh, &obj_ind, &mtl_unused, &obj_names, &mtl_names);
+    quadriga_lib::obj_file_write<double>("null_name.obj", mesh, obj_ind, mtl_unused, obj_names, mtl_names);
     CHECK(collect_after("null_name.mtl", "newmtl ") == std::vector<std::string>{"itu_wood"});
     arma::uvec mi;
     quadriga_lib::obj_file_read<double>("null_name.obj", nullptr, nullptr, nullptr, nullptr, nullptr, &mi);
@@ -1170,16 +1170,16 @@ TEST_CASE("obj_file_write - outputs that alias inputs")
     arma::umat fio;
     arma::uvec obj_ind(mesh.n_rows, arma::fill::zeros);
     std::vector<std::string> obj_names = {"cube"};
-    CHECK_NOTHROW(quadriga_lib::obj_file_write<double>("", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &fio));
+    CHECK_NOTHROW(quadriga_lib::obj_file_write<double>("", mesh, obj_ind, {}, obj_names, {}, &vlo, &fio));
 
     arma::mat m = mesh;
     arma::umat oi(obj_ind.memptr(), obj_ind.n_elem, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", &m, &obj_ind, nullptr, &obj_names, nullptr, &m, &fio), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &oi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", m, obj_ind, {}, obj_names, {}, &m, &fio), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", mesh, obj_ind, {}, obj_names, {}, &vlo, &oi), std::invalid_argument);
     CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
 
     arma::umat fi = fio;
-    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, &vlo, &fi, &vlo, &fi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", {}, {}, {}, {}, {}, &vlo, &fi, vlo, fi), std::invalid_argument);
 }
 
 TEST_CASE("Test OBJ File Write - Non-finite and very large coordinates")
@@ -1189,8 +1189,8 @@ TEST_CASE("Test OBJ File Write - Non-finite and very large coordinates")
     {
         arma::mat vert;
         arma::umat faces;
-        quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vert, &faces, nullptr, nullptr,
-                                             nullptr, threshold);
+        quadriga_lib::obj_file_write<double>("", mesh, {}, {}, {}, {}, &vert, &faces, {}, {},
+                                             {}, threshold);
         return vert.n_rows;
     };
     const arma::mat base = {{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0},

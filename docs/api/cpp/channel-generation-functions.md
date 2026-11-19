@@ -162,8 +162,8 @@ void quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *eod = nullptr,
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
-    const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
-    const std::vector<bool> *active_path = nullptr,
+    const quadriga_lib::arrayant<dtype> &irs_array_2 = quadriga_lib::arrayant<dtype>(),
+    const std::vector<bool> &active_path = std::vector<bool>(),
     std::vector<bool> *active_path_out = nullptr,
     int use_kernel = 0);
 ```
@@ -194,7 +194,7 @@ void quadriga_lib::get_channels_irs(
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](array-antenna-class.md#arrayant)
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; empty (no elements): `irs_array` on both sides; see [arrayant](array-antenna-class.md#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 - **`use_kernel`** *(optional)* — Kernel of both segments, passed to [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in

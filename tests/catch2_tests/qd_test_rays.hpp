@@ -434,8 +434,8 @@ namespace
         const bool e = in.f.use_eps;
         quadriga_lib::ssf_rays(in.sp, in.f.tx, in.f.rx, in.fc, in.f.lsp, in.st.mu, in.st.sigma, in.cl.delay,
                                in.cl.power, in.cl.aod, in.cl.eod, in.cl.aoa, in.cl.eoa, in.rnd, rays, in.method,
-                               in.i_freq, in.angle_model, in.pol_model, e ? &in.f.eps_re : nullptr,
-                               e ? &in.f.eps_im : nullptr, in.pol_variability, in.random_phase);
+                               in.i_freq, in.angle_model, in.pol_model, e ? in.f.eps_re : arma::mat(),
+                               e ? in.f.eps_im : arma::mat(), in.pol_variability, in.random_phase);
     }
 
     std::vector<quadriga_lib::gbsm_rays> call(const rays_in_t &in)

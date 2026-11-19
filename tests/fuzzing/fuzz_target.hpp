@@ -109,6 +109,14 @@ namespace fz
         }
     }
 
+    // Optional input: x itself if 'use', else an empty object of its type (not a copy, so that aliasing checks see x)
+    template <typename T>
+    inline const T &opt(bool use, const T &x)
+    {
+        static const T none{};
+        return use ? x : none;
+    }
+
     // Structured input for targets that call API functions: sizes, indices and values taken from the fuzz input
     struct input : FuzzedDataProvider
     {

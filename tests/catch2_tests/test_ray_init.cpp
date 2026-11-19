@@ -38,9 +38,9 @@ namespace
     // radius r0, so this returns a fixed fraction of r0 rather than r0 itself. Comparing two runs
     // with the same n_ray_target cancels that fraction exactly.
     float launch_radius(arma::uword n_ray_target, float max_path_length,
-                        const arma::fmat *mesh, const arma::fmat *points,
-                        const arma::u32_vec *sub_mesh_ind = nullptr,
-                        const arma::fmat *aabb = nullptr)
+                        const arma::fmat &mesh, const arma::fmat &points,
+                        const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+                        const arma::fmat &aabb = arma::fmat())
     {
         arma::fmat orig;
         arma::uword n = quadriga_lib::ray_init(n_ray_target, 1, {0.0f, 0.0f, 0.0f}, max_path_length,
@@ -82,7 +82,7 @@ TEST_CASE("ray_init - Ray count quantization")
         arma::uword n = quadriga_lib::ray_init(c.target, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
-                                               nullptr, nullptr, nullptr, nullptr, nullptr, false);
+                                               nullptr, {}, {}, {}, {}, false);
         CHECK(n == c.expected);
         CHECK(orig.n_rows == c.expected);
     }
@@ -100,7 +100,7 @@ TEST_CASE("ray_init - Output shapes")
     arma::uword n = quadriga_lib::ray_init(500, n_freq, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
-                                           &paths, nullptr, nullptr, nullptr, nullptr, false);
+                                           &paths, {}, {}, {}, {}, false);
 
     REQUIRE(n == 500);
 
@@ -144,7 +144,7 @@ TEST_CASE("ray_init - Geometry invariants (no mesh)")
     arma::uword n = quadriga_lib::ray_init(500, 1, {O(0), O(1), O(2)}, maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, {}, {}, {}, {}, false);
     REQUIRE(n == 500);
 
     // Destinations lie at max_path_length from O
@@ -180,7 +180,7 @@ TEST_CASE("ray_init - max_path_length floor")
     arma::uword n = quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 0.0f,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, {}, {}, {}, {}, false);
     REQUIRE(n == 80);
 
     arma::fvec dd = dist_from(dest, arma::frowvec{0.0f, 0.0f, 0.0f});
@@ -203,7 +203,7 @@ TEST_CASE("ray_init - Path initialization")
         arma::uword n = quadriga_lib::ray_init(80, n_freq, {0.0f, 0.0f, 0.0f}, 5.0f,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
-                                               &paths, nullptr, nullptr, nullptr, nullptr, scalar_mode);
+                                               &paths, {}, {}, {}, {}, scalar_mode);
         REQUIRE(n == 80);
         REQUIRE(paths.size() == n);
 
@@ -229,7 +229,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
     arma::uword n = quadriga_lib::ray_init(80, 4, {1.0f, 2.0f, 3.0f}, 5.0f,
                                            &orig, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, {}, {}, {}, {}, false);
     REQUIRE(n == 80);
     REQUIRE((orig.n_rows == 80 && orig.n_cols == 3));
 
@@ -237,7 +237,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
     arma::uword m = quadriga_lib::ray_init(80, 4, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, nullptr, false);
+                                           nullptr, {}, {}, {}, {}, false);
     CHECK(m == 80);
 }
 
@@ -247,7 +247,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_THROWS_AS(quadriga_lib::ray_init(80, 0, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, nullptr, false),
+                                           nullptr, {}, {}, {}, {}, false),
                     std::invalid_argument);
 
     // Mesh with the wrong number of columns
@@ -255,7 +255,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, &bad_mesh, nullptr, nullptr, nullptr, false),
+                                           nullptr, bad_mesh, {}, {}, {}, false),
                     std::invalid_argument);
 
     // Points with the wrong number of columns
@@ -263,7 +263,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, &bad_points, false),
+                                           nullptr, {}, {}, {}, bad_points, false),
                     std::invalid_argument);
 
     // An empty point matrix is treated as absent, not as an error
@@ -271,7 +271,7 @@ TEST_CASE("ray_init - Error cases")
     CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                          nullptr, nullptr, nullptr, nullptr,
                                          nullptr, nullptr, nullptr, nullptr, nullptr,
-                                         nullptr, nullptr, nullptr, nullptr, &empty_points, false));
+                                         nullptr, {}, {}, {}, empty_points, false));
 }
 
 TEST_CASE("ray_init - Launch sphere sizing with mesh")
@@ -285,7 +285,7 @@ TEST_CASE("ray_init - Launch sphere sizing with mesh")
     arma::uword n = quadriga_lib::ray_init(180, 1, {0.0f, 0.0f, 0.0f}, maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr, nullptr,
-                                           &mesh, nullptr, nullptr, nullptr, false);
+                                           mesh, {}, {}, {}, false);
     REQUIRE(n == 180);
 
     // Launch sphere radius, read back from the origins (launch point at the coordinate origin)
@@ -313,7 +313,7 @@ TEST_CASE("ray_init - Launch sphere sizing with points only")
 
     // A single receive point at 2 m caps the launch sphere at 0.8 * 2 m
     arma::fmat P = make_points({{2.0f, 0.0f, 0.0f}});
-    float r_2m = launch_radius(180, maxpath, nullptr, &P);
+    float r_2m = launch_radius(180, maxpath, {}, P);
 
     CHECK(r_2m <= 0.8f * 2.0f + 1e-3f);
     CHECK(r_2m > 0.1f); // clearly above the 1 cm default
@@ -324,12 +324,12 @@ TEST_CASE("ray_init - Launch sphere sizing with points only")
     // Doubling the distance doubles the radius: the icosphere centroid factor is identical for
     // both runs, so the ratio is exact up to float rounding
     arma::fmat P4 = make_points({{0.0f, 4.0f, 0.0f}});
-    float r_4m = launch_radius(180, maxpath, nullptr, &P4);
+    float r_4m = launch_radius(180, maxpath, {}, P4);
     CHECK(std::abs(r_4m / r_2m - 2.0f) < 1e-3f);
 
     // Only the nearest point matters, and direction is irrelevant
     arma::fmat P_many = make_points({{0.0f, 0.0f, -7.0f}, {2.0f, 0.0f, 0.0f}, {5.0f, 5.0f, 5.0f}});
-    float r_many = launch_radius(180, maxpath, nullptr, &P_many);
+    float r_many = launch_radius(180, maxpath, {}, P_many);
     CHECK(std::abs(r_many - r_2m) < 1e-4f);
 }
 
@@ -338,16 +338,16 @@ TEST_CASE("ray_init - Nearest of mesh and points wins")
     const float maxpath = 10.0f;
     arma::fmat mesh = quadriga_lib::cube<float>({}, {}, {3.0f, 0.0f, 0.0f}); // nearest face at 2 m
 
-    float r_mesh_only = launch_radius(180, maxpath, &mesh, nullptr);
+    float r_mesh_only = launch_radius(180, maxpath, mesh, {});
 
     // A receive point closer than the mesh takes over the sizing
     arma::fmat P_near = make_points({{-1.0f, 0.0f, 0.0f}}); // 1 m, half the mesh distance
-    float r_point_wins = launch_radius(180, maxpath, &mesh, &P_near);
+    float r_point_wins = launch_radius(180, maxpath, mesh, P_near);
     CHECK(std::abs(r_point_wins / r_mesh_only - 0.5f) < 1e-3f);
 
     // A receive point farther than the mesh leaves the mesh-derived radius untouched
     arma::fmat P_far = make_points({{0.0f, -5.0f, 0.0f}});
-    float r_mesh_wins = launch_radius(180, maxpath, &mesh, &P_far);
+    float r_mesh_wins = launch_radius(180, maxpath, mesh, P_far);
     CHECK(std::abs(r_mesh_wins - r_mesh_only) < 1e-4f);
 
     // Neither source is allowed to place an obstacle or a receiver inside the sphere
@@ -360,13 +360,13 @@ TEST_CASE("ray_init - Launch sphere fallback and clamp with points")
     // Every receive point beyond max_path_length falls back to the 1 cm default
     const float maxpath = 5.0f;
     arma::fmat P_far = make_points({{20.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -30.0f}});
-    float r_fallback = launch_radius(80, maxpath, nullptr, &P_far);
+    float r_fallback = launch_radius(80, maxpath, {}, P_far);
     CHECK(r_fallback <= 0.01f + 1e-6f);
     CHECK(r_fallback > 0.0f);
 
     // A receive point that would produce a sub-centimeter radius is clamped to 0.01 m
     arma::fmat P_close = make_points({{0.005f, 0.0f, 0.0f}});
-    float r_clamped = launch_radius(80, maxpath, nullptr, &P_close);
+    float r_clamped = launch_radius(80, maxpath, {}, P_close);
     CHECK(std::abs(r_clamped - r_fallback) < 1e-6f); // both sit at the 1 cm floor
 }
 
@@ -387,7 +387,7 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
     arma::uword n = quadriga_lib::ray_init(180, n_freq, {O(0), O(1), O(2)}, maxpath,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
-                                           &paths, nullptr, nullptr, nullptr, &P, false);
+                                           &paths, {}, {}, {}, P, false);
     REQUIRE(n == 180);
 
     // Destinations still sit at max_path_length, directions are still unit length
@@ -421,13 +421,13 @@ TEST_CASE("ray_init - Sub-mesh acceleration does not change the launch sphere")
     REQUIRE(smi.n_elem > 1); // a single sub-mesh would make the comparison vacuous
 
     arma::fmat boxes;
-    quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, boxes, &smi);
+    quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, boxes, smi);
     REQUIRE(boxes.n_rows == smi.n_elem);
     REQUIRE(boxes.n_cols == 6);
 
-    const float r_plain = launch_radius(180, maxpath, &mesh_seg, nullptr);
-    const float r_smi = launch_radius(180, maxpath, &mesh_seg, nullptr, &smi);
-    const float r_full = launch_radius(180, maxpath, &mesh_seg, nullptr, &smi, &boxes);
+    const float r_plain = launch_radius(180, maxpath, mesh_seg, {});
+    const float r_smi = launch_radius(180, maxpath, mesh_seg, {}, smi);
+    const float r_full = launch_radius(180, maxpath, mesh_seg, {}, smi, boxes);
 
     CHECK(r_plain > 0.1f); // the probe must register hits, or all three are the 1 cm default
     CHECK(r_smi == r_plain);
@@ -447,18 +447,18 @@ TEST_CASE("ray_init - Sub-mesh acceleration alongside receive points")
     arma::u32_vec smi;
     quadriga_lib::triangle_mesh_segmentation<float>(mesh, mesh_seg, smi, 64, 8);
     arma::fmat boxes;
-    quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, boxes, &smi);
+    quadriga_lib::triangle_mesh_aabb<float>(mesh_seg, boxes, smi);
 
-    const float r_mesh = launch_radius(180, maxpath, &mesh_seg, nullptr, &smi, &boxes);
+    const float r_mesh = launch_radius(180, maxpath, mesh_seg, {}, smi, boxes);
 
     // A receive point at 1 m, closer than the nearest face at 2 m, halves the radius
     arma::fmat P_near = make_points({{0.0f, 1.0f, 0.0f}});
-    const float r_near = launch_radius(180, maxpath, &mesh_seg, &P_near, &smi, &boxes);
+    const float r_near = launch_radius(180, maxpath, mesh_seg, P_near, smi, boxes);
     CHECK(std::abs(r_near / r_mesh - 0.5f) < 1e-3f);
 
     // A receive point beyond the mesh leaves the mesh-derived radius untouched
     arma::fmat P_far = make_points({{0.0f, 0.0f, 12.0f}});
-    const float r_far = launch_radius(180, maxpath, &mesh_seg, &P_far, &smi, &boxes);
+    const float r_far = launch_radius(180, maxpath, mesh_seg, P_far, smi, boxes);
     CHECK(r_far == r_mesh);
 }
 
@@ -467,12 +467,12 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
     arma::fmat mesh = quadriga_lib::cube<float>({}, {}, {3.0f, 0.0f, 0.0f});
     const arma::uword n_face = mesh.n_rows;
 
-    auto call = [&](const arma::u32_vec *smi, const arma::fmat *box)
+    auto call = [&](const arma::u32_vec &smi, const arma::fmat &box)
     {
         return quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 10.0f,
                                       nullptr, nullptr, nullptr, nullptr,
                                       nullptr, nullptr, nullptr, nullptr, nullptr,
-                                      nullptr, &mesh, smi, box, nullptr, false);
+                                      nullptr, mesh, smi, box, {}, false);
     };
 
     SECTION("valid baseline")
@@ -480,36 +480,36 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
         arma::u32_vec smi = {0u, 6u};
         arma::fmat box(2, 6, arma::fill::zeros);
         box.col(1).ones(), box.col(3).ones(), box.col(5).ones();
-        CHECK_NOTHROW(call(&smi, &box));
-        CHECK_NOTHROW(call(&smi, nullptr)); // boxes are optional, not computed internally
-        CHECK_NOTHROW(call(nullptr, nullptr));
+        CHECK_NOTHROW(call(smi, box));
+        CHECK_NOTHROW(call(smi, {})); // boxes are optional, not computed internally
+        CHECK_NOTHROW(call({}, {}));
     }
 
     SECTION("sub_mesh_ind must start at 0")
     {
         arma::u32_vec smi = {1u, 6u};
-        CHECK_THROWS_AS(call(&smi, nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(call(smi, {}), std::invalid_argument);
     }
 
     SECTION("sub_mesh_ind must be strictly increasing")
     {
         arma::u32_vec bad = {0u, 6u, 6u};
-        CHECK_THROWS_AS(call(&bad, nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(call(bad, {}), std::invalid_argument);
 
         arma::u32_vec desc = {0u, 8u, 4u};
-        CHECK_THROWS_AS(call(&desc, nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(call(desc, {}), std::invalid_argument);
     }
 
     SECTION("sub_mesh_ind cannot exceed the face count")
     {
         arma::u32_vec smi = {0u, (unsigned)n_face};
-        CHECK_THROWS_AS(call(&smi, nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(call(smi, {}), std::invalid_argument);
     }
 
     SECTION("aabb requires sub_mesh_ind")
     {
         arma::fmat box(1, 6, arma::fill::zeros);
-        CHECK_THROWS_AS(call(nullptr, &box), std::invalid_argument);
+        CHECK_THROWS_AS(call({}, box), std::invalid_argument);
     }
 
     SECTION("aabb shape must match the partition")
@@ -517,10 +517,10 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
         arma::u32_vec smi = {0u, 6u};
 
         arma::fmat rows(3, 6, arma::fill::zeros); // three boxes, two sub-meshes
-        CHECK_THROWS_AS(call(&smi, &rows), std::invalid_argument);
+        CHECK_THROWS_AS(call(smi, rows), std::invalid_argument);
 
         arma::fmat cols(2, 5, arma::fill::zeros); // five columns, not six
-        CHECK_THROWS_AS(call(&smi, &cols), std::invalid_argument);
+        CHECK_THROWS_AS(call(smi, cols), std::invalid_argument);
     }
 
     SECTION("both are ignored without a mesh")
@@ -531,7 +531,7 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
         CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 10.0f,
                                              nullptr, nullptr, nullptr, nullptr,
                                              nullptr, nullptr, nullptr, nullptr, nullptr,
-                                             nullptr, nullptr, &bad, &box, nullptr, false));
+                                             nullptr, {}, bad, box, {}, false));
     }
 }
 
@@ -544,7 +544,7 @@ TEST_CASE("ray_init - Outputs that alias inputs")
     auto call = [&](arma::fmat *o, arma::fmat *d, arma::fmat *tv, arma::fmat *td, arma::Col<short> *p, arma::Col<short> *c)
     {
         return quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 10.0f, o, d, tv, td, p, c, &buf, nullptr, &acc_dist,
-                                      nullptr, &mesh, nullptr, nullptr, nullptr, false);
+                                      nullptr, mesh, {}, {}, {}, false);
     };
     CHECK_NOTHROW(call(&orig, &dest, &trivec, &tridir, &prev, &cur));
 

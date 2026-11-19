@@ -85,12 +85,8 @@ py::array_t<double> sos_randn(const py::array_t<double> &dist_decorr,
     arma::mat val;
     auto val_py = qd_python_init_output(pos_a.n_rows, dist_decorr_a.n_elem, &val);
 
-    // Wrap optional pointers
-    const arma::mat *p_pos_b = pos_b_a.is_empty() ? nullptr : &pos_b_a;
-    const arma::vec *p_dist_decorr_b = dist_decorr_b_a.is_empty() ? nullptr : &dist_decorr_b_a;
-
     // Call library function
-    quadriga_lib::sos_randn<double>(dist_decorr_a, pos_a, val, p_pos_b, p_dist_decorr_b, preset, seed);
+    quadriga_lib::sos_randn<double>(dist_decorr_a, pos_a, val, pos_b_a, dist_decorr_b_a, preset, seed);
 
     return val_py;
 }

@@ -68,10 +68,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     const int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 
-
-    // Wrap optional input pointer
-    const arma::u32_vec *p_sub_cloud_index = sub_cloud_ind.empty() ? nullptr : &sub_cloud_ind;
-
     // hit_count output: size known (n_points), MATLAB-owned memory
     arma::u32_vec hit_count;
     plhs[0] = qd_mex_init_output(&hit_count, points.n_rows);
@@ -89,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call library function
     CALL_QD(quadriga_lib::ray_point_intersect<double>(points, orig, trivec, tridir,
                                                       p_hit_index, p_hit_offset, p_hit_count, nullptr,
-                                                      p_sub_cloud_index, use_kernel, gpu_id));
+                                                      sub_cloud_ind, use_kernel, gpu_id));
 
     // Transpose the CSR list into the zero-padded [max_hits, n_points] MATLAB array.
     // qd_mex_init_output allocates through mxCreateNumericMatrix, so the unused slots

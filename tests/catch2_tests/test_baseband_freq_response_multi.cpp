@@ -1179,7 +1179,7 @@ TEST_CASE("baseband_freq_response_multi_vec - Equals a loop of baseband_freq_res
         {
             std::vector<arma::cube> Hr, Hi;
             std::vector<arma::cx_cube> H(1, arma::cx_cube(1, 1, 1)); // Stale size, resized by the call
-            quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, &Hi, &H, remove_phase, &i_snap);
+            quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, &Hi, &H, remove_phase, i_snap);
             const arma::uvec snap = i_snap.is_empty() ? arma::uvec{0, 1, 2} : i_snap;
             REQUIRE(H.size() == snap.n_elem);
             REQUIRE(Hr.size() == snap.n_elem);
@@ -1202,17 +1202,17 @@ TEST_CASE("baseband_freq_response_multi_vec - Equals a loop of baseband_freq_res
     bad[1].pop_back();
     CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr), std::invalid_argument);
     const arma::uvec i_21 = {2, 1};
-    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, &i_21),
+    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, i_21),
                       StartsWith("Snapshot 1: "));
     bad = cre;
     bad[2][1] = arma::cube(2, 2, 2);
     CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr), StartsWith("Snapshot 2: "));
     const arma::uvec past_end = {3};
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, &past_end),
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, past_end),
                     std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, arma::vec{3.1e9, 3.0e9, 3.3e9}, freq_new, &Hr),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, nullptr, 3),
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, {}, 3),
                     std::invalid_argument);
 
     CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, arma::vec{3.1e9, 3.0e9, 3.3e9}, freq_new, &Hr),

@@ -153,8 +153,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Optional second IRS array (RX-facing side)
     quadriga_lib::arrayant<double> irs_array_2;
-    bool use_alternative_irs = (nrhs > 23) && !mxIsEmpty(prhs[23]);
-    if (use_alternative_irs)
+    if (nrhs > 23 && !mxIsEmpty(prhs[23]))
         irs_array_2 = qd_irs_struct2arrayant(prhs[23], "irs_array_2");
 
     const auto active_path = (nrhs < 25 || mxIsEmpty(prhs[24])) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[24], "active_path");
@@ -175,8 +174,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube *p_eod = (nlhs > 5) ? &eod : nullptr;
     arma::cube *p_aoa = (nlhs > 6) ? &aoa : nullptr;
     arma::cube *p_eoa = (nlhs > 7) ? &eoa : nullptr;
-    const quadriga_lib::arrayant<double> *p_irs_array_2 = use_alternative_irs ? &irs_array_2 : nullptr;
-    const std::vector<bool> *p_active_path = active_path.empty() ? nullptr : &active_path;
 
     // Call library function
     std::vector<bool> active_path_out;
@@ -188,7 +185,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2,
                                                    coeff_re, coeff_im, delay,
                                                    i_irs, threshold_dB, center_freq, use_absolute_delays,
-                                                   p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path,
+                                                   p_aod, p_eod, p_aoa, p_eoa, irs_array_2, active_path,
                                                    p_active_path_out, use_kernel));
 
     // Write to MATLAB

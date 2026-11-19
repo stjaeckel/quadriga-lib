@@ -67,13 +67,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::u32_vec mesh_ind;
 
     // Wrap optional pointers
-    const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
     arma::uvec *p_mtl_indR = (nlhs > 3) ? &mtl_indR : nullptr;
     arma::u32_vec *p_mesh_index = (nlhs > 2) ? &mesh_ind : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::triangle_mesh_segmentation<double>(mesh, mesh_out, sub_mesh_ind,
-                                                             target_size, vec_size, p_mtl_ind, p_mtl_indR, p_mesh_index));
+                                                             target_size, vec_size, mtl_ind, p_mtl_indR, p_mesh_index));
 
     // Convert indices from 0-based (C++) to 1-based (MATLAB); mtl_indR is 1-based in C++ (no shift intended)
     sub_mesh_ind += 1;

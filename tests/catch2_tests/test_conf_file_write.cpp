@@ -137,8 +137,8 @@ namespace
 
     void write_data(const std::string &fn, const conf_data &d, bool write_defaults)
     {
-        quadriga_lib::conf_file_write(fn, d.scenpar, d.pl_model, &d.plpar, &d.pl_order,
-                                      &d.short_names, "", nullptr, nullptr, write_defaults);
+        quadriga_lib::conf_file_write(fn, d.scenpar, d.pl_model, d.plpar, d.pl_order,
+                                      d.short_names, "", {}, {}, write_defaults);
     }
 
     // Differences between two data sets as text, empty if they are identical bit for bit
@@ -254,7 +254,7 @@ namespace
     std::string round_trip(const std::unordered_map<std::string, double> &scenpar, const std::string &fn,
                            bool write_defaults, std::string *text = nullptr)
     {
-        quadriga_lib::conf_file_write(fn, scenpar, "", nullptr, nullptr, nullptr, "", nullptr, nullptr,
+        quadriga_lib::conf_file_write(fn, scenpar, "", {}, {}, {}, "", {}, {},
                                       write_defaults);
         if (!file_exists(fn))
             return " <file not written>";
@@ -505,8 +505,8 @@ TEST_CASE("conf_file_write - layout of a written file")
         "PL_An =                39.08        % TX-RX 3D dist.-dep. of NLOS-PL [dB/log10(m)]\n"
         "PL_Exn =               1 2.5\n";
 
-    quadriga_lib::conf_file_write(f.fn, scenpar, "nlos", &plpar, &pl_order, &short_names,
-                                  "Test reference", &ref_sec, &valid_range, false);
+    quadriga_lib::conf_file_write(f.fn, scenpar, "nlos", plpar, pl_order, short_names,
+                                  "Test reference", ref_sec, valid_range, false);
     REQUIRE(file_exists(f.fn));
     const std::string text = slurp(f.fn);
 
@@ -553,7 +553,7 @@ TEST_CASE("conf_file_write - numbers are written with the fewest digits that rea
     for (const auto &c : cases)
         scenpar[c.key] = c.value;
 
-    quadriga_lib::conf_file_write(f.fn, scenpar, "", &plpar);
+    quadriga_lib::conf_file_write(f.fn, scenpar, "", plpar);
     REQUIRE(file_exists(f.fn));
     const std::string text = slurp(f.fn);
     const conf_data back = read_back(f.fn);
@@ -643,7 +643,7 @@ TEST_CASE("conf_file_write - without write_defaults exactly the keys that differ
     {
         quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 21.0}});
         CHECK(n_lines(slurp(f.fn), "SubpathMethod") == 0);
-        quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 21.0}}, "", nullptr, nullptr, nullptr, "", nullptr, nullptr,
+        quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 21.0}}, "", {}, {}, {}, "", {}, {},
                                       true);
         CHECK(n_lines(slurp(f.fn), "SubpathMethod") == 0);
     }
@@ -734,7 +734,7 @@ TEST_CASE("conf_file_write - path-loss comments and formulas depend on the model
     for (const auto &c : cases)
     {
         INFO("model '" << c.model << "'");
-        quadriga_lib::conf_file_write(f.fn, {}, c.model, &plpar);
+        quadriga_lib::conf_file_write(f.fn, {}, c.model, plpar);
         REQUIRE(file_exists(f.fn));
         const std::string text = slurp(f.fn);
         QD_DIAG("%s,%s,%s,%s,%d%d%d%d\n", c.model, comment_text(text, "PL_A").c_str(),
@@ -773,10 +773,10 @@ TEST_CASE("conf_file_write - path-loss keys are written in the given order, else
     const std::unordered_map<std::string, std::vector<double>> plpar = {{"Bn", {1.0}}, {"A", {2.0}}, {"hE", {3.0}}};
     const std::vector<std::string> order = {"hE", "A", "Bn"};
 
-    quadriga_lib::conf_file_write(f.fn, {}, "logdist", &plpar, &order);
+    quadriga_lib::conf_file_write(f.fn, {}, "logdist", plpar, order);
     CHECK(read_back(f.fn).pl_order == order);
 
-    quadriga_lib::conf_file_write(f.fn, {}, "logdist", &plpar);
+    quadriga_lib::conf_file_write(f.fn, {}, "logdist", plpar);
     CHECK(read_back(f.fn).pl_order == std::vector<std::string>({"A", "Bn", "hE"})); // byte-wise: A < B < h
 
     // Model only: the section has the model line and no other key
@@ -833,8 +833,8 @@ TEST_CASE("conf_file_write - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "logdist", &pl, &order, &names, "ref",
-                                                    &refs, &vr, true));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "logdist", pl, order, names, "ref",
+                                                    refs, vr, true));
         CHECK(file_exists(f.fn));
         CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp));
     }
@@ -891,43 +891,43 @@ TEST_CASE("conf_file_write - input validation")
         const plmap model = {{"model", {1.0}}}, space = {{"A B", {1.0}}}, empty_name = {{"", {1.0}}},
                     no_value = {{"A", {}}}, nan = {{"A", {1.0, QNAN}}};
         for (const plmap *p : {&model, &space, &empty_name, &no_value, &nan})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", p); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", *p); });
     }
 
     SECTION("pl_order")
     {
         const std::vector<std::string> missing = {"A"}, extra = {"A", "B", "C"}, twice = {"A", "A"};
         for (const auto *o : {&missing, &extra, &twice})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", &pl, o); });
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", nullptr, &order); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", pl, *o); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", {}, order); });
     }
 
     SECTION("short_names")
     {
         const std::vector<std::string> space = {"A b"}, empty = {""}, twice = {"Ab", "Cd", "Ab"}; // must be distinct
         for (const auto *s : {&space, &empty, &twice})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, s); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, *s); });
         const std::vector<std::string> case_differs = {"Ab", "AB"};
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, &case_differs));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, case_differs));
     }
 
     SECTION("ref and ref_sec")
     {
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "a\nb"); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, {}, "a\nb"); });
         const std::vector<std::string> cr = {"a\rb"}, eleven(11, "x");
         for (const auto *r : {&cr, &eleven})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", r); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, {}, "", *r); });
         const std::vector<std::string> ten(10, "x");
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", &ten));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, {}, "", ten));
     }
 
     SECTION("valid_range")
     {
         const arma::mat r32(3, 2, arma::fill::ones), r24(2, 4, arma::fill::ones), r42(4, 2, arma::fill::ones), r0;
         for (const auto *r : {&r32, &r24})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", nullptr, r); });
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", nullptr, &r0));
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", nullptr, &r42));
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, {}, "", {}, *r); });
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, {}, "", {}, r0));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", {}, {}, {}, "", {}, r42));
     }
 }
 
@@ -1109,7 +1109,7 @@ TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
         INFO("write_defaults " << wd);
 
         // Size of the text without a limit
-        quadriga_lib::conf_file_write(fn, sp, "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
+        quadriga_lib::conf_file_write(fn, sp, "", pl, {}, {}, "", {}, {}, wd);
         const size_t n_bytes = slurp(fn).size();
         REQUIRE(n_bytes > 2048);
 
@@ -1124,7 +1124,7 @@ TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
             setrlimit(RLIMIT_FSIZE, &limit);
             try
             {
-                quadriga_lib::conf_file_write(fn, sp, "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
+                quadriga_lib::conf_file_write(fn, sp, "", pl, {}, {}, "", {}, {}, wd);
             }
             catch (const std::runtime_error &)
             {
@@ -1149,8 +1149,8 @@ TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
     if (std::filesystem::exists("/dev/full") && geteuid() != 0)
     {
         CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp), std::runtime_error);
-        CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp, "", nullptr, nullptr, nullptr, "",
-                                                      nullptr, nullptr, true),
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp, "", {}, {}, {}, "",
+                                                      {}, {}, true),
                         std::runtime_error);
     }
 

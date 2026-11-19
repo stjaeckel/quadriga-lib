@@ -73,7 +73,7 @@ static void run(fz::input &in)
             h_re.resize(in.size(3)), h.resize(in.size(3));
         fz::clean([&] { quadriga_lib::baseband_freq_response_vec(cre, cim, dl, pilot, bandwidth,
                                                                  (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
-                                                                 (out_mask & 4) ? &h : nullptr, (out_mask & 32) ? &i_snap : nullptr,
+                                                                 (out_mask & 4) ? &h : nullptr, fz::opt((out_mask & 32), i_snap),
                                                                  use_kernel); });
     }
 
@@ -105,7 +105,7 @@ static void run(fz::input &in)
             v_re.resize(in.size(3)), v.resize(in.size(3));
         fz::clean([&] { quadriga_lib::baseband_freq_response_multi_vec(b_re, b_im, b_dl, freq, freq_new, (out_mask & 1) ? &v_re : nullptr,
                                                                        (out_mask & 2) ? &v_im : nullptr, (out_mask & 4) ? &v : nullptr,
-                                                                       remove_phase, (out_mask & 32) ? &i_snap : nullptr, use_kernel); });
+                                                                       remove_phase, fz::opt((out_mask & 32), i_snap), use_kernel); });
     }
 }
 

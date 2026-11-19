@@ -176,13 +176,13 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     // Subdivide the mesh into smaller chunks
     arma::fmat cube_sub = cube;
     arma::uvec mtl_ind_sub;
-    quadriga_lib::subdivide_triangles(3, cube, cube_sub, &mtl_ind, &mtl_ind_sub);
+    quadriga_lib::subdivide_triangles(3, cube, cube_sub, mtl_ind, &mtl_ind_sub);
     // Case 1 - Mesh size is already below threshold, test padding
     arma::fmat cube_re;
     arma::uvec mtl_ind_re;
     arma::u32_vec cube_index, mesh_ind;
     auto n_sub = quadriga_lib::triangle_mesh_segmentation(cube_sub, cube_re, cube_index, 1024, 8,
-                                                          &mtl_ind_sub, &mtl_ind_re, &mesh_ind);
+                                                          mtl_ind_sub, &mtl_ind_re, &mesh_ind);
 
     CHECK(n_sub == 1);
     CHECK(cube_re.n_rows == 112);    // Multiple of 8
@@ -205,7 +205,7 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
 
     // Case 2 - Subdivide, no padding
     n_sub = quadriga_lib::triangle_mesh_segmentation(cube_sub, cube_re, cube_index, 64, 1,
-                                                     &mtl_ind_sub, &mtl_ind_re, &mesh_ind);
+                                                     mtl_ind_sub, &mtl_ind_re, &mesh_ind);
     CHECK(n_sub == 3);
     CHECK(cube_re.n_rows == 108);
     CHECK(mtl_ind_re.n_elem == 108);
@@ -323,7 +323,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
     CHECK(arma::all(reverse_ind == I));
 
     // Test AABB of sub-clouds
-    quadriga_lib::point_cloud_aabb(pointsR, aabb, &sub_cloud_ind);
+    quadriga_lib::point_cloud_aabb(pointsR, aabb, sub_cloud_ind);
 
     T = {{0.0f, 0.3f, -5.0f, -5.0f, 1.0f, 1.0f},
          {0.0f, 0.3f, 5.0f, 5.0f, 1.0f, 1.0f},
@@ -346,17 +346,17 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
     arma::Mat<float> tridirN;
 
     // No index given
-    auto n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN);
+    auto n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN);
     CHECK(n_rayN == 4 * orig.n_rows);
 
     // Empty index
     arma::u32_vec index;
-    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN, nullptr, index);
     CHECK(n_rayN == 4 * orig.n_rows);
 
     // Select two beams
     index = {2, 1};
-    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, {}, &origN, &trivecN, &tridirN, nullptr, index);
     CHECK(n_rayN == 8);
 
     // Check for directions that are equal (beam 1)
@@ -388,7 +388,7 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
     arma::fmat destN;
 
     index = {0};
-    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, &dest, &origN, &trivecN, &tridirN, &destN, &index);
+    n_rayN = quadriga_lib::subdivide_rays<float>(orig, trivec, tridir, dest, &origN, &trivecN, &tridirN, &destN, index);
 
     CHECK(n_rayN == 4);
 }
@@ -591,26 +591,26 @@ TEST_CASE("subdivide_triangles - outputs that alias inputs")
 {
     arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {1, 2, 3, 4, 5, 7, -1, 0, 2}}, out;
     arma::uvec mtl = {3, 5}, mtl_out;
-    CHECK_NOTHROW(quadriga_lib::subdivide_triangles(3, t, out, &mtl, &mtl_out));
+    CHECK_NOTHROW(quadriga_lib::subdivide_triangles(3, t, out, mtl, &mtl_out));
 
     // An output that is its own input is rejected before anything is written
     arma::mat t2 = t;
     arma::uvec mtl2 = mtl;
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, t2, t2, &mtl, &mtl_out), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, t, out, &mtl2, &mtl2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, t2, t2, mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, t, out, mtl2, &mtl2), std::invalid_argument);
     CHECK(arma::approx_equal(t2, t, "absdiff", 0.0));
     CHECK(arma::all(mtl2 == mtl));
     CHECK_THROWS_WITH(quadriga_lib::subdivide_triangles(3, arma::mat(), out), "Input 'triangles_in' cannot be empty.");
 
     // n_div = 1 keeps the size, an output on the memory of the input is rejected as well
     arma::mat view(t2.memptr(), t2.n_rows, t2.n_cols, false, true);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1, t2, view, &mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1, t2, view, mtl, &mtl_out), std::invalid_argument);
 
     // An invalid material list leaves the output untouched
     out.set_size(1, 1);
     out(0, 0) = 9.0;
     arma::uvec bad = {1, 2, 3};
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, t, out, &bad, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, t, out, bad, &mtl_out), std::invalid_argument);
     CHECK(out.n_elem == 1);
 }
 
@@ -664,13 +664,13 @@ TEST_CASE("triangle_mesh_segmentation - outputs that alias inputs")
     arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {10, 0, 0, 11, 0, 0, 10, 1, 0}, {20, 0, 0, 21, 0, 0, 20, 1, 0}}, meshR;
     arma::u32_vec sub_mesh_ind, mesh_ind;
     arma::uvec mtl = {1, 2, 3}, mtl_out;
-    CHECK_NOTHROW(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, &mtl, &mtl_out, &mesh_ind));
+    CHECK_NOTHROW(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, mtl, &mtl_out, &mesh_ind));
 
     arma::mat m = mesh;
     arma::uvec mt = mtl;
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(m, m, sub_mesh_ind, 1, 2, &mtl, &mtl_out), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, &mt, &mt), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, &mtl, &mtl_out, &sub_mesh_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(m, m, sub_mesh_ind, 1, 2, mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, mt, &mt), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, mtl, &mtl_out, &sub_mesh_ind), std::invalid_argument);
     CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
     CHECK(arma::all(mt == mtl));
 }
@@ -719,20 +719,20 @@ TEST_CASE("subdivide_rays - outputs that alias inputs")
     arma::mat tridir = {{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}};
     arma::mat dest = {{5.0, 5.0, 5.0}};
     arma::mat origN, trivecN, tridirN, destN;
-    CHECK_NOTHROW(quadriga_lib::subdivide_rays(orig, trivec, tridir, &dest, &origN, &trivecN, &tridirN, &destN));
+    CHECK_NOTHROW(quadriga_lib::subdivide_rays(orig, trivec, tridir, dest, &origN, &trivecN, &tridirN, &destN));
 
     arma::mat o = orig, tv = trivec, td = tridir, d = dest;
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(o, trivec, tridir, &dest, &o), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, tv, tridir, &dest, &origN, &tv), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, td, &dest, &origN, &trivecN, &td), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, &d, &origN, &trivecN, &tridirN, &d), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, &dest, &origN, &trivecN, &trivecN), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, &dest, &origN, &trivecN, &tridirN, &origN), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(o, trivec, tridir, dest, &o), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, tv, tridir, dest, &origN, &tv), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, td, dest, &origN, &trivecN, &td), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, d, &origN, &trivecN, &tridirN, &d), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, dest, &origN, &trivecN, &trivecN), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, dest, &origN, &trivecN, &tridirN, &origN), std::invalid_argument);
     CHECK(arma::approx_equal(o, orig, "absdiff", 0.0));
     CHECK(arma::approx_equal(d, dest, "absdiff", 0.0));
 
     arma::mat view(tv.memptr(), 4, 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, tv, tridir, (arma::mat *)nullptr, &view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, tv, tridir, {}, &view), std::invalid_argument);
 }
 
 TEST_CASE("icosphere - outputs that alias inputs")

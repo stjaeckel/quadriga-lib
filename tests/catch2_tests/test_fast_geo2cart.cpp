@@ -29,7 +29,7 @@ TEMPLATE_TEST_CASE("fast_geo2cart - Large azimuth angles", "[fast_geo2cart]", fl
     {
         INFO("use_kernel = " << k);
         arma::Col<dtype> x, y, z;
-        quadriga_lib::fast_geo2cart<dtype>(az, el, x, y, z, nullptr, nullptr, nullptr, nullptr, nullptr, k);
+        quadriga_lib::fast_geo2cart<dtype>(az, el, x, y, z, nullptr, nullptr, nullptr, nullptr, {}, k);
         for (arma::uword i = 0; i < az.n_elem; ++i)
         {
             const double a = (double)az[i], e = (double)el[i];
@@ -45,7 +45,7 @@ TEMPLATE_TEST_CASE("fast_geo2cart - Large azimuth angles", "[fast_geo2cart]", fl
     for (int k : geo_kernels())
     {
         arma::Col<dtype> x, y, z;
-        quadriga_lib::fast_geo2cart<dtype>(az_nf, el_nf, x, y, z, nullptr, nullptr, nullptr, nullptr, nullptr, k);
+        quadriga_lib::fast_geo2cart<dtype>(az_nf, el_nf, x, y, z, nullptr, nullptr, nullptr, nullptr, {}, k);
         for (arma::uword i = 0; i < 2; ++i)
             CHECK((std::isnan(x[i]) && std::isnan(y[i])));
     }
@@ -148,26 +148,26 @@ TEMPLATE_TEST_CASE("fast_geo2cart / fast_cart2geo - Invalid use_kernel", "[fast_
     {
         INFO("use_kernel = " << k);
         CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o3, k), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, nullptr, k),
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, {}, k),
                         std::invalid_argument);
     }
 
     for (int k : {0, 1})
     {
         CHECK_NOTHROW(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o3, k));
-        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, nullptr, k));
+        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, {}, k));
     }
 
     // 2 = AVX2 throws when AVX2 is not available (library built without AVX2 or CPU without AVX2)
     if (quadriga_lib::quadriga_lib_has_AVX2())
     {
         CHECK_NOTHROW(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o3, 2));
-        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, nullptr, 2));
+        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, {}, 2));
     }
     else
     {
         CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o3, 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, nullptr, 2),
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, nullptr, {}, 2),
                         std::invalid_argument);
     }
 }
@@ -180,23 +180,23 @@ TEMPLATE_TEST_CASE("fast_geo2cart / fast_cart2geo - Outputs that alias inputs", 
 
     for (int k : geo_kernels())
     {
-        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, &o4, nullptr, nullptr, &o5, &len, k));
+        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, &o4, nullptr, nullptr, &o5, len, k));
         CHECK_NOTHROW(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o3, k));
 
         // An output is an input
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, a, o2, o3, nullptr, nullptr, nullptr, nullptr, nullptr, k), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, &len, &len, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, a, o2, o3, nullptr, nullptr, nullptr, nullptr, {}, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, &len, len, k), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, c, nullptr, k), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &a, k), std::invalid_argument);
 
         // Two outputs are the same object
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o1, o3, nullptr, nullptr, nullptr, nullptr, nullptr, k), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, &o4, nullptr, &o4, nullptr, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o1, o3, nullptr, nullptr, nullptr, nullptr, {}, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, &o4, nullptr, &o4, nullptr, {}, k), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o1, k), std::invalid_argument);
 
         // An output uses the memory of an input
         arma::Col<dtype> b_view(b.memptr(), 9, false, true);
-        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, b_view, nullptr, nullptr, nullptr, nullptr, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, b_view, nullptr, nullptr, nullptr, nullptr, {}, k), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, b_view, o2, nullptr, k), std::invalid_argument);
     }
 }

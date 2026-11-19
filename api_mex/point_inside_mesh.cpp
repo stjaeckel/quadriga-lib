@@ -55,10 +55,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Object index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
     const arma::uvec obj_ind_arma = (nrhs < 3) ? arma::uvec() : qd_mex_get_index_Col(prhs[2], "obj_ind");
 
-    const arma::uvec *p_obj_ind = obj_ind_arma.is_empty() ? nullptr : &obj_ind_arma;
 
     arma::uvec res;
-    CALL_QD(quadriga_lib::point_inside_mesh(points_arma, mesh_arma, res, p_obj_ind, distance));
+    CALL_QD(quadriga_lib::point_inside_mesh(points_arma, mesh_arma, res, obj_ind_arma, distance));
 
     plhs[0] = qd_mex_copy2matlab(&res);
 }

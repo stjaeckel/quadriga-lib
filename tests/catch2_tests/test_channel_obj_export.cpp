@@ -83,7 +83,7 @@ TEST_CASE("Channel - OBJ Export")
 
     c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "turbo");
     const arma::uvec i_snap = {1, 0, 0, 1};
-    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "jet", &i_snap, 0.5, 0.2, 12);
+    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "jet", i_snap, 0.5, 0.2, 12);
 
     std::remove("test_chan.obj");
     std::remove("test_chan.mtl");

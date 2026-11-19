@@ -107,15 +107,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Wrap optional pointers
     arma::mat offset, mean_before;
-    const arma::mat *p_pos_b = pos_b.empty() ? nullptr : &pos_b;
     arma::mat *p_phase_b = phase_b.empty() ? nullptr : &phase_b;
-    const arma::vec *p_acf = acf.empty() ? nullptr : &acf;
-    const arma::vec *p_dist = dist.empty() ? nullptr : &dist;
     arma::mat *p_offset = (nlhs > 2) ? &offset : nullptr;
     arma::mat *p_mean_before = (nlhs > 3) ? &mean_before : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, p_pos_b, p_phase_b, p_acf, p_dist, p_offset, p_mean_before, spatial_freq_scale_b));
+    CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, pos_b, p_phase_b, acf, dist, p_offset, p_mean_before, spatial_freq_scale_b));
 
     // Copy to MATLAB
     plhs[0] = qd_mex_copy2matlab(&phase);

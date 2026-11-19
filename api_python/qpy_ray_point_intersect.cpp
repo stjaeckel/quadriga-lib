@@ -83,7 +83,7 @@ py::tuple ray_point_intersect(const py::array_t<double> &points,
 
     quadriga_lib::ray_point_intersect<double>(points_arma, orig_arma, trivec_arma, tridir_arma,
                                               &hit_ind, &hit_offset, &hit_count, nullptr,
-                                              &sub_cloud_ind_arma, use_kernel, gpu_id);
+                                              sub_cloud_ind_arma, use_kernel, gpu_id);
 
     // Copy the flat list into numpy, widening to the signed 64 bit index type.
     // The Armadillo wrapper only aliases the vector, it does not copy.

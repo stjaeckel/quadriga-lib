@@ -100,8 +100,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::u32_vec path_type;
     arma::uvec ray_ind;
     CALL_QD(quadriga_lib::ssf_paths(rays, link_gain_dB, path_gain, path_length, polmat, mobility,
-                                    tx_pos.empty() ? nullptr : &tx_pos, rx_pos.empty() ? nullptr : &rx_pos,
-                                    kf_ratio.empty() ? nullptr : &kf_ratio, (nlhs > 3) ? &aod : nullptr,
+                                    tx_pos, rx_pos,
+                                    kf_ratio, (nlhs > 3) ? &aod : nullptr,
                                     (nlhs > 4) ? &eod : nullptr, (nlhs > 5) ? &aoa : nullptr,
                                     (nlhs > 6) ? &eoa : nullptr, (nlhs > 7) ? &fbs_pos : nullptr,
                                     (nlhs > 8) ? &lbs_pos : nullptr, (nlhs > 9) ? &path_type : nullptr,

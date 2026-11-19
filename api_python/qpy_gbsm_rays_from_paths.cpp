@@ -94,8 +94,8 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
 
     quadriga_lib::gbsm_rays_from_paths(center_freq_a, tx_pos_a, rx_pos_a, fbs_pos_a, lbs_pos_a, path_gain_a,
                                        path_length_a, polmat_a, rays[0], method,
-                                       path_type.is_none() ? nullptr : &path_type_a, tap.is_none() ? nullptr : &tap_a,
-                                       has_gr ? &gr_eps_re : nullptr, has_gr ? &gr_eps_im : nullptr);
+                                       path_type_a, tap_a,
+                                       gr_eps_re, gr_eps_im);
 
     // The method string and the complex permittivity cannot be aliased
     py::dict rays_out = rays_py[0];

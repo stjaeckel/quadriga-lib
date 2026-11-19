@@ -347,7 +347,7 @@ void fast_geo2cart(
     arma::Col<dtype> *cos_az = nullptr,
     arma::Col<dtype> *sin_el = nullptr,
     arma::Col<dtype> *cos_el = nullptr,
-    const arma::Col<dtype> *len = nullptr,
+    const arma::Col<dtype> &len = arma::Col<dtype>(),
     int use_kernel = 0);
 ```
 
@@ -375,19 +375,19 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
                                  arma::Col<dtype> &x, arma::Col<dtype> &y, arma::Col<dtype> &z,
                                  arma::Col<dtype> *sin_az, arma::Col<dtype> *cos_az,
                                  arma::Col<dtype> *sin_el, arma::Col<dtype> *cos_el,
-                                 const arma::Col<dtype> *len, int use_kernel)
+                                 const arma::Col<dtype> &len, int use_kernel)
 {
     const arma::uword n_val = az.n_elem;
 
     if (el.n_elem != n_val)
         throw std::invalid_argument("Input vectors 'az' and 'el' must have the same length.");
-    if (len && len->n_elem != n_val)
+    if (!len.empty() && len.n_elem != n_val)
         throw std::invalid_argument("Input vectors 'az', 'el' and 'len' must have the same length.");
 
     [[maybe_unused]] const int kernel = qd_kernel_auto_avx2(use_kernel);
 
     qd_check_alias_list<arma::Col<dtype>>({&x, &y, &z, sin_az, cos_az, sin_el, cos_el}, {"x", "y", "z", "sin_az", "cos_az", "sin_el", "cos_el"},
-                                          &az, &el, len);
+                                          &az, &el, &len);
 
     // Resize required outputs
     if (x.n_elem != n_val)
@@ -412,7 +412,7 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
 
     const dtype * pAZ = az.memptr();
     const dtype * pEL = el.memptr();
-    const dtype * pLEN = len ? len->memptr() : nullptr;
+    const dtype * pLEN = len.empty() ? nullptr : len.memptr();
     dtype * pX = x.memptr();
     dtype * pY = y.memptr();
     dtype * pZ = z.memptr();
@@ -432,13 +432,13 @@ template void quadriga_lib::fast_geo2cart(const arma::Col<float> &az, const arma
                                           arma::Col<float> &x, arma::Col<float> &y, arma::Col<float> &z,
                                           arma::Col<float> *sin_az, arma::Col<float> *cos_az,
                                           arma::Col<float> *sin_el, arma::Col<float> *cos_el,
-                                          const arma::Col<float> *len, int use_kernel);
+                                          const arma::Col<float> &len, int use_kernel);
 
 template void quadriga_lib::fast_geo2cart(const arma::Col<double> &az, const arma::Col<double> &el,
                                           arma::Col<double> &x, arma::Col<double> &y, arma::Col<double> &z,
                                           arma::Col<double> *sin_az, arma::Col<double> *cos_az,
                                           arma::Col<double> *sin_el, arma::Col<double> *cos_el,
-                                          const arma::Col<double> *len, int use_kernel);
+                                          const arma::Col<double> &len, int use_kernel);
 
 /*!MD
 # fast_cart2geo

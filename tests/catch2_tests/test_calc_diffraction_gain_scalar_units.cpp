@@ -22,13 +22,13 @@ TEST_CASE("calc_diffraction_gain - scalar mode takes the acoustic frequency")
     arma::vec gain;
     arma::mat xpr;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl, prop, 1000.0, 0, &gain, &xpr,
-                                                nullptr, 0, nullptr, 1, 0, true, 0.0, false, true);
+                                                nullptr, 0, {}, 1, 0, true, 0.0, false, true);
     REQUIRE(xpr.n_rows == 2);
     CHECK(std::abs(gain(0) - 1.0) < 1e-6);
     CHECK(std::abs(std::abs(std::atan2(xpr(1, 0), xpr(0, 0))) - arma::datum::pi) < 1e-6);
 
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl, prop, 1000.0 * c_light / c_sound, 0, &gain, &xpr,
-                                                nullptr, 0, nullptr, 1, 0, false, 0.0, false, true);
+                                                nullptr, 0, {}, 1, 0, false, 0.0, false, true);
     REQUIRE(xpr.n_rows == 8);
     CHECK(std::abs(std::abs(std::atan2(xpr(1, 0), xpr(0, 0))) - arma::datum::pi) < 1e-6);
 }

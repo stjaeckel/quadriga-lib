@@ -895,8 +895,8 @@ TEST_CASE("ssf_rays - outputs that alias inputs")
     const arma::vec fc = rays[0].center_freq;
     CHECK_THROWS_AS(quadriga_lib::ssf_rays(in.sp, in.f.tx, in.f.rx, rays[0].center_freq, in.f.lsp, in.st.mu,
                                            in.st.sigma, in.cl.delay, in.cl.power, in.cl.aod, in.cl.eod, in.cl.aoa,
-                                           in.cl.eoa, in.rnd, rays, in.method, 0, "additive", "38.901", &in.f.eps_re,
-                                           &in.f.eps_im),
+                                           in.cl.eoa, in.rnd, rays, in.method, 0, "additive", "38.901", in.f.eps_re,
+                                           in.f.eps_im),
                     std::invalid_argument);
     CHECK(arma::approx_equal(rays[0].center_freq, fc, "absdiff", 0.0));
 

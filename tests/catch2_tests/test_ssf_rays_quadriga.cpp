@@ -424,17 +424,17 @@ TEST_CASE("ssf_rays - both polarisation models are swap-reciprocal for mirrored 
         arma::cube ph, ra, rb;
         arma::mat x;
         quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
-        quadriga_lib::gbsm_draw(sp, "cluster", ph, a.tx, a.rx, a.rnd, -1, "Comb256", nullptr, nullptr, true);
-        quadriga_lib::gbsm_draw(sp, "cluster", ph, b.tx, b.rx, b.rnd, -1, "Comb256", nullptr, nullptr, true);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, a.tx, a.rx, a.rnd, -1, "Comb256", {}, {}, true);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, b.tx, b.rx, b.rnd, -1, "Comb256", {}, {}, true);
         quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23, 0);
-        quadriga_lib::gbsm_draw(sp, "cluster", ph, a.tx, a.rx, x, 0, "Comb256", nullptr, nullptr, true);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, a.tx, a.rx, x, 0, "Comb256", {}, {}, true);
         a.rnd_freq.slice(0) = x;
-        quadriga_lib::gbsm_draw(sp, "cluster", ph, b.tx, b.rx, x, 0, "Comb256", nullptr, nullptr, true);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, b.tx, b.rx, x, 0, "Comb256", {}, {}, true);
         b.rnd_freq.slice(0) = x;
         quadriga_lib::gbsm_init_phases(sp, "ray", ph, 23, qd ? -1 : 0);
-        quadriga_lib::gbsm_draw(sp, "ray", ph, a.tx, a.rx, x, qd ? -1 : 0, "Comb256", nullptr, &fc, true);
+        quadriga_lib::gbsm_draw(sp, "ray", ph, a.tx, a.rx, x, qd ? -1 : 0, "Comb256", {}, fc, true);
         ra = arma::cube(x.memptr(), x.n_rows, x.n_cols, 1);
-        quadriga_lib::gbsm_draw(sp, "ray", ph, b.tx, b.rx, x, qd ? -1 : 0, "Comb256", nullptr, &fc, true);
+        quadriga_lib::gbsm_draw(sp, "ray", ph, b.tx, b.rx, x, qd ? -1 : 0, "Comb256", {}, fc, true);
         rb = arma::cube(x.memptr(), x.n_rows, x.n_cols, 1);
         const out_t ca = run(sp, a, method), cb = run(sp, b, method);
         lsp_stats_t sa = make_lsp_stats(a, 262), sb = sa;
@@ -450,9 +450,9 @@ TEST_CASE("ssf_rays - both polarisation models are swap-reciprocal for mirrored 
                 INFO(method << ", " << angle << ", " << pol << ", eta " << (p == 1));
                 std::vector<quadriga_lib::gbsm_rays> A, B;
                 quadriga_lib::ssf_rays(sp, a.tx, a.rx, fc, a.lsp, sa.mu, sa.sigma, ca.delay, ca.power, ca.aod, ca.eod,
-                                       ca.aoa, ca.eoa, ra, A, method, 0, angle, pol, &a.eps_re, &a.eps_im, p == 1);
+                                       ca.aoa, ca.eoa, ra, A, method, 0, angle, pol, a.eps_re, a.eps_im, p == 1);
                 quadriga_lib::ssf_rays(sp, b.tx, b.rx, fc, b.lsp, sb.mu, sb.sigma, cb.delay, cb.power, cb.aod, cb.eod,
-                                       cb.aoa, cb.eoa, rb, B, method, 0, angle, pol, &b.eps_re, &b.eps_im, p == 1);
+                                       cb.aoa, cb.eoa, rb, B, method, 0, angle, pol, b.eps_re, b.eps_im, p == 1);
                 double d_ang = 0.0, d_rel = 0.0, d_M = 0.0;
                 for (arma::uword l = 0; l < 6; ++l)
                     for (arma::uword i = 0; i < A[l].n_ray(); ++i)
@@ -519,11 +519,11 @@ TEST_CASE("Diagnostic - ssf_rays quadriga ray delay spread relative to the slot 
     const lib_t in = lib_inputs(sp, tx, rx, 282, 3.5e9);
     out_t o;
     quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa, "quadriga",
-                               nullptr, nullptr, &in.eod, &in.toa);
+                               {}, {}, in.eod, in.toa);
     arma::cube ph;
     arma::mat x;
     quadriga_lib::gbsm_init_phases(sp, "ray", ph, 282);
-    quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, -1, "Comb256", nullptr, &fc);
+    quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, -1, "Comb256", {}, fc);
     const arma::cube rnd(x.memptr(), x.n_rows, x.n_cols, 1);
     arma::cube mu(200, 1, 8, arma::fill::value(1.0)), sigma(200, 1, 8, arma::fill::value(3.0));
     mu.slice(7).fill(9.0);

@@ -140,8 +140,8 @@ void quadriga_lib::ssf_rays(
     arma::uword i_freq = 0,
     const std::string &angle_model = "additive",
     const std::string &pol_model = "38.901",
-    const arma::mat *gr_eps_re = nullptr,
-    const arma::mat *gr_eps_im = nullptr,
+    const arma::mat &gr_eps_re = arma::mat(),
+    const arma::mat &gr_eps_im = arma::mat(),
     bool pol_variability = false,
     bool random_phase = true);
 ```
@@ -196,8 +196,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                             arma::uword i_freq,
                             const std::string &angle_model,
                             const std::string &pol_model,
-                            const arma::mat *gr_eps_re,
-                            const arma::mat *gr_eps_im,
+                            const arma::mat &gr_eps_re,
+                            const arma::mat &gr_eps_im,
                             bool pol_variability,
                             bool random_phase)
 {
@@ -250,19 +250,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                                     ", n_freq] for the TR methods or [n_link, " + std::to_string(n_gen) +
                                     ", 1] for 'quadriga'.");
     if (G)
-    {
-        if (gr_eps_re == nullptr || gr_eps_im == nullptr)
-            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' are required when 'GR_enabled' is set.");
-        if (gr_eps_re->n_rows != n_link || gr_eps_re->n_cols != F || gr_eps_im->n_rows != n_link ||
-            gr_eps_im->n_cols != F)
-            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must have size [n_link, n_freq].");
-        if (!gr_eps_re->is_finite() || !gr_eps_im->is_finite())
-            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must be finite.");
-        if (arma::any(arma::vectorise(*gr_eps_re) < 1.0) || arma::any(arma::vectorise(*gr_eps_im) < 0.0))
-            throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
-        if (n_link > 0 && (arma::any(rx.row(2) < 0.0) || arma::any(tx.row(2) < 0.0)))
-            throw std::invalid_argument("Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
-    }
+        qd_gbsm_check_gr(gr_eps_re, gr_eps_im, n_link, F, tx, rx);
 
     // Values used: the TR methods read frequency i_freq (geometry slice i_freq for "38.901_MF", else 0), "quadriga"
     // all frequencies
@@ -300,7 +288,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     auto check = [&](const auto &m)
     {
         qd_check_alias(&m, "rays", &tx_pos, &rx_pos, &center_freq, &lsp, &lsp_mu, &lsp_sigma, &delay, &power, &aod,
-                       &eod, &aoa, &eoa, &rnd_ray, gr_eps_re, gr_eps_im);
+                       &eod, &aoa, &eoa, &rnd_ray, &gr_eps_re, &gr_eps_im);
     };
     for (const gbsm_rays &r : rays)
         check(r.tx_pos), check(r.rx_pos), check(r.center_freq), check(r.delay), check(r.power), check(r.aod),
@@ -385,7 +373,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         {
             fit(r.gr_eps_re, Fo), fit(r.gr_eps_im, Fo);
             for (arma::uword k = k0; k <= k1; ++k)
-                r.gr_eps_re(k - k0) = (*gr_eps_re)(l, k), r.gr_eps_im(k - k0) = (*gr_eps_im)(l, k);
+                r.gr_eps_re(k - k0) = gr_eps_re(l, k), r.gr_eps_im(k - k0) = gr_eps_im(l, k);
         }
         for (auto *x : {&r.gr_eps_re, &r.gr_eps_im})
             if (!G && !x->empty())
@@ -418,7 +406,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                 continue;
             r.power(1, o) = power(l, 1, k);
             std::complex<double> R_par, R_perp;
-            qd_gbsm_fresnel((*gr_eps_re)(l, k), (*gr_eps_im)(l, k), tx(2, t), rx(2, l),
+            qd_gbsm_fresnel(gr_eps_re(l, k), gr_eps_im(l, k), tx(2, t), rx(2, l),
                             std::sqrt(dx * dx + dy * dy), R_par, R_perp);
             const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
             if (R > 0.0)

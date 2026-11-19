@@ -47,12 +47,12 @@ arma::vec dist_decorr = {10.0, 50.0};
 
 // Normal distributed values with zero mean and unit variance, size [1000, 2]
 arma::mat val;
-quadriga_lib::sos_randn<double>(dist_decorr, pos, val, nullptr, nullptr, "Comb256", 42);
+quadriga_lib::sos_randn<double>(dist_decorr, pos, val, {}, {}, "Comb256", 42);
 
 // Uniform values between 0 and 1, and integers from 1 to 6
 arma::mat uni, dice;
-quadriga_lib::sos_rand<double>(dist_decorr, pos, uni, nullptr, nullptr, "Comb256", 42);
-quadriga_lib::sos_randi<double>(dist_decorr, pos, 6, dice, nullptr, nullptr, "Comb256", 42);
+quadriga_lib::sos_rand<double>(dist_decorr, pos, uni, {}, {}, "Comb256", 42);
+quadriga_lib::sos_randi<double>(dist_decorr, pos, 6, dice, {}, {}, "Comb256", 42);
 ```
 
 The last argument is the seed. With the same seed, decorrelation distances and preset, a later call returns the same
@@ -89,12 +89,12 @@ quadriga_lib::sos_val(spatial_freq, phase, pos_new, val_new);
 
 // Uniform distributed output
 arma::mat val_uni;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, {}, {}, {}, 1.0, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
 std::vector<arma::cube> grid;
-quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
+quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, y);
 ```
 
 - **Presets:** `Exp`, `Gauss` and `Comb`, each with 128, 256, 512 or 1024 sinusoids, e.g. `"Exp512"`. `Exp`
@@ -110,7 +110,7 @@ quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
 // Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
 pos_rx *= 100.0;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, &pos_rx, nullptr, &acf, &dist);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx, {}, acf, dist);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -276,8 +276,8 @@ void quadriga_lib::sos_acf_estimate(
     arma::Col<dtype> &acf_est,
     arma::Col<dtype> *dist_est = nullptr,
     arma::Col<dtype> *acf_est_dual = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::sword seed = -1);
 ```
 
@@ -547,8 +547,8 @@ void quadriga_lib::sos_map(
     const arma::Mat<dtype> &phase,
     const arma::Col<dtype> &x,
     std::vector<arma::Cube<dtype>> &map,
-    const arma::Col<dtype> *y = nullptr,
-    const arma::Col<dtype> *z = nullptr,
+    const arma::Col<dtype> &y = arma::Col<dtype>(),
+    const arma::Col<dtype> &z = arma::Col<dtype>(),
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -658,8 +658,8 @@ void quadriga_lib::sos_rand(
     const arma::Col<dtype> &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Col<dtype> *dist_decorr_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -723,8 +723,8 @@ void quadriga_lib::sos_randi(
     const arma::Mat<dtype> &pos,
     arma::uword imax,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Col<dtype> *dist_decorr_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -786,8 +786,8 @@ void quadriga_lib::sos_randn(
     const arma::Col<dtype> &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Col<dtype> *dist_decorr_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -861,10 +861,10 @@ void quadriga_lib::sos_remove_bias(
     const arma::Mat<dtype> &spatial_freq,
     arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
-    const arma::Mat<dtype> *pos_b = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
     arma::Mat<dtype> *phase_b = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
     dtype spatial_freq_scale_b = 1.0);
@@ -952,10 +952,10 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Mat<dtype> *phase_b = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     dtype spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);

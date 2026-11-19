@@ -53,7 +53,7 @@ void calc_diffraction_gain(
     arma::Mat<dtype> *polmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
@@ -127,7 +127,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          arma::Mat<dtype> *polmat,
                                          arma::Cube<dtype> *coord,
                                          int verbose,
-                                         const arma::u32_vec *sub_mesh_ind,
+                                         const arma::u32_vec &sub_mesh_ind,
                                          int use_kernel,
                                          int gpu_id,
                                          bool scalar_mode,
@@ -176,7 +176,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     if (polmat && (polmat->n_rows != nXPR || polmat->n_cols != n_pos))
         polmat->set_size(nXPR, n_pos);
     if (polmat) // Initialize to unit matrix
-        quadriga_lib::polmat_update<dtype>(*polmat, nullptr, nullptr, true);
+        quadriga_lib::polmat_update<dtype>(*polmat, {}, nullptr, true);
 
     // Generate diffraction paths
     arma::Cube<dtype> ray_x, ray_y, ray_z, weight;
@@ -351,7 +351,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             arma::Col<unsigned> n_interact, fbs_ind, sbs_ind;
             quadriga_lib::ray_triangle_intersect<dtype>(s_orig, s_dest, mesh, nullptr, nullptr,
                                                         &n_interact, &fbs_ind, &sbs_ind,
-                                                        sub_mesh_ind, &aabb, use_kernel, gpu_id);
+                                                        sub_mesh_ind, aabb, use_kernel, gpu_id);
 
             unsigned *p_no_interact = n_interact.memptr(); // Pointer to 'n_interact'
             unsigned *p_fbs_ind = fbs_ind.memptr();         // Pointer to 'fbs_ind'
@@ -534,7 +534,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             {
                 arma::uvec ray_ind(p_iSPINE, n_spine, false, true);             // Ray index view
                 arma::Mat<dtype> update(p_xprmatN, nXPR, n_spine, false, true); // Xprmat update view
-                quadriga_lib::polmat_update<dtype>(*polmat, &update, nullptr, false, false, false, &ray_ind);
+                quadriga_lib::polmat_update<dtype>(*polmat, update, nullptr, false, false, false, &ray_ind);
             }
 
             // Add multi-hits to a new launch config
@@ -625,7 +625,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     if (polmat)
     {
         // Normalize XPRMAT to remove the gain
-        quadriga_lib::polmat_update<dtype>(*polmat, nullptr, nullptr, false, true);
+        quadriga_lib::polmat_update<dtype>(*polmat, {}, nullptr, false, true);
 
         if (verbose == 2 && n_pos == 1) // Debug output
             (*polmat).t().print("Total polmat = ");
@@ -693,7 +693,7 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, 
                                                   const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
                                                   float center_freq, int lod,
                                                   arma::Col<float> *gain, arma::Mat<float> *polmat, arma::Cube<float> *coord,
-                                                  int verbose, const arma::u32_vec *sub_mesh_ind,
+                                                  int verbose, const arma::u32_vec &sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
                                                   bool apply_fspl, bool apply_phase);
 
@@ -702,6 +702,6 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> &orig,
                                                   const std::unordered_map<std::string, std::vector<double>> &mtl_prop,
                                                   double center_freq, int lod,
                                                   arma::Col<double> *gain, arma::Mat<double> *polmat, arma::Cube<double> *coord,
-                                                  int verbose, const arma::u32_vec *sub_mesh_ind,
+                                                  int verbose, const arma::u32_vec &sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
                                                   bool apply_fspl, bool apply_phase);

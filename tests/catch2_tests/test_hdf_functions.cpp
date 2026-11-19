@@ -1205,22 +1205,22 @@ TEST_CASE("hdf5_read_channel - i_snap reads the selected snapshots")
     for (arma::uvec i_snap : {arma::uvec{2}, arma::uvec{3, 0}, arma::uvec{1, 1, 2}, arma::uvec{0, 1, 2, 3}})
     {
         INFO("i_snap " << arma::conv_to<std::vector<arma::uword>>::from(i_snap)[0] << ", n = " << i_snap.n_elem);
-        auto r = quadriga_lib::hdf5_read_channel<double>(f.fn, 0, 0, 0, 0, &i_snap);
+        auto r = quadriga_lib::hdf5_read_channel<double>(f.fn, 0, 0, 0, 0, i_snap);
         check_structured(r, select_snapshots(per_snap, i_snap));
         CHECK(r.par_names == per_snap.par_names);
-        check_structured(quadriga_lib::hdf5_read_channel<float>(f.fn, 0, 0, 0, 0, &i_snap), select_snapshots(per_snap, i_snap));
+        check_structured(quadriga_lib::hdf5_read_channel<float>(f.fn, 0, 0, 0, 0, i_snap), select_snapshots(per_snap, i_snap));
     }
     arma::uvec i_shared = {2, 0}, i_single = {0, 0}, none;
-    check_structured(quadriga_lib::hdf5_read_channel<double>(f.fn, 1, 0, 0, 0, &i_shared), select_snapshots(shared, i_shared));
-    check_structured(quadriga_lib::hdf5_read_channel<double>(f.fn, 2, 0, 0, 0, &i_single), select_snapshots(single, i_single));
-    check_structured(quadriga_lib::hdf5_read_channel<double>(f.fn, 0, 0, 0, 0, &none), per_snap); // Empty = all
+    check_structured(quadriga_lib::hdf5_read_channel<double>(f.fn, 1, 0, 0, 0, i_shared), select_snapshots(shared, i_shared));
+    check_structured(quadriga_lib::hdf5_read_channel<double>(f.fn, 2, 0, 0, 0, i_single), select_snapshots(single, i_single));
+    check_structured(quadriga_lib::hdf5_read_channel<double>(f.fn, 0, 0, 0, 0, none), per_snap); // Empty = all
 
     // Index >= n_snap of a non-empty slot throws; empty slots and slots outside the layout stay empty
     arma::uvec i_4 = {4}, i_0 = {0}, i_7 = {7};
-    CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(f.fn, 0, 0, 0, 0, &i_4), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(f.fn, 3, 0, 0, 0, &i_0), std::invalid_argument);
-    CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 4, 0, 0, 0, &i_7).empty());
-    CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 9, 0, 0, 0, &i_7).empty());
+    CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(f.fn, 0, 0, 0, 0, i_4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(f.fn, 3, 0, 0, 0, i_0), std::invalid_argument);
+    CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 4, 0, 0, 0, i_7).empty());
+    CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 9, 0, 0, 0, i_7).empty());
 }
 
 TEST_CASE("hdf5_write_channel_vec / hdf5_read_channel_vec - equal loops of single calls")
@@ -1255,7 +1255,7 @@ TEST_CASE("hdf5_write_channel_vec / hdf5_read_channel_vec - equal loops of singl
         check_structured(r[i], quadriga_lib::hdf5_read_channel<double>(f.fn, all(0, i), all(1, i)));
 
     arma::uvec i_snap = {0};
-    auto rs = quadriga_lib::hdf5_read_channel_vec<float>(f.fn, all, &i_snap);
+    auto rs = quadriga_lib::hdf5_read_channel_vec<float>(f.fn, all, i_snap);
     check_structured(rs[1], select_snapshots(chan[0], i_snap));
     check_structured(rs[2], chan[1]);
     CHECK(rs[3].empty());
@@ -1303,5 +1303,5 @@ TEST_CASE("hdf5_write_channel_vec / hdf5_read_channel_vec - input validation")
     CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel_vec<double>(f.fn, arma::Mat<unsigned>(3, 1, arma::fill::zeros)), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel_vec<double>(f.fn, arma::Mat<unsigned>(0, 2)), std::invalid_argument);
     const arma::uvec i_1 = {1}; // The written channels have one snapshot
-    CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel_vec<double>(f.fn, pair, &i_1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel_vec<double>(f.fn, pair, i_1), std::invalid_argument);
 }

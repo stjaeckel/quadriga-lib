@@ -127,8 +127,8 @@ void quadriga_lib::los_probability(
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
-    const arma::vec *rnd_g = nullptr,
-    const arma::vec *center_freq = nullptr,
+    const arma::vec &rnd_g = arma::vec(),
+    const arma::vec &center_freq = arma::vec(),
     arma::mat *los_soft = nullptr);
 ```
 
@@ -168,8 +168,8 @@ void quadriga_lib::los_probability(const std::string &model,
                                    double d_clutter,
                                    double r_clutter,
                                    double h_clutter,
-                                   const arma::vec *rnd_g,
-                                   const arma::vec *center_freq,
+                                   const arma::vec &rnd_g,
+                                   const arma::vec &center_freq,
                                    arma::mat *los_soft)
 {
     // Model name
@@ -207,16 +207,16 @@ void quadriga_lib::los_probability(const std::string &model,
     // Soft LOS inputs
     if (los_soft != nullptr)
     {
-        if (rnd_g == nullptr || center_freq == nullptr)
+        if ((rnd_g.empty() && n_link > 0) || center_freq.empty())
             throw std::invalid_argument("Output 'los_soft' requires 'rnd_g' and 'center_freq'.");
-        if (rnd_g->n_elem != n_link)
+        if (rnd_g.n_elem != n_link)
             throw std::invalid_argument("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'.");
-        if (!rnd_g->is_finite())
+        if (!rnd_g.is_finite())
             throw std::invalid_argument("Input 'rnd_g' must be finite.");
-        qd_gbsm_check_fc(*center_freq);
+        qd_gbsm_check_fc(center_freq);
     }
-    qd_check_alias(&p_los, "p_los", &d2d_out, &h_bs, &h_ut, rnd_g, center_freq);
-    qd_check_alias(los_soft, "los_soft", &d2d_out, &h_bs, &h_ut, rnd_g, center_freq);
+    qd_check_alias(&p_los, "p_los", &d2d_out, &h_bs, &h_ut, &rnd_g, &center_freq);
+    qd_check_alias(los_soft, "los_soft", &d2d_out, &h_bs, &h_ut, &rnd_g, &center_freq);
     qd_check_alias_outputs(&p_los, "p_los", los_soft, "los_soft");
 
     // Model parameters with their defaults
@@ -341,16 +341,16 @@ void quadriga_lib::los_probability(const std::string &model,
     // Soft LOS state, TR 38.901 eq. (7.6-18)
     if (los_soft != nullptr)
     {
-        const arma::uword n_freq = center_freq->n_elem;
+        const arma::uword n_freq = center_freq.n_elem;
         arma::vec G(n_link, arma::fill::none); // G + F(p) per link
         for (arma::uword l = 0; l < n_link; ++l)
-            G[l] = rnd_g->at(l) + qd_los_probit(p_los[l]);
+            G[l] = rnd_g.at(l) + qd_los_probit(p_los[l]);
 
         if (los_soft->n_rows != n_link || los_soft->n_cols != n_freq)
             los_soft->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq && n_link > 0; ++k)
         {
-            const double kk = std::sqrt(20.0 * center_freq->at(k) / 299792458.0); // sqrt(20 / lambda)
+            const double kk = std::sqrt(20.0 * center_freq.at(k) / 299792458.0); // sqrt(20 / lambda)
             double *ps = los_soft->colptr(k);
             for (arma::uword l = 0; l < n_link; ++l)
                 ps[l] = 0.5 + std::atan(kk * G[l]) / arma::datum::pi;

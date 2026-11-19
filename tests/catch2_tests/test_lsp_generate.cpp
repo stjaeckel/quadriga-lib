@@ -250,7 +250,7 @@ namespace
     };
 
     outputs run_all(const scen_t &sp, const arma::vec &fc, const arma::mat &tx, const arma::mat &rx, const arma::mat &rnd,
-                    const arma::mat *sf = nullptr, bool chol = true, bool clip = true)
+                    const arma::mat &sf = arma::mat(), bool chol = true, bool clip = true)
     {
         outputs o;
         quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, o.lsp, sf, &o.toa, &o.re, &o.im, &o.eod, &o.mu, &o.sg, chol, clip);
@@ -307,7 +307,7 @@ TEST_CASE("lsp_generate - mean and std follow the formula with every term")
     const arma::mat rnd = rnd_values(4, 11);
 
     arma::cube lsp, mu, sg;
-    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu, &sg);
+    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, &mu, &sg);
     REQUIRE(mu.n_rows == 4);
     REQUIRE(mu.n_cols == 3);
     REQUIRE(mu.n_slices == 8);
@@ -432,7 +432,7 @@ TEST_CASE("lsp_generate - TR spot checks of four v19 files")
         const arma::mat rnd(rx.n_cols, 11, arma::fill::zeros);
 
         arma::cube lsp, mu, sg;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu, &sg);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, &mu, &sg);
         REQUIRE(mu.n_rows == rx.n_cols);
 
         for (arma::uword l = 0; l < rx.n_cols; ++l)
@@ -463,7 +463,7 @@ TEST_CASE("lsp_generate - TR spot checks of four v19 files")
     {
         sp["DS_VS"] = vs;
         arma::cube lsp, mu;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, &mu);
         const double ref = std::log10(30.0 * vs + 32.0) - 9.44;
         QD_DIAG("InF_NLOS_DL DS_VS %.6f: mu %.15f, TR %.15f\n", vs, mu(0, 0, 0), ref);
         INFO("DS_VS " << vs);
@@ -512,7 +512,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         sp["EoD_offset_b"] = b;
         arma::cube lsp;
         arma::mat eod;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, &eod);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, &eod);
         REQUIRE(eod.n_rows == rx.n_cols);
         REQUIRE(eod.n_cols == 2);
         for (size_t i = 0; i < dist.size(); ++i)
@@ -540,7 +540,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         const arma::vec fc1 = {3.5e9, 28.0e9};
         arma::cube lsp;
         arma::mat eod;
-        quadriga_lib::lsp_generate(uma, fc1, tx1, rx1, arma::mat(4, 11, arma::fill::zeros), lsp, nullptr, nullptr, nullptr, nullptr, &eod);
+        quadriga_lib::lsp_generate(uma, fc1, tx1, rx1, arma::mat(4, 11, arma::fill::zeros), lsp, {}, nullptr, nullptr, nullptr, &eod);
         for (arma::uword l = 0; l < 4; ++l)
             for (arma::uword k = 0; k < 2; ++k)
             {
@@ -561,7 +561,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         const arma::vec fc1 = {3.5e9};
         arma::cube lsp;
         arma::mat eod;
-        quadriga_lib::lsp_generate(sma, fc1, tx1, rx1, arma::mat(4, 11, arma::fill::zeros), lsp, nullptr, nullptr, nullptr, nullptr, &eod);
+        quadriga_lib::lsp_generate(sma, fc1, tx1, rx1, arma::mat(4, 11, arma::fill::zeros), lsp, {}, nullptr, nullptr, nullptr, &eod);
         for (arma::uword l = 0; l < 4; ++l)
         {
             const double d = rx1(0, l), hu = rx1(2, l);
@@ -579,7 +579,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         arma::cube lsp;
         arma::mat eod;
         quadriga_lib::lsp_generate(uma, arma::vec({3.5e9, 28e9}), tx1, rx1, arma::mat(2, 11, arma::fill::zeros), lsp,
-                                   nullptr, nullptr, nullptr, nullptr, &eod);
+                                   {}, nullptr, nullptr, nullptr, &eod);
         CHECK(arma::all(arma::vectorise(eod) == 0.0));
     }
 }
@@ -606,7 +606,7 @@ TEST_CASE("lsp_generate - values are 10^(mu + sigma x) with x from the correlati
     for (bool chol : {true, false})
     {
         arma::cube lsp;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, chol);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, chol);
         REQUIRE(lsp.n_rows == 3);
         REQUIRE(lsp.n_cols == 2);
         REQUIRE(lsp.n_slices == 8);
@@ -685,7 +685,7 @@ TEST_CASE("lsp_generate - the symmetric square root is the principal root of R")
         set_corr(sp, c.second);
         const arma::mat R = corr_matrix(sp);
         arma::cube lsp;
-        quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, unit_rnd(), lsp, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, unit_rnd(), lsp, {}, nullptr, nullptr, nullptr,
                                    nullptr, nullptr, nullptr, false);
         const arma::mat X = root_from_lsp(lsp);
         const double e_sq = arma::abs(mm(X, X) - R).max(), e_sym = arma::abs(X - X.t()).max();
@@ -710,7 +710,7 @@ TEST_CASE("lsp_generate - the symmetric square root is the principal root of R")
     scen_t sp = unit_scen();
     set_corr(sp, R_sing);
     arma::cube lsp;
-    quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, unit_rnd(), lsp, nullptr, nullptr, nullptr, nullptr,
+    quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, unit_rnd(), lsp, {}, nullptr, nullptr, nullptr,
                                nullptr, nullptr, nullptr, false);
     const arma::mat X = root_from_lsp(lsp);
     QD_DIAG("singular to rounding,%.3e,%.3e\n", arma::abs(mm(X, X) - R_sing).max(), arma::abs(X - X.t()).max());
@@ -741,7 +741,7 @@ TEST_CASE("lsp_generate - sample covariance of the log values equals the correla
     for (bool chol : {true, false})
     {
         arma::cube lsp;
-        quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr,
                                    nullptr, nullptr, chol, false);
         arma::mat X(n, 8);
         for (arma::uword l = 0; l < n; ++l)
@@ -763,8 +763,8 @@ TEST_CASE("lsp_generate - spreads are clipped at 104 and 52 degrees")
     const arma::mat rnd(2, 11, arma::fill::zeros);
     const arma::vec fc = {3.5e9};
     arma::cube lsp_c, lsp_n, mu_c, mu_n;
-    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp_c, nullptr, nullptr, nullptr, nullptr, nullptr, &mu_c, nullptr, true, true);
-    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp_n, nullptr, nullptr, nullptr, nullptr, nullptr, &mu_n, nullptr, true, false);
+    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp_c, {}, nullptr, nullptr, nullptr, nullptr, &mu_c, nullptr, true, true);
+    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp_n, {}, nullptr, nullptr, nullptr, nullptr, &mu_n, nullptr, true, false);
     for (arma::uword l = 0; l < 2; ++l)
     {
         INFO("link " << l);
@@ -790,7 +790,7 @@ TEST_CASE("lsp_generate - the same random values apply to all frequencies")
     const arma::mat rnd = rnd_values(3, 99);
     const arma::vec fc = {7.0e9, 15.0e9, 28.0e9};
     arma::cube lsp, mu, sg;
-    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu, &sg, true, false);
+    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, &mu, &sg, true, false);
     REQUIRE(lsp.n_cols == 3);
     CHECK(std::abs(mu(0, 0, 0) - mu(0, 2, 0)) > 1e-3); // the DS mean depends on the frequency
     for (arma::uword l = 0; l < 3; ++l)
@@ -820,7 +820,7 @@ TEST_CASE("lsp_generate - sf_sigma_dB from path_loss replaces the SF standard de
             sf(l, k) = 3.1 + 0.7 * (double)l + 1.3 * (double)k;
 
     const outputs a = run_all(sp, fc, tx, rx, rnd);
-    const outputs b = run_all(sp, fc, tx, rx, rnd, &sf);
+    const outputs b = run_all(sp, fc, tx, rx, rnd, sf);
     for (arma::uword l = 0; l < 3; ++l)
         for (arma::uword k = 0; k < 2; ++k)
         {
@@ -874,7 +874,7 @@ TEST_CASE("lsp_generate - InF delay spread uses V/S")
     auto ds_mu = [&](const scen_t &s)
     {
         arma::cube lsp, mu;
-        quadriga_lib::lsp_generate(s, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu);
+        quadriga_lib::lsp_generate(s, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, &mu);
         return mu(0, 0, 0);
     };
 
@@ -908,7 +908,7 @@ TEST_CASE("lsp_generate - absolute TOA")
     {
         arma::cube lsp;
         arma::vec t;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, &t);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, &t);
         return t;
     };
 
@@ -952,7 +952,7 @@ TEST_CASE("lsp_generate - ground permittivity interpolates dry, medium and wet g
     const arma::vec fc = {1.0e9, 10.0e9, 28.0e9};
     arma::cube lsp;
     arma::mat re, im;
-    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, &re, &im);
+    quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, &re, &im);
     REQUIRE(re.n_rows == 5);
     REQUIRE(re.n_cols == 3);
     REQUIRE(im.n_rows == 5);
@@ -1009,19 +1009,19 @@ TEST_CASE("lsp_generate - optional outputs alone and together give the same valu
         quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp);
         CHECK(arma::approx_equal(lsp, all.lsp, "absdiff", 0.0));
         arma::vec toa;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, &toa);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, &toa);
         CHECK(arma::approx_equal(toa, all.toa, "absdiff", 0.0));
         arma::mat re, im, eod;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, &re);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, &re);
         CHECK(arma::approx_equal(re, all.re, "absdiff", 0.0));
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, &im);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, &im);
         CHECK(arma::approx_equal(im, all.im, "absdiff", 0.0));
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, &eod);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, &eod);
         CHECK(arma::approx_equal(eod, all.eod, "absdiff", 0.0));
         arma::cube mu, sg;
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, &mu);
         CHECK(arma::approx_equal(mu, all.mu, "absdiff", 0.0));
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &sg);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, nullptr, nullptr, nullptr, nullptr, nullptr, &sg);
         CHECK(arma::approx_equal(sg, all.sg, "absdiff", 0.0));
     }
 
@@ -1044,7 +1044,7 @@ TEST_CASE("lsp_generate - optional outputs alone and together give the same valu
         o.im.set_size(3, 3), o.im.fill(NAN);
         o.eod.set_size(4, 2), o.eod.fill(NAN);
         const double *p_lsp = o.lsp.memptr(), *p_toa = o.toa.memptr(), *p_re = o.re.memptr(), *p_mu = o.mu.memptr();
-        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, o.lsp, nullptr, &o.toa, &o.re, &o.im, &o.eod, &o.mu, &o.sg);
+        quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, o.lsp, {}, &o.toa, &o.re, &o.im, &o.eod, &o.mu, &o.sg);
         CHECK(o.lsp.memptr() == p_lsp);
         CHECK(o.toa.memptr() == p_toa);
         CHECK(o.re.memptr() == p_re);
@@ -1109,7 +1109,7 @@ TEST_CASE("lsp_generate - input validation")
         CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp));
         CHECK_NOTHROW(quadriga_lib::lsp_generate({}, fc, tx, rx, rnd, lsp)); // empty scenpar: all defaults
         arma::mat sf(3, 2, arma::fill::value(4.0));
-        CHECK_NOTHROW(run_all(sp, fc, tx, rx, rnd, &sf, false, false));
+        CHECK_NOTHROW(run_all(sp, fc, tx, rx, rnd, sf, false, false));
     }
     SECTION("outputs that alias inputs")
     {
@@ -1117,17 +1117,17 @@ TEST_CASE("lsp_generate - input validation")
         arma::vec f = fc, toa;
         arma::mat *no_mat = nullptr;
         arma::vec *no_vec = nullptr;
-        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, r, rnd, lsp, no_mat, no_vec, no_mat, no_mat, &r), std::invalid_argument); // eod_offset_deg is 'rx_pos'
-        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, t, rx, rnd, lsp, no_mat, no_vec, no_mat, no_mat, &t), std::invalid_argument); // eod_offset_deg is 'tx_pos'
-        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, lsp, no_mat, no_vec, &u, &im), std::invalid_argument);            // gr_eps_re is 'rnd'
-        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, f, tx, rx, rnd, lsp, no_mat, &f, &re, &im), std::invalid_argument);              // abs_toa is 'center_freq'
-        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, no_mat, &toa, &re, &re), std::invalid_argument);           // gr_eps_im is 'gr_eps_re'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, r, rnd, lsp, {}, no_vec, no_mat, no_mat, &r), std::invalid_argument); // eod_offset_deg is 'rx_pos'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, t, rx, rnd, lsp, {}, no_vec, no_mat, no_mat, &t), std::invalid_argument); // eod_offset_deg is 'tx_pos'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, lsp, {}, no_vec, &u, &im), std::invalid_argument);            // gr_eps_re is 'rnd'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, f, tx, rx, rnd, lsp, {}, &f, &re, &im), std::invalid_argument);              // abs_toa is 'center_freq'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, &toa, &re, &re), std::invalid_argument);           // gr_eps_im is 'gr_eps_re'
         arma::cube on_rnd(u.memptr(), 3, 1, 8, false, true);
         CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, on_rnd), std::invalid_argument);
         CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
         CHECK(arma::approx_equal(u, rnd, "absdiff", 0.0));
         CHECK(arma::approx_equal(f, fc, "absdiff", 0.0));
-        CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, no_mat, &toa, &re, &im));
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, {}, &toa, &re, &im));
     }
     SECTION("rx_pos")
     {
@@ -1175,13 +1175,13 @@ TEST_CASE("lsp_generate - input validation")
     SECTION("sf_sigma_dB")
     {
         arma::mat sf(3, 1, arma::fill::value(4.0));
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, sf), std::invalid_argument,
                              Message("Input 'sf_sigma_dB' must have size [n_link, n_freq]."));
         sf.set_size(3, 2), sf.fill(4.0), sf(1, 1) = -1.0;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, sf), std::invalid_argument,
                              Message("Input 'sf_sigma_dB' must be finite and >= 0."));
         sf(1, 1) = NAN;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, sf), std::invalid_argument,
                              Message("Input 'sf_sigma_dB' must be finite and >= 0."));
     }
     SECTION("scenpar")
@@ -1206,7 +1206,7 @@ TEST_CASE("lsp_generate - input validation")
         for (bool chol : {true, false})
         {
             arma::cube out(3, 2, 8, arma::fill::value(-7.0));
-            CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, chol), std::invalid_argument,
+            CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, {}, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, chol), std::invalid_argument,
                                  Message("LSP cross-correlation matrix in 'scenpar' is not positive definite."));
             CHECK(arma::all(arma::vectorise(out) == -7.0)); // output untouched
         }
@@ -1215,18 +1215,18 @@ TEST_CASE("lsp_generate - input validation")
     {
         arma::mat bad = rnd;
         bad(1, 9) = 1.5;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, {}, nullptr, &re), std::invalid_argument,
                              Message("Ground-permittivity column of 'rnd' must be in the range from 0 to 1."));
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, nullptr, &im), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, {}, nullptr, nullptr, &im), std::invalid_argument,
                              Message("Ground-permittivity column of 'rnd' must be in the range from 0 to 1."));
         bad(1, 9) = -0.1;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re, &im), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, {}, nullptr, &re, &im), std::invalid_argument,
                              Message("Ground-permittivity column of 'rnd' must be in the range from 0 to 1."));
         // Not checked when the ground permittivity is not requested
         bad(1, 9) = 1.5;
         arma::vec toa;
         arma::mat eod;
-        CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, &toa, nullptr, nullptr, &eod));
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, {}, &toa, nullptr, nullptr, &eod));
     }
     SECTION("frequency terms")
     {
@@ -1270,12 +1270,12 @@ TEST_CASE("lsp_generate - input validation")
         arma::vec toa;
         arma::mat eod;
         CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out));
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, nullptr, nullptr, nullptr, &eod), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, {}, nullptr, nullptr, nullptr, &eod), std::invalid_argument,
                              Message("Scenario parameter 'EoD_offset_a_gamma' must be finite."));
-        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, &toa), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, {}, &toa), std::invalid_argument,
                              Message("Scenario parameter 'absTOA_sigma' must be finite."));
         bad["absTOA_mu"] = -100.0; // inactive
-        CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, nullptr, &toa));
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(bad, fc, tx, rx, rnd, out, {}, &toa));
 
         // An infinite P_mu gives no NaN and is allowed
         bad = sp;

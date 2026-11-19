@@ -85,13 +85,9 @@ py::tuple ray_triangle_intersect(const py::array_t<double> &orig,
     auto fbs_ind_p = qd_python_init_output(n_ray, &fbs_ind);
     auto sbs_ind_p = qd_python_init_output(n_ray, &sbs_ind);
 
-    // Resolve optional pointers
-    const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_arma.empty() ? nullptr : &sub_mesh_index_arma;
-    const arma::mat *p_aabb = aabb_arma.empty() ? nullptr : &aabb_arma;
-
     quadriga_lib::ray_triangle_intersect<double>(orig_arma, dest_arma, triangles_arma,
                                                  &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind,
-                                                 p_sub_mesh_index, p_aabb, use_kernel, gpu_id);
+                                                 sub_mesh_index_arma, aabb_arma, use_kernel, gpu_id);
 
     return py::make_tuple(fbs_p, sbs_p, n_interact_p, fbs_ind_p, sbs_ind_p);
 }

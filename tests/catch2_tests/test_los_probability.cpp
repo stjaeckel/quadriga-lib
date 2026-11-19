@@ -424,7 +424,7 @@ TEST_CASE("los_probability - soft LOS is 0.5 at G = -F(d) and matches p over man
         for (arma::uword i = 0; i < d.n_elem; ++i)
             g(i) = -ref_probit(p(i));
         arma::mat soft;
-        quadriga_lib::los_probability("38.901_RMa", d, arma::vec{35.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, &fc, &soft);
+        quadriga_lib::los_probability("38.901_RMa", d, arma::vec{35.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, fc, &soft);
         REQUIRE(soft.n_rows == d.n_elem);
         REQUIRE(soft.n_cols == 2);
         QD_DIAG("\n# diag: soft LOS at G = -F(p)\nd,p,F,fc,soft,diff,tol\n");
@@ -449,8 +449,8 @@ TEST_CASE("los_probability - soft LOS is 0.5 at G = -F(d) and matches p over man
         {
             arma::vec d(K, arma::fill::value(dd)), p;
             arma::mat soft;
-            quadriga_lib::los_probability("38.901_RMa", d, arma::vec{35.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &G,
-                                          &fc, &soft);
+            quadriga_lib::los_probability("38.901_RMa", d, arma::vec{35.0}, arma::vec{1.5}, p, NAN, NAN, NAN, G,
+                                          fc, &soft);
             REQUIRE(soft.n_rows == K);
             const double pr = tr_rma(dd);
             for (arma::uword k = 0; k < 2; ++k)
@@ -469,12 +469,12 @@ TEST_CASE("los_probability - soft LOS is 0.5 at G = -F(d) and matches p over man
         const arma::vec d = {5.0, 100.0, 1000.0};
         arma::vec p;
         arma::mat soft;
-        quadriga_lib::los_probability("LOS", d, arma::vec{25.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, &fc, &soft);
+        quadriga_lib::los_probability("LOS", d, arma::vec{25.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, fc, &soft);
         CHECK(arma::all(arma::vectorise(soft) == 1.0));
-        quadriga_lib::los_probability("NLOS", d, arma::vec{25.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, &fc, &soft);
+        quadriga_lib::los_probability("NLOS", d, arma::vec{25.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, fc, &soft);
         CHECK(arma::all(arma::vectorise(soft) == 0.0));
         quadriga_lib::los_probability("38.901_RMa", arma::vec{5.0, 10.0, 1.0}, arma::vec{25.0}, arma::vec{1.5}, p, NAN,
-                                      NAN, NAN, &g, &fc, &soft);
+                                      NAN, NAN, g, fc, &soft);
         CHECK(arma::all(arma::vectorise(soft) == 1.0));
     }
 
@@ -483,7 +483,7 @@ TEST_CASE("los_probability - soft LOS is 0.5 at G = -F(d) and matches p over man
         const arma::vec d = {30.0, 100.0, 300.0, 18.0}, g = {0.7, -1.2, 2.1, -0.4};
         arma::vec p;
         arma::mat soft;
-        quadriga_lib::los_probability("38.901_UMa", d, arma::vec{25.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, &fc, &soft);
+        quadriga_lib::los_probability("38.901_UMa", d, arma::vec{25.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, fc, &soft);
         REQUIRE(soft.n_rows == 4);
         QD_DIAG("\n# diag: soft LOS vs eq. (7.6-18)\nd,G,fc,soft,ref,diff\n");
         for (arma::uword i = 0; i < 4; ++i)
@@ -520,7 +520,7 @@ TEST_CASE("los_probability - the inverse normal CDF of the soft LOS is accurate"
     const arma::vec g(d.n_elem, arma::fill::zeros);
     arma::vec p;
     arma::mat soft;
-    quadriga_lib::los_probability("38.901_RMa", d, arma::vec{35.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, &fc, &soft);
+    quadriga_lib::los_probability("38.901_RMa", d, arma::vec{35.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, fc, &soft);
     REQUIRE(soft.n_rows == d.n_elem);
 
     QD_DIAG("\n# diag: inverse normal CDF through the soft LOS\np,1-p,F_rec,F_ref,rel_err\n");
@@ -548,17 +548,17 @@ TEST_CASE("los_probability - optional inputs")
     arma::mat soft;
 
     // los_soft requires rnd_g and fc
-    CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, nullptr, &fc, &soft), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, {}, fc, &soft), std::invalid_argument,
                          Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
-    CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, nullptr, &soft), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, {}, &soft), std::invalid_argument,
                          Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
 
     // rnd_g and fc without los_soft are ignored (not validated)
     quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p_ref);
     const arma::vec g_bad = {NAN}, fc_bad;
-    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g_bad, &fc_bad));
+    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g_bad, fc_bad));
     CHECK(arma::all(p == p_ref));
-    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, &fc));
+    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, g, fc));
     CHECK(arma::all(p == p_ref));
 
     // A single height applies to all links
@@ -566,8 +566,8 @@ TEST_CASE("los_probability - optional inputs")
     {
         arma::vec p1, p2;
         arma::mat s1, s2;
-        quadriga_lib::los_probability(m, d, arma::vec{8.0}, arma::vec{1.5}, p1, NAN, NAN, NAN, &g, &fc, &s1);
-        quadriga_lib::los_probability(m, d, arma::vec{8.0, 8.0, 8.0}, arma::vec{1.5, 1.5, 1.5}, p2, NAN, NAN, NAN, &g, &fc, &s2);
+        quadriga_lib::los_probability(m, d, arma::vec{8.0}, arma::vec{1.5}, p1, NAN, NAN, NAN, g, fc, &s1);
+        quadriga_lib::los_probability(m, d, arma::vec{8.0, 8.0, 8.0}, arma::vec{1.5, 1.5, 1.5}, p2, NAN, NAN, NAN, g, fc, &s2);
         INFO("model " << m);
         CHECK(arma::all(p1 == p2));
         CHECK(arma::all(arma::vectorise(s1 == s2)));
@@ -587,7 +587,7 @@ TEST_CASE("los_probability - pre-sized outputs, empty input and repeated calls")
     const arma::vec fc = {3.5e9, 28.0e9};
     arma::vec p_ref;
     arma::mat s_ref;
-    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p_ref, NAN, NAN, NAN, &g, &fc, &s_ref);
+    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p_ref, NAN, NAN, NAN, g, fc, &s_ref);
     REQUIRE(p_ref.n_elem == 3);
     REQUIRE(s_ref.n_rows == 3);
     REQUIRE(s_ref.n_cols == 2);
@@ -596,7 +596,7 @@ TEST_CASE("los_probability - pre-sized outputs, empty input and repeated calls")
     arma::vec p(3, arma::fill::value(7.0));
     arma::mat s(3, 2, arma::fill::value(7.0));
     const double *pp = p.memptr(), *ps = s.memptr();
-    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, &g, &fc, &s);
+    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, g, fc, &s);
     CHECK(p.memptr() == pp);
     CHECK(s.memptr() == ps);
     CHECK(arma::all(p == p_ref));
@@ -605,7 +605,7 @@ TEST_CASE("los_probability - pre-sized outputs, empty input and repeated calls")
     // Wrongly sized outputs are resized
     arma::vec p2(5, arma::fill::value(7.0));
     arma::mat s2(1, 7, arma::fill::value(7.0));
-    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p2, NAN, NAN, NAN, &g, &fc, &s2);
+    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p2, NAN, NAN, NAN, g, fc, &s2);
     CHECK(arma::all(p2 == p_ref));
     REQUIRE(s2.n_rows == 3);
     REQUIRE(s2.n_cols == 2);
@@ -614,7 +614,7 @@ TEST_CASE("los_probability - pre-sized outputs, empty input and repeated calls")
     // Repeated call: identical
     arma::vec p3;
     arma::mat s3;
-    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p3, NAN, NAN, NAN, &g, &fc, &s3);
+    quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p3, NAN, NAN, NAN, g, fc, &s3);
     CHECK(arma::all(p3 == p_ref));
     CHECK(arma::all(arma::vectorise(s3 == s_ref)));
 
@@ -622,7 +622,7 @@ TEST_CASE("los_probability - pre-sized outputs, empty input and repeated calls")
     const arma::vec e;
     arma::vec p0(4, arma::fill::ones);
     arma::mat s0(2, 2, arma::fill::ones);
-    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMa", e, e, e, p0, NAN, NAN, NAN, &e, &fc, &s0));
+    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMa", e, e, e, p0, NAN, NAN, NAN, e, fc, &s0));
     CHECK(p0.n_elem == 0);
     CHECK(s0.n_rows == 0);
     CHECK(s0.n_cols == 2);
@@ -638,17 +638,17 @@ TEST_CASE("los_probability - input validation")
     arma::mat soft;
 
     auto call = [&](const std::string &m, const arma::vec &dd, const arma::vec &hb, const arma::vec &hu, double dcl,
-                    double r, double hc, const arma::vec *gg, const arma::vec *ff, arma::mat *ss)
+                    double r, double hc, const arma::vec &gg, const arma::vec &ff, arma::mat *ss)
     { quadriga_lib::los_probability(m, dd, hb, hu, p, dcl, r, hc, gg, ff, ss); };
     auto call_m = [&](const std::string &m)
-    { return call(m, d, hB, hU, NAN, NAN, NAN, nullptr, nullptr, nullptr); };
+    { return call(m, d, hB, hU, NAN, NAN, NAN, {}, {}, nullptr); };
     auto call_d = [&](const arma::vec &dd)
-    { return call("38.901_UMa", dd, hB, arma::vec{1.5}, NAN, NAN, NAN, nullptr, nullptr, nullptr); };
+    { return call("38.901_UMa", dd, hB, arma::vec{1.5}, NAN, NAN, NAN, {}, {}, nullptr); };
     auto call_h = [&](const arma::vec &hb, const arma::vec &hu)
-    { return call("38.901_UMa", d, hb, hu, NAN, NAN, NAN, nullptr, nullptr, nullptr); };
+    { return call("38.901_UMa", d, hb, hu, NAN, NAN, NAN, {}, {}, nullptr); };
     auto call_c = [&](const std::string &m, double dcl, double r, double hc)
-    { return call(m, d, hB, hU, dcl, r, hc, nullptr, nullptr, nullptr); };
-    auto call_s = [&](const arma::vec *gg, const arma::vec *ff)
+    { return call(m, d, hB, hU, dcl, r, hc, {}, {}, nullptr); };
+    auto call_s = [&](const arma::vec &gg, const arma::vec &ff)
     { return call("38.901_UMa", d, hB, hU, NAN, NAN, NAN, gg, ff, &soft); };
 
     SECTION("valid baseline")
@@ -657,8 +657,8 @@ TEST_CASE("los_probability - input validation")
         {
             INFO("model " << m);
             CHECK_NOTHROW(call_m(m));
-            CHECK_NOTHROW(call(m, d, hB, hU, 5.0, 0.0, 0.0, &g, &fc, &soft));
-            CHECK_NOTHROW(call(m, d, hB, hU, 5.0, 0.99, 3.0, &g, &fc, &soft));
+            CHECK_NOTHROW(call(m, d, hB, hU, 5.0, 0.0, 0.0, g, fc, &soft));
+            CHECK_NOTHROW(call(m, d, hB, hU, 5.0, 0.99, 3.0, g, fc, &soft));
         }
         CHECK_NOTHROW(call_d(arma::vec{0.0, 1e6}));
         CHECK_NOTHROW(call_h(arma::vec{-10.0, 0.0, 25.0}, arma::vec{0.0}));
@@ -739,19 +739,20 @@ TEST_CASE("los_probability - input validation")
     }
     SECTION("los_soft")
     {
-        CHECK_THROWS_MATCHES(call_s(nullptr, &fc), std::invalid_argument,
+        CHECK_THROWS_MATCHES(call_s({}, fc), std::invalid_argument,
                              Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
-        CHECK_THROWS_MATCHES(call_s(&g, nullptr), std::invalid_argument,
+        CHECK_THROWS_MATCHES(call_s(g, {}), std::invalid_argument,
                              Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
         const arma::vec g2 = {0.3, 0.1}, g_nan = {0.3, NAN, 0.1}, g_inf = {0.3, inf, 0.1};
-        CHECK_THROWS_MATCHES(call_s(&g2, &fc), std::invalid_argument,
+        CHECK_THROWS_MATCHES(call_s(g2, fc), std::invalid_argument,
                              Message("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'."));
-        CHECK_THROWS_MATCHES(call_s(&g_nan, &fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
-        CHECK_THROWS_MATCHES(call_s(&g_inf, &fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
+        CHECK_THROWS_MATCHES(call_s(g_nan, fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
+        CHECK_THROWS_MATCHES(call_s(g_inf, fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
         const arma::vec f0, f1 = {3.5e9, 0.0}, f2 = {-1.0}, f3 = {NAN}, f4 = {inf};
-        CHECK_THROWS_MATCHES(call_s(&g, &f0), std::invalid_argument, Message("Input 'center_freq' cannot be empty."));
+        CHECK_THROWS_MATCHES(call_s(g, f0), std::invalid_argument,
+                             Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'.")); // empty = omitted
         for (const arma::vec *f : {&f1, &f2, &f3, &f4})
-            CHECK_THROWS_MATCHES(call_s(&g, f), std::invalid_argument, Message("Input 'center_freq' must be finite and > 0."));
+            CHECK_THROWS_MATCHES(call_s(g, *f), std::invalid_argument, Message("Input 'center_freq' must be finite and > 0."));
     }
 }
 
@@ -760,15 +761,15 @@ TEST_CASE("los_probability - outputs that alias inputs")
     const arma::vec d = {20.0, 100.0, 400.0}, hB = {25.0}, hU = {1.5, 15.0, 22.5}, g = {0.3, -0.5, 1.1}, fc = {3.5e9};
     arma::vec p, b = hB, u = hU, gg = g, f = fc;
     arma::mat soft;
-    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, &g, &fc, &soft));
+    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, g, fc, &soft));
 
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, b, hU, b), std::invalid_argument);                              // p_los is 'h_bs'
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, u), std::invalid_argument);                              // p_los is 'h_ut'
-    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, gg, NAN, NAN, NAN, &gg, &fc, &soft), std::invalid_argument); // p_los is 'rnd_g'
-    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, f, NAN, NAN, NAN, &g, &f, &soft), std::invalid_argument);   // p_los is 'center_freq'
-    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, &g, &fc, &p), std::invalid_argument);     // los_soft is 'p_los'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, gg, NAN, NAN, NAN, gg, fc, &soft), std::invalid_argument); // p_los is 'rnd_g'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, f, NAN, NAN, NAN, g, f, &soft), std::invalid_argument);   // p_los is 'center_freq'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, g, fc, &p), std::invalid_argument);     // los_soft is 'p_los'
     arma::mat on_u(u.memptr(), 3, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, p, NAN, NAN, NAN, &g, &fc, &on_u), std::invalid_argument);   // los_soft on the memory of 'h_ut'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, p, NAN, NAN, NAN, g, fc, &on_u), std::invalid_argument);   // los_soft on the memory of 'h_ut'
     CHECK(arma::approx_equal(b, hB, "absdiff", 0.0));
     CHECK(arma::approx_equal(u, hU, "absdiff", 0.0));
 }

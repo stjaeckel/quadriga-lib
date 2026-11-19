@@ -47,10 +47,10 @@ arma::uword ray_init(
     arma::fcube *path_dir_prev = nullptr,
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
-    const arma::fmat *mesh = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::fmat *aabb = nullptr,
-    const arma::fmat *rx_points = nullptr,
+    const arma::fmat &mesh = arma::fmat(),
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::fmat &aabb = arma::fmat(),
+    const arma::fmat &rx_points = arma::fmat(),
     bool scalar_mode = false);
 ```
 
@@ -61,15 +61,15 @@ arma::uword ray_init(
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`. Used only to auto-size
-  the launch sphere `r0`. NULL → the mesh does not bound `r0`.
+  the launch sphere `r0`. Empty → the mesh does not bound `r0`.
 - **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
-  strictly increasing, first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. NULL → no partitioning
+  strictly increasing, first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Unlike [[ray_progress]], boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
   so building them here would usually cost more than it saves. Pass the [[triangle_mesh_aabb]] result the
   caller already holds for the tracing loop.
 - **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
-  sphere `r0`, so that no receiver starts inside it. NULL → receivers are not considered.
+  sphere `r0`, so that no receiver starts inside it. Empty → receivers are not considered.
 - **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
   coefficient per frequency), `false` = EM (2×2 Jones matrix per frequency)
 
@@ -117,62 +117,58 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    arma::fcube *path_dir_prev,
                                    arma::fmat *acc_dist,
                                    std::vector<quadriga_lib::path> *paths,
-                                   const arma::fmat *mesh,
-                                   const arma::u32_vec *sub_mesh_ind,
-                                   const arma::fmat *aabb,
-                                   const arma::fmat *rx_points,
+                                   const arma::fmat &mesh,
+                                   const arma::u32_vec &sub_mesh_ind,
+                                   const arma::fmat &aabb,
+                                   const arma::fmat &rx_points,
                                    bool scalar_mode)
 {
     const float *p_orig_pos = qd_xyz(orig_pos, "orig_pos");
     const float Ox = p_orig_pos[0], Oy = p_orig_pos[1], Oz = p_orig_pos[2];
 
     qd_check_alias_list({orig, dest, trivec, tridir, acc_dist}, {"orig", "dest", "trivec", "tridir", "acc_dist"},
-                        mesh, aabb, rx_points);
+                        &mesh, &aabb, &rx_points);
     qd_check_alias_list({mtl_ind_prev, mtl_ind_current, mtl_ind_buffer},
                         {"mtl_ind_prev", "mtl_ind_current", "mtl_ind_buffer"});
 
     // Validate mesh
-    bool has_mesh = mesh && mesh->n_rows != 0;
-    if (has_mesh && mesh->n_cols != 9)
+    bool has_mesh = mesh.n_rows != 0;
+    if (has_mesh && mesh.n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
     // Validate receive points
-    bool has_points = rx_points && rx_points->n_rows != 0;
-    if (has_points && rx_points->n_cols != 3)
+    bool has_points = rx_points.n_rows != 0;
+    if (has_points && rx_points.n_cols != 3)
         throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
 
     // Validate the sub-mesh partition and its bounding boxes. Both only accelerate the probe, so
     // they are ignored outright when there is no mesh to probe against.
-    const arma::u32_vec *sub_mesh_ptr = nullptr;
-    const arma::fmat *aabb_ptr = nullptr;
     if (has_mesh)
     {
         arma::uword n_sub = 0;
-        if (sub_mesh_ind && sub_mesh_ind->n_elem != 0)
+        if (sub_mesh_ind.n_elem != 0)
         {
-            n_sub = sub_mesh_ind->n_elem;
-            const unsigned *p_sub = sub_mesh_ind->memptr();
+            n_sub = sub_mesh_ind.n_elem;
+            const unsigned *p_sub = sub_mesh_ind.memptr();
 
             if (p_sub[0] != 0u)
                 throw std::invalid_argument("First element of 'sub_mesh_ind' must be 0.");
 
             for (arma::uword i = 1; i < n_sub; ++i)
             {
-                if ((arma::uword)p_sub[i] >= mesh->n_rows)
+                if ((arma::uword)p_sub[i] >= mesh.n_rows)
                     throw std::invalid_argument("Entries of 'sub_mesh_ind' cannot exceed the number of mesh faces.");
                 if (p_sub[i] <= p_sub[i - 1])
                     throw std::invalid_argument("Entries of 'sub_mesh_ind' must be strictly increasing.");
             }
-            sub_mesh_ptr = sub_mesh_ind;
         }
 
-        if (aabb && aabb->n_elem != 0)
+        if (aabb.n_elem != 0)
         {
             if (n_sub == 0)
                 throw std::invalid_argument("Input 'aabb' requires 'sub_mesh_ind'.");
-            if (aabb->n_rows != n_sub || aabb->n_cols != 6)
+            if (aabb.n_rows != n_sub || aabb.n_cols != 6)
                 throw std::invalid_argument("Input 'aabb' must have size [n_sub, 6].");
-            aabb_ptr = aabb;
         }
     }
 
@@ -217,7 +213,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
             }
 
             // Get intersect coordinates
-            quadriga_lib::ray_triangle_intersect<float>(orig_tmp, dest_tmp, *mesh, &intersect_tmp, nullptr, nullptr, nullptr, nullptr, sub_mesh_ptr, aabb_ptr);
+            quadriga_lib::ray_triangle_intersect<float>(orig_tmp, dest_tmp, mesh, &intersect_tmp, nullptr, nullptr, nullptr, nullptr, sub_mesh_ind, aabb);
 
             // Nearest obstacle along the probe sphere
             float *p_intersect = intersect_tmp.memptr();
@@ -235,8 +231,8 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
         {
             // A receive point inside the launch sphere is never reached by any ray, so the
             // nearest one bounds r0 in the same way an obstacle does
-            const arma::uword n_points = rx_points->n_rows;
-            const float *p_points = rx_points->memptr();
+            const arma::uword n_points = rx_points.n_rows;
+            const float *p_points = rx_points.memptr();
 
 #pragma omp parallel if (n_points >= 32768)
             {

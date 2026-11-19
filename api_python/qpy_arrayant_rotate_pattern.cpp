@@ -67,10 +67,10 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
     if (ant_vec.size() > 1) // Frequency-dependent: rotate every entry
     {
         const unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
-        quadriga_lib::arrayant_rotate_pattern_multi(ant_vec, ori, usage_multi, &i_el);
+        quadriga_lib::arrayant_rotate_pattern_multi(ant_vec, ori, usage_multi, i_el);
     }
     else // Single-frequency: usage 0/1 adjust the sampling grid
-        quadriga_lib::arrayant_rotate_pattern(ant_vec[0], ori, usage, &i_el);
+        quadriga_lib::arrayant_rotate_pattern(ant_vec[0], ori, usage, i_el);
 
     return qd_python_arrayant2dict_multi(ant_vec);
 }

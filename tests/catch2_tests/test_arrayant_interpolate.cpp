@@ -92,7 +92,7 @@ namespace
         arma::Mat<dtype> V_re, V_im, H_re, H_im, dist, az_loc, el_loc, gamma;
     };
 
-    // Calls with all outputs; the optional inputs take nullptr without a cast (dtype is deduced from ant)
+    // Calls with all outputs; the optional inputs take {} (dtype is deduced from ant)
     template <typename T>
     struct qd_same
     {
@@ -100,8 +100,8 @@ namespace
     };
     template <typename dtype>
     qd_result<dtype> run(const quadriga_lib::arrayant<dtype> &ant, const arma::Mat<dtype> &az, const arma::Mat<dtype> &el,
-                         const arma::uvec *i_element, const arma::Cube<typename qd_same<dtype>::type> *orientation,
-                         const arma::Mat<typename qd_same<dtype>::type> *element_pos, int kernel)
+                         const arma::uvec &i_element, const arma::Cube<typename qd_same<dtype>::type> &orientation,
+                         const arma::Mat<typename qd_same<dtype>::type> &element_pos, int kernel)
     {
         qd_result<dtype> r;
         quadriga_lib::arrayant_interpolate<dtype>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, i_element, orientation, element_pos,
@@ -406,7 +406,7 @@ TEST_CASE("arrayant_interpolate - two samples along azimuth and elevation give t
         }
         for (int kernel : kernels())
         {
-            const auto r = run(ant, az, el, nullptr, nullptr, nullptr, kernel);
+            const auto r = run(ant, az, el, {}, {}, {}, kernel);
             check_deviation<dtype>(deviation(r, x, 1, 4), kernel, what);
         }
     };
@@ -436,7 +436,7 @@ TEST_CASE("arrayant_interpolate - samples on the grid are reproduced")
         const arma::uvec i_all = {0, 1, 2};
         const auto x = smooth_expect(az, el, i_all, arma::Cube<dtype>(3, 1, 1, arma::fill::zeros), ant.element_pos);
         for (int kernel : kernels())
-            check_deviation<dtype>(deviation(run(ant, az, el, nullptr, nullptr, nullptr, kernel), x, 3, az.n_cols), kernel, "grid");
+            check_deviation<dtype>(deviation(run(ant, az, el, {}, {}, {}, kernel), x, 3, az.n_cols), kernel, "grid");
     };
     check(0.0f);
     check(0.0);
@@ -460,7 +460,7 @@ TEST_CASE("arrayant_interpolate - a smooth pattern is reproduced between the sam
             const auto el = random_angles<dtype>(rnd, n_rows, 50, -80.0 * pi / 180.0, 80.0 * pi / 180.0);
             const auto x = smooth_expect(az, el, i_all, no_rotation, ant.element_pos);
             for (int kernel : kernels())
-                check_deviation<dtype>(deviation(run(ant, az, el, nullptr, nullptr, nullptr, kernel), x, 3, 50), kernel,
+                check_deviation<dtype>(deviation(run(ant, az, el, {}, {}, {}, kernel), x, 3, 50), kernel,
                                        n_rows == 1 ? "planar" : "per-element");
         }
     };
@@ -492,7 +492,7 @@ TEST_CASE("arrayant_interpolate - heading and tilt shift the local angles")
             x[a] = {two_sample_oracle(s[0], s[1], t), two_sample_oracle(s[2], s[3], t), tilt ? 0.0 : ang + shift, tilt ? ang + shift : 0.0, 0.0, 0.0};
         }
         for (int kernel : kernels())
-            check_deviation<dtype>(deviation(run(ant, az, el, nullptr, &ori, nullptr, kernel), x, 1, 4), kernel, tilt ? "tilt" : "heading");
+            check_deviation<dtype>(deviation(run(ant, az, el, {}, ori, {}, kernel), x, 1, 4), kernel, tilt ? "tilt" : "heading");
     };
     for (bool tilt : {false, true})
         check(0.0f, tilt), check(0.0, tilt);
@@ -514,7 +514,7 @@ TEST_CASE("arrayant_interpolate - bank turns the polarization")
         std::vector<qd_expect> x = {{{rs2, rs2}, {rs2, rs2}, 0.0, 0.0, 0.25 * pi, 0.0},
                                     {{rs2, rs2}, {-rs2, -rs2}, 0.0, 0.0, -0.25 * pi, 0.0}};
         for (int kernel : kernels())
-            check_deviation<dtype>(deviation(run(ant, az, el, &i_element, &ori, nullptr, kernel), x, 2, 1), kernel, "bank");
+            check_deviation<dtype>(deviation(run(ant, az, el, i_element, ori, {}, kernel), x, 2, 1), kernel, "bank");
     };
     check(0.0f);
     check(0.0);
@@ -540,7 +540,7 @@ TEST_CASE("arrayant_interpolate - every orientation shape matches the rotated-fr
         const arma::Mat<dtype> pos = {{0.3, -0.1, 0.0, 0.2}, {0.1, 0.2, -0.3, 0.0}, {-0.2, 0.0, 0.1, 0.4}};
         const auto x = smooth_expect(az, el, i_element, ori, pos);
         for (int kernel : kernels())
-            check_deviation<dtype>(deviation(run(ant, az, el, &i_element, &ori, &pos, kernel), x, n_out, n_ang), kernel, what);
+            check_deviation<dtype>(deviation(run(ant, az, el, i_element, ori, pos, kernel), x, n_out, n_ang), kernel, what);
     };
 
     SECTION("[3, 1, 1], planar angles")
@@ -588,7 +588,7 @@ TEST_CASE("arrayant_interpolate - the projected distance follows the element pos
             {
                 INFO("kernel " << kernel << ", az " << d.az << ", el " << d.el);
                 const arma::Mat<dtype> az(1, 1, arma::fill::value((dtype)d.az)), el(1, 1, arma::fill::value((dtype)d.el));
-                const auto r = run(ant, az, el, &i_element, nullptr, &pos, kernel);
+                const auto r = run(ant, az, el, i_element, {}, pos, kernel);
                 const arma::vec expect = {d.dx, d.dy, d.dz};
                 CHECK(arma::approx_equal(arma::conv_to<arma::vec>::from(r.dist), expect, "absdiff", tol_angle<dtype>(kernel)));
             }
@@ -611,8 +611,8 @@ TEST_CASE("arrayant_interpolate - element indices: omitted, permuted and repeate
             INFO("kernel " << kernel);
             // Omitted (nullptr or empty): all elements in order, positions of the arrayant
             const arma::uvec i_all = {0, 1, 2}, i_empty;
-            const auto r_null = run(ant, az, el, nullptr, nullptr, nullptr, kernel);
-            const auto r_empty = run(ant, az, el, &i_empty, nullptr, nullptr, kernel);
+            const auto r_null = run(ant, az, el, {}, {}, {}, kernel);
+            const auto r_empty = run(ant, az, el, i_empty, {}, {}, kernel);
             CHECK(identical(r_null, r_empty));
             auto d = deviation(r_null, smooth_expect(az, el, i_all, no_rotation, ant.element_pos), 3, 12);
             check_deviation<dtype>(d, kernel, "omitted");
@@ -620,7 +620,7 @@ TEST_CASE("arrayant_interpolate - element indices: omitted, permuted and repeate
             // Permuted and repeated: rows follow the indices, positions are the columns i_element of ant.element_pos
             const arma::uvec i_perm = {2, 0, 2, 1, 2};
             const arma::Mat<dtype> pos_perm = ant.element_pos.cols(i_perm);
-            d = deviation(run(ant, az, el, &i_perm, nullptr, nullptr, kernel), smooth_expect(az, el, i_perm, no_rotation, pos_perm), 5, 12);
+            d = deviation(run(ant, az, el, i_perm, {}, {}, kernel), smooth_expect(az, el, i_perm, no_rotation, pos_perm), 5, 12);
             check_deviation<dtype>(d, kernel, "permuted");
         }
     };
@@ -643,21 +643,21 @@ TEST_CASE("arrayant_interpolate - element positions: given, from the arrayant, o
         {
             INFO("kernel " << kernel);
             // Given positions replace those of the arrayant
-            auto r = run(ant, az, el, &i_element, nullptr, &pos, kernel);
+            auto r = run(ant, az, el, i_element, {}, pos, kernel);
             check_deviation<dtype>(deviation(r, smooth_expect(az, el, i_element, no_rotation, pos), 2, 9), kernel, "pos given");
 
             // Omitted (nullptr or empty): the columns i_element of ant.element_pos
-            r = run(ant, az, el, &i_element, nullptr, nullptr, kernel);
+            r = run(ant, az, el, i_element, {}, {}, kernel);
             const arma::Mat<dtype> pos_ant = ant.element_pos.cols(i_element);
             check_deviation<dtype>(deviation(r, smooth_expect(az, el, i_element, no_rotation, pos_ant), 2, 9), kernel, "pos of ant");
-            CHECK(identical(r, run(ant, az, el, &i_element, nullptr, &pos_empty, kernel)));
+            CHECK(identical(r, run(ant, az, el, i_element, {}, pos_empty, kernel)));
 
             // Omitted with an empty ant.element_pos: all elements at the origin, zero distance
             auto ant_no_pos = ant;
             ant_no_pos.element_pos.reset();
-            r = run(ant_no_pos, az, el, &i_element, nullptr, nullptr, kernel);
+            r = run(ant_no_pos, az, el, i_element, {}, {}, kernel);
             CHECK(arma::all(arma::vectorise(r.dist) == (dtype)0.0));
-            CHECK(identical(r.V_re, run(ant, az, el, &i_element, nullptr, nullptr, kernel).V_re));
+            CHECK(identical(r.V_re, run(ant, az, el, i_element, {}, {}, kernel).V_re));
         }
     };
     check(0.0f);
@@ -676,7 +676,7 @@ TEST_CASE("arrayant_interpolate - empty angle input gives empty outputs")
             qd_result<double> r;
             for (arma::mat *m : {&r.V_re, &r.V_im, &r.H_re, &r.H_im, &r.dist, &r.az_loc, &r.el_loc, &r.gamma})
                 m->ones(3, 3); // Stale content of another size
-            quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, &i_element, nullptr, nullptr,
+            quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, i_element, {}, {},
                                                &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
             for (arma::mat *m : {&r.V_re, &r.V_im, &r.H_re, &r.H_im, &r.dist, &r.az_loc, &r.el_loc, &r.gamma})
             {
@@ -696,22 +696,22 @@ TEST_CASE("arrayant_interpolate - optional outputs alone and together give the s
     for (int kernel : kernels())
     {
         INFO("kernel " << kernel);
-        const auto all = run(ant, az, el, nullptr, &ori, nullptr, kernel);
+        const auto all = run(ant, az, el, {}, ori, {}, kernel);
         CHECK(arma::abs(all.V_re).max() > 0.1); // Not a trivial (zero) result
         CHECK(arma::abs(all.gamma).max() > 0.01);
 
         arma::mat V_re, V_im, H_re, H_im, x;
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr,
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, ori, {},
                                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
         CHECK((identical(V_re, all.V_re) && identical(V_im, all.V_im) && identical(H_re, all.H_re) && identical(H_im, all.H_im)));
 
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, &x, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, ori, {}, &x, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
         CHECK(identical(x, all.dist));
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, &x, nullptr, nullptr, nullptr, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, ori, {}, nullptr, &x, nullptr, nullptr, nullptr, nullptr, kernel);
         CHECK(identical(x, all.az_loc));
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, nullptr, &x, nullptr, nullptr, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, ori, {}, nullptr, nullptr, &x, nullptr, nullptr, nullptr, kernel);
         CHECK(identical(x, all.el_loc));
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, nullptr, nullptr, &x, nullptr, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, ori, {}, nullptr, nullptr, nullptr, &x, nullptr, nullptr, kernel);
         CHECK(identical(x, all.gamma));
         CHECK((identical(V_re, all.V_re) && identical(H_im, all.H_im)));
     }
@@ -726,7 +726,7 @@ TEST_CASE("arrayant_interpolate - pre-sized outputs are written in place, others
     for (int kernel : kernels())
     {
         INFO("kernel " << kernel);
-        const auto ref = run(ant, az, el, nullptr, nullptr, nullptr, kernel);
+        const auto ref = run(ant, az, el, {}, {}, {}, kernel);
         CHECK(arma::abs(ref.V_re).max() > 0.1); // Not a trivial (zero) result
 
         // Correct size, stale content: written in place and completely
@@ -735,7 +735,7 @@ TEST_CASE("arrayant_interpolate - pre-sized outputs are written in place, others
         std::vector<const double *> ptr;
         for (arma::mat *m : outs)
             m->set_size(3, 6), m->fill(nan), ptr.push_back(m->memptr());
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, nullptr, nullptr, nullptr,
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, {}, {}, {},
                                            &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
         for (size_t i = 0; i < outs.size(); ++i)
             CHECK(outs[i]->memptr() == ptr[i]);
@@ -744,7 +744,7 @@ TEST_CASE("arrayant_interpolate - pre-sized outputs are written in place, others
         // Wrong size, stale content: resized and overwritten
         for (arma::mat *m : outs)
             m->set_size(2, 7), m->fill(nan);
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, nullptr, nullptr, nullptr,
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, {}, {}, {},
                                            &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
         CHECK(identical(r, ref));
     }
@@ -766,9 +766,9 @@ TEST_CASE("arrayant_interpolate - NaN and infinite angles give NaN")
             // Planar angles: columns 1 to 6 are non-finite, columns 0 and 7 are finite
             const arma::Mat<dtype> az = {{0.3, nan, inf, -inf, 0.2, 0.2, 0.2, -2.0}};
             const arma::Mat<dtype> el = {{0.1, 0.0, 0.0, 0.0, nan, inf, -inf, 0.5}};
-            const auto r = run(ant, az, el, nullptr, nullptr, nullptr, kernel);
+            const auto r = run(ant, az, el, {}, {}, {}, kernel);
             const arma::Mat<dtype> az_f = {{0.3, -2.0}}, el_f = {{0.1, 0.5}};
-            const auto r_f = run(ant, az_f, el_f, nullptr, nullptr, nullptr, kernel);
+            const auto r_f = run(ant, az_f, el_f, {}, {}, {}, kernel);
             for (arma::uword o = 0; o < 2; ++o)
             {
                 for (arma::uword a = 1; a < 7; ++a)
@@ -782,7 +782,7 @@ TEST_CASE("arrayant_interpolate - NaN and infinite angles give NaN")
             const arma::Mat<dtype> az2 = {{nan, 0.3, 0.1, inf}, {0.3, -inf, 0.2, 0.0}};
             const arma::Mat<dtype> el2 = {{0.1, 0.1, nan, 0.0}, {0.1, 0.1, 0.0, -inf}};
             const int bad[2][4] = {{1, 0, 1, 1}, {0, 1, 0, 1}};
-            const auto r2 = run(ant, az2, el2, nullptr, nullptr, nullptr, kernel);
+            const auto r2 = run(ant, az2, el2, {}, {}, {}, kernel);
             for (arma::uword o = 0; o < 2; ++o)
                 for (arma::uword a = 0; a < 4; ++a)
                     for (const arma::Mat<dtype> *m : {&r2.V_re, &r2.H_im, &r2.dist, &r2.gamma})
@@ -809,10 +809,10 @@ TEST_CASE("arrayant_interpolate - angles outside the nominal ranges")
     {
         INFO("kernel " << kernel);
         const double tf = tol_field<double>(kernel), ta = tol_angle<double>(kernel);
-        const auto r = run(ant, az, el_in, nullptr, &ori, nullptr, kernel);
+        const auto r = run(ant, az, el_in, {}, ori, {}, kernel);
         for (double shift : {2.0 * pi, -2.0 * pi})
         {
-            const auto s = run(ant, arma::mat(az + shift), el_in, nullptr, &ori, nullptr, kernel);
+            const auto s = run(ant, arma::mat(az + shift), el_in, {}, ori, {}, kernel);
             CHECK(arma::approx_equal(s.V_re, r.V_re, "absdiff", tf));
             CHECK(arma::approx_equal(s.H_im, r.H_im, "absdiff", tf));
             CHECK(arma::approx_equal(s.az_loc, r.az_loc, "absdiff", ta));
@@ -820,8 +820,8 @@ TEST_CASE("arrayant_interpolate - angles outside the nominal ranges")
         }
         for (double sign : {1.0, -1.0})
         {
-            const auto r_in = run(ant, arma::mat(az + pi), arma::mat(sign * el_in), nullptr, &ori, nullptr, kernel);
-            const auto r_out = run(ant, az, arma::mat(sign * el_out), nullptr, &ori, nullptr, kernel);
+            const auto r_in = run(ant, arma::mat(az + pi), arma::mat(sign * el_in), {}, ori, {}, kernel);
+            const auto r_out = run(ant, az, arma::mat(sign * el_out), {}, ori, {}, kernel);
             CHECK(arma::approx_equal(r_out.V_re, arma::mat(-r_in.V_re), "absdiff", tf));
             CHECK(arma::approx_equal(r_out.V_im, arma::mat(-r_in.V_im), "absdiff", tf));
             CHECK(arma::approx_equal(r_out.H_re, arma::mat(-r_in.H_re), "absdiff", tf));
@@ -870,9 +870,9 @@ TEST_CASE("arrayant_interpolate - GENERIC and AVX2 agree on a 3GPP panel")
 
         // Reference from the inputs as the dtype run sees them
         const arma::cube ori_ref = arma::conv_to<arma::cube>::from(ori);
-        const auto ref = run(ant_d, arma::conv_to<arma::mat>::from(az), arma::conv_to<arma::mat>::from(el), &i_element,
-                             &ori_ref, nullptr, 1);
-        const auto avx = run(ant, az, el, &i_element, &ori, nullptr, 2);
+        const auto ref = run(ant_d, arma::conv_to<arma::mat>::from(az), arma::conv_to<arma::mat>::from(el), i_element,
+                             ori_ref, {}, 1);
+        const auto avx = run(ant, az, el, i_element, ori, {}, 2);
         CHECK(compare_single_precision(avx, ref, M, S, pos_max, what) < 1.0);
     };
 
@@ -982,8 +982,8 @@ TEST_CASE("arrayant_interpolate - AVX2 accuracy at fixed directions and at the p
             for (arma::uword o = 0; o < p.n_out; ++o)
                 pos_d(0, o) = 0.1 * (double)o - 0.3, pos_d(1, o) = 0.2 - 0.05 * (double)o, pos_d(2, o) = 0.04 * (double)o;
             const arma::Mat<dtype> pos = arma::conv_to<arma::Mat<dtype>>::from(pos_d);
-            const auto ref = run(ant_d, az_d, el_d, &i_element, &ori_d, &pos_d, 1);
-            const auto r = run(ant, arma::conv_to<arma::Mat<dtype>>::from(az_d), arma::conv_to<arma::Mat<dtype>>::from(el_d), &i_element, &ori, &pos, 2);
+            const auto ref = run(ant_d, az_d, el_d, i_element, ori_d, pos_d, 1);
+            const auto r = run(ant, arma::conv_to<arma::Mat<dtype>>::from(az_d), arma::conv_to<arma::Mat<dtype>>::from(el_d), i_element, ori, pos, 2);
 
             double d_field = 0.0, d_power = 0.0, d_az = 0.0, d_el = 0.0, d_gamma = 0.0, d_dist = 0.0;
             for (arma::uword i = 0; i < ref.V_re.n_elem; ++i)
@@ -1046,7 +1046,7 @@ TEST_CASE("arrayant_interpolate - on the pole of the local frame the polarizatio
         const double V_ref = (1.0 - (x - (double)j)) * ant_d.e_theta_re(row, j, 0) + (x - (double)j) * ant_d.e_theta_re(row, j + 1, 0);
         arma::Cube<dtype> ori(3, 1, 1);
         ori(0) = (dtype)bank, ori(1) = (dtype)tilt, ori(2) = (dtype)heading;
-        const auto r = run(ant, arma::Mat<dtype>{(dtype)az}, arma::Mat<dtype>{(dtype)el}, nullptr, &ori, nullptr, kernel);
+        const auto r = run(ant, arma::Mat<dtype>{(dtype)az}, arma::Mat<dtype>{(dtype)el}, {}, ori, {}, kernel);
         INFO("kernel " << kernel << (std::is_same<dtype, float>::value ? " float" : " double") << ", orientation (" << bank
                        << ", " << tilt << ", " << heading << "), direction (" << az << ", " << el << ")");
         CHECK(std::abs(wrap((double)r.az_loc(0) - az_ref)) < tol_angle<dtype>(kernel));
@@ -1092,8 +1092,8 @@ TEST_CASE("arrayant_interpolate - float and double agree")
     for (auto &v : ori)
         v = (float)rnd(-pi, pi);
     const arma::cube ori_d = arma::conv_to<arma::cube>::from(ori);
-    const auto r_f = run(ant_f, az, el, nullptr, &ori, nullptr, 1);
-    const auto r_d = run(ant_d, arma::conv_to<arma::mat>::from(az), arma::conv_to<arma::mat>::from(el), nullptr, &ori_d, nullptr, 1);
+    const auto r_f = run(ant_f, az, el, {}, ori, {}, 1);
+    const auto r_d = run(ant_d, arma::conv_to<arma::mat>::from(az), arma::conv_to<arma::mat>::from(el), {}, ori_d, {}, 1);
     CHECK(compare_single_precision(r_f, r_d, M, S, arma::abs(ant_d.element_pos).max(), "GENERIC") < 1.0);
 }
 
@@ -1101,7 +1101,7 @@ TEST_CASE("arrayant_interpolate - repeated calls are identical and a large call 
 {
     // Large enough for the OpenMP regions of both kernels; for AVX2 the orientation does not vary per angle, since
     // slicing a per-angle orientation to one angle selects another AVX2 code path
-    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 5.0);
+    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 5.0);
     const arma::uvec i_element = {7, 0, 3, 3, 5, 1, 6, 2, 4, 0, 7};
     const arma::uword n_ang = 300;
     qd_uniform rnd(41);
@@ -1114,8 +1114,8 @@ TEST_CASE("arrayant_interpolate - repeated calls are identical and a large call 
             arma::cube ori(3, 11, 1);
             for (auto &v : ori)
                 v = rnd(-1.0, 1.0);
-            const auto r1 = run(ant, az, el, &i_element, &ori, nullptr, kernel);
-            const auto r2 = run(ant, az, el, &i_element, &ori, nullptr, kernel);
+            const auto r1 = run(ant, az, el, i_element, ori, {}, kernel);
+            const auto r2 = run(ant, az, el, i_element, ori, {}, kernel);
             CHECK(arma::abs(r1.V_re).max() > 0.1); // Not a trivial (zero) result
             CHECK(identical(r1, r2));
 
@@ -1124,7 +1124,7 @@ TEST_CASE("arrayant_interpolate - repeated calls are identical and a large call 
                 m->set_size(11, n_ang);
             for (arma::uword a = 0; a < n_ang; ++a)
             {
-                const auto s = run(ant, arma::mat(az.col(a)), arma::mat(el.col(a)), &i_element, &ori, nullptr, kernel);
+                const auto s = run(ant, arma::mat(az.col(a)), arma::mat(el.col(a)), i_element, ori, {}, kernel);
                 cat.V_re.col(a) = s.V_re, cat.V_im.col(a) = s.V_im, cat.H_re.col(a) = s.H_re, cat.H_im.col(a) = s.H_im;
                 cat.dist.col(a) = s.dist, cat.az_loc.col(a) = s.az_loc, cat.el_loc.col(a) = s.el_loc, cat.gamma.col(a) = s.gamma;
             }
@@ -1136,13 +1136,13 @@ TEST_CASE("arrayant_interpolate - repeated calls are identical and a large call 
     arma::cube ori(3, 11, n_ang);
     for (auto &v : ori)
         v = rnd(-1.0, 1.0);
-    const auto r1 = run(ant, az, el, &i_element, &ori, nullptr, 1);
+    const auto r1 = run(ant, az, el, i_element, ori, {}, 1);
     bool all_equal = true;
     for (arma::uword a = 0; a < n_ang; ++a)
     {
         arma::cube ori_a(3, 11, 1);
         ori_a.slice(0) = ori.slice(a);
-        const auto s = run(ant, arma::mat(az.col(a)), arma::mat(el.col(a)), &i_element, &ori_a, nullptr, 1);
+        const auto s = run(ant, arma::mat(az.col(a)), arma::mat(el.col(a)), i_element, ori_a, {}, 1);
         all_equal = all_equal && identical(arma::mat(r1.V_re.col(a)), s.V_re) && identical(arma::mat(r1.gamma.col(a)), s.gamma);
     }
     CHECK(all_equal);
@@ -1153,18 +1153,18 @@ TEST_CASE("arrayant_interpolate - use_kernel selects the kernel")
     const auto ant = smooth_ant<double>();
     qd_uniform rnd(43);
     const auto az = random_angles<double>(rnd, 1, 20, -2.5, 2.5), el = random_angles<double>(rnd, 1, 20, -1.0, 1.0);
-    const auto r0 = run(ant, az, el, nullptr, nullptr, nullptr, 0);
-    const auto r1 = run(ant, az, el, nullptr, nullptr, nullptr, 1);
+    const auto r0 = run(ant, az, el, {}, {}, {}, 0);
+    const auto r1 = run(ant, az, el, {}, {}, {}, 1);
     CHECK(identical(r0, r1)); // Auto selects GENERIC
 
     if (quadriga_lib::quadriga_lib_has_AVX2())
     {
-        const auto r2 = run(ant, az, el, nullptr, nullptr, nullptr, 2);
+        const auto r2 = run(ant, az, el, {}, {}, {}, 2);
         CHECK(!identical(r2.V_re, r1.V_re)); // AVX2 computes in single precision
     }
     else
     {
-        CHECK_THROWS_AS(run(ant, az, el, nullptr, nullptr, nullptr, 2), std::invalid_argument);
+        CHECK_THROWS_AS(run(ant, az, el, {}, {}, {}, 2), std::invalid_argument);
     }
 }
 
@@ -1177,21 +1177,21 @@ TEST_CASE("arrayant_interpolate - complex outputs equal the split outputs bit fo
     auto check = [](auto dtype_tag, int kernel, arma::uword n_out, arma::uword n_ang_rows)
     {
         using dtype = decltype(dtype_tag);
-        const auto ant = convert<dtype>(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0));
+        const auto ant = convert<dtype>(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0));
         const arma::uvec i_element = arma::uvec({7, 0, 3, 3, 5, 1, 6, 2, 4, 0, 7}).head(n_out);
         qd_uniform rnd(47);
         const auto az = random_angles<dtype>(rnd, n_ang_rows, 13, -pi, pi);
         const auto el = random_angles<dtype>(rnd, n_ang_rows, 13, -1.5, 1.5);
         arma::Cube<dtype> ori(3, 1, 1);
         ori(0) = dtype(0.3), ori(1) = dtype(-0.2), ori(2) = dtype(1.1);
-        const auto ref = run(ant, az, el, &i_element, &ori, nullptr, kernel);
+        const auto ref = run(ant, az, el, i_element, ori, {}, kernel);
 
         for (int mode = 0; mode < 3; ++mode) // V and H, V only, H only
         {
             qd_result<dtype> r;
             r.V_re.ones(2, 2), r.V_im.ones(2, 2), r.H_re.ones(2, 2), r.H_im.ones(2, 2); // Stale content
             arma::Mat<std::complex<dtype>> V, H;
-            quadriga_lib::arrayant_interpolate<dtype>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, &i_element, &ori, nullptr,
+            quadriga_lib::arrayant_interpolate<dtype>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, i_element, ori, {},
                                                       &r.dist, &r.az_loc, &r.el_loc, &r.gamma,
                                                       mode != 2 ? &V : nullptr, mode != 1 ? &H : nullptr, kernel);
             if (mode != 2)
@@ -1219,13 +1219,13 @@ TEST_CASE("arrayant_interpolate - complex outputs equal the split outputs bit fo
     arma::cube ori(3, n_out, 4, arma::fill::zeros); // 12 n_out values, more than [n_out, 4] complex
     arma::cx_mat V, H, ori_alias((std::complex<double> *)ori.memptr(), n_out, 4, false, true);
     arma::cx_mat H_alias((std::complex<double> *)H_im.memptr(), n_out, 4, false, true);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr,
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, ori, {},
                                                                nullptr, nullptr, nullptr, nullptr, &ori_alias, &H),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr,
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, {}, {},
                                                                nullptr, nullptr, nullptr, nullptr, &V, &V),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr,
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, {}, {},
                                                                nullptr, nullptr, nullptr, nullptr, nullptr, &H_alias),
                     std::invalid_argument);
 }
@@ -1239,14 +1239,14 @@ TEST_CASE("arrayant_interpolate - input validation")
     const arma::mat pos(3, 3, arma::fill::zeros);
     arma::mat V_re, V_im, H_re, H_im, dist, az_loc, el_loc, gamma;
 
-    CHECK_NOTHROW(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, &i_element, &ori, &pos,
+    CHECK_NOTHROW(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, i_element, ori, pos,
                                                      &dist, &az_loc, &el_loc, &gamma, nullptr, nullptr, 1));
 
     // An invalid call leaves the outputs untouched
     V_re.fill(7.0);
     const double *V_re_ptr = V_re.memptr();
     auto call = [&](const quadriga_lib::arrayant<double> &a, const arma::mat &azi, const arma::mat &ele,
-                    const arma::uvec *ie, const arma::cube *o, const arma::mat *p, int k)
+                    const arma::uvec &ie, const arma::cube &o, const arma::mat &p, int k)
     {
         quadriga_lib::arrayant_interpolate<double>(a, azi, ele, V_re, V_im, H_re, H_im, ie, o, p, &dist, &az_loc, &el_loc, &gamma, nullptr, nullptr, k);
     };
@@ -1255,61 +1255,61 @@ TEST_CASE("arrayant_interpolate - input validation")
     {
         auto bad = ant;
         bad.e_theta_im.set_size(13, 18, 3);
-        CHECK_THROWS_AS(call(bad, az, el, &i_element, &ori, &pos, 1), std::invalid_argument);
+        CHECK_THROWS_AS(call(bad, az, el, i_element, ori, pos, 1), std::invalid_argument);
     }
     SECTION("azimuth")
     {
-        CHECK_THROWS_AS(call(ant, arma::mat(0, 4), arma::mat(0, 4), &i_element, &ori, &pos, 1), std::invalid_argument);
-        CHECK_THROWS_AS(call(ant, arma::mat(2, 4), arma::mat(2, 4), &i_element, &ori, &pos, 1), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, arma::mat(0, 4), arma::mat(0, 4), i_element, ori, pos, 1), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, arma::mat(2, 4), arma::mat(2, 4), i_element, ori, pos, 1), std::invalid_argument);
     }
     SECTION("elevation")
     {
-        CHECK_THROWS_AS(call(ant, az, arma::mat(1, 3), &i_element, &ori, &pos, 1), std::invalid_argument);
-        CHECK_THROWS_AS(call(ant, az, arma::mat(3, 4), &i_element, &ori, &pos, 1), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, az, arma::mat(1, 3), i_element, ori, pos, 1), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, az, arma::mat(3, 4), i_element, ori, pos, 1), std::invalid_argument);
     }
     SECTION("i_element")
     {
         const arma::uvec bad = {2, 3, 1};
-        CHECK_THROWS_AS(call(ant, az, el, &bad, &ori, &pos, 1), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, az, el, bad, ori, pos, 1), std::invalid_argument);
     }
     SECTION("orientation")
     {
         for (const arma::cube &bad : {arma::cube(2, 3, 4), arma::cube(3, 2, 4), arma::cube(3, 3, 3)})
-            CHECK_THROWS_AS(call(ant, az, el, &i_element, &bad, &pos, 1), std::invalid_argument);
+            CHECK_THROWS_AS(call(ant, az, el, i_element, bad, pos, 1), std::invalid_argument);
     }
     SECTION("element_pos")
     {
         for (const arma::mat &bad : {arma::mat(2, 3), arma::mat(3, 2)})
-            CHECK_THROWS_AS(call(ant, az, el, &i_element, &ori, &bad, 1), std::invalid_argument);
+            CHECK_THROWS_AS(call(ant, az, el, i_element, ori, bad, 1), std::invalid_argument);
     }
     SECTION("use_kernel")
     {
-        CHECK_THROWS_AS(call(ant, az, el, &i_element, &ori, &pos, -1), std::invalid_argument);
-        CHECK_THROWS_AS(call(ant, az, el, &i_element, &ori, &pos, 3), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, az, el, i_element, ori, pos, -1), std::invalid_argument);
+        CHECK_THROWS_AS(call(ant, az, el, i_element, ori, pos, 3), std::invalid_argument);
     }
     SECTION("an output is an input or shares memory with one")
     {
         arma::mat az_copy = az;
-        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az_copy, el, az_copy, V_im, H_re, H_im, &i_element), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az_copy, el, V_re, V_im, H_re, H_im, &i_element, &ori, &pos,
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az_copy, el, az_copy, V_im, H_re, H_im, i_element), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az_copy, el, V_re, V_im, H_re, H_im, i_element, ori, pos,
                                                            nullptr, nullptr, &az_copy),
                         std::invalid_argument);
         arma::mat on_pos(const_cast<double *>(pos.memptr()), 3, 3, false, true);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, on_pos, V_im, H_re, H_im, &i_element, &ori, &pos),
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, on_pos, V_im, H_re, H_im, i_element, ori, pos),
                         std::invalid_argument);
     }
     SECTION("an output is a data member of ant")
     {
         CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, ant.element_pos, V_im, H_re, H_im), std::invalid_argument);
         arma::mat on_pattern(ant.e_phi_im.memptr(), 3, 4, false, true);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr,
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, {}, {},
                                                            nullptr, nullptr, nullptr, &on_pattern),
                         std::invalid_argument);
     }
     SECTION("two outputs are the same object")
     {
         CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_re, H_re, H_im), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr,
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, {}, {}, {},
                                                            nullptr, &az_loc, nullptr, &az_loc),
                         std::invalid_argument);
     }

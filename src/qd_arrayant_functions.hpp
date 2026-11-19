@@ -236,14 +236,14 @@ static inline void qd_check_alias_arrayant(const T *const (&out)[N], const char 
                        &ant.elevation_grid, &ant.element_pos, &ant.coupling_re, &ant.coupling_im);
 }
 
-// Element indices of the calc functions: nullptr or empty = all elements, duplicates allowed, out of range throws
-static inline arma::uvec qd_arrayant_calc_element_list(const arma::uvec *i_element, arma::uword n_elements)
+// Element indices of the calc functions: empty = all elements, duplicates allowed, out of range throws
+static inline arma::uvec qd_arrayant_calc_element_list(const arma::uvec &i_element, arma::uword n_elements)
 {
-    if (i_element == nullptr || i_element->n_elem == 0) // A valid arrayant has at least one element
+    if (i_element.n_elem == 0) // A valid arrayant has at least one element
         return arma::regspace<arma::uvec>(0, n_elements - 1);
-    if (arma::any(*i_element >= n_elements))
+    if (arma::any(i_element >= n_elements))
         throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
-    return *i_element;
+    return i_element;
 }
 
 // Per-element kernels of arrayant_calc_beamwidth / arrayant_calc_directivity (src/qd_arrayant_ops.cpp); no checks:

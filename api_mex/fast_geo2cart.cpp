@@ -71,5 +71,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::fast_geo2cart<double>(az, el, out[0], out[1], out[2],
                                                 (nlhs > 3) ? &out[3] : nullptr, (nlhs > 4) ? &out[4] : nullptr,
                                                 (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr,
-                                                len.empty() ? nullptr : &len, use_kernel));
+                                                len, use_kernel));
 }

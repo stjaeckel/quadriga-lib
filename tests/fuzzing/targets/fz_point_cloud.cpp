@@ -44,10 +44,10 @@ static void run(fz::input &in)
         sci = arma::sort(sci);
     const arma::Mat<T> &aabb_points = (in.ConsumeBool() && pointsR.n_rows != 0) ? pointsR : points;
     const int aabb_mode = in.ConsumeIntegralInRange<int>(0, 2);
-    const arma::u32_vec *aabb_sci = aabb_mode == 0 ? nullptr : (aabb_mode == 1 ? &sci : &sub_cloud_ind);
+    const arma::u32_vec no_sci, *aabb_sci = aabb_mode == 0 ? &no_sci : (aabb_mode == 1 ? &sci : &sub_cloud_ind);
     const arma::uword vec_size_aabb = in.size(9);
     arma::Mat<T> aabb;
-    fz::clean([&] { quadriga_lib::point_cloud_aabb<T>(aabb_points, aabb, aabb_sci, vec_size_aabb); });
+    fz::clean([&] { quadriga_lib::point_cloud_aabb<T>(aabb_points, aabb, *aabb_sci, vec_size_aabb); });
 
     // Split; the outputs may be distinct, the same object, or the input itself
     arma::Mat<T> copy = points, pointsA(in.size(2), 3), pointsB;

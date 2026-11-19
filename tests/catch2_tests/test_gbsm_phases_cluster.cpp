@@ -224,7 +224,7 @@ TEST_CASE("gbsm_init_phases - cluster: the sets are distinct from each other and
 {
     const auto sp = scen(13.0, 10.0);
     arma::cube lsf, shared, f0, f1;
-    quadriga_lib::gbsm_init_phases(sp, "lsf", lsf, 42, -1, "Comb256", nullptr, nullptr, false, false);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", lsf, 42, -1, "Comb256", {}, {}, false, false);
     quadriga_lib::gbsm_init_phases(sp, "cluster", shared, 42);
     quadriga_lib::gbsm_init_phases(sp, "cluster", f0, 42, 0);
     quadriga_lib::gbsm_init_phases(sp, "cluster", f1, 42, 1);
@@ -392,8 +392,8 @@ TEST_CASE("gbsm_draw - cluster: dual mobility values follow the two-device formu
             const bool shared = s == 0;
             const arma::cube phase = make_phase(256, N, shared, 55 + s);
             arma::mat rnd;
-            quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, rnd, shared ? -1 : 0, "Comb256", f ? &fl : nullptr,
-                                    nullptr, true);
+            quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, rnd, shared ? -1 : 0, "Comb256", f ? fl : arma::u32_vec(),
+                                    {}, true);
             REQUIRE(rnd.n_rows == 5);
             REQUIRE(rnd.n_cols == n_gen_of(N, shared));
             double max_d = 0.0;
@@ -438,8 +438,8 @@ TEST_CASE("gbsm_draw - cluster: swapping Tx and Rx exchanges the departure and a
             arma::cube phase;
             quadriga_lib::gbsm_init_phases(sp, "cluster", phase, 61, set);
             arma::mat ab, ba;
-            quadriga_lib::gbsm_draw(sp, "cluster", phase, B, A, ab, set, "Comb256", f ? &fl : nullptr, nullptr, true); // tx = B, rx = A
-            quadriga_lib::gbsm_draw(sp, "cluster", phase, A, B, ba, set, "Comb256", f ? &fl : nullptr, nullptr, true); // tx = A, rx = B
+            quadriga_lib::gbsm_draw(sp, "cluster", phase, B, A, ab, set, "Comb256", f ? fl : arma::u32_vec(), {}, true); // tx = B, rx = A
+            quadriga_lib::gbsm_draw(sp, "cluster", phase, A, B, ba, set, "Comb256", f ? fl : arma::u32_vec(), {}, true); // tx = A, rx = B
             REQUIRE(ab.n_cols == n_gen_of(N, shared));
             REQUIRE(ba.n_cols == n_gen_of(N, shared));
             for (arma::uword c = 0; c < ab.n_cols; ++c)
@@ -462,7 +462,7 @@ TEST_CASE("gbsm_draw - cluster: a column does not depend on the phases of the ot
 
     arma::mat ref1, ref2;
     quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref1);
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref2, -1, "Comb256", nullptr, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref2, -1, "Comb256", {}, {}, true);
     for (arma::uword c : cols)
     {
         // New raw phases for all columns except c and its mirror (both enter the dual-mobility value of c), slice 1
@@ -478,7 +478,7 @@ TEST_CASE("gbsm_draw - cluster: a column does not depend on the phases of the ot
 
         arma::mat v1, v2;
         quadriga_lib::gbsm_draw(sp, "cluster", other, tx, rx, v1);
-        quadriga_lib::gbsm_draw(sp, "cluster", other, tx, rx, v2, -1, "Comb256", nullptr, nullptr, true);
+        quadriga_lib::gbsm_draw(sp, "cluster", other, tx, rx, v2, -1, "Comb256", {}, {}, true);
         INFO("column " << c);
         CHECK(arma::all(v1.col(c) == ref1.col(c)));
         CHECK(arma::all(v2.col(c) == ref2.col(c)));
@@ -497,7 +497,7 @@ TEST_CASE("gbsm_draw - cluster: floors as in the lsf set")
         const arma::u32_vec fl0(5, arma::fill::zeros);
         arma::mat a, b;
         quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, a);
-        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, b, -1, "Comb256", &fl0);
+        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, b, -1, "Comb256", fl0);
         CHECK(qd_equal(a, b));
     }
 
@@ -510,7 +510,7 @@ TEST_CASE("gbsm_draw - cluster: floors as in the lsf set")
     arma::u32_vec fl(2 * n, arma::fill::zeros);
     fl.subvec(n, 2 * n - 1).fill(1);
     arma::mat rnd;
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, rnd, -1, "Comb256", &fl);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, rnd, -1, "Comb256", fl);
     REQUIRE(rnd.n_rows == 2 * n);
     QD_DIAG("\n# diag: gbsm_draw cluster correlation between floors 0 and 1 at equal positions\ncolumn,corr\n");
     for (arma::uword c = 0; c < rnd.n_cols; ++c)
@@ -533,12 +533,12 @@ TEST_CASE("gbsm_draw - cluster: 2D mode does not depend on z, 3D mode does")
     for (int dual = 0; dual < 2; ++dual)
     {
         arma::mat a, b;
-        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, a, -1, "Comb256", nullptr, nullptr, dual == 1);
-        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx_up, rx_up, b, -1, "Comb256", nullptr, nullptr, dual == 1);
+        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, a, -1, "Comb256", {}, {}, dual == 1);
+        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx_up, rx_up, b, -1, "Comb256", {}, {}, dual == 1);
         INFO("dual mobility " << dual);
         CHECK(qd_equal(a, b));
-        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, a, -1, "Comb256", nullptr, nullptr, dual == 1, false);
-        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx_up, rx_up, b, -1, "Comb256", nullptr, nullptr, dual == 1,
+        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, a, -1, "Comb256", {}, {}, dual == 1, false);
+        quadriga_lib::gbsm_draw(sp, "cluster", phase, tx_up, rx_up, b, -1, "Comb256", {}, {}, dual == 1,
                                 false);
         REQUIRE(a.n_cols == 27);
         for (arma::uword c = 0; c < 27; ++c)
@@ -638,7 +638,7 @@ TEST_CASE("gbsm_draw - cluster: sizes, empty input and pre-sized output")
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 27);
     rnd.ones(4, 4);
-    CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", phase, rx0, rx0, rnd, -1, "Comb256", nullptr, nullptr, true));
+    CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", phase, rx0, rx0, rnd, -1, "Comb256", {}, {}, true));
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 27);
 
@@ -653,7 +653,7 @@ TEST_CASE("gbsm_draw - cluster: sizes, empty input and pre-sized output")
     CHECK(rnd.n_rows == 5);
     CHECK(rnd.n_cols == 0);
     rnd.ones(4, 4);
-    quadriga_lib::gbsm_draw(sp1, "cluster", ph0f, tx, rx, rnd, 0, "Comb256", nullptr, nullptr, true);
+    quadriga_lib::gbsm_draw(sp1, "cluster", ph0f, tx, rx, rnd, 0, "Comb256", {}, {}, true);
     CHECK(rnd.n_rows == 5);
     CHECK(rnd.n_cols == 0);
     rnd.ones(4, 4);
@@ -664,22 +664,22 @@ TEST_CASE("gbsm_draw - cluster: sizes, empty input and pre-sized output")
     // Pre-sized output with stale content: written in place (same memory) and completely
     const arma::u32_vec fl = {0, 3, 3, 259, 1};
     arma::mat ref1, ref2;
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref1, -1, "Comb256", &fl);
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref2, -1, "Comb256", nullptr, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref1, -1, "Comb256", fl);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref2, -1, "Comb256", {}, {}, true);
     arma::mat pre(5, 27);
     pre.fill(99.0);
     const double *mem = pre.memptr();
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, pre, -1, "Comb256", &fl);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, pre, -1, "Comb256", fl);
     CHECK(pre.memptr() == mem);
     CHECK(qd_equal(pre, ref1));
     pre.fill(99.0);
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, pre, -1, "Comb256", nullptr, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, pre, -1, "Comb256", {}, {}, true);
     CHECK(pre.memptr() == mem);
     CHECK(qd_equal(pre, ref2));
 
     // Wrong size: resized
     arma::mat wrong(3, 3, arma::fill::ones);
-    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, wrong, -1, "Comb256", nullptr, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, wrong, -1, "Comb256", {}, {}, true);
     CHECK(qd_equal(wrong, ref2));
 }
 
@@ -694,7 +694,7 @@ TEST_CASE("gbsm_draw - input validation")
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, rnd));
-        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", perf, tx, rx, rnd, 5, "Comb256", &fl, nullptr, true));
+        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", perf, tx, rx, rnd, 5, "Comb256", fl, {}, true));
     }
     SECTION("positions")
     {
@@ -755,11 +755,11 @@ TEST_CASE("gbsm_draw - input validation")
     SECTION("floor_id")
     {
         const arma::u32_vec bad = {0, 1};
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, rnd, -1, "Comb256", &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, rnd, -1, "Comb256", bad), std::invalid_argument,
                              Message("Number of elements in 'floor_id' does not match number of columns in 'rx_pos'."));
         arma::mat keep(2, 2, arma::fill::ones);
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, keep, -1, "Comb256", &fl,
-                                                     nullptr, false, false), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, keep, -1, "Comb256", fl,
+                                                     {}, false, false), std::invalid_argument,
                              Message("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors."));
         CHECK(keep.n_rows == 2);
         CHECK(arma::all(arma::vectorise(keep) == 1.0));
@@ -781,10 +781,10 @@ TEST_CASE("gbsm_draw - input validation")
         {
             arma::mat a, b, c, d;
             quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, a);
-            CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, b, -1, "Comb256", nullptr, &fc));
+            CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, b, -1, "Comb256", {}, fc));
             CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
             quadriga_lib::gbsm_draw(sp, "lsf", ph_lsf, tx, rx, c);
-            CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", ph_lsf, tx, rx, d, -1, "Comb256", nullptr, &fc));
+            CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", ph_lsf, tx, rx, d, -1, "Comb256", {}, fc));
             CHECK(arma::approx_equal(c, d, "absdiff", 0.0));
         }
     }

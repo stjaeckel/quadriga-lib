@@ -1239,12 +1239,12 @@ void quadriga_lib::conf_file_write(
     const std::string &fn,
     const std::unordered_map<std::string, double> &scenpar,
     const std::string &pl_model = "",
-    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
-    const std::vector<std::string> *pl_order = nullptr,
-    const std::vector<std::string> *short_names = nullptr,
+    const std::unordered_map<std::string, std::vector<double>> &plpar = std::unordered_map<std::string, std::vector<double>>(),
+    const std::vector<std::string> &pl_order = std::vector<std::string>(),
+    const std::vector<std::string> &short_names = std::vector<std::string>(),
     const std::string &ref = "",
-    const std::vector<std::string> *ref_sec = nullptr,
-    const arma::mat *valid_range = nullptr,
+    const std::vector<std::string> &ref_sec = std::vector<std::string>(),
+    const arma::mat &valid_range = arma::mat(),
     bool write_defaults = false);
 ```
 
@@ -1271,12 +1271,12 @@ MD!*/
 void quadriga_lib::conf_file_write(const std::string &fn,
                                    const std::unordered_map<std::string, double> &scenpar,
                                    const std::string &pl_model,
-                                   const std::unordered_map<std::string, std::vector<double>> *plpar,
-                                   const std::vector<std::string> *pl_order,
-                                   const std::vector<std::string> *short_names,
+                                   const std::unordered_map<std::string, std::vector<double>> &plpar,
+                                   const std::vector<std::string> &pl_order,
+                                   const std::vector<std::string> &short_names,
                                    const std::string &ref,
-                                   const std::vector<std::string> *ref_sec,
-                                   const arma::mat *valid_range,
+                                   const std::vector<std::string> &ref_sec,
+                                   const arma::mat &valid_range,
                                    bool write_defaults)
 {
     // Layout of the written file (QuaDRiGa's conf files): within a section, keys in paragraphs separated by a blank
@@ -1307,8 +1307,8 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         throw std::invalid_argument("Input 'pl_model' must be empty or one name.");
 
     std::vector<std::string> pl_keys; // Path-loss keys in write order
-    if (plpar != nullptr)
-        for (const auto &entry : *plpar)
+    if (!plpar.empty())
+        for (const auto &entry : plpar)
         {
             if (!qd_conf_is_name(entry.first) || entry.first == "model")
                 throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' is not a valid parameter name.");
@@ -1320,23 +1320,23 @@ void quadriga_lib::conf_file_write(const std::string &fn,
             pl_keys.push_back(entry.first);
         }
 
-    if (pl_order == nullptr)
+    if (pl_order.empty())
         std::sort(pl_keys.begin(), pl_keys.end());
     else
     {
         std::unordered_set<std::string> seen;
-        for (const auto &key : *pl_order)
-            if (plpar == nullptr || plpar->count(key) == 0 || !seen.insert(key).second)
+        for (const auto &key : pl_order)
+            if (plpar.empty() || plpar.count(key) == 0 || !seen.insert(key).second)
                 throw std::invalid_argument("Input 'pl_order' must name each key of 'plpar' once.");
         if (seen.size() != pl_keys.size())
             throw std::invalid_argument("Input 'pl_order' must name each key of 'plpar' once.");
-        pl_keys = *pl_order;
+        pl_keys = pl_order;
     }
 
-    if (short_names != nullptr)
+    if (!short_names.empty())
     {
         std::unordered_set<std::string> seen;
-        for (const auto &name : *short_names)
+        for (const auto &name : short_names)
         {
             if (!qd_conf_is_name(name))
                 throw std::invalid_argument("Entries of 'short_names' must be one name each.");
@@ -1347,16 +1347,16 @@ void quadriga_lib::conf_file_write(const std::string &fn,
 
     if (qd_conf_has_newline(ref))
         throw std::invalid_argument("Input 'ref' must not contain a line break.");
-    if (ref_sec != nullptr)
+    if (!ref_sec.empty())
     {
-        if (ref_sec->size() > QD_CONF_N_SEC)
+        if (ref_sec.size() > QD_CONF_N_SEC)
             throw std::invalid_argument("Input 'ref_sec' can have at most 10 entries.");
-        for (const auto &s : *ref_sec)
+        for (const auto &s : ref_sec)
             if (qd_conf_has_newline(s))
                 throw std::invalid_argument("Entries of 'ref_sec' must not contain a line break.");
     }
 
-    if (valid_range != nullptr && !valid_range->empty() && (valid_range->n_rows != 4 || valid_range->n_cols != 2))
+    if (!valid_range.empty() && (valid_range.n_rows != 4 || valid_range.n_cols != 2))
         throw std::invalid_argument("Input 'valid_range' must have size [4, 2].");
 
     // Header: scenario name, reference, validity range, short names
@@ -1364,7 +1364,7 @@ void quadriga_lib::conf_file_write(const std::string &fn,
     if (!ref.empty())
         out += "% See: " + ref + "\n";
 
-    if (valid_range != nullptr && !valid_range->empty())
+    if (!valid_range.empty())
     {
         const char *label[4][2] = {{"% Valid frequency range:        ", " GHz\n"},
                                    {"% Valid distance range:         ", " m\n"},
@@ -1373,7 +1373,7 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         std::string block;
         for (arma::uword r = 0; r < 4; ++r)
         {
-            const double lo = valid_range->at(r, 0), hi = valid_range->at(r, 1);
+            const double lo = valid_range.at(r, 0), hi = valid_range.at(r, 1);
             if (!std::isnan(lo) && !std::isnan(hi))
                 block += label[r][0] + qd_conf_number(lo) + (lo == hi ? "" : " to " + qd_conf_number(hi)) + label[r][1];
         }
@@ -1381,10 +1381,10 @@ void quadriga_lib::conf_file_write(const std::string &fn,
             out += "\n" + block;
     }
 
-    if (short_names != nullptr && !short_names->empty())
+    if (!short_names.empty())
     {
         out += "\n";
-        for (const auto &name : *short_names)
+        for (const auto &name : short_names)
             out += qd_conf_line("ShortName", name, "You can use this short name to load the file");
     }
 
@@ -1457,7 +1457,7 @@ void quadriga_lib::conf_file_write(const std::string &fn,
             for (const auto &key : pl_keys)
             {
                 std::string value, comment;
-                for (double v : plpar->at(key))
+                for (double v : plpar.at(key))
                     value += (value.empty() ? "" : " ") + qd_conf_number(v);
                 for (const auto &c : qd_conf_pl_comments)
                     if (key == c[0] && (c[1][0] == 0 || pl_model == c[1]))
@@ -1550,8 +1550,8 @@ void quadriga_lib::conf_file_write(const std::string &fn,
 
         const std::string rule = "% " + std::string(98, '=') + "\n";
         out += "\n" + rule + "% " + qd_conf_sections[sec] + "\n";
-        if (ref_sec != nullptr && sec < ref_sec->size() && !(*ref_sec)[sec].empty())
-            out += "% See: " + (ref.empty() ? "" : ref + "; ") + (*ref_sec)[sec] + "\n";
+        if (!ref_sec.empty() && sec < ref_sec.size() && !ref_sec[sec].empty())
+            out += "% See: " + (ref.empty() ? "" : ref + "; ") + ref_sec[sec] + "\n";
         out += rule + "\n" + body;
     }
 

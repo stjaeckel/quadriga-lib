@@ -38,8 +38,8 @@ void quadriga_lib::sos_map(
     const arma::Mat<dtype> &phase,
     const arma::Col<dtype> &x,
     std::vector<arma::Cube<dtype>> &map,
-    const arma::Col<dtype> *y = nullptr,
-    const arma::Col<dtype> *z = nullptr,
+    const arma::Col<dtype> &y = arma::Col<dtype>(),
+    const arma::Col<dtype> &z = arma::Col<dtype>(),
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -68,13 +68,13 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
                            const arma::Mat<dtype> &phase,
                            const arma::Col<dtype> &x,
                            std::vector<arma::Cube<dtype>> &map,
-                           const arma::Col<dtype> *y,
-                           const arma::Col<dtype> *z,
+                           const arma::Col<dtype> &y,
+                           const arma::Col<dtype> &z,
                            bool uniform,
                            int use_kernel)
 {
-    const bool has_y = y != nullptr && !y->is_empty();
-    const bool has_z = z != nullptr && !z->is_empty();
+    const bool has_y = !y.is_empty();
+    const bool has_z = !z.is_empty();
 
     if (spatial_freq.n_elem == 0)
         throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
@@ -95,7 +95,7 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
     if (use_kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
         throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
 
-    const arma::uword nx = x.n_elem, ny = has_y ? y->n_elem : 1, nz = has_z ? z->n_elem : 1, n_gen = phase.n_cols;
+    const arma::uword nx = x.n_elem, ny = has_y ? y.n_elem : 1, nz = has_z ? z.n_elem : 1, n_gen = phase.n_cols;
 
     // Positions in meshgrid order: iy runs fastest, then ix, then iz
     const arma::uword n_pos = nx * ny * nz, n_dim_pos = has_z ? 3 : (has_y ? 2 : 1);
@@ -107,13 +107,13 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
                 arma::uword i = iy + ny * (ix + nx * iz);
                 pos.at(i, 0) = x.at(ix);
                 if (n_dim_pos > 1)
-                    pos.at(i, 1) = has_y ? y->at(iy) : (dtype)0.0;
+                    pos.at(i, 1) = has_y ? y.at(iy) : (dtype)0.0;
                 if (n_dim_pos > 2)
-                    pos.at(i, 2) = z->at(iz);
+                    pos.at(i, 2) = z.at(iz);
             }
 
     for (const auto &cube : map)
-        qd_check_alias(&cube, "map", &spatial_freq, &phase, &x, y, z);
+        qd_check_alias(&cube, "map", &spatial_freq, &phase, &x, &y, &z);
 
     if (map.size() != n_gen)
         map.resize(n_gen);
@@ -130,12 +130,12 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
     if (one_block)
     {
         arma::Mat<dtype> val(map[0].memptr(), n_pos, n_gen, false, true);
-        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, nullptr, nullptr, nullptr, nullptr, (dtype)1.0, uniform, use_kernel);
+        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, {}, {}, {}, {}, (dtype)1.0, uniform, use_kernel);
     }
     else
     {
         arma::Mat<dtype> val;
-        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, nullptr, nullptr, nullptr, nullptr, (dtype)1.0, uniform, use_kernel);
+        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, {}, {}, {}, {}, (dtype)1.0, uniform, use_kernel);
         const long long n_gen_ll = (long long)n_gen;
 #pragma omp parallel for if (n_pos * n_gen > 65536)
         for (long long g = 0; g < n_gen_ll; ++g)
@@ -144,6 +144,6 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
 }
 
 template void quadriga_lib::sos_map(const arma::Mat<float> &spatial_freq, const arma::Mat<float> &phase, const arma::Col<float> &x, std::vector<arma::Cube<float>> &map,
-                                    const arma::Col<float> *y, const arma::Col<float> *z, bool uniform, int use_kernel);
+                                    const arma::Col<float> &y, const arma::Col<float> &z, bool uniform, int use_kernel);
 template void quadriga_lib::sos_map(const arma::Mat<double> &spatial_freq, const arma::Mat<double> &phase, const arma::Col<double> &x, std::vector<arma::Cube<double>> &map,
-                                    const arma::Col<double> *y, const arma::Col<double> *z, bool uniform, int use_kernel);
+                                    const arma::Col<double> &y, const arma::Col<double> &z, bool uniform, int use_kernel);

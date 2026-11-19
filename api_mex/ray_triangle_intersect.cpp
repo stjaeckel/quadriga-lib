@@ -103,11 +103,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::u32_vec *p_no_interact = n_interact.empty() ? nullptr : &n_interact;
     arma::u32_vec *p_fbs_ind = fbs_ind.empty() ? nullptr : &fbs_ind;
     arma::u32_vec *p_sbs_ind = sbs_ind.empty() ? nullptr : &sbs_ind;
-    arma::u32_vec *p_sub_mesh_index = sub_mesh_ind.empty() ? nullptr : &sub_mesh_ind;
-    arma::mat *p_aabb = aabb.empty() ? nullptr : &aabb;
 
     // Call library function
     CALL_QD(quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, p_fbs, p_sbs,
                                                          p_no_interact, p_fbs_ind, p_sbs_ind,
-                                                         p_sub_mesh_index, p_aabb, use_kernel, gpu_id));
+                                                         sub_mesh_ind, aabb, use_kernel, gpu_id));
 }

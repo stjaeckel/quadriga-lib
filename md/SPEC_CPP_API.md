@@ -87,8 +87,9 @@ The conventions a declaration follows, for writing one in the plan or the spec a
 - Argument order: required inputs, mandatory outputs, then all arguments with a default (options, optional inputs, optional outputs, flags); later extensions are appended at the end with a default so that existing callers keep working.
 - Argument passing — the rule for new declarations:
   - **Mandatory** inputs and outputs (and in-place updated data) are passed by **reference**: `const arma::Mat<dtype> &input`, `arma::Mat<dtype> &output`. No `nullptr` check is needed or possible.
-  - **Optional** inputs and outputs are passed by **pointer**, default-initialized to `nullptr`: `const arma::Mat<dtype> *input = nullptr`, `arma::Mat<dtype> *output = nullptr`. A `nullptr` input means "not provided"; a `nullptr` output is not allocated and not computed.
-  - Strings and Armadillo containers are never passed by value: `const &` when mandatory, a pointer when optional. An optional input container whose empty value means "not given" may instead be a `const &` with an empty default (`const arma::vec &dist = arma::vec()`), so that callers can pass `{3.0}` inline; use a pointer where `nullptr` and an empty container behave differently, and for optional outputs. A string option with a literal default stays a reference (`const std::string &colormap = "jet"`). `std::string_view` is not used for arguments of public functions.
+  - **Optional inputs** are passed by **`const` reference with an empty default** (`const arma::vec &x = arma::vec()`; an `arrayant` without elements counts as empty), so callers skip one with `{}` and pass values inline; use a pointer only where an empty value has its own meaning (e.g. `polmat_update` `ray_ind`: empty = zero updates).
+  - **Optional outputs** and optional in/out arguments are passed by **pointer**, default-initialized to `nullptr`: `arma::Mat<dtype> *output = nullptr`. A `nullptr` output is not allocated and not computed.
+  - Strings and Armadillo containers are never passed by value. A string option with a literal default stays a reference (`const std::string &colormap = "jet"`). `std::string_view` is not used for arguments of public functions.
   - `ray_mesh_interact` and `ray_state_update` still pass mandatory arguments by pointer (older style, kept until the planned engine rework). Declare the mandatory arguments of every other function, new or changed, by reference.
 - Results are returned through output arguments; a computed array is never returned. The return value is used for an object from a reader, generator or factory (`arrayant`, `channel`, a mesh, a colormap, a path list), a count, status or read object (also next to output arguments), or a single computed scalar, and is documented under "Returns". See the glossary entry "Results".
 - Default values exist only in the header, never in the definition.
@@ -166,7 +167,7 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 ## Outputs
 - Mandatory outputs are references and are always computed. Optional outputs are pointers: when one is `nullptr`, skip both its allocation and the computational steps that only serve that output.
 - If a quantity belonging to an omitted optional output is needed internally (as an intermediate for another output), compute it in a variable that is local to the function; never allocate or write through the caller's pointer for it, and do not compute it at all when nothing needs it.
-- The same holds for optional inputs: a `nullptr` input selects the documented default behavior; a default object that is needed internally is local to the function.
+- The same holds for optional inputs: an empty input (or a `nullptr` one, where the input is a pointer) selects the documented default behavior; a default object that is needed internally is local to the function.
 - Resize an output only if its size differs from the required size, then write into it in place:
 ```
 if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
@@ -262,7 +263,7 @@ SECTION!*/
 - Arrays: `CHECK(arma::approx_equal(A, B, "absdiff", tol));` (or `"reldiff"`). Scalars: `CHECK(std::abs(a - b) < tol);`. Integers, indices and flags are compared exactly. The Catch2 `Approx` class is not used in new tests.
 - Choose tolerances from the arithmetic, not from the observed error: near machine precision for exact-by-construction `double` results (1e-12 to 1e-14), a few `float` epsilons scaled by the magnitude for `float`, and the documented model accuracy where an approximation is tested. State the reason in a comment when a tolerance is loose.
 - Inside loops, add `INFO("angle " << a << ", type " << t);` before the checks so that a failure reports the case.
-- When `nullptr` is passed for a templated pointer argument, give the template argument (`function<double>(...)`) or cast it (`(arma::mat *)nullptr`); a bare `nullptr` stops the deduction of `dtype` even when another argument would give it.
+- When `nullptr` is passed for a templated pointer argument (an optional output), give the template argument (`function<double>(...)`) or cast it (`(arma::mat *)nullptr`); a bare `nullptr` stops the deduction of `dtype` even when another argument would give it.
 
 ## Default coverage
 The plan or spec may narrow or extend this list.

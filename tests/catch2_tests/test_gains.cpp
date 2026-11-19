@@ -73,7 +73,7 @@ static inline void write_los_qrt(const std::string &fn, const arma::vec &freq,
     }
 
     arma::vec tx_orientation(3, arma::fill::zeros);
-    size_t written = quadriga_lib::qrt_file_append<double>(fn, paths, tx_pos, &tx_orientation, "TX");
+    size_t written = quadriga_lib::qrt_file_append<double>(fn, paths, tx_pos, tx_orientation, "TX");
     REQUIRE(written == (size_t)n_cir);
 }
 
@@ -125,10 +125,10 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
         {
             arma::vec g_rel, g_abs;
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, cf(f), 0,
-                                                        &g_rel, nullptr, nullptr, 0, nullptr, 0, 0,
+                                                        &g_rel, nullptr, nullptr, 0, {}, 0, 0,
                                                         false, 0.0, false, false);
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, cf(f), 0,
-                                                        &g_abs, nullptr, nullptr, 0, nullptr, 0, 0,
+                                                        &g_abs, nullptr, nullptr, 0, {}, 0, 0,
                                                         false, 0.0, true, false);
 
             // The path is clear, so the diffraction gain is 1 and g_abs is pure path loss
@@ -188,7 +188,7 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
             arma::vec g_abs;
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
                                                         cf(f), 0,
-                                                        &g_abs, nullptr, nullptr, 0, nullptr, 0, 0,
+                                                        &g_abs, nullptr, nullptr, 0, {}, 0, 0,
                                                         true, 0.0, true, false);
             CHECK(std::abs(g_abs(0) / pg(0, f) - 1.0) < 1e-6);
         }
@@ -273,10 +273,10 @@ TEST_CASE("Gains - Phase matches get_channels_spherical, EM mode")
             arma::vec gain;
             arma::mat M_plain, M_phase;
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map, freq, 0,
-                                                        &gain, &M_plain, nullptr, 0, nullptr, 0, 0,
+                                                        &gain, &M_plain, nullptr, 0, {}, 0, 0,
                                                         false, 0.0, false, false);
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map, freq, 0,
-                                                        nullptr, &M_phase, nullptr, 0, nullptr, 0, 0,
+                                                        nullptr, &M_phase, nullptr, 0, {}, 0, 0,
                                                         false, 0.0, false, true);
 
             REQUIRE(M_plain.n_rows == 8);
@@ -383,11 +383,11 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
             arma::mat X_plain, X_phase;
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map,
                                                         freq, 0,
-                                                        &gain, &X_plain, nullptr, 0, nullptr, 0, 0,
+                                                        &gain, &X_plain, nullptr, 0, {}, 0, 0,
                                                         true, 0.0, false, false);
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, ind, map,
                                                         freq, 0,
-                                                        nullptr, &X_phase, nullptr, 0, nullptr, 0, 0,
+                                                        nullptr, &X_phase, nullptr, 0, {}, 0, 0,
                                                         true, 0.0, false, true);
 
             REQUIRE(X_plain.n_rows == 2);
@@ -471,11 +471,11 @@ TEST_CASE("Gains - Acoustic and EM phase use different wave speeds")
 
     arma::mat X_em, X_ac;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                nullptr, &X_em, nullptr, 0, nullptr, 0, 0,
+                                                nullptr, &X_em, nullptr, 0, {}, 0, 0,
                                                 false, 0.0, false, true);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
                                                 freq, 0,
-                                                nullptr, &X_ac, nullptr, 0, nullptr, 0, 0,
+                                                nullptr, &X_ac, nullptr, 0, {}, 0, 0,
                                                 true, 0.0, false, true);
 
     std::complex<double> em(X_em(0, 0), X_em(1, 0));
@@ -494,7 +494,7 @@ TEST_CASE("Gains - Acoustic and EM phase use different wave speeds")
     arma::mat X_ac2;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest2, cube, mtl_ind, mtl_map,
                                                 freq, 0,
-                                                nullptr, &X_ac2, nullptr, 0, nullptr, 0, 0,
+                                                nullptr, &X_ac2, nullptr, 0, {}, 0, 0,
                                                 true, 0.0, false, true);
     std::complex<double> ac2(X_ac2(0, 0), X_ac2(1, 0));
     CHECK(std::abs(ac2 - ac) < 1e-9);

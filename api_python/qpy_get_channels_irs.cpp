@@ -175,8 +175,6 @@ py::tuple get_channels_irs(const py::dict &tx_array,
     for (arma::uword i = 0; i < active_path_in.n_elem; ++i)
         active_path_a[i] = active_path_in[i] != 0.0;
 
-    const quadriga_lib::arrayant<double> *p_irs_array_2 = irs_array_2.is_none() ? nullptr : &irs_array_2_a;
-    const std::vector<bool> *p_active_path = active_path_a.empty() ? nullptr : &active_path_a;
 
     // Output sizes depend on the path selection: copied after the call
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
@@ -191,7 +189,7 @@ py::tuple get_channels_irs(const py::dict &tx_array,
                                            i_irs, threshold_dB, center_freq, want_absolute,
                                            want_angles ? &aod : nullptr, want_angles ? &eod : nullptr,
                                            want_angles ? &aoa : nullptr, want_angles ? &eoa : nullptr,
-                                           p_irs_array_2, p_active_path, &active_path_out, use_kernel);
+                                           irs_array_2_a, active_path_a, &active_path_out, use_kernel);
 
     py::array_t<bool> active_path_out_py((py::ssize_t)active_path_out.size());
     bool *p_out = active_path_out_py.mutable_data();

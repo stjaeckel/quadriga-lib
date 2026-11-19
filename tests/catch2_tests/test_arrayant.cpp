@@ -330,16 +330,16 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
     {
         const std::vector<quadriga_lib::arrayant<T>> v = {a};
         arma::Col<T> az_ok = {T(-1.0), T(0.0), T(1.0)}, el_ok = {T(0.0)};
-        CHECK_NOTHROW(quadriga_lib::arrayant_combine_pattern(a, &az_ok, &el_ok));
+        CHECK_NOTHROW(quadriga_lib::arrayant_combine_pattern(a, az_ok, el_ok));
 
         arma::Col<T> az_nan = {T(-1.0), nan, T(1.0)}, el_nan = {nan};
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, &az_nan, &el_ok), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, &az_ok, &el_nan), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, &az_nan, &el_ok), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, &az_ok, &el_nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, az_nan, el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, az_ok, el_nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, az_nan, el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, az_ok, el_nan), std::invalid_argument);
 
         arma::Col<T> az_rep = {T(-1.0), T(-1.0), T(1.0)};
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, &az_rep, &el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, az_rep, el_ok), std::invalid_argument);
     }
 }
 
@@ -359,15 +359,15 @@ TEST_CASE("Arrayant calc_beamwidth - outputs that are the same variable")
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 60.0, 0.0, 10.0);
     arma::vec bw_az, bw_el, p_az, p_el, d;
-    CHECK_NOTHROW(quadriga_lib::arrayant_calc_beamwidth(a, nullptr, 3.0, &bw_az, &bw_el, &p_az, &p_el));
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, nullptr, 3.0, &bw_az, &bw_az), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth<double>(a, nullptr, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, nullptr, 3.0, &a.azimuth_grid), std::invalid_argument);
+    CHECK_NOTHROW(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_el, &p_az, &p_el));
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth<double>(a, {}, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &a.azimuth_grid), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity(a, a.elevation_grid), std::invalid_argument);
 
     std::vector<quadriga_lib::arrayant<double>> v = {a, a};
     arma::mat m1, m2;
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v, nullptr, 3.0, &m1, &m1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi<double>(v, nullptr, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v, {}, 3.0, &m1, &m1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi<double>(v, {}, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity_multi(v, v[0].coupling_re), std::invalid_argument);
 }

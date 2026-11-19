@@ -126,10 +126,10 @@ namespace
     {
         out_t o;
         quadriga_lib::ssf_clusters(sp, f.tx, f.rx, f.lsp, f.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa, method,
-                                   f.use_rf ? &f.rnd_freq : nullptr, f.use_anchor ? &f.anchor : nullptr,
-                                   f.use_eod ? &f.eod : nullptr, f.use_toa ? &f.toa : nullptr,
-                                   f.use_eps ? &f.eps_re : nullptr, f.use_eps ? &f.eps_im : nullptr,
-                                   f.use_o2i ? &f.o2i : nullptr, f.use_ncl ? &f.ncl : nullptr, &o.n_active);
+                                   f.use_rf ? f.rnd_freq : arma::cube(), f.use_anchor ? f.anchor : arma::cube(),
+                                   f.use_eod ? f.eod : arma::mat(), f.use_toa ? f.toa : arma::vec(),
+                                   f.use_eps ? f.eps_re : arma::mat(), f.use_eps ? f.eps_im : arma::mat(),
+                                   f.use_o2i ? f.o2i : std::vector<bool>(), f.use_ncl ? f.ncl : arma::u32_vec(), &o.n_active);
         return o;
     }
 
@@ -242,7 +242,7 @@ namespace
         arma::mat rnd_l;
         quadriga_lib::gbsm_init_phases(sp, "lsf", ph, seed);
         quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, rnd_l);
-        quadriga_lib::lsp_generate(sp, arma::vec{fc}, tx, rx, rnd_l, r.lsp, nullptr, &r.toa, nullptr, nullptr, &r.eod);
+        quadriga_lib::lsp_generate(sp, arma::vec{fc}, tx, rx, rnd_l, r.lsp, {}, &r.toa, nullptr, nullptr, &r.eod);
         quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd);
         quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed, 0);

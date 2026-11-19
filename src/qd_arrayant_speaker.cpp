@@ -30,7 +30,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
-- If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 343 m/s.
 - **Driver models** (`driver_type`):
@@ -61,7 +61,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        const arma::Col<dtype> *center_freq = nullptr,
+        const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
         dtype angular_resolution_deg = 5.0);
 ```
 
@@ -79,7 +79,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
-- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
+- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; empty: third-octave bands
 - **`angular_resolution_deg`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ## Returns:
@@ -89,11 +89,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 ```
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
 arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &sub_freqs, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
 ```
 MD!*/
 
@@ -114,11 +114,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
                                                                           dtype sensitivity_dB, const std::string &radiation_type,
                                                                           dtype hor_coverage_deg, dtype ver_coverage_deg, dtype horn_control_freq,
                                                                           dtype baffle_width, dtype baffle_height,
-                                                                          const arma::Col<dtype> *center_freq_in, dtype angular_resolution_deg)
+                                                                          const arma::Col<dtype> &center_freq_in, dtype angular_resolution_deg)
 {
-    arma::Col<dtype> center_freq; // Local copy; filled with third-octave bands if not given
-    if (center_freq_in != nullptr)
-        center_freq = *center_freq_in;
+    arma::Col<dtype> center_freq = center_freq_in; // Local copy; filled with third-octave bands if not given
 
     // Constants
     const double c_sound = qd_speed_of_sound; // Speed of sound in [m/s]
@@ -398,7 +396,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
 }
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::generate_speaker(
-    const std::string &, float, float, float, float, float, float, const std::string &, float, float, float, float, float, const arma::Col<float> *, float);
+    const std::string &, float, float, float, float, float, float, const std::string &, float, float, float, float, float, const arma::Col<float> &, float);
     
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::generate_speaker(
-    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const arma::Col<double> *, double);
+    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const arma::Col<double> &, double);

@@ -662,7 +662,7 @@ TEST_CASE("ssf_clusters - 38.901 spread statistics over a drop")
         const lib_t in = lib_inputs(sp, tx, rx, seed);
         out_t o;
         quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa, "38.901",
-                                   &in.rnd_freq, nullptr, &in.eod, &in.toa);
+                                   in.rnd_freq, {}, in.eod, in.toa);
         spread_ratios(o, in.lsp, ratio);
     }
     const char *lbl[5] = {"DS", "ASD", "ASA", "ESD", "ESA"};
@@ -842,8 +842,8 @@ TEST_CASE("ssf_clusters - empty input and pre-sized outputs")
             c->set_size(r, r == 4 ? N + 2 : 3, r == 4 ? 1 : 4), c->fill(NAN);
         p.n_active.set_size(r == 4 ? 4 : 7), p.n_active.fill(99);
         quadriga_lib::ssf_clusters(sp, f.tx, f.rx, f.lsp, f.rnd, p.delay, p.power, p.aod, p.eod, p.aoa, p.eoa,
-                                   "38.901", &f.rnd_freq, nullptr, nullptr, nullptr, &f.eps_re, &f.eps_im, nullptr,
-                                   &f.ncl, &p.n_active);
+                                   "38.901", f.rnd_freq, {}, {}, {}, f.eps_re, f.eps_im, {},
+                                   f.ncl, &p.n_active);
         CHECK(equal(p, ref));
     }
 }
@@ -976,7 +976,7 @@ TEST_CASE("ssf_clusters - input validation")
     fix_t x = f0;
     x.lsp(0, 0, 0) = -1.0;
     CHECK_THROWS_AS(quadriga_lib::ssf_clusters(sp, x.tx, x.rx, x.lsp, x.rnd, o.delay, o.power, o.aod, o.eod, o.aoa,
-                                               o.eoa, "38.901", &x.rnd_freq),
+                                               o.eoa, "38.901", x.rnd_freq),
                     std::invalid_argument);
     CHECK(arma::all(arma::vectorise(o.delay) == 7.0));
     CHECK(arma::all(arma::vectorise(o.power) == 7.0));
@@ -993,7 +993,7 @@ TEST_CASE("ssf_clusters - outputs that alias inputs")
     auto call = [&](arma::cube &delay, arma::cube &power, arma::cube &aod, arma::u32_vec &n_active)
     {
         quadriga_lib::ssf_clusters(sp, f.tx, f.rx, f.lsp, f.rnd, delay, power, aod, o.eod, o.aoa, o.eoa, "38.901",
-                                   &f.rnd_freq, &f.anchor, nullptr, nullptr, nullptr, nullptr, nullptr, &f.ncl, &n_active);
+                                   f.rnd_freq, f.anchor, {}, {}, {}, {}, {}, f.ncl, &n_active);
     };
     CHECK_NOTHROW(call(o.delay, o.power, o.aod, o.n_active));
 

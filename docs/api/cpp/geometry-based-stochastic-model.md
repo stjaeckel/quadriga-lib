@@ -265,12 +265,12 @@ void quadriga_lib::conf_file_write(
     const std::string &fn,
     const std::unordered_map<std::string, double> &scenpar,
     const std::string &pl_model = "",
-    const std::unordered_map<std::string, std::vector<double>> *plpar = nullptr,
-    const std::vector<std::string> *pl_order = nullptr,
-    const std::vector<std::string> *short_names = nullptr,
+    const std::unordered_map<std::string, std::vector<double>> &plpar = std::unordered_map<std::string, std::vector<double>>(),
+    const std::vector<std::string> &pl_order = std::vector<std::string>(),
+    const std::vector<std::string> &short_names = std::vector<std::string>(),
     const std::string &ref = "",
-    const std::vector<std::string> *ref_sec = nullptr,
-    const arma::mat *valid_range = nullptr,
+    const std::vector<std::string> &ref_sec = std::vector<std::string>(),
+    const arma::mat &valid_range = arma::mat(),
     bool write_defaults = false);
 ```
 
@@ -339,8 +339,8 @@ void quadriga_lib::gbsm_draw(
     arma::mat &rnd,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::u32_vec *floor_id = nullptr,
-    const arma::vec *center_freq = nullptr,
+    const arma::u32_vec &floor_id = arma::u32_vec(),
+    const arma::vec &center_freq = arma::vec(),
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -399,8 +399,8 @@ void quadriga_lib::gbsm_init_phases(
     arma::sword seed = -1,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
     bool dual_mobility = false,
     bool remove_bias = true,
     bool horizontal = true);
@@ -511,10 +511,10 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::cube &polmat,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
-    const arma::u32_vec *path_type = nullptr,
-    const arma::u32_vec *tap = nullptr,
-    const arma::vec *gr_eps_re = nullptr,
-    const arma::vec *gr_eps_im = nullptr);
+    const arma::u32_vec &path_type = arma::u32_vec(),
+    const arma::u32_vec &tap = arma::u32_vec(),
+    const arma::vec &gr_eps_re = arma::vec(),
+    const arma::vec &gr_eps_im = arma::vec());
 ```
 
 ### Inputs:
@@ -579,11 +579,11 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const std::string &mobility = "auto",
     const std::string &output = "taps",
     arma::uword i_freq = 0,
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
-    const arma::mat *tx_orientation = nullptr,
-    const arma::mat *rx_orientation = nullptr,
-    const arma::vec *kf_ratio = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
+    const arma::mat &tx_orientation = arma::mat(),
+    const arma::mat &rx_orientation = arma::mat(),
+    const arma::vec &kf_ratio = arma::vec(),
     bool oxygen = false,
     bool use_absolute_delays = false);
 ```
@@ -662,8 +662,8 @@ void quadriga_lib::los_probability(
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
-    const arma::vec *rnd_g = nullptr,
-    const arma::vec *center_freq = nullptr,
+    const arma::vec &rnd_g = arma::vec(),
+    const arma::vec &center_freq = arma::vec(),
     arma::mat *los_soft = nullptr);
 ```
 
@@ -737,7 +737,7 @@ void quadriga_lib::lsp_generate(
     const arma::mat &rx_pos,
     const arma::mat &rnd,
     arma::cube &lsp,
-    const arma::mat *sf_sigma_dB = nullptr,
+    const arma::mat &sf_sigma_dB = arma::mat(),
     arma::vec *abs_toa = nullptr,
     arma::mat *gr_eps_re = nullptr,
     arma::mat *gr_eps_im = nullptr,
@@ -896,8 +896,8 @@ void quadriga_lib::path_loss(
     const arma::mat &rx_pos,
     arma::mat &pl_dB,
     arma::mat *sf_sigma_dB = nullptr,
-    const arma::vec *d2d_in = nullptr,
-    const arma::vec *rnd_he = nullptr);
+    const arma::vec &d2d_in = arma::vec(),
+    const arma::vec &rnd_he = arma::vec());
 ```
 
 ### Inputs:
@@ -1037,14 +1037,14 @@ void quadriga_lib::ssf_clusters(
     arma::cube &aoa,
     arma::cube &eoa,
     const std::string &method = "38.901",
-    const arma::cube *rnd_freq = nullptr,
-    const arma::cube *lsp_anchor = nullptr,
-    const arma::mat *eod_offset_deg = nullptr,
-    const arma::vec *abs_toa = nullptr,
-    const arma::mat *gr_eps_re = nullptr,
-    const arma::mat *gr_eps_im = nullptr,
-    const std::vector<bool> *o2i = nullptr,
-    const arma::u32_vec *n_cluster = nullptr,
+    const arma::cube &rnd_freq = arma::cube(),
+    const arma::cube &lsp_anchor = arma::cube(),
+    const arma::mat &eod_offset_deg = arma::mat(),
+    const arma::vec &abs_toa = arma::vec(),
+    const arma::mat &gr_eps_re = arma::mat(),
+    const arma::mat &gr_eps_im = arma::mat(),
+    const std::vector<bool> &o2i = std::vector<bool>(),
+    const arma::u32_vec &n_cluster = arma::u32_vec(),
     arma::u32_vec *n_active = nullptr);
 ```
 
@@ -1134,9 +1134,9 @@ void quadriga_lib::ssf_paths(
     arma::vec &path_length,
     arma::cube &polmat,
     const std::string &mobility = "auto",
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
-    const arma::vec *kf_ratio = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
+    const arma::vec &kf_ratio = arma::vec(),
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
     arma::vec *aoa = nullptr,
@@ -1236,8 +1236,8 @@ void quadriga_lib::ssf_rays(
     arma::uword i_freq = 0,
     const std::string &angle_model = "additive",
     const std::string &pol_model = "38.901",
-    const arma::mat *gr_eps_re = nullptr,
-    const arma::mat *gr_eps_im = nullptr,
+    const arma::mat &gr_eps_re = arma::mat(),
+    const arma::mat &gr_eps_im = arma::mat(),
     bool pol_variability = false,
     bool random_phase = true);
 ```

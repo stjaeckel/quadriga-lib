@@ -87,7 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (is_multi)
         CALL_QD(qdant_write_multi(fn, ant_multi));
     else
-        CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, &layout));
+        CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, layout));
 
     plhs[0] = qd_mex_copy2matlab(&id);
 }

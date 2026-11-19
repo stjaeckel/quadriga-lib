@@ -33,12 +33,12 @@ arma::uword quadriga_lib::subdivide_rays(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &trivec,
     const arma::Mat<dtype> &tridir,
-    const arma::Mat<dtype> *dest = nullptr,
+    const arma::Mat<dtype> &dest = arma::Mat<dtype>(),
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
-    const arma::u32_vec *index = nullptr);
+    const arma::u32_vec &index = arma::u32_vec());
 ```
 
 ## Inputs:
@@ -57,7 +57,7 @@ arma::uword quadriga_lib::subdivide_rays(
 - **`origN`** — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 - **`trivecN`** — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
 - **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
-- **`destN`** — Subdivided destinations, left untouched if `dest` was `nullptr` or empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`destN`** — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 
 ## Returns:
 - `n_rayN` — Number of rays written to the output, `4 * n_subdiv`
@@ -72,12 +72,12 @@ template <typename dtype>
 arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
                                          const arma::Mat<dtype> &trivec,
                                          const arma::Mat<dtype> &tridir,
-                                         const arma::Mat<dtype> *dest,
+                                         const arma::Mat<dtype> &dest,
                                          arma::Mat<dtype> *origN,
                                          arma::Mat<dtype> *trivecN,
                                          arma::Mat<dtype> *tridirN,
                                          arma::Mat<dtype> *destN,
-                                         const arma::u32_vec *index,
+                                         const arma::u32_vec &index,
                                          bool transposed_output)
 {
     // Check input dimensions
@@ -95,17 +95,17 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     if (tridir.n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
 
-    const bool have_dest = (dest && !dest->is_empty());
-    if (have_dest && dest->n_rows != n_ray)
+    const bool have_dest = (!dest.is_empty());
+    if (have_dest && dest.n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'dest' does not match number of rows in 'orig'.");
-    if (have_dest && dest->n_cols != 3)
+    if (have_dest && dest.n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
 
     // Ray selection
     const unsigned *p_ind = nullptr;
     arma::uword n_subdiv = n_ray;
-    if (index && index->n_elem != 0)
-        p_ind = index->memptr(), n_subdiv = (arma::uword)index->n_elem;
+    if (index.n_elem != 0)
+        p_ind = index.memptr(), n_subdiv = (arma::uword)index.n_elem;
     const arma::uword n_rayN = 4 * n_subdiv; // Number of rays in the output
 
     if (n_rayN == 0) // Nothing to do, outputs are left untouched
@@ -122,7 +122,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     arma::Mat<dtype> *out_list[4] = {origN, trivecN, tridirN, destN};
     const arma::uword out_cols[4] = {3, 9, tridir.n_cols, 3};
     const char *out_name[4] = {"origN", "trivecN", "tridirN", "destN"};
-    qd_check_alias_list<arma::Mat<dtype>>({origN, trivecN, tridirN, destN}, out_name, &orig, &trivec, &tridir, dest);
+    qd_check_alias_list<arma::Mat<dtype>>({origN, trivecN, tridirN, destN}, out_name, &orig, &trivec, &tridir, &dest);
 
     // Number of ray slots in the output buffers, rays are in the columns for transposed output.
     // Buffers that can hold all new rays are reused as they are and must have the same size.
@@ -168,7 +168,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     const dtype *p_orig = orig.memptr();
     const dtype *p_trivec = trivec.memptr();
     const dtype *p_tridir = tridir.memptr();
-    const dtype *p_dest = have_dest ? dest->memptr() : nullptr;
+    const dtype *p_dest = have_dest ? dest.memptr() : nullptr;
 
     // Memory pointers (outputs)
     dtype *p_origN = origN ? origN->memptr() : nullptr;
@@ -363,10 +363,10 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     return n_rayN;
 }
 
-template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<float> &orig, const arma::Mat<float> &trivec, const arma::Mat<float> &tridir, const arma::Mat<float> *dest,
+template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<float> &orig, const arma::Mat<float> &trivec, const arma::Mat<float> &tridir, const arma::Mat<float> &dest,
                                                   arma::Mat<float> *origN, arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, arma::Mat<float> *destN,
-                                                  const arma::u32_vec *index, bool transposed_output);
+                                                  const arma::u32_vec &index, bool transposed_output);
 
-template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<double> &orig, const arma::Mat<double> &trivec, const arma::Mat<double> &tridir, const arma::Mat<double> *dest,
+template arma::uword quadriga_lib::subdivide_rays(const arma::Mat<double> &orig, const arma::Mat<double> &trivec, const arma::Mat<double> &tridir, const arma::Mat<double> &dest,
                                                   arma::Mat<double> *origN, arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Mat<double> *destN,
-                                                  const arma::u32_vec *index, bool transposed_output);
+                                                  const arma::u32_vec &index, bool transposed_output);

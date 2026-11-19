@@ -121,8 +121,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // The result is returned by value and copied
     quadriga_lib::channel<double> chan;
     CALL_QD(chan = quadriga_lib::gbsm_single_link_channel(tx_array, rx_array, rays, link_gain_dB, mobility, output,
-                                                          i_freq, &tx_pos, &rx_pos, &tx_ori, &rx_ori,
-                                                          kf_ratio.empty() ? nullptr : &kf_ratio, oxygen,
+                                                          i_freq, tx_pos, rx_pos, tx_ori, rx_ori,
+                                                          kf_ratio, oxygen,
                                                           use_absolute_delays));
 
     plhs[0] = qd_mex_channel2struct({chan});

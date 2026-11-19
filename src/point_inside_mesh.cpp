@@ -28,7 +28,7 @@ void quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
     arma::uvec &result,
-    const arma::uvec *obj_ind = nullptr,
+    const arma::uvec &obj_ind = arma::uvec(),
     dtype distance = 0.0);
 ```
 
@@ -51,7 +51,7 @@ template <typename dtype>
 void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
                                      const arma::Mat<dtype> &mesh,
                                      arma::uvec &result,
-                                     const arma::uvec *obj_ind,
+                                     const arma::uvec &obj_ind,
                                      dtype distance)
 {
     if (points.n_cols != 3)
@@ -60,13 +60,13 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
     if (mesh.n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns.");
 
-    if (obj_ind != nullptr && obj_ind->n_elem != mesh.n_rows && obj_ind->n_elem != 0)
+    if (obj_ind.n_elem != 0 && obj_ind.n_elem != mesh.n_rows)
         throw std::invalid_argument("Number of elements in 'obj_ind' does not match number of rows in 'mesh'.");
 
     if (!(distance >= 0.0 && distance <= 20.0)) // Also rejects NaN
         throw std::invalid_argument("Distance must be in between 0 and 20 meters.");
 
-    qd_check_alias(&result, "result", &points, &mesh, obj_ind);
+    qd_check_alias(&result, "result", &points, &mesh, &obj_ind);
 
     if (points.n_rows == 0)
     {
@@ -144,15 +144,14 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
 
     // Carry obj_ind through the reordering/padding so fbs_ind (into meshR) maps correctly.
     arma::uvec obj_ind_R;
-    bool have_obj = (obj_ind != nullptr && obj_ind->n_elem != 0);
+    bool have_obj = (obj_ind.n_elem != 0);
     quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, target_size, 8,
-                                             have_obj ? obj_ind : nullptr,
-                                             have_obj ? &obj_ind_R : nullptr);
+                                             obj_ind, have_obj ? &obj_ind_R : nullptr);
 
     // Calculate intersections
     arma::Mat<dtype> fbs, sbs;
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
-    ray_triangle_intersect(orig, dest, meshR, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &sub_mesh_ind);
+    ray_triangle_intersect(orig, dest, meshR, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, sub_mesh_ind);
 
     // Calculate the incidence angles
     arma::Col<dtype> fbs_angle, thickness;
@@ -202,11 +201,11 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
 template void quadriga_lib::point_inside_mesh(const arma::Mat<float> &points,
                                               const arma::Mat<float> &mesh,
                                               arma::uvec &result,
-                                              const arma::uvec *obj_ind,
+                                              const arma::uvec &obj_ind,
                                               float distance);
 
 template void quadriga_lib::point_inside_mesh(const arma::Mat<double> &points,
                                               const arma::Mat<double> &mesh,
                                               arma::uvec &result,
-                                              const arma::uvec *obj_ind,
+                                              const arma::uvec &obj_ind,
                                               double distance);

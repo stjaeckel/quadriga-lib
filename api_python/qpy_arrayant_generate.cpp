@@ -166,7 +166,7 @@ py::dict arrayant_generate(const std::string &type,
         if (!pattern_d.empty()) // Use custom pattern dict
         {
             const auto custom_array = qd_python_dict2arrayant(pattern_d, true);
-            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array);
+            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array);
         }
         else if (pol == 2 || pol == 5 || pol == 3 || pol == 6) // Dual-polarized base pattern
         {
@@ -177,13 +177,13 @@ py::dict arrayant_generate(const std::string &type,
             {
                 custom_array = quadriga_lib::generate_arrayant_omni<double>(res);
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
             }
-            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array);
+            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array);
         }
         else // Isotropic per-element pattern
-            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, nullptr, res);
+            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, {}, res);
         arrayant.name = "ula";
     }
     else if (type == "3GPP" || type == "3gpp")
@@ -192,7 +192,7 @@ py::dict arrayant_generate(const std::string &type,
         {
             auto custom_array = qd_python_dict2arrayant(pattern_d, true);
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
-                                                                    Mg, Ng, dgv, dgh, &custom_array);
+                                                                    Mg, Ng, dgv, dgh, custom_array);
         }
         else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
         {
@@ -200,20 +200,20 @@ py::dict arrayant_generate(const std::string &type,
             if (pol == 2 || pol == 5)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, &el_1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, el_1);
             }
             else if (pol == 3 || pol == 6)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
             }
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
-                                                                    Mg, Ng, dgv, dgh, &custom_array);
+                                                                    Mg, Ng, dgv, dgh, custom_array);
         }
         else // Use 3GPP default pattern
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
-                                                                    Mg, Ng, dgv, dgh, nullptr, res);
+                                                                    Mg, Ng, dgv, dgh, {}, res);
     }
     else if (type == "multibeam")
     {

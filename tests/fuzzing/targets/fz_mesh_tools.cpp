@@ -94,7 +94,7 @@ static void run(fz::input &in)
     T distance = in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.value<T>() : in.ConsumeFloatingPointInRange<T>(T(0), T(3));
     const bool use_obj = in.ConsumeBool();
     arma::uvec inside;
-    fz::clean([&] { quadriga_lib::point_inside_mesh<T>(points, mesh, inside, use_obj ? &obj_ind : nullptr, distance); });
+    fz::clean([&] { quadriga_lib::point_inside_mesh<T>(points, mesh, inside, fz::opt(use_obj, obj_ind), distance); });
 
     // Overlap of objects
     std::vector<std::string> reason(in.size(2));
@@ -110,7 +110,7 @@ static void run(fz::input &in)
     arma::Mat<T> sub = mesh, sub_out(in.size(3), in.size(10));
     arma::uvec mtl_sub = mtl_ind;
     fz::clean([&]
-              { quadriga_lib::subdivide_triangles<T>(n_div_t, sub, in_place ? sub : sub_out, use_mtl ? &mtl_sub : nullptr,
+              { quadriga_lib::subdivide_triangles<T>(n_div_t, sub, in_place ? sub : sub_out, fz::opt(use_mtl, mtl_sub),
                                                      in_place ? &mtl_sub : &mtl_ind_out); });
 
     // Segmentation; vec_size is small or the largest value
@@ -122,7 +122,7 @@ static void run(fz::input &in)
     const int seg_mask = in.ConsumeIntegralInRange<int>(0, 3);
     fz::clean([&]
               { quadriga_lib::triangle_mesh_segmentation<T>(mesh, meshR, sub_mesh_ind, target_size, vec_size,
-                                                            (seg_mask & 1) ? &mtl_ind : nullptr, (seg_mask & 1) ? &mtl_ind_seg : nullptr,
+                                                            fz::opt((seg_mask & 1), mtl_ind), (seg_mask & 1) ? &mtl_ind_seg : nullptr,
                                                             (seg_mask & 2) ? &mesh_ind : nullptr); });
 
     // AABB of fuzzed or segmented sub-meshes
@@ -132,10 +132,10 @@ static void run(fz::input &in)
     if (in.ConsumeBool())
         smi = arma::sort(smi);
     const arma::Mat<T> &aabb_mesh = (in.ConsumeBool() && meshR.n_rows != 0) ? meshR : mesh;
-    const arma::u32_vec *aabb_smi = in.ConsumeBool() ? &smi : (in.ConsumeBool() ? &sub_mesh_ind : nullptr);
+    const arma::u32_vec no_smi, *aabb_smi = in.ConsumeBool() ? &smi : (in.ConsumeBool() ? &sub_mesh_ind : &no_smi);
     const arma::uword vec_size_aabb = in.size(9);
     arma::Mat<T> aabb;
-    fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(aabb_mesh, aabb, aabb_smi, vec_size_aabb); });
+    fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(aabb_mesh, aabb, *aabb_smi, vec_size_aabb); });
 
     // Split along each axis selector, also invalid ones; the outputs may be distinct, the same object, or the input
     arma::Mat<T> split_mesh = mesh, meshA(in.size(2), 9), meshB;

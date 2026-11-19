@@ -65,7 +65,7 @@ void calc_diffraction_gain(
     arma::Mat<dtype> *polmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
@@ -173,7 +173,7 @@ void quadriga_lib::combine_irs_coord(
     arma::Mat<dtype> &interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
-    const std::vector<bool> *active_path = nullptr);
+    const std::vector<bool> &active_path = std::vector<bool>());
 ```
 
 ### Inputs:
@@ -475,7 +475,7 @@ void quadriga_lib::mitsuba_xml_file_write(
     const arma::uvec &mtl_ind,
     const std::vector<std::string> &obj_names,
     const std::vector<std::string> &mtl_names,
-    const arma::Mat<dtype> *bsdf = nullptr,
+    const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
     bool map_to_itu_materials = false);
 ```
 
@@ -488,7 +488,7 @@ void quadriga_lib::mitsuba_xml_file_write(
   material — 0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
 - **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`; nullptr or empty: none
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`; empty: none
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ### See also:
@@ -587,7 +587,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#obj_file_write) · [P
 - With `split_loose_parts`: objects are separated into connected components ("separate by loose parts"); connectivity
   follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
-  1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
+  1-based material index (0 = no material, leaving that face unassigned); leave `mtl_ind` empty to omit materials entirely
 - A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
   `usemtl (null)`, which [obj_file_read](#obj_file_read) reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
   are unchanged. A material named `(null)` that is used by a face is therefore rejected (`std::invalid_argument`);
@@ -604,20 +604,20 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#obj_file_write) · [P
 ```cpp
 void obj_file_write(
     const std::string &fn,
-    const arma::Mat<dtype> *mesh = nullptr,
-    const arma::uvec *obj_ind = nullptr,
-    const arma::uvec *mtl_ind = nullptr,
-    const std::vector<std::string> *obj_names = nullptr,
-    const std::vector<std::string> *mtl_names = nullptr,
+    const arma::Mat<dtype> &mesh = arma::Mat<dtype>(),
+    const arma::uvec &obj_ind = arma::uvec(),
+    const arma::uvec &mtl_ind = arma::uvec(),
+    const std::vector<std::string> &obj_names = std::vector<std::string>(),
+    const std::vector<std::string> &mtl_names = std::vector<std::string>(),
     arma::Mat<dtype> *vert_list_out = nullptr,
     arma::umat *face_ind_out = nullptr,
-    const arma::Mat<dtype> *vert_list = nullptr,
-    const arma::umat *face_ind = nullptr,
-    const arma::Mat<dtype> *bsdf = nullptr,
+    const arma::Mat<dtype> &vert_list = arma::Mat<dtype>(),
+    const arma::umat &face_ind = arma::umat(),
+    const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
     const dtype threshold = 0.001,
-    const arma::uvec *csv_ind = nullptr,
-    const std::vector<std::string> *csv_names = nullptr,
-    const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
+    const arma::uvec &csv_ind = arma::uvec(),
+    const std::vector<std::string> &csv_names = std::vector<std::string>(),
+    const std::unordered_map<std::string, std::vector<dtype>> &csv_prop = std::unordered_map<std::string, std::vector<dtype>>(),
     bool csv_write_defaults = false,
     bool split_loose_parts = false);
 ```
@@ -626,9 +626,9 @@ void obj_file_write(
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
 - **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; omit (`nullptr`) for no materials
+- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
 - **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `mtl_ind` is given
+- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
 - **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [obj_file_read](#obj_file_read) for columns
@@ -765,7 +765,7 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_cloud_aabb) · [Python](../python/site-specific-simulation-tools.md#point_cloud_aabb)
 
 - Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
-- If `sub_cloud_ind` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- If `sub_cloud_ind` is empty, the entire input is treated as a single cloud; last index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ### Declaration:
@@ -773,7 +773,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_cloud_aabb) · 
 void quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> &points,
     arma::Mat<dtype> &aabb,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
 
@@ -894,7 +894,7 @@ void quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
     arma::uvec &result,
-    const arma::uvec *obj_ind = nullptr,
+    const arma::uvec &obj_ind = arma::uvec(),
     dtype distance = 0.0);
 ```
 
@@ -936,7 +936,7 @@ Not in: MATLAB, Python
 ```cpp
 void polmat_update(
     arma::Mat<dtype> &polmat,
-    const arma::Mat<dtype> *update = nullptr,
+    const arma::Mat<dtype> &update = arma::Mat<dtype>(),
     arma::Col<dtype> *gain = nullptr,
     bool initialize = false,
     bool normalize = false,
@@ -952,7 +952,7 @@ void polmat_update(
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
-  broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
+  broadcasts one matrix to every update; empty applies the identity (no multiply).
 - **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
   - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
     normalization. With `normalize == false` this measures the gain without modifying the matrix
@@ -968,7 +968,8 @@ void polmat_update(
   Untouched columns of `polmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
 - **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `polmat`.
-  Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
+  Length `n_rayU`. Default (`nullptr`) is the identity map, which requires `n_ray == n_rayU`; an empty
+  `ray_ind` means zero updates (`n_rayU = 0`), which is why it stays a pointer. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
   so the result is the same as a single-threaded run for any thread count. With duplicates the call
@@ -982,27 +983,27 @@ initialize -> update -> normalize -> apply_gain. Argument order is
 arma::Mat<dtype> polmat;                            // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 
 // (1) Initialization
-polmat_update(polmat, &U0);                         // empty polmat: sized from U0, seeded, polmat := U0
-polmat_update(polmat, nullptr, nullptr, true);      // pre-sized polmat: reset every column to unity
-polmat_update(polmat, &U0, nullptr, true);          // pre-sized polmat: copy-through, polmat := U0 (ignores old)
+polmat_update(polmat, U0);                          // empty polmat: sized from U0, seeded, polmat := U0
+polmat_update(polmat, {}, nullptr, true);           // pre-sized polmat: reset every column to unity
+polmat_update(polmat, U0, nullptr, true);           // pre-sized polmat: copy-through, polmat := U0 (ignores old)
 
 // (2) Updating (accumulate onto existing state)
-polmat_update(polmat, &U);                          // polmat := U * polmat
-polmat_update(polmat, &Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
+polmat_update(polmat, U);                           // polmat := U * polmat
+polmat_update(polmat, Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
 
 // (3) Gain extraction (measure, leave the matrix part untouched)
 arma::Col<dtype> g;
-polmat_update(polmat, nullptr, &g);                 // g[k] = gain( polmat[:,k] )
-polmat_update(polmat, &U, &g);                      // apply U, then measure into g (no normalize)
+polmat_update(polmat, {}, &g);                      // g[k] = gain( polmat[:,k] )
+polmat_update(polmat, U, &g);                       // apply U, then measure into g (no normalize)
 
 // (4) Normalizing (scale each column to unit gain; optionally update first)
-polmat_update(polmat, nullptr, nullptr, false, true); // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
-polmat_update(polmat, &U, nullptr, false, true);    // update, then normalize, one pass
+polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, U, nullptr, false, true);     // update, then normalize, one pass
 
 // (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
 //     'g' is read here (apply_gain = true):
-polmat_update(polmat, nullptr, &g, false, true, true); // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
-polmat_update(polmat, &U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
+polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
 ```
 
 ### Storage layout (column-major, interleaved complex):
@@ -1063,9 +1064,9 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
-    const arma::u32_vec *point_ind = nullptr,
-    const std::vector<bool> *subdiv_flag_in = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
+    const arma::u32_vec &point_ind = arma::u32_vec(),
+    const std::vector<bool> &subdiv_flag_in = std::vector<bool>(),
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
     uint8_t min_segments = 0,
@@ -1089,15 +1090,15 @@ arma::uword quadriga_lib::ray_commit(
   flags in bits 14 and 15); `[n_ray]`
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
-  [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. NULL → no partitioning
+  [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. Empty → no partitioning
 - **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
-  indexing. NULL → `points` is used as passed in and `i_cir` indexes it directly
+  indexing. Empty → `points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
-  same launch configuration. NULL / empty → no ray is excluded on these grounds
+  same launch configuration. Empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
@@ -1167,10 +1168,10 @@ arma::uword ray_init(
     arma::fcube *path_dir_prev = nullptr,
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
-    const arma::fmat *mesh = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::fmat *aabb = nullptr,
-    const arma::fmat *rx_points = nullptr,
+    const arma::fmat &mesh = arma::fmat(),
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::fmat &aabb = arma::fmat(),
+    const arma::fmat &rx_points = arma::fmat(),
     bool scalar_mode = false);
 ```
 
@@ -1181,15 +1182,15 @@ arma::uword ray_init(
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
-  the launch sphere `r0`. NULL → the mesh does not bound `r0`.
+  the launch sphere `r0`. Empty → the mesh does not bound `r0`.
 - **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
-  strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
+  strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Unlike [ray_progress](#ray_progress), boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
   so building them here would usually cost more than it saves. Pass the [triangle_mesh_aabb](#triangle_mesh_aabb) result the
   caller already holds for the tracing loop.
 - **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
-  sphere `r0`, so that no receiver starts inside it. NULL → receivers are not considered.
+  sphere `r0`, so that no receiver starts inside it. Empty → receivers are not considered.
 - **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
   coefficient per frequency), `false` = EM (2×2 Jones matrix per frequency)
 
@@ -1397,7 +1398,7 @@ void quadriga_lib::ray_point_intersect(
     arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
     std::vector<arma::u32_vec> *hits_per_point = nullptr,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -1485,8 +1486,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     std::vector<quadriga_lib::path> &paths,
     arma::fmat *trivec = nullptr,
     arma::fmat *tridir = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::fmat *aabb = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::fmat &aabb = arma::fmat(),
     uint8_t max_interactions = 20,
     uint8_t max_reflections = 10,
     uint8_t max_transmissions = 10,
@@ -1496,10 +1497,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
-    const arma::u32_vec *n_interact_in = nullptr,
-    const arma::u32_vec *fbs_ind_in = nullptr,
-    const arma::u32_vec *sbs_ind_in = nullptr,
-    const std::vector<bool> *subdiv_flag_in = nullptr);
+    const arma::u32_vec &n_interact_in = arma::u32_vec(),
+    const arma::u32_vec &fbs_ind_in = arma::u32_vec(),
+    const arma::u32_vec &sbs_ind_in = arma::u32_vec(),
+    const std::vector<bool> &subdiv_flag_in = std::vector<bool>());
 ```
 
 ### Inputs:
@@ -1509,9 +1510,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`center_freq`** — Center frequencies in [Hz], in scalar mode the acoustic frequencies; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
 - **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
-  first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
+  first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
-  NULL with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
+  Empty with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
 - **`max_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
 - **`max_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
 - **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
@@ -1877,8 +1878,8 @@ void quadriga_lib::ray_triangle_intersect(
     arma::u32_vec *n_interact = nullptr,
     arma::u32_vec *fbs_ind = nullptr,
     arma::u32_vec *sbs_ind = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::Mat<dtype> *aabb = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::Mat<dtype> &aabb = arma::Mat<dtype>(),
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -1888,7 +1889,7 @@ void quadriga_lib::ray_triangle_intersect(
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
 - **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
@@ -1970,12 +1971,12 @@ arma::uword quadriga_lib::subdivide_rays(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &trivec,
     const arma::Mat<dtype> &tridir,
-    const arma::Mat<dtype> *dest = nullptr,
+    const arma::Mat<dtype> &dest = arma::Mat<dtype>(),
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
-    const arma::u32_vec *index = nullptr);
+    const arma::u32_vec &index = arma::u32_vec());
 ```
 
 ### Inputs:
@@ -1994,7 +1995,7 @@ arma::uword quadriga_lib::subdivide_rays(
 - **`origN`** — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 - **`trivecN`** — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
 - **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
-- **`destN`** — Subdivided destinations, left untouched if `dest` was `nullptr` or empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`destN`** — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 
 ### Returns:
 - `n_rayN` — Number of rays written to the output, `4 * n_subdiv`
@@ -2022,7 +2023,7 @@ arma::uword quadriga_lib::subdivide_triangles(
     arma::uword n_div,
     const arma::Mat<dtype> &triangles_in,
     arma::Mat<dtype> &triangles_out,
-    const arma::uvec *mtl_ind = nullptr,
+    const arma::uvec &mtl_ind = arma::uvec(),
     arma::uvec *mtl_ind_out = nullptr);
 ```
 
@@ -2055,7 +2056,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#triangle_mesh_aabb) �
 void quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> &mesh,
     arma::Mat<dtype> &aabb,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
     arma::uword vec_size = 1);
 ```
 
@@ -2090,7 +2091,7 @@ arma::uword triangle_mesh_segmentation(
     arma::u32_vec &sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    const arma::uvec *mtl_ind = nullptr,
+    const arma::uvec &mtl_ind = arma::uvec(),
     arma::uvec *mtl_ind_out = nullptr,
     arma::u32_vec *mesh_ind = nullptr);
 ```

@@ -145,12 +145,12 @@ arma::vec dist_decorr = {10.0, 50.0};
 
 // Normal distributed values with zero mean and unit variance, size [1000, 2]
 arma::mat val;
-quadriga_lib::sos_randn<double>(dist_decorr, pos, val, nullptr, nullptr, "Comb256", 42);
+quadriga_lib::sos_randn<double>(dist_decorr, pos, val, {}, {}, "Comb256", 42);
 
 // Uniform values between 0 and 1, and integers from 1 to 6
 arma::mat uni, dice;
-quadriga_lib::sos_rand<double>(dist_decorr, pos, uni, nullptr, nullptr, "Comb256", 42);
-quadriga_lib::sos_randi<double>(dist_decorr, pos, 6, dice, nullptr, nullptr, "Comb256", 42);
+quadriga_lib::sos_rand<double>(dist_decorr, pos, uni, {}, {}, "Comb256", 42);
+quadriga_lib::sos_randi<double>(dist_decorr, pos, 6, dice, {}, {}, "Comb256", 42);
 ```
 
 The last argument is the seed. With the same seed, decorrelation distances and preset, a later call returns the same
@@ -187,12 +187,12 @@ quadriga_lib::sos_val(spatial_freq, phase, pos_new, val_new);
 
 // Uniform distributed output
 arma::mat val_uni;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, {}, {}, {}, 1.0, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
 std::vector<arma::cube> grid;
-quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
+quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, y);
 ```
 
 - **Presets:** `Exp`, `Gauss` and `Comb`, each with 128, 256, 512 or 1024 sinusoids, e.g. `"Exp512"`. `Exp`
@@ -208,7 +208,7 @@ quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
 // Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
 pos_rx *= 100.0;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, &pos_rx, nullptr, &acf, &dist);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx, {}, acf, dist);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -310,10 +310,10 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
-    const arma::Mat<dtype> *pos_b = nullptr,
-    const arma::Mat<dtype> *phase_b = nullptr,
-    const arma::Col<dtype> *acf = nullptr,
-    const arma::Col<dtype> *dist = nullptr,
+    const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
+    const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
+    const arma::Col<dtype> &acf = arma::Col<dtype>(),
+    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     dtype spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);
@@ -354,16 +354,16 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
                            const arma::Mat<dtype> &phase,
                            const arma::Mat<dtype> &pos,
                            arma::Mat<dtype> &val,
-                           const arma::Mat<dtype> *pos_b,
-                           const arma::Mat<dtype> *phase_b,
-                           const arma::Col<dtype> *acf,
-                           const arma::Col<dtype> *dist,
+                           const arma::Mat<dtype> &pos_b,
+                           const arma::Mat<dtype> &phase_b,
+                           const arma::Col<dtype> &acf,
+                           const arma::Col<dtype> &dist,
                            dtype spatial_freq_scale_b,
                            bool uniform,
                            int use_kernel)
 {
-    const bool two_devices = pos_b != nullptr && !pos_b->is_empty();
-    const bool two_maps = phase_b != nullptr && !phase_b->is_empty();
+    const bool two_devices = !pos_b.is_empty();
+    const bool two_maps = !phase_b.is_empty();
 
     if (spatial_freq.n_elem == 0)
         throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
@@ -379,16 +379,16 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
         throw std::invalid_argument("Input 'pos' cannot have more columns than 'spatial_freq'.");
     if (two_devices)
     {
-        if (pos_b->n_rows != pos.n_rows)
+        if (pos_b.n_rows != pos.n_rows)
             throw std::invalid_argument("Number of rows in 'pos_b' does not match number of rows in 'pos'.");
-        if (pos_b->n_cols > spatial_freq.n_cols)
+        if (pos_b.n_cols > spatial_freq.n_cols)
             throw std::invalid_argument("Input 'pos_b' cannot have more columns than 'spatial_freq'.");
     }
     if (two_maps)
     {
         if (!two_devices)
             throw std::invalid_argument("Input 'phase_b' requires 'pos_b'.");
-        if (phase_b->n_rows != phase.n_rows || phase_b->n_cols != phase.n_cols)
+        if (phase_b.n_rows != phase.n_rows || phase_b.n_cols != phase.n_cols)
             throw std::invalid_argument("Input 'phase_b' must have the same size as 'phase'.");
     }
     if (!(spatial_freq_scale_b > (dtype)0.0) || !std::isfinite((double)spatial_freq_scale_b))
@@ -397,12 +397,12 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
         throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'phase_b'.");
     if (two_devices && !two_maps)
     {
-        if (acf == nullptr || dist == nullptr || acf->is_empty() || dist->is_empty())
+        if (acf.is_empty() || dist.is_empty())
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for two devices on the same map.");
-        qd_sos_check_acf_same_map(*acf, *dist);
+        qd_sos_check_acf_same_map(acf, dist);
     }
 
-    qd_check_alias(&val, "val", &spatial_freq, &phase, &pos, pos_b, phase_b, acf, dist);
+    qd_check_alias(&val, "val", &spatial_freq, &phase, &pos, &pos_b, &phase_b, &acf, &dist);
 
     // kernel: 1 = GENERIC, 2 = AVX2
     int kernel = 1;
@@ -449,11 +449,11 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
     {
         std::vector<double> pos_b_store;
         const double *qx = nullptr, *qy = nullptr, *qz = nullptr;
-        qd_sos_split_pos(*pos_b, pos_b_store, qx, qy, qz);
+        qd_sos_split_pos(pos_b, pos_b_store, qx, qy, qz);
         if (two_maps)
         {
             qd_sos_split_freq(spatial_freq, (double)spatial_freq_scale_b, fx, fy, fz);
-            qd_sos_weights(*phase_b, wc, ws);
+            qd_sos_weights(phase_b, wc, ws);
         }
 
         arma::mat sb_mat(n_pos, n_gen, arma::fill::none);
@@ -471,7 +471,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
         else
         {
             // Normalisation per position
-            const arma::vec acf_d = arma::conv_to<arma::vec>::from(*acf), dist_d = arma::conv_to<arma::vec>::from(*dist);
+            const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
             const double *pa = acf_d.memptr(), *pd = dist_d.memptr();
             const arma::uword n_acf = acf_d.n_elem;
             std::vector<double> w_vec(n_pos);
@@ -516,8 +516,8 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
 }
 
 template void quadriga_lib::sos_val(const arma::Mat<float> &spatial_freq, const arma::Mat<float> &phase, const arma::Mat<float> &pos, arma::Mat<float> &val,
-                                    const arma::Mat<float> *pos_b, const arma::Mat<float> *phase_b, const arma::Col<float> *acf, const arma::Col<float> *dist,
+                                    const arma::Mat<float> &pos_b, const arma::Mat<float> &phase_b, const arma::Col<float> &acf, const arma::Col<float> &dist,
                                     float spatial_freq_scale_b, bool uniform, int use_kernel);
 template void quadriga_lib::sos_val(const arma::Mat<double> &spatial_freq, const arma::Mat<double> &phase, const arma::Mat<double> &pos, arma::Mat<double> &val,
-                                    const arma::Mat<double> *pos_b, const arma::Mat<double> *phase_b, const arma::Col<double> *acf, const arma::Col<double> *dist,
+                                    const arma::Mat<double> &pos_b, const arma::Mat<double> &phase_b, const arma::Col<double> &acf, const arma::Col<double> &dist,
                                     double spatial_freq_scale_b, bool uniform, int use_kernel);

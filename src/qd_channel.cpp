@@ -772,7 +772,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     dtype gain_max_dB = -60.0,
     dtype gain_min_dB = -140.0,
     const std::string &colormap = "jet",
-    const arma::uvec *i_snap = nullptr,
+    const arma::uvec &i_snap = arma::uvec(),
     dtype radius_max = 0.05,
     dtype radius_min = 0.01,
     arma::uword n_edges = 5) const;
@@ -784,7 +784,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
 - **`radius_min`** *(optional)* — Tube radius at minimum gain
 - **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
@@ -799,7 +799,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
                                                            arma::uword max_paths,
                                                            dtype gain_max_dB, dtype gain_min_dB,
                                                            const std::string &colormap,
-                                                           const arma::uvec *i_snap_in,
+                                                           const arma::uvec &i_snap_sel,
                                                            dtype radius_max, dtype radius_min,
                                                            arma::uword n_edges) const
 {
@@ -848,9 +848,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
     arma::uword n_rx = this->n_rx();
     arma::uword n_tx = this->n_tx();
 
-    const arma::uvec i_snap = (i_snap_in == nullptr || i_snap_in->n_elem == 0ULL)
-                                  ? arma::regspace<arma::uvec>(0ULL, n_snap_in - 1ULL)
-                                  : *i_snap_in;
+    const arma::uvec i_snap = (i_snap_sel.n_elem == 0ULL) ? arma::regspace<arma::uvec>(0ULL, n_snap_in - 1ULL) : i_snap_sel;
 
     if (arma::any(i_snap >= n_snap_in))
         throw std::invalid_argument("Snapshot indices 'i_snap' cannot exceed the number of snapshots in the channel.");

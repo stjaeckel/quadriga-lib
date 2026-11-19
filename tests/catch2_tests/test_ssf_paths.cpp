@@ -55,8 +55,8 @@ namespace
     };
 
     // ssf_paths with all optional outputs; link gain 'lg' in [dB] per frequency (omitted: 0 dB)
-    po_t pth(const rays_t &r, const std::string &mob, const arma::vec *T = nullptr, const arma::vec *R = nullptr,
-             const arma::vec *kf = nullptr, bool o2 = false, const arma::vec *lg = nullptr)
+    po_t pth(const rays_t &r, const std::string &mob, const arma::vec &T = arma::vec(), const arma::vec &R = arma::vec(),
+             const arma::vec &kf = arma::vec(), bool o2 = false, const arma::vec *lg = nullptr)
     {
         po_t o;
         const arma::vec g = (lg != nullptr) ? *lg : arma::vec(r.n_freq(), arma::fill::zeros);
@@ -175,8 +175,8 @@ TEST_CASE("ssf_paths - phase at the ray-data positions returns the ray data")
     const rays_t r = make_rays(11, true, true, 6, 2, "38.901");
     const arma::vec lg = {-87.3, -101.9}, T = r.tx_pos, R = r.rx_pos;
     const double d3D = len3(R - T);
-    const po_t o = pth(r, "phase", nullptr, nullptr, nullptr, false, &lg);
-    const po_t o2 = pth(r, "phase", &T, &R, nullptr, false, &lg);
+    const po_t o = pth(r, "phase", {}, {}, {}, false, &lg);
+    const po_t o2 = pth(r, "phase", T, R, {}, false, &lg);
 
     // The zero-power NLOS ray (index 4) is dropped; LOS and GR are kept
     const arma::uvec ind = {0, 1, 2, 3, 5, 6, 7};
@@ -221,7 +221,7 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
     for (arma::uword q = 0; q < small.size(); ++q)
     {
         const arma::vec dT2 = small[q].first, dR2 = small[q].second, T = r.tx_pos + dT2, R = r.rx_pos + dR2;
-        const po_t o = pth(r, "phase", &T, &R);
+        const po_t o = pth(r, "phase", T, R);
         double max_first = 0.0, max_bound = 0.0;
         for (arma::uword p = 0; p < ind.n_elem; ++p)
             for (arma::uword k = 0; k < 2; ++k)
@@ -251,7 +251,7 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
     {
         const arma::vec T = r.tx_pos + c.first, R = r.rx_pos + c.second;
         const arma::vec eT = T - r.tx_pos, eR = R - r.rx_pos; // the displacements as the positions give them
-        const po_t o = pth(r, "phase", &T, &R);
+        const po_t o = pth(r, "phase", T, R);
         REQUIRE(o.ind.n_elem == ind.n_elem);
         for (arma::uword p = 0; p < ind.n_elem; ++p)
             for (arma::uword k = 0; k < 2; ++k)
@@ -274,7 +274,7 @@ TEST_CASE("ssf_paths - drift at the ray-data positions reproduces the drop geome
     r.solve_scatterers(2.0);
     const arma::vec lg = {-90.0, -95.5}, &T = r.tx_pos, &R = r.rx_pos;
     const double d3D = len3(R - T);
-    const po_t o = pth(r, "drift", nullptr, nullptr, nullptr, false, &lg);
+    const po_t o = pth(r, "drift", {}, {}, {}, false, &lg);
     const arma::uvec ind = kept(r);
     REQUIRE(arma::all(o.ind == ind));
     REQUIRE(arma::size(o.fbs) == arma::size(3, ind.n_elem));
@@ -350,7 +350,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
                     r.polmat(2 * e, 1, k) = m.real(), r.polmat(2 * e + 1, 1, k) = m.imag();
                 }
             const arma::vec T = r.tx_pos + dT, R = r.rx_pos + dR, G = specular_point(T, R);
-            const po_t o = pth(r, "drift", &T, &R, nullptr, false, &lg);
+            const po_t o = pth(r, "drift", T, R, {}, false, &lg);
             const arma::uvec ind = kept(r);
             REQUIRE(arma::all(o.ind == ind));
             for (arma::uword p = 0; p < ind.n_elem; ++p)
@@ -404,7 +404,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
 
             // Continuous at the ray-data positions: a 1 µm move changes the GR matrix by far less than 1e-5
             const arma::vec R1 = r.rx_pos + arma::vec{1e-6, 0.0, 0.0};
-            const po_t o1 = pth(r, "drift", nullptr, &R1);
+            const po_t o1 = pth(r, "drift", {}, R1);
             CHECK(arma::approx_equal(o1.M.col(1), r.polmat.col(1), "absdiff", 1e-5));
             CHECK(arma::abs(arma::vectorise(o1.M.col(1) - r.polmat.col(1))).max() > 0.0);
         }
@@ -416,7 +416,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
         for (arma::uword k = 0; k < 2; ++k)
             f.polmat(2, 1, k) = 0.3, f.polmat(5, 1, k) = -0.2;
         const arma::vec R = d.rx_pos + dR;
-        CHECK(arma::approx_equal(pth(f, "drift", nullptr, &R).M, pth(d, "drift", nullptr, &R).M, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pth(f, "drift", {}, R).M, pth(d, "drift", {}, R).M, "absdiff", 0.0));
     }
 
     // Without permittivity at the ray-data positions: no recomputation needed, GR unchanged
@@ -429,7 +429,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
     // Rx moved to directly below the Tx (vertical LOS): EOD -pi/2 and EOA +pi/2
     const rays_t q = make_rays(16, true, true, 6, 2, "38.901", true);
     const arma::vec Rv = {q.tx_pos(0), q.tx_pos(1), 1.5};
-    const po_t v = pth(q, "drift", nullptr, &Rv);
+    const po_t v = pth(q, "drift", {}, Rv);
     REQUIRE(v.type(0) == 0);
     CHECK(std::abs(v.eod(0) + 0.5 * arma::datum::pi) < 1e-12);
     CHECK(std::abs(v.eoa(0) - 0.5 * arma::datum::pi) < 1e-12);
@@ -447,7 +447,7 @@ TEST_CASE("ssf_paths - drift path lengths change by at most the displacement")
         const arma::vec dT = (t % 3 == 0) ? z3 : U(0.0, 3.0) * unit_vec(U(-pi, pi), U(-0.5, 0.5));
         const arma::vec dR = (t % 3 == 1) ? z3 : U(0.0, 3.0) * unit_vec(U(-pi, pi), U(-0.4, 0.4));
         const arma::vec T = r.tx_pos + dT, R = r.rx_pos + dR;
-        const po_t o = pth(r, "drift", &T, &R);
+        const po_t o = pth(r, "drift", T, R);
         INFO("trial " << t);
         CHECK(arma::all(arma::abs(o.len - o0.len) <= len3(dT) + len3(dR) + 1e-9));
         CHECK(arma::abs(o.len - o0.len).max() > 0.1 * (len3(dT) + len3(dR))); // the lengths do change
@@ -458,7 +458,7 @@ TEST_CASE("ssf_paths - kf_ratio rescales LOS and GR against NLOS as K' = r·K_c"
 {
     const rays_t r = make_rays(18, true, true, 6, 3, "38.901");
     const arma::vec kf = {0.3, 2.5, 0.0}, ones(3, arma::fill::ones);
-    const po_t o = pth(r, "phase", nullptr, nullptr, &kf), o1 = pth(r, "phase", nullptr, nullptr, &ones);
+    const po_t o = pth(r, "phase", {}, {}, kf), o1 = pth(r, "phase", {}, {}, ones);
     const po_t on = pth(r, "phase");
     CHECK(arma::approx_equal(o1.gain, on.gain, "reldiff", 1e-15));
     const arma::uvec ind = kept(r);
@@ -492,7 +492,7 @@ TEST_CASE("ssf_paths - kf_ratio rescales LOS and GR against NLOS as K' = r·K_c"
     for (arma::uword i = 2; i < z.n_ray(); ++i)
         z.power(i, 1) = 0.0;
     const arma::vec kz = {1.0, 0.0, 1.0};
-    const po_t oz = pth(z, "phase", nullptr, nullptr, &kz);
+    const po_t oz = pth(z, "phase", {}, {}, kz);
     CHECK(oz.gain.is_finite());
     CHECK((oz.gain(0, 1) == 0.0 && oz.gain(1, 1) == 0.0));
     CHECK(arma::all(oz.gain.col(1).subvec(2, oz.gain.n_rows - 1) == 0.0));
@@ -512,7 +512,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
     {
         const rays_t &x = (mode == 0) ? r : s;
         const std::string mob = (mode == 0) ? "phase" : "drift";
-        const po_t a = pth(x, mob, nullptr, &R), b = pth(x, mob, nullptr, &R, nullptr, true);
+        const po_t a = pth(x, mob, {}, R), b = pth(x, mob, {}, R, {}, true);
         CHECK(arma::approx_equal(a.len, b.len, "absdiff", 0.0));
         CHECK(arma::approx_equal(a.M, b.M, "absdiff", 0.0));
         for (arma::uword p = 0; p < a.len.n_elem; ++p)
@@ -533,7 +533,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
         rays_t q = make_rays(19, true, true, 6, 15, "38.901");
         for (arma::uword k = 0; k < 15; ++k)
             q.center_freq(k) = (53.0 + (double)k) * 1e9;
-        const po_t a = pth(q, "phase", nullptr, &R), b = pth(q, "phase", nullptr, &R, nullptr, true);
+        const po_t a = pth(q, "phase", {}, R), b = pth(q, "phase", {}, R, {}, true);
         for (arma::uword p = 0; p < a.len.n_elem; ++p)
             for (arma::uword k = 0; k < 15; ++k)
             {
@@ -547,7 +547,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
     // loss, with and without oxygen
     rays_t h = r;
     h.center_freq(0) = 52e9, h.center_freq(4) = 68e9, h.center_freq(5) = 1e300;
-    const po_t c = pth(h, "phase", nullptr, &R), d = pth(h, "phase", nullptr, &R, nullptr, true);
+    const po_t c = pth(h, "phase", {}, R), d = pth(h, "phase", {}, R, {}, true);
     for (arma::uword k : {0, 4, 5})
         CHECK(arma::approx_equal(c.gain.col(k), d.gain.col(k), "absdiff", 0.0));
 }
@@ -561,8 +561,8 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
         r.solve_scatterers();
         const arma::vec R = r.rx_pos + dR;
         const bool qd = std::string(method) == "quadriga";
-        const po_t a = pth(r, "auto", nullptr, &R, nullptr, false, &lg);
-        const po_t e = pth(r, qd ? "drift" : "phase", nullptr, &R, nullptr, false, &lg);
+        const po_t a = pth(r, "auto", {}, R, {}, false, &lg);
+        const po_t e = pth(r, qd ? "drift" : "phase", {}, R, {}, false, &lg);
         INFO("method " << method);
         CHECK((a.gain.n_rows == e.gain.n_rows && arma::approx_equal(a.gain, e.gain, "absdiff", 0.0)));
         CHECK(arma::approx_equal(a.M, e.M, "absdiff", 0.0));
@@ -575,25 +575,25 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
         arma::cube M;
         arma::u32_vec ut;
         arma::uvec u;
-        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R);
-        const po_t d = pth(r, "drift", nullptr, &R, nullptr, false, &lg);
+        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", {}, R);
+        const po_t d = pth(r, "drift", {}, R, {}, false, &lg);
         CHECK((arma::approx_equal(g, d.gain, "absdiff", 0.0) && arma::approx_equal(l, d.len, "absdiff", 0.0) &&
                arma::approx_equal(M, d.M, "absdiff", 0.0)));
         const arma::vec *ang[4] = {&d.aod, &d.eod, &d.aoa, &d.eoa};
         for (int q = 0; q < 4; ++q)
         {
-            quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, q == 0 ? &v : nullptr,
+            quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", {}, R, {}, q == 0 ? &v : nullptr,
                                     q == 1 ? &v : nullptr, q == 2 ? &v : nullptr, q == 3 ? &v : nullptr);
             CHECK(arma::approx_equal(v, *ang[q], "absdiff", 0.0));
         }
-        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, nullptr, nullptr, nullptr, nullptr, &fb);
-        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", {}, R, {}, nullptr, nullptr, nullptr, nullptr, &fb);
+        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", {}, R, {}, nullptr, nullptr, nullptr, nullptr,
                                 nullptr, &lb);
         CHECK((arma::approx_equal(fb, d.fbs, "absdiff", 0.0) && arma::approx_equal(lb, d.lbs, "absdiff", 0.0)));
-        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", {}, R, {}, nullptr, nullptr, nullptr, nullptr,
                                 nullptr, nullptr, &ut);
         CHECK(arma::all(ut == d.type));
-        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", {}, R, {}, nullptr, nullptr, nullptr, nullptr,
                                 nullptr, nullptr, nullptr, &u);
         CHECK(arma::all(u == d.ind));
 
@@ -608,7 +608,7 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
         arma::mat lb2(2, 2, arma::fill::value(5.0));
         arma::vec eo(n + 3, arma::fill::value(5.0)), aa(1, arma::fill::value(5.0)), ee;
         arma::u32_vec pt(1, arma::fill::value(5));
-        quadriga_lib::ssf_paths(r, lg, sg, sl, sM, "drift", nullptr, &R, nullptr, &sa, &eo, &aa, &ee, &sf, &lb2, &pt,
+        quadriga_lib::ssf_paths(r, lg, sg, sl, sM, "drift", {}, R, {}, &sa, &eo, &aa, &ee, &sf, &lb2, &pt,
                                 &st);
         CHECK((sg.memptr() == b_g.data() && sl.memptr() == b_l.data() && sM.memptr() == b_M.data() &&
                sa.memptr() == b_a.data() && sf.memptr() == b_f.data() && st.memptr() == b_t.data()));
@@ -637,7 +637,7 @@ TEST_CASE("ssf_paths - phase and drift agree for millimetre displacements")
         for (arma::uword q = 0; q < cases.size(); ++q)
         {
             const arma::vec dT = cases[q].first, dR = cases[q].second, T = r.tx_pos + dT, R = r.rx_pos + dR;
-            const po_t op = pth(r, "phase", &T, &R), od = pth(r, "drift", &T, &R);
+            const po_t op = pth(r, "phase", T, R), od = pth(r, "drift", T, R);
             REQUIRE(op.ind.n_elem == od.ind.n_elem);
             double max_first = 0.0, max_bound = 0.0;
             for (arma::uword k = 0; k < 2; ++k)
@@ -693,7 +693,7 @@ TEST_CASE("ssf_paths - n_ray = 0, NLOS scenario and data-from-paths rays")
     const arma::vec kf = {2.0, 0.5};
     for (const char *mob : {"phase", "drift"})
     {
-        const po_t o = pth(n, mob, nullptr, nullptr, &kf);
+        const po_t o = pth(n, mob, {}, {}, kf);
         INFO(mob);
         REQUIRE(o.ind.n_elem == 7);
         CHECK(arma::all(o.ind == arma::uvec{0, 1, 2, 3, 5, 6, 7}));
@@ -709,7 +709,7 @@ TEST_CASE("ssf_paths - n_ray = 0, NLOS scenario and data-from-paths rays")
     const po_t o = pth(s, "drift");
     rays_t d;
     quadriga_lib::gbsm_rays_from_paths(s.center_freq, s.tx_pos, s.rx_pos, o.fbs, o.lbs, o.gain, o.len, o.M, d,
-                                       "quadriga", &o.type, nullptr, &s.gr_eps_re, &s.gr_eps_im);
+                                       "quadriga", o.type, {}, s.gr_eps_re, s.gr_eps_im);
     const po_t od = pth(d, "auto");
     REQUIRE(od.ind.n_elem == o.ind.n_elem);
     CHECK(arma::approx_equal(od.gain, o.gain, "reldiff", 1e-14));
@@ -728,11 +728,11 @@ TEST_CASE("ssf_paths - input validation")
     arma::mat g(1, 1, arma::fill::value(-3.0));
     arma::vec l;
     arma::cube M;
-    auto call = [&](const rays_t &x, const arma::vec &lgx, const std::string &mob, const arma::vec *T,
-                    const arma::vec *R, const arma::vec *k)
+    auto call = [&](const rays_t &x, const arma::vec &lgx, const std::string &mob, const arma::vec &T,
+                    const arma::vec &R, const arma::vec &k)
     { quadriga_lib::ssf_paths(x, lgx, g, l, M, mob, T, R, k); };
-    auto ok = [&](const rays_t &x, const arma::vec &lgx, const std::string &mob, const arma::vec *T,
-                  const arma::vec *R, const arma::vec *k)
+    auto ok = [&](const rays_t &x, const arma::vec &lgx, const std::string &mob, const arma::vec &T,
+                  const arma::vec &R, const arma::vec &k)
     {
         arma::mat g2;
         arma::vec l2;
@@ -748,70 +748,70 @@ TEST_CASE("ssf_paths - input validation")
 
     SECTION("baseline")
     {
-        CHECK_NOTHROW(ok(r, lg, "phase", &T, &R, &kf));
-        CHECK_NOTHROW(ok(s, lg, "drift", &T, &R, &kf));
-        CHECK_NOTHROW(ok(s, lg, "auto", nullptr, nullptr, nullptr));
+        CHECK_NOTHROW(ok(r, lg, "phase", T, R, kf));
+        CHECK_NOTHROW(ok(s, lg, "drift", T, R, kf));
+        CHECK_NOTHROW(ok(s, lg, "auto", {}, {}, {}));
         rays_t q = s;
         q.method = "quadriga";
-        CHECK_NOTHROW(ok(q, lg, "auto", &T, nullptr, nullptr));
+        CHECK_NOTHROW(ok(q, lg, "auto", T, {}, {}));
     }
     SECTION("rays")
     {
-        thr([&] { call(rays_t(), lg, "phase", nullptr, nullptr, nullptr); },
+        thr([&] { call(rays_t(), lg, "phase", {}, {}, {}); },
             "Input 'rays.tx_pos' must have 3 elements.");
         rays_t x = r;
         x.method = "x";
-        thr([&] { call(x, lg, "phase", nullptr, nullptr, nullptr); },
+        thr([&] { call(x, lg, "phase", {}, {}, {}); },
             "Input 'rays.method' must be '38.901', '38.901_MF' or 'quadriga'.");
     }
     SECTION("mobility")
     {
-        thr([&] { call(r, lg, "Phase", nullptr, nullptr, nullptr); },
+        thr([&] { call(r, lg, "Phase", {}, {}, {}); },
             "Input 'mobility' must be 'phase', 'drift' or 'auto'.");
     }
     SECTION("link_gain_dB")
     {
-        thr([&] { call(r, arma::vec{-80.0}, "phase", nullptr, nullptr, nullptr); },
+        thr([&] { call(r, arma::vec{-80.0}, "phase", {}, {}, {}); },
             "Input 'link_gain_dB' must have n_freq elements.");
-        thr([&] { call(r, arma::vec{-80.0, arma::datum::inf}, "phase", nullptr, nullptr, nullptr); },
+        thr([&] { call(r, arma::vec{-80.0, arma::datum::inf}, "phase", {}, {}, {}); },
             "Input 'link_gain_dB' must be finite.");
     }
     SECTION("tx_pos and rx_pos")
     {
         const arma::vec two = {1.0, 2.0}, nan3 = {1.0, arma::datum::nan, 2.0};
-        thr([&] { call(r, lg, "phase", &two, nullptr, nullptr); }, "Input 'tx_pos' must have 3 elements.");
-        thr([&] { call(r, lg, "phase", &nan3, nullptr, nullptr); }, "Input 'tx_pos' must be finite.");
-        thr([&] { call(r, lg, "phase", nullptr, &two, nullptr); }, "Input 'rx_pos' must have 3 elements.");
-        thr([&] { call(r, lg, "phase", nullptr, &nan3, nullptr); }, "Input 'rx_pos' must be finite.");
+        thr([&] { call(r, lg, "phase", two, {}, {}); }, "Input 'tx_pos' must have 3 elements.");
+        thr([&] { call(r, lg, "phase", nan3, {}, {}); }, "Input 'tx_pos' must be finite.");
+        thr([&] { call(r, lg, "phase", {}, two, {}); }, "Input 'rx_pos' must have 3 elements.");
+        thr([&] { call(r, lg, "phase", {}, nan3, {}); }, "Input 'rx_pos' must be finite.");
     }
     SECTION("kf_ratio")
     {
         const arma::vec one = {1.0}, neg = {1.0, -0.1}, nan2 = {arma::datum::nan, 1.0};
-        thr([&] { call(r, lg, "phase", nullptr, nullptr, &one); }, "Input 'kf_ratio' must have n_freq elements.");
-        thr([&] { call(r, lg, "phase", nullptr, nullptr, &neg); }, "Input 'kf_ratio' must be finite and >= 0.");
-        thr([&] { call(r, lg, "phase", nullptr, nullptr, &nan2); }, "Input 'kf_ratio' must be finite and >= 0.");
+        thr([&] { call(r, lg, "phase", {}, {}, one); }, "Input 'kf_ratio' must have n_freq elements.");
+        thr([&] { call(r, lg, "phase", {}, {}, neg); }, "Input 'kf_ratio' must be finite and >= 0.");
+        thr([&] { call(r, lg, "phase", {}, {}, nan2); }, "Input 'kf_ratio' must be finite and >= 0.");
     }
     SECTION("drift without scatterers")
     {
         const std::string msg = "Mobility 'drift' needs 'rays.fbs_pos' and 'rays.lbs_pos'; solve the scatterers first.";
-        thr([&] { call(r, lg, "drift", nullptr, nullptr, nullptr); }, msg);
+        thr([&] { call(r, lg, "drift", {}, {}, {}); }, msg);
         rays_t q = r;
         q.method = "quadriga";
-        thr([&] { call(q, lg, "auto", nullptr, nullptr, nullptr); }, msg);
+        thr([&] { call(q, lg, "auto", {}, {}, {}); }, msg);
     }
     SECTION("drift with a GR ray at moved ends")
     {
         rays_t x = s;
         x.gr_eps_re.reset(), x.gr_eps_im.reset();
-        CHECK_NOTHROW(ok(x, lg, "drift", nullptr, nullptr, nullptr));
-        CHECK_NOTHROW(ok(x, lg, "phase", &T, nullptr, nullptr));
-        thr([&] { call(x, lg, "drift", &T, nullptr, nullptr); },
+        CHECK_NOTHROW(ok(x, lg, "drift", {}, {}, {}));
+        CHECK_NOTHROW(ok(x, lg, "phase", T, {}, {}));
+        thr([&] { call(x, lg, "drift", T, {}, {}); },
             "Input 'rays.gr_eps_re' is required to recompute the ground reflection away from the positions of 'rays'.");
         const arma::vec Tb = {3.0, -4.0, -0.5}, Rb = {120.0, 45.0, -1.0};
-        CHECK_NOTHROW(ok(s, lg, "phase", &Tb, &Rb, nullptr));
-        thr([&] { call(s, lg, "drift", &Tb, nullptr, nullptr); },
+        CHECK_NOTHROW(ok(s, lg, "phase", Tb, Rb, {}));
+        thr([&] { call(s, lg, "drift", Tb, {}, {}); },
             "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
-        thr([&] { call(s, lg, "drift", nullptr, &Rb, nullptr); },
+        thr([&] { call(s, lg, "drift", {}, Rb, {}); },
             "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
     }
 }
@@ -837,11 +837,11 @@ TEST_CASE("Diagnostic - ssf_paths fallback share and b_med on a library drop")
         const bool qd = std::string(method) == "quadriga";
         out_t o;
         quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa, method,
-                                   qd ? nullptr : &in.rnd_freq, nullptr, &in.eod, qd ? &in.toa : nullptr);
+                                   qd ? arma::cube() : in.rnd_freq, {}, in.eod, qd ? in.toa : arma::vec());
         arma::cube ph;
         arma::mat x;
         quadriga_lib::gbsm_init_phases(sp, "ray", ph, 292, qd ? -1 : 0);
-        quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, qd ? -1 : 0, "Comb256", nullptr, &fc);
+        quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, qd ? -1 : 0, "Comb256", {}, fc);
         const arma::cube rnd(x.memptr(), x.n_rows, x.n_cols, 1);
         std::vector<rays_t> rays;
         quadriga_lib::ssf_rays(sp, tx, rx, fc, in.lsp, mu, sigma, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa, rnd,
@@ -886,7 +886,7 @@ TEST_CASE("ssf_paths - outputs that alias inputs")
     arma::mat g;
     arma::cube M;
     const std::string ph = "phase";
-    CHECK_NOTHROW(quadriga_lib::ssf_paths(keep, lg, g, l, M, ph, &T, nullptr, nullptr, &a, &e));
+    CHECK_NOTHROW(quadriga_lib::ssf_paths(keep, lg, g, l, M, ph, T, {}, {}, &a, &e));
 
     rays_t x = keep;
     CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, x.polmat), std::invalid_argument); // polmat is 'rays.polmat'
@@ -898,17 +898,17 @@ TEST_CASE("ssf_paths - outputs that alias inputs")
     CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, x.delay, M), std::invalid_argument); // path_length is 'rays.delay'
     CHECK(arma::approx_equal(x.delay, keep.delay, "absdiff", 0.0));
     x = keep;
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, nullptr, nullptr, nullptr, &x.center_freq), std::invalid_argument); // aod is 'rays.center_freq'
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, {}, {}, {}, &x.center_freq), std::invalid_argument); // aod is 'rays.center_freq'
     CHECK(arma::approx_equal(x.center_freq, keep.center_freq, "absdiff", 0.0));
     x = keep;
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &x.rx_pos),
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, {}, {}, {}, nullptr, nullptr, nullptr, nullptr, &x.rx_pos),
                     std::invalid_argument); // fbs_pos is 'rays.rx_pos'
     CHECK(arma::approx_equal(x.rx_pos, keep.rx_pos, "absdiff", 0.0));
     x = keep;
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, &T, nullptr, nullptr, &a, &a), std::invalid_argument); // eod is 'aod'
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, T, {}, {}, &a, &a), std::invalid_argument); // eod is 'aod'
     arma::vec T2 = T, lg2 = lg;
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, &T2, nullptr, nullptr, &T2), std::invalid_argument); // aod is 'tx_pos'
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg2, g, l, M, ph, &T, nullptr, nullptr, &lg2), std::invalid_argument); // aod is 'link_gain_dB'
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, T2, {}, {}, &T2), std::invalid_argument); // aod is 'tx_pos'
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg2, g, l, M, ph, T, {}, {}, &lg2), std::invalid_argument); // aod is 'link_gain_dB'
     CHECK(arma::approx_equal(T2, T, "absdiff", 0.0));
     x = keep;
     arma::mat on_power(x.power.memptr(), 2, 2, false, true);

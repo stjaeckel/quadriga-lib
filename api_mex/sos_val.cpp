@@ -246,12 +246,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat val;
     plhs[0] = qd_mex_init_output(&val, pos.n_rows, phase.n_cols);
 
-    // Wrap optional pointers
-    const arma::mat *p_pos_b = pos_b.empty() ? nullptr : &pos_b;
-    const arma::mat *p_phase_b = phase_b.empty() ? nullptr : &phase_b;
-    const arma::vec *p_acf = acf.empty() ? nullptr : &acf;
-    const arma::vec *p_dist = dist.empty() ? nullptr : &dist;
-
     // Call library function
-    CALL_QD(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val, p_pos_b, p_phase_b, p_acf, p_dist, spatial_freq_scale_b, uniform, use_kernel));
+    CALL_QD(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val, pos_b, phase_b, acf, dist, spatial_freq_scale_b, uniform, use_kernel));
 }

@@ -108,10 +108,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat val;
     plhs[0] = qd_mex_init_output(&val, pos.n_rows, dist_decorr.n_elem);
 
-    // Wrap optional pointers
-    const arma::mat *p_pos_b = pos_b.empty() ? nullptr : &pos_b;
-    const arma::vec *p_dist_decorr_b = dist_decorr_b.empty() ? nullptr : &dist_decorr_b;
-
     // Call library function
-    CALL_QD(quadriga_lib::sos_randi<double>(dist_decorr, pos, imax, val, p_pos_b, p_dist_decorr_b, preset, seed));
+    CALL_QD(quadriga_lib::sos_randi<double>(dist_decorr, pos, imax, val, pos_b, dist_decorr_b, preset, seed));
 }

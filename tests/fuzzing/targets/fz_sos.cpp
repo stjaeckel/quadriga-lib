@@ -90,8 +90,8 @@ static void run(fz::input &in)
         // val is a fresh matrix or one of the inputs
         arma::Mat<T> *out[] = {&val, &pos, &pos_b, &phase, &phase_b};
         arma::Mat<T> *v = out[in.ConsumeIntegralInRange<int>(0, 7) < 5 ? 0 : in.ConsumeIntegralInRange<int>(0, 4)];
-        fz::clean([&] { quadriga_lib::sos_val(spatial_freq, phase, pos, *v, use_b ? &pos_b : nullptr, use_phase_b ? &phase_b : nullptr,
-                                              use_acf ? &acf : nullptr, use_acf ? &dist : nullptr, scale_b, uniform, kernel); });
+        fz::clean([&] { quadriga_lib::sos_val(spatial_freq, phase, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, phase_b),
+                                              fz::opt(use_acf, acf), fz::opt(use_acf, dist), scale_b, uniform, kernel); });
         break;
     }
     case 2:
@@ -101,7 +101,7 @@ static void run(fz::input &in)
         if (in.ConsumeBool() && !map.empty())
             map[0].set_size(in.size(3), in.size(3), in.size(3));
         const int mode = in.ConsumeIntegralInRange<int>(0, 3);
-        fz::clean([&] { quadriga_lib::sos_map(spatial_freq, phase, x, map, mode & 1 ? &y : nullptr, mode & 2 ? &z : nullptr, uniform, kernel); });
+        fz::clean([&] { quadriga_lib::sos_map(spatial_freq, phase, x, map, fz::opt(mode & 1, y), fz::opt(mode & 2, z), uniform, kernel); });
         break;
     }
     case 3:
@@ -115,11 +115,11 @@ static void run(fz::input &in)
         const int which = in.ConsumeIntegralInRange<int>(0, 2);
         const arma::uword imax = in.ConsumeIntegralInRange<int>(0, 3) == 0 ? in.ConsumeIntegral<arma::uword>() : in.size(10);
         if (which == 0)
-            fz::clean([&] { quadriga_lib::sos_randn(dd, pos, *v, use_b ? &pos_b : nullptr, use_phase_b ? &dd_b : nullptr, preset, s); });
+            fz::clean([&] { quadriga_lib::sos_randn(dd, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, dd_b), preset, s); });
         else if (which == 1)
-            fz::clean([&] { quadriga_lib::sos_rand(dd, pos, *v, use_b ? &pos_b : nullptr, use_phase_b ? &dd_b : nullptr, preset, s); });
+            fz::clean([&] { quadriga_lib::sos_rand(dd, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, dd_b), preset, s); });
         else
-            fz::clean([&] { quadriga_lib::sos_randi(dd, pos, imax, *v, use_b ? &pos_b : nullptr, use_phase_b ? &dd_b : nullptr, preset, s); });
+            fz::clean([&] { quadriga_lib::sos_randi(dd, pos, imax, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, dd_b), preset, s); });
         break;
     }
     case 4:
@@ -127,8 +127,8 @@ static void run(fz::input &in)
         arma::Mat<T> offset, mean_before;
         const int outs = in.ConsumeIntegralInRange<int>(0, 3);
         arma::Mat<T> *off = outs & 1 ? (in.ConsumeBool() ? &offset : &phase_b) : nullptr; // phase_b as output may clash
-        fz::clean([&] { quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, use_b ? &pos_b : nullptr, use_phase_b ? &phase_b : nullptr,
-                                                      use_acf ? &acf : nullptr, use_acf ? &dist : nullptr, off,
+        fz::clean([&] { quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, fz::opt(use_b, pos_b), use_phase_b ? &phase_b : nullptr,
+                                                      fz::opt(use_acf, acf), fz::opt(use_acf, dist), off,
                                                       outs & 2 ? &mean_before : nullptr, scale_b); });
         break;
     }
@@ -166,8 +166,8 @@ static void run(fz::input &in)
         const arma::uword n_pos = in.size(32);
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
         fz::clean([&] { quadriga_lib::sos_acf_estimate(spatial_freq, ph, bins, n_pos, outs & 8 ? bins : est, outs & 1 ? &d_est : nullptr,
-                                                       outs & 2 ? &dual : nullptr, outs & 4 ? &acf : nullptr,
-                                                       outs & 4 ? &dist : nullptr, seed(in)); });
+                                                       outs & 2 ? &dual : nullptr, fz::opt(outs & 4, acf),
+                                                       fz::opt(outs & 4, dist), seed(in)); });
         break;
     }
     case 9:

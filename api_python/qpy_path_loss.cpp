@@ -109,13 +109,9 @@ py::tuple path_loss(py::handle plpar,
     auto pl_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &pl_dB);
     auto sf_sigma_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &sf_sigma_dB);
 
-    // Wrap optional pointers
-    const arma::vec *p_d2d_in = d2d_in_a.is_empty() ? nullptr : &d2d_in_a;
-    const arma::vec *p_rnd_he = rnd_he_a.is_empty() ? nullptr : &rnd_he_a;
-
     // Call library function
-    quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, pl_dB, &sf_sigma_dB, p_d2d_in,
-                            p_rnd_he);
+    quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, pl_dB, &sf_sigma_dB, d2d_in_a,
+                            rnd_he_a);
 
     return py::make_tuple(pl_py, sf_sigma_py);
 }

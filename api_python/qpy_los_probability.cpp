@@ -101,14 +101,12 @@ py::tuple los_probability(const std::string &model,
     if (soft)
         los_soft_py = qd_python_init_output(d2d_out_a.n_elem, center_freq_a.n_elem, &los_soft);
 
-    // Wrap optional pointers
-    const arma::vec *p_rnd_g = soft ? &rnd_g_a : nullptr;
-    const arma::vec *p_center_freq = soft ? &center_freq_a : nullptr;
+    // Optional output
     arma::mat *p_los_soft = soft ? &los_soft : nullptr;
 
     // Call library function
     quadriga_lib::los_probability(model, d2d_out_a, h_bs_a, h_ut_a, p_los, d_clutter_d, r_clutter_d, h_clutter_d,
-                                  p_rnd_g, p_center_freq, p_los_soft);
+                                  rnd_g_a, center_freq_a, p_los_soft);
 
     return py::make_tuple(p_los_py, los_soft_py);
 }

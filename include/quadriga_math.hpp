@@ -61,17 +61,17 @@ namespace quadriga_lib
 
     // Fast, approximate geographic-to-Cartesian conversion
     template <typename dtype>
-    void fast_geo2cart(const arma::Col<dtype> &az,            // Input azimuth angles in radians, Length [n]
-                       const arma::Col<dtype> &el,            // Input elevation angles in radians, Length [n]
-                       arma::Col<dtype> &x,                   // Output x-coordinates, Length [n]
-                       arma::Col<dtype> &y,                   // Output y-coordinates, Length [n]
-                       arma::Col<dtype> &z,                   // Output z-coordinates, Length [n]
-                       arma::Col<dtype> *sin_az = nullptr,    // Optional output: sin(az), Length [n]
-                       arma::Col<dtype> *cos_az = nullptr,    // Optional output: cos(az), Length [n]
-                       arma::Col<dtype> *sin_el = nullptr,    // Optional output: sin(el), Length [n]
-                       arma::Col<dtype> *cos_el = nullptr,    // Optional output: cos(el), Length [n]
-                       const arma::Col<dtype> *len = nullptr, // Optional input vector length, Length [n]
-                       int use_kernel = 0);                   // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
+    void fast_geo2cart(const arma::Col<dtype> &az,                       // Input azimuth angles in radians, Length [n]
+                       const arma::Col<dtype> &el,                       // Input elevation angles in radians, Length [n]
+                       arma::Col<dtype> &x,                              // Output x-coordinates, Length [n]
+                       arma::Col<dtype> &y,                              // Output y-coordinates, Length [n]
+                       arma::Col<dtype> &z,                              // Output z-coordinates, Length [n]
+                       arma::Col<dtype> *sin_az = nullptr,               // Optional output: sin(az), Length [n]
+                       arma::Col<dtype> *cos_az = nullptr,               // Optional output: cos(az), Length [n]
+                       arma::Col<dtype> *sin_el = nullptr,               // Optional output: sin(el), Length [n]
+                       arma::Col<dtype> *cos_el = nullptr,               // Optional output: cos(el), Length [n]
+                       const arma::Col<dtype> &len = arma::Col<dtype>(), // Optional input vector length, Length [n]
+                       int use_kernel = 0);                              // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate Cartesian-to-geographic conversion
     template <typename dtype>

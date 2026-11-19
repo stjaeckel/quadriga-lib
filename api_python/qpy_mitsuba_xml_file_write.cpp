@@ -67,5 +67,5 @@ void mitsuba_xml_file_write(const py::handle &fn,
     const std::vector<std::string> mtl_names_a = qd_python_list2vector_Strings(mtl_names);
     const arma::mat bsdf_a = qd_python_numpy2arma_Mat<double>(bsdf, true);
 
-    quadriga_lib::mitsuba_xml_file_write(fn_s, vert_list_a, face_ind_a, obj_ind_a, mtl_ind_a, obj_names_a, mtl_names_a, &bsdf_a, map_to_itu_b);
+    quadriga_lib::mitsuba_xml_file_write(fn_s, vert_list_a, face_ind_a, obj_ind_a, mtl_ind_a, obj_names_a, mtl_names_a, bsdf_a, map_to_itu_b);
 }

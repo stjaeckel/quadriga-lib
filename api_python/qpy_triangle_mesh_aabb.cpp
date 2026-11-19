@@ -44,7 +44,7 @@ py::array_t<double> triangle_mesh_aabb(const py::array_t<double> &mesh,
     const auto sub_mesh_index_arma = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true, false, "sub_mesh_ind");
 
     arma::mat aabb;
-    quadriga_lib::triangle_mesh_aabb(triangles_arma, aabb, &sub_mesh_index_arma, vec_size);
+    quadriga_lib::triangle_mesh_aabb(triangles_arma, aabb, sub_mesh_index_arma, vec_size);
 
     return qd_python_copy2numpy(&aabb);
 }

@@ -240,5 +240,5 @@ TEST_CASE("Arrayant quick check - Generated antennas are marked")
                 CHECK(qd_arrayant_cache_matches(a));
             }
     CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_omni<double>(10.0)));
-    CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0)));
+    CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0)));
 }

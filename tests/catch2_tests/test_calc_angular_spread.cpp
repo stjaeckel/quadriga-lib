@@ -376,10 +376,7 @@ TEST_CASE("calc_angular_spread - phi and theta are the local angles of the outpu
         const arma::mat A = az[0].t(), E = el[0].t();
         const arma::cube O(ori.memptr(), 3, 1, 1);
         arma::mat Vr, Vi, Hr, Hi, az_loc, el_loc;
-        const arma::uvec *i_el = nullptr;
-        const arma::mat *pos = nullptr;
-        arma::mat *dist = nullptr;
-        quadriga_lib::arrayant_interpolate(omni, A, E, Vr, Vi, Hr, Hi, i_el, &O, pos, dist, &az_loc, &el_loc);
+        quadriga_lib::arrayant_interpolate(omni, A, E, Vr, Vi, Hr, Hi, {}, O, {}, (arma::mat *)nullptr, &az_loc, &el_loc);
         CHECK(arma::approx_equal(phi[0], arma::vec(az_loc.t()), "absdiff", 1e-6));
         CHECK(arma::approx_equal(theta[0], arma::vec(el_loc.t()), "absdiff", 1e-6));
     }

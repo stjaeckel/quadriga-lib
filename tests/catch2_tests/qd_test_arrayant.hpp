@@ -19,7 +19,7 @@ static inline void qd_rotate(quadriga_lib::arrayant<dtype> &ant, double bank, do
 {
     const arma::Col<dtype> orientation = {dtype(bank), dtype(tilt), dtype(heading)};
     const arma::uvec i_element = element == unsigned(-1) ? arma::uvec() : arma::uvec{element};
-    quadriga_lib::arrayant_rotate_pattern(ant, orientation, usage, &i_element);
+    quadriga_lib::arrayant_rotate_pattern(ant, orientation, usage, i_element);
 }
 
 template <typename dtype>
@@ -27,7 +27,7 @@ static inline void qd_rotate_multi(std::vector<quadriga_lib::arrayant<dtype>> &v
                                    double heading, unsigned usage = 0, const arma::uvec &i_element = {})
 {
     const arma::Col<dtype> orientation = {dtype(bank), dtype(tilt), dtype(heading)};
-    quadriga_lib::arrayant_rotate_pattern_multi(vec, orientation, usage, &i_element);
+    quadriga_lib::arrayant_rotate_pattern_multi(vec, orientation, usage, i_element);
 }
 
 template <typename T> // Keeps the output pointers out of the template argument deduction (nullptr arguments)
@@ -46,7 +46,7 @@ static inline void qd_beamwidth(const quadriga_lib::arrayant<dtype> &ant, arma::
     const arma::uvec i_element = {element};
     dtype *out[] = {beamwidth_az, beamwidth_el, az_point_ang, el_point_ang};
     arma::Col<dtype> res[4];
-    quadriga_lib::arrayant_calc_beamwidth(ant, &i_element, dtype(threshold_dB), out[0] ? &res[0] : nullptr,
+    quadriga_lib::arrayant_calc_beamwidth(ant, i_element, dtype(threshold_dB), out[0] ? &res[0] : nullptr,
                                           out[1] ? &res[1] : nullptr, out[2] ? &res[2] : nullptr,
                                           out[3] ? &res[3] : nullptr);
     for (int k = 0; k < 4; ++k)
@@ -59,7 +59,7 @@ static inline dtype qd_directivity(const quadriga_lib::arrayant<dtype> &ant, arm
 {
     const arma::uvec i_element = {element};
     arma::Col<dtype> directivity_dBi;
-    quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi, &i_element);
+    quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi, i_element);
     return directivity_dBi[0];
 }
 

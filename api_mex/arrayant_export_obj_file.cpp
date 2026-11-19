@@ -77,5 +77,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         ant = qd_mex_struct2arrayant(prhs[1], true, false, "arrayant");
 
-    CALL_QD(quadriga_lib::arrayant_export_obj_file(fn, ant, directivity_range_dB, colormap, object_radius, icosphere_n_div, &element_ind));
+    CALL_QD(quadriga_lib::arrayant_export_obj_file(fn, ant, directivity_range_dB, colormap, object_radius, icosphere_n_div, element_ind));
 }

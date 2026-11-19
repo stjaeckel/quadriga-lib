@@ -49,7 +49,7 @@ namespace
     }
 
     // Oracle: the documented composition for generator g
-    arma::vec ref_randn(double d_a, double d_b, const arma::mat &pos, const arma::mat *pos_b, const std::string &preset,
+    arma::vec ref_randn(double d_a, double d_b, const arma::mat &pos, const arma::mat &pos_b, const std::string &preset,
                         arma::sword seed, arma::uword g, arma::uword n_gen, bool uniform = false)
     {
         d_a = d_a == 0.0 ? 0.1 : d_a, d_b = d_b == 0.0 ? 0.1 : d_b;
@@ -61,12 +61,12 @@ namespace
         quadriga_lib::sos_init_phases(spatial_freq.n_rows, n_gen, phase, seed);
         quadriga_lib::sos_init_phases(spatial_freq.n_rows, n_gen, phase_b, seed + ((arma::sword)1 << 62));
         arma::mat ph_a = phase.col(g), ph_b = phase_b.col(g);
-        if (pos_b == nullptr)
-            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, uniform);
+        if (pos_b.is_empty())
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, {}, {}, {}, {}, 1.0, uniform);
         else if (d_a == d_b)
-            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, (arma::mat *)nullptr, &acf, &dist, 1.0, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, {}, acf, dist, 1.0, uniform);
         else
-            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, &ph_b, (arma::vec *)nullptr, (arma::vec *)nullptr, d_a / d_b, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, ph_b, {}, {}, d_a / d_b, uniform);
         return val.col(0);
     }
 }
@@ -78,14 +78,14 @@ TEST_CASE("sos_randn - one device: each generator is the documented composition"
     arma::mat pos = rnd(11, 3, -100.0, 100.0, 1);
 
     arma::mat val;
-    quadriga_lib::sos_randn(dd, pos, val, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 7);
+    quadriga_lib::sos_randn(dd, pos, val, {}, {}, "Comb256", 7);
     REQUIRE(val.n_rows == 11);
     REQUIRE(val.n_cols == 5);
 
     QD_DIAG("\n# diag: sos_randn one device against the composition\ngen,dist_decorr,val_0,ref_0,max_abs_diff\n");
     for (arma::uword g = 0; g < 5; ++g)
     {
-        arma::vec ref = ref_randn(dd(g), dd(g), pos, nullptr, "Comb256", 7, g, 5);
+        arma::vec ref = ref_randn(dd(g), dd(g), pos, {}, "Comb256", 7, g, 5);
         double mx = arma::abs(val.col(g) - ref).max();
         QD_DIAG("%llu,%.1f,%.9f,%.9f,%.2e\n", (unsigned long long)g, dd(g), val(0, g), ref(0), mx);
         INFO("generator " << g);
@@ -98,8 +98,8 @@ TEST_CASE("sos_randn - one device: each generator is the documented composition"
 
     // Another preset gives other values
     arma::mat other;
-    quadriga_lib::sos_randn(dd, pos, other, (arma::mat *)nullptr, (arma::vec *)nullptr, "Exp128", 7);
-    CHECK(arma::abs(other.col(1) - ref_randn(20.0, 20.0, pos, nullptr, "Exp128", 7, 1, 5)).max() < 1e-12);
+    quadriga_lib::sos_randn(dd, pos, other, {}, {}, "Exp128", 7);
+    CHECK(arma::abs(other.col(1) - ref_randn(20.0, 20.0, pos, {}, "Exp128", 7, 1, 5)).max() < 1e-12);
     CHECK(arma::abs(other - val).max() > 0.05);
 }
 
@@ -110,26 +110,26 @@ TEST_CASE("sos_randn - two devices: same map for equal distances, two maps for d
 
     // Without dist_decorr_b: all generators on one map
     arma::mat same, swapped;
-    quadriga_lib::sos_randn(dd, pa, same, &pb, (arma::vec *)nullptr, "Comb256", 4);
-    quadriga_lib::sos_randn(dd, pb, swapped, &pa, (arma::vec *)nullptr, "Comb256", 4);
+    quadriga_lib::sos_randn(dd, pa, same, pb, {}, "Comb256", 4);
+    quadriga_lib::sos_randn(dd, pb, swapped, pa, {}, "Comb256", 4);
     REQUIRE(same.n_rows == 9);
     REQUIRE(same.n_cols == 4);
     for (arma::uword g = 0; g < 4; ++g)
     {
         INFO("same map, generator " << g);
-        CHECK(arma::abs(same.col(g) - ref_randn(dd(g), dd(g), pa, &pb, "Comb256", 4, g, 4)).max() < 1e-12);
+        CHECK(arma::abs(same.col(g) - ref_randn(dd(g), dd(g), pa, pb, "Comb256", 4, g, 4)).max() < 1e-12);
     }
     CHECK(arma::abs(same).max() > 0.3);
     CHECK(arma::approx_equal(same, swapped, "absdiff", 1e-12)); // Symmetric under a swap of the devices
 
     // With dist_decorr_b: generators 0 and 3 have equal distances (one map), 1 and 2 differ (two maps)
     arma::mat mixed;
-    quadriga_lib::sos_randn(dd, pa, mixed, &pb, &db, "Comb256", 4);
+    quadriga_lib::sos_randn(dd, pa, mixed, pb, db, "Comb256", 4);
     REQUIRE(mixed.n_cols == 4);
     QD_DIAG("\n# diag: sos_randn two devices\ngen,d_a,d_b,max_abs_diff_to_composition\n");
     for (arma::uword g = 0; g < 4; ++g)
     {
-        double mx = arma::abs(mixed.col(g) - ref_randn(dd(g), db(g), pa, &pb, "Comb256", 4, g, 4)).max();
+        double mx = arma::abs(mixed.col(g) - ref_randn(dd(g), db(g), pa, pb, "Comb256", 4, g, 4)).max();
         QD_DIAG("%llu,%.1f,%.1f,%.2e\n", (unsigned long long)g, dd(g), db(g), mx);
         INFO("mixed, generator " << g);
         CHECK(mx < 1e-12);
@@ -145,12 +145,12 @@ TEST_CASE("sos_rand and sos_randi - mappings of the Normal values")
     arma::mat pa = rnd(200, 3, -300.0, 300.0, 5), pb = rnd(200, 3, -300.0, 300.0, 6);
 
     arma::mat nrm, uni, itg, nrm2, uni2, itg2;
-    quadriga_lib::sos_randn(dd, pa, nrm, (arma::mat *)nullptr, (arma::vec *)nullptr, "Gauss256", 9);
-    quadriga_lib::sos_rand(dd, pa, uni, (arma::mat *)nullptr, (arma::vec *)nullptr, "Gauss256", 9);
-    quadriga_lib::sos_randi(dd, pa, 6, itg, (arma::mat *)nullptr, (arma::vec *)nullptr, "Gauss256", 9);
-    quadriga_lib::sos_randn(dd, pa, nrm2, &pb, &db, "Gauss256", 9);
-    quadriga_lib::sos_rand(dd, pa, uni2, &pb, &db, "Gauss256", 9);
-    quadriga_lib::sos_randi(dd, pa, 6, itg2, &pb, &db, "Gauss256", 9);
+    quadriga_lib::sos_randn(dd, pa, nrm, {}, {}, "Gauss256", 9);
+    quadriga_lib::sos_rand(dd, pa, uni, {}, {}, "Gauss256", 9);
+    quadriga_lib::sos_randi(dd, pa, 6, itg, {}, {}, "Gauss256", 9);
+    quadriga_lib::sos_randn(dd, pa, nrm2, pb, db, "Gauss256", 9);
+    quadriga_lib::sos_rand(dd, pa, uni2, pb, db, "Gauss256", 9);
+    quadriga_lib::sos_randi(dd, pa, 6, itg2, pb, db, "Gauss256", 9);
     REQUIRE(uni.n_rows == 200);
     REQUIRE(uni.n_cols == 3);
     REQUIRE(itg.n_rows == 200);
@@ -190,11 +190,11 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - distributions over widely spread pos
     arma::mat pos = rnd(n, 3, 0.0, 10000.0, 7), pos_b = rnd(n, 3, 0.0, 10000.0, 8);
     arma::vec dd = {10.0}, db = {25.0};
     arma::mat nrm, uni, itg, dual_same, dual_two;
-    quadriga_lib::sos_randn(dd, pos, nrm, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 1);
-    quadriga_lib::sos_rand(dd, pos, uni, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 1);
-    quadriga_lib::sos_randi(dd, pos, 10, itg, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 1);
-    quadriga_lib::sos_randn(dd, pos, dual_same, &pos, (arma::vec *)nullptr, "Comb256", 1); // As the MATLAB test: both devices at the same place
-    quadriga_lib::sos_randn(dd, pos, dual_two, &pos_b, &db, "Comb256", 1);
+    quadriga_lib::sos_randn(dd, pos, nrm, {}, {}, "Comb256", 1);
+    quadriga_lib::sos_rand(dd, pos, uni, {}, {}, "Comb256", 1);
+    quadriga_lib::sos_randi(dd, pos, 10, itg, {}, {}, "Comb256", 1);
+    quadriga_lib::sos_randn(dd, pos, dual_same, pos, {}, "Comb256", 1); // As the MATLAB test: both devices at the same place
+    quadriga_lib::sos_randn(dd, pos, dual_two, pos_b, db, "Comb256", 1);
     REQUIRE(nrm.n_elem == n);
     REQUIRE(uni.n_elem == n);
     REQUIRE(itg.n_elem == n);
@@ -249,9 +249,9 @@ TEST_CASE("sos_randn - seeds, pre-sized output, positions with fewer columns, fl
     arma::mat pos = rnd(13, 3, -50.0, 50.0, 10);
 
     arma::mat a, b, c, r1, r2;
-    quadriga_lib::sos_randn(dd, pos, a, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
-    quadriga_lib::sos_randn(dd, pos, b, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
-    quadriga_lib::sos_randn(dd, pos, c, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 4);
+    quadriga_lib::sos_randn(dd, pos, a, {}, {}, "Comb256", 3);
+    quadriga_lib::sos_randn(dd, pos, b, {}, {}, "Comb256", 3);
+    quadriga_lib::sos_randn(dd, pos, c, {}, {}, "Comb256", 4);
     quadriga_lib::sos_randn(dd, pos, r1);
     quadriga_lib::sos_randn(dd, pos, r2);
     REQUIRE(a.n_rows == 13);
@@ -263,34 +263,34 @@ TEST_CASE("sos_randn - seeds, pre-sized output, positions with fewer columns, fl
 
     // The same seed gives the same field in separate calls: a subset of the positions gets the same values
     arma::mat sub = pos.rows(3, 7), vs;
-    quadriga_lib::sos_randn(dd, sub, vs, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
+    quadriga_lib::sos_randn(dd, sub, vs, {}, {}, "Comb256", 3);
     CHECK(arma::approx_equal(vs, a.rows(3, 7), "absdiff", 0.0));
 
     // The first generator does not depend on the number of generators
     arma::vec d1 = {5.0};
     arma::mat v1;
-    quadriga_lib::sos_randn(d1, pos, v1, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
+    quadriga_lib::sos_randn(d1, pos, v1, {}, {}, "Comb256", 3);
     CHECK(arma::approx_equal(v1.col(0), a.col(0), "absdiff", 0.0));
 
     arma::mat sized(13, 2);
     sized.fill(9.0);
     const double *ptr = sized.memptr();
-    quadriga_lib::sos_randn(dd, pos, sized, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
+    quadriga_lib::sos_randn(dd, pos, sized, {}, {}, "Comb256", 3);
     CHECK(sized.memptr() == ptr);
     CHECK(arma::approx_equal(sized, a, "absdiff", 0.0));
 
     // Two columns: z = 0
     arma::mat p2 = pos.cols(0, 1), p3 = pos, v2, v3;
     p3.col(2).zeros();
-    quadriga_lib::sos_randn(dd, p2, v2, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
-    quadriga_lib::sos_randn(dd, p3, v3, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 3);
+    quadriga_lib::sos_randn(dd, p2, v2, {}, {}, "Comb256", 3);
+    quadriga_lib::sos_randn(dd, p3, v3, {}, {}, "Comb256", 3);
     CHECK(arma::approx_equal(v2, v3, "absdiff", 0.0));
 
     arma::fvec df = {5.0f, 20.0f};
     arma::fmat pf = arma::conv_to<arma::fmat>::from(pos), vf, uf, jf;
-    quadriga_lib::sos_randn(df, pf, vf, (arma::fmat *)nullptr, (arma::fvec *)nullptr, "Comb256", 3);
-    quadriga_lib::sos_rand(df, pf, uf, (arma::fmat *)nullptr, (arma::fvec *)nullptr, "Comb256", 3);
-    quadriga_lib::sos_randi(df, pf, 4, jf, (arma::fmat *)nullptr, (arma::fvec *)nullptr, "Comb256", 3);
+    quadriga_lib::sos_randn(df, pf, vf, {}, {}, "Comb256", 3);
+    quadriga_lib::sos_rand(df, pf, uf, {}, {}, "Comb256", 3);
+    quadriga_lib::sos_randi(df, pf, 4, jf, {}, {}, "Comb256", 3);
     REQUIRE(vf.n_rows == 13);
     REQUIRE(vf.n_cols == 2);
     // Positions rounded to float (up to 50 m, 4e-6 m) at frequencies up to 0.15 / m: below 1e-4
@@ -305,17 +305,15 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
 {
     arma::vec dd = {5.0, 20.0}, db = {5.0, 8.0};
     arma::mat pos = rnd(6, 3, -50.0, 50.0, 11), pos_b = rnd(6, 3, -50.0, 50.0, 12), val;
-    arma::mat *no_mat = nullptr;
-    arma::vec *no_vec = nullptr;
 
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val));
-        CHECK_NOTHROW(quadriga_lib::sos_rand(dd, pos, val, &pos_b, &db, "Exp128", 0));
-        CHECK_NOTHROW(quadriga_lib::sos_randi(dd, pos, 3, val, &pos_b));
+        CHECK_NOTHROW(quadriga_lib::sos_rand(dd, pos, val, pos_b, db, "Exp128", 0));
+        CHECK_NOTHROW(quadriga_lib::sos_randi(dd, pos, 3, val, pos_b));
         arma::mat empty;
         arma::vec vempty;
-        CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val, &empty, &vempty)); // Empty means omitted
+        CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val, empty, vempty)); // Empty means omitted
     }
     SECTION("dist_decorr")
     {
@@ -339,22 +337,22 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
     SECTION("pos_b")
     {
         arma::mat rows(5, 3, arma::fill::ones), four(6, 4, arma::fill::ones);
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &rows), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &four), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, rows), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, four), std::invalid_argument);
     }
     SECTION("dist_decorr_b")
     {
         arma::vec size = {5.0}, neg = {5.0, -8.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, no_mat, &db), std::invalid_argument); // Needs pos_b
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &size), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &neg), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, {}, db), std::invalid_argument); // Needs pos_b
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, pos_b, size), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, pos_b, neg), std::invalid_argument);
         arma::vec nan = {5.0, std::nan("")}, inf = {5.0, arma::datum::inf};
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &nan), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &inf), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, pos_b, nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, pos_b, inf), std::invalid_argument);
     }
     SECTION("preset")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, no_mat, no_vec, "Comb300"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, {}, {}, "Comb300"), std::invalid_argument);
 
         // The error names the argument of these functions, 'preset', not the argument 'name' of sos_preset
         auto message = [&](int fun, const std::string &preset)
@@ -362,11 +360,11 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
             try
             {
                 if (fun == 0)
-                    quadriga_lib::sos_randn(dd, pos, val, no_mat, no_vec, preset, 1);
+                    quadriga_lib::sos_randn(dd, pos, val, {}, {}, preset, 1);
                 else if (fun == 1)
-                    quadriga_lib::sos_rand(dd, pos, val, &pos_b, no_vec, preset, 1);
+                    quadriga_lib::sos_rand(dd, pos, val, pos_b, {}, preset, 1);
                 else
-                    quadriga_lib::sos_randi(dd, pos, 3, val, &pos_b, &db, preset, 1);
+                    quadriga_lib::sos_randi(dd, pos, 3, val, pos_b, db, preset, 1);
             }
             catch (const std::invalid_argument &e)
             {
@@ -383,7 +381,7 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
     }
     SECTION("seed")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, no_mat, no_vec, "Comb256", -2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, val, {}, {}, "Comb256", -2), std::invalid_argument);
     }
     SECTION("imax")
     {
@@ -394,7 +392,7 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - input validation")
         arma::mat keep(2, 2), empty;
         keep.fill(7.0);
         CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, empty, keep), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, keep, no_mat, no_vec, "Comb300"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, pos, keep, {}, {}, "Comb300"), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, pos, 0, keep), std::invalid_argument);
         CHECK(keep.n_rows == 2);
         CHECK(keep(1, 1) == 7.0);
@@ -411,11 +409,11 @@ TEST_CASE("sos_randn, sos_rand - nearby positions get similar values in separate
     arma::mat pos = rnd(200, 3, -300.0, 300.0, 30), near = pos, a, b, c, ua, ub;
     near.col(0) += 0.06, near.col(1) -= 0.08; // 0.1 m
 
-    quadriga_lib::sos_randn(dd, pos, a, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
-    quadriga_lib::sos_randn(dd, near, b, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
-    quadriga_lib::sos_randn(dd, near, c, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 6);
-    quadriga_lib::sos_rand(dd, pos, ua, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
-    quadriga_lib::sos_rand(dd, near, ub, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 5);
+    quadriga_lib::sos_randn(dd, pos, a, {}, {}, "Comb256", 5);
+    quadriga_lib::sos_randn(dd, near, b, {}, {}, "Comb256", 5);
+    quadriga_lib::sos_randn(dd, near, c, {}, {}, "Comb256", 6);
+    quadriga_lib::sos_rand(dd, pos, ua, {}, {}, "Comb256", 5);
+    quadriga_lib::sos_rand(dd, near, ub, {}, {}, "Comb256", 5);
     REQUIRE(a.n_rows == 200);
     REQUIRE(b.n_cols == 3);
 
@@ -441,9 +439,9 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator
     arma::mat pa = rnd(40, 3, -60.0, 60.0, 40), pb = rnd(40, 3, -60.0, 60.0, 41);
 
     arma::mat n4, u4, i4;
-    quadriga_lib::sos_randn(dd4, pa, n4, &pb, &db4, "Comb256", 9);
-    quadriga_lib::sos_rand(dd4, pa, u4, &pb, &db4, "Comb256", 9);
-    quadriga_lib::sos_randi(dd4, pa, 1000, i4, &pb, &db4, "Comb256", 9);
+    quadriga_lib::sos_randn(dd4, pa, n4, pb, db4, "Comb256", 9);
+    quadriga_lib::sos_rand(dd4, pa, u4, pb, db4, "Comb256", 9);
+    quadriga_lib::sos_randi(dd4, pa, 1000, i4, pb, db4, "Comb256", 9);
     REQUIRE(n4.n_cols == 4);
     CHECK(arma::abs(n4).max() > 0.5);
 
@@ -451,9 +449,9 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator
     {
         arma::vec dd = dd4.head(n_gen), db = db4.head(n_gen);
         arma::mat n, u, i;
-        quadriga_lib::sos_randn(dd, pa, n, &pb, &db, "Comb256", 9);
-        quadriga_lib::sos_rand(dd, pa, u, &pb, &db, "Comb256", 9);
-        quadriga_lib::sos_randi(dd, pa, 1000, i, &pb, &db, "Comb256", 9);
+        quadriga_lib::sos_randn(dd, pa, n, pb, db, "Comb256", 9);
+        quadriga_lib::sos_rand(dd, pa, u, pb, db, "Comb256", 9);
+        quadriga_lib::sos_randi(dd, pa, 1000, i, pb, db, "Comb256", 9);
         REQUIRE(n.n_cols == n_gen);
         INFO("n_gen " << n_gen);
         // The generators of a call are evaluated in groups of equal decorrelation distances and each value
@@ -467,14 +465,14 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator
     // With the same phases for both devices the value would be sqrt(2) times the single-device value.
     arma::vec d1 = {10.0}, d1b = {10.5};
     arma::mat one, two;
-    quadriga_lib::sos_randn(d1, pa, one, (arma::mat *)nullptr, (arma::vec *)nullptr, "Comb256", 9);
-    quadriga_lib::sos_randn(d1, pa, two, &pa, &d1b, "Comb256", 9);
+    quadriga_lib::sos_randn(d1, pa, one, {}, {}, "Comb256", 9);
+    quadriga_lib::sos_randn(d1, pa, two, pa, d1b, "Comb256", 9);
     CHECK(arma::abs(two - std::sqrt(2.0) * one).max() > 0.5);
 
     // Without a seed both streams are random
     arma::mat r1, r2;
-    quadriga_lib::sos_randn(dd4, pa, r1, &pb, &db4);
-    quadriga_lib::sos_randn(dd4, pa, r2, &pb, &db4);
+    quadriga_lib::sos_randn(dd4, pa, r1, pb, db4);
+    quadriga_lib::sos_randn(dd4, pa, r2, pb, db4);
     CHECK(arma::abs(r1.col(0) - r2.col(0)).max() > 0.05);
 }
 
@@ -482,13 +480,13 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - outputs that alias inputs")
 {
     arma::mat pos = rnd(5, 3, -60.0, 60.0, 50), pos_b = rnd(5, 3, -60.0, 60.0, 51), val;
     arma::vec dd = {5.0, 8.0, 11.0}, db = {5.0, 30.0, 11.0};
-    CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &db, "Comb128", 3));
+    CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val, pos_b, db, "Comb128", 3));
 
     arma::mat a = pos, b = pos_b;
     arma::vec d = dd;
-    CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, a, a, &pos_b, &db, "Comb128", 3), std::invalid_argument);   // val is 'pos'
-    CHECK_THROWS_AS(quadriga_lib::sos_rand(dd, pos, b, &b, &db, "Comb128", 3), std::invalid_argument);      // val is 'pos_b'
-    CHECK_THROWS_AS(quadriga_lib::sos_randi(d, pos, 9, d, &pos_b, &db, "Comb128", 3), std::invalid_argument); // val is 'dist_decorr'
+    CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, a, a, pos_b, db, "Comb128", 3), std::invalid_argument);   // val is 'pos'
+    CHECK_THROWS_AS(quadriga_lib::sos_rand(dd, pos, b, b, db, "Comb128", 3), std::invalid_argument);      // val is 'pos_b'
+    CHECK_THROWS_AS(quadriga_lib::sos_randi(d, pos, 9, d, pos_b, db, "Comb128", 3), std::invalid_argument); // val is 'dist_decorr'
     arma::mat v(a.memptr() + 3, 5, 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, a, 9, v, &pos_b, &db, "Comb128", 3), std::invalid_argument); // val on part of the memory of 'pos'
+    CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, a, 9, v, pos_b, db, "Comb128", 3), std::invalid_argument); // val on part of the memory of 'pos'
 }

@@ -16,7 +16,7 @@ void fuzz_seeds(const fz::seeds &s)
                       {1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0}};
     arma::uvec obj_ind = {0, 1}, mtl_ind = {1, 2};
     std::vector<std::string> obj_names = {"Wall", "Floor"}, mtl_names = {"itu_concrete", "itu_glass"};
-    quadriga_lib::obj_file_write<double>(s.path("two_objects.obj"), &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+    quadriga_lib::obj_file_write<double>(s.path("two_objects.obj"), mesh, obj_ind, mtl_ind, obj_names, mtl_names);
 }
 
 void fuzz_one(const uint8_t *data, size_t size)

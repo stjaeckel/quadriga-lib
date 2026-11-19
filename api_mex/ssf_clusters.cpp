@@ -123,24 +123,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::u32_vec n_cluster =
         (nrhs < 14) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[13], false, "n_cluster");
 
-    // Wrap optional pointers; an omitted or empty input selects the default; with zero links an empty input other
-    // than [], e.g. [0, N], counts as given
-    auto given = [&](int i)
-    {
-        if (nrhs <= i)
-            return false;
-        const bool shaped = mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0; // not [] (0 x 0)
-        return !mxIsEmpty(prhs[i]) || (rx_pos.n_elem == 0 && shaped);
-    };
-    const arma::cube *p_rnd_freq = given(6) ? &rnd_freq : nullptr;
-    const arma::cube *p_lsp_anchor = given(7) ? &lsp_anchor : nullptr;
-    const arma::mat *p_eod_offset_deg = given(8) ? &eod_offset_deg : nullptr;
-    const arma::vec *p_abs_toa = given(9) ? &abs_toa : nullptr;
-    const arma::mat *p_gr_eps_re = given(10) ? &gr_eps_re : nullptr;
-    const arma::mat *p_gr_eps_im = given(11) ? &gr_eps_im : nullptr;
-    const std::vector<bool> *p_o2i = given(12) ? &o2i : nullptr;
-    const arma::u32_vec *p_n_cluster = given(13) ? &n_cluster : nullptr;
-
     // Output allocation in MATLAB memory, sizes from a completed copy of 'scenpar'; an invalid 'scenpar' allocates
     // nothing, the library call then throws its message
     arma::cube delay, power, aod, eod, aoa, eoa;
@@ -170,6 +152,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call library function
     arma::u32_vec *p_n_active = (nlhs > 6) ? &n_active : nullptr;
     CALL_QD(quadriga_lib::ssf_clusters(scenpar, tx_pos, rx_pos, lsp, rnd, delay, power, aod, eod, aoa, eoa, method,
-                                       p_rnd_freq, p_lsp_anchor, p_eod_offset_deg, p_abs_toa, p_gr_eps_re,
-                                       p_gr_eps_im, p_o2i, p_n_cluster, p_n_active));
+                                       rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re,
+                                       gr_eps_im, o2i, n_cluster, p_n_active));
 }

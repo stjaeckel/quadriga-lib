@@ -2485,9 +2485,9 @@ TEST_CASE("Acoustic - convergence with acoustic terms absent", "[wave]")
     arma::mat x1, x2;
     arma::cube c1, c2;
     quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind, mtl, api_freq(f, true), 3,
-                                                &g1, &x1, &c1, 0, nullptr, 0, 0, true, 1.0);
+                                                &g1, &x1, &c1, 0, {}, 0, 0, true, 1.0);
     quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind2, mtl2, api_freq(f, true), 3,
-                                                &g2, &x2, &c2, 0, nullptr, 0, 0, true, 1.0);
+                                                &g2, &x2, &c2, 0, {}, 0, 0, true, 1.0);
     CHECK(arma::approx_equal(g1, g2, "absdiff", 1e-12));
     CHECK(arma::approx_equal(x1, x2, "absdiff", 1e-12));
     CHECK(arma::approx_equal(c1, c2, "absdiff", 1e-12));
@@ -2582,7 +2582,7 @@ TEST_CASE("Acoustic - pass-through calibration", "[wave]")
         arma::mat orig = {{-d, 0.0, 0.0}}, dest = {{d, 0.0, 0.0}};
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, slab, mtl_ind, mtl, api_freq(f, true), 0,
-                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
+                                                    &gain, nullptr, nullptr, 0, {}, 0, 0, true, 1.0);
         return gain(0);
     };
 
@@ -2644,7 +2644,7 @@ TEST_CASE("Acoustic - embedded material counted once", "[wave]")
         mtl["fRef"] = {fRef_GHz, fRef_GHz};
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl, api_freq(f, true), 0,
-                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
+                                                    &gain, nullptr, nullptr, 0, {}, 0, 0, true, 1.0);
         return gain(0);
     };
 

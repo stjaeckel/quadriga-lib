@@ -475,7 +475,7 @@ size_t quadriga_lib::qrt_file_append(
     const std::string &fn,
     const std::vector<quadriga_lib::path> &path_data,
     const arma::Mat<dtype> &orig_pos,
-    const arma::Mat<dtype> *orig_orientation = nullptr,
+    const arma::Mat<dtype> &orig_orientation = arma::Mat<dtype>(),
     const std::string &orig_name = "TX");
 ```
 
@@ -483,7 +483,7 @@ size_t quadriga_lib::qrt_file_append(
 - **`fn`** — Path to an existing QRT file created by [[qrt_file_init]]
 - **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
-- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
+- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
 
 ## Returns:
@@ -498,12 +498,12 @@ template <typename dtype>
 size_t quadriga_lib::qrt_file_append(const std::string &fn,
                                      const std::vector<quadriga_lib::path> &path_data,
                                      const arma::Mat<dtype> &orig_pos,
-                                     const arma::Mat<dtype> *orig_orientation,
+                                     const arma::Mat<dtype> &orig_orientation,
                                      const std::string &orig_name)
 {
     const dtype zeros[3] = {dtype(0), dtype(0), dtype(0)};
     const dtype *p_pos = qd_xyz(orig_pos, "orig_pos");
-    const dtype *p_ori = orig_orientation ? qd_xyz(*orig_orientation, "orig_orientation") : zeros;
+    const dtype *p_ori = !orig_orientation.empty() ? qd_xyz(orig_orientation, "orig_orientation") : zeros;
     if (orig_name.size() > 255)
         throw std::invalid_argument("Input 'orig_name' cannot exceed 255 characters.");
 
@@ -700,11 +700,11 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
 }
 
 template size_t quadriga_lib::qrt_file_append<float>(const std::string &fn, const std::vector<quadriga_lib::path> &path_data,
-                                                     const arma::Mat<float> &orig_pos, const arma::Mat<float> *orig_orientation,
+                                                     const arma::Mat<float> &orig_pos, const arma::Mat<float> &orig_orientation,
                                                      const std::string &orig_name);
 
 template size_t quadriga_lib::qrt_file_append<double>(const std::string &fn, const std::vector<quadriga_lib::path> &path_data,
-                                                      const arma::Mat<double> &orig_pos, const arma::Mat<double> *orig_orientation,
+                                                      const arma::Mat<double> &orig_pos, const arma::Mat<double> &orig_orientation,
                                                       const std::string &orig_name);
 
 /*!MD

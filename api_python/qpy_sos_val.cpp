@@ -252,14 +252,8 @@ py::array_t<double> sos_val(const py::array_t<double> &spatial_freq,
     arma::mat val;
     auto val_py = qd_python_init_output(pos_a.n_rows, phase_a.n_cols, &val);
 
-    // Wrap optional pointers
-    const arma::mat *p_pos_b = pos_b_a.is_empty() ? nullptr : &pos_b_a;
-    const arma::mat *p_phase_b = phase_b_a.is_empty() ? nullptr : &phase_b_a;
-    const arma::vec *p_acf = acf_a.is_empty() ? nullptr : &acf_a;
-    const arma::vec *p_dist = dist_a.is_empty() ? nullptr : &dist_a;
-
     // Call library function
-    quadriga_lib::sos_val<double>(freq_a, phase_a, pos_a, val, p_pos_b, p_phase_b, p_acf, p_dist,
+    quadriga_lib::sos_val<double>(freq_a, phase_a, pos_a, val, pos_b_a, phase_b_a, acf_a, dist_a,
                                   spatial_freq_scale_b, uniform_b, use_kernel);
 
     return val_py;

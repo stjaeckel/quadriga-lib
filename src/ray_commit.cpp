@@ -59,9 +59,9 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
-    const arma::u32_vec *sub_cloud_ind = nullptr,
-    const arma::u32_vec *point_ind = nullptr,
-    const std::vector<bool> *subdiv_flag_in = nullptr,
+    const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),
+    const arma::u32_vec &point_ind = arma::u32_vec(),
+    const std::vector<bool> &subdiv_flag_in = std::vector<bool>(),
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
     uint8_t min_segments = 0,
@@ -85,15 +85,15 @@ arma::uword quadriga_lib::ray_commit(
   flags in bits 14 and 15); `[n_ray]`
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
-  [[point_cloud_segmentation]]); `[n_sub]`. NULL → no partitioning
+  [[point_cloud_segmentation]]); `[n_sub]`. Empty → no partitioning
 - **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [[point_cloud_segmentation]] for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
-  indexing. NULL → `points` is used as passed in and `i_cir` indexes it directly
+  indexing. Empty → `points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [[ray_subdivide_flag]] for the
-  same launch configuration. NULL / empty → no ray is excluded on these grounds
+  same launch configuration. Empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
@@ -134,9 +134,9 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                                      const arma::fmat &tridir,
                                      const arma::Col<short> &mtl_ind_current,
                                      const arma::fmat &rx_points,
-                                     const arma::u32_vec *sub_cloud_ind,
-                                     const arma::u32_vec *point_ind,
-                                     const std::vector<bool> *subdiv_flag_in,
+                                     const arma::u32_vec &sub_cloud_ind,
+                                     const arma::u32_vec &point_ind,
+                                     const std::vector<bool> &subdiv_flag_in,
                                      float max_path_length, float min_gain_dB,
                                      uint8_t min_segments, bool ignore_direct_path)
 {
@@ -199,8 +199,8 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
         throw std::invalid_argument("Layout of 'paths_commit' must match 'paths'.");
 
     // Optional subdivision flags, indexed in the full ray set
-    const bool has_subdiv = subdiv_flag_in && !subdiv_flag_in->empty();
-    if (has_subdiv && (arma::uword)subdiv_flag_in->size() != n_ray)
+    const bool has_subdiv = !subdiv_flag_in.empty();
+    if (has_subdiv && (arma::uword)subdiv_flag_in.size() != n_ray)
         throw std::invalid_argument("Input 'subdiv_flag_in' must have n_ray elements.");
 
     // Point count, needed before the intersect call to validate the index map
@@ -210,10 +210,10 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     // forward_ind of point_cloud_segmentation: 1-based, 0 marks a padding row. Padding points sit
     // at the center of their sub-cloud AABB, so they are hit as readily as any real point and must
     // be dropped rather than committed.
-    const bool has_pt_index = point_ind && !point_ind->empty();
-    if (has_pt_index && (arma::uword)point_ind->n_elem != n_points)
+    const bool has_pt_index = !point_ind.empty();
+    if (has_pt_index && (arma::uword)point_ind.n_elem != n_points)
         throw std::invalid_argument("Input 'point_ind' must have n_point elements.");
-    const unsigned *p_pt_index = has_pt_index ? point_ind->memptr() : nullptr;
+    const unsigned *p_pt_index = has_pt_index ? point_ind.memptr() : nullptr;
 
     // Minimum interaction count, evaluated per ray below
     const size_t min_seg = (size_t)min_segments;
@@ -281,7 +281,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             continue;
         }
 
-        if (has_subdiv && (*subdiv_flag_in)[iR]) // reappears as sub-beams next iteration
+        if (has_subdiv && (subdiv_flag_in)[iR]) // reappears as sub-beams next iteration
             continue;
 
         const quadriga_lib::path &P = paths[iR];

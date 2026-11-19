@@ -127,7 +127,7 @@ TEST_CASE("Get Channels IRS - Minimal test")
                                            fbs_pos_1, fbs_pos_1, path_gain, path_length, M,
                                            fbs_pos_2, fbs_pos_2, path_gain, path_length, M,
                                            coeff_re, coeff_im, delay, 0, -6.0, f0, 1, &aod, &eod, &aoa, &eoa,
-                                           nullptr, nullptr, &keep);
+                                           {}, {}, &keep);
 
     // First path should be close to 1.8, 0.2 path gain * 3 * 3 (IRS array gain)
     arma::mat T(3, 3, arma::fill::value(1.8));
@@ -187,7 +187,7 @@ TEST_CASE("Tools - Combine IRS Coord")
     std::vector active_path(3, true);
     REQUIRE_THROWS_AS(quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
                                                       n_interact_1, interact_coord_1, n_interact_2, interact_coord_2,
-                                                      n_interact, interact_coord, 1, 1, &active_path),
+                                                      n_interact, interact_coord, 1, 1, active_path),
                       std::invalid_argument);
 
     active_path = std::vector(4, true);
@@ -230,7 +230,7 @@ TEST_CASE("Tools - Combine IRS Coord")
     active_path[0] = false;
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
                                     n_interact_1, interact_coord_1, n_interact_2, interact_coord_2,
-                                    n_interact, interact_coord, 0, 1, &active_path);
+                                    n_interact, interact_coord, 0, 1, active_path);
 
     CHECK(n_interact.n_elem == 3);
     CHECK(n_interact(0) == 5);
@@ -247,7 +247,7 @@ TEST_CASE("Tools - Combine IRS Coord")
     active_path[3] = false;
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
                                     n_interact_1, interact_coord_1, n_interact_2, interact_coord_2,
-                                    n_interact, interact_coord, 0, 0, &active_path);
+                                    n_interact, interact_coord, 0, 0, active_path);
 
     CHECK(n_interact.n_elem == 1);
     CHECK(n_interact(0) == 1);
@@ -523,7 +523,7 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
                                     n_interact_1, interact_coord_1,
                                     n_interact_2, interact_coord_2,
                                     n_interact, interact_coord,
-                                    false, false, &active_path);
+                                    false, false, active_path);
 
     // Two active paths, each with 3 interaction points: seg1 + IRS + seg2
     REQUIRE(n_interact.n_elem == 2);
@@ -693,7 +693,7 @@ TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
         quadriga_lib::get_channels_irs<double>(ant, ant, irs, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0}, {5, 5, 0}, {0, 0, 0},
                                                *(s1 ? &f0 : &fb), *(s1 ? &f0 : &fb), *(s1 ? &e : &g), *(s1 ? &e : &l), *(s1 ? &M0 : &M),
                                                *(s1 ? &fb : &f0), *(s1 ? &fb : &f0), *(s1 ? &g : &e), *(s1 ? &l : &e), *(s1 ? &M : &M0),
-                                               cr, ci, dl, 0, -140.0, 1e9, false, &ad, &ed, &aa, &ea, nullptr, nullptr, &keep);
+                                               cr, ci, dl, 0, -140.0, 1e9, false, &ad, &ed, &aa, &ea, {}, {}, &keep);
         CHECK(keep.empty());
         for (const arma::cube *c : {&cr, &ci, &dl, &ad, &ed, &aa, &ea})
         {
@@ -826,13 +826,13 @@ TEST_CASE("Get Channels IRS - Empty element_pos and coupling_im of any shape")
     // An empty element_pos ([0, n] as well as [0, 0]) places all IRS elements at the phase centre, an empty coupling_im
     // ([n, 0] as well as [0, 0]) means real weights; both are valid and give the result of the explicit zeros
     auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, nullptr, 10.0);
+    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 10.0);
     irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_re(1, 2) = -1.0;
     irs.element_pos.zeros(3, 4), irs.coupling_im.zeros(4, 3);
     const arma::mat fb1 = arma::mat({5.0, 5.0, 7.0}).t(), fb2 = arma::mat({15.0, 5.0, 3.0}).t();
     const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
     const arma::vec g = {1.0}, l = {0.0};
-    auto run = [&](const quadriga_lib::arrayant<double> &irs_1, const quadriga_lib::arrayant<double> *irs_2, arma::cube &cr, arma::cube &ci)
+    auto run = [&](const quadriga_lib::arrayant<double> &irs_1, const quadriga_lib::arrayant<double> &irs_2, arma::cube &cr, arma::cube &ci)
     {
         arma::cube dl;
         quadriga_lib::get_channels_irs<double>(ant, ant, irs_1, {0, 0, 10}, {0, 0, 0}, {20, 0, 1.5}, {0, 0, 0}, {10, 10, 5}, {0, 0, 0},
@@ -840,7 +840,7 @@ TEST_CASE("Get Channels IRS - Empty element_pos and coupling_im of any shape")
                                                nullptr, nullptr, nullptr, nullptr, irs_2);
     };
     arma::cube cr_ref, ci_ref, cr, ci;
-    run(irs, nullptr, cr_ref, ci_ref);
+    run(irs, {}, cr_ref, ci_ref);
     REQUIRE(cr_ref.n_slices == 1);
 
     for (int k = 0; k < 4; ++k)
@@ -851,10 +851,10 @@ TEST_CASE("Get Channels IRS - Empty element_pos and coupling_im of any shape")
         if (k == 2) e.coupling_im.set_size(4, 0);
         if (k == 3) e.coupling_im.reset();
         REQUIRE(e.is_valid().empty());
-        run(e, nullptr, cr, ci);
+        run(e, {}, cr, ci);
         CHECK(arma::approx_equal(cr, cr_ref, "absdiff", 0.0));
         CHECK(arma::approx_equal(ci, ci_ref, "absdiff", 0.0));
-        run(irs, &e, cr, ci);
+        run(irs, e, cr, ci);
         CHECK(arma::approx_equal(cr, cr_ref, "absdiff", 0.0));
         CHECK(arma::approx_equal(ci, ci_ref, "absdiff", 0.0));
     }
@@ -865,7 +865,7 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
     // irs_array_2 is used for the RX-facing side only; both arrays are inputs and keep their data, so a repeated call
     // gives the same result, and the second array may use another angle grid
     auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, nullptr, 10.0);
+    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 10.0);
     irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_im.zeros(4, 3);
     auto irs2 = irs;
     irs2.e_theta_re *= 0.5, irs2.coupling_re *= 3.0, irs2.element_pos.fill(0.1);
@@ -878,7 +878,7 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
         arma::cube dl;
         quadriga_lib::get_channels_irs<double>(ant, ant, irs, {0, 0, 10}, {0, 0, 0}, {20, 0, 1.5}, {0, 0, 0}, {10, 10, 5}, {0, 0, 0},
                                                fb1, fb1, g, l, M, fb2, fb2, g, l, M, cr, ci, dl, 1, -140.0, 3.5e9, false,
-                                               nullptr, nullptr, nullptr, nullptr, &irs_2);
+                                               nullptr, nullptr, nullptr, nullptr, irs_2);
     };
     arma::cube cr_1, ci_1, cr_2, ci_2;
     run(irs2, cr_1, ci_1), run(irs2, cr_2, ci_2);
@@ -894,7 +894,7 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
     }
 
     // The same second IRS on a 5 degree grid
-    auto irs3 = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, nullptr, 5.0);
+    auto irs3 = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 5.0);
     irs3.e_theta_re *= 0.5, irs3.coupling_re = irs2.coupling_re, irs3.coupling_im.reset(), irs3.element_pos = irs2.element_pos;
     arma::cube cr_3, ci_3;
     REQUIRE_NOTHROW(run(irs3, cr_3, ci_3));
@@ -924,13 +924,13 @@ TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is
         {
             CHECK_THROWS_AS(quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
                                                                    f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[k], ci[k], dl[k], 0, -200.0,
-                                                                   3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k),
+                                                                   3e9, false, nullptr, nullptr, nullptr, nullptr, {}, {}, nullptr, k),
                             std::invalid_argument);
             continue;
         }
         quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
                                                f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[k], ci[k], dl[k], 0, -200.0,
-                                               3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k);
+                                               3e9, false, nullptr, nullptr, nullptr, nullptr, {}, {}, nullptr, k);
     }
     REQUIRE(cr[1].n_slices == 12);
     CHECK((arma::approx_equal(cr[0], cr[1], "absdiff", 0.0) && arma::approx_equal(ci[0], ci[1], "absdiff", 0.0)));
@@ -942,6 +942,6 @@ TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is
     }
     CHECK_THROWS_AS(quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
                                                            f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[0], ci[0], dl[0], 0, -200.0,
-                                                           3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 3),
+                                                           3e9, false, nullptr, nullptr, nullptr, nullptr, {}, {}, nullptr, 3),
                     std::invalid_argument);
 }

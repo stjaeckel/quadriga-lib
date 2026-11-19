@@ -669,7 +669,7 @@ TEST_CASE("ssf_clusters - quadriga is continuous along tracks")
             const lib_t in = lib_inputs(sp, tx, rx, 11 + tr);
             out_t o;
             quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa,
-                                       "quadriga", nullptr, nullptr, &in.eod, &in.toa);
+                                       "quadriga", {}, {}, in.eod, in.toa);
             track_events(o, in.lsp, ev);
         }
         QD_DIAG("%s,%d,%d,%d,%d\n", name, ev[0], ev[1], ev[2], ev[3]);
@@ -696,10 +696,10 @@ TEST_CASE("ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields"
             f.tx.row(2).fill(h), f.rx.row(2).fill(1.5);
             arma::cube ph;
             quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
-            quadriga_lib::gbsm_draw(sp, "cluster", ph, f.tx, f.rx, f.rnd, -1, "Comb256", nullptr, nullptr, true);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, f.tx, f.rx, f.rnd, -1, "Comb256", {}, {}, true);
             fix_t s = f;
             s.tx = f.rx, s.rx = f.tx;
-            quadriga_lib::gbsm_draw(sp, "cluster", ph, s.tx, s.rx, s.rnd, -1, "Comb256", nullptr, nullptr, true);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, s.tx, s.rx, s.rnd, -1, "Comb256", {}, {}, true);
             s.lsp.slice(3) = f.lsp.slice(4), s.lsp.slice(4) = f.lsp.slice(3);
             s.lsp.slice(5) = f.lsp.slice(6), s.lsp.slice(6) = f.lsp.slice(5);
             const out_t a = run(sp, f, "quadriga"), b = run(sp, s, "quadriga");

@@ -109,5 +109,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call quadriga-lib function
     CALL_QD(c.write_paths_to_obj_file(fn, max_paths, gain_max_dB, gain_min_dB, colormap,
-                                      &i_snap, radius_max, radius_min, n_edges));
+                                      i_snap, radius_max, radius_min, n_edges));
 }

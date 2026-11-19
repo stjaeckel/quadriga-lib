@@ -54,5 +54,5 @@ void arrayant_export_obj_file(const py::handle &fn,
     if (i_freq >= ant.size())
         throw std::invalid_argument("'i_freq' is out of bound.");
 
-    quadriga_lib::arrayant_export_obj_file(fn_s, ant[i_freq], directivity_range_dB, colormap, object_radius, icosphere_n_div, &i_element_a);
+    quadriga_lib::arrayant_export_obj_file(fn_s, ant[i_freq], directivity_range_dB, colormap, object_radius, icosphere_n_div, i_element_a);
 }

@@ -42,25 +42,25 @@ namespace quadriga_lib
 
     // Initialize rays; float only; returns n_ray; min 190 byte per ray
     arma::uword ray_init(
-        arma::uword n_ray_target,                         // Target number of rays
-        arma::uword n_freq,                               // Number of frequencies
-        const arma::fmat &orig_pos,                       // Origin position in [m], [3, 1] or [1, 3]
-        float max_path_length,                            // Maximum path length
-        arma::fmat *orig = nullptr,                       // Ray origins in GCS, [n_ray, 3]
-        arma::fmat *dest = nullptr,                       // Ray destinations in GCS, [n_ray, 3]
-        arma::fmat *trivec = nullptr,                     // Beam wavefront vertices relative to origin, [n_ray, 9]
-        arma::fmat *tridir = nullptr,                     // Vertex-ray directions, [n_ray, 9]
-        arma::Col<short> *mtl_ind_prev = nullptr,         // Previous medium (0 = outside), [n_ray]
-        arma::Col<short> *mtl_ind_current = nullptr,      // Current medium (0 = outside), [n_ray]
-        arma::Col<short> *mtl_ind_buffer = nullptr,       // Next-transition buffer (0 = empty), [n_ray]
-        arma::fcube *path_dir_prev = nullptr,             // Physical ray direction, [n_ray, 3]
-        arma::fmat *acc_dist = nullptr,                   // Accumulated in-layer distance, [n_ray, 2]
-        std::vector<quadriga_lib::path> *paths = nullptr, // Path data storage, 64 byte + overflow, [n_ray]
-        const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
-        const arma::u32_vec *sub_mesh_ind = nullptr,      // Optional: Sub-mesh index, 0-based, [n_sub]
-        const arma::fmat *aabb = nullptr,                 // Axis-aligned bounding boxes for the sub-meshes, Size [ n_sub, 6 ]
-        const arma::fmat *rx_points = nullptr,            // Receive points in 3D Space, Size: [n_points, 3]
-        bool scalar_mode = false);                        // Switch for EM mode or scalar mode
+        arma::uword n_ray_target,                            // Target number of rays
+        arma::uword n_freq,                                  // Number of frequencies
+        const arma::fmat &orig_pos,                          // Origin position in [m], [3, 1] or [1, 3]
+        float max_path_length,                               // Maximum path length
+        arma::fmat *orig = nullptr,                          // Ray origins in GCS, [n_ray, 3]
+        arma::fmat *dest = nullptr,                          // Ray destinations in GCS, [n_ray, 3]
+        arma::fmat *trivec = nullptr,                        // Beam wavefront vertices relative to origin, [n_ray, 9]
+        arma::fmat *tridir = nullptr,                        // Vertex-ray directions, [n_ray, 9]
+        arma::Col<short> *mtl_ind_prev = nullptr,            // Previous medium (0 = outside), [n_ray]
+        arma::Col<short> *mtl_ind_current = nullptr,         // Current medium (0 = outside), [n_ray]
+        arma::Col<short> *mtl_ind_buffer = nullptr,          // Next-transition buffer (0 = empty), [n_ray]
+        arma::fcube *path_dir_prev = nullptr,                // Physical ray direction, [n_ray, 3]
+        arma::fmat *acc_dist = nullptr,                      // Accumulated in-layer distance, [n_ray, 2]
+        std::vector<quadriga_lib::path> *paths = nullptr,    // Path data storage, 64 byte + overflow, [n_ray]
+        const arma::fmat &mesh = arma::fmat(),               // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
+        const arma::u32_vec &sub_mesh_ind = arma::u32_vec(), // Optional: Sub-mesh index, 0-based, [n_sub]
+        const arma::fmat &aabb = arma::fmat(),               // Axis-aligned bounding boxes for the sub-meshes, Size [ n_sub, 6 ]
+        const arma::fmat &rx_points = arma::fmat(),          // Receive points in 3D Space, Size: [n_points, 3]
+        bool scalar_mode = false);                           // Switch for EM mode or scalar mode
 
     // Flag rays for subdivision
     void ray_subdivide_flag(
@@ -98,8 +98,8 @@ namespace quadriga_lib
         std::vector<quadriga_lib::path> &paths,                              // Path data storage, 64 byte + overflow, updated in-place, [n_ray]
         arma::fmat *trivec = nullptr,                                        // Optional: Beam wavefront vertices relative to origin, updated in-place, [n_ray, 9]
         arma::fmat *tridir = nullptr,                                        // Optional: Vertex-ray directions, updated in-place, Cartesian [n_ray, 9]
-        const arma::u32_vec *sub_mesh_ind = nullptr,                         // Optional: Sub-mesh index, 0-based, [n_sub]
-        const arma::fmat *aabb = nullptr,                                    // Optional: Bounding box matrix; [n_sub, 6]
+        const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),                 // Optional: Sub-mesh index, 0-based, [n_sub]
+        const arma::fmat &aabb = arma::fmat(),                               // Optional: Bounding box matrix; [n_sub, 6]
         uint8_t max_interactions = 20,                                       // Total number of interactions per ray, 0-255
         uint8_t max_reflections = 10,                                        // Number of reflections, 0-255
         uint8_t max_transmissions = 10,                                      // Number of transmissions / refractions, 0-255
@@ -109,10 +109,10 @@ namespace quadriga_lib
         float thin_slab_threshold = 0.15f,                                   // Resolve threshold on the round-trip in-slab amplitude
         bool refraction_mode = true,                                         // Switch for straight-path / refraction
         bool scalar_mode = false,                                            // Switch for EM mode or scalar mode
-        const arma::u32_vec *n_interact_in = nullptr,                        // Optional: Externally computed intersection count per ray, skips the internal intersector, [n_ray]
-        const arma::u32_vec *fbs_ind_in = nullptr,                           // Optional: Externally computed 1-based FBS face index, 0 = no hit, [n_ray]
-        const arma::u32_vec *sbs_ind_in = nullptr,                           // Optional: Externally computed 1-based SBS face index, 0 = no hit, [n_ray]
-        const std::vector<bool> *subdiv_flag_in = nullptr);                  // Optional: List of beam to subdivide, [n_ray]
+        const arma::u32_vec &n_interact_in = arma::u32_vec(),                // Optional: Externally computed intersection count per ray, skips the internal intersector, [n_ray]
+        const arma::u32_vec &fbs_ind_in = arma::u32_vec(),                   // Optional: Externally computed 1-based FBS face index, 0 = no hit, [n_ray]
+        const arma::u32_vec &sbs_ind_in = arma::u32_vec(),                   // Optional: Externally computed 1-based SBS face index, 0 = no hit, [n_ray]
+        const std::vector<bool> &subdiv_flag_in = std::vector<bool>());      // Optional: List of beam to subdivide, [n_ray]
 
     // Compute the committed paths (paths that hit a receiver)
     // - Adds committed paths to the provided paths_commit vector
@@ -131,9 +131,9 @@ namespace quadriga_lib
         const arma::fmat &tridir,                                            // Vertex-ray directions, Cartesian [n_ray, 9]
         const arma::Col<short> &mtl_ind_current,                             // Current medium (0 = outside), [n_ray]
         const arma::fmat &points,                                            // Receive points in 3D Space, Size: [n_points, 3]
-        const arma::u32_vec *sub_cloud_ind = nullptr,                        // Sub-cloud index, 0-based, Length: [n_sub]
-        const arma::u32_vec *point_ind = nullptr,                            // Mapping "points" to "points_out", 1-based, Length: [ n_points_out ]
-        const std::vector<bool> *subdiv_flag_in = nullptr,                   // Optional: List of beam to subdivide, [n_ray], NULL/empty = none
+        const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),                // Sub-cloud index, 0-based, Length: [n_sub]
+        const arma::u32_vec &point_ind = arma::u32_vec(),                    // Mapping "points" to "points_out", 1-based, Length: [ n_points_out ]
+        const std::vector<bool> &subdiv_flag_in = std::vector<bool>(),       // Optional: List of beam to subdivide, [n_ray], empty = none
         float max_path_length = 10e3,                                        // Maximum path length
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
         uint8_t min_segments = 0,                                            // Minimum number of segment required to commit a path

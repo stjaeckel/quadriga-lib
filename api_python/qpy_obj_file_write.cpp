@@ -105,27 +105,14 @@ py::tuple obj_file_write(const py::handle &fn,
     if (!csv_prop.is_none())
         csv_prop_m = qd_python_dict2map<double>(csv_prop);
 
-    // Wrap optional inputs as nullptr when absent (C++ keys its mode off nullptr, not empty)
-    const arma::mat *p_mesh = mesh_a.is_empty() ? nullptr : &mesh_a;
-    const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
-    const arma::uvec *p_mtl_ind = mtl_ind_a.is_empty() ? nullptr : &mtl_ind_a;
-    const std::vector<std::string> *p_obj_names = obj_names_v.empty() ? nullptr : &obj_names_v;
-    const std::vector<std::string> *p_mtl_names = mtl_names_v.empty() ? nullptr : &mtl_names_v;
-    const arma::mat *p_vert_list = vert_list_a.is_empty() ? nullptr : &vert_list_a;
-    const arma::umat *p_face_ind = face_ind_a.is_empty() ? nullptr : &face_ind_a;
-    const arma::mat *p_bsdf = bsdf_a.is_empty() ? nullptr : &bsdf_a;
-    const arma::uvec *p_csv_ind = csv_ind_a.is_empty() ? nullptr : &csv_ind_a;
-    const std::vector<std::string> *p_csv_names = csv_names_v.empty() ? nullptr : &csv_names_v;
-    const std::unordered_map<std::string, std::vector<double>> *p_csv_prop = csv_prop_m.empty() ? nullptr : &csv_prop_m;
-
     // Outputs (size determined by the C++ call) - always allocated and returned
     arma::mat vert_list_out;
     arma::umat face_ind_out;
 
     // Call library function
-    quadriga_lib::obj_file_write<double>(fn_s, p_mesh, p_obj_ind, p_mtl_ind, p_obj_names, p_mtl_names,
-                                         &vert_list_out, &face_ind_out, p_vert_list, p_face_ind,
-                                         p_bsdf, threshold, p_csv_ind, p_csv_names, p_csv_prop,
+    quadriga_lib::obj_file_write<double>(fn_s, mesh_a, obj_ind_a, mtl_ind_a, obj_names_v, mtl_names_v,
+                                         &vert_list_out, &face_ind_out, vert_list_a, face_ind_a,
+                                         bsdf_a, threshold, csv_ind_a, csv_names_v, csv_prop_m,
                                          csv_write_defaults_b, split_loose_parts_b);
 
     // Copy to python (face indices stay 0-based)

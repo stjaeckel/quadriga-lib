@@ -33,7 +33,7 @@ TEST_CASE("Test Mitsuba XML File Write")
         xml_file.string(),
         vert_list, face_ind, obj_ind, mtl_ind,
         obj_names, mtl_names,
-        /*bsdf*/ nullptr, /*map_to_itu_materials=*/true);
+        /*bsdf*/ {}, /*map_to_itu_materials=*/true);
 
     const std::filesystem::path mesh_folder = xml_file.stem().string() + "_meshes";
 
@@ -68,7 +68,7 @@ TEST_CASE("Test Mitsuba XML File Write - 1-based material indices")
     // Valid 1-based input writes successfully (object is split per material).
     quadriga_lib::mitsuba_xml_file_write<double>(
         xml_file.string(), vert_list, face_ind, obj_ind, mtl_ind,
-        obj_names, mtl_names, /*bsdf*/ nullptr, /*map_to_itu_materials=*/false);
+        obj_names, mtl_names, /*bsdf*/ {}, /*map_to_itu_materials=*/false);
 
     CHECK(std::filesystem::exists(xml_file));
     CHECK(std::filesystem::is_directory(mesh_folder));
@@ -82,7 +82,7 @@ TEST_CASE("Test Mitsuba XML File Write - 1-based material indices")
     CHECK_THROWS_AS(
         quadriga_lib::mitsuba_xml_file_write<double>(
             xml_file.string(), vert_list, face_ind, obj_ind, mtl_ind_no_material,
-            obj_names, mtl_names, /*bsdf*/ nullptr, /*map_to_itu_materials=*/false),
+            obj_names, mtl_names, /*bsdf*/ {}, /*map_to_itu_materials=*/false),
         std::invalid_argument);
 }
 
@@ -101,7 +101,7 @@ TEST_CASE("Test Mitsuba XML File Write - XML and PLY output are byte-identical t
         for (arma::uword c = 0; c < 17; ++c)
             bsdf(m, c) = 0.0625 * (double)((m * 17 + c) % 16);
 
-    quadriga_lib::mitsuba_xml_file_write<double>("mref.xml", vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, &bsdf);
+    quadriga_lib::mitsuba_xml_file_write<double>("mref.xml", vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf);
 
     auto slurp = [](const std::string &fn)
     {

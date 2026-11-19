@@ -226,14 +226,14 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::handle &coeff
 
     if (is_multifreq)
         quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq_arma, freq_new_arma, nullptr, nullptr,
-                                                               &hmat_vec, remove_delay_phase_b, &snap_arma, use_kernel);
+                                                               &hmat_vec, remove_delay_phase_b, snap_arma, use_kernel);
     else
     {
         std::vector<arma::Cube<double>> cre_3(n_snap_total), cim_3(n_snap_total), dl_3(n_snap_total);
         for (arma::uword j : src)
             cre_3[j] = std::move(cre[j][0]), cim_3[j] = std::move(cim[j][0]), dl_3[j] = std::move(dl[j][0]);
         quadriga_lib::baseband_freq_response_vec<double>(cre_3, cim_3, dl_3, pilot_grid_arma, bandwidth,
-                                                         nullptr, nullptr, &hmat_vec, &snap_arma, use_kernel);
+                                                         nullptr, nullptr, &hmat_vec, snap_arma, use_kernel);
     }
     return output;
 }

@@ -181,7 +181,7 @@ void fast_geo2cart(
     arma::Col<dtype> *cos_az = nullptr,
     arma::Col<dtype> *sin_el = nullptr,
     arma::Col<dtype> *cos_el = nullptr,
-    const arma::Col<dtype> *len = nullptr,
+    const arma::Col<dtype> &len = arma::Col<dtype>(),
     int use_kernel = 0);
 ```
 

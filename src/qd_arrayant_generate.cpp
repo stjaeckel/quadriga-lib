@@ -361,7 +361,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
     arma::uword N = 1, 
     dtype center_freq = 299792458.0, 
     dtype spacing = 0.5,
-    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
     dtype res = 1.0);
 ```
 
@@ -369,7 +369,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 - **`N`** *(optional)* — Number of elements
 - **`center_freq`** *(optional)* — Center frequency
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern; empty (no elements): default
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ## Returns:
@@ -378,7 +378,7 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N, dtype center_freq, dtype spacing,
-                                                                  const arrayant<dtype> *pattern, dtype res)
+                                                                  const arrayant<dtype> &pattern, dtype res)
 {
     // Fix input ranges
     N = (N == 0ULL) ? 1ULL : N;
@@ -390,9 +390,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
     constexpr dtype zero = dtype(0.0);
 
     // Initialize pattern
-    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : *pattern;
+    quadriga_lib::arrayant<dtype> ant = (pattern.n_elements() == 0) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : pattern;
 
-    if (pattern != nullptr)
+    if (pattern.n_elements() != 0)
     {
         std::string error_message = ant.is_valid(); // Deep check
         if (error_message.length() != 0)
@@ -432,9 +432,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
 }
 
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_ula(arma::uword N, float center_freq, float spacing,
-                                                                           const arrayant<float> *pattern, float res);
+                                                                           const arrayant<float> &pattern, float res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_ula(arma::uword N, double center_freq, double spacing,
-                                                                            const arrayant<double> *pattern, double res);
+                                                                            const arrayant<double> &pattern, double res);
 
 /*!MD
 # generate_arrayant_3GPP
@@ -457,7 +457,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
     arma::uword Ng = 1, 
     dtype dgv = 0.5, 
     dtype dgh = 0.5,
-    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
     dtype res = 1.0);
 ```
 
@@ -480,7 +480,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`Ng`** *(optional)* — Number of horizontally stacked panels
 - **`dgv`** *(optional)* — Panel spacing in vertical direction in wavelengths
 - **`dgh`** *(optional)* — Panel spacing in horizontal direction in wavelengths
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern; empty (no elements): default
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ## Returns:
@@ -491,7 +491,7 @@ template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, dtype center_freq,
                                                                    unsigned pol, dtype tilt, dtype spacing,
                                                                    arma::uword Mg, arma::uword Ng, dtype dgv, dtype dgh,
-                                                                   const arrayant<dtype> *pattern, dtype res)
+                                                                   const arrayant<dtype> &pattern, dtype res)
 {
     // Fix input ranges
     M = (M == 0ULL) ? 1ULL : M;
@@ -510,9 +510,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     constexpr dtype zero = dtype(0.0);
 
     // Initialize pattern
-    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : *pattern;
+    quadriga_lib::arrayant<dtype> ant = (pattern.n_elements() == 0) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : pattern;
 
-    if (pattern != nullptr)
+    if (pattern.n_elements() != 0)
     {
         std::string error_message = ant.is_valid(); // Deep check
         if (error_message.length() != 0)
@@ -528,7 +528,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     ant.center_freq = center_freq;
     arma::uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
-    if (pattern == nullptr) // Generate 3GPP default radiation pattern
+    if (pattern.n_elements() == 0) // Generate 3GPP default radiation pattern
     {
         // Single antenna element vertical radiation pattern cut in dB
         arma::Col<dtype> Y = ant.elevation_grid;
@@ -561,13 +561,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
         if (pol == 2 || pol == 5)
         {
             quadriga_lib::arrayant_copy_element(ant, 0, {1});
-            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 2.0), zero, zero}, 2, &el_1);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 2.0), zero, zero}, 2, el_1);
         }
         else if (pol == 3 || pol == 6)
         {
             quadriga_lib::arrayant_copy_element(ant, 0, {1});
-            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 4.0), zero, zero}, 2, &el_0);
-            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(-arma::datum::pi / 4.0), zero, zero}, 2, &el_1);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 4.0), zero, zero}, 2, el_0);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(-arma::datum::pi / 4.0), zero, zero}, 2, el_1);
         }
     }
 
@@ -684,12 +684,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, float center_freq,
                                                                             unsigned pol, float tilt, float spacing,
                                                                             arma::uword Mg, arma::uword Ng, float dgv, float dgh,
-                                                                            const quadriga_lib::arrayant<float> *pattern, float res);
+                                                                            const quadriga_lib::arrayant<float> &pattern, float res);
 
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, double center_freq,
                                                                              unsigned pol, double tilt, double spacing,
                                                                              arma::uword Mg, arma::uword Ng, double dgv, double dgh,
-                                                                             const quadriga_lib::arrayant<double> *pattern, double res);
+                                                                             const quadriga_lib::arrayant<double> &pattern, double res);
 /*!MD
 # generate_arrayant_multibeam
 Generate a planar multi-element antenna array with multiple beam directions
@@ -792,7 +792,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     auto pattern = quadriga_lib::generate_arrayant_custom<dtype>(az_3dB, el_3dB, rear_gain_lin, res);
 
     // Assemble array antenna
-    quadriga_lib::arrayant<dtype> ant = quadriga_lib::generate_arrayant_3GPP<dtype>(M, N, center_freq, pol, zero, spacing, 1, 1, 0.5, 0.5, &pattern);
+    quadriga_lib::arrayant<dtype> ant = quadriga_lib::generate_arrayant_3GPP<dtype>(M, N, center_freq, pol, zero, spacing, 1, 1, 0.5, 0.5, pattern);
 
     arma::uword n_elements = ant.n_elements();
     arma::Mat<dtype> cpl_eye = ant.coupling_re;
@@ -972,17 +972,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
         const arma::uvec first = {0}, second = {n_elements};
         if (pol == 2)
         {
-            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 2.0), 0, 0}, 2, &second);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 2.0), 0, 0}, 2, second);
             dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
             quadriga_lib::arrayant_copy_element(ant, n_elements, dest);
         }
         else if (pol == 3)
         {
-            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 4.0), 0, 0}, 2, &first);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 4.0), 0, 0}, 2, first);
             dest = arma::regspace<arma::uvec>(1, n_elements - 1);
             quadriga_lib::arrayant_copy_element(ant, 0, dest);
 
-            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(-arma::datum::pi / 4.0), 0, 0}, 2, &second);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(-arma::datum::pi / 4.0), 0, 0}, 2, second);
             dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
             quadriga_lib::arrayant_copy_element(ant, n_elements, dest);
 

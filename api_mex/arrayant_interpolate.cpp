@@ -90,9 +90,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto freq_new = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "freq_new");
     const int use_kernel = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "use_kernel", 0);
 
-    const arma::uvec *p_element = i_element.is_empty() ? nullptr : &i_element;
-    const arma::cube *p_orientation = orientation.is_empty() ? nullptr : &orientation;
-    const arma::mat *p_element_pos = element_pos.is_empty() ? nullptr : &element_pos;
 
     const arma::uword n_out = i_element.is_empty() ? ant[0].n_elements() : i_element.n_elem;
     const arma::uword n_ang = az.n_cols;
@@ -113,8 +110,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             plhs[3] = qd_mex_init_output(&H_im, n_out, n_ang, n_freq);
 
         CALL_QD(quadriga_lib::arrayant_interpolate_multi<double>(ant, az, el, V_re, V_im, H_re, H_im,
-                                                                 freq_new.is_empty() ? nullptr : &freq_new,
-                                                                 p_element, p_orientation, p_element_pos, nullptr, nullptr, use_kernel));
+                                                                 freq_new,
+                                                                 i_element, orientation, element_pos, nullptr, nullptr, use_kernel));
         return;
     }
 
@@ -135,7 +132,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 7)
         plhs[7] = qd_mex_init_output(&gamma, n_out, n_ang);
 
-    CALL_QD(quadriga_lib::arrayant_interpolate<double>(ant[0], az, el, V_re, V_im, H_re, H_im, p_element, p_orientation, p_element_pos,
+    CALL_QD(quadriga_lib::arrayant_interpolate<double>(ant[0], az, el, V_re, V_im, H_re, H_im, i_element, orientation, element_pos,
                                                        (nlhs > 4) ? &dist : nullptr, (nlhs > 5) ? &azimuth_loc : nullptr,
                                                        (nlhs > 6) ? &elevation_loc : nullptr, (nlhs > 7) ? &gamma : nullptr,
                                                        nullptr, nullptr, use_kernel));

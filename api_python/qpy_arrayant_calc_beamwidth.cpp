@@ -62,14 +62,14 @@ py::tuple arrayant_calc_beamwidth(const py::dict &arrayant,
     if (ant_multi.size() == 1) // Single frequency: 1D outputs (n_out,)
     {
         arma::vec bw_az, bw_el, az_pt, el_pt;
-        quadriga_lib::arrayant_calc_beamwidth(ant_multi[0], &i_el, threshold_dB, &bw_az, &bw_el, &az_pt, &el_pt);
+        quadriga_lib::arrayant_calc_beamwidth(ant_multi[0], i_el, threshold_dB, &bw_az, &bw_el, &az_pt, &el_pt);
         return py::make_tuple(qd_python_copy2numpy(&bw_az), qd_python_copy2numpy(&bw_el),
                               qd_python_copy2numpy(&az_pt), qd_python_copy2numpy(&el_pt));
     }
 
     // Multi-frequency: 2D outputs (n_out, n_freq)
     arma::mat bw_az, bw_el, az_pt, el_pt;
-    quadriga_lib::arrayant_calc_beamwidth_multi(ant_multi, &i_el, threshold_dB, &bw_az, &bw_el, &az_pt, &el_pt);
+    quadriga_lib::arrayant_calc_beamwidth_multi(ant_multi, i_el, threshold_dB, &bw_az, &bw_el, &az_pt, &el_pt);
     return py::make_tuple(qd_python_copy2numpy(&bw_az), qd_python_copy2numpy(&bw_el),
                           qd_python_copy2numpy(&az_pt), qd_python_copy2numpy(&el_pt));
 }

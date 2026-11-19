@@ -361,7 +361,7 @@ if (nlhs > 1)
 
 ## Optional and mandatory C++ arguments
 - Optional C++ outputs (pointers) get `(nlhs > k) ? &obj : nullptr`, so that an output nobody requested is neither allocated nor computed. The exception is an optional C++ output that feeds the first wrapper output: it is always passed.
-- Optional C++ inputs (pointers) get `nullptr` when the input is omitted or empty.
+- Optional C++ inputs that are references with an empty default get the (possibly empty) object itself; an empty MATLAB input means "not given". The few optional C++ inputs that are pointers get `nullptr` when the input is omitted or empty.
 - Mandatory C++ arguments (by reference) get the object itself. A mandatory output is pre-allocated with `qd_mex_init_output` only when it is requested (the first output always); otherwise the local empty object is passed and discarded.
 
 ## Call the C++ function

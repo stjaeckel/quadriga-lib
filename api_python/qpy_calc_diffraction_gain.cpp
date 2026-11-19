@@ -120,12 +120,9 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     auto gain_p = qd_python_init_output(n_pos, &gain);
     auto polmat_p = qd_python_init_output((scalar_mode_b ? 2 : 8), n_pos, &polmat);
 
-    // Resolve optional pointer
-    const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_a.empty() ? nullptr : &sub_mesh_index_a;
-
     quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
                                                 center_freq, lod, &gain, &polmat, &coord, verbose,
-                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode_b,
+                                                sub_mesh_index_a, use_kernel, gpu_id, scalar_mode_b,
                                                 thin_slab_threshold, apply_fspl_b, apply_phase_b);
 
     return py::make_tuple(gain_p, polmat_p, qd_python_copy2numpy(&coord));

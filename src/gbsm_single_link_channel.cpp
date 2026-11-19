@@ -61,11 +61,11 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const std::string &mobility = "auto",
     const std::string &output = "taps",
     arma::uword i_freq = 0,
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
-    const arma::mat *tx_orientation = nullptr,
-    const arma::mat *rx_orientation = nullptr,
-    const arma::vec *kf_ratio = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
+    const arma::mat &tx_orientation = arma::mat(),
+    const arma::mat &rx_orientation = arma::mat(),
+    const arma::vec &kf_ratio = arma::vec(),
     bool oxygen = false,
     bool use_absolute_delays = false);
 ```
@@ -121,11 +121,11 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                                                                      const std::string &mobility,
                                                                      const std::string &output,
                                                                      arma::uword i_freq,
-                                                                     const arma::mat *tx_pos,
-                                                                     const arma::mat *rx_pos,
-                                                                     const arma::mat *tx_orientation,
-                                                                     const arma::mat *rx_orientation,
-                                                                     const arma::vec *kf_ratio,
+                                                                     const arma::mat &tx_pos,
+                                                                     const arma::mat &rx_pos,
+                                                                     const arma::mat &tx_orientation,
+                                                                     const arma::mat &rx_orientation,
+                                                                     const arma::vec &kf_ratio,
                                                                      bool oxygen,
                                                                      bool use_absolute_delays)
 {
@@ -152,7 +152,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         throw std::invalid_argument("Input 'link_gain_dB' must be finite.");
     // Positions and orientations as [3, n] (qd_gbsm_cols: [1, 3] is one snapshot); empty = omitted
     const char *pn[4] = {"tx_pos", "rx_pos", "tx_orientation", "rx_orientation"};
-    const arma::mat *pp[4] = {tx_pos, rx_pos, tx_orientation, rx_orientation};
+    const arma::mat *pp[4] = {&tx_pos, &rx_pos, &tx_orientation, &rx_orientation};
     arma::mat pc[4];
     arma::uword n_snap = 1;
     for (int j = 0; j < 4; ++j)
@@ -165,12 +165,12 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                 throw std::invalid_argument("Input '" + std::string(pn[j]) + "' must be finite.");
             n_snap = std::max(n_snap, pc[j].n_cols);
         }
-    if (kf_ratio != nullptr && (!kf_ratio->is_finite() || arma::any(*kf_ratio < 0.0)))
+    if (!kf_ratio.empty() && (!kf_ratio.is_finite() || arma::any(kf_ratio < 0.0)))
         throw std::invalid_argument("Input 'kf_ratio' must be finite and >= 0.");
     const std::pair<std::string, arma::uword> cnt[6] = {
         {"tx_pos", pc[0].empty() ? 1 : pc[0].n_cols}, {"rx_pos", pc[1].empty() ? 1 : pc[1].n_cols},
         {"tx_orientation", pc[2].empty() ? 1 : pc[2].n_cols}, {"rx_orientation", pc[3].empty() ? 1 : pc[3].n_cols},
-        {"link_gain_dB", link_gain_dB.n_elem}, {"kf_ratio", kf_ratio ? kf_ratio->n_elem : 1}};
+        {"link_gain_dB", link_gain_dB.n_elem}, {"kf_ratio", !kf_ratio.empty() ? kf_ratio.n_elem : 1}};
     for (const auto &c : cnt)
         if (c.second != 1 && c.second != n_snap)
             throw std::invalid_argument("Number of snapshots in '" + c.first + "' must be 1 or " +
@@ -220,7 +220,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     arma::vec lg(n_snap), kf(n_snap);
     for (arma::uword t = 0; t < n_snap; ++t)
         lg(t) = link_gain_dB(link_gain_dB.n_elem == 1 ? 0 : t),
-        kf(t) = (kf_ratio == nullptr) ? 1.0 : (*kf_ratio)(kf_ratio->n_elem == 1 ? 0 : t);
+        kf(t) = kf_ratio.empty() ? 1.0 : kf_ratio(kf_ratio.n_elem == 1 ? 0 : t);
 
     // Taps: index of each kept ray's tap (ascending tap values) and its delay weight w / sum(w) with w the ray
     // power at i_freq (equal weights where the sum is 0)
@@ -309,7 +309,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                 arma::mat pg;
                 arma::cube pM;
                 const arma::vec lg_t = {lg(t)}, kf_t = {kf(t)};
-                ssf_paths(rr, lg_t, pg, L_ph, pM, "phase", nullptr, nullptr, kf_ratio ? &kf_t : nullptr, nullptr,
+                ssf_paths(rr, lg_t, pg, L_ph, pM, "phase", {}, {}, !kf_ratio.empty() ? kf_t : arma::vec(), nullptr,
                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, oxygen);
                 if (n_kept > 0) // col(0) of a [0, 1] matrix would bind a null reference
                     g_ph[t] = pg.col(0);
@@ -386,7 +386,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         {
             arma::cube pM;
             const arma::vec T = c.tx_pos.col(t), R = c.rx_pos.col(t), lg_t = {lg(t)}, kf_t = {kf(t)};
-            ssf_paths(rr, lg_t, pg, pl, pM, "drift", &T, &R, kf_ratio ? &kf_t : nullptr, &aod, &eod, &aoa, &eoa,
+            ssf_paths(rr, lg_t, pg, pl, pM, "drift", T, R, !kf_ratio.empty() ? kf_t : arma::vec(), &aod, &eod, &aoa, &eoa,
                       &fbs, &lbs, nullptr, nullptr, oxygen);
             M = arma::mat(pM.slice_memptr(0), 8, n_kept);
             const arma::vec g = (n_kept > 0) ? arma::vec(pg.col(0)) : arma::vec();

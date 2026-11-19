@@ -96,8 +96,8 @@ py::tuple ssf_paths(const py::dict &rays,
     arma::u32_vec path_type;
     arma::uvec ray_ind;
     quadriga_lib::ssf_paths(rays_a, link_gain_dB_a, path_gain, path_length, polmat, mobility,
-                            tx_pos.is_none() ? nullptr : &tx_pos_a, rx_pos.is_none() ? nullptr : &rx_pos_a,
-                            kf_ratio.is_none() ? nullptr : &kf_ratio_a, &aod, &eod, &aoa, &eoa, &fbs_pos, &lbs_pos,
+                            tx_pos_a, rx_pos_a,
+                            kf_ratio_a, &aod, &eod, &aoa, &eoa, &fbs_pos, &lbs_pos,
                             &path_type, &ray_ind, oxygen_b);
 
     return py::make_tuple(qd_python_copy2numpy(&path_gain), qd_python_copy2numpy(&path_length),

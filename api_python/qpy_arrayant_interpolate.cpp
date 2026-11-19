@@ -102,9 +102,6 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     const auto element_pos_a = qd_python_numpy2arma_Mat<double>(element_pos, true);
     const auto freq_new_a = qd_python_numpy2arma_Col<double>(freq_new, true);
 
-    const arma::uvec *p_element = i_element_a.is_empty() ? nullptr : &i_element_a;
-    const arma::cube *p_orientation = orientation_a.is_empty() ? nullptr : &orientation_a;
-    const arma::mat *p_element_pos = element_pos_a.is_empty() ? nullptr : &element_pos_a;
 
     const auto ant = qd_python_dict2arrayant_multi(arrayant, true, strict);
     const arma::uword n_out = i_element_a.is_empty() ? ant[0].n_elements() : i_element_a.n_elem;
@@ -122,8 +119,8 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
         auto H_py = qd_python_init_output(n_out, n_ang, n_freq, &H);
 
         quadriga_lib::arrayant_interpolate_multi<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
-                                                         freq_new_a.is_empty() ? nullptr : &freq_new_a,
-                                                         p_element, p_orientation, p_element_pos,
+                                                         freq_new_a,
+                                                         i_element_a, orientation_a, element_pos_a,
                                                          &V, &H, use_kernel);
         return py::make_tuple(V_py, H_py);
     }
@@ -143,7 +140,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     }
 
     quadriga_lib::arrayant_interpolate<double>(ant[0], azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
-                                               p_element, p_orientation, p_element_pos,
+                                               i_element_a, orientation_a, element_pos_a,
                                                want_dist ? &dist_a : nullptr,
                                                want_local_angles ? &azimuth_loc : nullptr,
                                                want_local_angles ? &elevation_loc : nullptr,

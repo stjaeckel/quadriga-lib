@@ -70,12 +70,8 @@ py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
     std::vector<arma::cube> map;
     auto map_py = qd_python_init_output(ny, nx, nz, n_gen, &map);
 
-    // Wrap optional pointers
-    const arma::vec *p_y = y_a.is_empty() ? nullptr : &y_a;
-    const arma::vec *p_z = z_a.is_empty() ? nullptr : &z_a;
-
     // Call library function
-    quadriga_lib::sos_map<double>(freq_a, phase_a, x_a, map, p_y, p_z, uniform_b, use_kernel);
+    quadriga_lib::sos_map<double>(freq_a, phase_a, x_a, map, y_a, z_a, uniform_b, use_kernel);
 
     return map_py;
 }

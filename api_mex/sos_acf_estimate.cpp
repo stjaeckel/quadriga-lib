@@ -107,9 +107,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Wrap optional pointers
     arma::vec *p_dist_est = dist_est.empty() ? nullptr : &dist_est;
     arma::vec *p_acf_est_dual = acf_est_dual.empty() ? nullptr : &acf_est_dual;
-    const arma::vec *p_acf = acf.empty() ? nullptr : &acf;
-    const arma::vec *p_dist = dist.empty() ? nullptr : &dist;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_acf_estimate<double>(spatial_freq, phase, bins, n_pos, acf_est, p_dist_est, p_acf_est_dual, p_acf, p_dist, seed));
+    CALL_QD(quadriga_lib::sos_acf_estimate<double>(spatial_freq, phase, bins, n_pos, acf_est, p_dist_est, p_acf_est_dual, acf, dist, seed));
 }

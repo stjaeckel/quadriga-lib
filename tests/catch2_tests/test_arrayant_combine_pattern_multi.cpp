@@ -110,7 +110,7 @@ TEST_CASE("Combine multi - Out-of-range azimuth_grid_new throws")
     arma::vec freqs = {1000.0};
     auto vec = build_simple_multi(freqs);
     arma::vec bad_az = {-4.0, 0.0, 4.0}; // Outside [-pi, pi]
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(vec, &bad_az),
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(vec, bad_az),
                       std::invalid_argument);
 }
 
@@ -120,7 +120,7 @@ TEST_CASE("Combine multi - Out-of-range elevation_grid_new throws")
     auto vec = build_simple_multi(freqs);
     arma::vec bad_el = {-2.0, 0.0, 2.0}; // Outside [-pi/2, pi/2]
     REQUIRE_THROWS_AS(
-        quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, &bad_el),
+        quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, bad_el),
         std::invalid_argument);
 }
 
@@ -130,17 +130,17 @@ TEST_CASE("Combine multi - Non-positive freq_new throws")
     auto vec = build_simple_multi(freqs);
     arma::vec bad_freq = {0.0, 1000.0};
     REQUIRE_THROWS_AS(
-        quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &bad_freq),
+        quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, bad_freq),
         std::invalid_argument);
 
     arma::vec neg_freq = {-100.0, 1000.0};
     REQUIRE_THROWS_AS(
-        quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &neg_freq),
+        quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, neg_freq),
         std::invalid_argument);
 
     // Infinite values are rejected with a message that names this function's argument
     arma::vec inf_freq = {1000.0, arma::datum::inf};
-    CHECK_THROWS_WITH(quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &inf_freq),
+    CHECK_THROWS_WITH(quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, inf_freq),
                       Catch::Matchers::ContainsSubstring("freq_new"));
 }
 
@@ -151,11 +151,11 @@ TEST_CASE("Combine multi - Unsorted freq_new produces correct results")
 
     // Sorted query
     arma::vec freq_sorted = {1200.0, 1800.0, 2500.0};
-    auto out_sorted = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_sorted);
+    auto out_sorted = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_sorted);
 
     // Same frequencies in scrambled order
     arma::vec freq_unsorted = {2500.0, 1200.0, 1800.0};
-    auto out_unsorted = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_unsorted);
+    auto out_unsorted = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_unsorted);
 
     REQUIRE(out_sorted.size() == 3);
     REQUIRE(out_unsorted.size() == 3);
@@ -176,7 +176,7 @@ TEST_CASE("Combine multi - Reversed freq_new (descending)")
     auto vec = build_simple_multi(entry_freqs);
 
     arma::vec freq_desc = {2000.0, 1000.0, 500.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_desc);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_desc);
 
     REQUIRE(out.size() == 3);
     // At exact match each output should equal that entry's single-freq combine_pattern
@@ -194,7 +194,7 @@ TEST_CASE("Combine multi - Duplicate freq_new entries produce identical outputs"
     auto vec = build_simple_multi(entry_freqs);
 
     arma::vec freq_dup = {1500.0, 1500.0, 1500.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_dup);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_dup);
 
     REQUIRE(out.size() == 3);
     CHECK(arma::approx_equal(out[0].e_theta_re, out[1].e_theta_re, "absdiff", 1e-12));
@@ -220,7 +220,7 @@ TEST_CASE("Combine multi - Output count matches freq_new")
     arma::vec freqs = {1000.0, 2000.0};
     auto vec = build_simple_multi(freqs);
     arma::vec freq_new = {500.0, 1500.0, 2500.0, 3500.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
     CHECK(out.size() == 4);
 }
 
@@ -284,7 +284,7 @@ TEST_CASE("Combine multi - Output center_freq matches requested freq grid")
 
     // Custom: requested values
     arma::vec freq_new = {750.0, 1500.0, 2500.0};
-    auto out_custom = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out_custom = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
     REQUIRE(out_custom.size() == 3);
     CHECK(std::abs(out_custom[0].center_freq - 750.0) < 1e-9);
     CHECK(std::abs(out_custom[1].center_freq - 1500.0) < 1e-9);
@@ -327,7 +327,7 @@ TEST_CASE("Combine multi - Single entry, clamped query frequency uses that entry
 
     // Query at lots of different frequencies — all should clamp to entry 0
     arma::vec freq_new = {1.0e6, 1.0e9, 1.0e12};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
     REQUIRE(out.size() == 3);
 
     // Field amplitudes should be identical (clamped), only the center_freq changes
@@ -385,7 +385,7 @@ TEST_CASE("Combine multi - Custom azimuth_grid_new used in output")
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
 
     arma::vec az_new = {-pi / 2.0, 0.0, pi / 2.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi(vec, &az_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi(vec, az_new);
 
     REQUIRE(out.size() == 1);
     CHECK(out[0].azimuth_grid.n_elem == 3);
@@ -401,7 +401,7 @@ TEST_CASE("Combine multi - Custom elevation_grid_new used in output")
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
 
     arma::vec el_new = {-pi / 4.0, 0.0, pi / 4.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, &el_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, el_new);
 
     REQUIRE(out.size() == 1);
     CHECK(out[0].elevation_grid.n_elem == 3);
@@ -419,7 +419,7 @@ TEST_CASE("Combine multi - All three grids custom")
     arma::vec az_new = {-pi / 2.0, 0.0, pi / 2.0};
     arma::vec el_new = {-pi / 6.0, 0.0, pi / 6.0};
     arma::vec freq_new = {0.5e9, 1.0e9, 1.5e9};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi(vec, &az_new, &el_new, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi(vec, az_new, el_new, freq_new);
 
     REQUIRE(out.size() == 3);
     for (auto &o : out)
@@ -459,7 +459,7 @@ TEST_CASE("Combine multi - Midpoint frequency interpolation (in-phase reals)")
     }
 
     arma::vec freq_new = {1500.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
     REQUIRE(out.size() == 1);
 
     // SLERP with in-phase → linear blend: 0.5*1 + 0.5*3 = 2.0
@@ -495,7 +495,7 @@ TEST_CASE("Combine multi - Coupling SLERPed between bracketing entries")
     }
 
     arma::vec freq_new = {1500.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     // result = coupling(1500) * pattern(1500) = 2.0 * 1.0 = 2.0
     CHECK(std::abs(out[0].e_theta_re(0, 0, 0) - 2.0) < 1e-9);
@@ -527,7 +527,7 @@ TEST_CASE("Combine multi - Coupling magnitude SLERP equals nearest at quarter po
     }
 
     arma::vec freq_new = {1250.0, 1750.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
     REQUIRE(out.size() == 2);
     CHECK(std::abs(out[0].e_theta_re(0, 0, 0) - 3.0) < 1e-9);
     CHECK(std::abs(out[1].e_theta_re(0, 0, 0) - 5.0) < 1e-9);
@@ -543,7 +543,7 @@ TEST_CASE("Combine multi - Query below lowest center_freq clamps to first entry"
     auto vec = build_simple_multi(freqs);
 
     arma::vec freq_new = {10.0}; // Way below lowest
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     auto ref = quadriga_lib::arrayant_combine_pattern(vec[0]);
     REQUIRE(out.size() == 1);
@@ -557,7 +557,7 @@ TEST_CASE("Combine multi - Query above highest center_freq clamps to last entry"
     auto vec = build_simple_multi(freqs);
 
     arma::vec freq_new = {1.0e9}; // Way above highest
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     auto ref = quadriga_lib::arrayant_combine_pattern(vec[2]);
     REQUIRE(out.size() == 1);
@@ -732,7 +732,7 @@ TEST_CASE("Combine multi - Doubling frequency doubles the phase shift")
 
     std::vector<quadriga_lib::arrayant<double>> vec = {ant};
     arma::vec freq_new = {f0, 2.0 * f0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     REQUIRE(out.size() == 2);
 
@@ -800,7 +800,7 @@ TEST_CASE("Combine multi - GHz antenna with varying pattern and coupling")
 
     // Query at WiFi channel frequencies — most are between input entries
     arma::vec freq_new = {2.412e9, 2.437e9, 2.462e9, 2.484e9};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     REQUIRE(out.size() == 4);
     for (auto &o : out)
@@ -827,7 +827,7 @@ TEST_CASE("Combine multi - Single speaker generate_speaker workflow")
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>(
         "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
+        0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
     // Combine without changing the frequency grid — output should be 1:1 with input
     auto out = quadriga_lib::arrayant_combine_pattern_multi(spk);
@@ -848,10 +848,10 @@ TEST_CASE("Combine multi - 2-way speaker workflow with arrayant_concat_multi")
     arma::vec entry_freqs = {100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 16000.0};
     auto woofer = quadriga_lib::generate_speaker<double>(
         "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, &entry_freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, entry_freqs, 10.0);
     auto tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, &entry_freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, entry_freqs, 10.0);
     auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
     // speaker has 2 elements; default coupling is [[1,0],[0,1]] (2 ports)
     REQUIRE(speaker[0].n_elements() == 2);
@@ -859,7 +859,7 @@ TEST_CASE("Combine multi - 2-way speaker workflow with arrayant_concat_multi")
 
     // Combine at output frequencies that fall inside the input range
     arma::vec freq_new = {150.0, 750.0, 3000.0, 8000.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(speaker, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(speaker, {}, {}, freq_new);
 
     REQUIRE(out.size() == 4);
     for (auto &o : out)
@@ -897,7 +897,7 @@ TEST_CASE("Combine multi - Dense sweep produces smooth finite output")
     auto vec = build_simple_multi(entry_freqs);
 
     arma::vec freq_new = arma::linspace(100.0, 10000.0, 50);
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     REQUIRE(out.size() == 50);
     for (auto &o : out)
@@ -923,7 +923,7 @@ TEST_CASE("Combine multi - Input arrayant_vec in unsorted frequency order")
 
     // Query at sorted output frequencies — should still produce sensible results
     arma::vec freq_new = {500.0, 1000.0, 2000.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     REQUIRE(out.size() == 3);
     // Output at f=500 should match vec[1] (which has center_freq=500, scale=2)
@@ -944,7 +944,7 @@ TEST_CASE("Combine multi - Single output frequency entry produces single output"
     auto vec = build_simple_multi(entry_freqs);
 
     arma::vec freq_new = {1500.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, {}, {}, freq_new);
 
     REQUIRE(out.size() == 1);
     CHECK(std::abs(out[0].center_freq - 1500.0) < 1e-6);
@@ -1000,7 +1000,7 @@ TEST_CASE("Combine multi - Custom angular grid resamples pattern correctly")
 
     arma::vec az_new = {-pi / 2.0, 0.0, pi / 2.0};
     arma::vec el_new = {0.0};
-    auto out = quadriga_lib::arrayant_combine_pattern_multi(vec, &az_new, &el_new);
+    auto out = quadriga_lib::arrayant_combine_pattern_multi(vec, az_new, el_new);
 
     REQUIRE(out.size() == 1);
     // Omni has constant V-pol on-axis → e_theta_re ≈ 1 everywhere on equator (within numerical noise)
@@ -1034,7 +1034,7 @@ TEST_CASE("Combine multi - Propagation speed")
     // Two omni "speakers" 0.2 m apart at 1 kHz (lambda = 0.344 m in air), summed into one port
     const arma::vec f_1k = {1000.0};
     auto s = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
-                                                    0, 0, 0, 0.15, 0.25, &f_1k, 10.0);
+                                                    0, 0, 0, 0.15, 0.25, f_1k, 10.0);
     auto two = quadriga_lib::arrayant_concat_multi(s, s);
     quadriga_lib::arrayant_set_element_pos_multi(two, arma::mat({{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}}));
     two[0].coupling_re = arma::mat(2, 1, arma::fill::ones);
@@ -1052,23 +1052,23 @@ TEST_CASE("Combine multi - Propagation speed")
 
     // Speed of sound: |1 + exp(j k d)| = 2 |cos(pi f d / c)| relative to broadside
     const double c = 344.0, ratio = std::abs(std::cos(arma::datum::pi * 1000.0 * 0.2 / c));
-    auto ac = quadriga_lib::arrayant_combine_pattern_multi<double>(two, nullptr, nullptr, nullptr, c);
+    auto ac = quadriga_lib::arrayant_combine_pattern_multi<double>(two, {}, {}, {}, c);
     REQUIRE(ac.size() == 1);
     CHECK(std::abs(amp(ac[0], ie, ia0) / p0 - 1.0) < 1e-6);
     CHECK(std::abs(amp(ac[0], ie, ia90) / p0 - ratio) < 1e-6);
 
     // Same as the single-frequency combine_pattern with the same speed
-    auto single = quadriga_lib::arrayant_combine_pattern<double>(two[0], nullptr, nullptr, c);
+    auto single = quadriga_lib::arrayant_combine_pattern<double>(two[0], {}, {}, c);
     CHECK(arma::approx_equal(ac[0].e_theta_re, single.e_theta_re, "absdiff", 1e-9));
     CHECK(arma::approx_equal(ac[0].e_theta_im, single.e_theta_im, "absdiff", 1e-9));
 
     // With an output frequency grid: the phase follows freq / propagation_speed
     arma::vec f_out = {500.0};
-    auto ac500 = quadriga_lib::arrayant_combine_pattern_multi<double>(two, nullptr, nullptr, &f_out, c);
+    auto ac500 = quadriga_lib::arrayant_combine_pattern_multi<double>(two, {}, {}, f_out, c);
     REQUIRE(ac500.size() == 1);
     CHECK(std::abs(amp(ac500[0], ie, ia90) / amp(ac500[0], ie, ia0) - std::abs(std::cos(arma::datum::pi * 500.0 * 0.2 / c))) < 1e-6);
 
     // Invalid speeds
     for (double v : {0.0, -344.0, arma::datum::nan, arma::datum::inf})
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi<double>(two, nullptr, nullptr, nullptr, v), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi<double>(two, {}, {}, {}, v), std::invalid_argument);
 }

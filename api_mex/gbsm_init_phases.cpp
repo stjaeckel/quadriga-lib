@@ -100,7 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[0] = qd_mex_init_output(&phase, n_coeff, qd_gbsm_n_gen(sp, set_type, set_id), 2);
 
     // Call library function
-    CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, &tx_pos, &rx_pos,
+    CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, tx_pos, rx_pos,
                                            dual_mobility, remove_bias, horizontal));
 
 }

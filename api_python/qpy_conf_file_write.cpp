@@ -94,6 +94,6 @@ void conf_file_write(const py::handle &fn,
     const bool write_defaults_b = qd_python_flag(write_defaults, false, "write_defaults");
 
     // Call library function
-    quadriga_lib::conf_file_write(fn_s, scenpar_m, pl_model, &plpar_m, &pl_order, &short_names_v,
-                                  ref_s, &ref_sec_v, &valid_range_a, write_defaults_b);
+    quadriga_lib::conf_file_write(fn_s, scenpar_m, pl_model, plpar_m, pl_order, short_names_v,
+                                  ref_s, ref_sec_v, valid_range_a, write_defaults_b);
 }

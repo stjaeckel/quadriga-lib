@@ -472,7 +472,7 @@ TEST_CASE("path_loss - O2I distances: geometric distance without d2d_in, outdoor
 
     arma::mat pl_geo, pl_o2i, sf;
     quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl_geo);
-    quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl_o2i, nullptr, &d2d_in);
+    quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl_o2i, nullptr, d2d_in);
 
     QD_DIAG("\n# diag: path_loss O2I distances (UMa NLOS file)\n");
     QD_DIAG("link,d2d_in,d2_geo,d3_geo,d2_out,d3_out,pl_geo_3.5,pl_o2i_3.5\n");
@@ -558,9 +558,9 @@ TEST_CASE("path_loss - UMa random hE follows the probability of TR note 1")
                 REQUIRE(std::abs(tr_c[i] - tr_c[j]) > 0.01);
 
         arma::mat pl_los, pl_copy, pl_nlos, pl_fixed;
-        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, pl_los, nullptr, nullptr, &u);
-        quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, pl_copy, nullptr, nullptr, &u);
-        quadriga_lib::path_loss(m_nlos, p_nlos, sp_nlos, fc, tx, rx, pl_nlos, nullptr, nullptr, &u);
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, pl_los, nullptr, {}, u);
+        quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, pl_copy, nullptr, {}, u);
+        quadriga_lib::path_loss(m_nlos, p_nlos, sp_nlos, fc, tx, rx, pl_nlos, nullptr, {}, u);
         quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, pl_fixed);
 
         int count[4] = {0, 0, 0, 0}, n_bad = 0, n_bad_copy = 0, n_bad_nlos = 0, n_bad_fixed = 0;
@@ -618,9 +618,9 @@ TEST_CASE("path_loss - UMa random hE follows the probability of TR note 1")
             const arma::mat tx = arma::vec{0.0, 0.0, hBS}, rx = arma::vec{d, 0.0, hUT};
             const arma::vec fc = {3.5e9};
             arma::mat a, b, c;
-            quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a, nullptr, nullptr, &u);
-            quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, b, nullptr, nullptr, &u);
-            quadriga_lib::path_loss(m_nlos, p_nlos, sp_nlos, fc, tx, rx, c, nullptr, nullptr, &u);
+            quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a, nullptr, {}, u);
+            quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, b, nullptr, {}, u);
+            quadriga_lib::path_loss(m_nlos, p_nlos, sp_nlos, fc, tx, rx, c, nullptr, {}, u);
             const double los = tr_uma_los(hBS, hUT, d, 3.5, hE);
             const double d3 = std::sqrt(d * d + (hBS - hUT) * (hBS - hUT));
             const double nl = std::max(tr_uma_nlos_prime(hUT, d3, 3.5), los);
@@ -636,8 +636,8 @@ TEST_CASE("path_loss - UMa random hE follows the probability of TR note 1")
         const arma::mat tx = arma::vec{0.0, 0.0, hBS}, rx = arma::mat({{4000.0, 0.0, 20.0}, {10000.0, 0.0, 20.0}}).t();
         const arma::vec fc = {3.5e9}, u0 = {0.0, 0.0}, u1 = {1.0, 1.0};
         arma::mat a, b;
-        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a, nullptr, nullptr, &u0);
-        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, b, nullptr, nullptr, &u1);
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a, nullptr, {}, u0);
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, b, nullptr, {}, u1);
         QD_DIAG("\n# diag: path_loss random hE with u = 1: 4 km %.4f dB (u = 0: %.4f), 10 km %.4f dB (u = 0: %.4f)\n",
                 b(0, 0), a(0, 0), b(1, 0), a(1, 0));
         CHECK(b.is_finite());
@@ -655,9 +655,9 @@ TEST_CASE("path_loss - UMa random hE follows the probability of TR note 1")
         const arma::vec fc = {3.5e9}, u = {0.3, 0.3, 0.99, 0.99};
         arma::mat a, b, c, d;
         quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, a);
-        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, b, nullptr, nullptr, &u);
+        quadriga_lib::path_loss(m_los, p_los, sp_los, fc, tx, rx, b, nullptr, {}, u);
         quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, c);
-        quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, d, nullptr, nullptr, &u);
+        quadriga_lib::path_loss(m_nlos, p_copy, sp_nlos, fc, tx, rx, d, nullptr, {}, u);
         CHECK(arma::approx_equal(a, b, "absdiff", 1e-12));
         CHECK(arma::approx_equal(c, d, "absdiff", 1e-12));
         for (arma::uword l = 0; l < 4; ++l)
@@ -1025,28 +1025,28 @@ TEST_CASE("path_loss - optional outputs and pre-sized outputs")
     const arma::vec d2d_in = {0.0, 10.0, 3.0, 2.0}, u = {0.1, 0.9, 0.6, 0.5};
 
     arma::mat pl0, sf0;
-    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl0, &sf0, &d2d_in, &u);
+    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl0, &sf0, d2d_in, u);
     REQUIRE(pl0.n_rows == 4);
     REQUIRE(pl0.n_cols == 3);
     REQUIRE(sf0.n_rows == 4);
     REQUIRE(sf0.n_cols == 3);
 
     arma::mat pl1;
-    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl1, nullptr, &d2d_in, &u);
+    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl1, nullptr, d2d_in, u);
     CHECK(arma::all(arma::vectorise(pl1 == pl0)));
 
     arma::mat pl2(4, 3, arma::fill::value(-7.0)), sf2(4, 3, arma::fill::value(-7.0));
-    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl2, &sf2, &d2d_in, &u);
+    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl2, &sf2, d2d_in, u);
     CHECK(arma::all(arma::vectorise(pl2 == pl0)));
     CHECK(arma::all(arma::vectorise(sf2 == sf0)));
 
     arma::mat pl3(2, 7, arma::fill::value(-7.0)), sf3(1, 1);
-    quadriga_lib::path_loss(model, plpar, sp, fc, txn, rx, pl3, &sf3, &d2d_in, &u); // repeated Tx columns, wrong sizes
+    quadriga_lib::path_loss(model, plpar, sp, fc, txn, rx, pl3, &sf3, d2d_in, u); // repeated Tx columns, wrong sizes
     CHECK(arma::all(arma::vectorise(pl3 == pl0)));
     CHECK(arma::all(arma::vectorise(sf3 == sf0)));
 
     arma::mat pl4, sf4; // repeated call
-    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl4, &sf4, &d2d_in, &u);
+    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx, pl4, &sf4, d2d_in, u);
     CHECK(arma::all(arma::vectorise(pl4 == pl0)));
     CHECK(arma::all(arma::vectorise(sf4 == sf0)));
 
@@ -1054,7 +1054,7 @@ TEST_CASE("path_loss - optional outputs and pre-sized outputs")
     arma::mat pl5(3, 3, arma::fill::value(1.0)), sf5(3, 3);
     const arma::mat rx0;
     const arma::vec e0;
-    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx0, pl5, &sf5, &e0, &e0);
+    quadriga_lib::path_loss(model, plpar, sp, fc, tx1, rx0, pl5, &sf5, e0, e0);
     CHECK((pl5.n_rows == 0 && pl5.n_cols == 3 && sf5.n_rows == 0 && sf5.n_cols == 3));
     quadriga_lib::path_loss(model, plpar, sp, fc, arma::mat(), rx0, pl5, &sf5);
     CHECK((pl5.n_rows == 0 && pl5.n_cols == 3));
@@ -1105,7 +1105,7 @@ TEST_CASE("path_loss - input validation")
     {
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl));
         arma::mat sf;
-        CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &sf, &d2d_in, &u));
+        CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &sf, d2d_in, u));
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, {}, fc, tx, rx, pl)); // empty scenpar: defaults
         for (const auto &m : full)
             CHECK_NOTHROW(call(m.first, m.second));
@@ -1189,25 +1189,25 @@ TEST_CASE("path_loss - input validation")
     SECTION("d2d_in")
     {
         arma::vec bad = {0.0, -1.0, 2.0};
-        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, bad), std::invalid_argument,
                              Message("Input 'd2d_in' must be finite and >= 0."));
         bad(1) = NAN;
-        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, bad), std::invalid_argument,
                              Message("Input 'd2d_in' must be finite and >= 0."));
         const arma::vec bad2 = {1.0, 2.0};
-        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, &bad2), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, bad2), std::invalid_argument,
                              Message("Number of elements in 'd2d_in' does not match number of columns in 'rx_pos'."));
     }
     SECTION("rnd_he")
     {
         arma::vec bad = {0.0, 1.5, 1.0};
-        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, {}, bad), std::invalid_argument,
                              Message("Input 'rnd_he' must be in the range from 0 to 1."));
         bad(1) = NAN;
-        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, {}, bad), std::invalid_argument,
                              Message("Input 'rnd_he' must be in the range from 0 to 1."));
         const arma::vec bad2 = {0.5, 0.5, 0.5, 0.5};
-        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, nullptr, &bad2), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, nullptr, {}, bad2), std::invalid_argument,
                              Message("Number of elements in 'rnd_he' does not match number of columns in 'rx_pos'."));
     }
     SECTION("fc")

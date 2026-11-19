@@ -2726,16 +2726,16 @@ namespace
         float sub_tol = 3.0f;
         float slab = 0.15f;
         bool refraction = true;
-        const arma::u32_vec *smi = nullptr;
-        const arma::fmat *aabb = nullptr;
+        arma::u32_vec smi;
+        arma::fmat aabb;
 
         // Delegated ray-mesh intersection (all three or none)
-        const arma::u32_vec *ni_in = nullptr;
-        const arma::u32_vec *fi_in = nullptr;
-        const arma::u32_vec *si_in = nullptr;
+        arma::u32_vec ni_in;
+        arma::u32_vec fi_in;
+        arma::u32_vec si_in;
 
         // Delegated subdivision flag
-        const std::vector<bool> *sf_in = nullptr;
+        std::vector<bool> sf_in;
     };
 
     struct Cfg
@@ -2883,12 +2883,12 @@ namespace
         arma::u32_vec n_interact, fbs_ind, sbs_ind;
     };
 
-    Hits intersect(const Cfg &C, const Scene &S, const arma::u32_vec *smi = nullptr)
+    Hits intersect(const Cfg &C, const Scene &S, const arma::u32_vec &smi = arma::u32_vec())
     {
         Hits H;
         quadriga_lib::ray_triangle_intersect<float>(C.orig, C.dest, S.mesh, nullptr, nullptr,
                                                     &H.n_interact, &H.fbs_ind, &H.sbs_ind,
-                                                    smi, nullptr);
+                                                    smi, {});
         return H;
     }
 
@@ -2896,9 +2896,9 @@ namespace
     Opt with_hits(const Opt &base, const Hits &H)
     {
         Opt o = base;
-        o.ni_in = &H.n_interact;
-        o.fi_in = &H.fbs_ind;
-        o.si_in = &H.sbs_ind;
+        o.ni_in = H.n_interact;
+        o.fi_in = H.fbs_ind;
+        o.si_in = H.sbs_ind;
         return o;
     }
 
@@ -2916,7 +2916,7 @@ namespace
     Opt with_flag(const Opt &base, const std::vector<bool> &f)
     {
         Opt o = base;
-        o.sf_in = &f;
+        o.sf_in = f;
         return o;
     }
 
@@ -3159,8 +3159,8 @@ namespace rp
         int n = 0;
         for (int g = 0; g < o.calls; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, o.scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr,
-                                       nullptr, o.max_int, o.max_refl, o.max_trans, 0, o.min_gain, 3.0f, o.slab, o.refr, o.scalar);
+            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, o.scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, {},
+                                       {}, o.max_int, o.max_refl, o.max_trans, 0, o.min_gain, 3.0f, o.slab, o.refr, o.scalar);
             if (orig.n_rows == 0)
                 break;
             n = g + 1;

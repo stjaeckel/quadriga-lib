@@ -83,9 +83,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     plhs[0] = qd_mex_init_gbsm_rays(1, fbs_pos.n_cols, center_freq.n_elem, has_gr, true, rays);
 
     CALL_QD(quadriga_lib::gbsm_rays_from_paths(center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, path_length,
-                                               polmat, rays[0], method, path_type.empty() ? nullptr : &path_type,
-                                               tap.empty() ? nullptr : &tap, gr_eps_re.empty() ? nullptr : &gr_eps_re,
-                                               gr_eps_im.empty() ? nullptr : &gr_eps_im));
+                                               polmat, rays[0], method, path_type,
+                                               tap, gr_eps_re,
+                                               gr_eps_im));
 
     mxSetField(plhs[0], 0, "method", mxCreateString(rays[0].method.c_str()));
 }

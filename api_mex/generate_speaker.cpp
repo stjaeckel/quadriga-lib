@@ -100,7 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          upper_rolloff_slope_dB, sensitivity_dB,
                                                          radiation_type, hor_coverage_deg, ver_coverage_deg,
                                                          horn_control_freq, baffle_width,
-                                                         baffle_height, &center_freq,
+                                                         baffle_height, center_freq,
                                                          angular_resolution_deg));
 
     // Copy to MATLAB

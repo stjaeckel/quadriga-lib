@@ -62,7 +62,7 @@ py::tuple fast_geo2cart(const py::array_t<double> &az,
     auto z_py = qd_python_init_output(az_a.n_elem, &z);
 
     quadriga_lib::fast_geo2cart<double>(az_a, el_a, x, y, z, nullptr, nullptr, nullptr, nullptr,
-                                        have_len ? &len_a : nullptr, use_kernel);
+                                        len_a, use_kernel);
 
     // Outputs in the shape of az; a column-major reshape of a 1D array is a view
     return py::make_tuple(x_py.attr("reshape")(shape, py::arg("order") = "F"),

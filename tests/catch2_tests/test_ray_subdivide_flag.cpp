@@ -214,7 +214,7 @@ namespace
     void intersect(Beams &B, const Scene &S)
     {
         quadriga_lib::ray_triangle_intersect<float>(B.orig, B.dest, S.mesh, nullptr, nullptr,
-                                                    nullptr, &B.fbs_ind, &B.sbs_ind, nullptr, nullptr);
+                                                    nullptr, &B.fbs_ind, &B.sbs_ind, {}, {});
     }
 
     // Deterministic fan of beams that all strike the near face (x = 4) of a cube centred at

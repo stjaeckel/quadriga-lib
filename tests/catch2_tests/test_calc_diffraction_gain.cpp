@@ -301,17 +301,17 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
     arma::mat orig = {{-10.0, 0.0, 0.5}};
     arma::mat dest = {{0.5, 0.0, 0.5}};
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
-                                                &g_em_n, nullptr, nullptr, 0, nullptr, 0, 0, false);
+                                                &g_em_n, nullptr, nullptr, 0, {}, 0, 0, false);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e4, 0,
-                                                &g_sc_n, nullptr, nullptr, 0, nullptr, 0, 0, true);
+                                                &g_sc_n, nullptr, nullptr, 0, {}, 0, 0, true);
 
     // Oblique incidence (~39 deg off normal at the west wall): dest still INSIDE -> single crossing
     orig = {{-10.0, -8.0, 0.5}};
     dest = {{0.5, 0.5, 0.5}};
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
-                                                &g_em_o, nullptr, nullptr, 0, nullptr, 0, 0, false);
+                                                &g_em_o, nullptr, nullptr, 0, {}, 0, 0, false);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e4, 0,
-                                                &g_sc_o, nullptr, nullptr, 0, nullptr, 0, 0, true);
+                                                &g_sc_o, nullptr, nullptr, 0, {}, 0, 0, true);
 
     // Scalar transmission conserves energy on light->dense: gain = att_lin*(1 - |R_TE(theta)|^2),
     // angle-dependent, and equal to EM at normal incidence (TE == TM there).
@@ -376,7 +376,7 @@ TEST_CASE("Calc Diffraction Gain - xprmat identity on clear path")
     arma::vec gain_s;
     arma::mat xpr_s;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e4, 0,
-                                                &gain_s, &xpr_s, nullptr, 0, nullptr, 0, 0, true);
+                                                &gain_s, &xpr_s, nullptr, 0, {}, 0, 0, true);
     CHECK(xpr_s.n_rows == 2);
     CHECK(xpr_s.n_cols == 1);
     CHECK(std::abs(gain_s(0) - 1.0) < 1e-12);
@@ -513,7 +513,7 @@ TEST_CASE("Calc Diffraction Gain - Fabry-Perot thin-slab resolution")
         arma::mat dest = {{10.0, 0.0, 0.0}}; // through both faces, normal incidence
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, slab, mtl_ind, mtl_map, f, 0,
-                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, false, threshold);
+                                                    &gain, nullptr, nullptr, 0, {}, 0, 0, false, threshold);
         return gain(0);
     };
 
@@ -562,7 +562,7 @@ TEST_CASE("Calc Diffraction Gain - Refraction in-medium path length")
     {
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, slab, mtl_ind, mtl_map, f, 0,
-                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
+                                                    &gain, nullptr, nullptr, 0, {}, 0, 0, true, 1.0);
         return gain(0);
     };
 
@@ -618,7 +618,7 @@ TEST_CASE("Calc Diffraction Gain - Multi-material stack")
 
     arma::vec gain;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl_map, f, 0,
-                                                &gain, nullptr, nullptr, 0, nullptr, 0, 0, false, 1.0);
+                                                &gain, nullptr, nullptr, 0, {}, 0, 0, false, 1.0);
 
     // Product of interface transmissions (normal incidence, TE == TM)
     double Ra = std::pow((1.0 - n1) / (1.0 + n1), 2.0); // air -> mat1
@@ -821,9 +821,9 @@ TEST_CASE("Calc Diffraction Gain - FSPL EM mode on clear path")
 
     arma::vec g_rel, g_abs;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                &g_rel, nullptr, nullptr, 0, nullptr, 0, 0, false, 0.0, false, false);
+                                                &g_rel, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, false, false);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                &g_abs, nullptr, nullptr, 0, nullptr, 0, 0, false, 0.0, true, false);
+                                                &g_abs, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, true, false);
 
     CHECK(std::abs(g_rel(0) - 1.0) < 1e-13); // default is unchanged: relative to FSPL
 
@@ -855,9 +855,9 @@ TEST_CASE("Calc Diffraction Gain - FSPL is separable from material loss")
     {
         arma::vec g_rel, g_abs;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, lod,
-                                                    &g_rel, nullptr, nullptr, 0, nullptr, 0, 0, false, 0.0, false, false);
+                                                    &g_rel, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, false, false);
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, lod,
-                                                    &g_abs, nullptr, nullptr, 0, nullptr, 0, 0, false, 0.0, true, false);
+                                                    &g_abs, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, true, false);
 
         CHECK(g_rel(0) > 0.0);
         CHECK(g_rel(0) < 1.0); // material loss is present
@@ -883,7 +883,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL distance scaling and multi-position")
 
     arma::vec gain;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                &gain, nullptr, nullptr, 0, nullptr, 0, 0, false, 0.0, true, false);
+                                                &gain, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, true, false);
 
     REQUIRE(gain.n_elem == 3);
     for (arma::uword i = 0; i < 3; ++i)
@@ -913,7 +913,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
                                                     freq, 0,
-                                                    &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
+                                                    &gain, nullptr, nullptr, 0, {}, 0, 0, true, 0.0, true, false);
         CHECK(std::abs(gain(0) / ref_spreading_gain(freq, dist, true) - 1.0) < 1e-8);
     }
 
@@ -921,7 +921,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     arma::vec g_low;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
                                                 1.0e3, 0,
-                                                &g_low, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
+                                                &g_low, nullptr, nullptr, 0, {}, 0, 0, true, 0.0, true, false);
     CHECK(ref_iso9613_alpha(1.0e3) * dist < 0.1);                   // absorption stays minor
     CHECK(std::abs(g_low(0) / (1.0 / (dist * dist)) - 1.0) < 0.02); // within 2 % of 1/d^2
 
@@ -929,7 +929,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     arma::vec g_high;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
                                                 20.0e3, 0,
-                                                &g_high, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
+                                                &g_high, nullptr, nullptr, 0, {}, 0, 0, true, 0.0, true, false);
     CHECK(g_high(0) < g_low(0));
     // The ratio isolates the absorption difference; both endpoints carry their own alpha
     double extra_dB = -10.0 * std::log10(g_high(0) / g_low(0));
@@ -939,7 +939,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     // Scalar and EM disagree at the same frequency: EM carries the 32.45 + 20*log10(f_GHz) term
     arma::vec g_em;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 20.0e3, 0,
-                                                &g_em, nullptr, nullptr, 0, nullptr, 0, 0, false, 0.0, true, false);
+                                                &g_em, nullptr, nullptr, 0, {}, 0, 0, false, 0.0, true, false);
     CHECK(g_em(0) > g_high(0)); // 20 kHz EM has a huge wavelength -> far less spreading loss
 }
 
@@ -960,7 +960,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase on clear path")
     arma::mat X;
     arma::vec gain;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                &gain, &X, nullptr, 0, nullptr, 0, 0, false, 0.0, false, true);
+                                                &gain, &X, nullptr, 0, {}, 0, 0, false, 0.0, false, true);
 
     REQUIRE(X.n_rows == 8);
     REQUIRE(X.n_cols == 1);
@@ -981,7 +981,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase on clear path")
     arma::mat Xs;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
                                                 1.0e3, 0,
-                                                nullptr, &Xs, nullptr, 0, nullptr, 0, 0, true, 0.0, false, true);
+                                                nullptr, &Xs, nullptr, 0, {}, 0, 0, true, 0.0, false, true);
     REQUIRE(Xs.n_rows == 2);
     CHECK(std::abs(xpr_cx(Xs, 0, 0) - ref_prop_phase(1.0e3, dist, true)) < 1e-9);
 
@@ -1006,7 +1006,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase wraps at one wavelength")
 
     arma::mat X;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                nullptr, &X, nullptr, 0, nullptr, 0, 0, false, 0.0, false, true);
+                                                nullptr, &X, nullptr, 0, {}, 0, 0, false, 0.0, false, true);
 
     REQUIRE(X.n_cols == 2);
     CHECK(std::abs(xpr_cx(X, 0, 0) - xpr_cx(X, 0, 1)) < 1e-9);
@@ -1015,7 +1015,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase wraps at one wavelength")
     arma::mat dest_half = {{-30.0, 0.0, 0.5}, {-30.0 + 0.5 * lambda, 0.0, 0.5}};
     arma::mat Xh;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest_half, cube, mtl_ind, mtl_map, freq, 0,
-                                                nullptr, &Xh, nullptr, 0, nullptr, 0, 0, false, 0.0, false, true);
+                                                nullptr, &Xh, nullptr, 0, {}, 0, 0, false, 0.0, false, true);
     CHECK(std::abs(xpr_cx(Xh, 0, 0) + xpr_cx(Xh, 0, 1)) < 1e-9);
 
     // Same acoustic check, using the speed of sound to form lambda
@@ -1024,7 +1024,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase wraps at one wavelength")
     arma::mat Xa;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest_ac, cube, mtl_ind, mtl_map,
                                                 f_ac, 0,
-                                                nullptr, &Xa, nullptr, 0, nullptr, 0, 0, true, 0.0, false, true);
+                                                nullptr, &Xa, nullptr, 0, {}, 0, 0, true, 0.0, false, true);
     CHECK(std::abs(xpr_cx(Xa, 0, 0) - xpr_cx(Xa, 0, 1)) < 1e-9);
 }
 
@@ -1049,9 +1049,9 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase composes with material phas
 
     arma::mat X0, X1;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                nullptr, &X0, nullptr, 0, nullptr, 0, 0, false, 0.0, false, false);
+                                                nullptr, &X0, nullptr, 0, {}, 0, 0, false, 0.0, false, false);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 0,
-                                                nullptr, &X1, nullptr, 0, nullptr, 0, 0, false, 0.0, false, true);
+                                                nullptr, &X1, nullptr, 0, {}, 0, 0, false, 0.0, false, true);
 
     std::complex<double> ph = ref_prop_phase(freq, dist, false);
     for (arma::uword base : {0u, 2u, 4u, 6u})
@@ -1087,13 +1087,13 @@ TEST_CASE("Calc Diffraction Gain - apply_fspl and apply_phase are independent")
     arma::vec g00, g10, g01, g11;
     arma::mat X00, X10, X01, X11;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 2,
-                                                &g00, &X00, nullptr, 0, nullptr, 0, 0, false, 0.0, false, false);
+                                                &g00, &X00, nullptr, 0, {}, 0, 0, false, 0.0, false, false);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 2,
-                                                &g10, &X10, nullptr, 0, nullptr, 0, 0, false, 0.0, true, false);
+                                                &g10, &X10, nullptr, 0, {}, 0, 0, false, 0.0, true, false);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 2,
-                                                &g01, &X01, nullptr, 0, nullptr, 0, 0, false, 0.0, false, true);
+                                                &g01, &X01, nullptr, 0, {}, 0, 0, false, 0.0, false, true);
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, freq, 2,
-                                                &g11, &X11, nullptr, 0, nullptr, 0, 0, false, 0.0, true, true);
+                                                &g11, &X11, nullptr, 0, {}, 0, 0, false, 0.0, true, true);
 
     // apply_fspl leaves xprmat alone, apply_phase leaves gain alone
     CHECK(arma::approx_equal(X10, X00, "absdiff", 1e-14));
@@ -1127,7 +1127,7 @@ TEST_CASE("Calc Diffraction Gain - Co-located TX and RX is finite")
     arma::vec gain;
     arma::mat X;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 3.5e9, 0,
-                                                &gain, &X, nullptr, 0, nullptr, 0, 0, false, 0.0, true, true);
+                                                &gain, &X, nullptr, 0, {}, 0, 0, false, 0.0, true, true);
 
     CHECK(std::isfinite(gain(0)));
     CHECK(X.col(0).is_finite());
@@ -1208,7 +1208,7 @@ TEST_CASE("Calc Diffraction Gain - Float instantiation with FSPL and phase")
     arma::fvec gain;
     arma::fmat X;
     quadriga_lib::calc_diffraction_gain<float>(orig, dest, cube, mtl_ind, mtl_map, (float)freq, 0,
-                                               &gain, &X, nullptr, 0, nullptr, 0, 0, false, 0.0, true, true);
+                                               &gain, &X, nullptr, 0, {}, 0, 0, false, 0.0, true, true);
 
     CHECK(std::abs(gain(0) / (float)ref_spreading_gain(freq, dist, false) - 1.0f) < 1e-4f);
 

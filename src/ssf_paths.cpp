@@ -61,9 +61,9 @@ void quadriga_lib::ssf_paths(
     arma::vec &path_length,
     arma::cube &polmat,
     const std::string &mobility = "auto",
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
-    const arma::vec *kf_ratio = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
+    const arma::vec &kf_ratio = arma::vec(),
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
     arma::vec *aoa = nullptr,
@@ -105,9 +105,9 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
                              arma::vec &path_length,
                              arma::cube &polmat,
                              const std::string &mobility,
-                             const arma::mat *tx_pos,
-                             const arma::mat *rx_pos,
-                             const arma::vec *kf_ratio,
+                             const arma::mat &tx_pos,
+                             const arma::mat &rx_pos,
+                             const arma::vec &kf_ratio,
                              arma::vec *aod,
                              arma::vec *eod,
                              arma::vec *aoa,
@@ -129,19 +129,19 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         throw std::invalid_argument("Input 'link_gain_dB' must have n_freq elements.");
     if (!link_gain_dB.is_finite())
         throw std::invalid_argument("Input 'link_gain_dB' must be finite.");
-    if (tx_pos != nullptr)
-        qd_xyz(*tx_pos, "tx_pos");
-    if (rx_pos != nullptr)
-        qd_xyz(*rx_pos, "rx_pos");
-    if (kf_ratio != nullptr && kf_ratio->n_elem != n_freq)
+    if (!tx_pos.empty())
+        qd_xyz(tx_pos, "tx_pos");
+    if (!rx_pos.empty())
+        qd_xyz(rx_pos, "rx_pos");
+    if (!kf_ratio.empty() && kf_ratio.n_elem != n_freq)
         throw std::invalid_argument("Input 'kf_ratio' must have n_freq elements.");
-    if (kf_ratio != nullptr && (!kf_ratio->is_finite() || arma::any(*kf_ratio < 0.0)))
+    if (!kf_ratio.empty() && (!kf_ratio.is_finite() || arma::any(kf_ratio < 0.0)))
         throw std::invalid_argument("Input 'kf_ratio' must be finite and >= 0.");
     auto check = [&](const auto *out, const char *name)
     {
         qd_check_alias(out, name, &rays.tx_pos, &rays.rx_pos, &rays.center_freq, &rays.delay, &rays.power, &rays.aod,
                        &rays.eod, &rays.aoa, &rays.eoa, &rays.polmat, &rays.path_type, &rays.tap, &rays.gr_eps_re,
-                       &rays.gr_eps_im, &rays.fbs_pos, &rays.lbs_pos, &rays.fallback, &link_gain_dB, tx_pos, rx_pos, kf_ratio);
+                       &rays.gr_eps_im, &rays.fbs_pos, &rays.lbs_pos, &rays.fallback, &link_gain_dB, &tx_pos, &rx_pos, &kf_ratio);
     };
     check(&polmat, "polmat"), check(path_type, "path_type"), check(ray_ind, "ray_ind");
     const arma::mat *outputs[8] = {&path_gain, &path_length, aod, eod, aoa, eoa, fbs_pos, lbs_pos};
@@ -152,7 +152,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
 
     const bool drift = mobility == "drift" || (mobility == "auto" && rays.method == "quadriga");
     const double *T0 = rays.tx_pos.memptr(), *R0 = rays.rx_pos.memptr();
-    const double *T = (tx_pos != nullptr) ? tx_pos->memptr() : T0, *R = (rx_pos != nullptr) ? rx_pos->memptr() : R0;
+    const double *T = !tx_pos.empty() ? tx_pos.memptr() : T0, *R = !rx_pos.empty() ? rx_pos.memptr() : R0;
     const bool moved = T[0] != T0[0] || T[1] != T0[1] || T[2] != T0[2] || R[0] != R0[0] || R[1] != R0[1] ||
                        R[2] != R0[2]; // exact: the positions of rays reproduce the drop geometry
     const bool gr_new = drift && moved && arma::any(rays.path_type == 1);
@@ -201,7 +201,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         double S_L = 0.0, S_N = 0.0;
         for (arma::uword i = 0; i < n_ray; ++i)
             (rays.path_type(i) == 0 ? S_L : S_N) += (rays.path_type(i) == 1) ? 0.0 : rays.power(i, k);
-        const double r = (kf_ratio != nullptr) ? (*kf_ratio)(k) : 1.0, q = r * S_L + S_N;
+        const double r = !kf_ratio.empty() ? kf_ratio(k) : 1.0, q = r * S_L + S_N;
         if (S_L + S_N > 0.0)
             a_L(k) = (q > 0.0) ? r * (S_L + S_N) / q : 0.0, a_N(k) = (q > 0.0) ? (S_L + S_N) / q : 1.0;
         lin(k) = std::pow(10.0, 0.1 * link_gain_dB(k));

@@ -109,28 +109,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Split objects into connected components ("separate by loose parts")
     const bool split_loose_parts = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "split_loose_parts", false);
 
-    // Wrap optional inputs as nullptr when empty
-    const arma::mat *p_mesh = mesh.is_empty() ? nullptr : &mesh;
-    const arma::uvec *p_obj_ind = obj_ind.is_empty() ? nullptr : &obj_ind;
-    const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
-    const std::vector<std::string> *p_obj_names = obj_names.empty() ? nullptr : &obj_names;
-    const std::vector<std::string> *p_mtl_names = mtl_names.empty() ? nullptr : &mtl_names;
-    const arma::mat *p_vert_list = vert_list.is_empty() ? nullptr : &vert_list;
-    const arma::umat *p_face_ind = face_ind.is_empty() ? nullptr : &face_ind;
-    const arma::mat *p_bsdf = bsdf.is_empty() ? nullptr : &bsdf;
-    const arma::uvec *p_csv_ind = csv_ind.is_empty() ? nullptr : &csv_ind;
-    const std::vector<std::string> *p_csv_names = csv_names.empty() ? nullptr : &csv_names;
-    const std::unordered_map<std::string, std::vector<double>> *p_csv_prop = csv_prop.empty() ? nullptr : &csv_prop;
-
     // Outputs (size determined by the C++ call); face_ind_out only when requested
     arma::mat vert_list_out;
     arma::umat face_ind_out;
     arma::umat *p_face_ind_out = (nlhs > 1) ? &face_ind_out : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::obj_file_write<double>(fn, p_mesh, p_obj_ind, p_mtl_ind, p_obj_names, p_mtl_names,
-                                                 &vert_list_out, p_face_ind_out, p_vert_list, p_face_ind,
-                                                 p_bsdf, threshold, p_csv_ind, p_csv_names, p_csv_prop,
+    CALL_QD(quadriga_lib::obj_file_write<double>(fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                                                 &vert_list_out, p_face_ind_out, vert_list, face_ind,
+                                                 bsdf, threshold, csv_ind, csv_names, csv_prop,
                                                  csv_write_defaults, split_loose_parts));
 
     // Copy to MATLAB (convert face indices back to 1-based)

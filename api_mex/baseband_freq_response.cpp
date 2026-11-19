@@ -202,7 +202,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(coeff_re, coeff_im, delay,
                                                                  pilot_grid, bw, &hmat_re_v, p_hmat_im_v, nullptr,
-                                                                 i_snap.is_empty() ? nullptr : &i_snap, use_kernel));
+                                                                 i_snap, use_kernel));
     }
     else if (n_slab == 1) // Single-frequency backend
     {

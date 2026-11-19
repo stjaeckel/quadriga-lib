@@ -123,8 +123,8 @@ py::tuple gbsm_single_link_channel(const py::dict &tx_array,
     // The result is returned by value and copied
     const auto chan = quadriga_lib::gbsm_single_link_channel(
         tx_array_a, rx_array_a, rays_a, link_gain_dB_a, mobility, output, i_freq,
-        &tx_pos_a, &rx_pos_a, &tx_orientation_a, &rx_orientation_a, // None or empty = omitted
-        kf_ratio.is_none() ? nullptr : &kf_ratio_a, oxygen_b, use_absolute_delays_b);
+        tx_pos_a, rx_pos_a, tx_orientation_a, rx_orientation_a, // None or empty = omitted
+        kf_ratio_a, oxygen_b, use_absolute_delays_b);
 
     py::dict par;
     for (size_t k = 0; k < chan.par_names.size(); ++k)

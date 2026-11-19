@@ -108,7 +108,7 @@ py::dict generate_speaker(const std::string &driver_type,
         driver_type, radius, lower_cutoff, upper_cutoff,
         lower_rolloff_slope_dB, upper_rolloff_slope_dB, sensitivity_dB,
         radiation_type, hor_coverage_deg, ver_coverage_deg, horn_control_freq,
-        baffle_width, baffle_height, &freq_vec, angular_resolution_deg);
+        baffle_width, baffle_height, freq_vec, angular_resolution_deg);
 
     return qd_python_arrayant2dict_multi(speaker);
 }

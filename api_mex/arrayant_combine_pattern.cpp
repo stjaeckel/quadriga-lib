@@ -68,7 +68,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant_in"); // Validated by the C++ function
         std::vector<quadriga_lib::arrayant<double>> out;
-        CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, &az, &el, &freq_new, propagation_speed));
+        CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, az, el, freq_new, propagation_speed));
         plhs[0] = (out.size() == 1) ? qd_mex_arrayant2struct(out[0]) : qd_mex_arrayant2struct_multi(out);
         return;
     }
@@ -78,6 +78,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant.center_freq = freq_new[0];
 
     quadriga_lib::arrayant<double> arrayant_out;
-    CALL_QD(arrayant_out = quadriga_lib::arrayant_combine_pattern(ant, &az, &el, propagation_speed));
+    CALL_QD(arrayant_out = quadriga_lib::arrayant_combine_pattern(ant, az, el, propagation_speed));
     plhs[0] = qd_mex_arrayant2struct(arrayant_out);
 }

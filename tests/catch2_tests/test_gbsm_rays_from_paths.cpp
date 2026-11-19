@@ -83,8 +83,8 @@ namespace
     void run(const in_t &in, quadriga_lib::gbsm_rays &out)
     {
         quadriga_lib::gbsm_rays_from_paths(in.cf, in.T, in.R, in.fbs, in.lbs, in.pg, in.pl, in.M, out, in.method,
-                                           in.has_type ? &in.type : nullptr, in.has_tap ? &in.tap : nullptr,
-                                           in.has_eps ? &in.er : nullptr, in.has_eps ? &in.ei : nullptr);
+                                           in.has_type ? in.type : arma::u32_vec(), in.has_tap ? in.tap : arma::u32_vec(),
+                                           in.has_eps ? in.er : arma::vec(), in.has_eps ? in.ei : arma::vec());
     }
 
     // Angle between the directions (az1, el1) and (az2, el2) in [rad]
@@ -316,14 +316,14 @@ TEST_CASE("gbsm_rays_from_paths - n_interact of qrt_file_read passes as path_typ
     std::remove(fn.c_str());
 
     quadriga_lib::gbsm_rays o;
-    quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &n_interact);
+    quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", n_interact);
     CHECK(o.is_valid().empty());
     CHECK(arma::all(o.path_type == r.path_type));
     CHECK(arma::accu(o.path_type == 1) == 1);
 
     // Ray-traced files count the interactions: a path with 3 throws
     n_interact(n_interact.n_elem - 1) = 3;
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &n_interact),
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", n_interact),
                          std::invalid_argument,
                          Message("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS)."));
 }
@@ -492,7 +492,7 @@ TEST_CASE("gbsm_rays_from_paths - input validation")
     }
     SECTION("permittivity")
     {
-        fails([](in_t &in) { in.ei.reset(); }, "Inputs 'gr_eps_re' and 'gr_eps_im' must have n_freq elements.");
+        fails([](in_t &in) { in.ei.reset(); }, "Inputs 'gr_eps_re' and 'gr_eps_im' must both be given or both be omitted.");
         fails([](in_t &in) { in.er.resize(3), in.ei.resize(3); },
               "Inputs 'gr_eps_re' and 'gr_eps_im' must have n_freq elements.");
         fails([](in_t &in) { in.er(1) = 0.9; }, "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
@@ -504,10 +504,10 @@ TEST_CASE("gbsm_rays_from_paths - input validation")
         quadriga_lib::gbsm_rays out;
         const std::string msg = "Inputs 'gr_eps_re' and 'gr_eps_im' must both be given or both be omitted.";
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(in.cf, in.T, in.R, in.fbs, in.lbs, in.pg, in.pl, in.M,
-                                                                out, in.method, &in.type, &in.tap, &in.er),
+                                                                out, in.method, in.type, in.tap, in.er),
                              std::invalid_argument, Message(msg));
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(in.cf, in.T, in.R, in.fbs, in.lbs, in.pg, in.pl, in.M,
-                                                                out, in.method, &in.type, &in.tap, nullptr, &in.ei),
+                                                                out, in.method, in.type, in.tap, {}, in.ei),
                              std::invalid_argument, Message(msg));
     }
     SECTION("outputs untouched on error")
@@ -529,7 +529,7 @@ TEST_CASE("gbsm_rays_from_paths - outputs that alias inputs")
     quadriga_lib::gbsm_rays o = r;
     CHECK_NOTHROW(run(in, o));
     auto call = [&](const arma::vec &cf, const arma::mat &pg, const arma::vec &pl, const arma::u32_vec &type)
-    { quadriga_lib::gbsm_rays_from_paths(cf, in.T, in.R, in.fbs, in.lbs, pg, pl, in.M, o, "quadriga", &type); };
+    { quadriga_lib::gbsm_rays_from_paths(cf, in.T, in.R, in.fbs, in.lbs, pg, pl, in.M, o, "quadriga", type); };
 
     CHECK_THROWS_AS(call(o.center_freq, in.pg, in.pl, in.type), std::invalid_argument); // center_freq is 'rays.center_freq'
     o = r;

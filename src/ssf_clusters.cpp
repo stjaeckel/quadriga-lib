@@ -402,14 +402,14 @@ void quadriga_lib::ssf_clusters(
     arma::cube &aoa,
     arma::cube &eoa,
     const std::string &method = "38.901",
-    const arma::cube *rnd_freq = nullptr,
-    const arma::cube *lsp_anchor = nullptr,
-    const arma::mat *eod_offset_deg = nullptr,
-    const arma::vec *abs_toa = nullptr,
-    const arma::mat *gr_eps_re = nullptr,
-    const arma::mat *gr_eps_im = nullptr,
-    const std::vector<bool> *o2i = nullptr,
-    const arma::u32_vec *n_cluster = nullptr,
+    const arma::cube &rnd_freq = arma::cube(),
+    const arma::cube &lsp_anchor = arma::cube(),
+    const arma::mat &eod_offset_deg = arma::mat(),
+    const arma::vec &abs_toa = arma::vec(),
+    const arma::mat &gr_eps_re = arma::mat(),
+    const arma::mat &gr_eps_im = arma::mat(),
+    const std::vector<bool> &o2i = std::vector<bool>(),
+    const arma::u32_vec &n_cluster = arma::u32_vec(),
     arma::u32_vec *n_active = nullptr);
 ```
 
@@ -464,14 +464,14 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                                 arma::cube &aoa,
                                 arma::cube &eoa,
                                 const std::string &method,
-                                const arma::cube *rnd_freq,
-                                const arma::cube *lsp_anchor,
-                                const arma::mat *eod_offset_deg,
-                                const arma::vec *abs_toa,
-                                const arma::mat *gr_eps_re,
-                                const arma::mat *gr_eps_im,
-                                const std::vector<bool> *o2i,
-                                const arma::u32_vec *n_cluster,
+                                const arma::cube &rnd_freq,
+                                const arma::cube &lsp_anchor,
+                                const arma::mat &eod_offset_deg,
+                                const arma::vec &abs_toa,
+                                const arma::mat &gr_eps_re,
+                                const arma::mat &gr_eps_im,
+                                const std::vector<bool> &o2i,
+                                const arma::u32_vec &n_cluster,
                                 arma::u32_vec *n_active)
 {
     // Validation, before any output is touched
@@ -515,76 +515,64 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
 
     if ((m_tr || m_mf) && N > 0)
     {
-        if (rnd_freq == nullptr)
+        if (rnd_freq.empty() && n_link > 0)
             throw std::invalid_argument("Input 'rnd_freq' is required for method '" + method + "'.");
-        if (rnd_freq->n_rows != n_link || rnd_freq->n_cols != N || rnd_freq->n_slices != F)
+        if (!rnd_freq.empty() && (rnd_freq.n_rows != n_link || rnd_freq.n_cols != N || rnd_freq.n_slices != F))
             throw std::invalid_argument("Input 'rnd_freq' must have size [n_link, " + std::to_string(N) +
                                         ", n_freq].");
-        if (!rnd_freq->is_finite())
+        if (!rnd_freq.is_finite())
             throw std::invalid_argument("Input 'rnd_freq' must be finite.");
     }
     if (m_mf && N > 0)
     {
-        if (lsp_anchor == nullptr)
+        if (lsp_anchor.empty() && n_link > 0)
             throw std::invalid_argument("Input 'lsp_anchor' is required for method '38.901_MF'.");
-        if (lsp_anchor->n_rows != n_link || lsp_anchor->n_cols != 1 || lsp_anchor->n_slices != 8)
+        if (!lsp_anchor.empty() && (lsp_anchor.n_rows != n_link || lsp_anchor.n_cols != 1 || lsp_anchor.n_slices != 8))
             throw std::invalid_argument("Input 'lsp_anchor' must have size [n_link, 1, 8].");
-        if (!lsp_anchor->is_finite())
+        if (!lsp_anchor.is_finite())
             throw std::invalid_argument("Input 'lsp_anchor' must be finite.");
-        spreads_positive(*lsp_anchor, "Delay and angular spreads in 'lsp_anchor' must be > 0.");
+        spreads_positive(lsp_anchor, "Delay and angular spreads in 'lsp_anchor' must be > 0.");
     }
-    if ((m_tr || m_qd) && eod_offset_deg != nullptr)
+    if ((m_tr || m_qd) && !eod_offset_deg.empty())
     {
-        if (eod_offset_deg->n_rows != n_link || eod_offset_deg->n_cols != F)
+        if (eod_offset_deg.n_rows != n_link || eod_offset_deg.n_cols != F)
             throw std::invalid_argument("Input 'eod_offset_deg' must have size [n_link, n_freq].");
-        if (!eod_offset_deg->is_finite())
+        if (!eod_offset_deg.is_finite())
             throw std::invalid_argument("Input 'eod_offset_deg' must be finite.");
     }
-    if (abs_toa != nullptr)
+    if (!abs_toa.empty())
     {
-        if (abs_toa->n_elem != n_link)
+        if (abs_toa.n_elem != n_link)
             throw std::invalid_argument("Number of elements in 'abs_toa' does not match number of columns in "
                                         "'rx_pos'.");
-        if (!abs_toa->is_finite() || arma::any(*abs_toa < 0.0))
+        if (!abs_toa.is_finite() || arma::any(abs_toa < 0.0))
             throw std::invalid_argument("Input 'abs_toa' must be finite and >= 0.");
     }
     // "quadriga" places the first NLOS cluster at the absolute TOA; without it the start of the NLOS delays is
     // arbitrary and can come close to the LOS delay
     const bool los = sp.at("KF_mu") > -30.0, toa_def = sp.at("absTOA_mu") > -30.0;
-    if (m_qd && !los && toa_def && N > 0 && abs_toa == nullptr)
+    if (m_qd && !los && toa_def && N > 0 && n_link > 0 && abs_toa.empty())
         throw std::invalid_argument(
             "Method 'quadriga' requires 'abs_toa' in NLOS scenarios that define the absolute TOA ('absTOA_mu' > -30): "
             "the NLOS clusters start at the excess delay of TR 38.901 clause 7.6.9.");
     if (G)
-    {
-        if (gr_eps_re == nullptr || gr_eps_im == nullptr)
-            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' are required when 'GR_enabled' is set.");
-        if (gr_eps_re->n_rows != n_link || gr_eps_re->n_cols != F || gr_eps_im->n_rows != n_link ||
-            gr_eps_im->n_cols != F)
-            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must have size [n_link, n_freq].");
-        if (!gr_eps_re->is_finite() || !gr_eps_im->is_finite())
-            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must be finite.");
-        if (arma::any(arma::vectorise(*gr_eps_re) < 1.0) || arma::any(arma::vectorise(*gr_eps_im) < 0.0))
-            throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
-        if (n_link > 0 && (arma::any(rx.row(2) < 0.0) || arma::any(tx.row(2) < 0.0)))
-            throw std::invalid_argument("Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
-    }
-    if (m_tr && o2i != nullptr && o2i->size() != n_link)
+        qd_gbsm_check_gr(gr_eps_re, gr_eps_im, n_link, F, tx, rx);
+    if (m_tr && !o2i.empty() && o2i.size() != n_link)
         throw std::invalid_argument("Number of elements in 'o2i' does not match number of columns in 'rx_pos'.");
-    if (n_cluster != nullptr)
+    if (!n_cluster.empty())
     {
-        if (n_cluster->n_elem != n_link)
+        if (n_cluster.n_elem != n_link)
             throw std::invalid_argument("Number of elements in 'n_cluster' does not match number of columns in "
                                         "'rx_pos'.");
         const double n_min = sp.at("NumClusters_min");
         const arma::uword N_lo = std::min(n_min > 2.0 ? (arma::uword)n_min - 1 : (arma::uword)1, N);
-        if (arma::any(*n_cluster < (unsigned)N_lo) || arma::any(*n_cluster > (unsigned)N))
+        if (arma::any(n_cluster < (unsigned)N_lo) || arma::any(n_cluster > (unsigned)N))
             throw std::invalid_argument("Entries of 'n_cluster' must be in [" + std::to_string(N_lo) + ", " +
                                         std::to_string(N) + "].");
     }
     qd_check_alias_list({&delay, &power, &aod, &eod, &aoa, &eoa}, {"delay", "power", "aod", "eod", "aoa", "eoa"},
-                        &tx_pos, &rx_pos, &lsp, &rnd, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im);
-    qd_check_alias(n_active, "n_active", n_cluster);
+                        &tx_pos, &rx_pos, &lsp, &rnd, &rnd_freq, &lsp_anchor, &eod_offset_deg, &abs_toa, &gr_eps_re, &gr_eps_im);
+    qd_check_alias(n_active, "n_active", &n_cluster);
 
     // Outputs
     const arma::uword n_slot = 1 + (G ? 1 : 0) + N, n_fd = m_mf ? F : 1;
@@ -607,7 +595,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     auto one_link = [&](arma::uword l)
     {
         const arma::uword t = tx_single ? 0 : l;
-        const arma::uword N_l = n_cluster != nullptr ? (*n_cluster)(l) : N;
+        const arma::uword N_l = !n_cluster.empty() ? n_cluster(l) : N;
 
         // LOS geometry; the angles of slot 0 and of the inactive slots
         const double vx = rx(0, l) - tx(0, t), vy = rx(1, l) - tx(1, t);
@@ -633,7 +621,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             const double ct = -(ht + hr) / d_gr1, s2 = (d2D / d_gr1) * (d2D / d_gr1);
             for (arma::uword k = 0; k < F; ++k)
             {
-                const std::complex<double> eps((*gr_eps_re)(l, k), -(*gr_eps_im)(l, k));
+                const std::complex<double> eps(gr_eps_re(l, k), -gr_eps_im(l, k));
                 const std::complex<double> q = std::sqrt(eps - s2), a = eps * ct, d_par = a - q, d_per = ct - q;
                 const std::complex<double> R_par = (d_par == 0.0) ? 0.0 : (a + q) / d_par;
                 const std::complex<double> R_per = (d_per == 0.0) ? 0.0 : (ct + q) / d_per;
@@ -651,7 +639,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                 x[c] = rnd(l, c);
             for (arma::uword k = 0; k < F && !m_qd; ++k)
                 for (arma::uword n = 0; n < N; ++n)
-                    z[k * N + n] = (*rnd_freq)(l, n, k);
+                    z[k * N + n] = rnd_freq(l, n, k);
             if (m_tr || m_mf) // LOS direction {AOD, AOA, ZOD, ZOA} in [deg]
                 for (arma::uword a = 0; a < 4; ++a)
                     centre[a] = (a < 2) ? los_ang[a] * r2d : 90.0 - los_ang[a] * r2d;
@@ -660,8 +648,8 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                 const double as[4] = {lsp(l, 0, 3), lsp(l, 0, 4), lsp(l, 0, 5), lsp(l, 0, 6)};
                 if (!los)
                 {
-                    centre[2] -= (eod_offset_deg != nullptr) ? (*eod_offset_deg)(l, 0) : 0.0; // mu_offset,ZOD
-                    centre[3] = (o2i != nullptr && (*o2i)[l]) ? 90.0 : centre[3];
+                    centre[2] -= !eod_offset_deg.empty() ? eod_offset_deg(l, 0) : 0.0; // mu_offset,ZOD
+                    centre[3] = (!o2i.empty() && o2i[l]) ? 90.0 : centre[3];
                 }
                 qd_ssf_tr(x.data(), z.data(), N, N_l, los, r_tau, zeta, lsp(l, 0, 0), los ? lsp(l, 0, 1) : 0.0, as,
                           centre, c_delay.data(), c_power.data(), c_ang.data());
@@ -673,7 +661,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                 std::vector<double> spk(5 * F), kf(F);
                 for (arma::uword i = 0; i < 5; ++i)
                 {
-                    sp0[i] = (*lsp_anchor)(l, 0, si[i]);
+                    sp0[i] = lsp_anchor(l, 0, si[i]);
                     for (arma::uword k = 0; k < F; ++k)
                         spk[5 * k + i] = lsp(l, k, si[i]);
                 }
@@ -693,7 +681,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                     for (arma::uword i = 1; i < 5; ++i)
                         spk[5 * k + i] = lsp(l, k, 2 + i) / r2d;
                     kf[k] = los ? lsp(l, k, 1) : 0.0;
-                    delta += (!los && eod_offset_deg != nullptr) ? (*eod_offset_deg)(l, k) / r2d / (double)F : 0.0;
+                    delta += (!los && !eod_offset_deg.empty()) ? eod_offset_deg(l, k) / r2d / (double)F : 0.0;
                 }
                 qd_ssf_quadriga(x.data(), N, N_l, F, los, r_tau, spk.data(), kf.data(), los_ang, G, tau_gr, e_gr,
                                 R2.data(), delta, c_delay.data(), c_power.data(), c_ang.data());
@@ -701,9 +689,9 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
 
             // Absolute TOA in NLOS scenarios (TR 38.901 eq. (7.6-43)): the TR methods add it; "quadriga" moves the
             // first NLOS cluster to it (scenarios without absolute TOA: only where the input is > 0)
-            if (!los && abs_toa != nullptr)
+            if (!los && !abs_toa.empty())
             {
-                const double toa = (*abs_toa)(l);
+                const double toa = abs_toa(l);
                 const double t0 = m_qd ? *std::min_element(c_delay.begin(), c_delay.end()) : 0.0;
                 if (!m_qd || toa_def || toa > 0.0)
                     for (double &d : c_delay)

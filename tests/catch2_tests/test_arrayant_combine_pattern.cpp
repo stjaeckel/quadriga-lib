@@ -166,13 +166,13 @@ TEST_CASE("Arrayant combine pattern - Propagation speed")
 
     // Speed of sound
     const double c = 344.0, expected = 2.0 * std::abs(std::cos(arma::datum::pi * 1000.0 * 0.2 / c));
-    auto ac = quadriga_lib::arrayant_combine_pattern<double>(ant, nullptr, nullptr, c);
+    auto ac = quadriga_lib::arrayant_combine_pattern<double>(ant, {}, {}, c);
     CHECK(std::abs(amp(ac, ie, ia0) - 2.0) < 1e-6);
     CHECK(std::abs(amp(ac, ie, ia90) - expected) < 1e-6);
     CHECK(std::abs(expected - 0.506) < 1e-3);
 
     // Explicit speed of light equals the default
-    auto em2 = quadriga_lib::arrayant_combine_pattern<double>(ant, nullptr, nullptr, 299792458.0);
+    auto em2 = quadriga_lib::arrayant_combine_pattern<double>(ant, {}, {}, 299792458.0);
     CHECK(arma::approx_equal(em.e_theta_re, em2.e_theta_re, "absdiff", 0.0));
     CHECK(arma::approx_equal(em.e_theta_im, em2.e_theta_im, "absdiff", 0.0));
 
@@ -183,10 +183,10 @@ TEST_CASE("Arrayant combine pattern - Propagation speed")
     antf.coupling_re = arma::fmat(2, 1, arma::fill::ones);
     antf.coupling_im = arma::fmat(2, 1, arma::fill::zeros);
     antf.center_freq = 1000.0f;
-    auto acf = quadriga_lib::arrayant_combine_pattern<float>(antf, nullptr, nullptr, 344.0f);
+    auto acf = quadriga_lib::arrayant_combine_pattern<float>(antf, {}, {}, 344.0f);
     CHECK(std::abs(std::hypot(acf.e_theta_re(ie, ia90, 0), acf.e_theta_im(ie, ia90, 0)) - expected) < 1e-4);
 
     // Invalid speeds
     for (double v : {0.0, -344.0, arma::datum::nan, arma::datum::inf})
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern<double>(ant, nullptr, nullptr, v), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern<double>(ant, {}, {}, v), std::invalid_argument);
 }

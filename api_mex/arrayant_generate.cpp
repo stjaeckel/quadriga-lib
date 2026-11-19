@@ -190,7 +190,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs > 15) // Use custom pattern
         {
             auto custom_array = qd_mex_struct2arrayant(prhs[15], true, false, "pattern");
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array));
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array));
         }
         else if (pol == 2 || pol == 5 || pol == 3 || pol == 6) // Build dual-polarized base pattern and pass to ULA
         {
@@ -203,13 +203,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             {
                 CALL_QD(custom_array = quadriga_lib::generate_arrayant_omni(res));
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
             }
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array));
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array));
         }
         else // Use isotropic
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, nullptr, res));
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, {}, res));
         arrayant.name = "ula";
     }
     else if (array_type == "3GPP" || array_type == "3gpp")
@@ -219,7 +219,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs > 15) // Use custom pattern
         {
             auto custom_array = qd_mex_struct2arrayant(prhs[15], true, false, "pattern");
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, custom_array));
         }
         else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
         {
@@ -227,18 +227,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             if (pol == 2 || pol == 5)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, &el_1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, el_1);
             }
             else if (pol == 3 || pol == 6)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
             }
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, custom_array));
         }
         else // Use 3GPP default pattern
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res));
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, {}, res));
     }
     else if (array_type == "multibeam" || array_type == "multibeam_sep")
     {

@@ -38,7 +38,7 @@ Thread a polarization transfer (Jones) matrix along a ray path
 ```
 void polmat_update(
     arma::Mat<dtype> &polmat,
-    const arma::Mat<dtype> *update = nullptr,
+    const arma::Mat<dtype> &update = arma::Mat<dtype>(),
     arma::Col<dtype> *gain = nullptr,
     bool initialize = false,
     bool normalize = false,
@@ -54,7 +54,7 @@ void polmat_update(
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
-  broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
+  broadcasts one matrix to every update; empty applies the identity (no multiply).
 - **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
   - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
     normalization. With `normalize == false` this measures the gain without modifying the matrix
@@ -70,7 +70,8 @@ void polmat_update(
   Untouched columns of `polmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
 - **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `polmat`.
-  Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
+  Length `n_rayU`. Default (`nullptr`) is the identity map, which requires `n_ray == n_rayU`; an empty
+  `ray_ind` means zero updates (`n_rayU = 0`), which is why it stays a pointer. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
   so the result is the same as a single-threaded run for any thread count. With duplicates the call
@@ -84,27 +85,27 @@ initialize -> update -> normalize -> apply_gain. Argument order is
 arma::Mat<dtype> polmat;                            // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 
 // (1) Initialization
-polmat_update(polmat, &U0);                         // empty polmat: sized from U0, seeded, polmat := U0
-polmat_update(polmat, nullptr, nullptr, true);      // pre-sized polmat: reset every column to unity
-polmat_update(polmat, &U0, nullptr, true);          // pre-sized polmat: copy-through, polmat := U0 (ignores old)
+polmat_update(polmat, U0);                          // empty polmat: sized from U0, seeded, polmat := U0
+polmat_update(polmat, {}, nullptr, true);           // pre-sized polmat: reset every column to unity
+polmat_update(polmat, U0, nullptr, true);           // pre-sized polmat: copy-through, polmat := U0 (ignores old)
 
 // (2) Updating (accumulate onto existing state)
-polmat_update(polmat, &U);                          // polmat := U * polmat
-polmat_update(polmat, &Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
+polmat_update(polmat, U);                           // polmat := U * polmat
+polmat_update(polmat, Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
 
 // (3) Gain extraction (measure, leave the matrix part untouched)
 arma::Col<dtype> g;
-polmat_update(polmat, nullptr, &g);                 // g[k] = gain( polmat[:,k] )
-polmat_update(polmat, &U, &g);                      // apply U, then measure into g (no normalize)
+polmat_update(polmat, {}, &g);                      // g[k] = gain( polmat[:,k] )
+polmat_update(polmat, U, &g);                       // apply U, then measure into g (no normalize)
 
 // (4) Normalizing (scale each column to unit gain; optionally update first)
-polmat_update(polmat, nullptr, nullptr, false, true); // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
-polmat_update(polmat, &U, nullptr, false, true);    // update, then normalize, one pass
+polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, U, nullptr, false, true);     // update, then normalize, one pass
 
 // (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
 //     'g' is read here (apply_gain = true):
-polmat_update(polmat, nullptr, &g, false, true, true); // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
-polmat_update(polmat, &U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
+polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
 ```
 
 ## Storage layout (column-major, interleaved complex):
@@ -317,25 +318,25 @@ static bool has_duplicate_index(const arma::uword *idx, arma::uword n, arma::uwo
 
 template <typename dtype>
 void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
-                                 const arma::Mat<dtype> *update,
+                                 const arma::Mat<dtype> &update,
                                  arma::Col<dtype> *gain,
                                  bool initialize,
                                  bool normalize,
                                  bool apply_gain,
                                  const arma::uvec *ray_ind)
 {
-    qd_check_alias(&polmat, "polmat", update);
-    qd_check_alias(gain, "gain", &polmat, update);
+    qd_check_alias(&polmat, "polmat", &update);
+    qd_check_alias(gain, "gain", &polmat, &update);
 
     const bool have_state = !polmat.is_empty();
-    const bool have_update = (update != nullptr) && !update->is_empty();
+    const bool have_update = !update.is_empty();
 
     // Infer mode (EM = 8 rows, scalar = 2) from whichever operand is present.
     arma::uword nXPR = 0;
     if (have_state)
         nXPR = polmat.n_rows;
     else if (have_update)
-        nXPR = update->n_rows;
+        nXPR = update.n_rows;
     else
         throw std::invalid_argument("At least one of 'polmat' or 'update' must be non-empty to infer the mode.");
 
@@ -347,9 +348,9 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
     bool broadcast = false;
     if (have_update)
     {
-        if (update->n_rows != nXPR)
+        if (update.n_rows != nXPR)
             throw std::invalid_argument("'update' row count must match 'polmat' (2 or 8).");
-        broadcast = (update->n_cols == 1);
+        broadcast = (update.n_cols == 1);
     }
 
     // Resolve the two index-space sizes: n_ray (columns of the global 'polmat') and n_rayU (the
@@ -365,7 +366,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
         n_ray = polmat.n_cols;
         n_rayU = ray_ind->n_elem;
 
-        if (have_update && !broadcast && update->n_cols != n_rayU)
+        if (have_update && !broadcast && update.n_cols != n_rayU)
             throw std::invalid_argument("'update' must have 'ray_ind' columns (or 1 to broadcast).");
 
         if (n_rayU > 0 && ray_ind->max() >= n_ray) // guard: max() on an empty uvec is undefined
@@ -376,7 +377,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
         // 1:1 mapping onto the existing buffer.
         n_ray = polmat.n_cols;
         n_rayU = n_ray;
-        if (have_update && !broadcast && update->n_cols != n_ray)
+        if (have_update && !broadcast && update.n_cols != n_ray)
             throw std::invalid_argument("'update' must have 'polmat' columns (or 1 to broadcast).");
     }
     else
@@ -386,7 +387,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
             throw std::invalid_argument("Cannot size an empty 'polmat' without a per-column 'update'; pre-size it to use 'initialize' on its own.");
         if (broadcast)
             throw std::invalid_argument("Cannot infer ray count from a broadcast 'update' with an empty 'polmat'.");
-        n_ray = update->n_cols;
+        n_ray = update.n_cols;
         n_rayU = n_ray;
     }
 
@@ -416,7 +417,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
     const bool seed = initialize || !have_state;
 
     dtype *p_xpr = polmat.memptr();
-    const dtype *p_upd = have_update ? update->memptr() : nullptr;
+    const dtype *p_upd = have_update ? update.memptr() : nullptr;
     const arma::uword *p_idx = ray_ind ? ray_ind->memptr() : nullptr;
     dtype *p_gain = (gain != nullptr) ? gain->memptr() : nullptr;
 
@@ -481,10 +482,10 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
     }
 }
 
-template void quadriga_lib::polmat_update(arma::Mat<float> &polmat, const arma::Mat<float> *update,
+template void quadriga_lib::polmat_update(arma::Mat<float> &polmat, const arma::Mat<float> &update,
                                           arma::Col<float> *gain, bool initialize, bool normalize,
                                           bool apply_gain, const arma::uvec *ray_ind);
 
-template void quadriga_lib::polmat_update(arma::Mat<double> &polmat, const arma::Mat<double> *update,
+template void quadriga_lib::polmat_update(arma::Mat<double> &polmat, const arma::Mat<double> &update,
                                           arma::Col<double> *gain, bool initialize, bool normalize,
                                           bool apply_gain, const arma::uvec *ray_ind);

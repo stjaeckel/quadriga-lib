@@ -72,10 +72,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nx != 0 && n_gen != 0)
         plhs[0] = qd_mex_init_output(&map, ny, nx, nz, n_gen);
 
-    // Wrap optional pointers
-    const arma::vec *p_y = y.empty() ? nullptr : &y;
-    const arma::vec *p_z = z.empty() ? nullptr : &z;
-
     // Call library function
-    CALL_QD(quadriga_lib::sos_map<double>(spatial_freq, phase, x, map, p_y, p_z, uniform, use_kernel));
+    CALL_QD(quadriga_lib::sos_map<double>(spatial_freq, phase, x, map, y, z, uniform, use_kernel));
 }

@@ -21,11 +21,11 @@
 #include <string>
 #include <vector>
 
-// Checks the shapes of the angles and of the optional inputs of the interpolation functions (nullptr or empty
+// Checks the shapes of the angles and of the optional inputs of the interpolation functions (empty
 // optional inputs pass); n_out and n_ang as in arrayant_interpolate
 template <typename dtype>
 static inline void qd_check_interpolation_inputs(const arma::Mat<dtype> &azimuth, const arma::Mat<dtype> &elevation,
-                                                 const arma::Cube<dtype> *orientation, const arma::Mat<dtype> *element_pos,
+                                                 const arma::Cube<dtype> &orientation, const arma::Mat<dtype> &element_pos,
                                                  arma::uword n_out)
 {
     const arma::uword n_ang = azimuth.n_cols;
@@ -35,11 +35,11 @@ static inline void qd_check_interpolation_inputs(const arma::Mat<dtype> &azimuth
         throw std::invalid_argument("Input 'azimuth' must have 1 or n_out rows.");
     if (elevation.n_rows != azimuth.n_rows || elevation.n_cols != n_ang)
         throw std::invalid_argument("Input 'elevation' must have the same size as 'azimuth'.");
-    if (orientation != nullptr && orientation->n_elem != 0 &&
-        (orientation->n_rows != 3 || (orientation->n_cols != 1 && orientation->n_cols != n_out) ||
-         (orientation->n_slices != 1 && orientation->n_slices != n_ang)))
+    if (orientation.n_elem != 0 &&
+        (orientation.n_rows != 3 || (orientation.n_cols != 1 && orientation.n_cols != n_out) ||
+         (orientation.n_slices != 1 && orientation.n_slices != n_ang)))
         throw std::invalid_argument("Input 'orientation' must have size [3, 1, 1], [3, n_out, 1], [3, 1, n_ang] or [3, n_out, n_ang].");
-    if (element_pos != nullptr && element_pos->n_elem != 0 && (element_pos->n_rows != 3 || element_pos->n_cols != n_out))
+    if (element_pos.n_elem != 0 && (element_pos.n_rows != 3 || element_pos.n_cols != n_out))
         throw std::invalid_argument("Input 'element_pos' must have size [3, n_out].");
 }
 
@@ -62,7 +62,7 @@ void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant,
         throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
     if (orientation.n_elem == 0 || element_pos.n_elem == 0)
         throw std::invalid_argument("Inputs 'orientation' and 'element_pos' cannot be empty.");
-    qd_check_interpolation_inputs(azimuth, elevation, &orientation, &element_pos, n_out);
+    qd_check_interpolation_inputs(azimuth, elevation, orientation, element_pos, n_out);
     for (const arma::Mat<dtype> *out : {V ? nullptr : &V_re, V ? nullptr : &V_im, H ? nullptr : &H_re, H ? nullptr : &H_im,
                                         dist, azimuth_loc, elevation_loc, gamma})
         if (out != nullptr && (out->n_rows != n_out || out->n_cols != n_ang))
@@ -152,9 +152,9 @@ void quadriga_lib::arrayant_interpolate(
     arma::Mat<dtype> &V_im,
     arma::Mat<dtype> &H_re,
     arma::Mat<dtype> &H_im,
-    const arma::uvec *i_element = nullptr,
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos = nullptr,
+    const arma::uvec &i_element = arma::uvec(),
+    const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
+    const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Mat<dtype> *dist = nullptr,
     arma::Mat<dtype> *azimuth_loc = nullptr,
     arma::Mat<dtype> *elevation_loc = nullptr,
@@ -168,13 +168,13 @@ void quadriga_lib::arrayant_interpolate(
 - **`ant`** — Array antenna with `n_elements` elements; see [[arrayant]]
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements in
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in
   order (`n_out = n_elements`); `[n_out]`
 - **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the antenna, for all outputs and angles,
-  per output, per angle, or both; `nullptr` or empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
+  per output, per angle, or both; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
   `[3, n_out, n_ang]`
-- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; `nullptr` or
-  empty: the columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
+- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the
+  columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
 - **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern
   has more than `INT_MAX` samples); other values throw
 
@@ -212,9 +212,9 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
                                         arma::Mat<dtype> &V_im,
                                         arma::Mat<dtype> &H_re,
                                         arma::Mat<dtype> &H_im,
-                                        const arma::uvec *i_element,
-                                        const arma::Cube<dtype> *orientation,
-                                        const arma::Mat<dtype> *element_pos,
+                                        const arma::uvec &i_element,
+                                        const arma::Cube<dtype> &orientation,
+                                        const arma::Mat<dtype> &element_pos,
                                         arma::Mat<dtype> *dist,
                                         arma::Mat<dtype> *azimuth_loc,
                                         arma::Mat<dtype> *elevation_loc,
@@ -228,10 +228,10 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
         throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     const arma::uword n_elements = ant.e_theta_re.n_slices;
-    const bool has_i_element = i_element != nullptr && i_element->n_elem != 0;
-    if (has_i_element && arma::any(*i_element >= n_elements))
+    const bool has_i_element = i_element.n_elem != 0;
+    if (has_i_element && arma::any(i_element >= n_elements))
         throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
-    const arma::uword n_out = has_i_element ? i_element->n_elem : n_elements;
+    const arma::uword n_out = has_i_element ? i_element.n_elem : n_elements;
     const arma::uword n_ang = azimuth.n_cols;
 
     qd_check_interpolation_inputs(azimuth, elevation, orientation, element_pos, n_out);
@@ -239,11 +239,11 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
 
     const arma::Mat<dtype> *outs[] = {&V_re, &V_im, &H_re, &H_im, dist, azimuth_loc, elevation_loc, gamma};
     const char *names[] = {"V_re", "V_im", "H_re", "H_im", "dist", "azimuth_loc", "elevation_loc", "gamma"};
-    qd_check_alias_list(outs, names, &azimuth, &elevation, i_element, orientation, element_pos);
+    qd_check_alias_list(outs, names, &azimuth, &elevation, &i_element, &orientation, &element_pos);
     qd_check_alias_arrayant(outs, names, ant);
     const arma::Mat<std::complex<dtype>> *outs_cx[] = {V, H};
     const char *names_cx[] = {"V", "H"};
-    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, i_element, orientation, element_pos);
+    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, &i_element, &orientation, &element_pos);
     qd_check_alias_arrayant(outs_cx, names_cx, ant);
     for (int i = 0; i < 2; ++i)
         for (int j = 0; j < 8; ++j)
@@ -270,22 +270,22 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
         i_element_all = arma::regspace<arma::uvec>(0, n_elements - 1);
 
     const arma::Cube<dtype> no_rotation(3, 1, 1, arma::fill::zeros);
-    const bool has_orientation = orientation != nullptr && orientation->n_elem != 0;
+    const bool has_orientation = orientation.n_elem != 0;
 
     arma::Mat<dtype> pos_local;
-    const arma::Mat<dtype> *pos = element_pos;
-    if (element_pos == nullptr || element_pos->n_elem == 0)
+    const arma::Mat<dtype> *pos = &element_pos;
+    if (element_pos.n_elem == 0)
     {
         if (ant.element_pos.n_elem == 0)
             pos_local.zeros(3, n_out), pos = &pos_local;
         else if (has_i_element)
-            pos_local = ant.element_pos.cols(*i_element), pos = &pos_local;
+            pos_local = ant.element_pos.cols(i_element), pos = &pos_local;
         else
             pos = &ant.element_pos;
     }
 
-    qd_arrayant_interpolate_dispatch<dtype>(ant, azimuth, elevation, has_i_element ? *i_element : i_element_all,
-                                            has_orientation ? *orientation : no_rotation, *pos,
+    qd_arrayant_interpolate_dispatch<dtype>(ant, azimuth, elevation, has_i_element ? i_element : i_element_all,
+                                            has_orientation ? orientation : no_rotation, *pos,
                                             V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma, kernel, V, H);
 }
 
@@ -315,10 +315,10 @@ void quadriga_lib::arrayant_interpolate_multi(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> *freq_new = nullptr,
-    const arma::uvec *i_element = nullptr,
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos = nullptr,
+    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const arma::uvec &i_element = arma::uvec(),
+    const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
+    const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Cube<std::complex<dtype>> *V = nullptr,
     arma::Cube<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
@@ -329,9 +329,9 @@ void quadriga_lib::arrayant_interpolate_multi(
   frequency
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`freq_new`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
+- **`freq_new`** *(optional)* — Target frequencies in Hz; empty: the center frequencies of the entries
   in vector order; `[n_freq]`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements;
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements;
   `[n_out]`
 - **`orientation`** *(optional)* — Euler angles (bank, tilt, heading), applied at all frequencies; shapes as in
   [[arrayant_interpolate]]
@@ -352,7 +352,7 @@ arma::mat az = {0.0, 1.5708, -1.5708, 3.14159};
 arma::mat el(1, 4, arma::fill::zeros);
 arma::vec freq = {250.0, 1500.0, 8000.0};
 arma::cube V_re, V_im, H_re, H_im;
-quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, &freq);
+quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, freq);
 ```
 
 ## See also:
@@ -370,10 +370,10 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
                                               arma::Cube<dtype> &V_im,
                                               arma::Cube<dtype> &H_re,
                                               arma::Cube<dtype> &H_im,
-                                              const arma::Col<dtype> *freq_new,
-                                              const arma::uvec *i_element,
-                                              const arma::Cube<dtype> *orientation,
-                                              const arma::Mat<dtype> *element_pos,
+                                              const arma::Col<dtype> &freq_new,
+                                              const arma::uvec &i_element,
+                                              const arma::Cube<dtype> &orientation,
+                                              const arma::Mat<dtype> &element_pos,
                                               arma::Cube<std::complex<dtype>> *V,
                                               arma::Cube<std::complex<dtype>> *H,
                                               int use_kernel)
@@ -387,16 +387,16 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
     const quadriga_lib::arrayant<dtype> &ant0 = arrayant_vec[0];
     const arma::uword n_entries = (arma::uword)arrayant_vec.size();
     const arma::uword n_elements = ant0.e_theta_re.n_slices;
-    const bool has_i_element = i_element != nullptr && i_element->n_elem != 0;
-    if (has_i_element && arma::any(*i_element >= n_elements))
+    const bool has_i_element = i_element.n_elem != 0;
+    if (has_i_element && arma::any(i_element >= n_elements))
         throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
-    const arma::uword n_out = has_i_element ? i_element->n_elem : n_elements;
+    const arma::uword n_out = has_i_element ? i_element.n_elem : n_elements;
     const arma::uword n_ang = azimuth.n_cols;
 
     qd_check_interpolation_inputs(azimuth, elevation, orientation, element_pos, n_out);
 
-    const bool has_freq_new = freq_new != nullptr && freq_new->n_elem != 0;
-    if (has_freq_new && !freq_new->is_finite())
+    const bool has_freq_new = freq_new.n_elem != 0;
+    if (has_freq_new && !freq_new.is_finite())
         throw std::invalid_argument("Input 'freq_new' must contain finite values.");
 
     unsigned long long n_pattern_values = 0;
@@ -406,10 +406,10 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
 
     const arma::Cube<dtype> *outs[] = {&V_re, &V_im, &H_re, &H_im};
     const char *names[] = {"V_re", "V_im", "H_re", "H_im"};
-    qd_check_alias_list(outs, names, &azimuth, &elevation, freq_new, i_element, orientation, element_pos);
+    qd_check_alias_list(outs, names, &azimuth, &elevation, &freq_new, &i_element, &orientation, &element_pos);
     const arma::Cube<std::complex<dtype>> *outs_cx[] = {V, H};
     const char *names_cx[] = {"V", "H"};
-    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, freq_new, i_element, orientation, element_pos);
+    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, &freq_new, &i_element, &orientation, &element_pos);
     for (int i = 0; i < 2; ++i)
         for (int j = 0; j < 4; ++j)
             qd_check_alias_outputs(outs_cx[i], names_cx[i], outs[j], names[j]);
@@ -420,7 +420,7 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
     arma::Col<dtype> cf(n_entries);
     for (arma::uword i = 0; i < n_entries; ++i)
         cf[i] = arrayant_vec[i].center_freq;
-    const arma::Col<dtype> &freq = has_freq_new ? *freq_new : cf;
+    const arma::Col<dtype> &freq = has_freq_new ? freq_new : cf;
     const arma::uword n_freq = freq.n_elem;
 
     // A requested complex output replaces its split pair, which is left empty
@@ -448,14 +448,14 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
     arma::uvec i_element_all;
     if (!has_i_element)
         i_element_all = arma::regspace<arma::uvec>(0, n_elements - 1);
-    const arma::uvec &i_el = has_i_element ? *i_element : i_element_all;
+    const arma::uvec &i_el = has_i_element ? i_element : i_element_all;
 
     const arma::Cube<dtype> no_rotation(3, 1, 1, arma::fill::zeros);
-    const arma::Cube<dtype> &ori = (orientation == nullptr || orientation->n_elem == 0) ? no_rotation : *orientation;
+    const arma::Cube<dtype> &ori = (orientation.n_elem == 0) ? no_rotation : orientation;
 
     arma::Mat<dtype> pos(3, n_out, arma::fill::zeros);
-    if (element_pos != nullptr && element_pos->n_elem != 0)
-        pos = *element_pos;
+    if (element_pos.n_elem != 0)
+        pos = element_pos;
     else if (!ant0.element_pos.is_empty())
         pos = ant0.element_pos.cols(i_el);
 
@@ -600,24 +600,24 @@ template void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<doub
 
 template void quadriga_lib::arrayant_interpolate(const arrayant<float> &ant, const arma::Mat<float> &azimuth, const arma::Mat<float> &elevation,
                                                  arma::Mat<float> &V_re, arma::Mat<float> &V_im, arma::Mat<float> &H_re, arma::Mat<float> &H_im,
-                                                 const arma::uvec *i_element, const arma::Cube<float> *orientation, const arma::Mat<float> *element_pos,
+                                                 const arma::uvec &i_element, const arma::Cube<float> &orientation, const arma::Mat<float> &element_pos,
                                                  arma::Mat<float> *dist, arma::Mat<float> *azimuth_loc, arma::Mat<float> *elevation_loc, arma::Mat<float> *gamma,
                                                  arma::Mat<std::complex<float>> *V, arma::Mat<std::complex<float>> *H, int use_kernel);
 
 template void quadriga_lib::arrayant_interpolate(const arrayant<double> &ant, const arma::Mat<double> &azimuth, const arma::Mat<double> &elevation,
                                                  arma::Mat<double> &V_re, arma::Mat<double> &V_im, arma::Mat<double> &H_re, arma::Mat<double> &H_im,
-                                                 const arma::uvec *i_element, const arma::Cube<double> *orientation, const arma::Mat<double> *element_pos,
+                                                 const arma::uvec &i_element, const arma::Cube<double> &orientation, const arma::Mat<double> &element_pos,
                                                  arma::Mat<double> *dist, arma::Mat<double> *azimuth_loc, arma::Mat<double> *elevation_loc, arma::Mat<double> *gamma,
                                                  arma::Mat<std::complex<double>> *V, arma::Mat<std::complex<double>> *H, int use_kernel);
 
 template void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<float>> &arrayant_vec, const arma::Mat<float> &azimuth, const arma::Mat<float> &elevation,
                                                        arma::Cube<float> &V_re, arma::Cube<float> &V_im, arma::Cube<float> &H_re, arma::Cube<float> &H_im,
-                                                       const arma::Col<float> *freq_new, const arma::uvec *i_element,
-                                                       const arma::Cube<float> *orientation, const arma::Mat<float> *element_pos,
+                                                       const arma::Col<float> &freq_new, const arma::uvec &i_element,
+                                                       const arma::Cube<float> &orientation, const arma::Mat<float> &element_pos,
                                                        arma::Cube<std::complex<float>> *V, arma::Cube<std::complex<float>> *H, int use_kernel);
 
 template void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<double>> &arrayant_vec, const arma::Mat<double> &azimuth, const arma::Mat<double> &elevation,
                                                        arma::Cube<double> &V_re, arma::Cube<double> &V_im, arma::Cube<double> &H_re, arma::Cube<double> &H_im,
-                                                       const arma::Col<double> *freq_new, const arma::uvec *i_element,
-                                                       const arma::Cube<double> *orientation, const arma::Mat<double> *element_pos,
+                                                       const arma::Col<double> &freq_new, const arma::uvec &i_element,
+                                                       const arma::Cube<double> &orientation, const arma::Mat<double> &element_pos,
                                                        arma::Cube<std::complex<double>> *V, arma::Cube<std::complex<double>> *H, int use_kernel);

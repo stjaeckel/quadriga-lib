@@ -110,11 +110,8 @@ py::tuple lsp_generate(py::handle scenpar,
     auto lsp_mu_py = qd_python_init_output(n_link, n_freq, (arma::uword)8, &lsp_mu);
     auto lsp_sigma_py = qd_python_init_output(n_link, n_freq, (arma::uword)8, &lsp_sigma);
 
-    // Wrap optional pointers
-    const arma::mat *p_sf_sigma = sf_sigma_a.is_empty() ? nullptr : &sf_sigma_a;
-
     // Call library function
-    quadriga_lib::lsp_generate(scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, rnd_a, lsp, p_sf_sigma, &abs_toa, &gr_eps_re,
+    quadriga_lib::lsp_generate(scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, rnd_a, lsp, sf_sigma_a, &abs_toa, &gr_eps_re,
                                &gr_eps_im, &eod_offset_deg, &lsp_mu, &lsp_sigma, cholesky_b, clip_spreads_b);
 
     // The permittivity is merged into one complex array (small: one value per link and frequency)

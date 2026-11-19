@@ -169,7 +169,7 @@ namespace
     //   (qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
-    // - floor_id: [n_link] or nullptr (all on floor 0)
+    // - floor_id: [n_link] or empty (all on floor 0)
     // - val [n_link, n_gen]: column g Normal(0,1), or Uniform(0,1) (map 0.5·erfc(-x/sqrt(2))) if gen[g].uniform
     // - Rx side of generator g: field of g at R (phases slice0.col(g), table tab[g]); Tx side (dual mobility): field
     //   of the mirror generator m(g) at T (phases slice1.col(g) = slice0.col(m(g)), table tab[m(g)])
@@ -181,7 +181,7 @@ namespace
     void qd_gbsm_eval(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
                       const std::vector<arma::vec> &acf, const std::vector<arma::vec> &dist,
                       const std::vector<arma::uword> &tab, const arma::cube &phase,
-                      const arma::mat &R, const arma::mat &T, const arma::u32_vec *floor_id,
+                      const arma::mat &R, const arma::mat &T, const arma::u32_vec &floor_id,
                       bool dual_mobility, arma::mat &val)
     {
         const arma::uword n_link = R.n_rows, n_gen = (arma::uword)gen.size(), n_coeff = phase.n_rows;
@@ -196,11 +196,11 @@ namespace
 
         // Links grouped by floor ID (ordered map: the groups are processed in increasing order of the ID)
         std::map<arma::uword, std::vector<arma::uword>> floors;
-        if (floor_id == nullptr)
+        if (floor_id.empty())
             floors[0] = {};
         else
             for (arma::uword l = 0; l < n_link; ++l)
-                floors[floor_id->at(l)].push_back(l);
+                floors[floor_id.at(l)].push_back(l);
         const bool one_group = floors.size() == 1; // all links in their order, no copies of the positions
 
         // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)
@@ -270,7 +270,7 @@ namespace
 
                     const arma::mat &pos = one_group ? (side == 0 ? R : T) : (side == 0 ? RL : TL);
                     arma::mat v;
-                    quadriga_lib::sos_val<double>(freq[t], ph, pos, v, nullptr, nullptr, nullptr, nullptr, 1.0, false, 0);
+                    quadriga_lib::sos_val<double>(freq[t], ph, pos, v, {}, {}, {}, {}, 1.0, false, 0);
 
                     arma::mat &out = (side == 0) ? val : b;
                     for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
@@ -376,8 +376,8 @@ void quadriga_lib::gbsm_init_phases(
     arma::sword seed = -1,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::mat *tx_pos = nullptr,
-    const arma::mat *rx_pos = nullptr,
+    const arma::mat &tx_pos = arma::mat(),
+    const arma::mat &rx_pos = arma::mat(),
     bool dual_mobility = false,
     bool remove_bias = true,
     bool horizontal = true);
@@ -410,8 +410,8 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
                                     arma::sword seed,
                                     arma::sword set_id,
                                     const std::string &preset,
-                                    const arma::mat *tx_pos,
-                                    const arma::mat *rx_pos,
+                                    const arma::mat &tx_pos,
+                                    const arma::mat &rx_pos,
                                     bool dual_mobility,
                                     bool remove_bias,
                                     bool horizontal)
@@ -432,21 +432,17 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
 
-    if (tx_pos != nullptr && tx_pos->empty()) // empty = omitted
-        tx_pos = nullptr;
-    if (rx_pos != nullptr && rx_pos->empty())
-        rx_pos = nullptr;
-    if (!lsf && (tx_pos != nullptr || rx_pos != nullptr))
+    if (!lsf && (!tx_pos.empty() || !rx_pos.empty()))
         throw std::invalid_argument("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only.");
 
-    const arma::mat tx = (tx_pos != nullptr) ? qd_gbsm_cols(*tx_pos) : arma::mat(),
-                    rx = (rx_pos != nullptr) ? qd_gbsm_cols(*rx_pos) : arma::mat();
-    qd_gbsm_check_links(tx_pos != nullptr ? &tx : nullptr, rx_pos != nullptr ? &rx : nullptr);
+    const arma::mat tx = !tx_pos.empty() ? qd_gbsm_cols(tx_pos) : arma::mat(),
+                    rx = !rx_pos.empty() ? qd_gbsm_cols(rx_pos) : arma::mat();
+    qd_gbsm_check_links(!tx_pos.empty() ? &tx : nullptr, !rx_pos.empty() ? &rx : nullptr);
     const arma::uword n_link = rx.n_cols;
     const bool do_bias = lsf && remove_bias && n_link > 2;
-    if (do_bias && dual_mobility && tx_pos == nullptr)
+    if (do_bias && dual_mobility && tx_pos.empty())
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
-    qd_check_alias(&phase, "phase", tx_pos, rx_pos);
+    qd_check_alias(&phase, "phase", &tx_pos, &rx_pos);
 
     // The decorrelation distances of the "ray" generators are not used here (no bias removal)
     const bool ray = set_type == "ray";
@@ -498,7 +494,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
         qd_gbsm_freq(preset, gen, freq, acf, dist, tab);
 
         arma::mat R, T;
-        qd_gbsm_positions(rx, (tx_pos != nullptr) ? tx : rx, horizontal, R, T);
+        qd_gbsm_positions(rx, !tx_pos.empty() ? tx : rx, horizontal, R, T);
         qd_gbsm_remove_bias(gen, freq, tab, P0, dual_mobility ? arma::mat(arma::join_cols(R, T)) : R);
     }
 
@@ -553,8 +549,8 @@ void quadriga_lib::gbsm_draw(
     arma::mat &rnd,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::u32_vec *floor_id = nullptr,
-    const arma::vec *center_freq = nullptr,
+    const arma::u32_vec &floor_id = arma::u32_vec(),
+    const arma::vec &center_freq = arma::vec(),
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -595,8 +591,8 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
                              arma::mat &rnd,
                              arma::sword set_id,
                              const std::string &preset,
-                             const arma::u32_vec *floor_id,
-                             const arma::vec *center_freq,
+                             const arma::u32_vec &floor_id,
+                             const arma::vec &center_freq,
                              bool dual_mobility,
                              bool horizontal)
 {
@@ -623,16 +619,16 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
                                     ", 2] for preset '" + preset + (lsf ? "'." : "' and this set."));
     if (!phase.is_finite())
         throw std::invalid_argument("Input 'phase' must be finite.");
-    if (floor_id != nullptr && floor_id->n_elem != n_link)
+    if (!floor_id.empty() && floor_id.n_elem != n_link)
         throw std::invalid_argument("Number of elements in 'floor_id' does not match number of columns in 'rx_pos'.");
-    if (floor_id != nullptr && !horizontal)
+    if (!floor_id.empty() && !horizontal)
         throw std::invalid_argument("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.");
     const bool shared_ray = set_type == "ray" && set_id == -1;
-    if (shared_ray && center_freq == nullptr)
+    if (shared_ray && center_freq.empty())
         throw std::invalid_argument("Input 'center_freq' is required for the shared 'ray' set.");
     if (shared_ray)
-        qd_gbsm_check_fc(*center_freq);
-    qd_check_alias(&rnd, "rnd", &phase, &tx_pos, &rx_pos, center_freq);
+        qd_gbsm_check_fc(center_freq);
+    qd_check_alias(&rnd, "rnd", &phase, &tx_pos, &rx_pos, &center_freq);
 
     if (n_link == 0 || n_gen == 0)
     {
@@ -649,9 +645,9 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     if (shared_ray)
     {
         double cds = 0.0;
-        for (arma::uword k = 0; k < center_freq->n_elem; ++k)
-            cds += qd_gbsm_cds(sp, center_freq->at(k));
-        cds /= (double)center_freq->n_elem;
+        for (arma::uword k = 0; k < center_freq.n_elem; ++k)
+            cds += qd_gbsm_cds(sp, center_freq.at(k));
+        cds /= (double)center_freq.n_elem;
         const double casa = sp.at("PerClusterAS_A") * 0.017453292519943295;
         if (cds <= 0.0)
             lambda_14 = 0.1;

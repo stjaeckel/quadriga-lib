@@ -20,11 +20,11 @@ static quadriga_lib::arrayant<T> antenna(fz::input &in)
     case 1:
         return quadriga_lib::generate_arrayant_xpol<T>(T(30));
     case 2:
-        fz::clean([&] { a = quadriga_lib::generate_arrayant_ula<T>(in.size(4), T(3.5e9), in.value<T>(), nullptr, T(30)); });
+        fz::clean([&] { a = quadriga_lib::generate_arrayant_ula<T>(in.size(4), T(3.5e9), in.value<T>(), {}, T(30)); });
         break;
     case 3:
         fz::clean([&] { a = quadriga_lib::generate_arrayant_3GPP<T>(in.size(2), in.size(2), T(3.5e9), in.ConsumeIntegralInRange<unsigned>(1, 6),
-                                                                    T(5), T(0.5), 1, 1, T(0.5), T(0.5), nullptr, T(30)); });
+                                                                    T(5), T(0.5), 1, 1, T(0.5), T(0.5), {}, T(30)); });
         break;
     default:
         return fz::arrayant<T>(in);
@@ -121,7 +121,7 @@ static void run(fz::input &in)
                                                        q1.fbs, q1.lbs, q1.gain, q1.length, q1.M, q2.fbs, q2.lbs, q2.gain, q2.length,
                                                        q2.M, c_re, c_im, dl, i_irs, threshold, fc, absolute,
                                                        opt(aod, 3), opt(eod, 4), opt(aoa, 5), opt(eoa, 6),
-                                                       use_irs2 ? &irs2 : nullptr, use_active ? &active : nullptr,
+                                                       fz::opt(use_irs2, irs2), fz::opt(use_active, active),
                                                        use_active_out ? &active_out : nullptr, use_kernel); });
         break;
     }

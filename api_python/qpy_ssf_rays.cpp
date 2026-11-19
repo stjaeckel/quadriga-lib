@@ -163,8 +163,6 @@ py::list ssf_rays(py::handle scenpar,
         gr_eps_re = arma::mat(re.memptr(), re.n_rows, re.n_cols * re.n_slices);
         gr_eps_im = arma::mat(im.memptr(), im.n_rows, im.n_cols * im.n_slices);
     }
-    const arma::mat *p_gr_eps_re = gr_eps.is_none() ? nullptr : &gr_eps_re;
-    const arma::mat *p_gr_eps_im = gr_eps.is_none() ? nullptr : &gr_eps_im;
 
     // Output dicts in numpy memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the library
     // call throws its message before any output is needed
@@ -191,7 +189,7 @@ py::list ssf_rays(py::handle scenpar,
 
     quadriga_lib::ssf_rays(scenpar_a, tx_pos_a, rx_pos_a, center_freq_a, lsp_a, lsp_mu_a, lsp_sigma_a, delay_a,
                            power_a, aod_a, eod_a, aoa_a, eoa_a, rnd_ray_a, rays, method, i_freq, angle_model, pol_model,
-                           p_gr_eps_re, p_gr_eps_im, pol_variability_b, random_phase_b);
+                           gr_eps_re, gr_eps_im, pol_variability_b, random_phase_b);
 
     // The method string and the complex permittivity cannot be aliased
     for (size_t l = 0; l < rays.size(); ++l)

@@ -91,8 +91,8 @@ void qd_arrayant_calc_beamwidth_element(const quadriga_lib::arrayant<dtype> &ant
     auto cut_power = [&](const arma::Mat<dtype> &az_q, const arma::Mat<dtype> &el_q, arma::Col<double> &P) -> arma::uword
     {
         arma::Mat<dtype> V_re, V_im, H_re, H_im;
-        quadriga_lib::arrayant_interpolate<dtype>(ant, az_q, el_q, V_re, V_im, H_re, H_im, &i_el_vec,
-                                                  nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
+        quadriga_lib::arrayant_interpolate<dtype>(ant, az_q, el_q, V_re, V_im, H_re, H_im, i_el_vec,
+                                                  {}, {}, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
         P.set_size(az_q.n_elem);
         double P_max = 0.0;
         arma::uword iM = 0;
@@ -282,7 +282,7 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 ```
 void quadriga_lib::arrayant_calc_beamwidth(
     const arrayant<dtype> &ant,
-    const arma::uvec *i_element = nullptr,
+    const arma::uvec &i_element = arma::uvec(),
     dtype threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
@@ -292,7 +292,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 
 ## Inputs:
 - **`ant`** — Valid arrayant
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 - **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
 
 ## Outputs:
@@ -305,7 +305,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 ```
 auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 20.0);
 arma::vec bw_az, bw_el;
-quadriga_lib::arrayant_calc_beamwidth(ant, nullptr, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
+quadriga_lib::arrayant_calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
 ```
 
 ## See also:
@@ -315,7 +315,7 @@ quadriga_lib::arrayant_calc_beamwidth(ant, nullptr, 3.0, &bw_az, &bw_el); // bw_
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::arrayant_calc_beamwidth(const arrayant<dtype> &ant, const arma::uvec *i_element, dtype threshold_dB,
+void quadriga_lib::arrayant_calc_beamwidth(const arrayant<dtype> &ant, const arma::uvec &i_element, dtype threshold_dB,
                                            arma::Col<dtype> *beamwidth_az_deg, arma::Col<dtype> *beamwidth_el_deg,
                                            arma::Col<dtype> *az_point_ang_deg, arma::Col<dtype> *el_point_ang_deg)
 {
@@ -327,7 +327,7 @@ void quadriga_lib::arrayant_calc_beamwidth(const arrayant<dtype> &ant, const arm
 
     const arma::Col<dtype> *outs[] = {beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg};
     const char *names[] = {"beamwidth_az_deg", "beamwidth_el_deg", "az_point_ang_deg", "el_point_ang_deg"};
-    qd_check_alias_list(outs, names, i_element);
+    qd_check_alias_list(outs, names, &i_element);
     qd_check_alias_arrayant(outs, names, ant);
 
     const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, ant.e_theta_re.n_slices);
@@ -344,9 +344,9 @@ void quadriga_lib::arrayant_calc_beamwidth(const arrayant<dtype> &ant, const arm
                                            el_point_ang_deg == nullptr ? nullptr : el_point_ang_deg->memptr() + i);
 }
 
-template void quadriga_lib::arrayant_calc_beamwidth(const arrayant<float> &, const arma::uvec *, float, arma::Col<float> *,
+template void quadriga_lib::arrayant_calc_beamwidth(const arrayant<float> &, const arma::uvec &, float, arma::Col<float> *,
                                                     arma::Col<float> *, arma::Col<float> *, arma::Col<float> *);
-template void quadriga_lib::arrayant_calc_beamwidth(const arrayant<double> &, const arma::uvec *, double, arma::Col<double> *,
+template void quadriga_lib::arrayant_calc_beamwidth(const arrayant<double> &, const arma::uvec &, double, arma::Col<double> *,
                                                     arma::Col<double> *, arma::Col<double> *, arma::Col<double> *);
 
 /*!MD
@@ -362,12 +362,12 @@ Calculate the directivity in dBi of array antenna elements
 void quadriga_lib::arrayant_calc_directivity(
     const arrayant<dtype> &ant,
     arma::Col<dtype> &directivity_dBi,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ## Inputs:
 - **`ant`** — Valid arrayant
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ## Outputs:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out]`
@@ -387,7 +387,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_calc_directivity(const arrayant<dtype> &ant, arma::Col<dtype> &directivity_dBi,
-                                             const arma::uvec *i_element)
+                                             const arma::uvec &i_element)
 {
     const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
@@ -395,7 +395,7 @@ void quadriga_lib::arrayant_calc_directivity(const arrayant<dtype> &ant, arma::C
 
     const arma::Col<dtype> *outs[] = {&directivity_dBi};
     const char *names[] = {"directivity_dBi"};
-    qd_check_alias_list(outs, names, i_element);
+    qd_check_alias_list(outs, names, &i_element);
     qd_check_alias_arrayant(outs, names, ant);
 
     const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, ant.e_theta_re.n_slices);
@@ -404,8 +404,8 @@ void quadriga_lib::arrayant_calc_directivity(const arrayant<dtype> &ant, arma::C
         directivity_dBi[i] = qd_arrayant_calc_directivity_element(ant, i_out[i]);
 }
 
-template void quadriga_lib::arrayant_calc_directivity(const arrayant<float> &, arma::Col<float> &, const arma::uvec *);
-template void quadriga_lib::arrayant_calc_directivity(const arrayant<double> &, arma::Col<double> &, const arma::uvec *);
+template void quadriga_lib::arrayant_calc_directivity(const arrayant<float> &, arma::Col<float> &, const arma::uvec &);
+template void quadriga_lib::arrayant_calc_directivity(const arrayant<double> &, arma::Col<double> &, const arma::uvec &);
 
 /*!MD
 # arrayant_combine_pattern
@@ -422,8 +422,8 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
     const arrayant<dtype> &ant,
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -444,8 +444,8 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const arrayant<dtype> &ant,
-                                                                     const arma::Col<dtype> *azimuth_grid_new,
-                                                                     const arma::Col<dtype> *elevation_grid_new,
+                                                                     const arma::Col<dtype> &azimuth_grid_new,
+                                                                     const arma::Col<dtype> &elevation_grid_new,
                                                                      dtype propagation_speed)
 {
     // Check if the arrayant object is valid
@@ -457,20 +457,20 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
         throw std::invalid_argument("Input 'propagation_speed' must be positive and finite.");
 
     // Get output angular grid
-    bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
-    bool new_elgrid = elevation_grid_new != nullptr && elevation_grid_new->n_elem != 0;
+    bool new_azgrid = azimuth_grid_new.n_elem != 0;
+    bool new_elgrid = elevation_grid_new.n_elem != 0;
 
-    if (new_azgrid && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
+    if (new_azgrid && !qd_in_range(azimuth_grid_new.memptr(), azimuth_grid_new.n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
         throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in between -pi and pi (equivalent to -180 to 180 degree).");
 
-    if (new_elgrid && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
+    if (new_elgrid && !qd_in_range(elevation_grid_new.memptr(), elevation_grid_new.n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
         throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
 
-    const dtype *p_azimuth_grid = (new_azgrid) ? azimuth_grid_new->memptr() : ant.azimuth_grid.memptr();
-    const dtype *p_elevation_grid = (new_elgrid) ? elevation_grid_new->memptr() : ant.elevation_grid.memptr();
+    const dtype *p_azimuth_grid = (new_azgrid) ? azimuth_grid_new.memptr() : ant.azimuth_grid.memptr();
+    const dtype *p_elevation_grid = (new_elgrid) ? elevation_grid_new.memptr() : ant.elevation_grid.memptr();
 
-    arma::uword n_azimuth_out = (new_azgrid) ? azimuth_grid_new->n_elem : ant.azimuth_grid.n_elem;
-    arma::uword n_elevation_out = (new_elgrid) ? elevation_grid_new->n_elem : ant.elevation_grid.n_elem;
+    arma::uword n_azimuth_out = (new_azgrid) ? azimuth_grid_new.n_elem : ant.azimuth_grid.n_elem;
+    arma::uword n_elevation_out = (new_elgrid) ? elevation_grid_new.n_elem : ant.elevation_grid.n_elem;
     arma::uword n_ang = n_azimuth_out * n_elevation_out;
 
     // Create list of angles for pattern interpolation
@@ -558,8 +558,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
     return output;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::arrayant_combine_pattern(const arrayant<float> &, const arma::Col<float> *, const arma::Col<float> *, float);
-template quadriga_lib::arrayant<double> quadriga_lib::arrayant_combine_pattern(const arrayant<double> &, const arma::Col<double> *, const arma::Col<double> *, double);
+template quadriga_lib::arrayant<float> quadriga_lib::arrayant_combine_pattern(const arrayant<float> &, const arma::Col<float> &, const arma::Col<float> &, float);
+template quadriga_lib::arrayant<double> quadriga_lib::arrayant_combine_pattern(const arrayant<double> &, const arma::Col<double> &, const arma::Col<double> &, double);
 
 /*!MD
 # arrayant_concat
@@ -766,7 +766,7 @@ void quadriga_lib::arrayant_export_obj_file(
     const std::string &colormap = "jet",
     dtype object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ## Inputs:
@@ -776,7 +776,7 @@ void quadriga_lib::arrayant_export_obj_file(
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
 - **`object_radius`** *(optional)* — Radius of the exported object
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [[icosphere]]
-- **`i_element`** *(optional)* — 0-based element indices to export; `nullptr` or empty exports all elements
+- **`i_element`** *(optional)* — 0-based element indices to export; empty exports all elements
 
 ## See also:
 - [[colormap]] (Used for setting the colormap)
@@ -787,7 +787,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayant<dtype> &ant, dtype directivity_range_dB,
                                             const std::string &colormap, dtype object_radius,
-                                            arma::uword icosphere_n_div, const arma::uvec *i_element_in)
+                                            arma::uword icosphere_n_div, const arma::uvec &i_element_in)
 {
     // Check if arrayant object is valid
     std::string error_message = qd_arrayant_is_valid_quick(ant);
@@ -828,9 +828,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
     arma::uword no_elements = ant.n_elements();
 
-    const arma::uvec i_element = (i_element_in == nullptr || i_element_in->n_elem == 0)
-                                     ? arma::regspace<arma::uvec>(0, no_elements - 1)
-                                     : *i_element_in;
+    const arma::uvec i_element = (i_element_in.n_elem == 0) ? arma::regspace<arma::uvec>(0, no_elements - 1) : i_element_in;
 
     if (arma::any(i_element >= no_elements))
         throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
@@ -928,8 +926,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
     // Interpolate antenna patterns (for all elements in the array)
     arma::Mat<dtype> V_re, V_im, H_re, H_im;
-    quadriga_lib::arrayant_interpolate<dtype>(ant, azimuth, elevation, V_re, V_im, H_re, H_im, &i_element,
-                                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
+    quadriga_lib::arrayant_interpolate<dtype>(ant, azimuth, elevation, V_re, V_im, H_re, H_im, i_element,
+                                              {}, {}, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
     dtype *vr = V_re.memptr(), *vi = V_im.memptr(), *hr = H_re.memptr(), *hi = H_im.memptr();
 
     // Calculate maximum Power in the Pattern
@@ -1146,8 +1144,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     }
 }
 
-template void quadriga_lib::arrayant_export_obj_file(const std::string &, const arrayant<float> &, float, const std::string &, float, arma::uword, const arma::uvec *);
-template void quadriga_lib::arrayant_export_obj_file(const std::string &, const arrayant<double> &, double, const std::string &, double, arma::uword, const arma::uvec *);
+template void quadriga_lib::arrayant_export_obj_file(const std::string &, const arrayant<float> &, float, const std::string &, float, arma::uword, const arma::uvec &);
+template void quadriga_lib::arrayant_export_obj_file(const std::string &, const arrayant<double> &, double, const std::string &, double, arma::uword, const arma::uvec &);
 
 /*!MD
 # arrayant_remove_zeros
@@ -1298,7 +1296,7 @@ void quadriga_lib::arrayant_rotate_pattern(
     arrayant<dtype> &ant,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec *i_element = nullptr);
+    const arma::uvec &i_element = arma::uvec());
 ```
 
 ## Inputs:
@@ -1312,7 +1310,7 @@ void quadriga_lib::arrayant_rotate_pattern(
    | 2    | No      | Yes          | No              |
    | 3    | Yes     | Yes          | No              |
    | 4    | Yes     | No           | No              |
-- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; empty: all elements
 
 ## Example:
 ```
@@ -1329,7 +1327,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat<dtype> &orientation,
-                                           unsigned usage, const arma::uvec *i_element)
+                                           unsigned usage, const arma::uvec &i_element)
 {
     // Check if arrayant object is valid
     std::string error_message = qd_arrayant_check(ant); // Deep check
@@ -1342,13 +1340,13 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
     // Set element indices; a subset without duplicates that holds every element counts as all elements
     const arma::uword n_elements = ant.e_theta_re.n_slices;
     arma::uvec i_out;
-    if (i_element == nullptr || i_element->n_elem == 0)
+    if (i_element.n_elem == 0)
         i_out = arma::regspace<arma::uvec>(0, n_elements - 1);
     else
     {
-        if (arma::any(*i_element >= n_elements))
+        if (arma::any(i_element >= n_elements))
             throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
-        i_out = *i_element;
+        i_out = i_element;
         if (arma::find_unique(i_out).eval().n_elem != i_out.n_elem)
             throw std::invalid_argument("Input 'i_element' must not contain duplicates.");
     }
@@ -1606,8 +1604,8 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
         quadriga_lib::arrayant_remove_zeros(ant);
 }
 
-template void quadriga_lib::arrayant_rotate_pattern(arrayant<float> &, const arma::Mat<float> &, unsigned, const arma::uvec *);
-template void quadriga_lib::arrayant_rotate_pattern(arrayant<double> &, const arma::Mat<double> &, unsigned, const arma::uvec *);
+template void quadriga_lib::arrayant_rotate_pattern(arrayant<float> &, const arma::Mat<float> &, unsigned, const arma::uvec &);
+template void quadriga_lib::arrayant_rotate_pattern(arrayant<double> &, const arma::Mat<double> &, unsigned, const arma::uvec &);
 
 /*!MD
 # qdant_write
@@ -1615,7 +1613,7 @@ Write arrayant data to a QDANT (XML) file
 
 - Multiple antennas can be stored in the same file using distinct `id` values
 - If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (`nullptr` or empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
+- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
   in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
 - The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
   pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
@@ -1636,7 +1634,7 @@ unsigned quadriga_lib::qdant_write(
     const std::string &fn,
     const arrayant<dtype> &ant,
     unsigned id = 0,
-    const arma::u32_mat *layout = nullptr);
+    const arma::u32_mat &layout = arma::u32_mat());
 ```
 
 ## Inputs:
@@ -1654,20 +1652,19 @@ unsigned quadriga_lib::qdant_write(
 MD!*/
 
 template <typename dtype>
-unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> &ant, unsigned id, const arma::u32_mat *layout)
+unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> &ant, unsigned id, const arma::u32_mat &layout)
 {
     // Check if arrayant object is valid
     std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    const arma::u32_mat layout_empty;
     unsigned id_in_file = 0;
     bool input_error = false;
     error_message = qd_arrayant_qdant_write(fn, id, &ant.name, &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
                                             &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
                                             &ant.coupling_re, &ant.coupling_im, &ant.center_freq,
-                                            layout == nullptr ? &layout_empty : layout, &id_in_file, &input_error);
+                                            &layout, &id_in_file, &input_error);
 
     // A layout with an ID that is not in the file is an error in the arguments; everything else is a problem with the file
     if (!error_message.empty() && input_error)
@@ -1678,5 +1675,5 @@ unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> 
     return id_in_file;
 }
 
-template unsigned quadriga_lib::qdant_write(const std::string &, const arrayant<float> &, unsigned, const arma::u32_mat *);
-template unsigned quadriga_lib::qdant_write(const std::string &, const arrayant<double> &, unsigned, const arma::u32_mat *);
+template unsigned quadriga_lib::qdant_write(const std::string &, const arrayant<float> &, unsigned, const arma::u32_mat &);
+template unsigned quadriga_lib::qdant_write(const std::string &, const arrayant<double> &, unsigned, const arma::u32_mat &);

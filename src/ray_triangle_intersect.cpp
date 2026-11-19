@@ -42,8 +42,8 @@ void quadriga_lib::ray_triangle_intersect(
     arma::u32_vec *n_interact = nullptr,
     arma::u32_vec *fbs_ind = nullptr,
     arma::u32_vec *sbs_ind = nullptr,
-    const arma::u32_vec *sub_mesh_ind = nullptr,
-    const arma::Mat<dtype> *aabb = nullptr,
+    const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),
+    const arma::Mat<dtype> &aabb = arma::Mat<dtype>(),
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -53,7 +53,7 @@ void quadriga_lib::ray_triangle_intersect(
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
 - **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
@@ -76,7 +76,7 @@ template <typename dtype>
 void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const arma::Mat<dtype> &dest, const arma::Mat<dtype> &mesh,
                                           arma::Mat<dtype> *fbs, arma::Mat<dtype> *sbs, arma::u32_vec *n_interact,
                                           arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
-                                          const arma::u32_vec *sub_mesh_ind, const arma::Mat<dtype> *aabb,
+                                          const arma::u32_vec &sub_mesh_ind, const arma::Mat<dtype> &aabb,
                                           int use_kernel, int gpu_id)
 {
     // Suppress unused-parameter warning when CUDA support is disabled at compile time
@@ -104,12 +104,12 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
 
     arma::uword n_mesh = mesh.n_rows;
 
-    qd_check_alias(fbs, "fbs", &orig, &dest, &mesh, aabb);
-    qd_check_alias(sbs, "sbs", &orig, &dest, &mesh, aabb);
+    qd_check_alias(fbs, "fbs", &orig, &dest, &mesh, &aabb);
+    qd_check_alias(sbs, "sbs", &orig, &dest, &mesh, &aabb);
     qd_check_alias_outputs(fbs, "fbs", sbs, "sbs");
-    qd_check_alias(n_interact, "n_interact", sub_mesh_ind);
-    qd_check_alias(fbs_ind, "fbs_ind", sub_mesh_ind);
-    qd_check_alias(sbs_ind, "sbs_ind", sub_mesh_ind);
+    qd_check_alias(n_interact, "n_interact", &sub_mesh_ind);
+    qd_check_alias(fbs_ind, "fbs_ind", &sub_mesh_ind);
+    qd_check_alias(sbs_ind, "sbs_ind", &sub_mesh_ind);
     qd_check_alias_outputs(n_interact, "n_interact", fbs_ind, "fbs_ind");
     qd_check_alias_outputs(n_interact, "n_interact", sbs_ind, "sbs_ind");
     qd_check_alias_outputs(fbs_ind, "fbs_ind", sbs_ind, "sbs_ind");
@@ -148,10 +148,10 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     // Check if the sub-mesh indices are valid
     arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
     arma::u32_vec smi(1, arma::fill::zeros);                      // Sub-mesh-index (local copy)
-    if (sub_mesh_ind != nullptr && sub_mesh_ind->n_elem != 0)     // Input is available
+    if (sub_mesh_ind.n_elem != 0)     // Input is available
     {
-        n_sub = sub_mesh_ind->n_elem;
-        const unsigned *p_sub = sub_mesh_ind->memptr();
+        n_sub = sub_mesh_ind.n_elem;
+        const unsigned *p_sub = sub_mesh_ind.memptr();
 
         if (*p_sub != 0U)
             throw std::invalid_argument("First sub-mesh must start at the first face.");
@@ -165,28 +165,29 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
         if (p_sub[n_sub - 1ULL] >= (unsigned)n_mesh)
             throw std::invalid_argument("Sub-mesh indices cannot exceed number of mesh elements.");
 
-        smi = *sub_mesh_ind;
+        smi = sub_mesh_ind;
     }
 
     // Compute or validate AABB
     arma::Mat<dtype> aabb_computed;
-    if (aabb == nullptr)
+    const arma::Mat<dtype> *p_aabb = &aabb;
+    if (aabb.empty())
     {
         quadriga_lib::triangle_mesh_aabb(mesh, aabb_computed, sub_mesh_ind);
-        aabb = &aabb_computed;
+        p_aabb = &aabb_computed;
     }
     else
     {
-        if (aabb->n_rows != n_sub)
+        if (aabb.n_rows != n_sub)
             throw std::invalid_argument("Number of rows in 'aabb' must match number of sub-meshes.");
-        if (aabb->n_cols < 6)
+        if (aabb.n_cols < 6)
             throw std::invalid_argument("Input 'aabb' must have at least 6 columns [x_min, x_max, y_min, y_max, z_min, z_max].");
     }
 
     // AABB data per sub-mesh
-    const dtype *Xmin = aabb->colptr(0), *Xmax = aabb->colptr(1);
-    const dtype *Ymin = aabb->colptr(2), *Ymax = aabb->colptr(3);
-    const dtype *Zmin = aabb->colptr(4), *Zmax = aabb->colptr(5);
+    const dtype *Xmin = p_aabb->colptr(0), *Xmax = p_aabb->colptr(1);
+    const dtype *Ymin = p_aabb->colptr(2), *Ymax = p_aabb->colptr(3);
+    const dtype *Zmin = p_aabb->colptr(4), *Zmax = p_aabb->colptr(5);
 
     // Mesh vertex pointers
     const dtype *Tx = mesh.colptr(0), *Ty = mesh.colptr(1), *Tz = mesh.colptr(2);
@@ -291,11 +292,11 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
 template void quadriga_lib::ray_triangle_intersect(const arma::Mat<float> &orig, const arma::Mat<float> &dest, const arma::Mat<float> &mesh,
                                                    arma::Mat<float> *fbs, arma::Mat<float> *sbs, arma::u32_vec *n_interact,
                                                    arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
-                                                   const arma::u32_vec *sub_mesh_ind, const arma::Mat<float> *aabb,
+                                                   const arma::u32_vec &sub_mesh_ind, const arma::Mat<float> &aabb,
                                                    int use_kernel, int gpu_id);
 
 template void quadriga_lib::ray_triangle_intersect(const arma::Mat<double> &orig, const arma::Mat<double> &dest, const arma::Mat<double> &mesh,
                                                    arma::Mat<double> *fbs, arma::Mat<double> *sbs, arma::u32_vec *n_interact,
                                                    arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
-                                                   const arma::u32_vec *sub_mesh_ind, const arma::Mat<double> *aabb,
+                                                   const arma::u32_vec &sub_mesh_ind, const arma::Mat<double> &aabb,
                                                    int use_kernel, int gpu_id);

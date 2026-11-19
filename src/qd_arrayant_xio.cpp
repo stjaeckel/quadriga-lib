@@ -71,7 +71,7 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
     for (arma::uword i = 0; i < n_entries; ++i)
         layout(i, 0) = (unsigned)(i + 1);
 
-    quadriga_lib::qdant_write(fn, arrayant_vec[0], 1, &layout);
+    quadriga_lib::qdant_write(fn, arrayant_vec[0], 1, layout);
 }
 
 template void quadriga_lib::qdant_write_multi(const std::string &, const std::vector<quadriga_lib::arrayant<float>> &);
@@ -448,7 +448,7 @@ void quadriga_lib::arrayant_copy_element_multi(
 arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
+    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
@@ -490,7 +490,7 @@ template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib
 Set element positions for all entries in a multi-frequency arrayant vector
 
 - Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is nullptr or empty, all positions are replaced and `element_pos` must have `n_elements` columns.
+- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
 - If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
@@ -499,13 +499,13 @@ Set element positions for all entries in a multi-frequency arrayant vector
 void quadriga_lib::arrayant_set_element_pos_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        const arma::uvec *i_element = nullptr);
+        const arma::uvec &i_element = arma::uvec());
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; nullptr or empty: all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; empty: all elements are replaced
 
 ## See also:
 - [[arrayant_copy_element_multi]] (replicate elements before setting positions)
@@ -515,11 +515,8 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                   const arma::Mat<dtype> &element_pos,
-                                                  const arma::uvec *i_element_in)
+                                                  const arma::uvec &i_element)
 {
-    const arma::uvec empty_index;
-    const arma::uvec &i_element = (i_element_in == nullptr) ? empty_index : *i_element_in;
-
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
@@ -581,8 +578,8 @@ void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arra
     }
 }
 
-template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, const arma::uvec *);
-template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, const arma::uvec *);
+template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, const arma::uvec &);
+template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, const arma::uvec &);
 
 /*!MD
 # arrayant_rotate_pattern_multi
@@ -598,14 +595,14 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &orientation,
         unsigned usage = 0,
-        const arma::uvec *i_element = nullptr)
+        const arma::uvec &i_element = arma::uvec())
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; empty: all elements
 
 ## See also:
 - [[arrayant_rotate_pattern]] (per-entry operation called internally)
@@ -616,7 +613,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                  const arma::Mat<dtype> &orientation, unsigned usage,
-                                                 const arma::uvec *i_element)
+                                                 const arma::uvec &i_element)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
@@ -646,8 +643,8 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
     }
 }
 
-template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, unsigned, const arma::uvec *);
-template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, unsigned, const arma::uvec *);
+template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, unsigned, const arma::uvec &);
+template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, unsigned, const arma::uvec &);
 
 /*!MD
 # arrayant_concat_multi
@@ -795,7 +792,7 @@ Combine element patterns, positions, and coupling weights into effective radiati
 
 - Multi-frequency counterpart to [[arrayant_combine_pattern]]
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
-- Output length = `freq_new->n_elem` if provided; otherwise one entry per input arrayant
+- Output length = `freq_new.n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [[arrayant_interpolate_multi]] (SLERP with linear-interpolation fallback)
 - Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
 - Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
@@ -806,9 +803,9 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ```
 std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
-    const arma::Col<dtype> *freq_new = nullptr,
+    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
+    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -832,9 +829,9 @@ MD!*/
 template <typename dtype>
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> *azimuth_grid_new,
-    const arma::Col<dtype> *elevation_grid_new,
-    const arma::Col<dtype> *freq_new,
+    const arma::Col<dtype> &azimuth_grid_new,
+    const arma::Col<dtype> &elevation_grid_new,
+    const arma::Col<dtype> &freq_new,
     dtype propagation_speed)
 {
     if (arrayant_vec.empty())
@@ -847,35 +844,35 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     arma::uword n_freq = (arma::uword)arrayant_vec.size();
 
     // Validate optional output grids
-    bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
-    bool new_elgrid = elevation_grid_new != nullptr && elevation_grid_new->n_elem != 0;
-    bool new_fgrid = freq_new != nullptr && freq_new->n_elem != 0;
+    bool new_azgrid = azimuth_grid_new.n_elem != 0;
+    bool new_elgrid = elevation_grid_new.n_elem != 0;
+    bool new_fgrid = freq_new.n_elem != 0;
 
-    if (new_azgrid && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
+    if (new_azgrid && !qd_in_range(azimuth_grid_new.memptr(), azimuth_grid_new.n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
         throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in [-pi, pi].");
 
-    if (new_elgrid && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
+    if (new_elgrid && !qd_in_range(elevation_grid_new.memptr(), elevation_grid_new.n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
         throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in [-pi/2, pi/2].");
 
     if (new_fgrid)
     {
-        const dtype *p_freq = freq_new->memptr();
-        for (arma::uword i = 0; i < freq_new->n_elem; ++i)
+        const dtype *p_freq = freq_new.memptr();
+        for (arma::uword i = 0; i < freq_new.n_elem; ++i)
             if (!(p_freq[i] > dtype(0.0)) || !std::isfinite(p_freq[i]))
                 throw std::invalid_argument("Values of 'freq_new' must be positive and finite.");
     }
 
     // Output grids
-    const dtype *p_azimuth_grid = new_azgrid ? azimuth_grid_new->memptr() : arrayant_vec[0].azimuth_grid.memptr();
-    const dtype *p_elevation_grid = new_elgrid ? elevation_grid_new->memptr() : arrayant_vec[0].elevation_grid.memptr();
-    arma::uword n_azimuth_out = new_azgrid ? azimuth_grid_new->n_elem : arrayant_vec[0].azimuth_grid.n_elem;
-    arma::uword n_elevation_out = new_elgrid ? elevation_grid_new->n_elem : arrayant_vec[0].elevation_grid.n_elem;
+    const dtype *p_azimuth_grid = new_azgrid ? azimuth_grid_new.memptr() : arrayant_vec[0].azimuth_grid.memptr();
+    const dtype *p_elevation_grid = new_elgrid ? elevation_grid_new.memptr() : arrayant_vec[0].elevation_grid.memptr();
+    arma::uword n_azimuth_out = new_azgrid ? azimuth_grid_new.n_elem : arrayant_vec[0].azimuth_grid.n_elem;
+    arma::uword n_elevation_out = new_elgrid ? elevation_grid_new.n_elem : arrayant_vec[0].elevation_grid.n_elem;
     arma::uword n_ang = n_azimuth_out * n_elevation_out;
 
     // Output frequency grid: default = per-entry center_freq in input order
     arma::Col<dtype> freq_grid;
     if (new_fgrid)
-        freq_grid = *freq_new;
+        freq_grid = freq_new;
     else
     {
         freq_grid.set_size(n_freq);
@@ -904,7 +901,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     arma::Mat<dtype> zero_pos(3, n_elements, arma::fill::zeros);
     arma::Cube<dtype> V_re, V_im, H_re, H_im;
     quadriga_lib::arrayant_interpolate_multi<dtype>(arrayant_vec, azimuth, elevation, V_re, V_im, H_re, H_im,
-                                                    &freq_grid, nullptr, nullptr, &zero_pos, nullptr, nullptr, 1);
+                                                    freq_grid, {}, {}, zero_pos, nullptr, nullptr, 1);
 
     // Geometric dist matrix: dist(e, a) = element_pos[:,e] · wave_direction(az[a], el[a])
     arma::Mat<dtype> dist(n_elements, n_ang, arma::fill::none);
@@ -1055,11 +1052,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<float>> &,
-    const arma::Col<float> *, const arma::Col<float> *, const arma::Col<float> *, float);
+    const arma::Col<float> &, const arma::Col<float> &, const arma::Col<float> &, float);
 
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<double>> &,
-    const arma::Col<double> *, const arma::Col<double> *, const arma::Col<double> *, double);
+    const arma::Col<double> &, const arma::Col<double> &, const arma::Col<double> &, double);
 
 /*!MD
 # arrayant_calc_beamwidth_multi
@@ -1073,7 +1070,7 @@ Calculate the beamwidth and pointing angles in degrees for each entry of a multi
 ```
 void quadriga_lib::arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
-        const arma::uvec *i_element = nullptr,
+        const arma::uvec &i_element = arma::uvec(),
         dtype threshold_dB = 3.0,
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,
@@ -1083,7 +1080,7 @@ void quadriga_lib::arrayant_calc_beamwidth_multi(
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [[arrayant_is_valid_multi]]
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 - **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
 
 ## Outputs:
@@ -1099,7 +1096,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
-                                                 const arma::uvec *i_element, dtype threshold_dB,
+                                                 const arma::uvec &i_element, dtype threshold_dB,
                                                  arma::Mat<dtype> *beamwidth_az_deg, arma::Mat<dtype> *beamwidth_el_deg,
                                                  arma::Mat<dtype> *az_point_ang_deg, arma::Mat<dtype> *el_point_ang_deg)
 {
@@ -1112,7 +1109,7 @@ void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtyp
     arma::Mat<dtype> *const outs[] = {beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg};
     const arma::Mat<dtype> *outs_c[] = {beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg};
     const char *names[] = {"beamwidth_az_deg", "beamwidth_el_deg", "az_point_ang_deg", "el_point_ang_deg"};
-    qd_check_alias_list(outs_c, names, i_element);
+    qd_check_alias_list(outs_c, names, &i_element);
     for (const auto &a : arrayant_vec)
         qd_check_alias_arrayant(outs_c, names, a);
 
@@ -1132,9 +1129,9 @@ void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtyp
                                                at(2, i, f), at(3, i, f));
 }
 
-template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<float>> &, const arma::uvec *, float,
+template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<float>> &, const arma::uvec &, float,
                                                           arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *);
-template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<double>> &, const arma::uvec *, double,
+template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<double>> &, const arma::uvec &, double,
                                                           arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *);
 
 /*!MD
@@ -1150,12 +1147,12 @@ Calculate the directivity in dBi for each entry of a multi-frequency arrayant ve
 void quadriga_lib::arrayant_calc_directivity_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
         arma::Mat<dtype> &directivity_dBi,
-        const arma::uvec *i_element = nullptr);
+        const arma::uvec &i_element = arma::uvec());
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [[arrayant_is_valid_multi]]
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ## Outputs:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
@@ -1167,7 +1164,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
-                                                   arma::Mat<dtype> &directivity_dBi, const arma::uvec *i_element)
+                                                   arma::Mat<dtype> &directivity_dBi, const arma::uvec &i_element)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
@@ -1177,7 +1174,7 @@ void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dt
 
     const arma::Mat<dtype> *outs[] = {&directivity_dBi};
     const char *names[] = {"directivity_dBi"};
-    qd_check_alias_list(outs, names, i_element);
+    qd_check_alias_list(outs, names, &i_element);
     for (const auto &a : arrayant_vec)
         qd_check_alias_arrayant(outs, names, a);
 
@@ -1189,5 +1186,5 @@ void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dt
             directivity_dBi.at(i, f) = qd_arrayant_calc_directivity_element(arrayant_vec[f], i_out[i]);
 }
 
-template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<float>> &, arma::Mat<float> &, const arma::uvec *);
-template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<double>> &, arma::Mat<double> &, const arma::uvec *);
+template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<float>> &, arma::Mat<float> &, const arma::uvec &);
+template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<double>> &, arma::Mat<double> &, const arma::uvec &);

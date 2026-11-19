@@ -49,6 +49,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // A single struct is a one-entry vector; the output is [n_out, n_freq] either way
     const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant"); // Validated by the C++ function
     arma::mat directivity_dBi;
-    CALL_QD(quadriga_lib::arrayant_calc_directivity_multi(ant_multi, directivity_dBi, &i_element));
+    CALL_QD(quadriga_lib::arrayant_calc_directivity_multi(ant_multi, directivity_dBi, i_element));
     plhs[0] = qd_mex_copy2matlab(&directivity_dBi);
 }

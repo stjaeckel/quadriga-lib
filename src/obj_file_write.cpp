@@ -231,7 +231,7 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
 //  their first face, so the output order follows the input face order.
 // - Parts are disjoint by construction, so splitting never duplicates vertices.
 static void separate_loose_parts(const arma::umat &face_ind, // Face indices, Size: [ n_mesh, 3 ]
-                                 const arma::uvec *obj_ind,  // Object index or nullptr, Size: [ n_mesh ]
+                                 const arma::uvec &obj_ind,  // Object index or empty, Size: [ n_mesh ]
                                  arma::uword n_vert,         // Number of vertices in the vertex list
                                  std::vector<arma::uword> &face_order, // Out: face indices grouped by part
                                  std::vector<arma::uword> &part_bnd,   // Out: part boundaries in "face_order", Size: [ n_part+1 ]
@@ -294,7 +294,7 @@ static void separate_loose_parts(const arma::umat &face_ind, // Face indices, Si
 
     for (arma::uword i = 0; i < n_mesh; ++i)
     {
-        const PartKey key{find(face_ind.at(i, 0)), (obj_ind != nullptr) ? obj_ind->at(i) : (arma::uword)0};
+        const PartKey key{find(face_ind.at(i, 0)), !obj_ind.empty() ? obj_ind.at(i) : (arma::uword)0};
 
         arma::uword p;
         if (auto it = key2part.find(key); it != key2part.end())
@@ -339,7 +339,7 @@ Write a triangulated Wavefront .obj (and .mtl) file
 - With `split_loose_parts`: objects are separated into connected components ("separate by loose parts"); connectivity
   follows the welded vertex list, so unwelded input geometry yields one part per face
 - Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
-  1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
+  1-based material index (0 = no material, leaving that face unassigned); leave `mtl_ind` empty to omit materials entirely
 - A face with `mtl_ind = 0` that follows a face with a material in the same object (or part) is preceded by
   `usemtl (null)`, which [[obj_file_read]] reads back as 0; the `.mtl` gets no `(null)` entry. Face order and objects
   are unchanged. A material named `(null)` that is used by a face is therefore rejected (`std::invalid_argument`);
@@ -356,20 +356,20 @@ Write a triangulated Wavefront .obj (and .mtl) file
 ```
 void obj_file_write(
     const std::string &fn,
-    const arma::Mat<dtype> *mesh = nullptr,
-    const arma::uvec *obj_ind = nullptr,
-    const arma::uvec *mtl_ind = nullptr,
-    const std::vector<std::string> *obj_names = nullptr,
-    const std::vector<std::string> *mtl_names = nullptr,
+    const arma::Mat<dtype> &mesh = arma::Mat<dtype>(),
+    const arma::uvec &obj_ind = arma::uvec(),
+    const arma::uvec &mtl_ind = arma::uvec(),
+    const std::vector<std::string> &obj_names = std::vector<std::string>(),
+    const std::vector<std::string> &mtl_names = std::vector<std::string>(),
     arma::Mat<dtype> *vert_list_out = nullptr,
     arma::umat *face_ind_out = nullptr,
-    const arma::Mat<dtype> *vert_list = nullptr,
-    const arma::umat *face_ind = nullptr,
-    const arma::Mat<dtype> *bsdf = nullptr,
+    const arma::Mat<dtype> &vert_list = arma::Mat<dtype>(),
+    const arma::umat &face_ind = arma::umat(),
+    const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
     const dtype threshold = 0.001,
-    const arma::uvec *csv_ind = nullptr,
-    const std::vector<std::string> *csv_names = nullptr,
-    const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
+    const arma::uvec &csv_ind = arma::uvec(),
+    const std::vector<std::string> &csv_names = std::vector<std::string>(),
+    const std::unordered_map<std::string, std::vector<dtype>> &csv_prop = std::unordered_map<std::string, std::vector<dtype>>(),
     bool csv_write_defaults = false,
     bool split_loose_parts = false);
 ```
@@ -378,9 +378,9 @@ void obj_file_write(
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
 - **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; omit (`nullptr`) for no materials
+- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
 - **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `mtl_ind` is given
+- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
 - **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [[obj_file_read]] for columns
@@ -402,27 +402,27 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::obj_file_write(const std::string &fn,
-                                  const arma::Mat<dtype> *mesh,
-                                  const arma::uvec *obj_ind,
-                                  const arma::uvec *mtl_ind,
-                                  const std::vector<std::string> *obj_names,
-                                  const std::vector<std::string> *mtl_names,
+                                  const arma::Mat<dtype> &mesh,
+                                  const arma::uvec &obj_ind,
+                                  const arma::uvec &mtl_ind,
+                                  const std::vector<std::string> &obj_names,
+                                  const std::vector<std::string> &mtl_names,
                                   arma::Mat<dtype> *vert_list_out,
                                   arma::umat *face_ind_out,
-                                  const arma::Mat<dtype> *vert_list,
-                                  const arma::umat *face_ind,
-                                  const arma::Mat<dtype> *bsdf,
+                                  const arma::Mat<dtype> &vert_list,
+                                  const arma::umat &face_ind,
+                                  const arma::Mat<dtype> &bsdf,
                                   const dtype threshold,
-                                  const arma::uvec *csv_ind,
-                                  const std::vector<std::string> *csv_names,
-                                  const std::unordered_map<std::string, std::vector<dtype>> *csv_prop,
+                                  const arma::uvec &csv_ind,
+                                  const std::vector<std::string> &csv_names,
+                                  const std::unordered_map<std::string, std::vector<dtype>> &csv_prop,
                                   bool csv_write_defaults,
                                   bool split_loose_parts)
 {
     // Mode selection: mesh XOR (vert_list + face_ind)
-    const bool has_mesh = (mesh != nullptr);
-    const bool has_vl = (vert_list != nullptr);
-    const bool has_fi = (face_ind != nullptr);
+    const bool has_mesh = !mesh.empty();
+    const bool has_vl = !vert_list.empty();
+    const bool has_fi = !face_ind.empty();
 
     if (has_mesh && (has_vl || has_fi))
         throw std::invalid_argument("Provide either 'mesh' or 'vert_list'+'face_ind', not both.");
@@ -430,8 +430,8 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         throw std::invalid_argument("Either 'mesh' or 'vert_list'+'face_ind' must be given.");
     if (!has_mesh && (!has_vl || !has_fi))
         throw std::invalid_argument("'vert_list' and 'face_ind' must be given together.");
-    qd_check_alias(vert_list_out, "vert_list_out", mesh, vert_list, bsdf);
-    qd_check_alias(face_ind_out, "face_ind_out", obj_ind, mtl_ind, face_ind, csv_ind);
+    qd_check_alias(vert_list_out, "vert_list_out", &mesh, &vert_list, &bsdf);
+    qd_check_alias(face_ind_out, "face_ind_out", &obj_ind, &mtl_ind, &face_ind, &csv_ind);
 
     if (fn.empty() && vert_list_out == nullptr && face_ind_out == nullptr)
         return;
@@ -440,34 +440,34 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     arma::uword n_mesh = 0;
     if (has_mesh)
     {
-        if (mesh->n_cols != 9)
+        if (mesh.n_cols != 9)
             throw std::invalid_argument("Input 'mesh' must have 9 columns.");
-        n_mesh = mesh->n_rows;
+        n_mesh = mesh.n_rows;
     }
     else
     {
-        if (vert_list->n_cols != 3)
+        if (vert_list.n_cols != 3)
             throw std::invalid_argument("Input 'vert_list' must have 3 columns.");
-        if (face_ind->n_cols != 3)
+        if (face_ind.n_cols != 3)
             throw std::invalid_argument("Input 'face_ind' must have 3 columns.");
-        n_mesh = face_ind->n_rows;
+        n_mesh = face_ind.n_rows;
     }
 
     if (n_mesh == 0)
         throw std::invalid_argument("No faces to write (empty geometry).");
 
     // Validate obj_ind: 0-based, each object a contiguous block
-    if (obj_ind != nullptr)
+    if (!obj_ind.empty())
     {
-        if (obj_ind->n_elem != n_mesh)
+        if (obj_ind.n_elem != n_mesh)
             throw std::invalid_argument("Input 'obj_ind' must have one element per face.");
 
         std::unordered_set<arma::uword> seen;
-        arma::uword prev = obj_ind->at(0);
+        arma::uword prev = obj_ind.at(0);
         seen.insert(prev);
         for (arma::uword n = 1; n < n_mesh; ++n)
         {
-            const arma::uword cur = obj_ind->at(n);
+            const arma::uword cur = obj_ind.at(n);
             if (cur != prev)
             {
                 if (!seen.insert(cur).second)
@@ -476,49 +476,49 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             }
         }
 
-        if (obj_names == nullptr || obj_names->size() <= obj_ind->max())
+        if (obj_names.size() <= obj_ind.max())
             throw std::invalid_argument("'obj_names' is missing or too short for the given 'obj_ind'.");
     }
 
     // Validate mtl_ind
-    if (mtl_ind != nullptr)
+    if (!mtl_ind.empty())
     {
-        if (mtl_ind->n_elem != n_mesh)
+        if (mtl_ind.n_elem != n_mesh)
             throw std::invalid_argument("Input 'mtl_ind' must have one element per face.");
 
-        const arma::uword n_mtl = mtl_ind->max(); // mtl_ind is 1-based; 0 = no material
-        if (mtl_names == nullptr || mtl_names->size() < n_mtl)
+        const arma::uword n_mtl = mtl_ind.max(); // mtl_ind is 1-based; 0 = no material
+        if (mtl_names.size() < n_mtl)
             throw std::invalid_argument("'mtl_names' is missing or too short for the given 'mtl_ind'.");
-        if (bsdf != nullptr && (bsdf->n_cols != 17 || bsdf->n_rows < n_mtl))
+        if (!bsdf.empty() && (bsdf.n_cols != 17 || bsdf.n_rows < n_mtl))
             throw std::invalid_argument("Input 'bsdf' must have 17 columns and one row per material.");
 
         // "(null)" marks faces without material in the written file (see below); a used material cannot carry it
         for (arma::uword i = 0; i < n_mtl; ++i)
-            if ((*mtl_names)[i] == "(null)" && arma::any(*mtl_ind == i + 1))
+            if (mtl_names[i] == "(null)" && arma::any(mtl_ind == i + 1))
                 throw std::invalid_argument("Material name '(null)' is reserved for faces without material; rename it.");
     }
-    else if (bsdf != nullptr)
+    else if (!bsdf.empty())
         throw std::invalid_argument("'bsdf' requires 'mtl_ind' and 'mtl_names'.");
 
     // Validate CSV material-table inputs (EM/acoustic side)
-    const bool want_csv = (csv_ind != nullptr || csv_names != nullptr || csv_prop != nullptr);
+    const bool want_csv = (!csv_ind.empty() || !csv_names.empty() || !csv_prop.empty());
     if (want_csv)
     {
-        if (csv_names == nullptr || csv_names->empty())
+        if (csv_names.empty())
             throw std::invalid_argument("Writing the material CSV requires a non-empty 'csv_names'.");
 
-        const arma::uword n_csv = (arma::uword)csv_names->size();
+        const arma::uword n_csv = (arma::uword)csv_names.size();
 
-        if (csv_prop != nullptr)
-            for (const auto &kv : *csv_prop)
+        if (!csv_prop.empty())
+            for (const auto &kv : csv_prop)
                 if ((arma::uword)kv.second.size() != n_csv)
                     throw std::invalid_argument("Column '" + kv.first + "' in 'csv_prop' must have one value per entry in 'csv_names'.");
 
-        if (csv_ind != nullptr)
+        if (!csv_ind.empty())
         {
-            if (csv_ind->n_elem != n_mesh)
+            if (csv_ind.n_elem != n_mesh)
                 throw std::invalid_argument("Input 'csv_ind' must have one element per face.");
-            if (csv_ind->max() > n_csv) // csv_ind is 1-based; 0 = no material
+            if (csv_ind.max() > n_csv) // csv_ind is 1-based; 0 = no material
                 throw std::invalid_argument("Input 'csv_ind' references a material outside 'csv_names'.");
         }
     }
@@ -531,23 +531,16 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
     if (has_mesh)
     {
-        arma::uvec obj_ones;
-        const arma::uvec *pObj = obj_ind;
-        if (pObj == nullptr)
-        {
-            obj_ones = arma::zeros<arma::uvec>(n_mesh);
-            pObj = &obj_ones;
-        }
-        mesh2vert_list(*mesh, *pObj, VL_local, FI_local, threshold);
+        mesh2vert_list(mesh, obj_ind.empty() ? arma::uvec(n_mesh, arma::fill::zeros) : obj_ind, VL_local, FI_local, threshold);
         pVL = &VL_local;
         pFI = &FI_local;
     }
     else
     {
-        if (face_ind->max() >= vert_list->n_rows)
+        if (face_ind.max() >= vert_list.n_rows)
             throw std::invalid_argument("Input 'face_ind' references a vertex outside 'vert_list'.");
-        pVL = vert_list;
-        pFI = face_ind;
+        pVL = &vert_list;
+        pFI = &face_ind;
     }
 
     // Fill optional outputs
@@ -576,19 +569,19 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     constexpr arma::uword NO_MTL = std::numeric_limits<arma::uword>::max();
 
     auto objid = [&](arma::uword f) -> arma::uword
-    { return (obj_ind != nullptr) ? obj_ind->at(f) : (arma::uword)0; };
+    { return !obj_ind.empty() ? obj_ind.at(f) : (arma::uword)0; };
 
     auto mtlid = [&](arma::uword f) -> arma::uword
     {
-        if (mtl_ind == nullptr)
+        if (mtl_ind.empty())
             return NO_MTL;
-        const arma::uword v = mtl_ind->at(f);
+        const arma::uword v = mtl_ind.at(f);
         return (v == 0) ? NO_MTL : v - 1; // 1-based -> 0-based; 0 = no material
     };
 
     // Materials actually used (nonzero, sorted, unique)
     std::set<arma::uword> used_mtl;
-    if (mtl_ind != nullptr)
+    if (!mtl_ind.empty())
         for (arma::uword f = 0; f < n_mesh; ++f)
             if (const arma::uword m = mtlid(f); m != NO_MTL)
                 used_mtl.insert(m); // 0-based material row (no-material faces skipped)
@@ -605,10 +598,10 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     {
         auto same_bsdf = [&](arma::uword p, arma::uword q) -> bool
         {
-            if (bsdf == nullptr)
+            if (bsdf.empty())
                 return true; // no BSDF data -> all same-named entries collapse into one
             for (arma::uword c = 0; c < 17; ++c)
-                if (bsdf->at(p, c) != bsdf->at(q, c))
+                if (bsdf.at(p, c) != bsdf.at(q, c))
                     return false;
             return true;
         };
@@ -616,7 +609,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         // Group the used material rows by name (used_mtl is sorted, so rows stay ascending)
         std::map<std::string, std::vector<arma::uword>> by_name;
         for (const arma::uword id : used_mtl)
-            by_name[(*mtl_names)[id]].push_back(id);
+            by_name[mtl_names[id]].push_back(id);
 
         // Reserve every base name so generated suffixes cannot collide with an existing name
         std::unordered_set<std::string> taken;
@@ -728,10 +721,10 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
     auto base_name = [&](arma::uword o) -> std::string
     {
-        if (obj_ind != nullptr)
-            return (*obj_names)[o];
-        if (obj_names != nullptr && !obj_names->empty())
-            return (*obj_names)[0];
+        if (!obj_ind.empty())
+            return (obj_names)[o];
+        if (!obj_names.empty())
+            return (obj_names)[0];
         return std::string("object");
     };
 
@@ -833,15 +826,15 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         {
             mtl << "\nnewmtl " << mtl_out_name.at(id) << "\n";
 
-            if (bsdf != nullptr)
+            if (!bsdf.empty())
             {
                 const arma::uword r = id; // id is already the 0-based material row
-                const dtype R = bsdf->at(r, 0), G = bsdf->at(r, 1), B = bsdf->at(r, 2);
-                const dtype d = bsdf->at(r, 3), Pr = bsdf->at(r, 4), Pm = bsdf->at(r, 5);
-                const dtype Ni = bsdf->at(r, 6), Ks = bsdf->at(r, 7);
-                const dtype Re = bsdf->at(r, 8), Ge = bsdf->at(r, 9), Be = bsdf->at(r, 10);
-                const dtype Ps = bsdf->at(r, 11), Pc = bsdf->at(r, 12), Pcr = bsdf->at(r, 13);
-                const dtype an = bsdf->at(r, 14), anr = bsdf->at(r, 15), Tf = bsdf->at(r, 16);
+                const dtype R = bsdf.at(r, 0), G = bsdf.at(r, 1), B = bsdf.at(r, 2);
+                const dtype d = bsdf.at(r, 3), Pr = bsdf.at(r, 4), Pm = bsdf.at(r, 5);
+                const dtype Ni = bsdf.at(r, 6), Ks = bsdf.at(r, 7);
+                const dtype Re = bsdf.at(r, 8), Ge = bsdf.at(r, 9), Be = bsdf.at(r, 10);
+                const dtype Ps = bsdf.at(r, 11), Pc = bsdf.at(r, 12), Pcr = bsdf.at(r, 13);
+                const dtype an = bsdf.at(r, 14), anr = bsdf.at(r, 15), Tf = bsdf.at(r, 16);
 
                 if (R != (dtype)0.8 || G != (dtype)0.8 || B != (dtype)0.8) // base color
                     mtl << "Kd " << fmt(R) << " " << fmt(G) << " " << fmt(B) << "\n";
@@ -892,24 +885,24 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             return (dtype)0.0;
         };
 
-        const arma::uword n_csv = (arma::uword)csv_names->size();
+        const arma::uword n_csv = (arma::uword)csv_names.size();
 
         // Output columns: canonical order first (present, or all if csv_write_defaults), then extra csv_prop columns
         std::vector<std::string> columns;
         std::unordered_set<std::string> emitted;
         for (const std::string &col : kOrder)
         {
-            const bool present = (csv_prop != nullptr && csv_prop->count(col) != 0);
+            const bool present = (!csv_prop.empty() && csv_prop.count(col) != 0);
             if (present || csv_write_defaults)
             {
                 columns.push_back(col);
                 emitted.insert(col);
             }
         }
-        if (csv_prop != nullptr)
+        if (!csv_prop.empty())
         {
             std::set<std::string> extra; // sorted -> deterministic
-            for (const auto &kv : *csv_prop)
+            for (const auto &kv : csv_prop)
                 if (emitted.find(kv.first) == emitted.end())
                     extra.insert(kv.first);
             for (const std::string &col : extra)
@@ -930,12 +923,12 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         for (arma::uword r = 0; r < n_csv; ++r)
         {
-            csv << (*csv_names)[r];
+            csv << (csv_names)[r];
             for (const std::string &col : columns)
             {
                 dtype val = default_for(col);
-                if (csv_prop != nullptr)
-                    if (auto it = csv_prop->find(col); it != csv_prop->end())
+                if (!csv_prop.empty())
+                    if (auto it = csv_prop.find(col); it != csv_prop.end())
                         val = it->second[r];
                 csv << "," << fmt(val);
             }
@@ -946,37 +939,37 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 }
 
 template void quadriga_lib::obj_file_write(const std::string &fn,
-                                           const arma::Mat<float> *mesh,
-                                           const arma::uvec *obj_ind,
-                                           const arma::uvec *mtl_ind,
-                                           const std::vector<std::string> *obj_names,
-                                           const std::vector<std::string> *mtl_names,
+                                           const arma::Mat<float> &mesh,
+                                           const arma::uvec &obj_ind,
+                                           const arma::uvec &mtl_ind,
+                                           const std::vector<std::string> &obj_names,
+                                           const std::vector<std::string> &mtl_names,
                                            arma::Mat<float> *vert_list_out,
                                            arma::umat *face_ind_out,
-                                           const arma::Mat<float> *vert_list,
-                                           const arma::umat *face_ind,
-                                           const arma::Mat<float> *bsdf,
+                                           const arma::Mat<float> &vert_list,
+                                           const arma::umat &face_ind,
+                                           const arma::Mat<float> &bsdf,
                                            const float threshold,
-                                           const arma::uvec *csv_ind,
-                                           const std::vector<std::string> *csv_names,
-                                           const std::unordered_map<std::string, std::vector<float>> *csv_prop,
+                                           const arma::uvec &csv_ind,
+                                           const std::vector<std::string> &csv_names,
+                                           const std::unordered_map<std::string, std::vector<float>> &csv_prop,
                                            bool csv_write_defaults,
                                            bool split_loose_parts);
 
 template void quadriga_lib::obj_file_write(const std::string &fn,
-                                           const arma::Mat<double> *mesh,
-                                           const arma::uvec *obj_ind,
-                                           const arma::uvec *mtl_ind,
-                                           const std::vector<std::string> *obj_names,
-                                           const std::vector<std::string> *mtl_names,
+                                           const arma::Mat<double> &mesh,
+                                           const arma::uvec &obj_ind,
+                                           const arma::uvec &mtl_ind,
+                                           const std::vector<std::string> &obj_names,
+                                           const std::vector<std::string> &mtl_names,
                                            arma::Mat<double> *vert_list_out,
                                            arma::umat *face_ind_out,
-                                           const arma::Mat<double> *vert_list,
-                                           const arma::umat *face_ind,
-                                           const arma::Mat<double> *bsdf,
+                                           const arma::Mat<double> &vert_list,
+                                           const arma::umat &face_ind,
+                                           const arma::Mat<double> &bsdf,
                                            const double threshold,
-                                           const arma::uvec *csv_ind,
-                                           const std::vector<std::string> *csv_names,
-                                           const std::unordered_map<std::string, std::vector<double>> *csv_prop,
+                                           const arma::uvec &csv_ind,
+                                           const std::vector<std::string> &csv_names,
+                                           const std::unordered_map<std::string, std::vector<double>> &csv_prop,
                                            bool csv_write_defaults,
                                            bool split_loose_parts);

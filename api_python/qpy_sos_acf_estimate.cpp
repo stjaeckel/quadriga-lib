@@ -80,10 +80,6 @@ py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
-    // Wrap optional pointers
-    const arma::vec *p_acf = acf_a.is_empty() ? nullptr : &acf_a;
-    const arma::vec *p_dist = dist_a.is_empty() ? nullptr : &dist_a;
-
     // Output allocation; the two-device estimate is requested only with an ACF table
     arma::vec acf_est, dist_est, acf_est_dual;
     auto acf_est_py = qd_python_init_output(bins_a.n_elem, &acf_est);
@@ -91,14 +87,14 @@ py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
 
     py::object acf_est_dual_py = py::none();
     arma::vec *p_acf_est_dual = nullptr;
-    if (p_acf != nullptr || p_dist != nullptr)
+    if (!acf_a.is_empty() || !dist_a.is_empty())
     {
         acf_est_dual_py = qd_python_init_output(bins_a.n_elem, &acf_est_dual);
         p_acf_est_dual = &acf_est_dual;
     }
 
     // Call library function
-    quadriga_lib::sos_acf_estimate<double>(freq_a, phase_a, bins_a, n_pos, acf_est, &dist_est, p_acf_est_dual, p_acf, p_dist, seed);
+    quadriga_lib::sos_acf_estimate<double>(freq_a, phase_a, bins_a, n_pos, acf_est, &dist_est, p_acf_est_dual, acf_a, dist_a, seed);
 
     return py::make_tuple(acf_est_py, dist_est_py, acf_est_dual_py);
 }

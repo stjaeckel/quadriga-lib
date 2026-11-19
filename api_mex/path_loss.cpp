@@ -120,9 +120,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Wrap optional pointers
     arma::mat *p_sf_sigma = (nlhs > 1) ? &sf_sigma_dB : nullptr;
-    const arma::vec *p_d2d_in = d2d_in.empty() ? nullptr : &d2d_in;
-    const arma::vec *p_rnd_he = rnd_he.empty() ? nullptr : &rnd_he;
 
     // Call library function
-    CALL_QD(quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, pl_dB, p_sf_sigma, p_d2d_in, p_rnd_he));
+    CALL_QD(quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, pl_dB, p_sf_sigma, d2d_in, rnd_he));
 }

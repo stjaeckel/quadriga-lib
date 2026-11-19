@@ -169,7 +169,7 @@ static void run(fz::input &in)
         arma::uvec i_snap(in.size(3));
         for (auto &i : i_snap)
             i = in.index(c.n_snap());
-        fz::clean([&] { c.write_paths_to_obj_file(obj, max_paths, g_max, g_min, "jet", &i_snap, r_max, r_min, n_edges); });
+        fz::clean([&] { c.write_paths_to_obj_file(obj, max_paths, g_max, g_min, "jet", i_snap, r_max, r_min, n_edges); });
     }
 
     // HDF5: a new file, written at a fuzzed index (inside or outside the layout), then read back
@@ -204,13 +204,13 @@ static void run(fz::input &in)
         arma::uvec i_snap(in.size(3));
         for (auto &i : i_snap)
             i = in.index(c.n_snap());
-        fz::clean([&] { quadriga_lib::hdf5_read_channel<T>(fn, ix, iy, iz, iw, &i_snap); });
+        fz::clean([&] { quadriga_lib::hdf5_read_channel<T>(fn, ix, iy, iz, iw, i_snap); });
         arma::Mat<unsigned> slots = {{ix, (unsigned)in.index(2)}, {iy, (unsigned)in.index(2)}, {iz, 0}, {iw, 0}};
         if (in.ConsumeBool()) // Other shapes, also without rows
             slots.resize(in.size(5), in.size(3));
         std::vector<quadriga_lib::channel<T>> chan_vec = {c, c};
         fz::clean([&] { quadriga_lib::hdf5_write_channel_vec(fn, chan_vec, slots); });
-        fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, &i_snap); });
+        fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, i_snap); });
     }
     std::vector<std::string> names;
     fz::clean([&] { names = quadriga_lib::hdf5_read_dset_names(fn, ix, iy, iz, iw); });

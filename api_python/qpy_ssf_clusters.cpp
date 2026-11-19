@@ -141,15 +141,6 @@ py::tuple ssf_clusters(py::handle scenpar,
     for (arma::uword i = 0; i < o2i_in.n_elem; ++i)
         o2i_a[i] = o2i_in[i] != 0.0;
 
-    // Wrap optional pointers; None selects the default
-    const arma::cube *p_rnd_freq = rnd_freq.is_none() ? nullptr : &rnd_freq_a;
-    const arma::cube *p_lsp_anchor = lsp_anchor.is_none() ? nullptr : &lsp_anchor_a;
-    const arma::mat *p_eod_offset_deg = eod_offset_deg.is_none() ? nullptr : &eod_offset_deg_a;
-    const arma::vec *p_abs_toa = abs_toa.is_none() ? nullptr : &abs_toa_a;
-    const arma::mat *p_gr_eps_re = gr_eps.is_none() ? nullptr : &gr_eps_re;
-    const arma::mat *p_gr_eps_im = gr_eps.is_none() ? nullptr : &gr_eps_im;
-    const std::vector<bool> *p_o2i = o2i.is_none() ? nullptr : &o2i_a;
-    const arma::u32_vec *p_n_cluster = n_cluster.is_none() ? nullptr : &n_cluster_a;
 
     // Output allocation in numpy memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the call
     // throws before any output is needed
@@ -183,8 +174,8 @@ py::tuple ssf_clusters(py::handle scenpar,
 
     // Call library function
     quadriga_lib::ssf_clusters(scenpar_a, tx_pos_a, rx_pos_a, lsp_a, rnd_a, delay, power, aod, eod, aoa, eoa, method,
-                               p_rnd_freq, p_lsp_anchor, p_eod_offset_deg, p_abs_toa, p_gr_eps_re, p_gr_eps_im, p_o2i,
-                               p_n_cluster, &n_active);
+                               rnd_freq_a, lsp_anchor_a, eod_offset_deg_a, abs_toa_a, gr_eps_re, gr_eps_im, o2i_a,
+                               n_cluster_a, &n_active);
 
     return py::make_tuple(delay_py, power_py, aod_py, eod_py, aoa_py, eoa_py, n_active_py);
 }

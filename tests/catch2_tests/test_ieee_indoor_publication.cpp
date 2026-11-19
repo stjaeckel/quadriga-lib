@@ -442,7 +442,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.2, Table 4-2: 4x4 MIMO NLOS capacity
     // 100 realisations per model (report: 2000). Per-realisation std measured over 2000 (A..F, IID):
     // 1.03, 0.81, 0.87, 0.83, 0.90, 0.86, 0.70 b/s/Hz. Tolerance: printed rounding (0.05) + 3 std of the difference
     // of the two means, std * sqrt(1/100 + 1/2000).
-    auto ula = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, nullptr, 30.0);
+    auto ula = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, {}, 30.0);
     arma::vec pilot = {0.0};
     const char *models[6] = {"A", "B", "C", "D", "E", "F"};
     const double published[7] = {9.0, 9.4, 9.1, 10.2, 9.6, 10.4, 11.0};

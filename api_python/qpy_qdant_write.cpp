@@ -82,5 +82,5 @@ py::ssize_t qdant_write(const py::handle &fn,
 
     // Single-frequency input: write one entry at the requested ID.
     const auto layout_a = qd_python_numpy2arma_Mat<unsigned>(layout, true, false, "layout");
-    return (py::ssize_t)quadriga_lib::qdant_write(fn_s, ant_vec[0], id, &layout_a);
+    return (py::ssize_t)quadriga_lib::qdant_write(fn_s, ant_vec[0], id, layout_a);
 }

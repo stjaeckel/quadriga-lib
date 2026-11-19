@@ -70,12 +70,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         // Usage 3 and 4 (no grid adjustment) are what the multi-frequency function always does for 0 and 1
         const unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
         auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, true, "arrayant_in"); // Validated by the C++ function
-        CALL_QD(quadriga_lib::arrayant_rotate_pattern_multi(ant_multi, orientation, usage_multi, &i_element));
+        CALL_QD(quadriga_lib::arrayant_rotate_pattern_multi(ant_multi, orientation, usage_multi, i_element));
         plhs[0] = qd_mex_arrayant2struct_multi(ant_multi);
         return;
     }
 
     auto ant = qd_mex_struct2arrayant(prhs[0], false, true, "arrayant_in"); // Validated by the C++ function
-    CALL_QD(quadriga_lib::arrayant_rotate_pattern(ant, orientation, usage, &i_element));
+    CALL_QD(quadriga_lib::arrayant_rotate_pattern(ant, orientation, usage, i_element));
     plhs[0] = qd_mex_arrayant2struct(ant);
 }

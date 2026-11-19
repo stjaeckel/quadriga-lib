@@ -100,9 +100,6 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
     const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    // Wrap optional pointers
-    const arma::u32_vec *p_floor_id = floor_id_a.is_empty() ? nullptr : &floor_id_a;
-    const arma::vec *p_center_freq = center_freq.is_none() ? nullptr : &center_freq_a;
 
     // Output allocation in numpy memory: (n_link, n_gen), n_gen = columns of 'phase' (checked by the library)
     arma::mat rnd;
@@ -110,7 +107,7 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
 
     // Call library function
     quadriga_lib::gbsm_draw(scenpar_a, set_type, phase_a, tx_pos_a, rx_pos_a, rnd, (arma::sword)set_id, preset,
-                            p_floor_id, p_center_freq, dual_mobility_b, horizontal_b);
+                            floor_id_a, center_freq_a, dual_mobility_b, horizontal_b);
 
     return rnd_py;
 }

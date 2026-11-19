@@ -16,6 +16,7 @@
 //                                                                  lsp_generate, ssf_clusters, ssf_rays
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
 //                                                                  o2i_loss.cpp, ssf_rays.cpp, qd_gbsm_phases.cpp
+//   qd_gbsm_check_gr      validation of the ground permittivity    ssf_clusters.cpp, ssf_rays.cpp
 //   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
 //                                                                  gbsm_init_phases
 //   qd_gbsm_n_gen         number of generators of a random set     qd_gbsm_phases.cpp, MEX and Python wrappers of
@@ -94,6 +95,25 @@ static inline void qd_gbsm_check_fc(const arma::vec &center_freq)
     for (arma::uword k = 0; k < center_freq.n_elem; ++k)
         if (!(std::isfinite(center_freq[k]) && center_freq[k] > 0.0))
             throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
+}
+
+// Validation of the ground permittivity for 'GR_enabled' (ssf_clusters, ssf_rays): [n_link, n_freq] each, finite,
+// gr_eps_re >= 1, gr_eps_im >= 0, and z >= 0 for the positions tx / rx ([3, n]); empty is allowed for zero links
+static inline void qd_gbsm_check_gr(const arma::mat &gr_eps_re, const arma::mat &gr_eps_im, arma::uword n_link,
+                                    arma::uword n_freq, const arma::mat &tx, const arma::mat &rx)
+{
+    if ((gr_eps_re.empty() || gr_eps_im.empty()) && n_link > 0)
+        throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' are required when 'GR_enabled' is set.");
+    if ((!gr_eps_re.empty() || !gr_eps_im.empty()) &&
+        (gr_eps_re.n_rows != n_link || gr_eps_re.n_cols != n_freq || gr_eps_im.n_rows != n_link ||
+         gr_eps_im.n_cols != n_freq))
+        throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must have size [n_link, n_freq].");
+    if (!gr_eps_re.is_finite() || !gr_eps_im.is_finite())
+        throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must be finite.");
+    if (arma::any(arma::vectorise(gr_eps_re) < 1.0) || arma::any(arma::vectorise(gr_eps_im) < 0.0))
+        throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
+    if (n_link > 0 && (arma::any(rx.row(2) < 0.0) || arma::any(tx.row(2) < 0.0)))
+        throw std::invalid_argument("Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
 }
 
 // Number of sinusoids of a preset of sos_preset; 0 for a name that is not a preset, so that the caller throws its

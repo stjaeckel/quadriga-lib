@@ -701,7 +701,7 @@ TEST_CASE("ray_progress - sub-mesh partitioning does not change the result", "[w
 
     Opt o;
     Opt op = o;
-    op.smi = &smi; // aabb left NULL: computed internally
+    op.smi = smi; // aabb left empty: computed internally
 
     auto s1 = PLAIN.step(S, o);
     auto s2 = PART.step(S, op);
@@ -1006,7 +1006,7 @@ TEST_CASE("ray_progress - delegated intersection ignores the acceleration struct
 
     Opt oa = with_hits(o, H);
     Opt ob = with_hits(o, H);
-    ob.smi = &smi; // supplied but unused
+    ob.smi = smi; // supplied but unused
 
     auto sa = A.step(S, oa);
     auto sb = B.step(S, ob);
@@ -1051,11 +1051,11 @@ TEST_CASE("ray_progress - delegated intersection validation", "[wave]")
             Cfg C = one_ray();
             Opt o;
             if (mask & 1)
-                o.ni_in = &ref.n_interact;
+                o.ni_in = ref.n_interact;
             if (mask & 2)
-                o.fi_in = &ref.fbs_ind;
+                o.fi_in = ref.fbs_ind;
             if (mask & 4)
-                o.si_in = &ref.sbs_ind;
+                o.si_in = ref.sbs_ind;
             CHECK_THROWS_AS(C.step(S, o), std::invalid_argument);
         }
     }
@@ -1365,9 +1365,11 @@ TEST_CASE("ray_progress - delegated subdivision flag validation", "[wave]")
         Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
         CHECK_THROWS_AS(C.step(S, with_flag(base, wrong)), std::invalid_argument);
 
+        // An empty flag is an omitted flag: the internal decision runs
         std::vector<bool> empty;
-        Cfg D = one_ray(10.0f, 1, false, WIDE_DEG);
-        CHECK_THROWS_AS(D.step(S, with_flag(base, empty)), std::invalid_argument);
+        Cfg D = one_ray(10.0f, 1, false, WIDE_DEG), E = one_ray(10.0f, 1, false, WIDE_DEG);
+        CHECK(D.step(S, with_flag(base, empty)) == E.step(S, base));
+        CHECK(D.n() == E.n());
     }
     SECTION("beam mode is required")
     {
@@ -1837,7 +1839,7 @@ TEST_CASE("ray_progress - input validation", "[wave]")
         {
             Cfg C = one_ray();
             Opt o;
-            o.smi = p;
+            o.smi = *p;
             CHECK_THROWS_AS(C.step(T, o), std::invalid_argument);
         }
     }
@@ -1850,15 +1852,15 @@ TEST_CASE("ray_progress - input validation", "[wave]")
         {
             Cfg C = one_ray();
             Opt o;
-            o.aabb = &box; // no sub_mesh_ind
+            o.aabb = box; // no sub_mesh_ind
             CHECK_THROWS_AS(C.step(T, o), std::invalid_argument);
         }
         {
             arma::fmat wrong(3, 6, arma::fill::zeros);
             Cfg C = one_ray();
             Opt o;
-            o.smi = &smi;
-            o.aabb = &wrong;
+            o.smi = smi;
+            o.aabb = wrong;
             CHECK_THROWS_AS(C.step(T, o), std::invalid_argument);
         }
     }
@@ -2892,9 +2894,9 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
         {
             std::vector<bool> ff(orig.n_rows, g == force_gen);
             quadriga_lib::ray_progress(W.mesh, W.mi, pal, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       beam ? &trivec : nullptr, beam ? &tridir : nullptr, nullptr, nullptr,
+                                       beam ? &trivec : nullptr, beam ? &tridir : nullptr, {}, {},
                                        20, (uint8_t)max_ref, 10, (uint8_t)(force_gen >= 0 ? 2 : 0), -300.0f, 3.0f, 0.15f, refr, true,
-                                       nullptr, nullptr, nullptr, force_gen >= 0 ? &ff : nullptr);
+                                       {}, {}, {}, force_gen >= 0 ? ff : std::vector<bool>());
             if (orig.n_rows == 0)
                 break;
             Gen G;
@@ -3100,7 +3102,7 @@ TEST_CASE("ray_progress - a coherent sheet with tf that is rarer than the invari
         Out O;
         for (int g = 0; g < 5; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, {}, {},
                                        20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, scalar);
             if (orig.n_rows == 0)
                 break;
@@ -3209,7 +3211,7 @@ TEST_CASE("ray_progress - a coherent sheet rarer than the invariant without tf t
         Out O;
         for (int g = 0; g < 5; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, {}, {},
                                        20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, scalar);
             if (orig.n_rows == 0)
                 break;
@@ -3589,8 +3591,8 @@ TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with th
                     long rays = 0;
                     for (int g = 0; g < 30; ++g)
                     {
-                        quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
-                                                   (uint8_t)20, 100, 100, 0, -140.0f, 3.0f, thr, refr != 0, true, nullptr, nullptr, nullptr, nullptr);
+                        quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, {}, {},
+                                                   (uint8_t)20, 100, 100, 0, -140.0f, 3.0f, thr, refr != 0, true, {}, {}, {}, {});
                         if (orig.n_rows == 0)
                             break;
                         rays += (long)orig.n_rows;
@@ -3838,9 +3840,9 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
         {
             std::vector<bool> ff(orig.n_rows, g == force_gen);
             quadriga_lib::ray_progress(W.mesh, W.mi, P, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
-                                       beam ? &trivec : nullptr, beam ? &tridir : nullptr, nullptr, nullptr,
+                                       beam ? &trivec : nullptr, beam ? &tridir : nullptr, {}, {},
                                        20, (uint8_t)max_ref, 10, (uint8_t)(force_gen >= 0 ? 2 : 0), -300.0f, 3.0f, slab, refr, true,
-                                       nullptr, nullptr, nullptr, force_gen >= 0 ? &ff : nullptr);
+                                       {}, {}, {}, force_gen >= 0 ? ff : std::vector<bool>());
             if (orig.n_rows == 0)
                 break;
             Gen G;

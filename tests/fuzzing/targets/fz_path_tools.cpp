@@ -95,7 +95,7 @@ static void run(fz::input &in)
         const bool rev_1 = in.ConsumeBool(), rev_2 = in.ConsumeBool(), use_active = in.ConsumeBool();
         fz::clean([&]
                   { quadriga_lib::combine_irs_coord<T>({irs[0], irs[1], irs[2]}, n_interact_1, coord_1, n_interact_2, coord_2,
-                                                       n_interact, interact_coord, rev_1, rev_2, use_active ? &active_path : nullptr); });
+                                                       n_interact, interact_coord, rev_1, rev_2, fz::opt(use_active, active_path)); });
     }
 
     // Tubes around a path; up to 16 points, up to 16 edges

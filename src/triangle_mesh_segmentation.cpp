@@ -26,7 +26,7 @@ arma::uword triangle_mesh_segmentation(
     arma::u32_vec &sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    const arma::uvec *mtl_ind = nullptr,
+    const arma::uvec &mtl_ind = arma::uvec(),
     arma::uvec *mtl_ind_out = nullptr,
     arma::u32_vec *mesh_ind = nullptr);
 ```
@@ -57,7 +57,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
                                                      arma::u32_vec &sub_mesh_ind,
                                                      arma::uword target_size,
                                                      arma::uword vec_size,
-                                                     const arma::uvec *mtl_ind,
+                                                     const arma::uvec &mtl_ind,
                                                      arma::uvec *mtl_ind_out,
                                                      arma::u32_vec *mesh_ind)
 {
@@ -70,7 +70,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
     arma::uword n_mesh = mesh.n_rows;
 
     qd_check_alias(&mesh_out, "mesh_out", &mesh);
-    qd_check_alias(mtl_ind_out, "mtl_ind_out", mtl_ind);
+    qd_check_alias(mtl_ind_out, "mtl_ind_out", &mtl_ind);
     qd_check_alias_outputs(&sub_mesh_ind, "sub_mesh_ind", mesh_ind, "mesh_ind");
 
     if (target_size == 0)
@@ -78,9 +78,9 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
     if (vec_size == 0)
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
 
-    bool process_mtl_ind = (mtl_ind != nullptr) && (mtl_ind_out != nullptr) && (mtl_ind->n_elem != 0);
+    bool process_mtl_ind = (mtl_ind.n_elem != 0) && (mtl_ind_out != nullptr);
 
-    if (process_mtl_ind && mtl_ind->n_elem != mesh.n_rows)
+    if (process_mtl_ind && mtl_ind.n_elem != mesh.n_rows)
         throw std::invalid_argument("Number of faces in 'mesh' and length of 'mtl_ind' do not match.");
 
     // Create a vector of meshes
@@ -195,7 +195,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
     mesh_out.set_size(n_out, 9);
     dtype *p_mesh_out = mesh_out.memptr();
 
-    const arma::uword *p_mtl_in = process_mtl_ind ? mtl_ind->memptr() : nullptr;
+    const arma::uword *p_mtl_in = process_mtl_ind ? mtl_ind.memptr() : nullptr;
     arma::uword *p_mtl_out = nullptr;
     if (process_mtl_ind)
     {
@@ -279,8 +279,8 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> &mes
 
 template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<float> &mesh, arma::Mat<float> &mesh_out,
                                                               arma::u32_vec &sub_mesh_ind, arma::uword target_size, arma::uword vec_size,
-                                                              const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);
+                                                              const arma::uvec &mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);
 
 template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<double> &mesh, arma::Mat<double> &mesh_out,
                                                               arma::u32_vec &sub_mesh_ind, arma::uword target_size, arma::uword vec_size,
-                                                              const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);
+                                                              const arma::uvec &mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);
