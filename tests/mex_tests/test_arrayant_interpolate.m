@@ -99,6 +99,7 @@ assertEqual( MV_1, cat(3, V_re, V_re) );
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.arrayant_interpolate( ant, az, el );
+assertElementsAlmostEqual( ans, V_re, 'absolute', 1e-12 );
 [ V_2, V_i2 ] = quadriga_lib.arrayant_interpolate( ant, az, el );
 assertElementsAlmostEqual( V_2, V_re, 'absolute', 1e-12 );
 assertElementsAlmostEqual( V_i2, V_im, 'absolute', 1e-12 );

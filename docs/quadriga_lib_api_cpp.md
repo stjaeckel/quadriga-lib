@@ -4626,7 +4626,7 @@ arma::mat quadriga_lib::o2i_loss(
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column
   3 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0` allowed
-- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; `[n_model]`
+- **`models`** — Models to mix, names as listed above; `[n_model]`
 - **`weights`** — Probability of each model, finite and >= 0, sum 1 within 1e-6; `[n_model]`
 - **`d2d_in_max`** *(optional)* — Maximum indoor 2D distance in [m], finite and >= 0 (key `O2I_d2D_in_max`; TR: 25 m
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)
@@ -5926,15 +5926,12 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#mitsuba_xml_file_write) · [Python](quadriga_lib_api_python.md#mitsuba_xml_file_write)
 
-- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
-  differentiable radio-propagation simulations
-- Supports grouping faces into named objects with per-face material assignments
-- Optionally maps material names to ITU-defined presets used by Sionna RT
+- The XML file can be loaded by NVIDIA Sionna RT
 - Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
   both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
   relative to the XML file (`<stem>_meshes/<object>.ply`)
-- Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
-  and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- An object whose faces use more than one material is split into one object per material, named
+  `<obj_name>_<mtl_name>`
 
 ### Declaration:
 ```cpp

@@ -2,10 +2,6 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Diagnostic output: off by default. QD_DIAG_GBSM=1 prints the tables of this file, QD_DIAG=1 those of all areas
-// (see qd_test_diag.hpp); the assertions run either way. Example:
-//   QD_DIAG_GBSM=1 ./build_linux/test_bin "o2i_loss*"
-
 // Verification suite for quadriga_lib::o2i_loss.
 //
 // Pins down: the building penetration loss of the low-loss, high-loss and low-loss A models, the backward
@@ -24,6 +20,7 @@
 // two uniforms on a 100 x 100 grid of mid-points within 2/100.
 // Conventions: frequencies in Hz at the interface, f in GHz in formulas; rnd columns 0 to 2 are Uniform(0,1)
 // (model choice, d2D-in #1, d2D-in #2), column 3 is Normal(0,1) (deviation).
+// Diagnostics: QD_DIAG_GBSM=1 build_linux/test_bin "o2i_loss*" prints the tables of this file.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
@@ -138,7 +135,7 @@ TEST_CASE("o2i_loss - the backward compatible model of Table 7.4.3-3")
     CHECK(arma::all(d2d_in2 == d2d_in));
 }
 
-TEST_CASE("o2i_loss - car penetration loss")
+TEST_CASE("o2i_loss - car loss is N(9, 5^2) or N(20, 5^2) and does not depend on the frequency")
 {
     const arma::vec fc = {0.6e9, 3.5e9, 28.0e9, 60.0e9};
     for (const char *m : {"car", "car_metal"})
@@ -179,7 +176,8 @@ TEST_CASE("o2i_loss - the model is chosen by the cumulative weights")
         if (idx(k) < 4)
             ++cnt(idx(k));
     QD_DIAG("\n# diag: model counts for weights {0.2, 0, 0.5, 0.3}\nlow,high,low_A,car\n%llu,%llu,%llu,%llu\n",
-            (unsigned long long)cnt(0), (unsigned long long)cnt(1), (unsigned long long)cnt(2), (unsigned long long)cnt(3));
+            (unsigned long long)cnt(0), (unsigned long long)cnt(1), (unsigned long long)cnt(2),
+            (unsigned long long)cnt(3));
     CHECK(cnt(0) == 200);
     CHECK(cnt(1) == 0);
     CHECK(cnt(2) == 500);
@@ -242,7 +240,7 @@ TEST_CASE("o2i_loss - indoor distance is the minimum of two uniforms")
     }
 }
 
-TEST_CASE("o2i_loss - optional outputs and sizes")
+TEST_CASE("o2i_loss - optional outputs give the same values and pre-sized outputs are written in place")
 {
     const arma::vec fc = {3.5e9, 28.0e9};
     const std::vector<std::string> models = {"low", "high", "legacy_6GHz", "car"};
@@ -321,24 +319,24 @@ TEST_CASE("o2i_loss - input validation")
                     double d_max)
     { loss = quadriga_lib::o2i_loss(f, r, m, ww, d_max); };
 
-    SECTION("outputs that alias inputs")
-    {
-        arma::vec f = fc, ww = w;
-        CHECK_THROWS_AS(loss = quadriga_lib::o2i_loss(f, rnd5, models, w, 25.0, &f), std::invalid_argument);    // d2d_in is 'center_freq'
-        CHECK_THROWS_AS(loss = quadriga_lib::o2i_loss(fc, rnd5, models, ww, 25.0, &ww), std::invalid_argument); // d2d_in is 'weights'
-        CHECK(arma::approx_equal(f, fc, "absdiff", 0.0));
-    }
-
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(call(fc, rnd5, models, w, 25.0));
-        CHECK_NOTHROW(call(fc, rnd5, {"low", "high", "low_A", "legacy_6GHz", "car", "car_metal"}, arma::vec{0.1, 0.1, 0.2, 0.2, 0.2, 0.2}, 0.0));
+        CHECK_NOTHROW(call(fc, rnd5, {"low", "high", "low_A", "legacy_6GHz", "car", "car_metal"},
+                           arma::vec{0.1, 0.1, 0.2, 0.2, 0.2, 0.2}, 0.0));
         CHECK_NOTHROW(call(fc, rnd5, models, arma::vec{0.4, 0.6 + 9e-7}, 25.0));
         CHECK_NOTHROW(call(fc, arma::mat(0, 4), models, w, 25.0));
         arma::vec d2d_in;
         arma::uvec idx;
         CHECK_NOTHROW(loss = quadriga_lib::o2i_loss(fc, rnd5, models, w, 25.0, &d2d_in, &idx));
         CHECK_NOTHROW(loss = quadriga_lib::o2i_loss(fc, rnd5, models, w));
+    }
+    SECTION("outputs that alias inputs")
+    {
+        arma::vec f = fc, ww = w;
+        CHECK_THROWS_AS(loss = quadriga_lib::o2i_loss(f, rnd5, models, w, 25.0, &f), std::invalid_argument);
+        CHECK_THROWS_AS(loss = quadriga_lib::o2i_loss(fc, rnd5, models, ww, 25.0, &ww), std::invalid_argument);
+        CHECK(arma::approx_equal(f, fc, "absdiff", 0.0));
     }
     SECTION("fc")
     {

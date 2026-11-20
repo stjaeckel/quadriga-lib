@@ -455,7 +455,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [MATLA
 ```python
 # Single-frequency mode
 V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, *, i_element, orientation, \
-    element_pos, use_kernel=0 )
+    element_pos, use_kernel )
 
 # Single-frequency mode with the projected distance and the local angles
 V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \

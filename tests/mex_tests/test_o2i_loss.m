@@ -34,17 +34,9 @@ assertEqual( quadriga_lib.o2i_loss( fc, rnd, models, weights, 25 ), loss_dB );
 assertElementsAlmostEqual( d2d_in3, [ 3; 0; 2 ], 'absolute', 1e-14 );
 assertElementsAlmostEqual( loss3(1, :) - loss_dB(1, :), 0.5 * (3 - 7.5) * [1, 1, 1], 'absolute', 1e-12 );
 
-%% Models as one string or as a cell array; the model index points into 'models'
-[ l_c, ~, i_c ] = quadriga_lib.o2i_loss( fc, rnd, 'car', 1 );
-[ l_cc, ~, i_cc ] = quadriga_lib.o2i_loss( fc, rnd, { 'car' }, 1 );
-assertEqual( l_c, l_cc );
-assertEqual( i_c, uint64( [1; 1; 1] ) );
-assertEqual( i_cc, i_c );
-[ ~, ~, i_r ] = quadriga_lib.o2i_loss( fc, rnd, { 'high', 'car', 'low' }, [ 0.5, 0.3, 0.2 ] );
-assertEqual( i_r, uint64( [1; 2; 3] ) );
-
 %% Outputs: none and fewer
 quadriga_lib.o2i_loss( fc, rnd, models, weights );
+assertEqual( ans, loss_dB );
 assertEqual( quadriga_lib.o2i_loss( fc, rnd, models, weights ), loss_dB );
 [ ~, d2d_in4 ] = quadriga_lib.o2i_loss( fc, rnd, models, weights );
 assertEqual( d2d_in4, d2d_in );
@@ -55,6 +47,15 @@ assertTrue( isa(l_t, 'double') && isa(i_t, 'uint64') );
 assertElementsAlmostEqual( l_t, loss_dB, 'absolute', 1e-5 );                      % rnd rounded to single
 assertElementsAlmostEqual( d_t, d2d_in, 'absolute', 1e-5 );
 assertEqual( i_t, model_ind );
+
+%% Indices: models as one string or as a cell array; the 1-based model index points into 'models'
+[ l_c, ~, i_c ] = quadriga_lib.o2i_loss( fc, rnd, 'car', 1 );
+[ l_cc, ~, i_cc ] = quadriga_lib.o2i_loss( fc, rnd, { 'car' }, 1 );
+assertEqual( l_c, l_cc );
+assertEqual( i_c, uint64( [1; 1; 1] ) );
+assertEqual( i_cc, i_c );
+[ ~, ~, i_r ] = quadriga_lib.o2i_loss( fc, rnd, { 'high', 'car', 'low' }, [ 0.5, 0.3, 0.2 ] );
+assertEqual( i_r, uint64( [1; 2; 3] ) );
 
 %% Errors
 assert_throws( @() quadriga_lib.o2i_loss( fc, rnd, models ), 'Wrong number of input arguments.' );

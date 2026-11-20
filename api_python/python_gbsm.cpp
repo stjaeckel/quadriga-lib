@@ -106,7 +106,7 @@ void quadriga_lib_gbsm(py::module_ &m)
     m.def("o2i_loss", &o2i_loss,
           py::arg("center_freq").none(false),
           py::arg("rnd").none(false),
-          py::arg("models"),
+          py::arg("models").none(false),
           py::arg("weights").none(false),
           py::kw_only(),
           py::arg("d2d_in_max") = 25.0);

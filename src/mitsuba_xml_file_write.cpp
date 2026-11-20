@@ -79,15 +79,12 @@ SECTION!*/
 # mitsuba_xml_file_write
 Write a triangular mesh to a Mitsuba 3 XML scene file
 
-- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
-  differentiable radio-propagation simulations
-- Supports grouping faces into named objects with per-face material assignments
-- Optionally maps material names to ITU-defined presets used by Sionna RT
+- The XML file can be loaded by NVIDIA Sionna RT
 - Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
   both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
   relative to the XML file (`<stem>_meshes/<object>.ply`)
-- Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
-  and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- An object whose faces use more than one material is split into one object per material, named
+  `<obj_name>_<mtl_name>`
 
 ## Declaration:
 ```

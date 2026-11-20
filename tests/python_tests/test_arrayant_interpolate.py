@@ -265,6 +265,8 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.arrayant.interpolate(self.ant, None, self.el)
         with self.assertRaises(TypeError):
+            quadriga_lib.arrayant.interpolate(None, self.az, self.el)
+        with self.assertRaises(TypeError):
             quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, freq=[1e9])
 
 

@@ -72,17 +72,18 @@ assert_throws( @() quadriga_lib.mitsuba_xml_file_write( args{:}, [], false, 1 ),
 assert_throws( @() out1( args{:} ), 'Wrong number of output arguments.' );
 
 %% Errors: 0 in converted indices, C++ checks
+write = @( varargin ) quadriga_lib.mitsuba_xml_file_write( fn, varargin{:} );
 f0 = face_ind; f0(1) = 0;
-assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, f0, obj_ind, mtl_ind, obj_names, mtl_names ), ...
+assert_throws( @() write( vert_list, f0, obj_ind, mtl_ind, obj_names, mtl_names ), ...
     'Entries in ''face_ind'' cannot be 0 (1-based index).' );
-assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, 0 * obj_ind, mtl_ind, obj_names, mtl_names ), ...
+assert_throws( @() write( vert_list, face_ind, 0 * obj_ind, mtl_ind, obj_names, mtl_names ), ...
     'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
-assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, 0 * mtl_ind, obj_names, mtl_names ), ...
-    'Input ''mtl_ind'' cannot contain 0' );
-assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list(:, 1:2), face_ind, obj_ind, mtl_ind, obj_names, mtl_names ), ...
-    '3 columns' );
-assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names(1), mtl_names ), ...
-    '''obj_names''' );
+assert_throws( @() write( vert_list, face_ind, obj_ind, 0 * mtl_ind, obj_names, mtl_names ), ...
+    'Input ''mtl_ind'' cannot contain 0' );                                                       % C++
+assert_throws( @() write( vert_list(:, 1:2), face_ind, obj_ind, mtl_ind, obj_names, mtl_names ), ...
+    'Input ''vert_list'' must have 3 columns.' );                                                 % C++
+assert_throws( @() write( vert_list, face_ind, obj_ind, mtl_ind, obj_names(1), mtl_names ), ...
+    '''obj_names''' );                                                                            % C++
 
 cleanup_files( fn, mesh_dir );
 end
@@ -117,6 +118,7 @@ for i = 1:numel(varargin)
 end
 end
 
+% Request 1 output so that the output-count guard fires
 function out1(varargin)
 x = quadriga_lib.mitsuba_xml_file_write( varargin{:} ); %#ok<NASGU>
 end

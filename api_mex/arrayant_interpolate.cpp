@@ -90,7 +90,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto freq_new = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "freq_new");
     const int use_kernel = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "use_kernel", 0);
 
-
     const arma::uword n_out = i_element.is_empty() ? ant[0].n_elements() : i_element.n_elem;
     const arma::uword n_ang = az.n_cols;
 

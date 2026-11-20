@@ -96,7 +96,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("angular_resolution_deg") = 5.0);
 
     m.def("interpolate", &arrayant_interpolate,
-          py::arg("arrayant"),
+          py::arg("arrayant").none(false),
           py::arg("azimuth").none(false),
           py::arg("elevation").none(false),
           py::kw_only(),

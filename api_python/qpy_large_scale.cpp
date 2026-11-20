@@ -346,8 +346,7 @@ loss_dB, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, model
 - **`center_freq`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column 3
   Normal(0,1), finite (deviation `sigma_P`, car loss); `(n_ut, 4)`, `n_ut = 0` allowed
-- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; list of str or one str;
-  `n_model` entries
+- **`models`** — Models to mix, names as listed above; list of str or one str; `n_model` entries
 - **`weights`** — Probability of each model, finite and >= 0, sum 1 within 1e-6; `(n_model,)`
 - **`d2d_in_max`** — Maximum indoor 2D distance in m, finite and >= 0 (`scenpar["O2I_d2D_in_max"]` of the O2I conf
   files; TR: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings); default: 25.0
@@ -376,10 +375,10 @@ py::tuple o2i_loss(const py::array_t<double> &center_freq,
     arma::vec d2d_in;
     arma::uvec model_ind;
     auto d2d_in_py = qd_python_init_output(rnd_a.n_rows, &d2d_in);
-    auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_ind);
+    auto model_ind_py = qd_python_init_output(rnd_a.n_rows, &model_ind);
 
     const arma::mat loss_dB = quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, d2d_in_max, &d2d_in,
                                                      &model_ind);
 
-    return py::make_tuple(qd_python_copy2numpy(&loss_dB), d2d_in_py, model_index_py);
+    return py::make_tuple(qd_python_copy2numpy(&loss_dB), d2d_in_py, model_ind_py);
 }

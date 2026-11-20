@@ -816,7 +816,7 @@ arma::mat quadriga_lib::o2i_loss(
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column
   3 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0` allowed
-- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; `[n_model]`
+- **`models`** — Models to mix, names as listed above; `[n_model]`
 - **`weights`** — Probability of each model, finite and >= 0, sum 1 within 1e-6; `[n_model]`
 - **`d2d_in_max`** *(optional)* — Maximum indoor 2D distance in [m], finite and >= 0 (key `O2I_d2D_in_max`; TR: 25 m
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)

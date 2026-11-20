@@ -210,15 +210,12 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 
 Also in: [C++](../cpp/site-specific-simulation-tools.md#mitsuba_xml_file_write) · [Python](../python/site-specific-simulation-tools.md#mitsuba_xml_file_write)
 
-- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
-  differentiable radio-propagation simulations
-- Supports grouping faces into named objects with per-face material assignments
-- Optionally maps material names to ITU-defined presets used by Sionna RT
+- The XML file can be loaded by NVIDIA Sionna RT
 - Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
   both the XML and the mesh folder must be distributable together; the XML refers to each PLY file by its path
   relative to the XML file (`<stem>_meshes/<object>.ply`)
-- Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
-  and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- An object whose faces use more than one material is split into one object per material, named
+  `<obj_name>_<mtl_name>`
 
 ### Usage:
 ```matlab
@@ -234,7 +231,8 @@ quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, 
 - **`mtl_ind`** — 1-based material index per triangle; every face must reference a material (0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; cell array of strings; length must equal `max(obj_ind)`
 - **`mtl_names`** — Material names; cell array of strings; length must equal `max(mtl_ind)`
-- **`bsdf`** — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[numel(mtl_names), 17]`; default: `[]` (none)
+- **`bsdf`** — BSDF material parameters per material; ignored by Sionna RT, used only by the Mitsuba renderer;
+  see [obj_file_read](#obj_file_read) for the columns; `[numel(mtl_names), 17]`; default: `[]` (none)
 - **`map_to_itu_materials`** — If `true`, maps material names to ITU presets recognised by Sionna RT; default: `false`
 
 ### See also:

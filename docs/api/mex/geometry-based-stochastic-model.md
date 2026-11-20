@@ -695,8 +695,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#o2i_loss) · [Python](.
 - **`rnd`** — Random values per UT: columns 1 to 3 Uniform in [0, 1] (model choice, two indoor
   distances), column 4 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0`
   allowed
-- **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; cell
-  array of strings or one string; `n_model` entries
+- **`models`** — Models to mix, names as listed above; cell array of strings or one string; `n_model`
+  entries
 - **`weights`** — Probability of each model, finite and >= 0, sum 1 within 1e-6; `[n_model]`
 - **`d2d_in_max`** — Maximum indoor 2D distance in [m], finite and >= 0 (`scenpar.O2I_d2D_in_max` of
   the O2I conf files; TR: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings);

@@ -117,13 +117,18 @@ class test_case(unittest.TestCase):
             f(self.fc, self.rnd, ["low", "foo"], [0.5, 0.5])
         self.assertIn("Model 'foo' is not supported.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f(self.fc, self.rnd, None, self.weights)
+            f(self.fc, self.rnd, [], self.weights)
         self.assertIn("Input 'models' cannot be empty.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # string-list helper
             f(self.fc, self.rnd, ["low", 3], [0.5, 0.5])
         self.assertIn("Expected a string, a list of strings, or None.", str(ctx.exception))
         with self.assertRaises(TypeError):
             f(self.fc, self.rnd, self.models)
+        for i in range(4):  # None for a mandatory input
+            args = [self.fc, self.rnd, self.models, self.weights]
+            args[i] = None
+            with self.assertRaises(TypeError):
+                f(*args)
         with self.assertRaises(TypeError):
             f(self.fc, self.rnd, self.models, self.weights, foo=1)
 
