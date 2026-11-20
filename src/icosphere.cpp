@@ -26,7 +26,7 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 ```
 arma::uword quadriga_lib::icosphere(
     arma::uword n_div,
-    dtype radius,
+    double radius,
     arma::Mat<dtype> &center,
     arma::Col<dtype> *length = nullptr,
     arma::Mat<dtype> *vert = nullptr,
@@ -51,9 +51,10 @@ MD!*/
 
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
 template <typename dtype>
-arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype> &center, arma::Col<dtype> *length,
+arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius_in, arma::Mat<dtype> &center, arma::Col<dtype> *length,
                                     arma::Mat<dtype> *vert, arma::Mat<dtype> *direction, bool direction_xyz)
 {
+    const dtype radius = dtype(radius_in);
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
 
@@ -189,7 +190,7 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
     return n_faces;
 }
 
-template arma::uword quadriga_lib::icosphere(arma::uword n_div, float radius, arma::Mat<float> &center, arma::Col<float> *length,
+template arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<float> &center, arma::Col<float> *length,
                                              arma::Mat<float> *vert, arma::Mat<float> *direction, bool direction_as_spheric);
 
 template arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<double> &center, arma::Col<double> *length,

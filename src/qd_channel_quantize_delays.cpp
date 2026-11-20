@@ -191,9 +191,9 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> &coeff_re_quant,
     std::vector<arma::Cube<dtype>> &coeff_im_quant,
     std::vector<arma::Cube<dtype>> &delay_quant,
-    dtype tap_spacing = (dtype)5.0e-9,
+    double tap_spacing = 5.0e-9,
     arma::uword max_taps = 48,
-    dtype power_exponent = (dtype)1.0,
+    double power_exponent = 1.0,
     int fix_taps = 0);
 ```
 
@@ -237,11 +237,13 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_r
                                    std::vector<arma::Cube<dtype>> &coeff_re_quant,
                                    std::vector<arma::Cube<dtype>> &coeff_im_quant,
                                    std::vector<arma::Cube<dtype>> &delay_quant,
-                                   dtype tap_spacing,
+                                   double tap_spacing_in,
                                    arma::uword max_taps,
-                                   dtype power_exponent,
+                                   double power_exponent_in,
                                    int fix_taps)
 {
+    const dtype tap_spacing = dtype(tap_spacing_in);
+    const dtype power_exponent = dtype(power_exponent_in);
     // --- Input validation ---
     qd_check_alias_list({&coeff_re_quant, &coeff_im_quant, &delay_quant},
                         {"coeff_re_quant", "coeff_im_quant", "delay_quant"}, &coeff_re, &coeff_im, &delay);
@@ -719,9 +721,9 @@ template void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<float>> &coeff_re_quant,
     std::vector<arma::Cube<float>> &coeff_im_quant,
     std::vector<arma::Cube<float>> &delay_quant,
-    float tap_spacing,
+    double tap_spacing,
     arma::uword max_taps,
-    float power_exponent,
+    double power_exponent,
     int fix_taps);
 
 template void quadriga_lib::quantize_delays(

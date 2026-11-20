@@ -46,7 +46,7 @@ void calc_diffraction_gain(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    dtype center_freq,
+    double center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
     arma::Mat<dtype> *polmat = nullptr,
@@ -120,7 +120,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          const arma::Mat<dtype> &mesh,
                                          const arma::uvec &mtl_ind,
                                          const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                         dtype center_freq,
+                                         double center_freq_in,
                                          int lod,
                                          arma::Col<dtype> *gain,
                                          arma::Mat<dtype> *polmat,
@@ -134,6 +134,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          bool apply_fspl,
                                          bool apply_phase)
 {
+    const dtype center_freq = dtype(center_freq_in);
     if (orig.n_elem == 0 || dest.n_elem == 0)
         throw std::invalid_argument("Inputs 'orig' and 'dest' cannot be empty.");
     if (lod < 0 || lod > 7)
@@ -453,7 +454,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 // Account for in-medium gain if the last segment ends inside an object
                 // Note: the in-medium gain for intermediate segments is resolved by ray_state_update
                 if (last_segment && !ray_continues)
-                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_freq, scalar_mode) : 1.0;
+                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_freq, scalar_mode) : dtype(1);
 
                 // Capture cos(theta_air)
                 if (old_cur == 0 && new_cur != 0)                     // air -> medium: capture cos(theta_air)
@@ -597,7 +598,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
         if (p_coord)
         {
-            scl = (scl <= 1e-6) ? 1.0 : (dtype)1.0 / scl;
+            scl = (scl <= 1e-6) ? dtype(1) : (dtype)1.0 / scl;
             for (arma::uword iS = 0; iS < n_seg - 1; ++iS)
             {
                 dtype x = (dtype)0.0, y = (dtype)0.0, z = (dtype)0.0;
@@ -683,7 +684,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, const arma::Mat<float> &dest,
                                                   const arma::Mat<float> &mesh, const arma::uvec &mtl_ind,
                                                   const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-                                                  float center_freq, int lod,
+                                                  double center_freq, int lod,
                                                   arma::Col<float> *gain, arma::Mat<float> *polmat, arma::Cube<float> *coord,
                                                   int verbose, const arma::u32_vec &sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,

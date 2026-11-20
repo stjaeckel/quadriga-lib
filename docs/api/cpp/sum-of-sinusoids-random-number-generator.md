@@ -447,8 +447,8 @@ arma::Mat<dtype> quadriga_lib::sos_generate(
     bool uniform_smp = true,
     arma::uword n_dir = 10,
     bool random_init = true,
-    dtype spatial_freq_min = 0.0,
-    dtype spatial_freq_max = NAN,
+    double spatial_freq_min = 0.0,
+    double spatial_freq_max = NAN,
     arma::sword seed = -1);
 ```
 
@@ -603,7 +603,7 @@ arma::Mat<dtype> quadriga_lib::sos_preset(
     const std::string &name,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
-    dtype dist_decorr = 10.0);
+    double dist_decorr = 10.0);
 ```
 
 ### Inputs:
@@ -867,7 +867,7 @@ void quadriga_lib::sos_remove_bias(
     const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
-    dtype spatial_freq_scale_b = 1.0);
+    double spatial_freq_scale_b = 1.0);
 ```
 
 ### Inputs:
@@ -956,7 +956,7 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
     const arma::Col<dtype> &acf = arma::Col<dtype>(),
     const arma::Col<dtype> &dist = arma::Col<dtype>(),
-    dtype spatial_freq_scale_b = 1.0,
+    double spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);
 ```

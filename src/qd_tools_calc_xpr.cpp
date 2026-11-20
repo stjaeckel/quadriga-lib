@@ -53,7 +53,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
     arma::Mat<dtype> *xpr = nullptr,
     arma::Col<dtype> *pg = nullptr,
     bool include_los = false,
-    dtype window_size = 0.01);
+    double window_size = 0.01);
 ```
 
 ## Inputs:
@@ -89,8 +89,9 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
                                                  arma::Mat<dtype> *xpr,
                                                  arma::Col<dtype> *pg,
                                                  bool include_los,
-                                                 dtype window_size)
+                                                 double window_size_in)
 {
+    const dtype window_size = dtype(window_size_in);
     // --- Input validation ---
     arma::uword n_cir = (arma::uword)powers.size();
     if (n_cir == 0)
@@ -284,7 +285,7 @@ template void quadriga_lib::calc_cross_polarization_ratio(
     arma::Mat<float> *xpr,
     arma::Col<float> *pg,
     bool include_los,
-    float window_size);
+    double window_size);
 
 template void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<double>> &powers,

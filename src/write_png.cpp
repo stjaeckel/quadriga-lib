@@ -29,8 +29,8 @@ void quadriga_lib::write_png(
     const std::string &fn,
     const arma::Mat<dtype> &data,
     const std::string &colormap = "jet",
-    dtype min_val = NAN,
-    dtype max_val = NAN,
+    double min_val = NAN,
+    double max_val = NAN,
     bool log_transform = false);
 ```
 
@@ -45,8 +45,10 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::write_png(const std::string &fn, const arma::Mat<dtype> &data, const std::string &colormap,
-                             dtype min_val, dtype max_val, bool log_transform)
+                             double min_val_in, double max_val_in, bool log_transform)
 {
+    const dtype min_val = dtype(min_val_in);
+    const dtype max_val = dtype(max_val_in);
     if (data.n_elem == 0)
         throw std::invalid_argument("Input 'data' must not be empty.");
 
@@ -133,7 +135,7 @@ void quadriga_lib::write_png(const std::string &fn, const arma::Mat<dtype> &data
 }
 
 template void quadriga_lib::write_png(const std::string &fn, const arma::Mat<float> &data, const std::string &colormap,
-                                      float min_val, float max_val, bool log_transform);
+                                      double min_val, double max_val, bool log_transform);
 
 template void quadriga_lib::write_png(const std::string &fn, const arma::Mat<double> &data, const std::string &colormap,
                                       double min_val, double max_val, bool log_transform);

@@ -90,7 +90,7 @@ void quadriga_lib::get_channels_spherical(
     arma::Cube<dtype> &coeff_re,
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Cube<dtype> *aod = nullptr,
@@ -148,10 +148,11 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
                                           const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
                                           const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &polmat,
                                           arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
-                                          dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                          double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                           int use_kernel)
 {
+    const dtype center_freq = dtype(center_freq_in);
     constexpr dtype zero = (dtype)0.0;
     constexpr dtype rC = dtype(1.0 / qd_speed_of_light);
     dtype wavelength = (center_freq > zero) ? (dtype)qd_speed_of_light / center_freq : (dtype)1.0;
@@ -403,7 +404,7 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    const arma::Mat<float> &fbs_pos, const arma::Mat<float> &lbs_pos,
                                                    const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &polmat,
                                                    arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
-                                                   float center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                   double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
                                                    int use_kernel);
 
@@ -452,7 +453,7 @@ void quadriga_lib::get_channels_spherical_vec(
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     std::vector<arma::Cube<dtype>> *aod = nullptr,
@@ -495,11 +496,12 @@ void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<dtype
                                               const std::vector<arma::Mat<dtype>> &polmat,
                                               std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                               std::vector<arma::Cube<dtype>> &delay,
-                                              dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                              double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
                                               std::vector<arma::Cube<dtype>> *aod, std::vector<arma::Cube<dtype>> *eod,
                                               std::vector<arma::Cube<dtype>> *aoa, std::vector<arma::Cube<dtype>> *eoa,
                                               std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
+    const dtype center_freq = dtype(center_freq_in);
     const size_t n_snap = fbs_pos.size();
     if (lbs_pos.size() != n_snap || path_gain.size() != n_snap || path_length.size() != n_snap || polmat.size() != n_snap)
         throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must have the same length.");
@@ -533,7 +535,7 @@ template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::array
                                                        const std::vector<arma::Mat<float>> &polmat,
                                                        std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
                                                        std::vector<arma::Cube<float>> &delay,
-                                                       float center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                       double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                        std::vector<arma::Cube<float>> *aod, std::vector<arma::Cube<float>> *eod,
                                                        std::vector<arma::Cube<float>> *aoa, std::vector<arma::Cube<float>> *eoa,
                                                        std::vector<arma::Cube<std::complex<float>>> *coeff, int use_kernel);

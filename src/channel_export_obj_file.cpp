@@ -27,12 +27,12 @@ void quadriga_lib::channel_export_obj_file(
     const std::string &fn,
     const channel<dtype> &chan,
     arma::uword max_paths = 0,
-    dtype gain_max_dB = -60.0,
-    dtype gain_min_dB = -140.0,
+    double gain_max_dB = -60.0,
+    double gain_min_dB = -140.0,
     const std::string &colormap = "jet",
     const arma::uvec &i_snap = arma::uvec(),
-    dtype radius_max = 0.05,
-    dtype radius_min = 0.01,
+    double radius_max = 0.05,
+    double radius_min = 0.01,
     arma::uword n_edges = 5);
 ```
 
@@ -56,12 +56,16 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<dtype> &chan,
                                            arma::uword max_paths,
-                                           dtype gain_max_dB, dtype gain_min_dB,
+                                           double gain_max_dB_in, double gain_min_dB_in,
                                            const std::string &colormap,
                                            const arma::uvec &i_snap_sel,
-                                           dtype radius_max, dtype radius_min,
+                                           double radius_max_in, double radius_min_in,
                                            arma::uword n_edges)
 {
+    const dtype gain_max_dB = dtype(gain_max_dB_in);
+    const dtype gain_min_dB = dtype(gain_min_dB_in);
+    const dtype radius_max = dtype(radius_max_in);
+    dtype radius_min = dtype(radius_min_in);
 
     std::string error_message = chan.is_valid();
     if (error_message.length() != 0)
@@ -332,8 +336,8 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
 }
 
 template void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<float> &chan, arma::uword max_paths,
-                                                    float gain_max_dB, float gain_min_dB, const std::string &colormap,
-                                                    const arma::uvec &i_snap, float radius_max, float radius_min,
+                                                    double gain_max_dB, double gain_min_dB, const std::string &colormap,
+                                                    const arma::uvec &i_snap, double radius_max, double radius_min,
                                                     arma::uword n_edges);
 template void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<double> &chan, arma::uword max_paths,
                                                     double gain_max_dB, double gain_min_dB, const std::string &colormap,

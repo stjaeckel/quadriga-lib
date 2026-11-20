@@ -87,12 +87,12 @@ namespace quadriga_lib
         const std::string &fn,                   // Filename of the OBJ file
         const channel<dtype> &chan,              // Channel with ray tracing data (n_interact, interact_coord)
         arma::uword max_paths = 0,               // Maximum number of paths to be shown, Default: all
-        dtype gain_max_dB = -60.0,               // Maximum path gain in dB (only for color-coding)
-        dtype gain_min_dB = -140.0,              // Minimum path gain in dB (only for color-coding and path selection)
+        double gain_max_dB = -60.0,              // Maximum path gain in dB (only for color-coding)
+        double gain_min_dB = -140.0,             // Minimum path gain in dB (only for color-coding and path selection)
         const std::string &colormap = "jet",     // Colormap for the visualization
         const arma::uvec &i_snap = arma::uvec(), // Snapshot indices, 0-based; empty = export all
-        dtype radius_max = 0.05,                 // Maximum tube radius in meters
-        dtype radius_min = 0.01,                 // Minimum tube radius in meters
+        double radius_max = 0.05,                // Maximum tube radius in meters
+        double radius_min = 0.01,                // Minimum tube radius in meters
         arma::uword n_edges = 5);                // Number of vertices in the circle building the tube, must be >= 3
 
     // Class for storing and managing path data
@@ -426,9 +426,9 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> &coeff_im_quant, // Output coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
         std::vector<arma::Cube<dtype>> &delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps], or [1, 1, n_taps]
                                                         //   for delay input [1, 1, n_path] with fix_taps 1 or 2
-        dtype tap_spacing = 5.0e-9,                     // Tap spacing in seconds
+        double tap_spacing = 5.0e-9,                    // Tap spacing in seconds
         arma::uword max_taps = 48,                      // 0 = unlimited
-        dtype power_exponent = 1.0,                     // Interpolation exponent (0.5=wideband, 1.0=narrowband)
+        double power_exponent = 1.0,                    // Interpolation exponent (0.5=wideband, 1.0=narrowband)
         int fix_taps = 0);                              // 0-3, delay sharing mode
 
     // Pre-parsed QRT file metadata cache for repeated qrt_file_read calls
@@ -583,7 +583,7 @@ namespace quadriga_lib
         arma::Cube<dtype> &coeff_re,            // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path]
         arma::Cube<dtype> &coeff_im,            // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path]
         arma::Cube<dtype> &delay,               // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path]
-        dtype center_freq = dtype(0.0),         // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+        double center_freq = 0.0,               // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
         bool use_absolute_delays = false,       // Option: If true, the LOS delay is included for all paths
         bool add_fake_los_path = false,         // Option: Add one path, slot 0 = LOS path (zero power if none was present)
         arma::Cube<dtype> *aod = nullptr,       // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
@@ -613,7 +613,7 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> &coeff_re,                      // Output: Channel coefficients, real part, vector (n_snap) of tensors [n_rx, n_tx, n_path]
         std::vector<arma::Cube<dtype>> &coeff_im,                      // Output: Channel coefficients, imaginary part, vector (n_snap) of tensors [n_rx, n_tx, n_path]
         std::vector<arma::Cube<dtype>> &delay,                         // Output: Propagation delay in seconds, vector (n_snap) of tensors [n_rx, n_tx, n_path]
-        dtype center_freq = dtype(0.0),                                // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+        double center_freq = 0.0,                                      // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
         bool use_absolute_delays = false,                              // Option: If true, the LOS delay is included for all paths
         bool add_fake_los_path = false,                                // Option: Add one path, slot 0 = LOS path (zero power if none was present)
         std::vector<arma::Cube<dtype>> *aod = nullptr,                 // Optional output: Azimuth of Departure angles in [rad], vector (n_snap) of tensors [n_rx, n_tx, n_path]
@@ -654,7 +654,7 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> &delay,                         // Output: delays [s], length [n_freq_new], each [n_rx, n_tx, n_path]
         bool use_absolute_delays = false,                              // If true, include LOS delay in all paths
         bool add_fake_los_path = false,                                // Add one path, slot 0 = LOS path (zero power if none was present)
-        dtype propagation_speed = 299792458.0,                         // Wave propagation speed [m/s]
+        double propagation_speed = 299792458.0,                        // Wave propagation speed [m/s]
         std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr, // Optional output: complex coeff_re / coeff_im (then left empty)
         int use_kernel = 0);                                           // Kernel of the antenna interpolation: 0 = auto (GENERIC), 1 = GENERIC, 2 = AVX2
 
@@ -693,8 +693,8 @@ namespace quadriga_lib
         arma::Cube<dtype> &coeff_im,                                // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path_irs]
         arma::Cube<dtype> &delay,                                   // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path_irs]
         arma::uword i_irs = 0,                                      // IRS codebook entry (= port number in the IRS array)
-        dtype threshold_dB = -140.0,                                // Threshold in dB relative to path gain below which paths are discarded from the output
-        dtype center_freq = 0.0,                                    // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+        double threshold_dB = -140.0,                               // Threshold in dB relative to path gain below which paths are discarded from the output
+        double center_freq = 0.0,                                   // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
         bool use_absolute_delays = false,                           // Option: If true, the LOS delay is included for all paths
         arma::Cube<dtype> *aod = nullptr,                           // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
         arma::Cube<dtype> *eod = nullptr,                           // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
@@ -735,7 +735,7 @@ namespace quadriga_lib
         arma::Cube<dtype> &coeff_re,            // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
         arma::Cube<dtype> &coeff_im,            // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
         arma::Cube<dtype> &delay,               // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
-        dtype center_freq = dtype(0.0),         // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+        double center_freq = 0.0,               // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
         bool use_absolute_delays = false,       // Option: If true, the LOS delay is included for all paths
         bool add_fake_los_path = false,         // Option: Add one path, slot 0 = LOS path (zero power if none was present)
         arma::Col<dtype> *rx_Doppler = nullptr, // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
@@ -764,7 +764,7 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> &coeff_re,                      // Output: Channel coefficients, real part, vector (n_snap) of tensors [n_rx, n_tx, n_path(+1)]
         std::vector<arma::Cube<dtype>> &coeff_im,                      // Output: Channel coefficients, imaginary part, vector (n_snap) of tensors [n_rx, n_tx, n_path(+1)]
         std::vector<arma::Cube<dtype>> &delay,                         // Output: Propagation delay in seconds, vector (n_snap) of tensors [n_rx, n_tx, n_path(+1)]
-        dtype center_freq = dtype(0.0),                                // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+        double center_freq = 0.0,                                      // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
         bool use_absolute_delays = false,                              // Option: If true, the LOS delay is included for all paths
         bool add_fake_los_path = false,                                // Option: Add one path, slot 0 = LOS path (zero power if none was present)
         std::vector<arma::Col<dtype>> *rx_Doppler = nullptr,           // Optional output: Doppler weights for moving RX, vector (n_snap) of vectors [n_path(+1)]

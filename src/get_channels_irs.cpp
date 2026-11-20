@@ -66,8 +66,8 @@ void quadriga_lib::get_channels_irs(
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
     arma::uword i_irs = 0,
-    dtype threshold_dB = -140.0,
-    dtype center_freq = 0.0,
+    double threshold_dB = -140.0,
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     arma::Cube<dtype> *aod = nullptr,
     arma::Cube<dtype> *eod = nullptr,
@@ -139,11 +139,13 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
                                     const arma::Mat<dtype> &fbs_pos_2, const arma::Mat<dtype> &lbs_pos_2,
                                     const arma::Col<dtype> &path_gain_2, const arma::Col<dtype> &path_length_2, const arma::Mat<dtype> &polmat_2,
                                     arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
-                                    arma::uword i_irs, dtype threshold_dB, dtype center_freq, bool use_absolute_delays,
+                                    arma::uword i_irs, double threshold_dB_in, double center_freq_in, bool use_absolute_delays,
                                     arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                     const arrayant<dtype> &irs_array_2, const std::vector<bool> &active_path,
                                     std::vector<bool> *active_path_out, int use_kernel)
 {
+    const dtype threshold_dB = dtype(threshold_dB_in);
+    const dtype center_freq = dtype(center_freq_in);
     // Positions and orientations, checked here so that an error names the argument (the segment calls of
     // get_channels_spherical would report 'irs_pos' as 'rx_pos' or 'tx_pos')
     const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_rp = qd_xyz(rx_pos, "rx_pos");
@@ -349,7 +351,7 @@ template void quadriga_lib::get_channels_irs(const arrayant<float> &tx_array, co
                                              const arma::Mat<float> &fbs_pos_2, const arma::Mat<float> &lbs_pos_2,
                                              const arma::Col<float> &path_gain_2, const arma::Col<float> &path_length_2, const arma::Mat<float> &polmat_2,
                                              arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
-                                             arma::uword i_irs, float threshold_dB, float center_freq, bool use_absolute_delays,
+                                             arma::uword i_irs, double threshold_dB, double center_freq, bool use_absolute_delays,
                                              arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
                                              const arrayant<float> &irs_array_2, const std::vector<bool> &active_path, std::vector<bool> *active_path_out, int use_kernel);
 

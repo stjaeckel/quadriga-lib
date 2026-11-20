@@ -26,7 +26,7 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 void generate_diffraction_paths(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &dest,
-    dtype center_freq,
+    double center_freq,
     int lod,
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
@@ -65,7 +65,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
                                               const arma::Mat<dtype> &dest,
-                                              dtype center_freq,
+                                              double center_freq_in,
                                               int lod,
                                               arma::Cube<dtype> &ray_x,
                                               arma::Cube<dtype> &ray_y,
@@ -73,6 +73,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
                                               arma::Cube<dtype> &weight,
                                               bool scalar_mode)
 {
+    const dtype center_freq = dtype(center_freq_in);
     // Check data validity
     if (orig.n_rows == 0)
         throw std::invalid_argument("Input 'orig' cannot be empty.");
@@ -277,7 +278,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     }
 }
 
-template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> &orig, const arma::Mat<float> &dest, float center_freq, int lod,
+template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> &orig, const arma::Mat<float> &dest, double center_freq, int lod,
                                                        arma::Cube<float> &ray_x, arma::Cube<float> &ray_y, arma::Cube<float> &ray_z, arma::Cube<float> &weight, bool scalar_mode);
 
 template void quadriga_lib::generate_diffraction_paths(const arma::Mat<double> &orig, const arma::Mat<double> &dest, double center_freq, int lod,

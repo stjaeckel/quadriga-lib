@@ -1539,7 +1539,7 @@ arma::Mat<dtype> quadriga_lib::sos_preset(
     const std::string &name,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
-    dtype dist_decorr = 10.0);
+    double dist_decorr = 10.0);
 ```
 
 ## Inputs:
@@ -1563,8 +1563,9 @@ template <typename dtype>
 arma::Mat<dtype> quadriga_lib::sos_preset(const std::string &name,
                                           arma::Col<dtype> *acf,
                                           arma::Col<dtype> *dist,
-                                          dtype dist_decorr)
+                                          double dist_decorr_in)
 {
+    const dtype dist_decorr = dtype(dist_decorr_in);
     // ACF type: 0 = Exp, 1 = Gauss, 2 = Comb
     int type = -1;
     arma::uword n_coeff = 0;
@@ -1616,5 +1617,5 @@ arma::Mat<dtype> quadriga_lib::sos_preset(const std::string &name,
     return spatial_freq;
 }
 
-template arma::Mat<float> quadriga_lib::sos_preset(const std::string &name, arma::Col<float> *acf, arma::Col<float> *dist, float dist_decorr);
+template arma::Mat<float> quadriga_lib::sos_preset(const std::string &name, arma::Col<float> *acf, arma::Col<float> *dist, double dist_decorr);
 template arma::Mat<double> quadriga_lib::sos_preset(const std::string &name, arma::Col<double> *acf, arma::Col<double> *dist, double dist_decorr);

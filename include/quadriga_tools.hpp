@@ -44,8 +44,8 @@ namespace quadriga_lib
     arma::Col<dtype> calc_delay_spread(
         const std::vector<arma::Col<dtype>> &delays, // Delays in [s], Vector (n_cir) of vectors of length [n_path]
         const std::vector<arma::Col<dtype>> &powers, // Path powers, linear scale, Vector (n_cir) of vectors of length [n_path]
-        dtype threshold_dB = 100.0,                  // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold_dB are excluded
-        dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
+        double threshold_dB = 100.0,                 // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold_dB are excluded
+        double granularity = 0.0,                    // Window size in seconds to group paths in delay domain
         arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
 
     // Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
@@ -64,7 +64,7 @@ namespace quadriga_lib
         std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
         bool wrapping = false,                          // Rotate the mean direction to the equator before the spread calculation
         bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for wrapping = true)
-        dtype quantize_deg = 0.0);                      // Angular quantization step in [deg], 0 = disabled
+        double quantize_deg = 0.0);                     // Angular quantization step in [deg], 0 = disabled
 
     // Calculate the Rician K-Factor
     // - KF = ratio of signal power in the dominant line-of-sight (LOS) path to the power in the scattered (non-line-of-sight, or NLOS) paths
@@ -79,7 +79,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates. Size [3,1] (fixed RX) or [3, n_cir] (mobile RX).
         arma::Col<dtype> *kf = nullptr,                   // Rician K-factor, linear scale, Length [n_cir]
         arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers), Length [n_cir]
-        dtype window_size = 0.01);                        // LOS window size in meters
+        double window_size = 0.01);                       // LOS window size in meters
 
     // Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
     // - Uses the aggregate power ratio method: total co-pol / total cross-pol across all paths
@@ -101,7 +101,7 @@ namespace quadriga_lib
         arma::Mat<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Size [n_cir, 6], Cols: 0=agg. linear, 1=V-XPR (receive V), 2=H-XPR (receive H), 3=agg. circular, 4=LHCP, 5=RHCP
         arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers × polarimetric powers in polmat), Length [n_cir]
         bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
-        dtype window_size = 0.01);                        // LOS window size in meters, paths with path_length <= dTR + window_size are excluded
+        double window_size = 0.01);                       // LOS window size in meters, paths with path_length <= dTR + window_size are excluded
 
     // ---- Site-specific simulation tools ----
 
@@ -118,7 +118,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &mesh,                                        // Triangle vertices; Size: [ n_mesh, 9 ]
         const arma::uvec &mtl_ind,                                           // 1-based material index, 0 = no material; Size: [n_mesh]
         const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
-        dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz in scalar mode
+        double center_freq,                                                  // Center frequency in [Hz]; acoustic Hz in scalar mode
         int lod = 2,                                                         // Level of detail, 0-7 (0 = direct ray only)
         arma::Col<dtype> *gain = nullptr,                                    // Diffraction gain, linear scale; Size: [ n_pos ]
         arma::Mat<dtype> *polmat = nullptr,                                  // Polarization transfer matrix; Size [8, n_pos] for EM or [2, n_pos] for scalar
@@ -187,7 +187,7 @@ namespace quadriga_lib
     void generate_diffraction_paths(
         const arma::Mat<dtype> &orig, // Origin points of the ellipsoid, Size [ n_pos, 3 ]
         const arma::Mat<dtype> &dest, // Destination points of the ellipsoid [ n_pos, 3 ]
-        dtype center_freq,            // Frequency in [Hz]; acoustic Hz in scalar mode
+        double center_freq,           // Frequency in [Hz]; acoustic Hz in scalar mode
         int lod,                      // Level of detail: Scalar 1-7
         arma::Cube<dtype> &ray_x,     // X-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
         arma::Cube<dtype> &ray_y,     // Y-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
@@ -203,7 +203,7 @@ namespace quadriga_lib
     template <typename dtype> // Allowed types: float or double
     arma::uword icosphere(
         arma::uword n_div,                     // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
-        dtype radius,                          // Radius of the icosphere in meters
+        double radius,                         // Radius of the icosphere in meters
         arma::Mat<dtype> &center,              // Pointing vector from the origin to the center of the triangle, matrix of size [n_faces, 3]
         arma::Col<dtype> *length = nullptr,    // Length of the pointing vector "center" (slightly smaller than 1), vector of length [n_faces]
         arma::Mat<dtype> *vert = nullptr,      // Vectors pointing from "center" to the vertices of the triangle, matrix of size [n_ray, 9], [x1 y1 z1 x2 y2 z2 x3 y3 z3]
@@ -260,7 +260,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &vert_list = arma::Mat<dtype>(),                                                                      // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
         const arma::umat &face_ind = arma::umat(),                                                                                   // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
         const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),                                                                           // BSDF data for the .MTL File, size [mtl_names.size, 17]
-        const dtype threshold = 0.001,                                                                                               // Co-location threshold for vertices, Default: 1 mm
+        double threshold = 0.001,                                                                                                    // Co-location threshold for vertices, Default: 1 mm
         const arma::uvec &csv_ind = arma::uvec(),                                                                                    // 1-based EM/acoustic-material index per face (0 = no material)
         const std::vector<std::string> &csv_names = std::vector<std::string>(),                                                      // EM/acoustic material names
         const std::unordered_map<std::string, std::vector<dtype>> &csv_prop = std::unordered_map<std::string, std::vector<dtype>>(), // Material properties keyed by column name
@@ -274,7 +274,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
         const arma::uvec &obj_ind,                  // Object ID per triangle (any values, e.g. 0-based from obj_file_read), Size: [ n_mesh ]
         std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
-        dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
+        double tolerance = 0.0005);                 // Optional input: Detection tolerance in meters
 
     // Convert paths to tubes
     // - Paths are defined by a list of ordered points
@@ -287,7 +287,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &path_coord, // Path coordinates, size [3, n_coord ]
         arma::Mat<dtype> &vert,             // Output: Vertices of the tube, size [3, n_coord * n_edges ]
         arma::umat &faces,                  // Output: Face indices, 0-based, size [4, (n_coord-1) * n_edges]
-        dtype radius = 1.0,                 // Tube radius in meters
+        double radius = 1.0,                // Tube radius in meters
         arma::uword n_edges = 5);           // Number of points in the circle building the tube, must be >= 3
 
     // Calculate the axis-aligned bounding box (AABB) of a point cloud
@@ -339,13 +339,13 @@ namespace quadriga_lib
         const arma::Mat<dtype> &points,           // Points in 3D space, size: [n_points, 3]
         const arma::Mat<dtype> &mesh,             // Triangular mesh faces, size: [n_mesh, 9]
         const arma::uvec &obj_ind = arma::uvec(), // Optional object indices, 0-based, size: [n_mesh]
-        dtype distance = 0.0);                    // Optional minimum distance from objects in [m]
+        double distance = 0.0);                   // Optional minimum distance from objects in [m]
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
     void ray_mesh_interact(
         int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
-        dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz for types 3-5
+        double center_freq,                                                  // Center frequency in [Hz]; acoustic Hz for types 3-5
         const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
         const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
         const arma::Mat<dtype> *mesh,                                        // Triangle mesh faces, [n_mesh, 9]
@@ -376,7 +376,7 @@ namespace quadriga_lib
     template <typename dtype>
     void ray_state_update(
         int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
-        dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz for types 3-5
+        double center_freq,                                                  // Center frequency in [Hz]; acoustic Hz for types 3-5
         const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
         const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
         const arma::Mat<dtype> *fbsN,                                        // First interaction points in GCS, [n_rayN, 3]
@@ -417,8 +417,8 @@ namespace quadriga_lib
     dtype medium_gain(
         const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
         arma::uword iM,                                                      // 1-based material index
-        dtype dist,                                                          // Length of the ray inside the medium
-        dtype center_freq,                                                   // Frequency in Hz; acoustic Hz in scalar mode
+        double dist,                                                         // Length of the ray inside the medium
+        double center_freq,                                                  // Frequency in Hz; acoustic Hz in scalar mode
         bool scalar_mode = false);                                           // Scalar (acoustic) mode
 
     // Calculate lumped interface transmission gain (att + coincidence)
@@ -426,7 +426,7 @@ namespace quadriga_lib
     dtype interface_gain(
         const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
         arma::uword iM,                                                      // 1-based material index of the entered material
-        dtype center_freq,                                                   // Frequency in Hz; acoustic Hz in scalar mode
+        double center_freq,                                                  // Frequency in Hz; acoustic Hz in scalar mode
         bool scalar_mode = false);                                           // Scalar (acoustic) mode
 
     // Real refractive index n = Re(sqrt(eta*mu)) of a medium; iM is 1-based (0 = air -> 1.0)
@@ -434,7 +434,7 @@ namespace quadriga_lib
     dtype refractive_index(
         const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
         arma::uword iM,                                                      // 1-based material index of the entered material
-        dtype center_freq,                                                   // Frequency in Hz; acoustic Hz in scalar mode
+        double center_freq,                                                  // Frequency in Hz; acoustic Hz in scalar mode
         bool scalar_mode = false);                                           // Scalar (acoustic) mode
 
     // Calculate the intersections of ray tubes with point clouds
@@ -538,8 +538,8 @@ namespace quadriga_lib
         const std::string &fn,               // Filename of the PNG file, string
         const arma::Mat<dtype> &data,        // Data matrix
         const std::string &colormap = "jet", // Colormap
-        dtype min_val = NAN,                 // Lower clipping bound, NaN = data minimum
-        dtype max_val = NAN,                 // Upper clipping bound, NaN = data maximum
+        double min_val = NAN,                // Lower clipping bound, NaN = data minimum
+        double max_val = NAN,                // Upper clipping bound, NaN = data maximum
         bool log_transform = false);         // Transform data to log-domain (10*log10(data))
 
     // Polarization transfer (Jones) matrix threading along a ray path

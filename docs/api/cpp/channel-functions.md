@@ -318,12 +318,12 @@ void quadriga_lib::channel_export_obj_file(
     const std::string &fn,
     const channel<dtype> &chan,
     arma::uword max_paths = 0,
-    dtype gain_max_dB = -60.0,
-    dtype gain_min_dB = -140.0,
+    double gain_max_dB = -60.0,
+    double gain_min_dB = -140.0,
     const std::string &colormap = "jet",
     const arma::uvec &i_snap = arma::uvec(),
-    dtype radius_max = 0.05,
-    dtype radius_min = 0.01,
+    double radius_max = 0.05,
+    double radius_min = 0.01,
     arma::uword n_edges = 5);
 ```
 
@@ -1295,9 +1295,9 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> &coeff_re_quant,
     std::vector<arma::Cube<dtype>> &coeff_im_quant,
     std::vector<arma::Cube<dtype>> &delay_quant,
-    dtype tap_spacing = (dtype)5.0e-9,
+    double tap_spacing = 5.0e-9,
     arma::uword max_taps = 48,
-    dtype power_exponent = (dtype)1.0,
+    double power_exponent = 1.0,
     int fix_taps = 0);
 ```
 

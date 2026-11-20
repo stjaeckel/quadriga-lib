@@ -285,7 +285,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind,
     std::vector<std::string> *reason = nullptr,
-    dtype tolerance = 0.0005);
+    double tolerance = 0.0005);
 ```
 
 ## Inputs:
@@ -307,8 +307,9 @@ MD!*/
 // Tests if 3D objects overlap (have a shared volume or boolean intersection)
 template <typename dtype>
 arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const arma::uvec &obj_ind,
-                                          std::vector<std::string> *reason, dtype tolerance)
+                                          std::vector<std::string> *reason, double tolerance_in)
 {
+    const dtype tolerance = dtype(tolerance_in);
     const dtype eps = (dtype)1.0e-5; // Numeric tolerance
 
     // An empty mesh has no overlapping objects
@@ -904,5 +905,5 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
     return overlap_ind;
 }
 
-template arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<float> &mesh, const arma::uvec &obj_ind, std::vector<std::string> *reason, float tolerance);
+template arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<float> &mesh, const arma::uvec &obj_ind, std::vector<std::string> *reason, double tolerance);
 template arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<double> &mesh, const arma::uvec &obj_ind, std::vector<std::string> *reason, double tolerance);

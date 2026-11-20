@@ -59,7 +59,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth) · 
 void quadriga_lib::arrayant_calc_beamwidth(
     const arrayant<dtype> &ant,
     const arma::uvec &i_element = arma::uvec(),
-    dtype threshold_dB = 3.0,
+    double threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
     arma::Col<dtype> *az_point_ang_deg = nullptr,
@@ -105,7 +105,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth) · 
 void quadriga_lib::arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
         const arma::uvec &i_element = arma::uvec(),
-        dtype threshold_dB = 3.0,
+        double threshold_dB = 3.0,
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,
         arma::Mat<dtype> *az_point_ang_deg = nullptr,
@@ -212,7 +212,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
     const arrayant<dtype> &ant,
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    dtype propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0);
 ```
 
 ### Inputs:
@@ -252,7 +252,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    dtype propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0);
 ```
 
 ### Inputs:
@@ -427,9 +427,9 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_export_obj_file) ·
 void quadriga_lib::arrayant_export_obj_file(
     const std::string &fn,
     const arrayant<dtype> &ant,
-    dtype directivity_range_dB = 30.0,
+    double directivity_range_dB = 30.0,
     const std::string &colormap = "jet",
-    dtype object_radius = 1.0,
+    double object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
     const arma::uvec &i_element = arma::uvec());
 ```
@@ -788,16 +788,16 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
     arma::uword M = 1, 
     arma::uword N = 1, 
-    dtype center_freq = 299792458.0,
+    double center_freq = 299792458.0,
     unsigned pol = 1, 
-    dtype tilt = 0.0, 
-    dtype spacing = 0.5, 
+    double tilt = 0.0, 
+    double spacing = 0.5, 
     arma::uword Mg = 1,
     arma::uword Ng = 1, 
-    dtype dgv = 0.5, 
-    dtype dgh = 0.5,
+    double dgv = 0.5, 
+    double dgh = 0.5,
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
-    dtype res = 1.0);
+    double res = 1.0);
 ```
 
 ### Inputs:
@@ -838,10 +838,10 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 ### Declaration:
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
-    dtype az_3dB = 90.0,
-    dtype el_3dB = 90.0, 
-    dtype rear_gain_lin = 0.0, 
-    dtype res = 1.0);
+    double az_3dB = 90.0,
+    double el_3dB = 90.0, 
+    double rear_gain_lin = 0.0, 
+    double res = 1.0);
 ```
 
 ### Inputs:
@@ -864,7 +864,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res = 1.0);
 ```
 
 ### Inputs:
@@ -884,7 +884,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res = 1.0);
 ```
 
 ### Inputs:
@@ -915,13 +915,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
     arma::Col<dtype> az = {0.0},
     arma::Col<dtype> el = {0.0},
     arma::Col<dtype> weight = {1.0},
-    dtype center_freq = 299792458.0,
+    double center_freq = 299792458.0,
     unsigned pol = 1,
-    dtype spacing = 0.5,
-    dtype az_3dB = 120.0,
-    dtype el_3dB = 120.0,
-    dtype rear_gain_lin = 0.0,
-    dtype res = 1.0,
+    double spacing = 0.5,
+    double az_3dB = 120.0,
+    double el_3dB = 120.0,
+    double rear_gain_lin = 0.0,
+    double res = 1.0,
     bool separate_beams = false,
     bool apply_weights = false);
 ```
@@ -961,7 +961,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res = 1.0);
 ```
 
 ### Inputs:
@@ -985,10 +985,10 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
     arma::uword N = 1, 
-    dtype center_freq = 299792458.0, 
-    dtype spacing = 0.5,
+    double center_freq = 299792458.0, 
+    double spacing = 0.5,
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
-    dtype res = 1.0);
+    double res = 1.0);
 ```
 
 ### Inputs:
@@ -1012,7 +1012,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res = 1.0);
 ```
 
 ### Inputs:
@@ -1054,20 +1054,20 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
 ```cpp
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         const std::string &driver_type = "piston",
-        dtype radius = 0.05,
-        dtype lower_cutoff = 80.0,
-        dtype upper_cutoff = 12000.0,
-        dtype lower_rolloff_slope_dB = 12.0,
-        dtype upper_rolloff_slope_dB = 12.0,
-        dtype sensitivity_dB = 85.0,
+        double radius = 0.05,
+        double lower_cutoff = 80.0,
+        double upper_cutoff = 12000.0,
+        double lower_rolloff_slope_dB = 12.0,
+        double upper_rolloff_slope_dB = 12.0,
+        double sensitivity_dB = 85.0,
         const std::string &radiation_type = "hemisphere",
-        dtype hor_coverage_deg = NAN,
-        dtype ver_coverage_deg = NAN,
-        dtype horn_control_freq = NAN,
-        dtype baffle_width = 0.15,
-        dtype baffle_height = 0.25,
+        double hor_coverage_deg = NAN,
+        double ver_coverage_deg = NAN,
+        double horn_control_freq = NAN,
+        double baffle_width = 0.15,
+        double baffle_height = 0.25,
         const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
-        dtype angular_resolution_deg = 5.0);
+        double angular_resolution_deg = 5.0);
 ```
 
 ### Inputs:

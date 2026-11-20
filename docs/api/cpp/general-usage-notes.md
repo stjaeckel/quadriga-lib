@@ -6,7 +6,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-genera
 - Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
-- Template parameter `dtype` is `float` or `double` unless stated; where no mandatory argument fixes it, it defaults to `double`.
+- Template parameter `dtype` is `float` or `double` unless stated. It is deduced from the data arguments; where no mandatory argument fixes it, it defaults to `double`. Real-valued scalar options are `double` for both types and are converted to `dtype` inside the function.
 - Mandatory arguments are references. Optional inputs are references with an empty default; an empty container (`{}`) means "not given". Optional outputs are pointers with a `nullptr` default (not computed). The few optional inputs whose empty value has its own meaning are pointers with a `nullptr` default; their documentation says so. `ray_mesh_interact` and `ray_state_update` still take mandatory arguments by pointer and throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output argument cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation. A returned result is a new object and may be assigned to an input.

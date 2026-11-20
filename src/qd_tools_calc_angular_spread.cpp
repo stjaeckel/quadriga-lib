@@ -122,7 +122,7 @@ void quadriga_lib::calc_angular_spread(
     std::vector<arma::Col<dtype>> *theta = nullptr,
     bool wrapping = false,
     bool calc_bank_angle = false,
-    dtype quantize_deg = (dtype)0);
+    double quantize_deg = 0.0);
 ```
 
 ## Inputs:
@@ -157,8 +157,9 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
                                        std::vector<arma::Col<dtype>> *theta_out,
                                        bool wrapping,
                                        bool calc_bank_angle,
-                                       dtype quantize_deg)
+                                       double quantize_deg_in)
 {
+    const dtype quantize_deg = dtype(quantize_deg_in);
     arma::uword N = (arma::uword)az.size();
 
     // --- Input validation ---
@@ -396,7 +397,7 @@ template void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<float>> &,
     arma::Col<float> *, arma::Col<float> *, arma::Mat<float> *,
     std::vector<arma::Col<float>> *, std::vector<arma::Col<float>> *,
-    bool, bool, float);
+    bool, bool, double);
 
 template void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<double>> &, const std::vector<arma::Col<double>> &,

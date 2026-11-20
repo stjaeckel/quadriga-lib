@@ -35,7 +35,7 @@ Generate an isotropic radiator with vertical polarization
 
 ## Declaration:
 ```
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res = 1.0);
 ```
 
 ## Inputs:
@@ -46,8 +46,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res_in)
 {
+    dtype res = dtype(res_in);
     quadriga_lib::arrayant<dtype> ant;
 
     res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
@@ -71,7 +72,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni(float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni(double res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni(double res);
 
 /*!MD
@@ -82,7 +83,7 @@ Generate a cross-polarized isotropic radiator
 
 ## Declaration:
 ```
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res = 1.0);
 ```
 
 ## Inputs:
@@ -93,8 +94,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res_in)
 {
+    dtype res = dtype(res_in);
     quadriga_lib::arrayant<dtype> ant;
 
     res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
@@ -128,7 +130,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_xpol(float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_xpol(double res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_xpol(double res);
 
 /*!MD
@@ -139,7 +141,7 @@ Generate a short dipole antenna with vertical polarization
 
 ## Declaration:
 ```
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res = 1.0);
 ```
 
 ## Inputs:
@@ -150,8 +152,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res =
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res_in)
 {
+    dtype res = dtype(res_in);
     quadriga_lib::arrayant<dtype> ant;
 
     res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
@@ -180,7 +183,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_dipole(float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_dipole(double res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_dipole(double res);
 
 /*!MD
@@ -191,7 +194,7 @@ Generate a half-wave dipole antenna with vertical polarization
 
 ## Declaration:
 ```
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res = 1.0);
 ```
 
 ## Inputs:
@@ -202,8 +205,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res_in)
 {
+    dtype res = dtype(res_in);
     quadriga_lib::arrayant<dtype> ant;
 
     res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
@@ -235,7 +239,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_half_wave_dipole(float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_half_wave_dipole(double res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wave_dipole(double res);
 
 /*!MD
@@ -248,10 +252,10 @@ Generate an antenna with custom 3dB beamwidth
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
-    dtype az_3dB = 90.0,
-    dtype el_3dB = 90.0, 
-    dtype rear_gain_lin = 0.0, 
-    dtype res = 1.0);
+    double az_3dB = 90.0,
+    double el_3dB = 90.0, 
+    double rear_gain_lin = 0.0, 
+    double res = 1.0);
 ```
 
 ## Inputs:
@@ -265,8 +269,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3dB, dtype rear_gain_lin, dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(double az_3dB_in, double el_3dB_in, double rear_gain_lin_in, double res_in)
 {
+    dtype az_3dB = dtype(az_3dB_in);
+    dtype el_3dB = dtype(el_3dB_in);
+    dtype rear_gain_lin = dtype(rear_gain_lin_in);
+    dtype res = dtype(res_in);
     // Fix input ranges
     az_3dB = (az_3dB <= (dtype)0.0) ? (dtype)90.0 : az_3dB;
     el_3dB = (el_3dB <= (dtype)0.0) ? (dtype)90.0 : el_3dB;
@@ -353,7 +361,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3dB, float rear_gain_lin, float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3dB, double rear_gain_lin, double res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3dB, double rear_gain_lin, double res);
 
 /*!MD
@@ -368,10 +376,10 @@ Generate a uniform linear array (ULA)
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
     arma::uword N = 1, 
-    dtype center_freq = 299792458.0, 
-    dtype spacing = 0.5,
+    double center_freq = 299792458.0, 
+    double spacing = 0.5,
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
-    dtype res = 1.0);
+    double res = 1.0);
 ```
 
 ## Inputs:
@@ -386,9 +394,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N, dtype center_freq, dtype spacing,
-                                                                  const arrayant<dtype> &pattern, dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N, double center_freq_in, double spacing_in,
+                                                                  const arrayant<dtype> &pattern, double res_in)
 {
+    dtype center_freq = dtype(center_freq_in);
+    dtype spacing = dtype(spacing_in);
+    dtype res = dtype(res_in);
     // Fix input ranges
     N = (N == 0ULL) ? 1ULL : N;
     center_freq = (center_freq <= (dtype)0.0) ? (dtype)qd_speed_of_light : center_freq;
@@ -440,8 +451,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
     return ant;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_ula(arma::uword N, float center_freq, float spacing,
-                                                                           const arrayant<float> &pattern, float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_ula(arma::uword N, double center_freq, double spacing,
+                                                                           const arrayant<float> &pattern, double res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_ula(arma::uword N, double center_freq, double spacing,
                                                                             const arrayant<double> &pattern, double res);
 
@@ -458,16 +469,16 @@ Generate a 3GPP-NR compliant antenna array model
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
     arma::uword M = 1, 
     arma::uword N = 1, 
-    dtype center_freq = 299792458.0,
+    double center_freq = 299792458.0,
     unsigned pol = 1, 
-    dtype tilt = 0.0, 
-    dtype spacing = 0.5, 
+    double tilt = 0.0, 
+    double spacing = 0.5, 
     arma::uword Mg = 1,
     arma::uword Ng = 1, 
-    dtype dgv = 0.5, 
-    dtype dgh = 0.5,
+    double dgv = 0.5, 
+    double dgh = 0.5,
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
-    dtype res = 1.0);
+    double res = 1.0);
 ```
 
 ## Inputs:
@@ -497,11 +508,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, dtype center_freq,
-                                                                   unsigned pol, dtype tilt, dtype spacing,
-                                                                   arma::uword Mg, arma::uword Ng, dtype dgv, dtype dgh,
-                                                                   const arrayant<dtype> &pattern, dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, double center_freq_in,
+                                                                   unsigned pol, double tilt_in, double spacing_in,
+                                                                   arma::uword Mg, arma::uword Ng, double dgv_in, double dgh_in,
+                                                                   const arrayant<dtype> &pattern, double res_in)
 {
+    dtype center_freq = dtype(center_freq_in);
+    const dtype tilt = dtype(tilt_in);
+    dtype spacing = dtype(spacing_in);
+    dtype dgv = dtype(dgv_in);
+    dtype dgh = dtype(dgh_in);
+    dtype res = dtype(res_in);
     // Fix input ranges
     M = (M == 0ULL) ? 1ULL : M;
     N = (N == 0ULL) ? 1ULL : N;
@@ -690,10 +707,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     return ant;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, float center_freq,
-                                                                            unsigned pol, float tilt, float spacing,
-                                                                            arma::uword Mg, arma::uword Ng, float dgv, float dgh,
-                                                                            const quadriga_lib::arrayant<float> &pattern, float res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, double center_freq,
+                                                                            unsigned pol, double tilt, double spacing,
+                                                                            arma::uword Mg, arma::uword Ng, double dgv, double dgh,
+                                                                            const quadriga_lib::arrayant<float> &pattern, double res);
 
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, double center_freq,
                                                                              unsigned pol, double tilt, double spacing,
@@ -718,13 +735,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
     arma::Col<dtype> az = {0.0},
     arma::Col<dtype> el = {0.0},
     arma::Col<dtype> weight = {1.0},
-    dtype center_freq = 299792458.0,
+    double center_freq = 299792458.0,
     unsigned pol = 1,
-    dtype spacing = 0.5,
-    dtype az_3dB = 120.0,
-    dtype el_3dB = 120.0,
-    dtype rear_gain_lin = 0.0,
-    dtype res = 1.0,
+    double spacing = 0.5,
+    double az_3dB = 120.0,
+    double el_3dB = 120.0,
+    double rear_gain_lin = 0.0,
+    double res = 1.0,
     bool separate_beams = false,
     bool apply_weights = false);
 ```
@@ -756,9 +773,15 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<dtype> az, arma::Col<dtype> el, arma::Col<dtype> weight,
-                                                                        dtype center_freq, unsigned pol, dtype spacing, dtype az_3dB, dtype el_3dB,
-                                                                        dtype rear_gain_lin, dtype res, bool separate_beams, bool apply_weights)
+                                                                        double center_freq_in, unsigned pol, double spacing_in, double az_3dB_in, double el_3dB_in,
+                                                                        double rear_gain_lin_in, double res_in, bool separate_beams, bool apply_weights)
 {
+    dtype center_freq = dtype(center_freq_in);
+    dtype spacing = dtype(spacing_in);
+    dtype az_3dB = dtype(az_3dB_in);
+    dtype el_3dB = dtype(el_3dB_in);
+    dtype rear_gain_lin = dtype(rear_gain_lin_in);
+    dtype res = dtype(res_in);
     dtype zero = (dtype)0.0;
 
     if (az.n_elem == 0)
@@ -1027,8 +1050,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
 }
 
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<float> az, arma::Col<float> el, arma::Col<float> weight,
-                                                                                 float center_freq, unsigned pol, float spacing, float az_3dB, float el_3dB,
-                                                                                 float rear_gain_lin, float res, bool separate_beams, bool apply_weights);
+                                                                                 double center_freq, unsigned pol, double spacing, double az_3dB, double el_3dB,
+                                                                                 double rear_gain_lin, double res, bool separate_beams, bool apply_weights);
 
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<double> az, arma::Col<double> el, arma::Col<double> weight,
                                                                                   double center_freq, unsigned pol, double spacing, double az_3dB, double el_3dB,

@@ -67,7 +67,7 @@ void quadriga_lib::sos_remove_bias(
     const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
-    dtype spatial_freq_scale_b = 1.0);
+    double spatial_freq_scale_b = 1.0);
 ```
 
 ## Inputs:
@@ -109,8 +109,9 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &spatial_freq,
                                    const arma::Col<dtype> &dist,
                                    arma::Mat<dtype> *offset,
                                    arma::Mat<dtype> *mean_before,
-                                   dtype spatial_freq_scale_b)
+                                   double spatial_freq_scale_b_in)
 {
+    const dtype spatial_freq_scale_b = dtype(spatial_freq_scale_b_in);
     const bool two_devices = !pos_b.is_empty();
     const bool two_maps = phase_b != nullptr && !phase_b->is_empty();
 
@@ -275,7 +276,7 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &spatial_freq,
 
 template void quadriga_lib::sos_remove_bias(const arma::Mat<float> &spatial_freq, arma::Mat<float> &phase, const arma::Mat<float> &pos, const arma::Mat<float> &pos_b,
                                             arma::Mat<float> *phase_b, const arma::Col<float> &acf, const arma::Col<float> &dist, arma::Mat<float> *offset,
-                                            arma::Mat<float> *mean_before, float spatial_freq_scale_b);
+                                            arma::Mat<float> *mean_before, double spatial_freq_scale_b);
 template void quadriga_lib::sos_remove_bias(const arma::Mat<double> &spatial_freq, arma::Mat<double> &phase, const arma::Mat<double> &pos, const arma::Mat<double> &pos_b,
                                             arma::Mat<double> *phase_b, const arma::Col<double> &acf, const arma::Col<double> &dist, arma::Mat<double> *offset,
                                             arma::Mat<double> *mean_before, double spatial_freq_scale_b);

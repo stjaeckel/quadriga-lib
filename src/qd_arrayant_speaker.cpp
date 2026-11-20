@@ -48,20 +48,20 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 ```
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         const std::string &driver_type = "piston",
-        dtype radius = 0.05,
-        dtype lower_cutoff = 80.0,
-        dtype upper_cutoff = 12000.0,
-        dtype lower_rolloff_slope_dB = 12.0,
-        dtype upper_rolloff_slope_dB = 12.0,
-        dtype sensitivity_dB = 85.0,
+        double radius = 0.05,
+        double lower_cutoff = 80.0,
+        double upper_cutoff = 12000.0,
+        double lower_rolloff_slope_dB = 12.0,
+        double upper_rolloff_slope_dB = 12.0,
+        double sensitivity_dB = 85.0,
         const std::string &radiation_type = "hemisphere",
-        dtype hor_coverage_deg = NAN,
-        dtype ver_coverage_deg = NAN,
-        dtype horn_control_freq = NAN,
-        dtype baffle_width = 0.15,
-        dtype baffle_height = 0.25,
+        double hor_coverage_deg = NAN,
+        double ver_coverage_deg = NAN,
+        double horn_control_freq = NAN,
+        double baffle_width = 0.15,
+        double baffle_height = 0.25,
         const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
-        dtype angular_resolution_deg = 5.0);
+        double angular_resolution_deg = 5.0);
 ```
 
 ## Inputs:
@@ -106,14 +106,26 @@ static double qd_piston_directivity(double x)
 }
 
 template <typename dtype>
-std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const std::string &driver_type, dtype radius,
-                                                                          dtype lower_cutoff, dtype upper_cutoff,
-                                                                          dtype lower_rolloff_slope_dB, dtype upper_rolloff_slope_dB,
-                                                                          dtype sensitivity_dB, const std::string &radiation_type,
-                                                                          dtype hor_coverage_deg, dtype ver_coverage_deg, dtype horn_control_freq,
-                                                                          dtype baffle_width, dtype baffle_height,
-                                                                          const arma::Col<dtype> &center_freq_in, dtype angular_resolution_deg)
+std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const std::string &driver_type, double radius_in,
+                                                                          double lower_cutoff_in, double upper_cutoff_in,
+                                                                          double lower_rolloff_slope_dB_in, double upper_rolloff_slope_dB_in,
+                                                                          double sensitivity_dB_in, const std::string &radiation_type,
+                                                                          double hor_coverage_deg_in, double ver_coverage_deg_in, double horn_control_freq_in,
+                                                                          double baffle_width_in, double baffle_height_in,
+                                                                          const arma::Col<dtype> &center_freq_in, double angular_resolution_deg_in)
 {
+    const dtype radius = dtype(radius_in);
+    const dtype lower_cutoff = dtype(lower_cutoff_in);
+    const dtype upper_cutoff = dtype(upper_cutoff_in);
+    const dtype lower_rolloff_slope_dB = dtype(lower_rolloff_slope_dB_in);
+    const dtype upper_rolloff_slope_dB = dtype(upper_rolloff_slope_dB_in);
+    const dtype sensitivity_dB = dtype(sensitivity_dB_in);
+    dtype hor_coverage_deg = dtype(hor_coverage_deg_in);
+    dtype ver_coverage_deg = dtype(ver_coverage_deg_in);
+    dtype horn_control_freq = dtype(horn_control_freq_in);
+    const dtype baffle_width = dtype(baffle_width_in);
+    const dtype baffle_height = dtype(baffle_height_in);
+    dtype angular_resolution_deg = dtype(angular_resolution_deg_in);
     arma::Col<dtype> center_freq = center_freq_in; // Local copy; filled with third-octave bands if not given
 
     const double c_sound = qd_speed_of_sound; // Speed of sound in [m/s]
@@ -390,7 +402,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
 }
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::generate_speaker(
-    const std::string &, float, float, float, float, float, float, const std::string &, float, float, float, float, float, const arma::Col<float> &, float);
+    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const arma::Col<float> &, double);
     
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::generate_speaker(
     const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const arma::Col<double> &, double);

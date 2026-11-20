@@ -805,7 +805,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    dtype propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0);
 ```
 
 ## Inputs:
@@ -831,8 +831,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     const arma::Col<dtype> &azimuth_grid_new,
     const arma::Col<dtype> &elevation_grid_new,
     const arma::Col<dtype> &freq_new,
-    dtype propagation_speed)
+    double propagation_speed_in)
 {
+    const dtype propagation_speed = dtype(propagation_speed_in);
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
@@ -1050,7 +1051,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<float>> &,
-    const arma::Col<float> &, const arma::Col<float> &, const arma::Col<float> &, float);
+    const arma::Col<float> &, const arma::Col<float> &, const arma::Col<float> &, double);
 
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<double>> &,
@@ -1069,7 +1070,7 @@ Calculate the beamwidth and pointing angles in degrees for each entry of a multi
 void quadriga_lib::arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
         const arma::uvec &i_element = arma::uvec(),
-        dtype threshold_dB = 3.0,
+        double threshold_dB = 3.0,
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,
         arma::Mat<dtype> *az_point_ang_deg = nullptr,
@@ -1094,10 +1095,11 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
-                                                 const arma::uvec &i_element, dtype threshold_dB,
+                                                 const arma::uvec &i_element, double threshold_dB_in,
                                                  arma::Mat<dtype> *beamwidth_az_deg, arma::Mat<dtype> *beamwidth_el_deg,
                                                  arma::Mat<dtype> *az_point_ang_deg, arma::Mat<dtype> *el_point_ang_deg)
 {
+    const dtype threshold_dB = dtype(threshold_dB_in);
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
     const std::string error_message = qd_arrayant_is_valid_multi_quick(arrayant_vec);
@@ -1127,7 +1129,7 @@ void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtyp
                                                at(2, i, f), at(3, i, f));
 }
 
-template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<float>> &, const arma::uvec &, float,
+template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<float>> &, const arma::uvec &, double,
                                                           arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *);
 template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<double>> &, const arma::uvec &, double,
                                                           arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *);

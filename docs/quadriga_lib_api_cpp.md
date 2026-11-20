@@ -11,7 +11,7 @@ lang: en-US
 - Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
-- Template parameter `dtype` is `float` or `double` unless stated; where no mandatory argument fixes it, it defaults to `double`.
+- Template parameter `dtype` is `float` or `double` unless stated. It is deduced from the data arguments; where no mandatory argument fixes it, it defaults to `double`. Real-valued scalar options are `double` for both types and are converted to `dtype` inside the function.
 - Mandatory arguments are references. Optional inputs are references with an empty default; an empty container (`{}`) means "not given". Optional outputs are pointers with a `nullptr` default (not computed). The few optional inputs whose empty value has its own meaning are pointers with a `nullptr` default; their documentation says so. `ray_mesh_interact` and `ray_state_update` still take mandatory arguments by pointer and throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output argument cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation. A returned result is a new object and may be assigned to an input.
@@ -358,7 +358,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](q
 void quadriga_lib::arrayant_calc_beamwidth(
     const arrayant<dtype> &ant,
     const arma::uvec &i_element = arma::uvec(),
-    dtype threshold_dB = 3.0,
+    double threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
     arma::Col<dtype> *az_point_ang_deg = nullptr,
@@ -404,7 +404,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](q
 void quadriga_lib::arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec,
         const arma::uvec &i_element = arma::uvec(),
-        dtype threshold_dB = 3.0,
+        double threshold_dB = 3.0,
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,
         arma::Mat<dtype> *az_point_ang_deg = nullptr,
@@ -511,7 +511,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
     const arrayant<dtype> &ant,
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    dtype propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0);
 ```
 
 ### Inputs:
@@ -551,7 +551,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    dtype propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0);
 ```
 
 ### Inputs:
@@ -726,9 +726,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_export_obj_file) · [Python](
 void quadriga_lib::arrayant_export_obj_file(
     const std::string &fn,
     const arrayant<dtype> &ant,
-    dtype directivity_range_dB = 30.0,
+    double directivity_range_dB = 30.0,
     const std::string &colormap = "jet",
-    dtype object_radius = 1.0,
+    double object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
     const arma::uvec &i_element = arma::uvec());
 ```
@@ -1087,16 +1087,16 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
     arma::uword M = 1, 
     arma::uword N = 1, 
-    dtype center_freq = 299792458.0,
+    double center_freq = 299792458.0,
     unsigned pol = 1, 
-    dtype tilt = 0.0, 
-    dtype spacing = 0.5, 
+    double tilt = 0.0, 
+    double spacing = 0.5, 
     arma::uword Mg = 1,
     arma::uword Ng = 1, 
-    dtype dgv = 0.5, 
-    dtype dgh = 0.5,
+    double dgv = 0.5, 
+    double dgh = 0.5,
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
-    dtype res = 1.0);
+    double res = 1.0);
 ```
 
 ### Inputs:
@@ -1137,10 +1137,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 ### Declaration:
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
-    dtype az_3dB = 90.0,
-    dtype el_3dB = 90.0, 
-    dtype rear_gain_lin = 0.0, 
-    dtype res = 1.0);
+    double az_3dB = 90.0,
+    double el_3dB = 90.0, 
+    double rear_gain_lin = 0.0, 
+    double res = 1.0);
 ```
 
 ### Inputs:
@@ -1163,7 +1163,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res = 1.0);
 ```
 
 ### Inputs:
@@ -1183,7 +1183,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res = 1.0);
 ```
 
 ### Inputs:
@@ -1214,13 +1214,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
     arma::Col<dtype> az = {0.0},
     arma::Col<dtype> el = {0.0},
     arma::Col<dtype> weight = {1.0},
-    dtype center_freq = 299792458.0,
+    double center_freq = 299792458.0,
     unsigned pol = 1,
-    dtype spacing = 0.5,
-    dtype az_3dB = 120.0,
-    dtype el_3dB = 120.0,
-    dtype rear_gain_lin = 0.0,
-    dtype res = 1.0,
+    double spacing = 0.5,
+    double az_3dB = 120.0,
+    double el_3dB = 120.0,
+    double rear_gain_lin = 0.0,
+    double res = 1.0,
     bool separate_beams = false,
     bool apply_weights = false);
 ```
@@ -1260,7 +1260,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res = 1.0);
 ```
 
 ### Inputs:
@@ -1284,10 +1284,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
     arma::uword N = 1, 
-    dtype center_freq = 299792458.0, 
-    dtype spacing = 0.5,
+    double center_freq = 299792458.0, 
+    double spacing = 0.5,
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(), 
-    dtype res = 1.0);
+    double res = 1.0);
 ```
 
 ### Inputs:
@@ -1311,7 +1311,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res = 1.0);
 ```
 
 ### Inputs:
@@ -1353,20 +1353,20 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
 ```cpp
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         const std::string &driver_type = "piston",
-        dtype radius = 0.05,
-        dtype lower_cutoff = 80.0,
-        dtype upper_cutoff = 12000.0,
-        dtype lower_rolloff_slope_dB = 12.0,
-        dtype upper_rolloff_slope_dB = 12.0,
-        dtype sensitivity_dB = 85.0,
+        double radius = 0.05,
+        double lower_cutoff = 80.0,
+        double upper_cutoff = 12000.0,
+        double lower_rolloff_slope_dB = 12.0,
+        double upper_rolloff_slope_dB = 12.0,
+        double sensitivity_dB = 85.0,
         const std::string &radiation_type = "hemisphere",
-        dtype hor_coverage_deg = NAN,
-        dtype ver_coverage_deg = NAN,
-        dtype horn_control_freq = NAN,
-        dtype baffle_width = 0.15,
-        dtype baffle_height = 0.25,
+        double hor_coverage_deg = NAN,
+        double ver_coverage_deg = NAN,
+        double horn_control_freq = NAN,
+        double baffle_width = 0.15,
+        double baffle_height = 0.25,
         const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
-        dtype angular_resolution_deg = 5.0);
+        double angular_resolution_deg = 5.0);
 ```
 
 ### Inputs:
@@ -1931,12 +1931,12 @@ void quadriga_lib::channel_export_obj_file(
     const std::string &fn,
     const channel<dtype> &chan,
     arma::uword max_paths = 0,
-    dtype gain_max_dB = -60.0,
-    dtype gain_min_dB = -140.0,
+    double gain_max_dB = -60.0,
+    double gain_min_dB = -140.0,
     const std::string &colormap = "jet",
     const arma::uvec &i_snap = arma::uvec(),
-    dtype radius_max = 0.05,
-    dtype radius_min = 0.01,
+    double radius_max = 0.05,
+    double radius_min = 0.01,
     arma::uword n_edges = 5);
 ```
 
@@ -2908,9 +2908,9 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> &coeff_re_quant,
     std::vector<arma::Cube<dtype>> &coeff_im_quant,
     std::vector<arma::Cube<dtype>> &delay_quant,
-    dtype tap_spacing = (dtype)5.0e-9,
+    double tap_spacing = 5.0e-9,
     arma::uword max_taps = 48,
-    dtype power_exponent = (dtype)1.0,
+    double power_exponent = 1.0,
     int fix_taps = 0);
 ```
 
@@ -3094,8 +3094,8 @@ void quadriga_lib::get_channels_irs(
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
     arma::uword i_irs = 0,
-    dtype threshold_dB = -140.0,
-    dtype center_freq = 0.0,
+    double threshold_dB = -140.0,
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     arma::Cube<dtype> *aod = nullptr,
     arma::Cube<dtype> *eod = nullptr,
@@ -3216,7 +3216,7 @@ void quadriga_lib::get_channels_multifreq(
     std::vector<arma::Cube<dtype>> &delay,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    dtype propagation_speed = dtype(299792458.0),
+    double propagation_speed = 299792458.0,
     std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
     int use_kernel = 0);
 ```
@@ -3305,7 +3305,7 @@ void quadriga_lib::get_channels_planar(
     arma::Cube<dtype> &coeff_re,
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Col<dtype> *rx_Doppler = nullptr,
@@ -3388,7 +3388,7 @@ void quadriga_lib::get_channels_planar_vec(
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     std::vector<arma::Col<dtype>> *rx_Doppler = nullptr,
@@ -3465,7 +3465,7 @@ void quadriga_lib::get_channels_spherical(
     arma::Cube<dtype> &coeff_re,
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Cube<dtype> *aod = nullptr,
@@ -3553,7 +3553,7 @@ void quadriga_lib::get_channels_spherical_vec(
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     std::vector<arma::Cube<dtype>> *aod = nullptr,
@@ -3661,7 +3661,7 @@ void quadriga_lib::calc_angular_spread(
     std::vector<arma::Col<dtype>> *theta = nullptr,
     bool wrapping = false,
     bool calc_bank_angle = false,
-    dtype quantize_deg = (dtype)0);
+    double quantize_deg = 0.0);
 ```
 
 ### Inputs:
@@ -3728,7 +3728,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
     arma::Mat<dtype> *xpr = nullptr,
     arma::Col<dtype> *pg = nullptr,
     bool include_los = false,
-    dtype window_size = 0.01);
+    double window_size = 0.01);
 ```
 
 ### Inputs:
@@ -3771,8 +3771,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread) · [Python](quadrig
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
-    dtype threshold_dB = 100.0,
-    dtype granularity = 0.0,
+    double threshold_dB = 100.0,
+    double granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
 ```
 
@@ -3813,7 +3813,7 @@ void quadriga_lib::calc_rician_k_factor(
     const arma::Mat<dtype> &rx_pos,
     arma::Col<dtype> *kf = nullptr,
     arma::Col<dtype> *pg = nullptr,
-    dtype window_size = 0.01);
+    double window_size = 0.01);
 ```
 
 ### Inputs:
@@ -5530,7 +5530,7 @@ void calc_diffraction_gain(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    dtype center_freq,
+    double center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
     arma::Mat<dtype> *polmat = nullptr,
@@ -5763,7 +5763,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_diffraction_paths) · [Python
 void generate_diffraction_paths(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &dest,
-    dtype center_freq,
+    double center_freq,
     int lod,
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
@@ -5813,7 +5813,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#icosphere) · [Python](quadriga_lib_ap
 ```cpp
 arma::uword quadriga_lib::icosphere(
     arma::uword n_div,
-    dtype radius,
+    double radius,
     arma::Mat<dtype> &center,
     arma::Col<dtype> *length = nullptr,
     arma::Mat<dtype> *vert = nullptr,
@@ -5854,7 +5854,7 @@ Not in: MATLAB, Python
 dtype quadriga_lib::interface_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq,
+    double center_freq,
     bool scalar_mode = false);
 ```
 
@@ -5899,8 +5899,8 @@ Not in: MATLAB, Python
 dtype quadriga_lib::medium_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype dist,
-    dtype center_freq,
+    double dist,
+    double center_freq,
     bool scalar_mode = false);
 ```
 
@@ -6081,7 +6081,7 @@ void obj_file_write(
     const arma::Mat<dtype> &vert_list = arma::Mat<dtype>(),
     const arma::umat &face_ind = arma::umat(),
     const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
-    const dtype threshold = 0.001,
+    double threshold = 0.001,
     const arma::uvec &csv_ind = arma::uvec(),
     const std::vector<std::string> &csv_names = std::vector<std::string>(),
     const std::unordered_map<std::string, std::vector<dtype>> &csv_prop = std::unordered_map<std::string, std::vector<dtype>>(),
@@ -6133,7 +6133,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind,
     std::vector<std::string> *reason = nullptr,
-    dtype tolerance = 0.0005);
+    double tolerance = 0.0005);
 ```
 
 ### Inputs:
@@ -6170,7 +6170,7 @@ void quadriga_lib::path_to_tube(
     const arma::Mat<dtype> &path_coord,
     arma::Mat<dtype> &vert,
     arma::umat &faces,
-    dtype radius = 1.0,
+    double radius = 1.0,
     arma::uword n_edges = 5);
 ```
 
@@ -6361,7 +6361,7 @@ arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind = arma::uvec(),
-    dtype distance = 0.0);
+    double distance = 0.0);
 ```
 
 ### Inputs:
@@ -6723,7 +6723,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ray_mesh_interact) · Not in: Python
 ```cpp
 void quadriga_lib::ray_mesh_interact(
     int interaction_type,
-    dtype center_freq,
+    double center_freq,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *mesh,
@@ -7068,7 +7068,7 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::ray_state_update(
     int interaction_type,
-    dtype center_freq,
+    double center_freq,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *fbsN,
@@ -7391,7 +7391,7 @@ Not in: MATLAB, Python
 dtype quadriga_lib::refractive_index(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq,
+    double center_freq,
     bool scalar_mode = false);
 ```
 
@@ -7640,8 +7640,8 @@ void quadriga_lib::write_png(
     const std::string &fn,
     const arma::Mat<dtype> &data,
     const std::string &colormap = "jet",
-    dtype min_val = NAN,
-    dtype max_val = NAN,
+    double min_val = NAN,
+    double max_val = NAN,
     bool log_transform = false);
 ```
 
@@ -8086,8 +8086,8 @@ arma::Mat<dtype> quadriga_lib::sos_generate(
     bool uniform_smp = true,
     arma::uword n_dir = 10,
     bool random_init = true,
-    dtype spatial_freq_min = 0.0,
-    dtype spatial_freq_max = NAN,
+    double spatial_freq_min = 0.0,
+    double spatial_freq_max = NAN,
     arma::sword seed = -1);
 ```
 
@@ -8242,7 +8242,7 @@ arma::Mat<dtype> quadriga_lib::sos_preset(
     const std::string &name,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
-    dtype dist_decorr = 10.0);
+    double dist_decorr = 10.0);
 ```
 
 ### Inputs:
@@ -8506,7 +8506,7 @@ void quadriga_lib::sos_remove_bias(
     const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
-    dtype spatial_freq_scale_b = 1.0);
+    double spatial_freq_scale_b = 1.0);
 ```
 
 ### Inputs:
@@ -8595,7 +8595,7 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
     const arma::Col<dtype> &acf = arma::Col<dtype>(),
     const arma::Col<dtype> &dist = arma::Col<dtype>(),
-    dtype spatial_freq_scale_b = 1.0,
+    double spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);
 ```

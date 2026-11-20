@@ -61,7 +61,7 @@ void quadriga_lib::get_channels_planar(
     arma::Cube<dtype> &coeff_re,
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Col<dtype> *rx_Doppler = nullptr,
@@ -112,9 +112,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
                                        const arma::Col<dtype> &aod, const arma::Col<dtype> &eod, const arma::Col<dtype> &aoa, const arma::Col<dtype> &eoa,
                                        const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &polmat,
                                        arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
-                                       dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                       double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
                                        arma::Col<dtype> *rx_Doppler, int use_kernel)
 {
+    const dtype center_freq = dtype(center_freq_in);
     constexpr dtype los_limit = dtype(1.0e-4);
     constexpr dtype zero = dtype(0.0);
     constexpr dtype one = dtype(1.0);
@@ -386,7 +387,7 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<flo
                                                 const arma::Col<float> &aod, const arma::Col<float> &eod, const arma::Col<float> &aoa, const arma::Col<float> &eoa,
                                                 const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &polmat,
                                                 arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
-                                                float center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<float> *rx_Doppler, int use_kernel);
 
 template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
@@ -435,7 +436,7 @@ void quadriga_lib::get_channels_planar_vec(
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
-    dtype center_freq = dtype(0.0),
+    double center_freq = 0.0,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     std::vector<arma::Col<dtype>> *rx_Doppler = nullptr,
@@ -477,10 +478,11 @@ void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<dtype> &
                                            const std::vector<arma::Mat<dtype>> &polmat,
                                            std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                            std::vector<arma::Cube<dtype>> &delay,
-                                           dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                           double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
                                            std::vector<arma::Col<dtype>> *rx_Doppler,
                                            std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
+    const dtype center_freq = dtype(center_freq_in);
     const size_t n_snap = aod.size();
     if (eod.size() != n_snap || aoa.size() != n_snap || eoa.size() != n_snap ||
         path_gain.size() != n_snap || path_length.size() != n_snap || polmat.size() != n_snap)
@@ -516,7 +518,7 @@ template void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant
                                                     const std::vector<arma::Mat<float>> &polmat,
                                                     std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
                                                     std::vector<arma::Cube<float>> &delay,
-                                                    float center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                     std::vector<arma::Col<float>> *rx_Doppler,
                                                     std::vector<arma::Cube<std::complex<float>>> *coeff, int use_kernel);
 

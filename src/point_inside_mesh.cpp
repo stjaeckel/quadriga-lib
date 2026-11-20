@@ -29,7 +29,7 @@ arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind = arma::uvec(),
-    dtype distance = 0.0);
+    double distance = 0.0);
 ```
 
 ## Inputs:
@@ -51,8 +51,9 @@ template <typename dtype>
 arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
                                            const arma::Mat<dtype> &mesh,
                                            const arma::uvec &obj_ind,
-                                           dtype distance)
+                                           double distance_in)
 {
+    const dtype distance = dtype(distance_in);
     if (points.n_cols != 3)
         throw std::invalid_argument("Input 'points' must have 3 columns.");
 
@@ -72,7 +73,7 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
     arma::uword n_mesh = mesh.n_rows;
 
     // Generate 4 rays for "inside" detection [x0, x1, x2, x3, y0, y1, y2, y3, z0, z1, z2, z3 ]
-    dtype dir[12] = {1.0, -0.5, -0.25, -0.25, 0.0, 0.866, -0.433, -0.433, 0.0, 0.0, 0.866, -0.866};
+    dtype dir[12] = {dtype(1.0), dtype(-0.5), dtype(-0.25), dtype(-0.25), dtype(0.0), dtype(0.866), dtype(-0.433), dtype(-0.433), dtype(0.0), dtype(0.0), dtype(0.866), dtype(-0.866)};
     qd_rotate_inplace<dtype>(0.1745f, 0.3491f, 0.5236f, dir, 4, true);
     qd_multiply_scalar<dtype>(1000.0f, dir, 12);
     arma::uword n_cast = 4;
@@ -194,7 +195,7 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
 template arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<float> &points,
                                                     const arma::Mat<float> &mesh,
                                                     const arma::uvec &obj_ind,
-                                                    float distance);
+                                                    double distance);
 
 template arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<double> &points,
                                                     const arma::Mat<double> &mesh,

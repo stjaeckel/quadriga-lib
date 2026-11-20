@@ -29,7 +29,7 @@ void quadriga_lib::path_to_tube(
     const arma::Mat<dtype> &path_coord,
     arma::Mat<dtype> &vert,
     arma::umat &faces,
-    dtype radius = 1.0,
+    double radius = 1.0,
     arma::uword n_edges = 5);
 ```
 
@@ -45,8 +45,9 @@ MD!*/
 
 // Convert paths to tubes
 template <typename dtype>
-void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dtype> &vert, arma::umat &faces, dtype radius, arma::uword n_edges)
+void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dtype> &vert, arma::umat &faces, double radius_in, arma::uword n_edges)
 {
+    const dtype radius = dtype(radius_in);
     qd_check_alias(&vert, "vert", &path_coord);
 
     if (path_coord.n_rows != 3ULL)
@@ -383,7 +384,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
 }
 
 template void quadriga_lib::path_to_tube(const arma::Mat<float> &path_coord, arma::Mat<float> &vert, arma::umat &faces,
-                                         float radius, arma::uword n_edges);
+                                         double radius, arma::uword n_edges);
 
 template void quadriga_lib::path_to_tube(const arma::Mat<double> &path_coord, arma::Mat<double> &vert, arma::umat &faces,
                                          double radius, arma::uword n_edges);

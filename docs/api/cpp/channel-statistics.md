@@ -80,7 +80,7 @@ void quadriga_lib::calc_angular_spread(
     std::vector<arma::Col<dtype>> *theta = nullptr,
     bool wrapping = false,
     bool calc_bank_angle = false,
-    dtype quantize_deg = (dtype)0);
+    double quantize_deg = 0.0);
 ```
 
 ### Inputs:
@@ -147,7 +147,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
     arma::Mat<dtype> *xpr = nullptr,
     arma::Col<dtype> *pg = nullptr,
     bool include_los = false,
-    dtype window_size = 0.01);
+    double window_size = 0.01);
 ```
 
 ### Inputs:
@@ -190,8 +190,8 @@ Also in: [MATLAB](../mex/channel-statistics.md#calc_delay_spread) · [Python](..
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
-    dtype threshold_dB = 100.0,
-    dtype granularity = 0.0,
+    double threshold_dB = 100.0,
+    double granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
 ```
 
@@ -232,7 +232,7 @@ void quadriga_lib::calc_rician_k_factor(
     const arma::Mat<dtype> &rx_pos,
     arma::Col<dtype> *kf = nullptr,
     arma::Col<dtype> *pg = nullptr,
-    dtype window_size = 0.01);
+    double window_size = 0.01);
 ```
 
 ### Inputs:

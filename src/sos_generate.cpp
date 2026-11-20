@@ -65,8 +65,8 @@ arma::Mat<dtype> quadriga_lib::sos_generate(
     bool uniform_smp = true,
     arma::uword n_dir = 10,
     bool random_init = true,
-    dtype spatial_freq_min = 0.0,
-    dtype spatial_freq_max = NAN,
+    double spatial_freq_min = 0.0,
+    double spatial_freq_max = NAN,
     arma::sword seed = -1);
 ```
 
@@ -108,10 +108,12 @@ arma::Mat<dtype> quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
                                             bool uniform_smp,
                                             arma::uword n_dir,
                                             bool random_init,
-                                            dtype spatial_freq_min,
-                                            dtype spatial_freq_max,
+                                            double spatial_freq_min_in,
+                                            double spatial_freq_max_in,
                                             arma::sword seed)
 {
+    const dtype spatial_freq_min = dtype(spatial_freq_min_in);
+    const dtype spatial_freq_max = dtype(spatial_freq_max_in);
     qd_sos_check_acf(acf, dist);
     qd_check_alias(ase, "ase", &acf, &dist);
     qd_check_alias(test_dir, "test_dir", &acf, &dist);
@@ -372,7 +374,7 @@ arma::Mat<dtype> quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
 
 template arma::Mat<float> quadriga_lib::sos_generate(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::uword n_coeff, arma::Col<float> *ase,
                                                      arma::Mat<float> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
-                                                     float spatial_freq_min, float spatial_freq_max, arma::sword seed);
+                                                     double spatial_freq_min, double spatial_freq_max, arma::sword seed);
 template arma::Mat<double> quadriga_lib::sos_generate(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::uword n_coeff, arma::Col<double> *ase,
                                                       arma::Mat<double> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
                                                       double spatial_freq_min, double spatial_freq_max, arma::sword seed);

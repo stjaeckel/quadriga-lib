@@ -59,7 +59,7 @@ void calc_diffraction_gain(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    dtype center_freq,
+    double center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
     arma::Mat<dtype> *polmat = nullptr,
@@ -292,7 +292,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#generate_diffraction_
 void generate_diffraction_paths(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &dest,
-    dtype center_freq,
+    double center_freq,
     int lod,
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
@@ -342,7 +342,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#icosphere) · [Python
 ```cpp
 arma::uword quadriga_lib::icosphere(
     arma::uword n_div,
-    dtype radius,
+    double radius,
     arma::Mat<dtype> &center,
     arma::Col<dtype> *length = nullptr,
     arma::Mat<dtype> *vert = nullptr,
@@ -383,7 +383,7 @@ Not in: MATLAB, Python
 dtype quadriga_lib::interface_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq,
+    double center_freq,
     bool scalar_mode = false);
 ```
 
@@ -428,8 +428,8 @@ Not in: MATLAB, Python
 dtype quadriga_lib::medium_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype dist,
-    dtype center_freq,
+    double dist,
+    double center_freq,
     bool scalar_mode = false);
 ```
 
@@ -610,7 +610,7 @@ void obj_file_write(
     const arma::Mat<dtype> &vert_list = arma::Mat<dtype>(),
     const arma::umat &face_ind = arma::umat(),
     const arma::Mat<dtype> &bsdf = arma::Mat<dtype>(),
-    const dtype threshold = 0.001,
+    double threshold = 0.001,
     const arma::uvec &csv_ind = arma::uvec(),
     const std::vector<std::string> &csv_names = std::vector<std::string>(),
     const std::unordered_map<std::string, std::vector<dtype>> &csv_prop = std::unordered_map<std::string, std::vector<dtype>>(),
@@ -662,7 +662,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind,
     std::vector<std::string> *reason = nullptr,
-    dtype tolerance = 0.0005);
+    double tolerance = 0.0005);
 ```
 
 ### Inputs:
@@ -699,7 +699,7 @@ void quadriga_lib::path_to_tube(
     const arma::Mat<dtype> &path_coord,
     arma::Mat<dtype> &vert,
     arma::umat &faces,
-    dtype radius = 1.0,
+    double radius = 1.0,
     arma::uword n_edges = 5);
 ```
 
@@ -890,7 +890,7 @@ arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> &points,
     const arma::Mat<dtype> &mesh,
     const arma::uvec &obj_ind = arma::uvec(),
-    dtype distance = 0.0);
+    double distance = 0.0);
 ```
 
 ### Inputs:
@@ -1252,7 +1252,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#ray_mesh_interact) ·
 ```cpp
 void quadriga_lib::ray_mesh_interact(
     int interaction_type,
-    dtype center_freq,
+    double center_freq,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *mesh,
@@ -1597,7 +1597,7 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::ray_state_update(
     int interaction_type,
-    dtype center_freq,
+    double center_freq,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *fbsN,
@@ -1920,7 +1920,7 @@ Not in: MATLAB, Python
 dtype quadriga_lib::refractive_index(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq,
+    double center_freq,
     bool scalar_mode = false);
 ```
 
@@ -2169,8 +2169,8 @@ void quadriga_lib::write_png(
     const std::string &fn,
     const arma::Mat<dtype> &data,
     const std::string &colormap = "jet",
-    dtype min_val = NAN,
-    dtype max_val = NAN,
+    double min_val = NAN,
+    double max_val = NAN,
     bool log_transform = false);
 ```
 

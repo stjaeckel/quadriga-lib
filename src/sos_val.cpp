@@ -311,7 +311,7 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
     const arma::Col<dtype> &acf = arma::Col<dtype>(),
     const arma::Col<dtype> &dist = arma::Col<dtype>(),
-    dtype spatial_freq_scale_b = 1.0,
+    double spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -355,10 +355,11 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
                            const arma::Mat<dtype> &phase_b,
                            const arma::Col<dtype> &acf,
                            const arma::Col<dtype> &dist,
-                           dtype spatial_freq_scale_b,
+                           double spatial_freq_scale_b_in,
                            bool uniform,
                            int use_kernel)
 {
+    const dtype spatial_freq_scale_b = dtype(spatial_freq_scale_b_in);
     const bool two_devices = !pos_b.is_empty();
     const bool two_maps = !phase_b.is_empty();
 
@@ -501,7 +502,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
 
 template void quadriga_lib::sos_val(const arma::Mat<float> &spatial_freq, const arma::Mat<float> &phase, const arma::Mat<float> &pos, arma::Mat<float> &val,
                                     const arma::Mat<float> &pos_b, const arma::Mat<float> &phase_b, const arma::Col<float> &acf, const arma::Col<float> &dist,
-                                    float spatial_freq_scale_b, bool uniform, int use_kernel);
+                                    double spatial_freq_scale_b, bool uniform, int use_kernel);
 template void quadriga_lib::sos_val(const arma::Mat<double> &spatial_freq, const arma::Mat<double> &phase, const arma::Mat<double> &pos, arma::Mat<double> &val,
                                     const arma::Mat<double> &pos_b, const arma::Mat<double> &phase_b, const arma::Col<double> &acf, const arma::Col<double> &dist,
                                     double spatial_freq_scale_b, bool uniform, int use_kernel);

@@ -73,8 +73,8 @@ else()
     # One section per function and data object, so that the MATLAB MEX links (-Wl,--gc-sections) drop the library
     # code a MEX file does not use. MATLAB disassembles every MEX file when it first loads it, which takes time in
     # proportion to the code size.
-    add_compile_options(${OPT_FLAGS} -fPIC -ffunction-sections -fdata-sections -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
-    set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
+    add_compile_options(${OPT_FLAGS} -fPIC -ffunction-sections -fdata-sections -Wall -Wextra -Wfloat-conversion $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
+    set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra -Wfloat-conversion")
 endif()
 
 include(ExternalProject)

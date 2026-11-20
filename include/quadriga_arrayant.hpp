@@ -69,7 +69,7 @@ namespace quadriga_lib
     void arrayant_calc_beamwidth(
         const arrayant<dtype> &ant,                    // Valid arrayant
         const arma::uvec &i_element = arma::uvec(),    // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
-        dtype threshold_dB = 3.0,                      // Threshold in dB, positive and finite; 3 dB = FWHM
+        double threshold_dB = 3.0,                     // Threshold in dB, positive and finite; 3 dB = FWHM
         arma::Col<dtype> *beamwidth_az_deg = nullptr,  // Optional output: azimuth beamwidth in degree; [n_out]
         arma::Col<dtype> *beamwidth_el_deg = nullptr,  // Optional output: elevation beamwidth in degree; [n_out]
         arma::Col<dtype> *az_point_ang_deg = nullptr,  // Optional output: azimuth pointing angle of the main beam in degree; [n_out]
@@ -89,7 +89,7 @@ namespace quadriga_lib
         const arrayant<dtype> &ant,                                      // Valid arrayant
         const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
         const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(), // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-        dtype propagation_speed = dtype(299792458.0));                   // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+        double propagation_speed = 299792458.0);                         // Wave propagation speed in m/s (~343 for acoustics); positive, finite
 
     // Concatenate the elements of two arrayants into a new arrayant (block-diagonal coupling)
     template <typename dtype>
@@ -109,9 +109,9 @@ namespace quadriga_lib
     void arrayant_export_obj_file(
         const std::string &fn,                       // Output OBJ filename; must end in .obj
         const arrayant<dtype> &ant,                  // Valid arrayant
-        dtype directivity_range_dB = 30.0,           // Dynamic range of the visualized directivity pattern in dB
+        double directivity_range_dB = 30.0,          // Dynamic range of the visualized directivity pattern in dB
         const std::string &colormap = "jet",         // Colormap for the visualization
-        dtype object_radius = 1.0,                   // Radius of the exported object
+        double object_radius = 1.0,                  // Radius of the exported object
         arma::uword icosphere_n_div = 4,             // Icosphere subdivision count; higher = finer mesh
         const arma::uvec &i_element = arma::uvec()); // Optional: 0-based element indices to export; default: all
 
@@ -144,7 +144,7 @@ namespace quadriga_lib
     void arrayant_calc_beamwidth_multi(
         const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector that passes arrayant_is_valid_multi
         const arma::uvec &i_element = arma::uvec(),       // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
-        dtype threshold_dB = 3.0,                         // Threshold in dB, positive and finite; 3 dB = FWHM
+        double threshold_dB = 3.0,                        // Threshold in dB, positive and finite; 3 dB = FWHM
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,     // Optional output: azimuth beamwidth in degree; [n_out, n_freq]
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,     // Optional output: elevation beamwidth in degree; [n_out, n_freq]
         arma::Mat<dtype> *az_point_ang_deg = nullptr,     // Optional output: azimuth pointing angle in degree; [n_out, n_freq]
@@ -164,7 +164,7 @@ namespace quadriga_lib
         const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
         const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(), // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
         const arma::Col<dtype> &freq_new = arma::Col<dtype>(),           // Output frequency grid in Hz; defaults to input grid
-        dtype propagation_speed = dtype(299792458.0));                   // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+        double propagation_speed = 299792458.0);                         // Wave propagation speed in m/s (~343 for acoustics); positive, finite
 
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model
     // - Both inputs must have equal entry counts, identical angular grids, and matching center_freq values at each index.
@@ -291,30 +291,30 @@ namespace quadriga_lib
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     // - Usage example: auto ant = quadriga_lib::generate_arrayant_omni<float>();
     template <typename dtype = double>
-    arrayant<dtype> generate_arrayant_omni(dtype res = 1.0);
+    arrayant<dtype> generate_arrayant_omni(double res = 1.0);
 
     // Generate cross-polarized isotropic radiator
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     template <typename dtype = double>
-    arrayant<dtype> generate_arrayant_xpol(dtype res = 1.0);
+    arrayant<dtype> generate_arrayant_xpol(double res = 1.0);
 
     // Generate short dipole radiating with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     template <typename dtype = double>
-    arrayant<dtype> generate_arrayant_dipole(dtype res = 1.0);
+    arrayant<dtype> generate_arrayant_dipole(double res = 1.0);
 
     // Generate half-wave dipole radiating with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     template <typename dtype = double>
-    arrayant<dtype> generate_arrayant_half_wave_dipole(dtype res = 1.0);
+    arrayant<dtype> generate_arrayant_half_wave_dipole(double res = 1.0);
 
     // Generate an antenna with a custom 3dB beam with (FWHM)
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_custom(
-        dtype az_3dB = 90.0,       // Azimuth 3dB beam with in degree
-        dtype el_3dB = 90.0,       // Elevation 3dB beam with in degree
-        dtype rear_gain_lin = 0.0, // Front-back ration, linear value
-        dtype res = 1.0);          // Resolution of the antenna pattern sampling grid in degree
+        double az_3dB = 90.0,       // Azimuth 3dB beam with in degree
+        double el_3dB = 90.0,       // Elevation 3dB beam with in degree
+        double rear_gain_lin = 0.0, // Front-back ration, linear value
+        double res = 1.0);          // Resolution of the antenna pattern sampling grid in degree
 
     // Generate : Unified Linear Array
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
@@ -322,10 +322,10 @@ namespace quadriga_lib
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_ula(
         arma::uword N = 1,                                  // Number of elements
-        dtype center_freq = 299792458.0,                    // The center frequency in [Hz]
-        dtype spacing = 0.5,                                // Element spacing in [λ]
+        double center_freq = 299792458.0,                   // The center frequency in [Hz]
+        double spacing = 0.5,                               // Element spacing in [λ]
         const arrayant<dtype> &pattern = arrayant<dtype>(), // Optional custom per-element pattern; empty = default
-        dtype res = 1.0);                                   // Resolution in degree, ignored if custom pattern is given
+        double res = 1.0);                                  // Resolution in degree, ignored if custom pattern is given
 
     // Generate : Antenna model for the 3GPP-NR channel model
     // Polarization indicator:
@@ -341,16 +341,16 @@ namespace quadriga_lib
     arrayant<dtype> generate_arrayant_3GPP(
         arma::uword M = 1,                                  // Number of vertical elements
         arma::uword N = 1,                                  // Number of horizontal elements
-        dtype center_freq = 299792458.0,                    // The center frequency in [Hz]
+        double center_freq = 299792458.0,                   // The center frequency in [Hz]
         unsigned pol = 1,                                   // Polarization indicator
-        dtype tilt = 0.0,                                   // The electric downtilt angle in [deg] for pol = 4,5,6
-        dtype spacing = 0.5,                                // Element spacing in [λ]
+        double tilt = 0.0,                                  // The electric downtilt angle in [deg] for pol = 4,5,6
+        double spacing = 0.5,                               // Element spacing in [λ]
         arma::uword Mg = 1,                                 // Number of nested panels in a column (Mg)
         arma::uword Ng = 1,                                 // Number of nested panels in a row (Ng)
-        dtype dgv = 0.5,                                    // Panel spacing in vertical direction (dg,V) in [λ]
-        dtype dgh = 0.5,                                    // Panel spacing in horizontal direction (dg,H) in [λ]
+        double dgv = 0.5,                                   // Panel spacing in vertical direction (dg,V) in [λ]
+        double dgh = 0.5,                                   // Panel spacing in horizontal direction (dg,H) in [λ]
         const arrayant<dtype> &pattern = arrayant<dtype>(), // Optional custom per-element pattern; empty = default
-        dtype res = 1.0);                                   // Resolution in degree, ignored if custom pattern is given
+        double res = 1.0);                                  // Resolution in degree, ignored if custom pattern is given
 
     // Generate multi-beam antenna
     // - Generates a planar M x N array that forms mutiple beams pointing in different directions
@@ -358,20 +358,20 @@ namespace quadriga_lib
     // - Polarization indicator: (1) Vertical polarization only, (2) H/V polarized elements, (3) +/-45 degree polarized elements
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_multibeam(
-        arma::uword M = 1,               // Number of vertical elements
-        arma::uword N = 1,               // Number of horizontal elements
-        arma::Col<dtype> az = {0.0},     // Azimuth beam angles in degree
-        arma::Col<dtype> el = {0.0},     // Elevation beam angles in degree
-        arma::Col<dtype> weight = {1.0}, // Scaling factor for the beams
-        dtype center_freq = 299792458.0, // The center frequency in [Hz]
-        unsigned pol = 1,                // Polarization indicator
-        dtype spacing = 0.5,             // Element spacing in [λ]
-        dtype az_3dB = 120.0,            // Azimuth per-element 3dB beam with in degree
-        dtype el_3dB = 120.0,            // Elevation per-element 3dB beam with in degree
-        dtype rear_gain_lin = 0.0,       // Front-back ration, linear value
-        dtype res = 1.0,                 // Resolution of the antenna pattern sampling grid in degree
-        bool separate_beams = false,     // If true, create a separate beam for each angle pair (ignores weights)
-        bool apply_weights = false);     // Switch to apply the beamforming weights
+        arma::uword M = 1,                // Number of vertical elements
+        arma::uword N = 1,                // Number of horizontal elements
+        arma::Col<dtype> az = {0.0},      // Azimuth beam angles in degree
+        arma::Col<dtype> el = {0.0},      // Elevation beam angles in degree
+        arma::Col<dtype> weight = {1.0},  // Scaling factor for the beams
+        double center_freq = 299792458.0, // The center frequency in [Hz]
+        unsigned pol = 1,                 // Polarization indicator
+        double spacing = 0.5,             // Element spacing in [λ]
+        double az_3dB = 120.0,            // Azimuth per-element 3dB beam with in degree
+        double el_3dB = 120.0,            // Elevation per-element 3dB beam with in degree
+        double rear_gain_lin = 0.0,       // Front-back ration, linear value
+        double res = 1.0,                 // Resolution of the antenna pattern sampling grid in degree
+        bool separate_beams = false,      // If true, create a separate beam for each angle pair (ignores weights)
+        bool apply_weights = false);      // Switch to apply the beamforming weights
 
     // Generate a parametric loudspeaker model
     // - Returns a vector of arrayant objects, one per frequency sample
@@ -386,20 +386,20 @@ namespace quadriga_lib
     template <typename dtype = double>
     std::vector<arrayant<dtype>> generate_speaker(
         const std::string &driver_type = "piston",                // Driver type: "piston", "horn", "omni"
-        dtype radius = 0.05,                                      // Effective radiating radius in [m] (piston: cone, horn: mouth)
-        dtype lower_cutoff = 80.0,                                // Lower -3 dB frequency in [Hz]
-        dtype upper_cutoff = 12000.0,                             // Upper -3 dB frequency in [Hz]
-        dtype lower_rolloff_slope_dB = 12.0,                      // Low-frequency rolloff in [dB/octave]
-        dtype upper_rolloff_slope_dB = 12.0,                      // High-frequency rolloff in [dB/octave]
-        dtype sensitivity_dB = 85.0,                              // On-axis sensitivity in [dB SPL] at 1W/1m
+        double radius = 0.05,                                     // Effective radiating radius in [m] (piston: cone, horn: mouth)
+        double lower_cutoff = 80.0,                               // Lower -3 dB frequency in [Hz]
+        double upper_cutoff = 12000.0,                            // Upper -3 dB frequency in [Hz]
+        double lower_rolloff_slope_dB = 12.0,                     // Low-frequency rolloff in [dB/octave]
+        double upper_rolloff_slope_dB = 12.0,                     // High-frequency rolloff in [dB/octave]
+        double sensitivity_dB = 85.0,                             // On-axis sensitivity in [dB SPL] at 1W/1m
         const std::string &radiation_type = "hemisphere",         // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
-        dtype hor_coverage_deg = NAN,                             // Horizontal coverage angle in [deg], horn only, NaN or <= 0 = 90
-        dtype ver_coverage_deg = NAN,                             // Vertical coverage angle in [deg], horn only, NaN or <= 0 = 60
-        dtype horn_control_freq = NAN,                            // Horn pattern control frequency in [Hz], NaN or <= 0 = c / (2 pi radius)
-        dtype baffle_width = 0.15,                                // Enclosure baffle width in [m], piston only
-        dtype baffle_height = 0.25,                               // Enclosure baffle height in [m], piston only
+        double hor_coverage_deg = NAN,                            // Horizontal coverage angle in [deg], horn only, NaN or <= 0 = 90
+        double ver_coverage_deg = NAN,                            // Vertical coverage angle in [deg], horn only, NaN or <= 0 = 60
+        double horn_control_freq = NAN,                           // Horn pattern control frequency in [Hz], NaN or <= 0 = c / (2 pi radius)
+        double baffle_width = 0.15,                               // Enclosure baffle width in [m], piston only
+        double baffle_height = 0.25,                              // Enclosure baffle height in [m], piston only
         const arma::Col<dtype> &center_freq = arma::Col<dtype>(), // Frequency sample points in [Hz]; empty = auto third-octave
-        dtype angular_resolution_deg = 5.0);                      // Angular grid resolution in [deg]
+        double angular_resolution_deg = 5.0);                     // Angular grid resolution in [deg]
 
 }
 

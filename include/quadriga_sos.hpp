@@ -33,7 +33,7 @@ namespace quadriga_lib
         const std::string &name,          // Name of the preset, e.g. "Comb256"
         arma::Col<dtype> *acf = nullptr,  // Optional output: Target ACF, [200]
         arma::Col<dtype> *dist = nullptr, // Optional output: Sample points of the ACF in [m], [200]
-        dtype dist_decorr = 10.0);        // Decorrelation distance in [m], must be > 0
+        double dist_decorr = 10.0);       // Decorrelation distance in [m], must be > 0
 
     // Draw random phases for a set of sum-of-sinusoids generators
     // - Uniform in [-pi, pi); for the same seed, column g does not depend on n_gen
@@ -66,7 +66,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(), // Optional: Phases of the second device in [rad], [n_coeff, n_gen]
         const arma::Col<dtype> &acf = arma::Col<dtype>(),     // Optional: Target ACF, [n_acf]
         const arma::Col<dtype> &dist = arma::Col<dtype>(),    // Optional: Sample points of the ACF in [m], [n_acf]
-        dtype spatial_freq_scale_b = 1.0,                     // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
+        double spatial_freq_scale_b = 1.0,                    // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
         bool uniform = false,                                 // Output distribution: false = Normal, true = Uniform in [0, 1]
         int use_kernel = 0);                                  // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
@@ -130,7 +130,7 @@ namespace quadriga_lib
         const arma::Col<dtype> &dist = arma::Col<dtype>(),  // Optional: Sample points of the ACF in [m], [n_acf]
         arma::Mat<dtype> *offset = nullptr,                 // Optional output: Applied offsets in [rad], [n_gen, 1], or [n_gen, 2] with phase_b
         arma::Mat<dtype> *mean_before = nullptr,            // Optional output: Sample mean before the correction, [n_gen, 1]; with phase_b the mean of each device's own field, [n_gen, 2]
-        dtype spatial_freq_scale_b = 1.0);                  // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
+        double spatial_freq_scale_b = 1.0);                 // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
 
     // Target ACF on a 2-D grid
     // - Grid axis from -2·Dmax to 2·Dmax with the spacing of 'dist', Dmax = last sample point, n_grid = 4·n_acf - 3
@@ -193,8 +193,8 @@ namespace quadriga_lib
         bool uniform_smp = true,              // Regular (true) or random (false) directions of the sinusoids
         arma::uword n_dir = 10,               // Number of test directions, must be > 0
         bool random_init = true,              // Start from random frequencies (true) or build up sinusoid by sinusoid (false)
-        dtype spatial_freq_min = 0.0,         // Lower limit of abs(f) in [1/m], 0 = none
-        dtype spatial_freq_max = NAN,         // Upper limit of abs(f) in [1/m], NaN or <= 0 = 15 / max(dist)
+        double spatial_freq_min = 0.0,        // Lower limit of abs(f) in [1/m], 0 = none
+        double spatial_freq_max = NAN,        // Upper limit of abs(f) in [1/m], NaN or <= 0 = 15 / max(dist)
         arma::sword seed = -1);               // Seed, -1 = system random device
 }
 

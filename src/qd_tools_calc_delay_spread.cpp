@@ -27,8 +27,8 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
-    dtype threshold_dB = 100.0,
-    dtype granularity = 0.0,
+    double threshold_dB = 100.0,
+    double granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
 ```
 
@@ -53,10 +53,12 @@ MD!*/
 template <typename dtype>
 arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dtype>> &delays,
                                                  const std::vector<arma::Col<dtype>> &powers,
-                                                 dtype threshold_dB,
-                                                 dtype granularity,
+                                                 double threshold_dB_in,
+                                                 double granularity_in,
                                                  arma::Col<dtype> *mean_delay)
 {
+    const dtype threshold_dB = dtype(threshold_dB_in);
+    const dtype granularity = dtype(granularity_in);
     // --- Input validation ---
     arma::uword n_cir = (arma::uword)delays.size();
 
@@ -217,8 +219,8 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
 
 template arma::Col<float> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<float>> &delays,
                                                           const std::vector<arma::Col<float>> &powers,
-                                                          float threshold_dB,
-                                                          float granularity,
+                                                          double threshold_dB,
+                                                          double granularity,
                                                           arma::Col<float> *mean_delay);
 
 template arma::Col<double> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<double>> &delays,

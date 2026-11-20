@@ -29,7 +29,7 @@ void quadriga_lib::calc_rician_k_factor(
     const arma::Mat<dtype> &rx_pos,
     arma::Col<dtype> *kf = nullptr,
     arma::Col<dtype> *pg = nullptr,
-    dtype window_size = 0.01);
+    double window_size = 0.01);
 ```
 
 ## Inputs:
@@ -51,8 +51,9 @@ void quadriga_lib::calc_rician_k_factor(const std::vector<arma::Col<dtype>> &pow
                                         const arma::Mat<dtype> &rx_pos,
                                         arma::Col<dtype> *kf,
                                         arma::Col<dtype> *pg,
-                                        dtype window_size)
+                                        double window_size_in)
 {
+    const dtype window_size = dtype(window_size_in);
     // --- Input validation ---
     arma::uword n_cir = (arma::uword)powers.size();
     if (n_cir == 0)
@@ -154,7 +155,7 @@ template void quadriga_lib::calc_rician_k_factor(const std::vector<arma::Col<flo
                                                  const arma::Mat<float> &rx_pos,
                                                  arma::Col<float> *kf,
                                                  arma::Col<float> *pg,
-                                                 float window_size);
+                                                 double window_size);
 
 template void quadriga_lib::calc_rician_k_factor(const std::vector<arma::Col<double>> &powers,
                                                  const std::vector<arma::Col<double>> &path_length,

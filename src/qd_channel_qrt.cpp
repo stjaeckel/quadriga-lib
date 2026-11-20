@@ -1289,12 +1289,12 @@ static void qrt_read_cir(std::ifstream &fileR, size_t file_size, const quadriga_
             {
                 const dtype r11 = (dtype)src[0];
                 const dtype i11 = (dtype)src[1];
-                const dtype r21 = v6 ? 0.0 : (dtype)src[2];
-                const dtype i21 = v6 ? 0.0 : (dtype)src[3];
-                const dtype r12 = v6 ? 0.0 : (dtype)src[4];
-                const dtype i12 = v6 ? 0.0 : (dtype)src[5];
-                const dtype r22 = v6 ? 0.0 : (dtype)src[6];
-                const dtype i22 = v6 ? 0.0 : (dtype)src[7];
+                const dtype r21 = v6 ? dtype(0) : (dtype)src[2];
+                const dtype i21 = v6 ? dtype(0) : (dtype)src[3];
+                const dtype r12 = v6 ? dtype(0) : (dtype)src[4];
+                const dtype i12 = v6 ? dtype(0) : (dtype)src[5];
+                const dtype r22 = v6 ? dtype(0) : (dtype)src[6];
+                const dtype i22 = v6 ? dtype(0) : (dtype)src[7];
 
                 // column powers (V and H) - path gain = max column power
                 dtype gain = 1.0;
