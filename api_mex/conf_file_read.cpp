@@ -137,6 +137,8 @@ Read and validate a QuaDRiGa scenario configuration file
   number is required or the reverse, text after the value, `NaN`, a number beyond the range of a
   double, a `PL_` key without a name, a `ShortName` value stated twice), and with `validate = true`
   for a value that fails [[scenpar_validate]]
+- The outputs differ from C++: the path-loss model `pl_model` is the field `model` of `plpar`, the C++
+  outputs `key_order` and `pl_order` set the order of the fields, and `lsp_xcorr_pd` is called `lsp_xcorr_chk`
 
 ## Usage:
 ```
@@ -190,7 +192,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&lsp_xcorr, 8, 8);
 
-    arma::mat *p_lsp_xcorr = lsp_xcorr.empty() ? nullptr : &lsp_xcorr;
+    arma::mat *p_lsp_xcorr = (nlhs > 2) ? &lsp_xcorr : nullptr;
     std::vector<std::string> *p_short_names = (nlhs > 4) ? &short_names : nullptr;
     std::vector<std::string> *p_ignored_keys = (nlhs > 5) ? &ignored_keys : nullptr;
 

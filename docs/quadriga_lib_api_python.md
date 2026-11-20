@@ -2180,6 +2180,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [MATLAB](quadriga_lib_
   assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required or the reverse,
   text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a `ShortName` value
   stated twice), and with `validate = True` for a value that fails [scenpar_validate](#scenpar_validate)
+- The outputs differ from C++: the path-loss model `pl_model` is the key `model` of `plpar`, the C++ outputs
+  `key_order` and `pl_order` set the order of the keys, and `lsp_xcorr_pd` is called `lsp_xcorr_chk`
 
 ### Usage:
 ```python
@@ -4787,7 +4789,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [MATLAB](quadriga_lib
   `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
   unchanged, also if its phases lie outside that interval
 - Two devices on the same map need an ACF above -1 at all sample points, as in [sos.val](#sos.val)
-- The input arrays `phase_in` and `phase_b_in` are not modified; the corrected phases are new arrays
+- The C++ in/out arguments `phase` and `phase_b` are split into `phase_in` / `phase_out` and `phase_b_in` /
+  `phase_b_out`: the input arrays are not modified, the corrected phases are new arrays; C++ messages name them
+  `phase` and `phase_b`
 - An optional array that is `None` or empty counts as not given
 
 ### Usage:

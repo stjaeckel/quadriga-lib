@@ -115,7 +115,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool oxygen = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "oxygen", false);
     const bool use_absolute_delays = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "use_absolute_delays", false);
 
-
     // The result is returned by value and copied
     quadriga_lib::channel<double> chan;
     CALL_QD(chan = quadriga_lib::gbsm_single_link_channel(tx_array, rx_array, rays, link_gain_dB, mobility, output,

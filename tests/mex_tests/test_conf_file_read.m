@@ -89,6 +89,7 @@ assertEqual( chk4, false );                                                 % no
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.conf_file_read( fn );
+assertEqual( ans, scenpar );
 scenpar5 = quadriga_lib.conf_file_read( fn );
 assertEqual( scenpar5, scenpar );
 [ ~, plpar6 ] = quadriga_lib.conf_file_read( fn );

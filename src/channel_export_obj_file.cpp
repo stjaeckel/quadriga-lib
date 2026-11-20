@@ -79,6 +79,9 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     if (chan.polmat.empty() && chan.coeff_re.empty())
         throw std::invalid_argument("Input 'chan' must contain 'coeff_re' or 'polmat'.");
 
+    if (n_edges < 3)
+        throw std::invalid_argument("Input 'n_edges' must be at least 3.");
+
     if (!std::isfinite(gain_max_dB) || !std::isfinite(gain_min_dB) || !(gain_max_dB > gain_min_dB))
         throw std::invalid_argument("Inputs 'gain_max_dB' and 'gain_min_dB' must be finite, with 'gain_max_dB' larger than 'gain_min_dB'.");
 

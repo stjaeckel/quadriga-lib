@@ -204,6 +204,8 @@ Read and validate a QuaDRiGa scenario configuration file
   assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required or the reverse,
   text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a `ShortName` value
   stated twice), and with `validate = True` for a value that fails [[scenpar_validate]]
+- The outputs differ from C++: the path-loss model `pl_model` is the key `model` of `plpar`, the C++ outputs
+  `key_order` and `pl_order` set the order of the keys, and `lsp_xcorr_pd` is called `lsp_xcorr_chk`
 
 ## Usage:
 ```

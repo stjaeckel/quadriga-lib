@@ -768,6 +768,8 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_remove_bia
   `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
   unchanged, also if its phases lie outside that interval
 - Two devices on the same map need an ACF above -1 at all sample points, as in [sos_val](#sos_val)
+- The C++ in/out arguments `phase` and `phase_b` are split into `phase_in` / `phase_out` and `phase_b_in` /
+  `phase_b_out`, so that the inputs stay unchanged; C++ messages name them `phase` and `phase_b`
 
 ### Usage:
 ```matlab

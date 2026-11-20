@@ -68,9 +68,6 @@ assertTrue( ~isfield( p3, 'n_ray_tap' ) );
 c4 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 2 );
 assertEqual( c4.center_freq, fc(2) );
 assertTrue( max( abs( c4.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );
-c5 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], int32(2) );
-assertEqual( quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], uint8(2) ), c5 );
-assertEqual( c5.coeff_re, c4.coeff_re );
 c6 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 1, tx_pos, [ rx_pos, rx_pos + [ 1; 0; 0 ] ] );
 assertEqual( size(c6.coeff_re), [2, 1, n_tap, 2] );
 assertEqual( c6.rx_pos, [ rx_pos, rx_pos + [ 1; 0; 0 ] ] );
@@ -96,8 +93,14 @@ assertElementsAlmostEqual( c9.delay - chan.delay, norm( rx_pos - tx_pos ) / 2997
 
 %% Outputs: 0 to 2
 quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90 );
+assertEqual( ans.coeff_re, chan.coeff_re );
 c1 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90 );
 assertEqual( c1.coeff_im, chan.coeff_im );
+
+%% Type handling: integer classes for the 1-based index i_freq
+c5 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], int32(2) );
+assertEqual( quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], uint8(2) ), c5 );
+assertEqual( c5.coeff_re, c4.coeff_re );
 
 %% Errors
 assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays ), 'Wrong number of input arguments.' );

@@ -168,7 +168,7 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
     {
         if (input_error != nullptr)
             *input_error = true;
-        return "Could not find an arrayant object with ID " + attr_value + " in the file.";
+        return "Input 'id': the file has no arrayant with ID " + attr_value + ".";
     }
 
     // Read name

@@ -190,6 +190,7 @@ class test_channel_export_obj_file(unittest.TestCase):
             self._export('cm.obj', chan, colormap='not_a_colormap')
         with self.assertRaisesRegex(ValueError, "'n_edges' must be at least 3"):
             self._export('ne.obj', chan, n_edges=1)
+        self.assertFalse(os.path.exists(self._path('ne.obj')))  # checked before any file is written
         with self.assertRaisesRegex(ValueError, "'radius_min' cannot be negative."):
             self._export('nr.obj', chan, radius_max=-1.0)
         with self.assertRaisesRegex(ValueError, "'i_snap' cannot exceed"):

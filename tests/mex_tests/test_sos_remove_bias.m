@@ -67,6 +67,7 @@ assertElementsAlmostEqual( d4, zeros(128, 3), 'absolute', 1e-13 );
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.sos_remove_bias( spatial_freq, phase, pos );
+assertEqual( ans, phase_out );
 p5 = quadriga_lib.sos_remove_bias( spatial_freq, phase, pos );
 assertEqual( p5, phase_out );
 [ ~, ~, o6 ] = quadriga_lib.sos_remove_bias( spatial_freq, phase, pos );

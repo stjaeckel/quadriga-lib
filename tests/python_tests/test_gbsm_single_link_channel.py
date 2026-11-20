@@ -139,6 +139,17 @@ class test_case(unittest.TestCase):
                                         tx_pos=np.asfortranarray(TX), rx_pos=RX.astype(np.float32))[0]
         npt.assert_array_equal(chan["coeff"][0], self.out[0]["coeff"][0])
 
+    def test_inputs_not_modified(self):
+        rays = {k: np.copy(v) for k, v in self.rays.items()}
+        tx = {k: np.copy(v) for k, v in self.tx.items()}
+        gain = np.array([-90.0])
+        gbsm.single_link_channel(self.tx, self.rx, self.rays, gain, rx_pos=RX)
+        for k, v in rays.items():
+            npt.assert_array_equal(self.rays[k], v)
+        for k, v in tx.items():
+            npt.assert_array_equal(self.tx[k], v)
+        npt.assert_array_equal(gain, [-90.0])
+
     def test_errors(self):
         with self.assertRaises(ValueError) as ctx:
             self.call(i_freq=2)
