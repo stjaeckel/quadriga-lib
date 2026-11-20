@@ -100,6 +100,7 @@ test:   all moxunit-lib
 	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc)
 	bash tests/check_avx2_objects.sh $(CMAKE_BUILD_DIR)
 	bash tests/check_mex_symbol_versions.sh $(CMAKE_BUILD_DIR)
+	bash tests/check_mex_call_qd.sh
 	OMP_WAIT_POLICY=$${OMP_WAIT_POLICY:-passive} time $(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)

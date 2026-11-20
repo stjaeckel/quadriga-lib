@@ -36,12 +36,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    std::string quadriga_lib_version = quadriga_lib::quadriga_lib_version();
+    std::string quadriga_lib_version = quadriga_lib::quadriga_lib_version(); // no CALL_QD: does not throw
 
-    if (quadriga_lib::quadriga_lib_has_AVX2())
+    if (quadriga_lib::quadriga_lib_has_AVX2()) // no CALL_QD: does not throw
         quadriga_lib_version += "_AVX2";
 
-    if (quadriga_lib::quadriga_lib_has_CUDA())
+    if (quadriga_lib::quadriga_lib_has_CUDA()) // no CALL_QD: does not throw
         quadriga_lib_version += "_CUDA";
 
     plhs[0] = mxCreateString(quadriga_lib_version.c_str());

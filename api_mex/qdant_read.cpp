@@ -73,7 +73,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         else if (arrayant.size() > 1) // Multi-freq mode
         {
             // The entries must form a frequency set (same element count, grids, positions and coupling size)
-            std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant);
+            std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant); // no CALL_QD: returns the error
             if (!err.empty())
             {
                 err = "Entries in file '" + fn + "' do not form a frequency set (" + err +
