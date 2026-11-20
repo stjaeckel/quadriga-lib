@@ -29,7 +29,7 @@ val = quadriga_lib.sos_acfi( acf, dist, d );
 - **`d`** — Distances; must be >= 0; `[n_d]`
 
 ## Output:
-- **`val`** — ACF at the distances `d`; column vector; `[n_d]`
+- **`val`** — ACF at the distances `d`; `[n_d, 1]`
 
 ## See also:
 - [[sos_preset]] (ACF tables of the predefined models)
@@ -37,7 +37,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 3 || nrhs > 3)
+    if (nrhs != 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");

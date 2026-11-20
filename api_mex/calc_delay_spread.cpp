@@ -33,8 +33,8 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
   error is raised
 
 ## Outputs:
-- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir]`
-- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir]`
+- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir, 1]`
+- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir, 1]`
 
 ## See also:
 - [[quantize_delays]] (for mapping delays to a fixed tap grid)

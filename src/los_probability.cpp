@@ -178,7 +178,7 @@ arma::vec quadriga_lib::los_probability(const std::string &model,
         if (model == qd_los_names[i])
             m = i;
     if (m < 0)
-        throw std::invalid_argument("Model '" + model + "' is not supported.");
+        throw std::invalid_argument("Input 'model' has an unsupported value '" + model + "'.");
 
     // Distances and heights
     const arma::uword n_link = d2d_out.n_elem;
@@ -343,8 +343,7 @@ arma::vec quadriga_lib::los_probability(const std::string &model,
         for (arma::uword l = 0; l < n_link; ++l)
             G[l] = rnd_g.at(l) + qd_los_probit(p_los[l]);
 
-        if (los_soft->n_rows != n_link || los_soft->n_cols != n_freq)
-            los_soft->set_size(n_link, n_freq);
+        los_soft->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq && n_link > 0; ++k)
         {
             const double kk = std::sqrt(20.0 * center_freq.at(k) / qd_speed_of_light); // sqrt(20 / lambda)

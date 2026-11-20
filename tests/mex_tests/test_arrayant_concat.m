@@ -184,7 +184,7 @@ try
     quadriga_lib.arrayant_concat( ant1, [ant2, ant2] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'same number of entries';
+    expectedErrorMessage = 'same number of frequency entries';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -227,7 +227,7 @@ try
     quadriga_lib.arrayant_concat( [ant1, ant1], [ant_bad, ant_bad] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Azimuth grid sizes do not match';
+    expectedErrorMessage = 'same azimuth grid size';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -244,7 +244,7 @@ try
     quadriga_lib.arrayant_concat( [ant1, ant1], [ant_bad, ant_bad] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Elevation grid sizes'; 
+    expectedErrorMessage = 'same elevation grid size';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

@@ -18,8 +18,8 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap,  object_radius, ...
-   icosphere_n_div, i_element, i_freq );
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, ...
+    icosphere_n_div, i_element, i_freq );
 ```
 
 ## Inputs:
@@ -30,9 +30,9 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, color
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object; default: 1 m
 - **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
-- **`i_element`** — Element indices to export; 1-based; uint64; empty = export all elements
-- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based; 
-  uint64; default: 1; must satisfy `1 <= i_freq <= n_freq`
+- **`i_element`** — Element indices to export; 1-based; default: `[]` (all elements)
+- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based;
+  default: 1; must satisfy `1 <= i_freq <= n_freq`
 
 ## See also:
 - [[icosphere]] (icosphere primitive used internally)
@@ -60,7 +60,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     size_t n_freq = (size_t)mxGetNumberOfElements(prhs[1]);
     const size_t i_freq = (nrhs < 8) ? 0 : qd_mex_get_index<size_t>(prhs[7], "i_freq"); // 1-based -> 0-based
     if (i_freq >= n_freq)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' is out of bound.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' is out of range.");
 
     // Load arrayant (single entry for the requested frequency)
     auto ant = quadriga_lib::arrayant<double>();

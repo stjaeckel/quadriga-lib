@@ -27,19 +27,19 @@ Test whether 3D points are inside a triangle mesh using raycasting
 result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, *, distance )
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — 3D coordinates of test points; `(n_points, 3)`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_mesh, 9)`
-- **`obj_ind`** *(optional)* — 0-based object index per mesh element; enables per-object output; `(n_mesh,)`
-- **`distance`** *(optional)* — Surface proximity threshold; points within this distance
+- **`obj_ind`** — 0-based object index per mesh element; enables per-object output; `(n_mesh,)`; default: `None`
+- **`distance`** — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
-  range: 0–20 m; Default: 0
+  range: 0–20 m; default: 0
 
-## Output Arguments:
-- `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
-  index (with `obj_ind`); int64; size `(n_points,)`
+## Output:
+- **`result`** — Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
+  index (with `obj_ind`); int64; `(n_points,)`
 
-See also:
+## See also:
 - [[obj_file_read]] (for reading `mesh` and `obj_ind` from an .obj file)
 MD!*/
 

@@ -166,7 +166,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::runtime_error("Cannot open file.");
+            throw std::runtime_error("Cannot open file '" + fn + "'.");
     }
     const size_t file_size = qrt_file_size(fileR);
     fileR.seekg(0, std::ios::beg);
@@ -332,10 +332,10 @@ void quadriga_lib::qrt_file_init(
 - **`center_freq`** — Center frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries; stored in Hz as `float`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
-- **`cir_offset`** — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
-- **`n_orig`** — Number of origin (TX) slots to reserve; at least 1
-- **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
+- **`dest_names`** *(optional)* — Receiver (MT) names, at most 255 characters each; `[n_dest]`
+- **`cir_offset`** *(optional)* — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
+- **`n_orig`** *(optional)* — Number of origin (TX) slots to reserve; at least 1
+- **`scalar_mode`** *(optional)* — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
 ## See also:
 - [[qrt_file_append]] (write one TX block into a reserved slot)
@@ -413,7 +413,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
 
     std::ofstream fileW(fn, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!fileW.is_open())
-        throw std::runtime_error("Cannot open file for writing.");
+        throw std::runtime_error("Cannot create file '" + fn + "'.");
 
     std::string bin_id = scalar_mode ? "#QRT-BINv06" : "#QRT-BINv05";
     fileW.write(bin_id.c_str(), (std::streamsize)bin_id.size());
@@ -458,7 +458,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
 
     fileW.close();
     if (!fileW)
-        throw std::runtime_error("Cannot write file.");
+        throw std::runtime_error("Cannot write file '" + fn + "'.");
 }
 
 template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const arma::Col<float> &center_freq, const arma::Mat<float> &cir_pos,
@@ -496,7 +496,7 @@ size_t quadriga_lib::qrt_file_append(
 - **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
 - **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
-- **`orig_name`** — Transmitter name; at most 255 characters
+- **`orig_name`** *(optional)* — Transmitter name; at most 255 characters
 
 ## Returns:
 - Number of paths written across all CIRs.
@@ -521,14 +521,14 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
 
     std::fstream f(fn, std::ios::in | std::ios::out | std::ios::binary);
     if (!f.is_open())
-        throw std::runtime_error("Cannot open file.");
+        throw std::runtime_error("Cannot open file '" + fn + "'.");
 
     // Recover metadata via the existing header parser (open the file read-only for it).
     quadriga_lib::qrt_read_cache cache;
     {
         std::ifstream fr(fn, std::ios::in | std::ios::binary);
         if (!fr.is_open())
-            throw std::runtime_error("Cannot open file.");
+            throw std::runtime_error("Cannot open file '" + fn + "'.");
         cache = quadriga_lib::qrt_read_cache_init(fn, &fr);
     }
 
@@ -706,7 +706,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
 
     f.close();
     if (!f)
-        throw std::runtime_error("Cannot write file.");
+        throw std::runtime_error("Cannot write file '" + fn + "'.");
     return total_paths;
 }
 
@@ -800,7 +800,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::runtime_error("Cannot open file.");
+            throw std::runtime_error("Cannot open file '" + fn + "'.");
     }
 
     // Rewind the stream to the beginning
@@ -907,42 +907,19 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     }
     qrt_check_stream(fileR);
 
-    // Populate output parameters
-    if (n_cir)
-        *n_cir = (arma::uword)l_no_cir;
-    if (n_orig)
-        *n_orig = (arma::uword)l_no_orig;
-    if (n_dest)
-        *n_dest = (arma::uword)(l_no_dest == 0 ? 1 : l_no_dest);
-    if (n_freq)
-        *n_freq = (arma::uword)l_no_freq;
-    if (version)
-        *version = ver;
-
     if (l_cir_index.n_elem == 0 || l_cir_index[0] != 0)
         throw std::runtime_error("Invalid CIR index in QRT file. Potential file corruption.");
 
-    if (cir_offset)
-    {
-        cir_offset->set_size(l_cir_index.n_elem);
-        auto po = cir_offset->memptr();
-        for (auto &val : l_cir_index)
-            *po++ = (arma::uword)val;
-    }
-
-    if (dest_names)
-        *dest_names = std::move(l_dest_names);
-
     // Read origin names — requires seeking to each origin's data block
+    std::vector<std::string> l_orig_names;
     if (orig_names)
     {
-        orig_names->clear();
-        orig_names->reserve(l_no_orig);
+        l_orig_names.reserve(l_no_orig);
         for (unsigned i = 0; i < l_no_orig; ++i)
         {
             if (l_orig_index(i) == 0) // TX slot reserved but not yet written by append
             {
-                orig_names->push_back(std::string());
+                l_orig_names.push_back(std::string());
                 continue;
             }
             qrt_check_offset(file_size, l_orig_index(i), "orig_index");
@@ -955,26 +932,52 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
             fileR.read(&name[0], (size_t)tx_name_length);
             qrt_check_stream(fileR);
 
-            orig_names->push_back(std::move(name));
+            l_orig_names.push_back(std::move(name));
         }
     }
 
+    if (center_freq && ver == 4 && l_no_orig != 0)
+    {
+        // In version 4 the frequency is stored per-origin; read from the first origin
+        qrt_check_offset(file_size, l_orig_index(0), "orig_index");
+        fileR.seekg((std::streampos)l_orig_index(0));
+
+        uint8_t tx_name_length = 0;
+        fileR.read((char *)&tx_name_length, sizeof(uint8_t));
+        fileR.seekg((std::streamoff)tx_name_length, std::ios::cur); // skip name
+
+        l_freq.set_size(1);
+        fileR.read((char *)l_freq.memptr(), sizeof(float));
+        qrt_check_stream(fileR);
+    }
+
+    // Populate output parameters, after all reads and checks
+    if (n_cir)
+        *n_cir = (arma::uword)l_no_cir;
+    if (n_orig)
+        *n_orig = (arma::uword)l_no_orig;
+    if (n_dest)
+        *n_dest = (arma::uword)(l_no_dest == 0 ? 1 : l_no_dest);
+    if (n_freq)
+        *n_freq = (arma::uword)l_no_freq;
+    if (version)
+        *version = ver;
+
+    if (cir_offset)
+    {
+        cir_offset->set_size(l_cir_index.n_elem);
+        auto po = cir_offset->memptr();
+        for (auto &val : l_cir_index)
+            *po++ = (arma::uword)val;
+    }
+
+    if (dest_names)
+        *dest_names = std::move(l_dest_names);
+    if (orig_names)
+        *orig_names = std::move(l_orig_names);
+
     if (center_freq)
     {
-        if (ver == 4 && l_no_orig != 0)
-        {
-            // In version 4 the frequency is stored per-origin; read from the first origin
-            qrt_check_offset(file_size, l_orig_index(0), "orig_index");
-            fileR.seekg((std::streampos)l_orig_index(0));
-
-            uint8_t tx_name_length = 0;
-            fileR.read((char *)&tx_name_length, sizeof(uint8_t));
-            fileR.seekg((std::streamoff)tx_name_length, std::ios::cur); // skip name
-
-            l_freq.set_size(1);
-            fileR.read((char *)l_freq.memptr(), sizeof(float));
-            qrt_check_stream(fileR);
-        }
         l_freq *= (float)qd_qrt_freq_scale(l_freq.memptr(), l_freq.n_elem, ver);
         *center_freq = std::move(l_freq);
     }
@@ -1048,10 +1051,10 @@ void quadriga_lib::qrt_file_read(
 
 ## Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
-- **`i_cir`** — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
+- **`i_cir`** *(optional)* — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
   without CIRs)
-- **`i_orig`** — Origin index, 0-based
-- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
+- **`i_orig`** *(optional)* — Origin index, 0-based
+- **`uplink`** *(optional)* — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
 - **`normalize_polmat`** *(optional)* — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
@@ -1066,24 +1069,24 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
 
 ## Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** — Transmitter positions in Cartesian coordinates; `[3, n_out]`
-- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
-- **`rx_pos`** — Receiver positions in Cartesian coordinates; `[3, n_out]`
-- **`rx_orientation`** — Receiver orientations (bank, tilt, heading); `[3, n_out]`
-- **`fbs_pos`** — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`path_gain`** — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
-- **`polmat`** — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; `[n_out]` of `[n_path]`
-- **`eod`** — Departure elevation angles; `[n_out]` of `[n_path]`
-- **`aoa`** — Arrival azimuth angles; `[n_out]` of `[n_path]`
-- **`eoa`** — Arrival elevation angles; `[n_out]` of `[n_path]`
-- **`path_coord`** — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
-- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
-- **`coord`** — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
-- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
+- **`center_freq`** *(optional)* — Center frequency in Hz; `[n_freq]`
+- **`tx_pos`** *(optional)* — Transmitter positions in Cartesian coordinates; `[3, n_out]`
+- **`tx_orientation`** *(optional)* — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
+- **`rx_pos`** *(optional)* — Receiver positions in Cartesian coordinates; `[3, n_out]`
+- **`rx_orientation`** *(optional)* — Receiver orientations (bank, tilt, heading); `[3, n_out]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
+- **`polmat`** *(optional)* — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
+- **`aod`** *(optional)* — Departure azimuth angles; `[n_out]` of `[n_path]`
+- **`eod`** *(optional)* — Departure elevation angles; `[n_out]` of `[n_path]`
+- **`aoa`** *(optional)* — Arrival azimuth angles; `[n_out]` of `[n_path]`
+- **`eoa`** *(optional)* — Arrival elevation angles; `[n_out]` of `[n_path]`
+- **`path_coord`** *(optional)* — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
+- **`n_interact`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
+- **`coord`** *(optional)* — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
+- **`interact_type`** *(optional)* — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
   Empty for v4 legacy files. GBSM paths of [[qrt_paths_from_scatterers]] carry 129 (GR) and 193 (NLOS); LOS and GR
   paths are not marked as GBSM.
 
@@ -1458,7 +1461,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir,
                                  std::ifstream *file, const qrt_read_cache *cache)
 {
     if (normalize_polmat != 0 && normalize_polmat != 1)
-        throw std::invalid_argument("'normalize_polmat' must be 0 or 1.");
+        throw std::invalid_argument("Input 'normalize_polmat' must be 0 or 1.");
 
     // Outputs must be distinct and must not be part of the cache (possible for dtype = float)
     if (cache)
@@ -1484,7 +1487,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir,
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::runtime_error("Cannot open file.");
+            throw std::runtime_error("Cannot open file '" + fn + "'.");
     }
 
     // Without a cache, the whole header is read once for all requested CIRs
@@ -1498,12 +1501,13 @@ void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir,
 
     for (arma::uword k = 0; k < i_cir.n_elem; ++k)
         if (i_cir[k] >= (arma::uword)c.n_cir)
-            throw std::invalid_argument("Snapshot " + std::to_string(k) + ": CIR index exceeds number of CIRs in file.");
+            throw std::invalid_argument("Snapshot " + std::to_string(k) + ": Input 'i_cir' is out of range; the file has " +
+                                        std::to_string(c.n_cir) + " CIRs.");
     const arma::uword n_out = i_cir.empty() ? (arma::uword)c.n_cir : i_cir.n_elem;
 
     // A file without origins (possible for v4) reads empty when no CIR is requested
     if (c.n_orig != 0 && i_orig >= (arma::uword)c.n_orig)
-        throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
+        throw std::invalid_argument("Input 'i_orig' is out of range; the file has " + std::to_string(c.n_orig) + " origins.");
     if (n_out != 0 && c.n_orig == 0) // qrt_file_init writes at least one origin
         throw std::runtime_error("File does not contain any origins.");
 
@@ -1626,7 +1630,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 
 ## Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
-- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
+- **`i_orig`** *(optional)* — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 - **`cache`** *(optional)* — Pre-parsed metadata from [[qrt_read_cache_init]]; pass `nullptr` to parse the header on this call
 
@@ -1653,7 +1657,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::runtime_error("Cannot open file.");
+            throw std::runtime_error("Cannot open file '" + fn + "'.");
     }
     else if (!fileR.good())
         throw std::runtime_error("Supplied ifstream is not in a good state.");
@@ -1670,7 +1674,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
     if (c->version != 5 && c->version != 6)
         throw std::runtime_error("Only QRT versions 5 and 6 can be read as raw paths.");
     if (i_orig >= (arma::uword)c->n_orig)
-        throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
+        throw std::invalid_argument("Input 'i_orig' is out of range; the file has " + std::to_string(c->n_orig) + " origins.");
 
     unsigned n_cir = c->n_cir;
     unsigned n_freq = c->n_freq;

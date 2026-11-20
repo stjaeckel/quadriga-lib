@@ -86,7 +86,7 @@ directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, *, i_element
   see [generate](#generate) for the field layout
 - **`i_element`** — Element indices, 0-based, duplicates allowed; empty: all elements; `(n_out,)`; default: None (all elements)
 
-### Outputs:
+### Output:
 - **`directivity_dBi`** — Directivity in dBi; `(n_out,)` for a single-frequency input,
   `(n_out, n_freq)` for a multi-frequency input; `n_out = n_elements` when `i_element` is None
 
@@ -139,7 +139,7 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for
   acoustics; default: `299792458.0`
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Dict with the combined array antenna data; keys as in [generate](#generate)
 
 ### See also:
@@ -177,7 +177,7 @@ arrayant_out = quadriga_lib.arrayant.concat( arrayant1, arrayant2 )
 - **`arrayant2`** — Dict with the second array antenna; must use the same azimuth and elevation
   grids as `arrayant1`, and for 4D input the same number of frequency entries with matching `center_freq`
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Dict with the concatenated array antenna; same keys and layout as the
   inputs; single-frequency dict for 3D input, frequency-dependent dict for 4D input
 
@@ -216,7 +216,7 @@ arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, [0, 1], [2, 3] )
 - **`i_target`** — Index of the destination element(s); scalar int or 1D list or array of int; `(n_copy,)`;
   must have the same length as `i_source` unless `i_source` is a single index
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Dict with the modified array antenna data; same keys and layout as
   `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input
 
@@ -333,7 +333,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 - **`separate_beams`** — Produce one independent beam per angle pair (weights ignored); default: False
 - **`apply_weights`** — Apply the beamforming weights to the output coupling matrix; default: False
 
-### Outputs:
+### Output:
 - **`ant`** — Dict with fields:
    | Field            | Description                                               | Size                                   |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -411,7 +411,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_
   `(n_freq,)` or None; default: None
 - **`angular_resolution_deg`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
-### Outputs:
+### Output:
 - **`speaker`** — Multi-frequency arrayant dict with the fields below; for `n_freq = 1` the pattern fields
   are 3D `(n_elevation, n_azimuth, n_elements)` and `center_freq` is a float:
   - `e_theta_re` — e-theta field component, real part; `(n_elevation, n_azimuth, n_elements, n_freq)`
@@ -575,7 +575,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#qdant_write) · [MATLAB](../mex
 ```python
 # Single-frequency write
 id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant )
-id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant, id )
+id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant, id, *, layout )
 
 # Frequency-dependent write (4D patterns) — all entries written sequentially
 quadriga_lib.arrayant.qdant_write( fn, arrayant )
@@ -592,7 +592,7 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
   only IDs present in the file; ignored for 4D input; default: `None` (a row of all IDs in the file,
   which replaces a layout written before)
 
-### Outputs:
+### Output:
 - **`id_in_file`** — ID assigned to the entry in the file after writing; `0` for a frequency-dependent (4D) write
 
 ### See also:
@@ -639,6 +639,6 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, orientation, *, u
 - **`i_element`** — Element indices to rotate, 0-based, no duplicates; `None` or empty rotates all elements;
   default: `None`
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Dict with the rotated array antenna data; same keys and layout as
   `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input

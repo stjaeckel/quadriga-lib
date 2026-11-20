@@ -45,8 +45,8 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
   otherwise it must be finite and >= 1e-3 deg, else an error is raised
 
 ## Outputs:
-- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir]`
-- **`elevation_spread`** — RMS elevation angular spread; `[n_cir]`
+- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir, 1]`
+- **`elevation_spread`** — RMS elevation angular spread; `[n_cir, 1]`
 - **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
   direction (a positive tilt points down); `[3, n_cir]`
 - **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; `[n_path, n_cir]`

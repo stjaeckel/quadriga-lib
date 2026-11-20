@@ -24,7 +24,7 @@ directivity_dBi = quadriga_lib.arrayant_calc_directivity( arrayant, i_element );
 ## Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 
 ## Output:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty

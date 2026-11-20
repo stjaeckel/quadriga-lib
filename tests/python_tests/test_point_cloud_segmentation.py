@@ -54,13 +54,13 @@ class test_case(unittest.TestCase):
         # sub_cloud_ind / indices types
         self.assertGreaterEqual(sub_cloud_ind.ndim, 1)
         self.assertGreaterEqual(sub_cloud_ind.size, 1)
-        self.assertIn(sub_cloud_ind.dtype.kind, ('u', 'i'), msg="sub_cloud_ind must be integer")
+        self.assertEqual(sub_cloud_ind.dtype, np.int64)
         self.assertEqual(forward_ind.ndim, 1)
         self.assertEqual(forward_ind.size, n_points_out)
-        self.assertIn(forward_ind.dtype.kind, ('u', 'i'), msg="forward_ind must be integer")
+        self.assertEqual(forward_ind.dtype, np.int64)
         self.assertEqual(reverse_ind.ndim, 1)
         self.assertEqual(reverse_ind.size, n_points)
-        self.assertIn(reverse_ind.dtype.kind, ('u', 'i'), msg="reverse_ind must be integer")
+        self.assertEqual(reverse_ind.dtype, np.int64)
 
         # --- sub_cloud_ind properties (0-based, increasing, within range) ---
         sci = np.asarray(sub_cloud_ind, dtype=np.int64)

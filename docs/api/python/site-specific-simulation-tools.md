@@ -61,7 +61,7 @@ gain, polmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   1 / 2 = 7 / 19 paths with 3 segments; 3 = 37 paths, 4 segments; 4 = 61 paths, 5 segments; 5 / 6 = 1 / 2 paths
   with 2 segments (debug); 7 = direct line in 10 segments; default: 2
 - **`verbose`** — Verbosity level; default: 0
-- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `(n_mesh,)` or `None`; default: `None`
+- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `(n_sub,)` or `None`; default: `None`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect); default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 - **`scalar_mode`** — If `True`, uses scalar transmission (TE-only reflection coefficient,
@@ -126,7 +126,7 @@ mesh = quadriga_lib.RTtools.cube( scale, rotation, location, *, n_div )
 - **`location`** — Translation (x, y, z); shape `(3,)`; `None` or empty = origin; default: `None`
 - **`n_div`** — Number of subdivisions per edge; yields 12 · n_div^2 triangles; default: 1
 
-### Outputs:
+### Output:
 - **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(12 · n_div^2, 9)`
 
 ---
@@ -198,7 +198,7 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
 ### Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
 - **`radius`** — Radius of icosphere in meters; finite and positive
-- **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
+- **`direction_xyz`** — Output directions in Cartesian (true) or spherical
   azimuth/elevation (false); default: false
 
 ### Outputs:
@@ -208,7 +208,7 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
   `center` vector; `(n_faces,)`
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_faces, 9)`
 - **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
-  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `[n_faces, 9)`
+  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `(n_faces, 9)`
 
 ---
 <a id="mitsuba_xml_file_write"></a>
@@ -288,13 +288,13 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 ### Outputs:
 - **`mesh`** — Triangle vertex coordinates `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]` per row; `(n_mesh, 9)`
 - **`vert_list`** — All vertex positions in the file; `(n_vert, 3)`
-- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `(n_mesh, 3)`
-- **`obj_ind`** — 0-based object index per triangle; `(n_mesh,)`
+- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; int64; `(n_mesh, 3)`
+- **`obj_ind`** — 0-based object index per triangle; int64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of `str`; length `max(obj_ind) + 1`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `(n_mesh,)`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); int64; `(n_mesh,)`
 - **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `n_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `(n_mtl, 17)`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `(n_mesh,)`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); int64; `(n_mesh,)`
 - **`csv_names`** — Material names from the table; list of `str`; length `n_csv`
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column (excluding `name`)
   mapping to a 1D array of length `n_csv`
@@ -358,7 +358,7 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `(n_vert, 3)`
-- **`face_ind_out`** — 0-based face indices derived from `mesh`, or a copy of `face_ind`; `(n_mesh, 3)`
+- **`face_ind_out`** — 0-based face indices derived from `mesh`, or a copy of `face_ind`; int64; `(n_mesh, 3)`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading OBJ files and the BSDF column layout)
@@ -394,7 +394,7 @@ mesh = quadriga_lib.RTtools.plane( scale, rotation, location, *, n_div )
 - **`location`** — Translation (x, y, z); shape `(3,)`; `None` or empty = origin; default: `None`
 - **`n_div`** — Number of subdivisions per edge; yields 2 · n_div^2 triangles; default: 1
 
-### Outputs:
+### Output:
 - **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(2 · n_div^2, 9)`
 
 ---
@@ -414,13 +414,13 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_cloud_aabb) · [MA
 aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, *, vec_size )
 ```
 
-### Input Arguments:
+### Inputs:
 - **`points`** — 3D point coordinates; `(n_points, 3)`
-- **`sub_cloud_ind`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
-  use [point_cloud_segmentation](#point_cloud_segmentation) to generate; uint32; `(n_sub,)`; default: `None`
-- **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
+- **`sub_cloud_ind`** — 0-based row indices marking the start of each sub-cloud;
+  use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `(n_sub,)`; default: `None`
+- **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
-### Output Argument:
+### Output:
 - **`aabb`** — Bounding box matrix; `(n_out, 6)` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
@@ -450,16 +450,16 @@ points_out, sub_cloud_ind, forward_ind, reverse_ind = \
 
 ### Inputs:
 - **`points`** — Original 3D point cloud; `(n_points, 3)`
-- **`target_size`** *(optional)* — Maximum points per sub-cloud before padding; default: 1024
-- **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of
+- **`target_size`** — Maximum points per sub-cloud before padding; default: 1024
+- **`vec_size`** — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of
   this value; no padding when `1`; `ray_point_intersect` accepts any value, padding (e.g. 8 for AVX2) only
   improves its speed; default: 1
 
 ### Outputs:
 - **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `(n_points_out, 3)`
-- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `points_out`; uint32; `(n_sub,)`
-- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `points_out`; padding entries are `0`; uint32; `(n_points_out,)`
-- **`reverse_ind`** *(optional)* — 0-based row in `points_out` of each row of `points`; uint32; `(n_points,)`
+- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `points_out`; int64; `(n_sub,)`
+- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; int64; `(n_points_out,)`
+- **`reverse_ind`** — 0-based row in `points_out` of each row of `points`; int64; `(n_points,)`
 
 ---
 <a id="point_inside_mesh"></a>
@@ -482,19 +482,19 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_inside_mesh) · [M
 result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, *, distance )
 ```
 
-### Input Arguments:
+### Inputs:
 - **`points`** — 3D coordinates of test points; `(n_points, 3)`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_mesh, 9)`
-- **`obj_ind`** *(optional)* — 0-based object index per mesh element; enables per-object output; `(n_mesh,)`
-- **`distance`** *(optional)* — Surface proximity threshold; points within this distance
+- **`obj_ind`** — 0-based object index per mesh element; enables per-object output; `(n_mesh,)`; default: `None`
+- **`distance`** — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
-  range: 0–20 m; Default: 0
+  range: 0–20 m; default: 0
 
-### Output Arguments:
-- `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
-  index (with `obj_ind`); int64; size `(n_points,)`
+### Output:
+- **`result`** — Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
+  index (with `obj_ind`); int64; `(n_points,)`
 
-See also:
+### See also:
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
 
 ---
@@ -515,7 +515,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_point_intersect) · 
 
 ### Usage:
 ```python
-hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
+hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec, \
     tridir, sub_cloud_ind, *, use_kernel, gpu_id )
 ```
 
@@ -526,18 +526,18 @@ hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( point
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `(n_ray, 9)`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `(n_ray, 9)`
-- **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
+- **`sub_cloud_ind`** — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
-  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
-- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
+  `vec_size` is optional and only improves speed); `(n_sub,)`; default: `None`
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA; default: 0
+- **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ### Outputs:
 - **`hit_count`** — Number of beams intersecting each point; equals `numpy.diff(hit_offset)`; uint32;
   `(n_points,)`
-- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; `(n_hit,)`
+- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; int64; `(n_hit,)`
 - **`hit_offset`** — Start of each point's block within `hit_ind`; the last element equals `n_hit`;
   uint32; `(n_points + 1,)`
 
@@ -565,10 +565,10 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_triangle_intersect) 
 ### Usage:
 ```python
 # Output as tuple
-data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, *, use_kernel, gpu_id )
+data = quadriga_lib.RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 
 # Unpacked outputs
-fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
+fbs, sbs, n_interact, fbs_ind, sbs_ind = quadriga_lib.RTtools.ray_triangle_intersect( orig, dest, mesh, \
     sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 ```
 
@@ -576,13 +576,13 @@ fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, d
 - **`orig`** — Ray origins in GCS; `(n_ray, 3)`
 - **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `(n_mesh, 9)`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`; default: `None`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
+- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; `(n_sub,)`; default: `None`
+- **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
   `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`; default: `None`
-- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
   throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2,
-  else GENERIC.
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
+  else GENERIC; default: 0
+- **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ### Outputs:
 - **`fbs`** — First-bounce intersection points in GCS; `(n_ray, 3)`
@@ -644,9 +644,9 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, *, vec_size 
 
 ### Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
-- **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
-  of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
-- **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes; if omitted, the AABB
+  of the entire mesh is returned; `(n_sub,)`; default: `None`
+- **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
 
 ### Output:
 - **`aabb`** — Axis-aligned bounding boxes, one row per sub-mesh; `(n_sub_aligned, 6)`
@@ -690,6 +690,6 @@ mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
 
 ### Outputs:
 - **`mesh_out`** — Reordered and padded triangle vertices; `(n_mesh_out, 9)`
-- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; uint32; `(n_sub,)`
-- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_mesh_out,)`
-- **`mtl_ind_out`** — Reordered and padded material indices; `(n_mesh_out,)`; empty if `mtl_ind` is not provided
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; int64; `(n_sub,)`
+- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); int64; `(n_mesh_out,)`
+- **`mtl_ind_out`** — Reordered and padded material indices; int64; `(n_mesh_out,)`; empty if `mtl_ind` is not provided

@@ -41,14 +41,14 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [[generate_diffraction_paths]]; default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
-- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]];  `[n_mesh, 1]`;
+- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_sub, 1]`;
   default: `[]` (not using sub-meshes)
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [[ray_triangle_intersect]]; default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
-  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
-  1 = resolve never
+  energy-conservation transmission) instead of EM TE/TM averaging; default: `false` (EM mode)
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always,
+  1 = resolve never; default: 0
 - **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [[qrt_file_read]] for a
@@ -90,7 +90,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
     const arma::mat mesh = qd_mex_get_Mat<double>(prhs[2], false, "mesh");
-    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind");
+    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind"); // 1-based, 0 = none; no shift intended
 
     auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);
 
@@ -119,12 +119,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&polmat, (scalar_mode ? 2 : 8), n_pos);
 
-    arma::vec *p_gain = gain.empty() ? nullptr : &gain;
-    arma::mat *p_polmat = polmat.empty() ? nullptr : &polmat;
+    arma::mat *p_polmat = (nlhs > 1) ? &polmat : nullptr;
     arma::cube *p_coord = (nlhs > 2) ? &coord : nullptr; // Size depends on lod, set by C++
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
-                                                center_freq, lod, p_gain, p_polmat, p_coord, verbose,
+                                                center_freq, lod, &gain, p_polmat, p_coord, verbose,
                                                 sub_mesh_ind, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase));
 

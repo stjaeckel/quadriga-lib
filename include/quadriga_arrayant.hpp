@@ -279,7 +279,7 @@ namespace quadriga_lib
     // Write a vector of array antenna objects to a single QDANT file
     // - Each arrayant is stored with a sequential ID (1-based) in the file
     // - A layout matrix of size [n_entries, 1] with entries 1...n_entries is created automatically
-    // - Overwrites the file if it already exists
+    // - The file must not exist yet
     template <typename dtype>
     void qdant_write_multi(
         const std::string &fn,                             // Filename of the QDANT file

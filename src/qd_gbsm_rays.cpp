@@ -278,12 +278,9 @@ void quadriga_lib::ssf_scatterers(gbsm_rays &rays, double d_min)
         throw std::invalid_argument("Ground reflection requires z >= 0 in 'rays.tx_pos' and 'rays.rx_pos'.");
 
     const arma::uword n = rays.n_ray();
-    if (rays.fbs_pos.n_rows != 3 || rays.fbs_pos.n_cols != n)
-        rays.fbs_pos.set_size(3, n);
-    if (rays.lbs_pos.n_rows != 3 || rays.lbs_pos.n_cols != n)
-        rays.lbs_pos.set_size(3, n);
-    if (rays.fallback.n_elem != n)
-        rays.fallback.set_size(n);
+    rays.fbs_pos.set_size(3, n);
+    rays.lbs_pos.set_size(3, n);
+    rays.fallback.set_size(n);
 
     const double *T = rays.tx_pos.memptr(), *R = rays.rx_pos.memptr();
     const double D[3] = {T[0] - R[0], T[1] - R[1], T[2] - R[2]};

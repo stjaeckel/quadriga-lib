@@ -31,7 +31,7 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 ## Outputs:
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward
   from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
-- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces, 1]`
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_faces, 9]`
 - **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`

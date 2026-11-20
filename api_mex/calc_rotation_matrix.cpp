@@ -27,8 +27,8 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, transposed );
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
 - **`transposed`** — Returns the transpose of the rotation matrix; logical; default: false
 
-## Outputs:
-- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
+## Output:
+- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9, 1]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

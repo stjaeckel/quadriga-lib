@@ -49,10 +49,10 @@ int quadriga_lib::any_type_id(
     unsigned long long *dims = nullptr);
 ```
 
-### Inputs:
+### Input:
 - **`data`** — Pointer to the `std::any` object to inspect
 
-### Outputs:
+### Output:
 - **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
 
 ### Returns:
@@ -111,7 +111,7 @@ void quadriga_lib::baseband_freq_response(
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
@@ -139,7 +139,6 @@ Also in: [MATLAB](../mex/channel-functions.md#baseband_freq_response_multi) · [
   (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
 - Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
-- At least one of `hmat_re`/`hmat_im` or `hmat` must be non-null
 
 ### Declaration:
 ```cpp
@@ -169,7 +168,7 @@ void quadriga_lib::baseband_freq_response_multi(
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
   across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -218,7 +217,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
 - **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
 - **`remove_delay_phase`** *(optional)* — As in [baseband_freq_response_multi](#baseband_freq_response_multi); default `true`
 - **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carrier]`
@@ -265,7 +264,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
 - **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
@@ -563,10 +562,10 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
     arma::u32_vec *channel_id = nullptr);
 ```
 
-### Inputs:
+### Input:
 - **`fn`** — Path to the HDF5 file
 
-### Outputs:
+### Output:
 - **`channel_id`** *(optional)* — Serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ### Returns:
@@ -840,7 +839,7 @@ float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0
 - **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
-### Function 'duplicate';
+### Function 'duplicate':
 Copies the path into an existing target object and returns its length
 
 - Performs a deep copy: the target receives an independent data buffer and all metadata
@@ -894,7 +893,7 @@ size_t quadriga_lib::qrt_file_append(
 - **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
 - **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
-- **`orig_name`** — Transmitter name; at most 255 characters
+- **`orig_name`** *(optional)* — Transmitter name; at most 255 characters
 
 ### Returns:
 - Number of paths written across all CIRs.
@@ -937,10 +936,10 @@ void quadriga_lib::qrt_file_init(
 - **`center_freq`** — Center frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries; stored in Hz as `float`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
-- **`cir_offset`** — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
-- **`n_orig`** — Number of origin (TX) slots to reserve; at least 1
-- **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
+- **`dest_names`** *(optional)* — Receiver (MT) names, at most 255 characters each; `[n_dest]`
+- **`cir_offset`** *(optional)* — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
+- **`n_orig`** *(optional)* — Number of origin (TX) slots to reserve; at least 1
+- **`scalar_mode`** *(optional)* — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
 ### See also:
 - [qrt_file_append](#qrt_file_append) (write one TX block into a reserved slot)
@@ -1057,10 +1056,10 @@ void quadriga_lib::qrt_file_read(
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
-- **`i_cir`** — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
+- **`i_cir`** *(optional)* — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
   without CIRs)
-- **`i_orig`** — Origin index, 0-based
-- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
+- **`i_orig`** *(optional)* — Origin index, 0-based
+- **`uplink`** *(optional)* — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
 - **`normalize_polmat`** *(optional)* — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
@@ -1075,24 +1074,24 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
 ### Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** — Transmitter positions in Cartesian coordinates; `[3, n_out]`
-- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
-- **`rx_pos`** — Receiver positions in Cartesian coordinates; `[3, n_out]`
-- **`rx_orientation`** — Receiver orientations (bank, tilt, heading); `[3, n_out]`
-- **`fbs_pos`** — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`path_gain`** — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
-- **`polmat`** — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; `[n_out]` of `[n_path]`
-- **`eod`** — Departure elevation angles; `[n_out]` of `[n_path]`
-- **`aoa`** — Arrival azimuth angles; `[n_out]` of `[n_path]`
-- **`eoa`** — Arrival elevation angles; `[n_out]` of `[n_path]`
-- **`path_coord`** — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
-- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
-- **`coord`** — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
-- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
+- **`center_freq`** *(optional)* — Center frequency in Hz; `[n_freq]`
+- **`tx_pos`** *(optional)* — Transmitter positions in Cartesian coordinates; `[3, n_out]`
+- **`tx_orientation`** *(optional)* — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
+- **`rx_pos`** *(optional)* — Receiver positions in Cartesian coordinates; `[3, n_out]`
+- **`rx_orientation`** *(optional)* — Receiver orientations (bank, tilt, heading); `[3, n_out]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
+- **`polmat`** *(optional)* — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
+- **`aod`** *(optional)* — Departure azimuth angles; `[n_out]` of `[n_path]`
+- **`eod`** *(optional)* — Departure elevation angles; `[n_out]` of `[n_path]`
+- **`aoa`** *(optional)* — Arrival azimuth angles; `[n_out]` of `[n_path]`
+- **`eoa`** *(optional)* — Arrival elevation angles; `[n_out]` of `[n_path]`
+- **`path_coord`** *(optional)* — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
+- **`n_interact`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
+- **`coord`** *(optional)* — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
+- **`interact_type`** *(optional)* — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
   Empty for v4 legacy files. GBSM paths of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) carry 129 (GR) and 193 (NLOS); LOS and GR
   paths are not marked as GBSM.
 
@@ -1147,7 +1146,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
-- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
+- **`i_orig`** *(optional)* — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 - **`cache`** *(optional)* — Pre-parsed metadata from [qrt_read_cache_init](#qrt_read_cache_init); pass `nullptr` to parse the header on this call
 

@@ -47,13 +47,13 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]` per row; `(n_mesh, 9)`
 - **`vert_list`** — All vertex positions in the file; `(n_vert, 3)`
-- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `(n_mesh, 3)`
-- **`obj_ind`** — 0-based object index per triangle; `(n_mesh,)`
+- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; int64; `(n_mesh, 3)`
+- **`obj_ind`** — 0-based object index per triangle; int64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of `str`; length `max(obj_ind) + 1`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `(n_mesh,)`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); int64; `(n_mesh,)`
 - **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `n_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `(n_mtl, 17)`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `(n_mesh,)`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); int64; `(n_mesh,)`
 - **`csv_names`** — Material names from the table; list of `str`; length `n_csv`
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column (excluding `name`)
   mapping to a 1D array of length `n_csv`
@@ -153,7 +153,7 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 
 ## Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `(n_vert, 3)`
-- **`face_ind_out`** — 0-based face indices derived from `mesh`, or a copy of `face_ind`; `(n_mesh, 3)`
+- **`face_ind_out`** — 0-based face indices derived from `mesh`, or a copy of `face_ind`; int64; `(n_mesh, 3)`
 
 ## See also:
 - [[obj_file_read]] (for reading OBJ files and the BSDF column layout)

@@ -215,6 +215,61 @@ TEST_CASE("Ray-Point Intersect - CSR Outputs")
     CHECK(hit_offset.n_elem == pointsR.n_rows + 1);
 }
 
+// A hits_per_point that already has one entry per point is written in place: entries that wrap external memory
+// (as a wrapper's arrays do) of the right size receive the hits, the vector is not rebuilt.
+TEST_CASE("Ray-Point Intersect - pre-sized hits_per_point is written in place")
+{
+    arma::fmat points(4, 3);
+    points.col(0) = arma::regspace<arma::fvec>(0.0f, 0.1f, 0.3f);
+    points = repmat(points, 2, 1);
+    points.submat(4, 0, 7, 0) += 40.0f;
+    points = repmat(points, 2, 1);
+    points.submat(0, 1, 7, 1) -= 50.0f;
+    points.submat(8, 1, 15, 1) += 50.0f;
+    points.col(2) += 1.0f;
+    points.col(1) *= 0.1f;
+
+    arma::fmat pointsR;
+    arma::u32_vec sub_cloud_ind;
+    quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
+
+    arma::fmat orig, trivec, tridir;
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
+    orig.col(0) -= 10.0f;
+    orig.col(1) -= 20.0f;
+    orig.col(2) -= 30.0f;
+
+    std::vector<arma::u32_vec> ref;
+    arma::u32_vec hit_count;
+    quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir, nullptr, nullptr, &hit_count, &ref, sub_cloud_ind, 1);
+    const size_t n_point = pointsR.n_rows;
+    REQUIRE(ref.size() == n_point);
+
+    std::vector<std::vector<unsigned>> store(n_point);
+    std::vector<arma::u32_vec> wrapped;
+    wrapped.reserve(n_point); // No relocation, the entries keep wrapping their buffers
+    size_t n_wrapped = 0;
+    for (size_t i = 0; i < n_point; ++i)
+    {
+        store[i].assign(hit_count[i], 0xFFFFFFFFu);
+        if (hit_count[i] == 0)
+            wrapped.emplace_back();
+        else
+            wrapped.emplace_back(store[i].data(), hit_count[i], false, true), ++n_wrapped;
+    }
+    REQUIRE(n_wrapped > 0);
+
+    quadriga_lib::ray_point_intersect(pointsR, orig, trivec, tridir, nullptr, nullptr, nullptr, &wrapped, sub_cloud_ind, 1);
+
+    REQUIRE(wrapped.size() == n_point);
+    for (size_t i = 0; i < n_point; ++i)
+    {
+        REQUIRE(wrapped[i].n_elem == ref[i].n_elem);
+        for (size_t k = 0; k < store[i].size(); ++k)
+            CHECK(store[i][k] == ref[i][k]);
+    }
+}
+
 TEST_CASE("Ray-Point Intersect - Optional Outputs")
 {
     arma::fmat points(4, 3);

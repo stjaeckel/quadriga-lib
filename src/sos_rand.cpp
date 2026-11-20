@@ -28,7 +28,7 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
         throw std::invalid_argument("Input 'dist_decorr' cannot be empty.");
     for (arma::uword g = 0; g < dist_decorr.n_elem; ++g)
         if (!(dist_decorr.at(g) >= (dtype)0.0) || !std::isfinite((double)dist_decorr.at(g)))
-            throw std::invalid_argument("Input 'dist_decorr' must be >= 0.");
+            throw std::invalid_argument("Input 'dist_decorr' must be finite and >= 0.");
     if (pos.n_elem == 0)
         throw std::invalid_argument("Input 'pos' cannot be empty.");
     if (pos.n_cols > 3)
@@ -48,7 +48,7 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
             throw std::invalid_argument("Number of elements in 'dist_decorr_b' does not match number of elements in 'dist_decorr'.");
         for (arma::uword g = 0; g < dist_decorr_b.n_elem; ++g)
             if (!(dist_decorr_b.at(g) >= (dtype)0.0) || !std::isfinite((double)dist_decorr_b.at(g)))
-                throw std::invalid_argument("Input 'dist_decorr_b' must be >= 0.");
+                throw std::invalid_argument("Input 'dist_decorr_b' must be finite and >= 0.");
     }
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
@@ -92,8 +92,7 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
         phase_b = quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, seed_b);
     }
 
-    if (val.n_rows != n_pos || val.n_cols != n_gen)
-        val.set_size(n_pos, n_gen);
+    val.set_size(n_pos, n_gen);
 
     // Generators with the same pair of decorrelation distances share the frequencies and are evaluated together
     std::vector<bool> done(n_gen, false);

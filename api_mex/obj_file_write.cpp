@@ -14,7 +14,7 @@ SECTION!*/
 # OBJ_FILE_WRITE
 Write a Wavefront .obj file
 
-- Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is  an error
+- Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is an error
 - With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same
   object that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
@@ -57,8 +57,8 @@ Write a Wavefront .obj file
 - **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; validated if given
 - **`csv_names`** *(optional)* — EM/acoustic material names; cell array of strings; required to write the `.csv`
 - **`csv_prop`** *(optional)* — Material properties as a struct; each field is one CSV column holding a vector of length `numel(csv_names)`
-- **`csv_write_defaults`** *(optional)* — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
-- **`split_loose_parts`** *(optional)* — If true, split each object into connected components; default: false
+- **`csv_write_defaults`** — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
+- **`split_loose_parts`** — If true, split each object into connected components; default: false
 
 ## Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`

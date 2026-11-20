@@ -461,8 +461,7 @@ static inline void qd_channels_snapshot_loop(size_t n_snap, bool parallel,
         arma::Cube<dtype> &cr = split.first, &ci = split.second;
         call(s, cr, ci);
         arma::Cube<std::complex<dtype>> &c = (*coeff)[s];
-        if (c.n_rows != cr.n_rows || c.n_cols != cr.n_cols || c.n_slices != cr.n_slices)
-            c.set_size(cr.n_rows, cr.n_cols, cr.n_slices);
+        c.set_size(cr.n_rows, cr.n_cols, cr.n_slices);
         std::complex<dtype> *p = c.memptr();
         const dtype *p_re = cr.memptr(), *p_im = ci.memptr();
         for (arma::uword k = 0; k < cr.n_elem; ++k)

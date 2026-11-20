@@ -41,8 +41,8 @@ Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 ## Outputs:
 - **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
-- **`acf`** — Target ACF; `[200]`
-- **`dist`** — Sample points of the ACF; `[200]`
+- **`acf`** — Target ACF; `[200, 1]`
+- **`dist`** — Sample points of the ACF; `[200, 1]`
 
 ## See also:
 - [[sos_init_phases]] (random phases for the generator)

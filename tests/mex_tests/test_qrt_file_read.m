@@ -255,7 +255,7 @@ try
     quadriga_lib.qrt_file_read(fn, 999, 1, false, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'CIR index exceeds number of CIRs in file.';
+    expectedErrorMessage = '''i_cir'' is out of range';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end
@@ -383,7 +383,7 @@ failed = false;
 try
     [~] = quadriga_lib.qrt_file_read(fn0, 1);
 catch ME
-    failed = ~isempty(strfind(ME.message, 'CIR index exceeds number of CIRs in file.'));
+    failed = ~isempty(strfind(ME.message, '''i_cir'' is out of range'));
 end
 assertTrue(failed);
 

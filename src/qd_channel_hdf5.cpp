@@ -70,7 +70,7 @@ static void qHDF_check_par(const std::string &name, const std::any &par_data)
     h5::dtype t = h5::float32;
     const int datatype_id = quadriga_lib::any_type_id(&par_data);
     if (datatype_id != 9 && !qHDF_par_type(datatype_id, t))
-        throw std::invalid_argument("Unsupported data type for '" + name + "'");
+        throw std::invalid_argument("Unsupported data type for '" + name + "'.");
     if (datatype_id == 9 && std::any_cast<std::string>(&par_data)->size() > (size_t)UINT32_MAX) // 32-bit type size
         throw std::invalid_argument("String '" + name + "' is too long: at most 4294967295 bytes can be stored.");
 }
@@ -117,13 +117,13 @@ static void qHDF_check_chunks(const qHDF_file &h, const std::vector<std::pair<ui
 // exactly once), the version, and the storage index. With 'update', the file is opened for writing and the root
 // chunk must have exactly the structure written by the library (other links in the root would be lost). Returns
 // false if the file does not exist.
-static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const char *open_error = "Error opening file.")
+static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const char *hint = "")
 {
     if (!h.f.open(fn, update ? "r+b" : "rb"))
     {
         if (!h5::file::exists(fn))
             return false;
-        throw std::runtime_error(open_error);
+        throw std::runtime_error("Cannot open file '" + fn + "'." + hint);
     }
     const h5::superblock sb = h5::read_superblock(h.f);
     h.eof = sb.eof;
@@ -209,7 +209,7 @@ static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const ch
 static void qHDF_create_for_slot(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
     if (ix == UINT_MAX || iy == UINT_MAX || iz == UINT_MAX || iw == UINT_MAX)
-        throw std::invalid_argument("Index out of bound.");
+        throw std::invalid_argument("Inputs 'ix', 'iy', 'iz' and 'iw' must address a slot inside the storage layout.");
     quadriga_lib::hdf5_create_file(fn, ix + 1, iy + 1, iz + 1, iw + 1);
 }
 
@@ -540,16 +540,16 @@ MD!*/
 void quadriga_lib::hdf5_create_file(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     if (nx == 0 || ny == 0 || nz == 0 || nw == 0)
-        throw std::invalid_argument("Storage layout dimension sizes cannot be 0.");
+        throw std::invalid_argument("Inputs 'nx', 'ny', 'nz' and 'nw' must be at least 1.");
 
     // Checked before anything is allocated or written
     const uint64_t n_slot = qHDF_slot_count(nx, ny, nz, nw);
     if (h5::file::exists(fn))
-        throw std::runtime_error("File already exists.");
+        throw std::runtime_error("File '" + fn + "' already exists.");
 
     h5::file f;
     if (!f.open(fn, "wb"))
-        throw std::runtime_error("Error creating file. It may be already opened.");
+        throw std::runtime_error("Cannot create file '" + fn + "'. It may be open in another program.");
 
     // Root chunk 0 with the links to the root datasets and room for the directory of the root links; the datasets
     // follow it: 'ChannelDims', 'Version', 'Order' (all slots empty), 'ChannelRef' (null references)
@@ -601,10 +601,10 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
     arma::u32_vec *channel_id = nullptr);
 ```
 
-## Inputs:
+## Input:
 - **`fn`** — Path to the HDF5 file
 
-## Outputs:
+## Output:
 - **`channel_id`** *(optional)* — Serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ## Returns:
@@ -622,8 +622,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(const std::string &fn, arma::u32_ve
         return arma::u32_vec(4, arma::fill::zeros);
     if (channel_id != nullptr)
     {
-        if (channel_id->n_elem != (arma::uword)h.n_slot)
-            channel_id->set_size((arma::uword)h.n_slot);
+        channel_id->set_size((arma::uword)h.n_slot);
         h.f.read(h.order_addr, channel_id->memptr(), (size_t)(4 * h.n_slot));
     }
     return arma::u32_vec({h.dims[0], h.dims[1], h.dims[2], h.dims[3]});
@@ -807,9 +806,9 @@ static std::vector<std::string> qHDF_check_channel(const quadriga_lib::channel<d
 {
     std::string error_message = chan.is_valid();
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'chan' is not valid: " + error_message);
     if (chan.n_snap() > (arma::uword)UINT_MAX) // The snapshot count is stored in 32 bits; is_valid does not check it
-        throw std::invalid_argument("Too many snapshots.");
+        throw std::invalid_argument("Input 'chan' has more than 4294967295 snapshots.");
 
     std::vector<std::string> names;
     std::set<std::string> unique;
@@ -834,17 +833,17 @@ static int qHDF_write_slot(const std::string &fn, const quadriga_lib::channel<dt
         return 0;
 
     // Open the file (created just large enough for the slot if it does not exist), the slot and its old channel group
-    const char *open_error = "Error opening file. It may be opened by another program.";
+    const char *open_hint = " It may be open in another program.";
     qHDF_file h;
-    if (!qHDF_open(h, fn, true, open_error))
+    if (!qHDF_open(h, fn, true, open_hint))
     {
         qHDF_create_for_slot(fn, ix, iy, iz, iw);
-        if (!qHDF_open(h, fn, true, open_error)) // Only if the file was removed in between
-            throw std::runtime_error(open_error);
+        if (!qHDF_open(h, fn, true, open_hint)) // Only if the file was removed in between
+            throw std::runtime_error("Cannot open file '" + fn + "'." + open_hint);
     }
     const long long slot = qHDF_slot(h, ix, iy, iz, iw);
     if (slot < 0)
-        throw std::invalid_argument("Index out of bound.");
+        throw std::invalid_argument("Inputs 'ix', 'iy', 'iz' and 'iw' must address a slot inside the storage layout.");
     const uint64_t old = qHDF_channel_ref(h, slot);
     h5::root_links root("channel_");
     root.load(h.f, h.root, h.eof, old);
@@ -934,7 +933,7 @@ arma::s32_vec quadriga_lib::hdf5_write_channel_vec(const std::string &fn, const 
         {
             const arma::u32_vec max_ind = arma::max(slots, 1);
             if (arma::any(max_ind == UINT_MAX))
-                throw std::invalid_argument("Index out of bound.");
+                throw std::invalid_argument("Input 'slots' contains an index that is out of range.");
             new_dims = max_ind + 1;
             qHDF_slot_count(new_dims[0], new_dims[1], new_dims[2], new_dims[3]); // Throws for more than 2^32 - 1 slots
             for (int d = 0; d < 4; ++d)
@@ -1349,7 +1348,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     const uint64_t ref = qHDF_channel_ref(h, qHDF_slot(h, ix, iy, iz, iw));
     return ref == 0 ? quadriga_lib::channel<dtype>() : qHDF_read_slot<dtype>(h, ref, i_snap);
 }
@@ -1398,7 +1397,7 @@ std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(co
         throw std::invalid_argument("Input 'slots' must have 4 rows.");
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     std::vector<quadriga_lib::channel<dtype>> chan_vec(slots.n_cols);
     for (arma::uword i = 0; i < slots.n_cols; ++i)
     {
@@ -1450,16 +1449,16 @@ MD!*/
 void quadriga_lib::hdf5_reshape_layout(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     if (!h5::file::exists(fn))
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
 
     // Checked in 64 bits, before the file is opened
     const unsigned long long n_data_new = qHDF_slot_count(nx, ny, nz, nw);
 
     qHDF_file h;
     if (!qHDF_open(h, fn, true)) // Only if the file was removed in between
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     if (n_data_new != h.n_slot)
-        throw std::invalid_argument("Mismatch in number of elements in storage index.");
+        throw std::invalid_argument("Inputs 'nx', 'ny', 'nz' and 'nw' must give the same number of slots as the file.");
 
     uint8_t channel_dims[16];
     const unsigned dims[4] = {nx, ny, nz, nw};
@@ -1519,7 +1518,7 @@ std::any quadriga_lib::hdf5_read_dset(const std::string &fn, const std::string &
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     qHDF_group data;
     if (!qHDF_read_data_group(h, ix, iy, iz, iw, data))
         return std::any();
@@ -1567,7 +1566,7 @@ std::vector<std::string> quadriga_lib::hdf5_read_dset_names(const std::string &f
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     std::vector<std::string> names;
     qHDF_group data;
     if (!qHDF_read_data_group(h, ix, iy, iz, iw, data))
@@ -1631,7 +1630,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
 {
     // Name and type are checked before the file is changed
     if (name.empty())
-        throw std::invalid_argument("Dataset name not provided.");
+        throw std::invalid_argument("Input 'name' cannot be empty.");
     const std::string dset_name = prefix + name;
     qHDF_check_par(dset_name, data);
 
@@ -1641,11 +1640,11 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
     {
         qHDF_create_for_slot(fn, ix, iy, iz, iw);
         if (!qHDF_open(h, fn, true)) // Only if the file was removed in between
-            throw std::runtime_error("Error opening file.");
+            throw std::runtime_error("Cannot open file '" + fn + "'.");
     }
     const long long slot = qHDF_slot(h, ix, iy, iz, iw);
     if (slot < 0)
-        throw std::invalid_argument("Index out of bound.");
+        throw std::invalid_argument("Inputs 'ix', 'iy', 'iz' and 'iw' must address a slot inside the storage layout.");
     const uint64_t ref = qHDF_channel_ref(h, slot);
     h5::header hdr;
 

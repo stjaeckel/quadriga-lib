@@ -158,7 +158,7 @@ try
         [0,0,0], fbs_pos, fbs_pos, pg_m, path_length, M_m, fc, fc, 1, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'tx_array must not be empty.';
+    expectedErrorMessage = 'Input ''tx_array'' cannot be empty.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end

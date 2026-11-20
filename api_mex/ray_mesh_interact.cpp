@@ -48,11 +48,11 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output
   of [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
-- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; order
+- **`trivec`** — Beam wavefront triangle vertices relative to origin; order
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
-- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
+- **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
-- **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
+- **`compact`** — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
   transparent pass-through; logical; default: false
 
@@ -61,19 +61,19 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
-  single TE coefficient for types 3–5; `[n_rayN]`
+  single TE coefficient for types 3–5; `[n_rayN, 1]`
 - **`polmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
   `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`); includes interaction gain, TE/TM coefficients,
   incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
   `trivec`/`tridir` not provided
-- **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
-- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
+- **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN, 1]`
+- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN, 1]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit);
-  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN]`
+  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN, 1]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code, bit-encoded (uint32); `[n_rayN]`<br><br>
+- **`out_typeN`** — Interaction type code, bit-encoded; uint32; `[n_rayN, 1]`<br><br>
    |  Bit | Meaning                                                                 |
    | :--: | ----------------------------------------------------------------------- |
    |   0  | OK flag (0 = no valid interaction / undefined)                          |
@@ -101,7 +101,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
   for types 1/2/4/5; for undeviated transmission (types 1/4) this is the refracted direction, which
   differs from the geometric continuation used for `origN`/`destN`; `[n_rayN, 3]`
 - **`ray_indN`** — 1-based input ray index for each output ray (inverse of the compaction map,
-  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN]`
+  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN, 1]`
 
 ## See also:
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
@@ -122,6 +122,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto orig = qd_mex_get_Mat<double>(prhs[2], false, "orig");
     const auto dest = qd_mex_get_Mat<double>(prhs[3], false, "dest");
     const auto mesh = qd_mex_get_Mat<double>(prhs[4], false, "mesh");
+    // 'mtl_ind', 'fbs_ind' and 'sbs_ind' are 1-based with 0 = none in C++ too; no shift intended
     const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[5], false, "mtl_ind");
     const auto mtl_prop = qd_mex_struct2map<double>(prhs[6]);
     const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[7], false, "fbs_ind");

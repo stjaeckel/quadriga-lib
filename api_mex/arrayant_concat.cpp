@@ -30,11 +30,11 @@ arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
 
 ## Inputs:
 - **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
-  [[arrayant_generate]]; a struct array may contain a frequency-dependent  model
+  [[arrayant_generate]]; a struct array may contain a frequency-dependent model
 - **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
   `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
   a struct array of equal size is returned for multi-frequency input
 MD!*/
@@ -54,10 +54,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     size_t n_freq2 = (size_t)mxGetNumberOfElements(prhs[1]);
 
     if (n_freq1 == 0 || n_freq2 == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'arrayant_in1' and 'arrayant_in2' cannot be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'arrayant_in1' and 'arrayant_in2' cannot be empty.");
 
     if (n_freq1 != n_freq2)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'arrayant_in1' and 'arrayant_in2' must have the same number of entries.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'arrayant_in1' and 'arrayant_in2' must have the same number of frequency entries.");
 
     auto ant1 = quadriga_lib::arrayant<double>();
     auto ant2 = quadriga_lib::arrayant<double>();

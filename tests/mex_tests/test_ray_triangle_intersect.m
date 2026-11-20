@@ -115,7 +115,7 @@ try
     fbs_only = quadriga_lib.ray_triangle_intersect( orig, dest(2:end,:), cube );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of elements in ''orig'' and ''dest'' do not match.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -126,7 +126,7 @@ try
     fbs_only = quadriga_lib.ray_triangle_intersect( [], [], cube );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs cannot be empty.';
+    expectedErrorMessage = 'Input ''orig'' cannot be empty.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -314,7 +314,7 @@ try
     assertEqual( ifbs2, ifbs );
     assertEqual( isbs2, isbs );
 catch ME
-    expectedErrorMessage = 'AVX2 kernel requested but not available';
+    expectedErrorMessage = 'AVX2 kernel is not available';
     if isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -324,7 +324,7 @@ end
 try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube, [], [], 3 );
 catch ME
-    expectedErrorMessage = 'CUDA kernel requested but not available';
+    expectedErrorMessage = 'CUDA kernel is not available';
     if isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -337,7 +337,7 @@ try
     assertElementsAlmostEqual( sbs2, sbs_seg, 'absolute', 1e-5 );
     assertEqual( no_hit2, no_hit_seg );
 catch ME
-    if isempty(strfind(ME.message, 'AVX2 kernel requested but not available'))
+    if isempty(strfind(ME.message, 'AVX2 kernel is not available'))
         error('moxunit:exceptionNotRaised', ['Unexpected error: "', ME.message, '"']);
     end
 end

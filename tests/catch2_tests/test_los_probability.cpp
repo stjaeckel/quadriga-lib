@@ -665,10 +665,10 @@ TEST_CASE("los_probability - input validation")
     }
     SECTION("model")
     {
-        CHECK_THROWS_MATCHES(call_m("foo"), std::invalid_argument, Message("Model 'foo' is not supported."));
+        CHECK_THROWS_MATCHES(call_m("foo"), std::invalid_argument, Message("Input 'model' has an unsupported value 'foo'."));
         CHECK_THROWS_MATCHES(call_m("38.901_uma"), std::invalid_argument,
-                             Message("Model '38.901_uma' is not supported."));
-        CHECK_THROWS_MATCHES(call_m(""), std::invalid_argument, Message("Model '' is not supported."));
+                             Message("Input 'model' has an unsupported value '38.901_uma'."));
+        CHECK_THROWS_MATCHES(call_m(""), std::invalid_argument, Message("Input 'model' has an unsupported value ''."));
     }
     SECTION("d2d_out")
     {

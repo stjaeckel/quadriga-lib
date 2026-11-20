@@ -125,7 +125,7 @@ try
     out = quadriga_lib.arrayant_rotate_pattern(ant, [0; 0; pi/2], 1, 3);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''i_element'' contains indices that exceed the number of elements.';
+    expectedErrorMessage = 'Input ''i_element'' contains an index that is out of range.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

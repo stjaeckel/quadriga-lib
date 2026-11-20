@@ -148,7 +148,7 @@ quadriga_lib.channel_export_obj_file( fn, chan, max_paths, gain_max_dB, gain_min
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
-- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; empty exports all
+- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; default: `[]` (all snapshots)
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
@@ -276,7 +276,7 @@ dset = quadriga_lib.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix );
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; `''` looks up `name` as given; default (omitted or `[]`): `'par_'`
 
-### Outputs:
+### Output:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; empty `[]` if the dataset is missing
 
 ### See also:
@@ -308,8 +308,8 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix );
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix used to identify unstructured datasets; string; `''` lists all datasets with their full names; default (omitted or `[]`): `'par_'`
 
-### Outputs:
-- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
+### Output:
+- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings; `[n_names, 1]`
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (for reading individual unstructured datasets)
@@ -336,7 +336,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_layout) · [Python](../pyth
 - **`fn`** — Filename of the HDF5 file; string
 
 ### Outputs:
-- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `[4]`;  uint32
+- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; uint32; `[1, 4]`
 - **`has_data`** — Slot occupancy mask; `true` where data exists, `false` otherwise; `[nx, ny, nz, nw]`; logical
 
 ### See also:
@@ -402,14 +402,14 @@ code = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 - **`fn`** — Filename of the HDF5 file; string
 - **`chan`** — Structured channel data; non-empty struct array; field layout matches [hdf5_read_channel](#hdf5_read_channel)
 - **`par`** — Unstructured data; struct array of the same size as `chan`. Field names become HDF5 dataset
-  names per slot (each prefixed with `par_`). Empty fields are skipped. Pass `[]` or omit to disable.
+  names per slot (each prefixed with `par_`). Empty fields are skipped; default: `[]` (none).
   Field values follow the type rules of [hdf5_write_dset](#hdf5_write_dset) (at most 3 dimensions).
-- **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default `1:numel(chan)`
-- **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default `1`
-- **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default `1`
-- **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default `1`
+- **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default: `1:numel(chan)`
+- **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default: 1
+- **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default: 1
+- **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default: 1
 
-### Outputs:
+### Output:
 - **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `[numel(chan), 1]`; int32
 
 ### See also:
@@ -483,11 +483,11 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_parse) · [Python](../python
 - **`n_dest`** — Number of destination points (RX); uint64 scalar
 - **`n_freq`** — Number of frequency bands; uint64 scalar
 - **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
-  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
+  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest, 1]`
+- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig, 1]`
+- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest, 1]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq]`
+- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq, 1]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`
@@ -517,11 +517,11 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [Python](../python/
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; string
-- **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all; for a file
+- **`i_cir`** — Snapshot indices; 1-based; `[n_out]` or empty; default: `[]` (read all; for a file
   without CIRs, all outputs are empty with `n_out = 0`)
-- **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
+- **`i_orig`** — Origin index; 1-based; scalar; default: 1
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
-- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
     | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
@@ -532,29 +532,29 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [Python](../python/
     Other values are rejected with an error.
 
 ### Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq]`
+- **`center_freq`** — Center frequency in Hz; `[n_freq, 1]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, n_out]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, n_out]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, n_out]`
 - **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, n_out]`
 - **`fbs_pos`** — First-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions;  Cell of length `n_out`; elements `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
 - **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path]`
+- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path, 1]`
 - **`polmat`** — Polarization transfer matrix; Cell of length `n_out`;
   elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path]`
-- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path]`
-- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path]`
-- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path]`
+- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
 - **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
   elements Cell of length `n_path`, each `[3, n_interact + 2]`
 - **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
-  Cell of length `n_out`; elements `[n_path]`
+  Cell of length `n_out`; elements `[n_path, 1]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(n_interact)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(n_interact)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  Cell of length `n_out`; elements `[sum(n_interact), 1]`. Empty for v4 legacy files. GBSM paths written with the C++ API
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
@@ -575,7 +575,7 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [Python](../pytho
 - Two-tap interpolation avoids discontinuities when delays cross tap boundaries
 - Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
 - If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped 
-  (nearest neighor selection) but tap-selection logic still applies
+  (nearest neighbor selection) but tap-selection logic still applies
 - Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared `[1, 1, n_path, n_snap]`; 
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`

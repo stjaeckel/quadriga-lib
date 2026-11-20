@@ -54,9 +54,9 @@ Monte-Carlo estimate of the ACF of one generator
   device; default: -1
 
 ## Outputs:
-- **`acf_est`** — Estimated ACF; column vector; `[n_bin]`
-- **`dist_est`** — Mean distance of the pairs in each bin; column vector; `[n_bin]`
-- **`acf_est_dual`** — Estimated ACF for two devices on the same map; column vector; `[n_bin]`
+- **`acf_est`** — Estimated ACF; `[n_bin, 1]`
+- **`dist_est`** — Mean distance of the pairs in each bin; `[n_bin, 1]`
+- **`acf_est_dual`** — Estimated ACF for two devices on the same map; `[n_bin, 1]`
 
 ## See also:
 - [[sos_acf_approx]] (ACF of the sinusoids in closed form)

@@ -221,7 +221,7 @@ static inline int qd_kernel_auto_avx2(int use_kernel)
     const bool avx2_available = false;
 #endif
     if (use_kernel == 2 && !avx2_available)
-        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+        throw std::invalid_argument("Input 'use_kernel' cannot be 2 because the AVX2 kernel is not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
     return (use_kernel == 1 || !avx2_available) ? 1 : 2;
 }
 

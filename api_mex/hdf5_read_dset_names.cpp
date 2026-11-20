@@ -32,8 +32,8 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix );
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix used to identify unstructured datasets; string; `''` lists all datasets with their full names; default (omitted or `[]`): `'par_'`
 
-## Outputs:
-- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
+## Output:
+- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings; `[n_names, 1]`
 
 ## See also:
 - [[hdf5_read_dset]] (for reading individual unstructured datasets)

@@ -4,7 +4,6 @@
 
 #include "qd_helpers_python_types.hpp"
 
-#include <filesystem>
 
 /*!SECTION
 Array antenna functions
@@ -68,7 +67,7 @@ py::tuple qdant_read(const py::handle &fn,
     {
         auto ant_vec = quadriga_lib::qdant_read_multi<double>(fn_s, &layout);
         if (ant_vec.empty())
-            throw std::runtime_error("File does not contain any antenna data.");
+            throw std::runtime_error("File '" + fn_s + "' does not contain any antenna data.");
         if (ant_vec.size() > 1) // The entries must form a frequency set
         {
             std::string err = quadriga_lib::arrayant_is_valid_multi(ant_vec);
@@ -121,7 +120,7 @@ Writes array antenna data to QDANT files
 ```
 # Single-frequency write
 id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant )
-id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant, id )
+id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant, id, *, layout )
 
 # Frequency-dependent write (4D patterns) — all entries written sequentially
 quadriga_lib.arrayant.qdant_write( fn, arrayant )
@@ -138,7 +137,7 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
   only IDs present in the file; ignored for 4D input; default: `None` (a row of all IDs in the file,
   which replaces a layout written before)
 
-## Outputs:
+## Output:
 - **`id_in_file`** — ID assigned to the entry in the file after writing; `0` for a frequency-dependent (4D) write
 
 ## See also:
@@ -157,13 +156,11 @@ py::ssize_t qdant_write(const py::handle &fn,
     auto ant_vec = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 
     if (ant_vec.empty())
-        throw std::invalid_argument("'arrayant' does not contain any antenna data.");
+        throw std::invalid_argument("Input 'arrayant' does not contain any antenna data.");
 
     // Frequency-dependent input: write every entry with sequential 1-based IDs.
     if (ant_vec.size() > 1)
     {
-        if (std::filesystem::exists(fn_s))
-            throw std::runtime_error("File exists. Writing a frequency-dependent arrayant to an existing file is not allowed.");
         quadriga_lib::qdant_write_multi(fn_s, ant_vec);
         return 0;
     }
@@ -216,7 +213,7 @@ void arrayant_export_obj_file(const py::handle &fn,
     const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);
 
     if (i_freq >= ant.size())
-        throw std::invalid_argument("'i_freq' is out of bound.");
+        throw std::invalid_argument("Input 'i_freq' is out of range.");
 
     quadriga_lib::arrayant_export_obj_file(fn_s, ant[i_freq], directivity_range_dB, colormap, object_radius, icosphere_n_div, i_element_a);
 }

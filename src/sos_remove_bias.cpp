@@ -137,7 +137,7 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &spatial_freq,
             throw std::invalid_argument("Input 'phase_b' must have the same size as 'phase'.");
     }
     if (!(spatial_freq_scale_b > (dtype)0.0) || !std::isfinite((double)spatial_freq_scale_b))
-        throw std::invalid_argument("Input 'spatial_freq_scale_b' must be > 0.");
+        throw std::invalid_argument("Input 'spatial_freq_scale_b' must be finite and > 0.");
     if (spatial_freq_scale_b != (dtype)1.0 && !two_maps)
         throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'phase_b'.");
     if (two_devices && !two_maps)
@@ -260,15 +260,13 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &spatial_freq,
 
     if (offset != nullptr)
     {
-        if (offset->n_rows != n_gen || offset->n_cols != n_col)
-            offset->set_size(n_gen, n_col);
+        offset->set_size(n_gen, n_col);
         for (arma::uword i = 0; i < n_gen * n_col; ++i)
             offset->at(i) = (dtype)off.at(i);
     }
     if (mean_before != nullptr)
     {
-        if (mean_before->n_rows != n_gen || mean_before->n_cols != n_col)
-            mean_before->set_size(n_gen, n_col);
+        mean_before->set_size(n_gen, n_col);
         for (arma::uword i = 0; i < n_gen * n_col; ++i)
             mean_before->at(i) = (dtype)mean.at(i);
     }

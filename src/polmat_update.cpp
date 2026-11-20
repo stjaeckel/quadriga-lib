@@ -350,7 +350,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
         if (gain == nullptr)
             throw std::invalid_argument("'apply_gain' is set but no 'gain' vector was provided.");
         if (gain->n_elem != n_rayU)
-            throw std::invalid_argument("'gain' length must equal n_rayU when 'apply_gain' is set.");
+            throw std::invalid_argument("Input 'gain' must have one element per updated column (the length of 'ray_ind', else the columns of 'polmat') when 'apply_gain' is set.");
     }
     else if (gain)
         gain->set_size(n_rayU);

@@ -121,7 +121,7 @@ assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays, 0, [], '
     'Input ''output'' must be ''taps'' or ''rays''.' );
 bad = tx;
 bad.e_theta_re = bad.e_theta_re(:, 1:2);
-assert_throws( @() quadriga_lib.gbsm_single_link_channel( bad, rx, rays, 0 ), 'Transmit antenna: ' );
+assert_throws( @() quadriga_lib.gbsm_single_link_channel( bad, rx, rays, 0 ), 'Input ''tx_array'' is not valid: ' );
 
 end
 

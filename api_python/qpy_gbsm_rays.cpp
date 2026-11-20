@@ -128,7 +128,7 @@ Channel coefficients of one link at one frequency over one segment
   per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of `chan` stays 0. Validity limits: see `ssf_paths`
-- Raises `ValueError` for an invalid array (message prefixed with `Transmit antenna: ` or `Receive antenna: `), invalid
+- Raises `ValueError` for an invalid `tx_array` or `rx_array`, invalid
   `rays`, `"drift"` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a column
   or entry count other than 1 or `n_snap`
 
@@ -136,7 +136,7 @@ Channel coefficients of one link at one frequency over one segment
 ```
 chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, *, mobility, \
     output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
-    use_absolute_delays, stack=False )
+    use_absolute_delays, stack )
 ```
 
 ## Inputs:

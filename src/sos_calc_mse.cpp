@@ -191,8 +191,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
 
     if (acf_tail != nullptr)
     {
-        if (acf_tail->n_elem != 4)
-            acf_tail->set_size(4);
+        acf_tail->set_size(4);
         const double mult[4] = {2.0, 4.0, 10.0, 20.0};
         arma::mat tail(n_test, 4, arma::fill::none);
 #pragma omp parallel for if (n_test > 1)
@@ -211,8 +210,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
     if (test_dir != nullptr)
     {
         arma::uword nr = (n_dim == 1) ? 0 : n_test, nc = (n_dim == 1) ? 0 : n_dim - 1;
-        if (test_dir->n_rows != nr || test_dir->n_cols != nc)
-            test_dir->set_size(nr, nc);
+        test_dir->set_size(nr, nc);
         for (arma::uword t = 0; t < nr; ++t)
         {
             test_dir->at(t, 0) = (dtype)az[t];

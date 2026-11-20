@@ -47,7 +47,7 @@ Channel coefficients of one link at one frequency over one segment
   per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of the result stays 0. Validity limits: see `ssf_paths`
-- Throws `std::invalid_argument` for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `),
+- Throws `std::invalid_argument` for an invalid `tx_array` or `rx_array`,
   invalid `rays` (the `is_valid()` message), `"drift"` without scatterers or with a GR ray at moved ends without
   permittivity or below z = 0, and a column or entry count other than 1 or `n_snap`
 
@@ -151,7 +151,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     arma::mat pc[4];
     arma::uword n_snap = 1;
     for (int j = 0; j < 4; ++j)
-        if (pp[j] != nullptr && !pp[j]->empty())
+        if (!pp[j]->empty())
         {
             pc[j] = qd_gbsm_cols(*pp[j]);
             if (pc[j].n_rows != 3)

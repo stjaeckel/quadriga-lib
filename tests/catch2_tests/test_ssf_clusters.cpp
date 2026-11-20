@@ -876,7 +876,7 @@ TEST_CASE("ssf_clusters - input validation")
         {[](spmap &, fix_t &x, std::string &) { x.lsp(1, 0, 7) = INFINITY; }, "Input 'lsp' must be finite."},
         {[](spmap &, fix_t &x, std::string &) { x.lsp(0, 0, 1) = -1e-3; }, "K-factor in 'lsp' must be >= 0."},
         {[](spmap &, fix_t &x, std::string &) { x.lsp.resize(3, 2, 8), x.lsp.cols(1, 1) = x.lsp.cols(0, 0); },
-         "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several frequencies."},
+         "Input 'lsp' must have one frequency (n_freq = 1) for method '38.901'; use '38.901_MF' or 'quadriga' for several frequencies."},
         {[N](spmap &, fix_t &x, std::string &) { x.rnd = x.rnd.cols(0, 9 * N - 2); },
          "Input 'rnd' must have size [n_link, 108]."},
         {[](spmap &, fix_t &x, std::string &) { x.rnd = x.rnd.rows(0, 1); },

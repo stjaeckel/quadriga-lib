@@ -172,6 +172,7 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
     if ((arma::uword)powers.size() != N)
         throw std::invalid_argument("Input 'powers' must have the same number of elements as 'az'.");
 
+    std::vector<dtype> power_sum(N); // Total power per CIR
     for (arma::uword n = 0; n < N; n++)
     {
         arma::uword L = az[n].n_elem;
@@ -181,6 +182,13 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
             throw std::invalid_argument("Entry " + std::to_string(n) + ": Input 'el' must have the same length as 'az'.");
         if (powers[n].n_elem != L)
             throw std::invalid_argument("Entry " + std::to_string(n) + ": Input 'powers' must have the same length as 'az'.");
+        const dtype *pw_ptr = powers[n].memptr();
+        dtype pt = (dtype)0;
+        for (arma::uword i = 0; i < L; i++)
+            pt += pw_ptr[i];
+        if (pt <= (dtype)0)
+            throw std::invalid_argument("Entry " + std::to_string(n) + ": Sum of 'powers' must be positive.");
+        power_sum[n] = pt;
     }
 
     // quantize_deg: 0 (off) or a finite step >= 1e-3 deg, so that the bin count stays below 360 000 + 2
@@ -228,11 +236,7 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
         // --- Normalize power weights ---
         arma::Col<dtype> pn(L);
         dtype *pnp = pn.memptr();
-        dtype pt = (dtype)0;
-        for (arma::uword i = 0; i < L; i++)
-            pt += pw_ptr[i];
-        if (pt <= (dtype)0)
-            throw std::invalid_argument("Entry " + std::to_string(n) + ": Sum of 'powers' must be positive.");
+        const dtype pt = power_sum[n];
         for (arma::uword i = 0; i < L; i++)
             pnp[i] = pw_ptr[i] / pt;
 

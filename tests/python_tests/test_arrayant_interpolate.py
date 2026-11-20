@@ -167,7 +167,7 @@ class test_case(unittest.TestCase):
             for a, b in zip(res, ref):
                 npt.assert_allclose(a, b, atol=1e-5, rtol=0)  # Single precision, values up to 6
         except ValueError as e:
-            self.assertIn("AVX2 kernel requested but not available", str(e))
+            self.assertIn("'use_kernel' cannot be 2", str(e))
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=3)
         self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
@@ -246,7 +246,7 @@ class test_case(unittest.TestCase):
         self.assertIn("'elevation' must have the same size as 'azimuth'", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, i_element=[2])
-        self.assertIn("exceed the number of elements", str(ctx.exception))
+        self.assertIn("'i_element' contains an index that is out of range", str(ctx.exception))
         bad = dict(self.ant, azimuth_grid=np.array([0.0, np.nan]))
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.arrayant.interpolate(bad, self.az, self.el)

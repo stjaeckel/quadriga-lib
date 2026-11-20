@@ -38,7 +38,7 @@ Generate an isotropic radiator with vertical polarization
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res = 1.0);
 ```
 
-## Inputs:
+## Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
@@ -86,7 +86,7 @@ Generate a cross-polarized isotropic radiator
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res = 1.0);
 ```
 
-## Inputs:
+## Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
@@ -144,7 +144,7 @@ Generate a short dipole antenna with vertical polarization
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res = 1.0);
 ```
 
-## Inputs:
+## Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
@@ -197,7 +197,7 @@ Generate a half-wave dipole antenna with vertical polarization
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res = 1.0);
 ```
 
-## Inputs:
+## Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
@@ -416,7 +416,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
     {
         std::string error_message = ant.is_valid(); // Deep check
         if (error_message.length() != 0)
-            throw std::invalid_argument(error_message.c_str());
+            throw std::invalid_argument("Input 'pattern' is not valid: " + error_message);
 
         // Only the radiation pattern is used: element positions and coupling of the custom pattern are ignored
         const arma::uword n_el_pattern = ant.n_elements();
@@ -542,7 +542,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     {
         std::string error_message = ant.is_valid(); // Deep check
         if (error_message.length() != 0)
-            throw std::invalid_argument(error_message.c_str());
+            throw std::invalid_argument("Input 'pattern' is not valid: " + error_message);
 
         // Only the radiation pattern is used: element positions and coupling of the custom pattern are ignored
         const arma::uword n_el_pattern = ant.n_elements();
@@ -785,15 +785,15 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     dtype zero = (dtype)0.0;
 
     if (az.n_elem == 0)
-        throw std::invalid_argument("Must have at least one beam direction.");
+        throw std::invalid_argument("Input 'az' cannot be empty.");
 
     arma::uword n_beams = az.n_elem;
 
     if (el.n_elem != n_beams)
-        throw std::invalid_argument("Azimuth and elevation must have the same number of elements.");
+        throw std::invalid_argument("Inputs 'az' and 'el' must have the same number of elements.");
 
     if (weight.n_elem != 0 && weight.n_elem != n_beams)
-        throw std::invalid_argument("Beam weights must be empty or match the number of beams.");
+        throw std::invalid_argument("Input 'weight' must be empty or have the same number of elements as 'az'.");
 
     if (weight.n_elem == 0)
         weight.ones(n_beams);

@@ -130,9 +130,9 @@ namespace quadriga_lib
         const arma::fmat &trivec,                                            // Beam wavefront vertices relative to ray origin, [n_ray, 9]
         const arma::fmat &tridir,                                            // Vertex-ray directions, Cartesian [n_ray, 9]
         const arma::Col<short> &mtl_ind_current,                             // Current medium (0 = outside), [n_ray]
-        const arma::fmat &points,                                            // Receive points in 3D Space, Size: [n_points, 3]
+        const arma::fmat &rx_points,                                         // Receive points in 3D Space, Size: [n_points, 3]
         const arma::u32_vec &sub_cloud_ind = arma::u32_vec(),                // Sub-cloud index, 0-based, Length: [n_sub]
-        const arma::u32_vec &point_ind = arma::u32_vec(),                    // Mapping "points" to "points_out", 1-based, Length: [ n_points_out ]
+        const arma::u32_vec &point_ind = arma::u32_vec(),                    // Mapping "rx_points" to "points_out", 1-based, Length: [ n_points_out ]
         const std::vector<bool> &subdiv_flag_in = std::vector<bool>(),       // Optional: List of beam to subdivide, [n_ray], empty = none
         float max_path_length = 10e3,                                        // Maximum path length
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated

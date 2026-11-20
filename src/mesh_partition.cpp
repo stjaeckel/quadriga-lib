@@ -155,10 +155,7 @@ static int qd_partition_split(const arma::Mat<dtype> &data, arma::Mat<dtype> &A,
     int *p_split_ind = nullptr;
     if (split_ind != nullptr)
     {
-        if (split_ind->n_elem != data.n_rows)
-            split_ind->zeros(data.n_rows);
-        else
-            split_ind->zeros();
+        split_ind->set_size(data.n_rows);
         p_split_ind = split_ind->memptr();
     }
 
@@ -449,7 +446,7 @@ int quadriga_lib::point_cloud_split(
 ## Outputs:
 - **`pointsA`** — First sub-cloud; `[n_pointsA, 3]`
 - **`pointsB`** — Second sub-cloud; `[n_pointsB, 3]`
-- **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB, `0` = error; `[n_points]`
+- **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB; `[n_points]`
 
 ## Returns:
 - Axis used: `1` = x, `2` = y, `3` = z; negative (`-1`, `-2`, `-3`) if split failed
@@ -503,7 +500,7 @@ int triangle_mesh_split(
 ## Outputs:
 - **`meshA`** — Triangles with all vertices within the lower half of the bounding box; `[n_meshA, 9]`
 - **`meshB`** — Triangles with at least one vertex exceeding the split threshold; `[n_meshB, 9]`
-- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB, 0 = unassigned (failure); `[n_mesh]`
+- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB; `[n_mesh]`
 
 ## Returns:
 - Axis used for the split (1, 2, or 3); negative (-1, -2, or -3) on failure

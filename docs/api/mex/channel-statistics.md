@@ -24,7 +24,7 @@ Also in: [C++](../cpp/channel-statistics.md#acdf) · [Python](../python/channel-
 - `Inf` and `NaN` values are excluded from computation
 - A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu`
   and `sig`; if no set has finite values (possible only with `bins_in`), `cdf_avg`, `mu` and `sig` are NaN
-- If `bins` is empty, equally spaced bins spanning the data range are generated
+- If `bins_in` is empty, equally spaced bins spanning the data range are generated
 
 ### Usage:
 ```matlab
@@ -43,10 +43,10 @@ Also in: [C++](../cpp/channel-statistics.md#acdf) · [Python](../python/channel-
 ### Outputs:
 - **`cdf_per_set`** — Individual CDFs; one per column of data (NaN for a set without finite values); `[n_bins_out, n_sets]`
 - **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
-  `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
-- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins]`
-- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
-- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
+  `[n_bins_out, 1]` with `n_bins_out = n_bins` or `n_bins_out = n_bins_in`
+- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins_out, 1]`
+- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
+- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
 
 ---
 <a id="calc_angular_spread"></a>
@@ -86,8 +86,8 @@ Also in: [C++](../cpp/channel-statistics.md#calc_angular_spread) · [Python](../
   otherwise it must be finite and >= 1e-3 deg, else an error is raised
 
 ### Outputs:
-- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir]`
-- **`elevation_spread`** — RMS elevation angular spread; `[n_cir]`
+- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir, 1]`
+- **`elevation_spread`** — RMS elevation angular spread; `[n_cir, 1]`
 - **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
   direction (a positive tilt points down); `[3, n_cir]`
 - **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; `[n_path, n_cir]`
@@ -151,7 +151,7 @@ Also in: [C++](../cpp/channel-statistics.md#calc_cross_polarization_ratio) · [P
    | 5   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)       |
    | 6   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)       |
 - **`pg`** — Total path gain summed over all paths (including LOS) as 
-  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
+  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir, 1]`
 
 ---
 <a id="calc_delay_spread"></a>
@@ -179,8 +179,8 @@ Also in: [C++](../cpp/channel-statistics.md#calc_delay_spread) · [Python](../py
   error is raised
 
 ### Outputs:
-- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir]`
-- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir]`
+- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir, 1]`
+- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir, 1]`
 
 ### See also:
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed tap grid)
@@ -212,5 +212,5 @@ Also in: [C++](../cpp/channel-statistics.md#calc_rician_k_factor) · [Python](..
 - **`window_size`** — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS; default: 0.01
 
 ### Outputs:
-- **`kf`** — Rician K-Factor on linear scale; `[n_cir]`
-- **`pg`** — Total path gain (sum of all path powers) in [W]; `[n_cir]`
+- **`kf`** — Rician K-Factor on linear scale; `[n_cir, 1]`
+- **`pg`** — Total path gain (sum of all path powers) in [W]; `[n_cir, 1]`

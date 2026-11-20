@@ -622,7 +622,7 @@ TEST_CASE("Get Channels Planar - vec form errors")
     std::vector<arma::vec> e_v;
     std::vector<arma::mat> e_m;
     CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(bad, ant, p1, p1, r1, p1, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl),
-                      ContainsSubstring("Transmit antenna: ") && !ContainsSubstring("Snapshot"));
+                      ContainsSubstring("Input 'tx_array' is not valid: ") && !ContainsSubstring("Snapshot"));
     CHECK_THROWS_AS(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p1, p1, r1, p1, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl,
                                                                   0.0, false, false, nullptr, nullptr, 7),
                     std::invalid_argument);

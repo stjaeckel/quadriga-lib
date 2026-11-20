@@ -100,7 +100,7 @@ class test_case(unittest.TestCase):
 
         with self.assertRaises(ValueError) as context:
             arrayant.generate("bla")
-        self.assertEqual(str(context.exception), "Array type not supported!")
+        self.assertEqual(str(context.exception), "Input 'type' has an unsupported value 'bla'.")
             
     def test_none_and_flag_types(self):
         # The flags only act on 'multibeam', 'pattern' only on '3gpp' and 'ula'

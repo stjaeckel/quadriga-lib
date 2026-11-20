@@ -38,7 +38,7 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 ## Usage:
 ```
 coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff, delay, *, tap_spacing, max_taps, \
-    power_exponent, fix_taps, stack=False )
+    power_exponent, fix_taps, stack )
 ```
 
 ## Inputs:
@@ -75,13 +75,13 @@ py::tuple quantize_delays(const py::handle &coeff,
 
     // Convert the complex coefficient list to split real / imaginary cubes (length = n_snap)
     if (!py::isinstance<py::list>(coeff))
-        throw std::invalid_argument("'coeff' must be a list.");
+        throw std::invalid_argument("Input 'coeff' must be a list.");
     std::vector<arma::Cube<double>> coeff_re_a, coeff_im_a;
     qd_python_list2vector_Cube_Cplx<double>(py::cast<py::list>(coeff), coeff_re_a, coeff_im_a);
 
     // Convert delay list (ragged path counts allowed)
     if (!py::isinstance<py::list>(delay))
-        throw std::invalid_argument("'delay' must be a list.");
+        throw std::invalid_argument("Input 'delay' must be a list.");
     auto delay_a = qd_python_list2vector_Cube<double>(py::cast<py::list>(delay));
 
     std::vector<arma::Cube<double>> coeff_re_q, coeff_im_q, delay_q;

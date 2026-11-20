@@ -293,7 +293,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
             fbs, sbs, no_hit, ifbs, isbs = RTtools.ray_triangle_intersect(
                 self.orig, self.dest, self.cube, use_kernel=2)
         except ValueError as e:
-            self.assertIn("AVX2 kernel requested but not available", str(e))
+            self.assertIn("AVX2 kernel is not available", str(e))
             return
 
         npt.assert_allclose(fbs, fbs_ref, atol=1e-5)
@@ -307,7 +307,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
             RTtools.ray_triangle_intersect(
                 self.orig, self.dest, self.cube, use_kernel=3)
         except ValueError as e:
-            self.assertIn("CUDA kernel requested but not available", str(e))
+            self.assertIn("CUDA kernel is not available", str(e))
 
     def test_kernel_avx2_with_submesh_and_aabb(self):
         cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
@@ -321,7 +321,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
             fbs, sbs, no_hit, _, _ = RTtools.ray_triangle_intersect(
                 self.orig, self.dest, cube_seg, smi, aabb, use_kernel=2)
         except ValueError as e:
-            self.assertIn("AVX2 kernel requested but not available", str(e))
+            self.assertIn("AVX2 kernel is not available", str(e))
             return
 
         npt.assert_allclose(fbs, fbs_ref, atol=1e-5)

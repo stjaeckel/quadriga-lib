@@ -128,15 +128,27 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
         qd_check_alias(xpr, "xpr", &powers[i], &polmat[i], &path_length[i]),
             qd_check_alias(pg, "pg", &powers[i], &polmat[i], &path_length[i]);
 
+    if (xpr == nullptr && pg == nullptr)
+        return;
+
+    // Per-entry checks, before any output is written
+    for (arma::uword i = 0; i < n_cir; ++i)
+    {
+        arma::uword n_path = powers[i].n_elem;
+        if (n_path == 0)
+            continue;
+        if (polmat[i].n_rows != 8 || polmat[i].n_cols != n_path)
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'polmat' must have 8 rows and " + std::to_string(n_path) + " columns.");
+        if (path_length[i].n_elem != n_path)
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'path_length' must have " + std::to_string(n_path) + " elements.");
+    }
+
     // --- Initialize outputs ---
     if (xpr != nullptr)
         xpr->zeros(n_cir, 6);
 
     if (pg != nullptr)
         pg->zeros(n_cir);
-
-    if (xpr == nullptr && pg == nullptr)
-        return;
 
     // --- Precompute fixed positions ---
     const dtype *pTX = tx_pos.memptr();
@@ -149,12 +161,6 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
 
         if (n_path == 0)
             continue;
-
-        if (polmat[i].n_rows != 8 || polmat[i].n_cols != n_path)
-            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'polmat' must have 8 rows and " + std::to_string(n_path) + " columns.");
-
-        if (path_length[i].n_elem != n_path)
-            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'path_length' must have " + std::to_string(n_path) + " elements.");
 
         // --- Calculate TX-RX distance ---
         arma::uword tx_col = fixed_tx ? 0 : i;

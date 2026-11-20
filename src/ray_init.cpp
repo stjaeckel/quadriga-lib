@@ -76,22 +76,22 @@ arma::uword ray_init(
   caller already holds for the tracing loop.
 - **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
   sphere `r0`, so that no receiver starts inside it. Empty → receivers are not considered.
-- **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
+- **`scalar_mode`** *(optional)* — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
   coefficient per frequency), `false` = EM (2×2 Jones matrix per frequency)
 
 ## Outputs:
-- **`orig`** — Ray origins on the launch sphere, `O + r0·d̂`; `[n_ray, 3]`
-- **`dest`** — Ray destinations at `max_path_length` from `O`; `[n_ray, 3]`
-- **`trivec`** — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, matches [[ray_mesh_interact]]
-- **`tridir`** — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
-- **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Initial medium-state words for
+- **`orig`** *(optional)* — Ray origins on the launch sphere, `O + r0·d̂`; `[n_ray, 3]`
+- **`dest`** *(optional)* — Ray destinations at `max_path_length` from `O`; `[n_ray, 3]`
+- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, matches [[ray_mesh_interact]]
+- **`tridir`** *(optional)* — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
+- **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** *(optional)* — Initial medium-state words for
   [[ray_state_update]], all zeroed (outside air, no flags); `[n_ray]`
-- **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`), one slice per frequency;
+- **`path_dir_prev`** *(optional)* — Initial physical ray direction (unit vectors from `O`), one slice per frequency;
   `[n_ray, 3, n_freq]`. Every slice is seeded with the same launch direction. Slice `f` is contiguous, so a
   consumer can alias it as an `[n_ray, 3]` matrix without copying
-- **`acc_dist`** — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 1 = geometric distance
+- **`acc_dist`** *(optional)* — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 0 = geometric distance
   (frequency-independent, shared), col `1+f` = refracted distance at frequency `f`
-- **`paths`** — Per-ray [[path]] objects, one per ray; each reinitialized to 0 segments with `n_freq`
+- **`paths`** *(optional)* — Per-ray [[path]] objects, one per ray; each reinitialized to 0 segments with `n_freq`
   frequency bins in the `scalar_mode` layout, and `length` seeded to `orig_length` (the `O`-to-origin offset);
   `n_ray` entries
 
@@ -105,7 +105,7 @@ arma::uword ray_init(
 - [[triangle_mesh_aabb]] (generates `aabb`)
 - [[ray_mesh_interact]] (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [[ray_state_update]] (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
-- [[ray_commit]] (consumes the same `points` when committing paths that reach a receiver)
+- [[ray_commit]] (consumes the same `rx_points` when committing paths that reach a receiver)
 - [[path]] (the per-ray storage object populated in `paths`)
 MD!*/
 
@@ -145,7 +145,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     // Validate receive points
     bool has_points = rx_points.n_rows != 0;
     if (has_points && rx_points.n_cols != 3)
-        throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
+        throw std::invalid_argument("Input 'rx_points' must have 3 columns containing x,y,z coordinates.");
 
     // Validate the sub-mesh partition and its bounding boxes. Both only accelerate the probe, so
     // they are ignored outright when there is no mesh to probe against.
@@ -161,7 +161,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     arma::uword n_ray = 20 * n_div * n_div; // Number of rays
 
     if (n_freq == 0)
-        throw std::invalid_argument("Number of frequencies cannot be 0.");
+        throw std::invalid_argument("Input 'n_freq' cannot be 0.");
 
     // Detect launch sphere size
     float r0 = 0.01f; // Launch sphere radius, default = 1 cm
@@ -249,17 +249,17 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     const float *p_orig_local = orig_local.memptr(), *p_length_local = orig_length_local.memptr();
 
     bool has_orig = orig != nullptr;
-    if (has_orig && (orig->n_rows != n_ray || orig->n_cols != 3))
+    if (has_orig)
         orig->set_size(n_ray, 3);
     float *p_orig = has_orig ? orig->memptr() : nullptr;
 
     bool has_dir = path_dir_prev != nullptr;
-    if (has_dir && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3 || path_dir_prev->n_slices != n_freq))
+    if (has_dir)
         path_dir_prev->set_size(n_ray, 3, n_freq);
     float *p_dir = has_dir ? path_dir_prev->memptr() : nullptr;
 
     bool has_dest = dest != nullptr;
-    if (has_dest && (dest->n_rows != n_ray || dest->n_cols != 3))
+    if (has_dest)
         dest->set_size(n_ray, 3);
     float *p_dest = has_dest ? dest->memptr() : nullptr;
 

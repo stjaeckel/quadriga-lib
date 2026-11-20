@@ -164,7 +164,7 @@ class test_case(unittest.TestCase):
         bad = dict(self.tx, e_theta_re=self.tx["e_theta_re"][:, :2])
         with self.assertRaises(ValueError) as ctx:
             gbsm.single_link_channel(bad, self.rx, self.rays, [0.0])
-        self.assertIn("Transmit antenna: ", str(ctx.exception))
+        self.assertIn("Input 'tx_array' is not valid: ", str(ctx.exception))
         with self.assertRaises(TypeError):
             self.call(stack=2.5)
         with self.assertRaises(TypeError):

@@ -151,23 +151,14 @@ template <typename dtype>
 void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uword n_azimuth,
                                              arma::uword n_elements, arma::uword n_ports)
 {
-    if (azimuth_grid.n_elem != n_azimuth)
-        azimuth_grid.set_size(n_azimuth);
+    azimuth_grid.set_size(n_azimuth);
+    elevation_grid.set_size(n_elevation);
+    e_theta_re.set_size(n_elevation, n_azimuth, n_elements);
+    e_theta_im.set_size(n_elevation, n_azimuth, n_elements);
+    e_phi_re.set_size(n_elevation, n_azimuth, n_elements);
+    e_phi_im.set_size(n_elevation, n_azimuth, n_elements);
 
-    if (elevation_grid.n_elem != n_elevation)
-        elevation_grid.set_size(n_elevation);
-
-    if (e_theta_re.n_rows != n_elevation || e_theta_re.n_cols != n_azimuth || e_theta_re.n_slices != n_elements)
-        e_theta_re.set_size(n_elevation, n_azimuth, n_elements);
-
-    if (e_theta_im.n_rows != n_elevation || e_theta_im.n_cols != n_azimuth || e_theta_im.n_slices != n_elements)
-        e_theta_im.set_size(n_elevation, n_azimuth, n_elements);
-
-    if (e_phi_re.n_rows != n_elevation || e_phi_re.n_cols != n_azimuth || e_phi_re.n_slices != n_elements)
-        e_phi_re.set_size(n_elevation, n_azimuth, n_elements);
-
-    if (e_phi_im.n_rows != n_elevation || e_phi_im.n_cols != n_azimuth || e_phi_im.n_slices != n_elements)
-        e_phi_im.set_size(n_elevation, n_azimuth, n_elements);
+    // Zeroed / identity only when the size changes
 
     if (element_pos.n_rows != 3 || element_pos.n_cols != n_elements)
         element_pos.zeros(3, n_elements);
@@ -230,7 +221,7 @@ std::string qd_arrayant_check(const quadriga_lib::arrayant<dtype> &ant)
 
     if (e_theta_re.n_elem == 0ULL || e_theta_im.n_elem == 0ULL || e_phi_re.n_elem == 0ULL || e_phi_im.n_elem == 0ULL ||
         azimuth_grid.n_elem == 0ULL || elevation_grid.n_elem == 0ULL)
-        return std::string("Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid");
+        return std::string("Missing data for any of: 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im', 'azimuth_grid', 'elevation_grid'.");
 
     arma::uword n_elevation = e_theta_re.n_rows;
     arma::uword n_azimuth = e_theta_re.n_cols;
@@ -268,16 +259,16 @@ std::string qd_arrayant_check(const quadriga_lib::arrayant<dtype> &ant)
         return std::string("Values of 'elevation_grid' must be sorted in strictly ascending order.");
 
     if (!element_pos.empty() && (element_pos.n_rows != 3 || element_pos.n_cols != n_elements))
-        return std::string("Size of 'element_pos' must be either empty or match [3, n_elements]");
+        return std::string("Size of 'element_pos' must be either empty or match [3, n_elements].");
 
     if (!coupling_re.empty() && coupling_re.n_rows != n_elements)
-        return std::string("'Coupling' must be a matrix with rows equal to number of elements");
+        return std::string("'coupling_re' must have one row per element.");
 
     if (coupling_re.empty() && !coupling_im.empty())
-        return std::string("Imaginary part of coupling matrix (phase component) defined without real part (absolute component)");
+        return std::string("Imaginary part of coupling matrix (phase component) defined without real part (absolute component).");
 
     if (!coupling_im.empty() && (coupling_im.n_rows != n_elements || coupling_im.n_cols != coupling_re.n_cols))
-        return std::string("'coupling_im' must be empty or its size must match 'coupling_re'");
+        return std::string("'coupling_im' must be empty or its size must match 'coupling_re'.");
 
     return std::string("");
 }

@@ -155,7 +155,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     // Get the number of snapshots
     double n_snap_d = std::floor(observation_time / update_interval);
     if (!(n_snap_d < 4294967295.0))
-        throw std::invalid_argument("Too many snapshots: observation_time / update_interval must be below 2^32 - 1.");
+        throw std::invalid_argument("Inputs 'observation_time' and 'update_interval' must give observation_time / update_interval below 2^32 - 1.");
     arma::uword n_snap = 1 + (arma::uword)n_snap_d;
     long long n_snap_ll = (long long)n_snap;
 
@@ -414,7 +414,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                     if (v < n_subpath)
                         vehicle_reflected[i_path][v] = true;
                     else
-                        throw std::invalid_argument("Could not map vehicle refection to subpath.");
+                        throw std::invalid_argument("Could not map vehicle reflection to subpath.");
             }
         }
 

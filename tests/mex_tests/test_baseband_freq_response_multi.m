@@ -117,12 +117,12 @@ assertElementsAlmostEqual( hr_sp + 1j*hi_sp, hmat_re_m + 1j*hmat_im_m, 'absolute
 
 %% Errors
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay_4d(:,:,:,1:2), freq, freq_new ), ...
-    'The 4th dimension of ''delay'' must be 1 or the length of ''freq''.' );
+    'Input ''delay'' must have a 4th dimension of 1 or the length of ''freq''.' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( coeff_re_4d, coeff_im_4d, delay, freq(1:2), freq_new ), ...
-    'must match length of ''freq''' );
+    'must have the same length as ''freq''' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( cre_b, coeff_im_4d, dl_b, freq, freq_new ), 'must all be cell arrays' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( {coeff_re_4d, coeff_re_4d(1,:,:,:)}, ...
-    {coeff_im_4d, coeff_im_4d(1,:,:,:)}, {delay, delay}, freq, freq_new ), 'same number of rows and columns' );
+    {coeff_im_4d, coeff_im_4d(1,:,:,:)}, {delay, delay}, freq, freq_new ), 'n_rx and n_tx of the first selected snapshot' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( cre_b, cim_b, dl_b, freq, freq_new, true, 0 ), '1-based' );
 assert_throws( @() quadriga_lib.baseband_freq_response_multi( cre_b, cim_b, dl_b, freq, freq_new, true, 4 ), ...
     'outside the range of the' );

@@ -2425,7 +2425,7 @@ dtype quadriga_lib::medium_gain(
 - **`iM`** —  1-based material index (0 = no material / air)
 - **`dist`** — Path length of the ray inside the medium in [m]
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
+- **`scalar_mode`** *(optional)* — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ## Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -2443,10 +2443,10 @@ dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vecto
     const dtype dist = dtype(dist_in);
     const dtype center_freq = dtype(center_freq_in);
     if (!std::isfinite((double)center_freq) || center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
     MaterialCols<dtype> cols(mtl_prop); // validates column lengths and physical sanity
     if (iM > cols.n_mtl)
-        throw std::invalid_argument("Material index out of bound.");
+        throw std::invalid_argument("Input 'iM' is out of range; 'mtl_prop' has " + std::to_string(cols.n_mtl) + " materials.");
     return (dtype)Material(cols, iM).medium_gain((double)dist, qd_material_fGHz((double)center_freq, scalar_mode));
 }
 
@@ -2477,7 +2477,7 @@ dtype quadriga_lib::interface_gain(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
+- **`scalar_mode`** *(optional)* — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ## Returns:
 - Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
@@ -2495,10 +2495,10 @@ dtype quadriga_lib::interface_gain(const std::unordered_map<std::string, std::ve
 {
     const dtype center_freq = dtype(center_freq_in);
     if (center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+        throw std::invalid_argument("Input 'center_freq' must be > 0.");
     MaterialCols<dtype> cols(mtl_prop);
     if (iM > cols.n_mtl)
-        throw std::invalid_argument("Material index out of bound.");
+        throw std::invalid_argument("Input 'iM' is out of range; 'mtl_prop' has " + std::to_string(cols.n_mtl) + " materials.");
     return (dtype)Material(cols, iM).interface_gain(qd_material_fGHz((double)center_freq, scalar_mode));
 }
 
@@ -2528,7 +2528,7 @@ dtype quadriga_lib::refractive_index(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
+- **`scalar_mode`** *(optional)* — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ## Returns:
 - Real refractive index of the medium relative to air
@@ -2546,10 +2546,10 @@ dtype quadriga_lib::refractive_index(const std::unordered_map<std::string, std::
 {
     const dtype center_freq = dtype(center_freq_in);
     if (!std::isfinite((double)center_freq) || center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
     MaterialCols<dtype> cols(mtl_prop); // validates column lengths and physical sanity
     if (iM > cols.n_mtl)
-        throw std::invalid_argument("Material index out of bound.");
+        throw std::invalid_argument("Input 'iM' is out of range; 'mtl_prop' has " + std::to_string(cols.n_mtl) + " materials.");
     Material M(cols, iM);
     double fGHz = qd_material_fGHz((double)center_freq, scalar_mode);
     return (dtype)std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz)));
@@ -2634,23 +2634,23 @@ void quadriga_lib::ray_mesh_interact(
   (gain 1, identity `polmat`, `out_type = 0`).
 
 ## Outputs:
-- **`origN`** — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's
+- **`origN`** *(optional)* — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's
   coordinate magnitude (past the SBS of a co-located pair, except for reflection); `[n_rayN, 3]`
-- **`destN`** — New destinations along the outgoing direction; `[n_rayN, 3]`
-- **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
-- **`gainN`** — Linear power gain of the interaction, derived from `polmatN`; `[n_rayN]`
-- **`polmatN`** — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
+- **`destN`** *(optional)* — New destinations along the outgoing direction; `[n_rayN, 3]`
+- **`fbsN`**, **`sbsN`** *(optional)* — First/second interaction points in GCS; `[n_rayN, 3]`
+- **`gainN`** *(optional)* — Linear power gain of the interaction, derived from `polmatN`; `[n_rayN]`
+- **`polmatN`** *(optional)* — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`), the Jones matrix `J = [VV VH; HV HH]`
   acting as `e_out = J · e_in`, the incoming V/H basis from the incident direction and the outgoing one from
   `path_dirN` (`eH = ẑ × k̂` normalized, `eV = eH × k̂`); `[8, n_rayN]`. Types 3–5: `[Re Im]` of the scalar pressure
   coefficient; `[2, n_rayN]`. A transmitted coefficient includes the entered material's `interface_gain`.
-- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
-- **`fbs_angleN`** — Incidence angle at FBS in rad, the angle to the face (≥ 0 for a front-side hit); `[n_rayN]`
-- **`thicknessN`** — Geometric FBS-to-SBS distance; `[n_rayN]`. Unrelated to the material `thk` column:
+- **`trivecN`**, **`tridirN`** *(optional)* — Updated beam geometry/direction (format matches input); empty if inputs not provided
+- **`fbs_angleN`** *(optional)* — Incidence angle at FBS in rad, the angle to the face (≥ 0 for a front-side hit); `[n_rayN]`
+- **`thicknessN`** *(optional)* — Geometric FBS-to-SBS distance; `[n_rayN]`. Unrelated to the material `thk` column:
   this is what the mesh measured, `thk` is what the material table authored.
-- **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
-- **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code, bit-encoded (`qd::bits<uint8_t>`); `[n_rayN]`<br><br>
+- **`edge_lengthN`** *(optional)* — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
+- **`normal_vecN`** *(optional)* — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
+- **`out_typeN`** *(optional)* — Interaction type code, bit-encoded (`qd::bits<uint8_t>`); `[n_rayN]`<br><br>
    |  Bit | Meaning                                                                 |
    | :--: | ----------------------------------------------------------------------- |
    |   0  | OK flag (0 = no valid interaction / undefined)                          |
@@ -2691,12 +2691,12 @@ void quadriga_lib::ray_mesh_interact(
 
    Codes 69 and 71 each stand for three cases, which [[ray_state_update]] tells apart from the materials of the two
    faces. Total reflection occurs with bit 6 only for a glued pair. Bit 7 is unused.
-- **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
+- **`path_dirN`** *(optional)* — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
   No ray bends into a mass-law medium (`m > 0`). The wave in it is held: into air or another mass-law body it keeps its
   direction, into a medium without the mass column it is refracted as a wave from air.
-- **`ray_indN`** — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
+- **`ray_indN`** *(optional)* — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
 
 ## See also:
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a> (companion document)
@@ -2738,12 +2738,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 {
     const dtype center_freq = dtype(center_freq_in);
     if (interaction_type < 0 || interaction_type > 5)
-        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
+        throw std::invalid_argument("Input 'interaction_type' must be 0 to 5 (EM reflection, transmission, refraction; scalar reflection, transmission, refraction).");
     bool is_scalar = interaction_type >= 3;
     int geometry_type = interaction_type % 3;
 
     if (center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+        throw std::invalid_argument("Input 'center_freq' must be > 0.");
     double fGHz = qd_material_fGHz((double)center_freq, is_scalar);
 
     if (orig == nullptr)
@@ -2808,7 +2808,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
     MaterialCols<dtype> MaterialSet = (mtl_prop) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
     if (p_mtl_ind && mtl_ind->max() > MaterialSet.n_mtl)
-        throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
+        throw std::invalid_argument("Input 'mtl_ind' contains an index that is out of range for 'mtl_prop'.");
 
     qd_check_alias_list<arma::Mat<dtype>>({origN, destN, fbsN, sbsN, gainN, polmatN, trivecN, tridirN, fbs_angleN,
                                            thicknessN, edge_lengthN, normal_vecN, path_dirN},
@@ -2861,58 +2861,58 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const arma::uword n_rayN = (arma::uword)n_rayN_u;
     const unsigned *p_ray_map = output_ray_index.empty() ? nullptr : output_ray_index.memptr();
 
-    if (origN && (origN->n_rows != n_rayN || origN->n_cols != 3))
+    if (origN)
         origN->set_size(n_rayN, 3);
     dtype *p_origN = origN ? origN->memptr() : nullptr;
 
-    if (destN && (destN->n_rows != n_rayN || destN->n_cols != 3))
+    if (destN)
         destN->set_size(n_rayN, 3);
     dtype *p_destN = destN ? destN->memptr() : nullptr;
 
-    if (fbsN && (fbsN->n_rows != n_rayN || fbsN->n_cols != 3))
+    if (fbsN)
         fbsN->set_size(n_rayN, 3);
     dtype *p_fbsN = fbsN ? fbsN->memptr() : nullptr;
 
-    if (sbsN && (sbsN->n_rows != n_rayN || sbsN->n_cols != 3))
+    if (sbsN)
         sbsN->set_size(n_rayN, 3);
     dtype *p_sbsN = sbsN ? sbsN->memptr() : nullptr;
 
-    if (gainN && gainN->n_elem != n_rayN)
+    if (gainN)
         gainN->set_size(n_rayN);
     dtype *p_gainN = gainN ? gainN->memptr() : nullptr;
 
     const arma::uword nXPR = is_scalar ? 2 : 8; // Number of rows in polmat (8 for EM, 2 for scalar)
-    if (polmatN && (polmatN->n_rows != nXPR || polmatN->n_cols != n_rayN))
+    if (polmatN)
         polmatN->set_size(nXPR, n_rayN);
     dtype *p_xprmatN = polmatN ? polmatN->memptr() : nullptr;
 
-    if (trivecN && use_ray_tube && (trivecN->n_rows != n_rayN || trivecN->n_cols != 9))
+    if (trivecN && use_ray_tube)
         trivecN->set_size(n_rayN, 9);
     else if (trivecN && !use_ray_tube && !trivecN->is_empty())
         trivecN->reset();
     dtype *p_trivecN = trivecN ? trivecN->memptr() : nullptr;
 
-    if (tridirN && use_ray_tube == 1 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
+    if (tridirN && use_ray_tube == 1)
         tridirN->set_size(n_rayN, 6);
-    else if (tridirN && use_ray_tube == 2 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 9))
+    else if (tridirN && use_ray_tube == 2)
         tridirN->set_size(n_rayN, 9);
     else if (tridirN && !use_ray_tube && !tridirN->is_empty())
         tridirN->reset();
     dtype *p_tridirN = tridirN ? tridirN->memptr() : nullptr;
 
-    if (fbs_angleN && fbs_angleN->n_elem != n_rayN)
+    if (fbs_angleN)
         fbs_angleN->set_size(n_rayN);
     dtype *p_fbs_angleN = fbs_angleN ? fbs_angleN->memptr() : nullptr;
 
-    if (thicknessN && thicknessN->n_elem != n_rayN)
+    if (thicknessN)
         thicknessN->set_size(n_rayN);
     dtype *p_thicknessN = thicknessN ? thicknessN->memptr() : nullptr;
 
-    if (edge_lengthN && edge_lengthN->n_elem != n_rayN)
+    if (edge_lengthN)
         edge_lengthN->set_size(n_rayN);
     dtype *p_edge_lengthN = edge_lengthN ? edge_lengthN->memptr() : nullptr;
 
-    if (normal_vecN && (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6))
+    if (normal_vecN)
         normal_vecN->set_size(n_rayN, 6);
     dtype *p_normal_vecN = normal_vecN ? normal_vecN->memptr() : nullptr;
 
@@ -2920,11 +2920,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         out_typeN->resize(n_rayN, 0);
     uint8_t *p_out_typeN = out_typeN ? out_typeN->data() : nullptr;
 
-    if (path_dirN && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
+    if (path_dirN)
         path_dirN->set_size(n_rayN, 3);
     dtype *p_path_dirN = path_dirN ? path_dirN->memptr() : nullptr;
 
-    if (ray_indN && ray_indN->n_elem != n_rayN)
+    if (ray_indN)
         ray_indN->set_size(n_rayN);
     unsigned *p_ray_indN = ray_indN ? ray_indN->memptr() : nullptr;
 
@@ -3262,7 +3262,7 @@ void quadriga_lib::ray_state_update(
   16383 materials.
 - **`mtl_ind_fbsN`**, **`mtl_ind_sbsN`** — Material indices of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air).
   The sheet case of a hit is re-derived from the code and the two faces' materials.
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** *(optional)* — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (in air, no flags). Pass the words an earlier call wrote
   through unchanged.<br><br>
    | Word                 | Bits 0-13                          | Bit 14                                        | Bit 15                    |
@@ -3274,13 +3274,13 @@ void quadriga_lib::ray_state_update(
 
    Under bit 15 the buffer word is the normal thickness, as a logarithmic code, of a mass-law leg closed on the way
    into the current one (bonded mass-law bodies are one plate); it is exempt from the material range check.
-- **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
-- **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
+- **`path_dir_prev`** *(optional)* — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
+- **`acc_dist_geometric`** *(optional)* — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-independent, so a multi-frequency caller keeps one instance.
-- **`acc_dist_refracted`** — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
+- **`acc_dist_refracted`** *(optional)* — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-dependent (the bend follows the material at `center_freq`), so a
   multi-frequency caller keeps one instance per frequency.
-- **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+- **`ray_indN`** *(optional)* — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 - **`eps`** *(optional)* — Threshold on the round-trip amplitude `ρ` (`ρ ≥ 0`, not bounded by one: next to a lossy or
   evanescent layer a face can reflect more than one in amplitude): a series is summed where `ρ ≥ eps` and left to
   the tracer where `ρ < eps`. `eps = 0` always sums (for callers that cannot re-emit); `eps ≥ 1` leaves every series
@@ -3295,18 +3295,18 @@ void quadriga_lib::ray_state_update(
   [[ray_mesh_interact]]; `[n_ray, 9]`. Given together with `tridirN`; requires `origN` and `destN`
 
 ## Outputs:
-- **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words (layout
+- **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** *(optional)* — Updated state words (layout
   above), compact set; `[n_rayN]`. The previous-medium word may hold a sheet: the boundary behind the ray, never a
   medium it travels in. NULL skips the write.
-- **`gainN`** *(in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
+- **`gainN`** *(optional, in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
   with `polmatN`. A killed ray (`resolved_typeN == 0`) has `gainN = 0` and an all-zero `polmatN`.
-- **`polmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
+- **`polmatN`** *(optional, in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
   `[2, n_rayN]` for scalar mode, layout and basis as in [[ray_mesh_interact]]. On return it also carries the
   in-medium attenuation and excess phase of the leg the ray leaves and, where the series was summed, the factor
   `S`. Spreading loss stays excluded, so the matrix is the complete per-event Jones factor. Where the series is
   left to the tracer the matrix carries the first pass only, and the bounces arrive as further events. At a
   thin-sheet crossing the matrix is replaced by the composite for the media the state reports.
-- **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
+- **`path_dirN`** *(optional, in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
 - **`origN`**, **`destN`** *(optional, in/out)* — The relaunch segment [[ray_mesh_interact]] built, compact set;
   `[n_rayN, 3]`, given together. With a refracting type (2, 5) that segment was bent at a real angle in the
   medium the ray leaves. Where this function writes the direction of a wave out of a lossy medium whose
@@ -3319,10 +3319,10 @@ void quadriga_lib::ray_state_update(
   own direction in `tridir`. If one of the three cannot be formed, the ray keeps the geometry it had.
 - **`verdict_outN`** *(optional)* — Per event, 1 where this call summed a bounce series and 0 where it left the
   bounces to the tracer, compact set; `[n_rayN]`. NULL skips the write.
-- **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+- **`acc_dist_geometricN`** *(optional)* — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   Where the ray goes on inside a medium it includes the relaunch offset of [[ray_mesh_interact]] (`origN` lies that
   far past the point the ray left at), so the next leg, measured from `origN`, adds up to the leg from the hit point.
-- **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+- **`acc_dist_refractedN`** *(optional)* — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
   compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write. May be `out_typeN`, which is then updated in place.<br><br>
@@ -3435,13 +3435,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
 {
     const dtype center_freq = dtype(center_freq_in);
     if (interaction_type < 0 || interaction_type > 5)
-        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
+        throw std::invalid_argument("Input 'interaction_type' must be 0 to 5 (EM reflection, transmission, refraction; scalar reflection, transmission, refraction).");
     const bool is_scalar = interaction_type >= 3;
     const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
     const arma::uword nXPR = is_scalar ? 2 : 8;                              // Number of rows in polmat (8 for EM, 2 for scalar)
 
     if (!std::isfinite((double)center_freq) || center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
 
     if (!std::isfinite(eps) || eps < 0.0)
         throw std::invalid_argument("Input 'eps' must be finite and >= 0.");
@@ -3456,14 +3456,14 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (dest->n_rows != n_ray)
         throw std::invalid_argument("Inputs 'orig' and 'dest' must have the same number of rows.");
     if (sbsN->n_rows != n_rayN)
-        throw std::invalid_argument("Inputs 'fbs' and 'sbs' must have the same number of rows.");
+        throw std::invalid_argument("Inputs 'fbsN' and 'sbsN' must have the same number of rows.");
 
     if (n_interact == nullptr || n_interact->n_elem != n_ray)
         throw std::invalid_argument("Input 'n_interact' must match the number of rays in 'orig'.");
     const unsigned *p_no_interact = n_interact->memptr();
 
     if (fbs_angleN == nullptr || fbs_angleN->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'fbs_angleN' cannot be NULL and have length n_rayN.");
+        throw std::invalid_argument("Input 'fbs_angleN' must be given and have n_rayN elements.");
     const dtype *p_fbs_angleN = fbs_angleN->memptr();
 
     if (normal_vecN == nullptr)
@@ -3473,22 +3473,22 @@ void quadriga_lib::ray_state_update(int interaction_type,
     const dtype *p_normal_vecN = normal_vecN->memptr();
 
     if (out_typeN == nullptr || out_typeN->size() != n_rayN)
-        throw std::invalid_argument("Input 'out_typeN' cannot be NULL and have length n_rayN.");
+        throw std::invalid_argument("Input 'out_typeN' must be given and have n_rayN elements.");
     const uint8_t *p_out_typeN = out_typeN->data();
 
     MaterialCols<dtype> cols = mtl_prop ? MaterialCols<dtype>(*mtl_prop, true) : MaterialCols<dtype>();
 
     if (mtl_ind_fbsN == nullptr || mtl_ind_fbsN->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");
+        throw std::invalid_argument("Input 'mtl_ind_fbsN' must match the length of 'out_typeN'.");
     const short *p_mtl_ind_fbs = mtl_ind_fbsN->memptr();
     if (mtl_ind_fbsN->n_elem != 0 && arma::uword(mtl_ind_fbsN->max() & (short)0x7FFF) > cols.n_mtl)
-        throw std::invalid_argument("Values in 'mtl_ind_fbs' exceed the number of materials in 'mtl_prop'.");
+        throw std::invalid_argument("Input 'mtl_ind_fbsN' contains an index that is out of range for 'mtl_prop'.");
 
     if (mtl_ind_sbsN == nullptr || mtl_ind_sbsN->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'mtl_ind_sbs' must match the length of 'out_typeN'.");
+        throw std::invalid_argument("Input 'mtl_ind_sbsN' must match the length of 'out_typeN'.");
     const short *p_mtl_ind_sbs = mtl_ind_sbsN->memptr();
     if (mtl_ind_sbsN->n_elem != 0 && arma::uword(mtl_ind_sbsN->max() & (short)0x7FFF) > cols.n_mtl)
-        throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
+        throw std::invalid_argument("Input 'mtl_ind_sbsN' contains an index that is out of range for 'mtl_prop'.");
 
     // The buffer word under its flag bit carries a surface-mass code, not a material index.
     // Without it, bit 14 is the followed mark, or with an index the other layer of a stack behind the ray.
@@ -3498,7 +3498,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return;
         for (const short *p = v->memptr(), *pe = p + v->n_elem; p < pe; ++p)
             if (!(flag_is_code && (*p & buf_mass_code)) && arma::uword(*p & word_mtl) > cols.n_mtl)
-                throw std::invalid_argument(std::string("Values in '") + name + "' exceed the number of materials in 'mtl_prop'.");
+                throw std::invalid_argument(std::string("Input '") + name + "' contains an index that is out of range for 'mtl_prop'.");
     };
     check_state_words(mtl_ind_prev_in, "mtl_ind_prev_in");
     check_state_words(mtl_ind_current_in, "mtl_ind_current_in");
@@ -3540,15 +3540,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
     qd_check_alias(verdict_outN, "verdict_outN", out_typeN, verdict_inN);
     qd_check_alias_outputs(resolved_typeN, "resolved_typeN", verdict_outN, "verdict_outN");
 
-    if (mtl_ind_prev_outN && mtl_ind_prev_outN->n_elem != n_rayN)
+    if (mtl_ind_prev_outN)
         mtl_ind_prev_outN->set_size(n_rayN);
     short *p_prev_outN = mtl_ind_prev_outN ? mtl_ind_prev_outN->memptr() : nullptr;
 
-    if (mtl_ind_current_outN && mtl_ind_current_outN->n_elem != n_rayN)
+    if (mtl_ind_current_outN)
         mtl_ind_current_outN->set_size(n_rayN);
     short *p_cur_outN = mtl_ind_current_outN ? mtl_ind_current_outN->memptr() : nullptr;
 
-    if (mtl_ind_buffer_outN && mtl_ind_buffer_outN->n_elem != n_rayN)
+    if (mtl_ind_buffer_outN)
         mtl_ind_buffer_outN->set_size(n_rayN);
     short *p_buf_outN = mtl_ind_buffer_outN ? mtl_ind_buffer_outN->memptr() : nullptr;
 
@@ -3564,11 +3564,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
     dtype *p_path_dirN = path_dirN ? path_dirN->memptr() : nullptr;
 
-    if (acc_dist_geometricN && acc_dist_geometricN->n_elem != n_rayN)
+    if (acc_dist_geometricN)
         acc_dist_geometricN->set_size(n_rayN);
     dtype *p_acc_geo_outN = acc_dist_geometricN ? acc_dist_geometricN->memptr() : nullptr;
 
-    if (acc_dist_refractedN && acc_dist_refractedN->n_elem != n_rayN)
+    if (acc_dist_refractedN)
         acc_dist_refractedN->set_size(n_rayN);
     dtype *p_acc_refract_outN = acc_dist_refractedN ? acc_dist_refractedN->memptr() : nullptr;
 
@@ -3579,7 +3579,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (ray_indN && ray_indN->n_elem != n_rayN)
         throw std::invalid_argument("Input 'ray_indN' must match the length of 'out_typeN'.");
     if (ray_indN && ray_indN->n_elem != 0 && (arma::uword)ray_indN->max() >= n_ray)
-        throw std::invalid_argument("Values in 'ray_indN' exceed the number of rays in 'orig'.");
+        throw std::invalid_argument("Input 'ray_indN' contains an index that is out of range for 'orig'.");
     if (ray_indN == nullptr && n_ray != n_rayN)
         throw std::invalid_argument("Without 'ray_indN', the full and compact sets must have the same size.");
     const unsigned *p_ray_indN = ray_indN ? ray_indN->memptr() : nullptr;

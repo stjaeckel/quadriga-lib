@@ -243,7 +243,7 @@ assert_throws( @() quadriga_lib.obj_file_read(fn,'bla',true,99), 'Wrong number o
 assert_throws( @() out12(fn), 'Wrong number of output arguments.' );
 
 % Wrong file name
-assert_throws( @() quadriga_lib.obj_file_read('bla.obj'), 'Error opening file: ''bla.obj'' does not exist.' );
+assert_throws( @() quadriga_lib.obj_file_read('bla.obj'), 'File ''bla.obj'' does not exist.' );
 
 delete(fn);
 

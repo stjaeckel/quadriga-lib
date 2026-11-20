@@ -66,9 +66,9 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
 - **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
   unavailable); auto selects GENERIC in this version, see [[arrayant_interpolate]]; default: 0
 
@@ -182,5 +182,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                       aod, eod, aoa, eoa, path_gain, path_length, polmat,
                                                       coeff_re, coeff_im, delay,
                                                       center_freq, use_absolute_delays, add_fake_los_path,
-                                                      &rx_Doppler, use_kernel));
+                                                      (nlhs > 3) ? &rx_Doppler : nullptr, use_kernel));
 }

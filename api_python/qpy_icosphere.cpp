@@ -28,7 +28,7 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
 ## Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
 - **`radius`** — Radius of icosphere in meters; finite and positive
-- **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
+- **`direction_xyz`** — Output directions in Cartesian (true) or spherical
   azimuth/elevation (false); default: false
 
 ## Outputs:
@@ -38,7 +38,7 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
   `center` vector; `(n_faces,)`
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_faces, 9)`
 - **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
-  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `[n_faces, 9)`
+  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `(n_faces, 9)`
 MD!*/
 
 py::tuple icosphere(arma::uword n_div, double radius, py::handle direction_xyz)

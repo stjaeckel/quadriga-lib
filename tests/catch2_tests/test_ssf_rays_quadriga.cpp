@@ -485,7 +485,7 @@ TEST_CASE("ssf_rays - quadriga input validation")
     const std::vector<std::pair<void (*)(rays_in_t &), std::string>> bad = {
         {[](rays_in_t &x) { x.i_freq = 1; }, "Input 'i_freq' must select the first frequency for method 'quadriga'."},
         {[](rays_in_t &x) { x.pol_model = "quadriga", x.pol_variability = true; },
-         "Input 'pol_variability' needs pol_model '38.901'."},
+         "Input 'pol_variability' requires 'pol_model' = '38.901'."},
         {[](rays_in_t &x) { x.pol_model = "quadriga", x.f.lsp(2, 1, 7) = 0.0; }, "Input 'lsp' must be finite and > 0."},
         {[](rays_in_t &x) { x.pol_model = "quadriga", x.f.lsp(0, 0, 7) = NAN; },
          "Input 'lsp' must be finite and > 0."}};

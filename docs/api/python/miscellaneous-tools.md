@@ -27,14 +27,13 @@ Returns the quadriga-lib version number
 
 Also in: [C++](../cpp/miscellaneous-tools.md#quadriga_lib_version) · [MATLAB](../mex/miscellaneous-tools.md#version)
 
+- If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
+  a suffix `_AVX2` is added after the version number
+
 ### Usage:
 ```python
-version = quadriga_lib.version();
+version = quadriga_lib.version()
 ```
-
-### Caveat:
-- If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
-  an suffix `_AVX2` is added after the version number
 
 ---
 <a id="write_png"></a>
@@ -74,6 +73,6 @@ quadriga_lib.tools.write_png( fn, data, *, colormap, min_val, max_val, log_trans
 - **`max_val`** (optional)\
   Upper clipping bound; values above get the last colour. NaN (default): data maximum.
 
-- `**log_transform**` (optional)\
+- **`log_transform`** (optional)\
   If enabled, the `data` values are transformed to the log-domain (`10*log10(data)`) before processing.
   Default: false (disabled)

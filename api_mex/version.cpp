@@ -23,7 +23,7 @@ Returns the quadriga-lib version number
 version = quadriga_lib.version;
 ```
 
-## Outputs:
+## Output:
 - **`version`** — Version string (e.g. "0.11.5_AVX2_CUDA")
 MD!*/
 

@@ -376,7 +376,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         }
 
     if (par_names.size() != par_data.size())
-        return std::string("Number of elements in 'par_data' must match number of elements in 'par_name'.");
+        return std::string("Number of elements in 'par_data' must match number of elements in 'par_names'.");
 
     for (size_t i = 0; i < par_names.size(); ++i)
         if (any_type_id(&par_data[i]) < 0)
@@ -439,7 +439,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
 
     arma::uword n_snap_chan = this->n_snap();
     if (i_snap >= n_snap_chan)
-        throw std::invalid_argument("Snapshot index out of bound.");
+        throw std::invalid_argument("Input 'i_snap' is out of range.");
 
     // Check MIMO coefficients
     // The first given field sets the number of added paths (also when it is 0), every other field must match
@@ -457,25 +457,25 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         n_path_add = coeff_re_add->n_slices;
         n_path_set = true;
         if (coeff_im_add->n_slices != n_path_add)
-            throw std::invalid_argument("Size of 'coeff_im_add' does not match size of 'coeff_re_add'");
+            throw std::invalid_argument("Size of 'coeff_im_add' does not match size of 'coeff_re_add'.");
         if (delay_add->n_slices != n_path_add)
-            throw std::invalid_argument("Size of 'delay_add' does not match size of 'coeff_re_add'");
+            throw std::invalid_argument("Size of 'delay_add' does not match size of 'coeff_re_add'.");
 
         arma::uword n_rx = this->n_rx(), n_tx = this->n_tx();
         if (coeff_re_add->n_rows != n_rx || coeff_re_add->n_cols != n_tx ||
             coeff_im_add->n_rows != n_rx || coeff_im_add->n_cols != n_tx)
-            throw std::invalid_argument("MIMO matrix size mismatch.");
+            throw std::invalid_argument("Inputs 'coeff_re_add' and 'coeff_im_add' must have n_rx rows and n_tx columns.");
 
         n_rx = this->delay[i_snap].n_rows, n_tx = this->delay[i_snap].n_cols;
         if (delay_add->n_rows != n_rx || delay_add->n_cols != n_tx)
-            throw std::invalid_argument("Delay matrix size mismatch.");
+            throw std::invalid_argument("Input 'delay_add' must have the rows and columns of the snapshot's 'delay'.");
 
         add_coefficients = true;
     }
     if (!add_coefficients && (coeff_im_add != nullptr || delay_add != nullptr))
         throw std::invalid_argument("'coeff_re_add' is missing.");
     if (!add_coefficients && this->coeff_re.size() != 0)
-        throw std::invalid_argument("The channel object has coefficients, but no coefficients are added!");
+        throw std::invalid_argument("The channel object has coefficients, but no coefficients are added.");
 
     // Check interaction coordinates
     bool add_interact_coord = false;
@@ -490,7 +490,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = n_interact_add->n_elem, n_path_set = true;
         if (n_interact_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'n_interact_add' does not match size of 'coeff_re_add'");
+            throw std::invalid_argument("Size of 'n_interact_add' does not match size of 'coeff_re_add'.");
 
         // 64-bit sum: arma::sum of a u32_vec is a 32-bit sum and can wrap
         arma::uword sum_no_interact = 0;
@@ -504,7 +504,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (!add_interact_coord && interact_coord_add != nullptr)
         throw std::invalid_argument("'interact_coord_add' is given but 'n_interact_add' is missing.");
     if (!add_interact_coord && this->n_interact.size() != 0)
-        throw std::invalid_argument("The channel object has interaction coordinates, but no coordinates are added!");
+        throw std::invalid_argument("The channel object has interaction coordinates, but no coordinates are added.");
 
     // Check path gain
     if (path_gain_add != nullptr)
@@ -515,10 +515,10 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = path_gain_add->n_elem, n_path_set = true;
         if (path_gain_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'path_gain_add' does not match 'n_path_add'");
+            throw std::invalid_argument("Size of 'path_gain_add' does not match 'n_path_add'.");
     }
     else if (this->path_gain.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_gain', but no 'path_gain_add' is provided!");
+        throw std::invalid_argument("The channel object has 'path_gain', but no 'path_gain_add' is provided.");
 
     // Check path_length
     if (path_length_add != nullptr)
@@ -529,10 +529,10 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = path_length_add->n_elem, n_path_set = true;
         if (path_length_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'path_length_add' does not match 'n_path_add'");
+            throw std::invalid_argument("Size of 'path_length_add' does not match 'n_path_add'.");
     }
     else if (this->path_length.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_length', but no 'path_length_add' is provided!");
+        throw std::invalid_argument("The channel object has 'path_length', but no 'path_length_add' is provided.");
 
     // Check polmat
     if (polmat_add != nullptr)
@@ -543,12 +543,12 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = polmat_add->n_cols, n_path_set = true;
         if (polmat_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'polmat_add' does not match 'n_path_add'");
+            throw std::invalid_argument("Number of columns in 'polmat_add' does not match 'n_path_add'.");
         if (polmat_add->n_rows != 8ULL)
-            throw std::invalid_argument("Number of rows in 'polmat_add' must be 8");
+            throw std::invalid_argument("Number of rows in 'polmat_add' must be 8.");
     }
     else if (this->polmat.size() != 0)
-        throw std::invalid_argument("The channel object has 'polmat', but no 'polmat_add' is provided!");
+        throw std::invalid_argument("The channel object has 'polmat', but no 'polmat_add' is provided.");
 
     // Check path_angles
     if (path_angles_add != nullptr)
@@ -559,12 +559,12 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = path_angles_add->n_rows, n_path_set = true;
         if (path_angles_add->n_rows != n_path_add)
-            throw std::invalid_argument("Number of rows in 'path_angles_add' does not match 'n_path_add'");
+            throw std::invalid_argument("Number of rows in 'path_angles_add' does not match 'n_path_add'.");
         if (path_angles_add->n_cols != 4ULL)
-            throw std::invalid_argument("Number of columns in 'path_angles_add' must be 4");
+            throw std::invalid_argument("Number of columns in 'path_angles_add' must be 4.");
     }
     else if (this->path_angles.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_angles', but no 'path_angles_add' is provided!");
+        throw std::invalid_argument("The channel object has 'path_angles', but no 'path_angles_add' is provided.");
 
     // Check fbs_pos
     if (fbs_pos_add != nullptr)
@@ -575,12 +575,12 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = fbs_pos_add->n_cols, n_path_set = true;
         if (fbs_pos_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'fbs_pos_add' does not match 'n_path_add'");
+            throw std::invalid_argument("Number of columns in 'fbs_pos_add' does not match 'n_path_add'.");
         if (fbs_pos_add->n_rows != 3ULL)
-            throw std::invalid_argument("Number of rows in 'fbs_pos_add' must be 3");
+            throw std::invalid_argument("Number of rows in 'fbs_pos_add' must be 3.");
     }
     else if (this->fbs_pos.size() != 0)
-        throw std::invalid_argument("The channel object has 'fbs_pos', but no 'fbs_pos_add' is provided!");
+        throw std::invalid_argument("The channel object has 'fbs_pos', but no 'fbs_pos_add' is provided.");
 
     // Check lbs_pos
     if (lbs_pos_add != nullptr)
@@ -591,12 +591,12 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         if (!n_path_set)
             n_path_add = lbs_pos_add->n_cols, n_path_set = true;
         if (lbs_pos_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'lbs_pos_add' does not match 'n_path_add'");
+            throw std::invalid_argument("Number of columns in 'lbs_pos_add' does not match 'n_path_add'.");
         if (lbs_pos_add->n_rows != 3ULL)
-            throw std::invalid_argument("Number of rows in 'lbs_pos_add' must be 3");
+            throw std::invalid_argument("Number of rows in 'lbs_pos_add' must be 3.");
     }
     else if (this->lbs_pos.size() != 0)
-        throw std::invalid_argument("The channel object has 'lbs_pos', but no 'lbs_pos_add' is provided!");
+        throw std::invalid_argument("The channel object has 'lbs_pos', but no 'lbs_pos_add' is provided.");
 
     // The fields of snapshot i_snap are written: an input must not be one of them or share memory with one
     auto check_mat = [&](const arma::Mat<dtype> *out, const char *name)

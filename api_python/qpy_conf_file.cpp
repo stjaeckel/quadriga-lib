@@ -56,11 +56,11 @@ py::tuple conf_file_list(py::handle dirs,
         for (py::handle entry : py::reinterpret_borrow<py::sequence>(dirs))
         {
             if (!qd_python_try_path(entry, path))
-                throw std::invalid_argument("Expected a string, a list of strings, or None.");
+                throw std::invalid_argument("Input 'dirs' must be a path, a list or tuple of paths, or None.");
             dirs_v.push_back(path);
         }
     else if (!dirs.is_none())
-        throw std::invalid_argument("Expected a string, a list of strings, or None.");
+        throw std::invalid_argument("Input 'dirs' must be a path, a list or tuple of paths, or None.");
     const bool parse_shortnames_b = qd_python_flag(parse_shortnames, true, "parse_shortnames");
 
     std::vector<std::string> file_names, file_dirs;

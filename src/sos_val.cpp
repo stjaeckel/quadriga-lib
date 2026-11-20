@@ -80,21 +80,20 @@ static void qd_sos_weights(const arma::Mat<dtype> &phase, std::vector<double> &w
         pc[i] = a * std::cos((double)p[i]), ps[i] = a * std::sin((double)p[i]);
 }
 
-static void qd_sos_run_kernel(int kernel, const std::vector<double> &fx, const std::vector<double> &fy, const std::vector<double> &fz,
+static void qd_sos_run_kernel([[maybe_unused]] int kernel, const std::vector<double> &fx, const std::vector<double> &fy, const std::vector<double> &fz,
                               const std::vector<double> &wc, const std::vector<double> &ws, size_t n_gen,
                               const double *px, const double *py, const double *pz, size_t n_pos,
                               double *val)
 {
+    // Without BUILD_WITH_AVX2, qd_kernel_auto_avx2 never returns 2
+#if BUILD_WITH_AVX2
     if (kernel == 2)
     {
-#if BUILD_WITH_AVX2
         qd_SOS_AVX2(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val);
-#else
-        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-#endif
+        return;
     }
-    else
-        qd_SOS_GENERIC(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val);
+#endif
+    qd_SOS_GENERIC(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val);
 }
 
 // Calls fn(i0, i1) for consecutive index ranges that cover 0 ... n-1, in parallel for large n.
@@ -390,7 +389,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
             throw std::invalid_argument("Input 'phase_b' must have the same size as 'phase'.");
     }
     if (!(spatial_freq_scale_b > (dtype)0.0) || !std::isfinite((double)spatial_freq_scale_b))
-        throw std::invalid_argument("Input 'spatial_freq_scale_b' must be > 0.");
+        throw std::invalid_argument("Input 'spatial_freq_scale_b' must be finite and > 0.");
     if (spatial_freq_scale_b != (dtype)1.0 && !two_maps)
         throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'phase_b'.");
     if (two_devices && !two_maps)
@@ -419,8 +418,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
     double *sa = nullptr;
     if (is_double)
     {
-        if (val.n_rows != n_pos || val.n_cols != n_gen)
-            val.set_size(n_pos, n_gen);
+        val.set_size(n_pos, n_gen);
         sa = reinterpret_cast<double *>(val.memptr());
     }
     else
@@ -481,7 +479,7 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
     }
 
     // Output: for dtype = double the values are already in place
-    if (!is_double && (val.n_rows != n_pos || val.n_cols != n_gen))
+    if (!is_double)
         val.set_size(n_pos, n_gen);
 
     dtype *pv = val.memptr();

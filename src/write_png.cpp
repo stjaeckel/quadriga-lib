@@ -53,9 +53,9 @@ void quadriga_lib::write_png(const std::string &fn, const arma::Mat<dtype> &data
         throw std::invalid_argument("Input 'data' must not be empty.");
 
     if (std::isinf(min_val) || std::isinf(max_val))
-        throw std::invalid_argument("'min_val' and 'max_val' must be finite or NaN.");
+        throw std::invalid_argument("Inputs 'min_val' and 'max_val' must be finite or NaN.");
     if (std::isfinite(min_val) && std::isfinite(max_val) && min_val > max_val)
-        throw std::invalid_argument("'min_val' must not be larger than 'max_val'.");
+        throw std::invalid_argument("Input 'min_val' must not be larger than 'max_val'.");
 
     // Get colormap
     auto cmap = quadriga_lib::colormap(colormap, true);
@@ -131,7 +131,7 @@ void quadriga_lib::write_png(const std::string &fn, const arma::Mat<dtype> &data
     // Write PNG
     unsigned error = lodepng::encode(fn, image, (unsigned)width, (unsigned)height);
     if (error)
-        throw std::runtime_error("PNG encoder error: '" + std::string(lodepng_error_text(error)) + "'");
+        throw std::runtime_error("Cannot write PNG file '" + fn + "': " + std::string(lodepng_error_text(error)) + ".");
 }
 
 template void quadriga_lib::write_png(const std::string &fn, const arma::Mat<float> &data, const std::string &colormap,

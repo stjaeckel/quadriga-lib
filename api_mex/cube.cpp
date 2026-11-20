@@ -14,7 +14,6 @@ SECTION!*/
 # CUBE
 Construct a triangulated cube mesh
 
-## Description:
 - Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1)
 - Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1
 - Optional uniform subdivision produces 12 · n_div^2 triangles
@@ -29,15 +28,15 @@ mesh = quadriga_lib.cube( scale, rotation, location, n_div );
 ```
 
 ## Inputs:
-- **`scale`** *(optional)* — Length 1 scales all axes uniformly; length 3 scales {x,y,z}
-  independently; empty or omitted = 1 (no scaling)
-- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
-  XYZ); length 3; empty or omitted = no rotation
-- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
-- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 12 · n_div^2 triangles;
+- **`scale`** — Length 1 scales all axes uniformly; length 3 scales {x,y,z}
+  independently; default: `[]` (1, no scaling)
+- **`rotation`** — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; default: `[]` (no rotation)
+- **`location`** — Translation {x,y,z}; length 3; default: `[]` (origin)
+- **`n_div`** — Number of subdivisions per edge; yields 12 · n_div^2 triangles;
   default: 1
 
-## Outputs:
+## Output:
 - **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[12 · n_div^2, 9]`
 
 ## See also:

@@ -211,7 +211,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         throw std::invalid_argument("Input 'pol_model' must be '38.901' or 'quadriga'.");
     const bool pol_qd = pol_model == "quadriga";
     if (pol_variability && pol_qd)
-        throw std::invalid_argument("Input 'pol_variability' needs pol_model '38.901'.");
+        throw std::invalid_argument("Input 'pol_variability' requires 'pol_model' = '38.901'.");
 
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
@@ -223,7 +223,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     const arma::uword n_link = rx.n_cols, F = center_freq.n_elem, n_slot = 1 + G + N;
     if (m_tr && F > 1)
         throw std::invalid_argument(
-            "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several frequencies.");
+            "Input 'center_freq' must have one element for method '38.901'; use '38.901_MF' or 'quadriga' for several frequencies.");
     if (!m_qd && i_freq >= F)
         throw std::invalid_argument("Input 'i_freq' is out of range for " + std::to_string(F) + " frequencies.");
     if (m_qd && i_freq != 0)
@@ -350,21 +350,19 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
 
         // Sizes; attributes of the right size are written in place
         r.method = method;
-        auto fit = [](auto &x, arma::uword n)
-        {
-            if (x.n_elem != n)
-                x.set_size(n);
-        };
-        fit(r.tx_pos, 3), fit(r.rx_pos, 3), fit(r.center_freq, Fo), fit(r.delay, n_ray);
-        fit(r.aod, n_ray), fit(r.eod, n_ray), fit(r.aoa, n_ray), fit(r.eoa, n_ray), fit(r.path_type, n_ray);
-        fit(r.tap, n_ray);
-        if (r.power.n_rows != n_ray || r.power.n_cols != Fo)
-            r.power.set_size(n_ray, Fo);
-        if (r.polmat.n_rows != 8 || r.polmat.n_cols != n_ray || r.polmat.n_slices != Fo)
-            r.polmat.set_size(8, n_ray, Fo);
+        // Positions are matrices (a [1, 3] position keeps its shape); all other members are vectors
+        if (r.tx_pos.n_elem != 3)
+            r.tx_pos.set_size(3);
+        if (r.rx_pos.n_elem != 3)
+            r.rx_pos.set_size(3);
+        r.center_freq.set_size(Fo), r.delay.set_size(n_ray);
+        r.aod.set_size(n_ray), r.eod.set_size(n_ray), r.aoa.set_size(n_ray), r.eoa.set_size(n_ray);
+        r.path_type.set_size(n_ray), r.tap.set_size(n_ray);
+        r.power.set_size(n_ray, Fo);
+        r.polmat.set_size(8, n_ray, Fo);
         if (G)
         {
-            fit(r.gr_eps_re, Fo), fit(r.gr_eps_im, Fo);
+            r.gr_eps_re.set_size(Fo), r.gr_eps_im.set_size(Fo);
             for (arma::uword k = k0; k <= k1; ++k)
                 r.gr_eps_re(k - k0) = gr_eps_re(l, k), r.gr_eps_im(k - k0) = gr_eps_im(l, k);
         }

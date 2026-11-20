@@ -930,7 +930,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
         const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 ```
 
-### Inputs:
+### Input:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
 
 ### Returns:
@@ -959,7 +959,7 @@ Not in: MATLAB, Python
 void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant);
 ```
 
-### Inputs:
+### Input:
 - **`ant`** — Valid arrayant; updated in-place
 
 ---
@@ -1166,7 +1166,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -1186,7 +1186,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -1263,7 +1263,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -1314,7 +1314,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_generate) · [Python](quadrig
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -1521,8 +1521,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_write) · [Python](quadriga_lib_
 
 - Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [qdant_write](#qdant_write).
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
-- All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
-  Invalid input throws and leaves an existing file unchanged.
+- The file must not exist yet; an existing file throws `std::runtime_error` and is left unchanged.
 - Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_freq`.
 
 ### Declaration:
@@ -1533,7 +1532,7 @@ void quadriga_lib::qdant_write_multi(
 ```
 
 ### Inputs:
-- **`fn`** — Path of the QDANT file to write; must not be empty
+- **`fn`** — Path of the QDANT file to write; must not be empty and must not exist
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects to store
 
 ### See also:
@@ -1662,10 +1661,10 @@ int quadriga_lib::any_type_id(
     unsigned long long *dims = nullptr);
 ```
 
-### Inputs:
+### Input:
 - **`data`** — Pointer to the `std::any` object to inspect
 
-### Outputs:
+### Output:
 - **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
 
 ### Returns:
@@ -1724,7 +1723,7 @@ void quadriga_lib::baseband_freq_response(
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
@@ -1752,7 +1751,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response_multi) · [Pyth
   (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
 - Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
-- At least one of `hmat_re`/`hmat_im` or `hmat` must be non-null
 
 ### Declaration:
 ```cpp
@@ -1782,7 +1780,7 @@ void quadriga_lib::baseband_freq_response_multi(
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
   across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -1831,7 +1829,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
 - **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
 - **`remove_delay_phase`** *(optional)* — As in [baseband_freq_response_multi](#baseband_freq_response_multi); default `true`
 - **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carrier]`
@@ -1878,7 +1876,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
 - **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
@@ -2176,10 +2174,10 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
     arma::u32_vec *channel_id = nullptr);
 ```
 
-### Inputs:
+### Input:
 - **`fn`** — Path to the HDF5 file
 
-### Outputs:
+### Output:
 - **`channel_id`** *(optional)* — Serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ### Returns:
@@ -2453,7 +2451,7 @@ float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0
 - **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
-### Function 'duplicate';
+### Function 'duplicate':
 Copies the path into an existing target object and returns its length
 
 - Performs a deep copy: the target receives an independent data buffer and all metadata
@@ -2507,7 +2505,7 @@ size_t quadriga_lib::qrt_file_append(
 - **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
 - **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
-- **`orig_name`** — Transmitter name; at most 255 characters
+- **`orig_name`** *(optional)* — Transmitter name; at most 255 characters
 
 ### Returns:
 - Number of paths written across all CIRs.
@@ -2550,10 +2548,10 @@ void quadriga_lib::qrt_file_init(
 - **`center_freq`** — Center frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries; stored in Hz as `float`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
-- **`cir_offset`** — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
-- **`n_orig`** — Number of origin (TX) slots to reserve; at least 1
-- **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
+- **`dest_names`** *(optional)* — Receiver (MT) names, at most 255 characters each; `[n_dest]`
+- **`cir_offset`** *(optional)* — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
+- **`n_orig`** *(optional)* — Number of origin (TX) slots to reserve; at least 1
+- **`scalar_mode`** *(optional)* — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
 ### See also:
 - [qrt_file_append](#qrt_file_append) (write one TX block into a reserved slot)
@@ -2670,10 +2668,10 @@ void quadriga_lib::qrt_file_read(
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
-- **`i_cir`** — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
+- **`i_cir`** *(optional)* — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
   without CIRs)
-- **`i_orig`** — Origin index, 0-based
-- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
+- **`i_orig`** *(optional)* — Origin index, 0-based
+- **`uplink`** *(optional)* — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
 - **`normalize_polmat`** *(optional)* — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
@@ -2688,24 +2686,24 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
 ### Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** — Transmitter positions in Cartesian coordinates; `[3, n_out]`
-- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
-- **`rx_pos`** — Receiver positions in Cartesian coordinates; `[3, n_out]`
-- **`rx_orientation`** — Receiver orientations (bank, tilt, heading); `[3, n_out]`
-- **`fbs_pos`** — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`path_gain`** — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
-- **`polmat`** — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; `[n_out]` of `[n_path]`
-- **`eod`** — Departure elevation angles; `[n_out]` of `[n_path]`
-- **`aoa`** — Arrival azimuth angles; `[n_out]` of `[n_path]`
-- **`eoa`** — Arrival elevation angles; `[n_out]` of `[n_path]`
-- **`path_coord`** — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
-- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
-- **`coord`** — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
-- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
+- **`center_freq`** *(optional)* — Center frequency in Hz; `[n_freq]`
+- **`tx_pos`** *(optional)* — Transmitter positions in Cartesian coordinates; `[3, n_out]`
+- **`tx_orientation`** *(optional)* — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
+- **`rx_pos`** *(optional)* — Receiver positions in Cartesian coordinates; `[3, n_out]`
+- **`rx_orientation`** *(optional)* — Receiver orientations (bank, tilt, heading); `[3, n_out]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
+- **`polmat`** *(optional)* — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
+- **`aod`** *(optional)* — Departure azimuth angles; `[n_out]` of `[n_path]`
+- **`eod`** *(optional)* — Departure elevation angles; `[n_out]` of `[n_path]`
+- **`aoa`** *(optional)* — Arrival azimuth angles; `[n_out]` of `[n_path]`
+- **`eoa`** *(optional)* — Arrival elevation angles; `[n_out]` of `[n_path]`
+- **`path_coord`** *(optional)* — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
+- **`n_interact`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
+- **`coord`** *(optional)* — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
+- **`interact_type`** *(optional)* — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
   Empty for v4 legacy files. GBSM paths of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) carry 129 (GR) and 193 (NLOS); LOS and GR
   paths are not marked as GBSM.
 
@@ -2760,7 +2758,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
-- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
+- **`i_orig`** *(optional)* — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 - **`cache`** *(optional)* — Pre-parsed metadata from [qrt_read_cache_init](#qrt_read_cache_init); pass `nullptr` to parse the header on this call
 
@@ -4375,7 +4373,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_single_link_channel) · [Python](
   per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of the result stays 0. Validity limits: see `ssf_paths`
-- Throws `std::invalid_argument` for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `),
+- Throws `std::invalid_argument` for an invalid `tx_array` or `rx_array`,
   invalid `rays` (the `is_valid()` message), `"drift"` without scatterers or with a GR ray at moved ends without
   permittivity or below z = 0, and a column or entry count other than 1 or `n_snap`
 
@@ -5172,9 +5170,9 @@ void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &acos_x, int use_ke
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
-### Outputs:
+### Output:
 - **`acos_x`** — acos(x); `[n_elem]`
 
 ---
@@ -5196,9 +5194,9 @@ void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &asin_x, int use_ke
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
-### Outputs:
+### Output:
 - **`asin_x`** — asin(x); `[n_elem]`
 
 ---
@@ -5222,9 +5220,9 @@ void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fv
 ### Inputs:
 - **`y`** — Y-coordinates (numerator); `[n_elem]`
 - **`x`** — X-coordinates (denominator); `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
-### Outputs:
+### Output:
 - **`atan2_yx`** — atan2(y, x); `[n_elem]`
 
 ---
@@ -5256,7 +5254,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 - **`x`** — X-coordinates; `[n_elem]`
 - **`y`** — Y-coordinates; `[n_elem]`
 - **`z`** — Z-coordinates; `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw; default `0`
+- **`use_kernel`** *(optional)* — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ### Outputs:
 - **`az`** — Azimuth angles; `[n_elem]`
@@ -5282,7 +5280,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#fast_geo2cart) · [Python](quadriga_li
 
 ### Declaration:
 ```cpp
-void fast_geo2cart(
+void quadriga_lib::fast_geo2cart(
     const arma::Col<dtype> &az,
     const arma::Col<dtype> &el,
     arma::Col<dtype> &x,
@@ -5300,7 +5298,7 @@ void fast_geo2cart(
 - **`az`** — Azimuth angles; `[n_elem]`
 - **`el`** — Elevation angles; `[n_elem]`
 - **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
+- **`use_kernel`** *(optional)* — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ### Outputs:
 - **`x`** — X-coordinates; `[n_elem]`
@@ -5339,7 +5337,7 @@ void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *sin_x = nullptr,
 
 ### Inputs:
 - **`x`** — Input angles; `[n_elem]`
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`sin_x`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
@@ -5380,7 +5378,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 - **`B_re`** — Real part of source B; `[n_elem]`
 - **`B_im`** — Imaginary part of source B; `[n_elem]`
 - **`w`** — Per-element interpolation weight in [0, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
 ### Outputs:
 - **`X_re`** — Real part of interpolated result; `[n_elem]`
@@ -5401,7 +5399,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#interp) · [Python](quadriga_lib_api_p
 - `interp_1D` interpolates the columns of a matrix; a single data set is a matrix with one column.
 - Data types (`dtype`): `float` or `double`
 
-### Declarations:
+### Declaration:
 ```cpp
 void quadriga_lib::interp_2D(
     const arma::Col<dtype> &x,
@@ -5555,23 +5553,23 @@ void calc_diffraction_gain(
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
+- **`lod`** *(optional)* — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths)
-- **`verbose`** — Verbosity level
-- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
-- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect)
-- **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
-- **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
+- **`verbose`** *(optional)* — Verbosity level
+- **`sub_mesh_ind`** *(optional)* — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_sub]`
+- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect)
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+- **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
   interaction type passed to [ray_mesh_interact](#ray_mesh_interact) (4 vs. 1).
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude `ρ`: a series is summed where `ρ ≥ eps`; 0 = resolve always (default); `eps ≥ 1` re-emits every series whose `ρ` is below one, and a round trip at or above one is always summed; see [ray_state_update](#ray_state_update)
-- **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
+- **`thin_slab_threshold`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude `ρ`: a series is summed where `ρ ≥ eps`; 0 = resolve always (default); `eps ≥ 1` re-emits every series whose `ρ` is below one, and a round trip at or above one is always summed; see [ray_state_update](#ray_state_update)
+- **`apply_fspl`** *(optional)* — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
   the direct TX-RX distance, matching the `path_length` definition used by [qrt_file_read](#qrt_file_read) for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
   `center_freq`.
-- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
+- **`apply_phase`** *(optional)* — If `true`, multiplies `polmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
   same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
   of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
   magnitude, `polmat` stays normalized. This is the phase contribution that
@@ -5579,9 +5577,9 @@ void calc_diffraction_gain(
   omni-radiator coefficient without running the channel generator.
 
 ### Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
+- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
   i.e. bounded by 0 and 1; absolute propagation gain when `apply_fspl = true`.
-- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** *(optional)* — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
   For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row order
@@ -5589,7 +5587,7 @@ void calc_diffraction_gain(
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
-- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
+- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
   (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
 ### See also:
@@ -5702,14 +5700,14 @@ void quadriga_lib::coord2path(
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`n_interact`** — Number of interactions per path (0 = LOS); `[n_path]`
 - **`interact_coord`** — Interaction coordinates in path order; must have 3 rows; `[3, sum(n_interact)]`
-- **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
+- **`reverse_path`** *(optional)* — If `true`, swaps TX/RX and reverses interaction sequences
 
 ### Outputs:
-- **`path_length`** (optional) — Absolute path length TX to RX; `[n_path]`
-- **`fbs_pos`** (optional) — First-bounce scatterer positions; `[3, n_path]`
-- **`lbs_pos`** (optional) — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_angles`** (optional) — Departure and arrival angles {AOD, EOD, AOA, EOA}; `[n_path, 4]`
-- **`path_coord`** (optional) — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX; `[n_path]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_angles`** *(optional)* — Departure and arrival angles {AOD, EOD, AOA, EOA}; `[n_path, 4]`
+- **`path_coord`** *(optional)* — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
 
 ---
 <a id="cube"></a>
@@ -5736,11 +5734,11 @@ arma::Mat<dtype> quadriga_lib::cube(
 ```
 
 ### Inputs:
-- **`scale`** — Length 1 scales all axes uniformly; length 3 scales `{x,y,z}` independently; empty = 1 (no scaling)
-- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
+- **`scale`** *(optional)* — Length 1 scales all axes uniformly; length 3 scales `{x,y,z}` independently; empty = 1 (no scaling)
+- **`rotation`** *(optional)* — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
   length 3 or empty (no rotation)
-- **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
-- **`n_div`** — Number of subdivisions per edge; results in `12 * n_div^2` triangles
+- **`location`** *(optional)* — Translation {x,y,z} in [m]; length 3 or empty (origin)
+- **`n_div`** *(optional)* — Number of subdivisions per edge; results in `12 * n_div^2` triangles
 
 ### Returns:
 - Triangle mesh; each row holds `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[12 * n_div^2, 9]`
@@ -5827,13 +5825,13 @@ arma::uword quadriga_lib::icosphere(
 ### Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 × n_div² faces
 - **`radius`** — Radius of icosphere in meters; finite and positive
-- **`direction_xyz`** (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
+- **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
 
 ### Outputs:
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
-- **`length`** (optional) — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
-- **`vert`** (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; `[n_faces, 9]`
-- **`direction`** (optional) — Directions of the vertex rays; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
+- **`length`** *(optional)* — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`vert`** *(optional)* — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; `[n_faces, 9]`
+- **`direction`** *(optional)* — Directions of the vertex rays; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
 
 ### Returns:
 - Number of generated triangular faces (20 × n_div²)
@@ -5865,7 +5863,7 @@ dtype quadriga_lib::interface_gain(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
+- **`scalar_mode`** *(optional)* — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ### Returns:
 - Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
@@ -5912,7 +5910,7 @@ dtype quadriga_lib::medium_gain(
 - **`iM`** —  1-based material index (0 = no material / air)
 - **`dist`** — Path length of the ray inside the medium in [m]
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
+- **`scalar_mode`** *(optional)* — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ### Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -6014,22 +6012,22 @@ arma::uword quadriga_lib::obj_file_read(
 
 ### Inputs:
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
-- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
+- **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
   to index 0 (no material) unless `csv_strict` is set. Empty uses the built-in ITU-R P.2040 default table.
-- **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
+- **`csv_strict`** *(optional)* — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
 
 ### Outputs:
-- **`mesh`** — Triangle vertex coordinates `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
-- **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
-- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `[n_mesh, 3]`
-- **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
-- **`obj_names`** — Object names; length `max(obj_ind)+1`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); length `n_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
-- **`csv_names`** — Material names from the table; length `n_csv` (the full table)
-- **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has
+- **`mesh`** *(optional)* — Triangle vertex coordinates `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
+- **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
+- **`face_ind`** *(optional)* — 0-based vertex indices into `vert_list` per triangle; `[n_mesh, 3]`
+- **`obj_ind`** *(optional)* — 0-based object index per triangle; `[n_mesh]`
+- **`obj_names`** *(optional)* — Object names; length `max(obj_ind)+1`
+- **`mtl_ind`** *(optional)* — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
+- **`mtl_names`** *(optional)* — Visual material names (raw `usemtl`); length `n_mtl`
+- **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
+- **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
+- **`csv_names`** *(optional)* — Material names from the table; length `n_csv` (the full table)
+- **`csv_prop`** *(optional)* — Material properties keyed by CSV column name (excluding `name`); each value has
   length `n_csv`. Columns absent from the table are defaulted by consumers; empty cells parse as 0.
 
 ### Returns:
@@ -6094,24 +6092,24 @@ void obj_file_write(
 
 ### Inputs:
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
-- **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
-- **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
-- **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
-- **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
-- **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
-- **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [obj_file_read](#obj_file_read) for columns
-- **`threshold`** — Vertex co-location distance for merging within an object; default 1 mm
-- **`csv_ind`** — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; optional, validated if given
-- **`csv_names`** — EM/acoustic material names (the full table); writing the `.csv` requires this
-- **`csv_prop`** — Material properties keyed by column name; each vector must have one value per `csv_names` entry
-- **`csv_write_defaults`** — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
-- **`split_loose_parts`** — If `true`, split each object into connected components (faces sharing a vertex); parts of a split object are named `name.001`, `name.002`, ...
+- **`mesh`** *(optional)* — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
+- **`obj_ind`** *(optional)* — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
+- **`mtl_ind`** *(optional)* — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
+- **`obj_names`** *(optional)* — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
+- **`mtl_names`** *(optional)* — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
+- **`vert_list`** *(optional)* — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
+- **`face_ind`** *(optional)* — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
+- **`bsdf`** *(optional)* — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [obj_file_read](#obj_file_read) for columns
+- **`threshold`** *(optional)* — Vertex co-location distance for merging within an object; default 1 mm
+- **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; optional, validated if given
+- **`csv_names`** *(optional)* — EM/acoustic material names (the full table); writing the `.csv` requires this
+- **`csv_prop`** *(optional)* — Material properties keyed by column name; each vector must have one value per `csv_names` entry
+- **`csv_write_defaults`** *(optional)* — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
+- **`split_loose_parts`** *(optional)* — If `true`, split each object into connected components (faces sharing a vertex); parts of a split object are named `name.001`, `name.002`, ...
 
 ### Outputs:
-- **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
-- **`face_ind_out`** — 0-based face indices derived from `mesh`, or a copy of `face_ind`; `[n_mesh, 3]`
+- **`vert_list_out`** *(optional)* — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
+- **`face_ind_out`** *(optional)* — 0-based face indices derived from `mesh`, or a copy of `face_ind`; `[n_mesh, 3]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading OBJ files and the BSDF column layout)
@@ -6212,12 +6210,12 @@ arma::Mat<dtype> quadriga_lib::plane(
 ```
 
 ### Inputs:
-- **`scale`** — Length 1 scales x and y uniformly; length 2 scales `{x,y}` independently; length 3 is accepted for
+- **`scale`** *(optional)* — Length 1 scales x and y uniformly; length 2 scales `{x,y}` independently; length 3 is accepted for
   compatibility with [cube](#cube), but the third element is ignored; empty = 1 (no scaling)
-- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
+- **`rotation`** *(optional)* — Euler angles in [rad] about {x,y,z}, applied as `R = Rz*Ry*Rx` (Blender XYZ);
   length 3 or empty (no rotation)
-- **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
-- **`n_div`** — Number of subdivisions per edge; results in `2 * n_div^2` triangles
+- **`location`** *(optional)* — Translation {x,y,z} in [m]; length 3 or empty (origin)
+- **`n_div`** *(optional)* — Number of subdivisions per edge; results in `2 * n_div^2` triangles
 
 ### Returns:
 - Triangle mesh; each row holds `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[2 * n_div^2, 9]`
@@ -6332,7 +6330,7 @@ int quadriga_lib::point_cloud_split(
 ### Outputs:
 - **`pointsA`** — First sub-cloud; `[n_pointsA, 3]`
 - **`pointsB`** — Second sub-cloud; `[n_pointsB, 3]`
-- **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB, `0` = error; `[n_points]`
+- **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB; `[n_points]`
 
 ### Returns:
 - Axis used: `1` = x, `2` = y, `3` = z; negative (`-1`, `-2`, `-3`) if split failed
@@ -6508,7 +6506,7 @@ Not in: MATLAB, Python
   its coefficients, per frequency, via [medium_gain](#medium_gain) on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
 - The receiver index is written to the committed path's `i_cir`, 0-based. Without `point_ind` it indexes
-  `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
+  `rx_points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) needs no remapping afterwards.
 - Padding points inserted by [point_cloud_segmentation](#point_cloud_segmentation) for SIMD alignment sit at the center of their
   sub-cloud AABB and are therefore hit often. They are dropped when `point_ind` is supplied and committed
@@ -6560,11 +6558,11 @@ arma::uword quadriga_lib::ray_commit(
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. Empty → no partitioning
-- **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
+- **`point_ind`** *(optional)* — 1-based map from each row of `rx_points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
-  indexing. Empty → `points` is used as passed in and `i_cir` indexes it directly
+  indexing. Empty → `rx_points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
   same launch configuration. Empty → no ray is excluded on these grounds
@@ -6660,22 +6658,22 @@ arma::uword ray_init(
   caller already holds for the tracing loop.
 - **`rx_points`** *(optional)* — Receive points in 3D space; `[n_point, 3]`. Used only to bound the launch
   sphere `r0`, so that no receiver starts inside it. Empty → receivers are not considered.
-- **`scalar_mode`** — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
+- **`scalar_mode`** *(optional)* — Path storage layout passed to `paths`: `true` = SCALAR (acoustic, one pressure
   coefficient per frequency), `false` = EM (2×2 Jones matrix per frequency)
 
 ### Outputs:
-- **`orig`** — Ray origins on the launch sphere, `O + r0·d̂`; `[n_ray, 3]`
-- **`dest`** — Ray destinations at `max_path_length` from `O`; `[n_ray, 3]`
-- **`trivec`** — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, matches [ray_mesh_interact](#ray_mesh_interact)
-- **`tridir`** — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
-- **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** — Initial medium-state words for
+- **`orig`** *(optional)* — Ray origins on the launch sphere, `O + r0·d̂`; `[n_ray, 3]`
+- **`dest`** *(optional)* — Ray destinations at `max_path_length` from `O`; `[n_ray, 3]`
+- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, matches [ray_mesh_interact](#ray_mesh_interact)
+- **`tridir`** *(optional)* — Per-vertex ray directions, Cartesian; `[n_ray, 9]`
+- **`mtl_ind_prev`**, **`mtl_ind_current`**, **`mtl_ind_buffer`** *(optional)* — Initial medium-state words for
   [ray_state_update](#ray_state_update), all zeroed (outside air, no flags); `[n_ray]`
-- **`path_dir_prev`** — Initial physical ray direction (unit vectors from `O`), one slice per frequency;
+- **`path_dir_prev`** *(optional)* — Initial physical ray direction (unit vectors from `O`), one slice per frequency;
   `[n_ray, 3, n_freq]`. Every slice is seeded with the same launch direction. Slice `f` is contiguous, so a
   consumer can alias it as an `[n_ray, 3]` matrix without copying
-- **`acc_dist`** — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 1 = geometric distance
+- **`acc_dist`** *(optional)* — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 0 = geometric distance
   (frequency-independent, shared), col `1+f` = refracted distance at frequency `f`
-- **`paths`** — Per-ray [path](#path) objects, one per ray; each reinitialized to 0 segments with `n_freq`
+- **`paths`** *(optional)* — Per-ray [path](#path) objects, one per ray; each reinitialized to 0 segments with `n_freq`
   frequency bins in the `scalar_mode` layout, and `length` seeded to `orig_length` (the `O`-to-origin offset);
   `n_ray` entries
 
@@ -6689,7 +6687,7 @@ arma::uword ray_init(
 - [triangle_mesh_aabb](#triangle_mesh_aabb) (generates `aabb`)
 - [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [ray_state_update](#ray_state_update) (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
-- [ray_commit](#ray_commit) (consumes the same `points` when committing paths that reach a receiver)
+- [ray_commit](#ray_commit) (consumes the same `rx_points` when committing paths that reach a receiver)
 - [path](#path) (the per-ray storage object populated in `paths`)
 
 ---
@@ -6771,23 +6769,23 @@ void quadriga_lib::ray_mesh_interact(
   (gain 1, identity `polmat`, `out_type = 0`).
 
 ### Outputs:
-- **`origN`** — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's
+- **`origN`** *(optional)* — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's
   coordinate magnitude (past the SBS of a co-located pair, except for reflection); `[n_rayN, 3]`
-- **`destN`** — New destinations along the outgoing direction; `[n_rayN, 3]`
-- **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
-- **`gainN`** — Linear power gain of the interaction, derived from `polmatN`; `[n_rayN]`
-- **`polmatN`** — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
+- **`destN`** *(optional)* — New destinations along the outgoing direction; `[n_rayN, 3]`
+- **`fbsN`**, **`sbsN`** *(optional)* — First/second interaction points in GCS; `[n_rayN, 3]`
+- **`gainN`** *(optional)* — Linear power gain of the interaction, derived from `polmatN`; `[n_rayN]`
+- **`polmatN`** *(optional)* — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`), the Jones matrix `J = [VV VH; HV HH]`
   acting as `e_out = J · e_in`, the incoming V/H basis from the incident direction and the outgoing one from
   `path_dirN` (`eH = ẑ × k̂` normalized, `eV = eH × k̂`); `[8, n_rayN]`. Types 3–5: `[Re Im]` of the scalar pressure
   coefficient; `[2, n_rayN]`. A transmitted coefficient includes the entered material's `interface_gain`.
-- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
-- **`fbs_angleN`** — Incidence angle at FBS in rad, the angle to the face (≥ 0 for a front-side hit); `[n_rayN]`
-- **`thicknessN`** — Geometric FBS-to-SBS distance; `[n_rayN]`. Unrelated to the material `thk` column:
+- **`trivecN`**, **`tridirN`** *(optional)* — Updated beam geometry/direction (format matches input); empty if inputs not provided
+- **`fbs_angleN`** *(optional)* — Incidence angle at FBS in rad, the angle to the face (≥ 0 for a front-side hit); `[n_rayN]`
+- **`thicknessN`** *(optional)* — Geometric FBS-to-SBS distance; `[n_rayN]`. Unrelated to the material `thk` column:
   this is what the mesh measured, `thk` is what the material table authored.
-- **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
-- **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code, bit-encoded (`qd::bits<uint8_t>`); `[n_rayN]`
+- **`edge_lengthN`** *(optional)* — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
+- **`normal_vecN`** *(optional)* — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
+- **`out_typeN`** *(optional)* — Interaction type code, bit-encoded (`qd::bits<uint8_t>`); `[n_rayN]`
    |  Bit | Meaning                                                                 |
    | :--: | ----------------------------------------------------------------------- |
    |   0  | OK flag (0 = no valid interaction / undefined)                          |
@@ -6828,12 +6826,12 @@ void quadriga_lib::ray_mesh_interact(
 
    Codes 69 and 71 each stand for three cases, which [ray_state_update](#ray_state_update) tells apart from the materials of the two
    faces. Total reflection occurs with bit 6 only for a glued pair. Bit 7 is unused.
-- **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
+- **`path_dirN`** *(optional)* — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4/5; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
   No ray bends into a mass-law medium (`m > 0`). The wave in it is held: into air or another mass-law body it keeps its
   direction, into a medium without the mass column it is refracted as a wave from air.
-- **`ray_indN`** — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
+- **`ray_indN`** *(optional)* — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
 
 ### See also:
 - [The quadriga-lib Material Model and Ray-Surface Physics](http://quadriga-lib.org/quadriga_lib_material_model.md) (companion document)
@@ -6882,11 +6880,11 @@ void quadriga_lib::ray_point_intersect(
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-### Optional outputs:
-- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
-- **`hit_offset`** — Start of each point's block within `hit_ind`, last element is `n_hit`; `[n_points + 1]`
-- **`hit_count`** — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
-- **`hits_per_point`** — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
+### Outputs:
+- **`hit_ind`** *(optional)* — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
+- **`hit_offset`** *(optional)* — Start of each point's block within `hit_ind`, last element is `n_hit`; `[n_points + 1]`
+- **`hit_count`** *(optional)* — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
+- **`hits_per_point`** *(optional)* — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
 
 ### See also:
 - [icosphere](#icosphere) (generate ray beams)
@@ -6982,17 +6980,17 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Empty with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
-- **`max_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
-- **`max_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
-- **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
-- **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
+- **`max_interactions`** *(optional)* — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
+- **`max_reflections`** *(optional)* — Reflections per ray, 0 to 255. 0 skips the reflection pass
+- **`max_transmissions`** *(optional)* — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
+- **`max_subdivisions`** *(optional)* — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `n_sub` saturates at 255 instead of wrapping
-- **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
-- **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
-- **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
-- **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
+- **`min_gain_dB`** *(optional)* — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
+- **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
+- **`thin_slab_threshold`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
+- **`refraction_mode`** *(optional)* — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
+- **`scalar_mode`** *(optional)* — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
 - **`n_interact_in`** *(optional)* — Externally computed intersection count per ray from [ray_triangle_intersect](#ray_triangle_intersect); `[n_ray]`.
   When given, the internal intersector is skipped and `fbs_ind_in` and `sbs_ind_in` become mandatory
 - **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
@@ -7123,7 +7121,7 @@ void quadriga_lib::ray_state_update(
   16383 materials.
 - **`mtl_ind_fbsN`**, **`mtl_ind_sbsN`** — Material indices of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air).
   The sheet case of a hit is re-derived from the code and the two faces' materials.
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** *(optional)* — State words, full ray set; `[n_ray]`,
   read at `g`, never written. NULL reads as state `0` (in air, no flags). Pass the words an earlier call wrote
   through unchanged.
    | Word                 | Bits 0-13                          | Bit 14                                        | Bit 15                    |
@@ -7135,13 +7133,13 @@ void quadriga_lib::ray_state_update(
 
    Under bit 15 the buffer word is the normal thickness, as a logarithmic code, of a mass-law leg closed on the way
    into the current one (bonded mass-law bodies are one plate); it is exempt from the material range check.
-- **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
-- **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
+- **`path_dir_prev`** *(optional)* — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
+- **`acc_dist_geometric`** *(optional)* — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-independent, so a multi-frequency caller keeps one instance.
-- **`acc_dist_refracted`** — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
+- **`acc_dist_refracted`** *(optional)* — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-dependent (the bend follows the material at `center_freq`), so a
   multi-frequency caller keeps one instance per frequency.
-- **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+- **`ray_indN`** *(optional)* — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 - **`eps`** *(optional)* — Threshold on the round-trip amplitude `ρ` (`ρ ≥ 0`, not bounded by one: next to a lossy or
   evanescent layer a face can reflect more than one in amplitude): a series is summed where `ρ ≥ eps` and left to
   the tracer where `ρ < eps`. `eps = 0` always sums (for callers that cannot re-emit); `eps ≥ 1` leaves every series
@@ -7156,18 +7154,18 @@ void quadriga_lib::ray_state_update(
   [ray_mesh_interact](#ray_mesh_interact); `[n_ray, 9]`. Given together with `tridirN`; requires `origN` and `destN`
 
 ### Outputs:
-- **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words (layout
+- **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** *(optional)* — Updated state words (layout
   above), compact set; `[n_rayN]`. The previous-medium word may hold a sheet: the boundary behind the ray, never a
   medium it travels in. NULL skips the write.
-- **`gainN`** *(in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
+- **`gainN`** *(optional, in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
   with `polmatN`. A killed ray (`resolved_typeN == 0`) has `gainN = 0` and an all-zero `polmatN`.
-- **`polmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
+- **`polmatN`** *(optional, in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
   `[2, n_rayN]` for scalar mode, layout and basis as in [ray_mesh_interact](#ray_mesh_interact). On return it also carries the
   in-medium attenuation and excess phase of the leg the ray leaves and, where the series was summed, the factor
   `S`. Spreading loss stays excluded, so the matrix is the complete per-event Jones factor. Where the series is
   left to the tracer the matrix carries the first pass only, and the bounces arrive as further events. At a
   thin-sheet crossing the matrix is replaced by the composite for the media the state reports.
-- **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
+- **`path_dirN`** *(optional, in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
 - **`origN`**, **`destN`** *(optional, in/out)* — The relaunch segment [ray_mesh_interact](#ray_mesh_interact) built, compact set;
   `[n_rayN, 3]`, given together. With a refracting type (2, 5) that segment was bent at a real angle in the
   medium the ray leaves. Where this function writes the direction of a wave out of a lossy medium whose
@@ -7180,10 +7178,10 @@ void quadriga_lib::ray_state_update(
   own direction in `tridir`. If one of the three cannot be formed, the ray keeps the geometry it had.
 - **`verdict_outN`** *(optional)* — Per event, 1 where this call summed a bounce series and 0 where it left the
   bounces to the tracer, compact set; `[n_rayN]`. NULL skips the write.
-- **`acc_dist_geometricN`** — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+- **`acc_dist_geometricN`** *(optional)* — Accumulated geometric distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   Where the ray goes on inside a medium it includes the relaunch offset of [ray_mesh_interact](#ray_mesh_interact) (`origN` lies that
   far past the point the ray left at), so the next leg, measured from `origN`, adds up to the leg from the hit point.
-- **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
+- **`acc_dist_refractedN`** *(optional)* — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
   compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write. May be `out_typeN`, which is then updated in place.
@@ -7357,17 +7355,17 @@ void quadriga_lib::ray_triangle_intersect(
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`sub_mesh_ind`** *(optional)* — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
+- **`aabb`** *(optional)* — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ### Outputs:
-- **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
-- **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`n_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
-- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
-- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
+- **`fbs`** *(optional)* — First-bounce intersection points in GCS; `[n_ray, 3]`
+- **`sbs`** *(optional)* — Second-bounce intersection points in GCS; `[n_ray, 3]`
+- **`n_interact`** *(optional)* — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
+- **`fbs_ind`** *(optional)* — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
+- **`sbs_ind`** *(optional)* — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (load mesh from OBJ file)
@@ -7402,7 +7400,7 @@ dtype quadriga_lib::refractive_index(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
+- **`scalar_mode`** *(optional)* — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ### Returns:
 - Real refractive index of the medium relative to air
@@ -7445,7 +7443,8 @@ arma::uword quadriga_lib::subdivide_rays(
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
-    const arma::u32_vec &index = arma::u32_vec());
+    const arma::u32_vec &index = arma::u32_vec(),
+    bool transposed_output = false);
 ```
 
 ### Inputs:
@@ -7453,18 +7452,18 @@ arma::uword quadriga_lib::subdivide_rays(
 - **`trivec`** — Vectors from origin to the wavefront vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
-- **`dest`** (optional) — Ray destination points, ignored if empty; `[n_ray, 3]`
-- **`index`** (optional) — 0-based indices of the rays that should be subdivided, may repeat indices and
+- **`dest`** *(optional)* — Ray destination points, ignored if empty; `[n_ray, 3]`
+- **`index`** *(optional)* — 0-based indices of the rays that should be subdivided, may repeat indices and
   determines the output order; Invalid indices raise an exception after the loop has finished,
   outputs may be partially written by then; `[n_subdiv]`
-- **`transposed_output`** (optional) — If true, the outputs are written transposed with the rays in the
+- **`transposed_output`** *(optional)* — If true, the outputs are written transposed with the rays in the
   columns, e.g. `origN` becomes `[3, n_rayN]`; default = `false`
 
 ### Outputs:
-- **`origN`** — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
-- **`trivecN`** — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
-- **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
-- **`destN`** — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`origN`** *(optional)* — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`trivecN`** *(optional)* — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
+- **`tridirN`** *(optional)* — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
+- **`destN`** *(optional)* — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 
 ### Returns:
 - `n_rayN` — Number of rays written to the output, `4 * n_subdiv`
@@ -7499,11 +7498,11 @@ arma::uword quadriga_lib::subdivide_triangles(
 ### Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
-- **`mtl_ind`** — Material indices per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_triangles_in]`
+- **`mtl_ind`** *(optional)* — Material indices per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_triangles_in]`
 
 ### Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_ind_out`** — Material indices for subdivided triangles; `[n_triangles_out]`
+- **`mtl_ind_out`** *(optional)* — Material indices for subdivided triangles; `[n_triangles_out]`
 
 ### Returns:
 - `n_triangles_out` — Number of generated triangles
@@ -7613,7 +7612,7 @@ int triangle_mesh_split(
 ### Outputs:
 - **`meshA`** — Triangles with all vertices within the lower half of the bounding box; `[n_meshA, 9]`
 - **`meshB`** — Triangles with at least one vertex exceeding the split threshold; `[n_meshB, 9]`
-- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB, 0 = unassigned (failure); `[n_mesh]`
+- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB; `[n_mesh]`
 
 ### Returns:
 - Axis used for the split (1, 2, or 3); negative (-1, -2, or -3) on failure

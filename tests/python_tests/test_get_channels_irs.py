@@ -216,7 +216,7 @@ class test_case(unittest.TestCase):
         # From C++
         with self.assertRaises(ValueError) as ctx:
             self.call(i_irs=2)
-        self.assertIn("IRS codebook index out of bound", str(ctx.exception))
+        self.assertIn("'i_irs' is out of range", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             self.call(active_path=[True, False])
         self.assertIn("active_path", str(ctx.exception))
@@ -225,7 +225,7 @@ class test_case(unittest.TestCase):
         no_coupling = {k: v for k, v in self.irs.items() if not k.startswith("coupling")}
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.channel.irs(*self.args(irs=no_coupling))
-        self.assertIn("Coupling matrix", str(ctx.exception))
+        self.assertIn("Input 'irs_array' must have a coupling matrix", str(ctx.exception))
         npt.assert_array_equal(self.call(irs_array_2=no_coupling)[0], self.call()[0])
         patterns_only = {k: self.irs[k] for k in MANDATORY_KEYS}
         npt.assert_array_equal(self.call(irs_array_2=patterns_only, i_irs=1)[0], self.call(i_irs=1)[0])

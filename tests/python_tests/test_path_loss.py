@@ -147,10 +147,10 @@ class test_case(unittest.TestCase):
         args = (self.scenpar, self.fc, self.tx_pos, self.rx_pos)
         with self.assertRaises(ValueError) as ctx:  # C++
             f({"model": "foo"}, *args)
-        self.assertIn("Path-loss model 'foo' is not supported.", str(ctx.exception))
+        self.assertIn("Input 'pl_model' has an unsupported value 'foo'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f({"model": "logdist", "A": 20.0}, *args)
-        self.assertIn("Path-loss model 'logdist' requires the parameter 'B'.", str(ctx.exception))
+        self.assertIn("Input 'plpar' must have the key 'B' for model 'logdist'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.pl_los, self.sp_los, 1e9, self.tx_u, self.rx_u, d2d_in=None, rnd_he=[1.5])
         self.assertIn("Input 'rnd_he' must be in the range from 0 to 1.", str(ctx.exception))

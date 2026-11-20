@@ -146,7 +146,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_beamwidth) · [Python](quad
 ### Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`threshold_dB`** — Threshold in dB, positive and finite; default: 3 (equivalent to FWHM)
 
 ### Outputs:
@@ -178,7 +178,7 @@ directivity_dBi = quadriga_lib.arrayant_calc_directivity( arrayant, i_element );
 ### Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 
 ### Output:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
@@ -211,15 +211,14 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq_new, azi
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
-  recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
-   entry's `center_freq` unchanged.
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
+- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is
+  recomputed (interpolated) at each requested frequency; default: `[]` (each input entry's `center_freq` unchanged)
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; default: `[]` (input grid)
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; default: `[]` (input grid)
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
   default: 299792458
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when both input and
   `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
@@ -256,11 +255,11 @@ arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
 
 ### Inputs:
 - **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
-  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent  model
+  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
 - **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
   `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
   a struct array of equal size is returned for multi-frequency input
 
@@ -287,11 +286,11 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_targ
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
   [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
-- **`i_source`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
-- **`i_target`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+- **`i_source`** — Index of the source element(s); 1-based; scalar or `[n_copy]`
+- **`i_target`** — Index of the destination element(s); 1-based; scalar or `[n_copy]`;
   if `i_source` is a vector, must have the same length
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
   `arrayant_in`; a struct array of equal size is returned for multi-frequency input
 
@@ -308,8 +307,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_export_obj_file) · [Python](qua
 
 ### Usage:
 ```matlab
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap,  object_radius, ...
-   icosphere_n_div, i_element, i_freq );
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, ...
+    icosphere_n_div, i_element, i_freq );
 ```
 
 ### Inputs:
@@ -320,9 +319,9 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, color
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object; default: 1 m
 - **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [icosphere](#icosphere); default: 4
-- **`i_element`** — Element indices to export; 1-based; uint64; empty = export all elements
-- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based; 
-  uint64; default: 1; must satisfy `1 <= i_freq <= n_freq`
+- **`i_element`** — Element indices to export; 1-based; default: `[]` (all elements)
+- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based;
+  default: 1; must satisfy `1 <= i_freq <= n_freq`
 
 ### See also:
 - [icosphere](#icosphere) (icosphere primitive used internally)
@@ -435,7 +434,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 - **`dir`** — Beam steering angles, `[3, n_beams]`; rows are `[azimuth_deg; elevation_deg; weight]`; 
   `multibeam` combines beams via MRT weighting, `multibeam_sep` produces one independent beam per column (weights ignored)
 
-### Outputs:
+### Output:
 - **`ant`** — Struct with fields:
    | Field            | Description                                               | Size                                   |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -556,7 +555,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, orientation, us
   rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
 - **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
   field layout as documented in [arrayant_generate](#arrayant_generate)
 
@@ -570,7 +569,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_speaker) · [Python](quadriga_li
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
   directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
-  results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
+  results via [arrayant_concat](#arrayant_concat) and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
@@ -614,13 +613,13 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
 - **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
-- **`center_freq`** — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** — Frequency sample points; `[n_freq]`; default: `[]` (auto-generated third-octave bands)
 - **`angular_resolution_deg`** — Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
-### Outputs:
+### Output:
 - **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [arrayant_generate](#arrayant_generate) for struct fields; `[n_freq]`
+  see [arrayant_generate](#arrayant_generate) for struct fields; `[1, n_freq]`
 
 ---
 <a id="qdant_read"></a>
@@ -682,7 +681,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_write) · [Python](quadriga_lib_api
   written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
   degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
-  1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
+  1-based IDs; in this mode appending to an existing file is not allowed and will cause an error
 
 ### Usage:
 ```matlab
@@ -698,8 +697,8 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 - **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
   default: a row of all IDs in the file (replaces a layout written before)
 
-### Outputs:
-- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
+### Output:
+- **`id_in_file`** — ID assigned to the antenna in the file after writing; uint32; set to 0 in multi-frequency (struct array) mode
 
 ### See also:
 - [qdant_read](#qdant_read) (for reading QDANT data)
@@ -840,7 +839,7 @@ quadriga_lib.channel_export_obj_file( fn, chan, max_paths, gain_max_dB, gain_min
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
-- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; empty exports all
+- **`i_snap`** — Snapshot indices to include; 1-based; range [1 ... n_snap]; default: `[]` (all snapshots)
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
@@ -968,7 +967,7 @@ dset = quadriga_lib.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix );
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; `''` looks up `name` as given; default (omitted or `[]`): `'par_'`
 
-### Outputs:
+### Output:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; empty `[]` if the dataset is missing
 
 ### See also:
@@ -1000,8 +999,8 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix );
 - **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix used to identify unstructured datasets; string; `''` lists all datasets with their full names; default (omitted or `[]`): `'par_'`
 
-### Outputs:
-- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
+### Output:
+- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings; `[n_names, 1]`
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (for reading individual unstructured datasets)
@@ -1028,7 +1027,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_layout) · [Python](quadriga_li
 - **`fn`** — Filename of the HDF5 file; string
 
 ### Outputs:
-- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `[4]`;  uint32
+- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; uint32; `[1, 4]`
 - **`has_data`** — Slot occupancy mask; `true` where data exists, `false` otherwise; `[nx, ny, nz, nw]`; logical
 
 ### See also:
@@ -1094,14 +1093,14 @@ code = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 - **`fn`** — Filename of the HDF5 file; string
 - **`chan`** — Structured channel data; non-empty struct array; field layout matches [hdf5_read_channel](#hdf5_read_channel)
 - **`par`** — Unstructured data; struct array of the same size as `chan`. Field names become HDF5 dataset
-  names per slot (each prefixed with `par_`). Empty fields are skipped. Pass `[]` or omit to disable.
+  names per slot (each prefixed with `par_`). Empty fields are skipped; default: `[]` (none).
   Field values follow the type rules of [hdf5_write_dset](#hdf5_write_dset) (at most 3 dimensions).
-- **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default `1:numel(chan)`
-- **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default `1`
-- **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default `1`
-- **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default `1`
+- **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default: `1:numel(chan)`
+- **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default: 1
+- **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default: 1
+- **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default: 1
 
-### Outputs:
+### Output:
 - **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `[numel(chan), 1]`; int32
 
 ### See also:
@@ -1175,11 +1174,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_parse) · [Python](quadriga_lib_
 - **`n_dest`** — Number of destination points (RX); uint64 scalar
 - **`n_freq`** — Number of frequency bands; uint64 scalar
 - **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
-  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
+  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest, 1]`
+- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig, 1]`
+- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest, 1]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq]`
+- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq, 1]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`
@@ -1209,11 +1208,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; string
-- **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all; for a file
+- **`i_cir`** — Snapshot indices; 1-based; `[n_out]` or empty; default: `[]` (read all; for a file
   without CIRs, all outputs are empty with `n_out = 0`)
-- **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
+- **`i_orig`** — Origin index; 1-based; scalar; default: 1
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
-- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
     | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
@@ -1224,29 +1223,29 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
     Other values are rejected with an error.
 
 ### Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq]`
+- **`center_freq`** — Center frequency in Hz; `[n_freq, 1]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, n_out]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, n_out]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, n_out]`
 - **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, n_out]`
 - **`fbs_pos`** — First-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions;  Cell of length `n_out`; elements `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
 - **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path]`
+- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path, 1]`
 - **`polmat`** — Polarization transfer matrix; Cell of length `n_out`;
   elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path]`
-- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path]`
-- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path]`
-- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path]`
+- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
 - **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
   elements Cell of length `n_path`, each `[3, n_interact + 2]`
 - **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
-  Cell of length `n_out`; elements `[n_path]`
+  Cell of length `n_out`; elements `[n_path, 1]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(n_interact)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(n_interact)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  Cell of length `n_out`; elements `[sum(n_interact), 1]`. Empty for v4 legacy files. GBSM paths written with the C++ API
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
@@ -1267,7 +1266,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
 - Two-tap interpolation avoids discontinuities when delays cross tap boundaries
 - Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
 - If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped 
-  (nearest neighor selection) but tap-selection logic still applies
+  (nearest neighbor selection) but tap-selection logic still applies
 - Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared `[1, 1, n_path, n_snap]`; 
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -1340,9 +1339,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_ieee_indoor) · [Python](qua
 ### Usage:
 ```matlab
 chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type, center_freq, ...
-   tap_spacing, n_users, observation_time, update_interval, speed_station_kmh, speed_env_kmh, ...
-   dist, n_floors, uplink, offset_angles_deg, n_subpath, doppler_effect, seed, ...
-   kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB, dist_breakpoint, n_walls, wall_loss_dB );
+    tap_spacing, n_users, observation_time, update_interval, speed_station_kmh, speed_env_kmh, ...
+    dist, n_floors, uplink, offset_angles_deg, n_subpath, doppler_effect, seed, ...
+    kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB, dist_breakpoint, n_walls, wall_loss_dB );
 ```
 
 ### Inputs:
@@ -1469,8 +1468,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
-  only its patterns are used, its coupling and `element_pos` are ignored
-- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
+  only its patterns are used, its coupling and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
+- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`; default: `[]`
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
 
@@ -1627,9 +1626,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 - **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
 - **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
   unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](#arrayant_interpolate); default: 0
 
@@ -1712,9 +1711,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 - **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
   batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
   [arrayant_interpolate](#arrayant_interpolate); default: 0
@@ -1754,7 +1753,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [Python](quadriga_lib_api_python
 - `Inf` and `NaN` values are excluded from computation
 - A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu`
   and `sig`; if no set has finite values (possible only with `bins_in`), `cdf_avg`, `mu` and `sig` are NaN
-- If `bins` is empty, equally spaced bins spanning the data range are generated
+- If `bins_in` is empty, equally spaced bins spanning the data range are generated
 
 ### Usage:
 ```matlab
@@ -1773,10 +1772,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [Python](quadriga_lib_api_python
 ### Outputs:
 - **`cdf_per_set`** — Individual CDFs; one per column of data (NaN for a set without finite values); `[n_bins_out, n_sets]`
 - **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
-  `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
-- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins]`
-- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
-- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
+  `[n_bins_out, 1]` with `n_bins_out = n_bins` or `n_bins_out = n_bins_in`
+- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins_out, 1]`
+- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
+- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
 
 ---
 <a id="calc_angular_spread"></a>
@@ -1816,8 +1815,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spread) · [Python](quadriga
   otherwise it must be finite and >= 1e-3 deg, else an error is raised
 
 ### Outputs:
-- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir]`
-- **`elevation_spread`** — RMS elevation angular spread; `[n_cir]`
+- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir, 1]`
+- **`elevation_spread`** — RMS elevation angular spread; `[n_cir, 1]`
 - **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
   direction (a positive tilt points down); `[3, n_cir]`
 - **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; `[n_path, n_cir]`
@@ -1881,7 +1880,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [Python
    | 5   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)       |
    | 6   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)       |
 - **`pg`** — Total path gain summed over all paths (including LOS) as 
-  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
+  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir, 1]`
 
 ---
 <a id="calc_delay_spread"></a>
@@ -1909,8 +1908,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_delay_spread) · [Python](quadriga_l
   error is raised
 
 ### Outputs:
-- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir]`
-- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir]`
+- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir, 1]`
+- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir, 1]`
 
 ### See also:
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed tap grid)
@@ -1942,8 +1941,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_rician_k_factor) · [Python](quadrig
 - **`window_size`** — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS; default: 0.01
 
 ### Outputs:
-- **`kf`** — Rician K-Factor on linear scale; `[n_cir]`
-- **`pg`** — Total path gain (sum of all path powers) in [W]; `[n_cir]`
+- **`kf`** — Rician K-Factor on linear scale; `[n_cir, 1]`
+- **`pg`** — Total path gain (sum of all path powers) in [W]; `[n_cir, 1]`
 
 ---
 
@@ -2397,7 +2396,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
   per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `chan` has no `initial_position`. Validity limits: see `ssf_paths`
-- An error is raised for an invalid array (message prefixed with `Transmit antenna: ` or `Receive antenna: `), invalid
+- An error is raised for an invalid `tx_array` or `rx_array`, invalid
   `rays`, `'drift'` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a column
   or entry count other than 1 or `n_snap`
 
@@ -3105,8 +3104,8 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, transposed );
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
 - **`transposed`** — Returns the transpose of the rotation matrix; logical; default: false
 
-### Outputs:
-- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
+### Output:
+- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9, 1]`
 
 ---
 <a id="fast_cart2geo"></a>
@@ -3202,13 +3201,13 @@ cos_x = quadriga_lib.fast_sincos(x, true);
 ```
 
 ### Inputs:
-- **`x`** (input) — Input angles; radians; `[n_elem]`
+- **`x`** — Input angles; radians; vector, matrix or 3-D array
 - **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`sin_x`** — sin(x); single; `[n_elem]`
-- **`cos_x`** — cos(x); single; `[n_elem]`
+- **`sin_x`** — sin(x); single; size of `x`
+- **`cos_x`** — cos(x); single; size of `x`
 
 ---
 <a id="interp"></a>
@@ -3266,7 +3265,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quadriga_lib_version) · [Python](quadrig
 version = quadriga_lib.version;
 ```
 
-### Outputs:
+### Output:
 - **`version`** — Version string (e.g. "0.11.5_AVX2_CUDA")
 
 ---
@@ -3336,14 +3335,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths); default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
-- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation);  `[n_mesh, 1]`;
+- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_sub, 1]`;
   default: `[]` (not using sub-meshes)
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect); default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
-  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
-  1 = resolve never
+  energy-conservation transmission) instead of EM TE/TM averaging; default: `false` (EM mode)
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always,
+  1 = resolve never; default: 0
 - **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [qrt_file_read](#qrt_file_read) for a
@@ -3380,7 +3379,6 @@ Construct a triangulated cube mesh
 
 Also in: [C++](quadriga_lib_api_cpp.md#cube) · [Python](quadriga_lib_api_python.md#cube)
 
-### Description:
 - Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1)
 - Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1
 - Optional uniform subdivision produces 12 · n_div^2 triangles
@@ -3395,15 +3393,15 @@ mesh = quadriga_lib.cube( scale, rotation, location, n_div );
 ```
 
 ### Inputs:
-- **`scale`** *(optional)* — Length 1 scales all axes uniformly; length 3 scales {x,y,z}
-  independently; empty or omitted = 1 (no scaling)
-- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
-  XYZ); length 3; empty or omitted = no rotation
-- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
-- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 12 · n_div^2 triangles;
+- **`scale`** — Length 1 scales all axes uniformly; length 3 scales {x,y,z}
+  independently; default: `[]` (1, no scaling)
+- **`rotation`** — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; default: `[]` (no rotation)
+- **`location`** — Translation {x,y,z}; length 3; default: `[]` (origin)
+- **`n_div`** — Number of subdivisions per edge; yields 12 · n_div^2 triangles;
   default: 1
 
-### Outputs:
+### Output:
 - **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[12 · n_div^2, 9]`
 
 ### See also:
@@ -3443,7 +3441,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_diffraction_paths) · [Python](q
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
-- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+- **`scalar_mode`** — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
   default: `false` (EM, `299792458 / center_freq`)
 
 ### Outputs:
@@ -3478,7 +3476,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#icosphere) · [Python](quadriga_lib_api_p
 ### Outputs:
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward
   from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
-- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces, 1]`
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_faces, 9]`
 - **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
@@ -3525,7 +3523,6 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 
 Also in: [C++](quadriga_lib_api_cpp.md#obj_file_read) · [Python](quadriga_lib_api_python.md#obj_file_read)
 
-### Description:
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
   vertex). Index 0, or an index beyond the vertices defined before the face, raises an error, for any requested outputs
@@ -3553,19 +3550,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_read) · [Python](quadriga_lib_a
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
 - **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column;
   unmatched faces map to index 0 (no material) unless `csv_strict` is set; empty uses the built-in default table
-- **`csv_strict`** *(optional)* — If true, throw when a `usemtl` material is absent from the table;
+- **`csv_strict`** — If true, throw when a `usemtl` material is absent from the table;
   otherwise map to index 0 (no material); default: false
 
 ### Outputs:
 - **`mesh`** — Triangle vertex coordinates `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
 - **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** — 1-based vertex indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
-- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
+- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh, 1]`
 - **`obj_names`** — Object names; cell array of strings; length `max(obj_ind)`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh]`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh, 1]`
 - **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `n_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh]`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh, 1]`
 - **`csv_names`** — Material names from the table; cell array of strings; length `n_csv`
 - **`csv_prop`** — Material properties as a struct; each field is one CSV column (excluding `name`)
   holding a column vector of length `n_csv`
@@ -3582,7 +3579,7 @@ Write a Wavefront .obj file
 
 Also in: [C++](quadriga_lib_api_cpp.md#obj_file_write) · [Python](quadriga_lib_api_python.md#obj_file_write)
 
-- Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is  an error
+- Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is an error
 - With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same
   object that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
@@ -3625,8 +3622,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_write) · [Python](quadriga_lib_
 - **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; validated if given
 - **`csv_names`** *(optional)* — EM/acoustic material names; cell array of strings; required to write the `.csv`
 - **`csv_prop`** *(optional)* — Material properties as a struct; each field is one CSV column holding a vector of length `numel(csv_names)`
-- **`csv_write_defaults`** *(optional)* — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
-- **`split_loose_parts`** *(optional)* — If true, split each object into connected components; default: false
+- **`csv_write_defaults`** — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
+- **`split_loose_parts`** — If true, split each object into connected components; default: false
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
@@ -3642,7 +3639,6 @@ Construct a triangulated plane mesh
 
 Also in: [C++](quadriga_lib_api_cpp.md#plane) · [Python](quadriga_lib_api_python.md#plane)
 
-### Description:
 - Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices
   at +/-1, z = 0)
 - The quad is split into 2 triangles, yielding 2 triangles at n_div = 1
@@ -3659,16 +3655,16 @@ mesh = quadriga_lib.plane( scale, rotation, location, n_div );
 ```
 
 ### Inputs:
-- **`scale`** *(optional)* — Length 1 scales x and y uniformly; length 2 scales {x,y}
+- **`scale`** — Length 1 scales x and y uniformly; length 2 scales {x,y}
   independently; length 3 is accepted for compatibility with `cube`, but the third element is
-  ignored; empty or omitted = 1 (no scaling)
-- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
-  XYZ); length 3; empty or omitted = no rotation
-- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
-- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
+  ignored; default: `[]` (1, no scaling)
+- **`rotation`** — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; default: `[]` (no rotation)
+- **`location`** — Translation {x,y,z}; length 3; default: `[]` (origin)
+- **`n_div`** — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
   default: 1
 
-### Outputs:
+### Output:
 - **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[2 · n_div^2, 9]`
 
 ### See also:
@@ -3695,11 +3691,11 @@ aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, vec_size );
 
 ### Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_ind`** — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) 
-  to generate; uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
+- **`sub_cloud_ind`** — 1-based row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation)
+  to generate; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
-### Outputs:
+### Output:
 - **`aabb`** — Bounding box matrix; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
@@ -3733,9 +3729,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#point_cloud_segmentation) · [Python](qua
 
 ### Outputs:
 - **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `[n_points_out, 3]`
-- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `points_out`; `[n_sub]`
-- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; `[n_points_out]`
-- **`reverse_ind`** — 1-based row in `points_out` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `points_out`; uint32; `[n_sub, 1]`
+- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; uint32; `[n_points_out, 1]`
+- **`reverse_ind`** — 1-based row in `points_out` of each row of `points`; uint32; `[n_points, 1]`
 
 ---
 <a id="point_inside_mesh"></a>
@@ -3763,11 +3759,11 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object index per mesh element; 1-based; enables per-object output; `[n_mesh]`
 - **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are
-  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0
+  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; default: 0
 
 ### Output:
-- `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
-  index (with `obj_ind`); size `[n_points]`
+- **`result`** — Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
+  index (with `obj_ind`); uint64; `[n_points, 1]`
 
 ---
 <a id="ray_mesh_interact"></a>
@@ -3810,11 +3806,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output
   of [obj_file_read](#obj_file_read)); each field holds a vector of length `n_mtl`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
-- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; order
+- **`trivec`** — Beam wavefront triangle vertices relative to origin; order
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
-- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
+- **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
-- **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
+- **`compact`** — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
   transparent pass-through; logical; default: false
 
@@ -3823,19 +3819,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
-  single TE coefficient for types 3–5; `[n_rayN]`
+  single TE coefficient for types 3–5; `[n_rayN, 1]`
 - **`polmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
   `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`); includes interaction gain, TE/TM coefficients,
   incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
   `trivec`/`tridir` not provided
-- **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
-- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
+- **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN, 1]`
+- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN, 1]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit);
-  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN]`
+  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN, 1]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code, bit-encoded (uint32); `[n_rayN]`
+- **`out_typeN`** — Interaction type code, bit-encoded; uint32; `[n_rayN, 1]`
    |  Bit | Meaning                                                                 |
    | :--: | ----------------------------------------------------------------------- |
    |   0  | OK flag (0 = no valid interaction / undefined)                          |
@@ -3863,7 +3859,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
   for types 1/2/4/5; for undeviated transmission (types 1/4) this is the refracted direction, which
   differs from the geometric continuation used for `origN`/`destN`; `[n_rayN, 3]`
 - **`ray_indN`** — 1-based input ray index for each output ray (inverse of the compaction map,
-  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN]`
+  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN, 1]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for loading `mesh` and `mtl_prop` from OBJ file)
@@ -3896,15 +3892,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_point_intersect) · [Python](quadriga
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
-- **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
+- **`sub_cloud_ind`** — Segment boundary indices for the point cloud, 1-based; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
-  uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
+  `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
   and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ### Outputs:
-- **`hit_count`** — Number of beams intersecting each point; `[n_points, 1]`
+- **`hit_count`** — Number of beams intersecting each point; uint32; `[n_points, 1]`
 - **`ray_ind`** — Per-point list of 1-based ray indices that intersected that point; zero-padded to
   a regular 2D array (zero entries indicate unused slots); uint32; `[max_hits, n_points]`
 
@@ -3940,7 +3936,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [Python](quadr
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal;
   use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; `[n_sub]`; default: `[]` (not using sub-meshes)
 - **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; 
   if empty or omitted, AABBs are computed from `mesh`; `[n_sub, 6]`
@@ -3951,9 +3947,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [Python](quadr
 ### Outputs:
 - **`fbs`** — First-bounce intersection points in GCS; `[n_ray, 3]`
 - **`sbs`** — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray]`
-- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray]`
-- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray]`
+- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray, 1]`
+- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray, 1]`
+- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray, 1]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (load mesh from OBJ file)
@@ -3986,7 +3982,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#subdivide_triangles) · [Python](quadriga
 
 ### Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out]`; only
+- **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out, 1]`; only
   populated if `mtl_ind` is given
 
 ---
@@ -4009,7 +4005,7 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size );
 
 ### Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
-- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; 
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh`; use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate;
   `[n_sub]` or empty; default: `[]` (returns AABB of the entire mesh)
 - **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., 8 for AVX2); default: 1
 
@@ -4050,10 +4046,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_segmentation) · [Python](q
 
 ### Outputs:
 - **`mesh_out`** — Reordered and padded triangle vertices; `[n_mesh_out, 9]`
-- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub]`
-- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out]`
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub, 1]`
+- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out, 1]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
-  `[n_mesh_out]`; only populated if `mtl_ind` is given
+  `[n_mesh_out, 1]`; only populated if `mtl_ind` is given
 
 ---
 
@@ -4218,7 +4214,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_2d) · [Python](quadriga_lib_api_
 
 ### Outputs:
 - **`acf_2d`** — ACF on the grid; `[n_grid, n_grid]`
-- **`dist_2d`** — Grid axis; column vector; `[n_grid]`
+- **`dist_2d`** — Grid axis; `[n_grid, 1]`
 
 ### See also:
 - [sos_acf_approx](#sos_acf_approx) (ACF produced by a set of sinusoids on the same grid)
@@ -4255,7 +4251,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_approx) · [Python](quadriga_lib_
 
 ### Outputs:
 - **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above
-- **`dist_2d`** — Grid axis; column vector; `[n_grid]`
+- **`dist_2d`** — Grid axis; `[n_grid, 1]`
 
 ### See also:
 - [sos_acf_2d](#sos_acf_2d) (target ACF on the same grid)
@@ -4308,9 +4304,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_estimate) · [Python](quadriga_li
   device; default: -1
 
 ### Outputs:
-- **`acf_est`** — Estimated ACF; column vector; `[n_bin]`
-- **`dist_est`** — Mean distance of the pairs in each bin; column vector; `[n_bin]`
-- **`acf_est_dual`** — Estimated ACF for two devices on the same map; column vector; `[n_bin]`
+- **`acf_est`** — Estimated ACF; `[n_bin, 1]`
+- **`dist_est`** — Mean distance of the pairs in each bin; `[n_bin, 1]`
+- **`acf_est_dual`** — Estimated ACF for two devices on the same map; `[n_bin, 1]`
 
 ### See also:
 - [sos_acf_approx](#sos_acf_approx) (ACF of the sinusoids in closed form)
@@ -4338,7 +4334,7 @@ val = quadriga_lib.sos_acfi( acf, dist, d );
 - **`d`** — Distances; must be >= 0; `[n_d]`
 
 ### Output:
-- **`val`** — ACF at the distances `d`; column vector; `[n_d]`
+- **`val`** — ACF at the distances `d`; `[n_d, 1]`
 
 ### See also:
 - [sos_preset](#sos_preset) (ACF tables of the predefined models)
@@ -4389,7 +4385,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_calc_mse) · [Python](quadriga_lib_ap
 - **`mse_dB`** — Error along the test directions in [dB]; scalar
 - **`mse_core_dB`** — Error within the core radius in [dB]; scalar
 - **`mse_all_dB`** — Error on the complete grid in [dB]; scalar
-- **`acf_tail`** — Approximated ACF beyond the fitted range; column vector; `[4]`
+- **`acf_tail`** — Approximated ACF beyond the fitted range; `[4, 1]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 
@@ -4457,8 +4453,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_generate) · [Python](quadriga_lib_ap
 
 ### Outputs:
 - **`spatial_freq`** — Spatial frequencies; `[n_coeff, n_dim]`
-- **`ase`** — Mean squared error over the test directions after each pass, linear scale; column
-  vector; `[n_pass]`
+- **`ase`** — Mean squared error over the test directions after each pass, linear scale; `[n_pass, 1]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 
@@ -4577,8 +4572,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_preset) · [Python](quadriga_lib_api_
 
 ### Outputs:
 - **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
-- **`acf`** — Target ACF; `[200]`
-- **`dist`** — Sample points of the ACF; `[200]`
+- **`acf`** — Target ACF; `[200, 1]`
+- **`dist`** — Sample points of the ACF; `[200, 1]`
 
 ### See also:
 - [sos_init_phases](#sos_init_phases) (random phases for the generator)

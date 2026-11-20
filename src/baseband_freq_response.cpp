@@ -50,7 +50,7 @@ void quadriga_lib::baseband_freq_response(
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
@@ -78,10 +78,10 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> &coeff_re,    
     [[maybe_unused]] const int kernel = qd_kernel_auto_avx2(use_kernel);
 
     if (pilot_grid.n_elem == 0)
-        throw std::invalid_argument("Pilot grid must have at least one element.");
+        throw std::invalid_argument("Input 'pilot_grid' must have at least one element.");
 
     if (!pilot_grid.is_finite())
-        throw std::invalid_argument("Pilot grid must contain finite values only.");
+        throw std::invalid_argument("Input 'pilot_grid' must contain finite values only.");
 
     arma::uword n_rx = coeff_re.n_rows;
     arma::uword n_tx = coeff_re.n_cols;
@@ -91,14 +91,14 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> &coeff_re,    
     arma::uword n_carrier_s = (n_carrier % qd_carrier_block == 0) ? n_carrier : qd_carrier_block * (n_carrier / qd_carrier_block + 1);
 
     if (coeff_im.n_rows != n_rx || coeff_im.n_cols != n_tx || coeff_im.n_slices != n_path)
-        throw std::invalid_argument("Input 'coeff_im' must have same size as 'coeff_re'");
+        throw std::invalid_argument("Input 'coeff_im' must have the same size as 'coeff_re'.");
 
     if (!(delay.n_rows == n_rx && delay.n_cols == n_tx && delay.n_slices == n_path) &&
         !(delay.n_rows == 1 && delay.n_cols == 1 && delay.n_slices == n_path))
-        throw std::invalid_argument("Input 'delay' must match the size as 'coeff_re'");
+        throw std::invalid_argument("Input 'delay' must have size [n_rx, n_tx, n_path] or [1, 1, n_path].");
 
     if (!(bandwidth >= 0.0) || !std::isfinite(bandwidth))
-        throw std::invalid_argument("Bandwidth must be finite and cannot be negative");
+        throw std::invalid_argument("Input 'bandwidth' must be finite and non-negative.");
 
     qd_check_alias(hmat_re, "hmat_re", &coeff_re, &coeff_im, &delay);
     qd_check_alias(hmat_im, "hmat_im", &coeff_re, &coeff_im, &delay);
@@ -106,22 +106,19 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> &coeff_re,    
 
     if (hmat_re != nullptr)
     {
-        if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != n_carrier)
-            hmat_re->set_size(n_rx, n_tx, n_carrier);
+        hmat_re->set_size(n_rx, n_tx, n_carrier);
         if (n_path == 0)
             hmat_re->zeros();
     }
     if (hmat_im != nullptr)
     {
-        if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != n_carrier)
-            hmat_im->set_size(n_rx, n_tx, n_carrier);
+        hmat_im->set_size(n_rx, n_tx, n_carrier);
         if (n_path == 0)
             hmat_im->zeros();
     }
     if (hmat != nullptr)
     {
-        if (hmat->n_rows != n_rx || hmat->n_cols != n_tx || hmat->n_slices != n_carrier)
-            hmat->set_size(n_rx, n_tx, n_carrier);
+        hmat->set_size(n_rx, n_tx, n_carrier);
         if (n_path == 0)
             hmat->zeros();
     }
@@ -183,8 +180,8 @@ template void quadriga_lib::baseband_freq_response(const arma::Cube<double> &coe
                                                    const arma::Col<double> &pilot_grid, const double bandwidth,
                                                    arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat, int use_kernel);
 
-// Sets an optional output of the batch forms to n_out cubes; each cube is sized by the single-snapshot call, which
-// resizes it only if needed and so keeps externally borrowed memory
+// Sets an optional output of the batch forms to n_out cubes; each cube is sized by the single-snapshot call, whose
+// set_size keeps externally borrowed memory of the right size
 template <typename T>
 static void qd_size_batch_output(std::vector<arma::Cube<T>> *out, size_t n_out)
 {
@@ -224,7 +221,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
 - **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
@@ -247,13 +244,13 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
     if (coeff_re.size() == 0)
         throw std::invalid_argument("Input 'coeff_re' must contain at least one snapshot.");
     if (pilot_grid.n_elem == 0)
-        throw std::invalid_argument("Pilot grid must have at least one element.");
+        throw std::invalid_argument("Input 'pilot_grid' must have at least one element.");
     if (!pilot_grid.is_finite())
-        throw std::invalid_argument("Pilot grid must contain finite values only.");
+        throw std::invalid_argument("Input 'pilot_grid' must contain finite values only.");
     if (!(bandwidth >= 0.0) || !std::isfinite(bandwidth))
-        throw std::invalid_argument("Bandwidth must be finite and cannot be negative");
+        throw std::invalid_argument("Input 'bandwidth' must be finite and non-negative.");
     if (coeff_im.size() != coeff_re.size() || delay.size() != coeff_re.size())
-        throw std::invalid_argument("Coefficients and delays must have the same number of snapshots.");
+        throw std::invalid_argument("Inputs 'coeff_im' and 'delay' must have the same number of snapshots as 'coeff_re'.");
 
     const arma::uvec snap = qd_snapshot_list(i_snap, coeff_re.size());
     qd_check_alias(hmat_re, "hmat_re", &coeff_re, &coeff_im, &delay);
@@ -295,7 +292,6 @@ Compute the wideband frequency response of a MIMO channel with frequency-depende
   (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
 - Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
-- At least one of `hmat_re`/`hmat_im` or `hmat` must be non-null
 
 ## Declaration:
 ```
@@ -325,7 +321,7 @@ void quadriga_lib::baseband_freq_response_multi(
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
   across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -362,13 +358,13 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
         throw std::invalid_argument("Input 'freq_new' must have at least one element.");
 
     if (coeff_re.size() != n_freq)
-        throw std::invalid_argument("Length of 'coeff_re' must match length of 'freq'.");
+        throw std::invalid_argument("Input 'coeff_re' must have the same length as 'freq'.");
 
     if (coeff_im.size() != n_freq)
-        throw std::invalid_argument("Length of 'coeff_im' must match length of 'freq'.");
+        throw std::invalid_argument("Input 'coeff_im' must have the same length as 'freq'.");
 
     if (delay.size() != n_freq)
-        throw std::invalid_argument("Length of 'delay' must match length of 'freq'.");
+        throw std::invalid_argument("Input 'delay' must have the same length as 'freq'.");
 
     if (!freq.is_finite() || !freq_new.is_finite())
         throw std::invalid_argument("Inputs 'freq' and 'freq_new' must contain finite values only.");
@@ -384,7 +380,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     arma::uword n_path = coeff_re[0].n_slices;
 
     if (n_rx == 0 || n_tx == 0)
-        throw std::invalid_argument("Coefficient cubes must not be empty.");
+        throw std::invalid_argument("Input 'coeff_re' must have at least one row and one column.");
 
     // Validate all coefficient cubes have consistent dimensions
     for (size_t f = 0; f < n_freq; ++f)
@@ -415,26 +411,23 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 
     if (use_re)
     {
-        if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != (arma::uword)n_carrier)
-            hmat_re->set_size(n_rx, n_tx, (arma::uword)n_carrier);
+        hmat_re->set_size(n_rx, n_tx, (arma::uword)n_carrier);
         if (n_path == 0)
             hmat_re->zeros();
     }
     if (use_im)
     {
-        if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != (arma::uword)n_carrier)
-            hmat_im->set_size(n_rx, n_tx, (arma::uword)n_carrier);
+        hmat_im->set_size(n_rx, n_tx, (arma::uword)n_carrier);
         if (n_path == 0)
             hmat_im->zeros();
     }
     if (use_cplx)
     {
-        if (hmat->n_rows != n_rx || hmat->n_cols != n_tx || hmat->n_slices != (arma::uword)n_carrier)
-            hmat->set_size(n_rx, n_tx, (arma::uword)n_carrier);
+        hmat->set_size(n_rx, n_tx, (arma::uword)n_carrier);
         if (n_path == 0)
             hmat->zeros();
     }
-    if (n_path == 0)
+    if (n_path == 0 || (!use_re && !use_im && !use_cplx))
         return;
 
     // --- Precompute interpolation table ---
@@ -708,7 +701,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
 - **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
 - **`remove_delay_phase`** *(optional)* — As in [[baseband_freq_response_multi]]; default `true`
 - **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carrier]`
@@ -735,7 +728,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vecto
     if (coeff_re.size() == 0)
         throw std::invalid_argument("Input 'coeff_re' must contain at least one snapshot.");
     if (coeff_im.size() != coeff_re.size() || delay.size() != coeff_re.size())
-        throw std::invalid_argument("Coefficients and delays must have the same number of snapshots.");
+        throw std::invalid_argument("Inputs 'coeff_im' and 'delay' must have the same number of snapshots as 'coeff_re'.");
     if (freq.n_elem == 0 || freq_new.n_elem == 0)
         throw std::invalid_argument("Inputs 'freq' and 'freq_new' must have at least one element.");
     if (!freq.is_finite() || !freq_new.is_finite())

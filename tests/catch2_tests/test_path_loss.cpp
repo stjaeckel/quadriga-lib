@@ -1114,9 +1114,9 @@ TEST_CASE("path_loss - input validation")
     SECTION("unknown model")
     {
         CHECK_THROWS_MATCHES(call("foo", plpar), std::invalid_argument,
-                             Message("Path-loss model 'foo' is not supported."));
+                             Message("Input 'pl_model' has an unsupported value 'foo'."));
         CHECK_THROWS_MATCHES(call("Logdist", plpar), std::invalid_argument,
-                             Message("Path-loss model 'Logdist' is not supported."));
+                             Message("Input 'pl_model' has an unsupported value 'Logdist'."));
     }
     SECTION("missing required key")
     {
@@ -1127,41 +1127,41 @@ TEST_CASE("path_loss - input validation")
                 p.erase(e.first);
                 INFO("model " << m.first << ", key " << e.first);
                 CHECK_THROWS_MATCHES(call(m.first, p), std::invalid_argument,
-                                     Message("Path-loss model '" + m.first + "' requires the parameter '" + e.first + "'."));
+                                     Message("Input 'plpar' must have the key '" + e.first + "' for model '" + m.first + "'."));
             }
     }
     SECTION("one value per parameter")
     {
         CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {}}, {"C", {20.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'B' must have one value."));
+                             Message("Input 'plpar' must have one value for key 'B'."));
         CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {30.0, 31.0}}, {"C", {20.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'B' must have one value."));
+                             Message("Input 'plpar' must have one value for key 'B'."));
         CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"SF", {1.0, 2.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'SF' must have one value."));
+                             Message("Input 'plpar' must have one value for key 'SF'."));
         CHECK_THROWS_MATCHES(call("satellite", {{"usePLa", {}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'usePLa' must have one value."));
+                             Message("Input 'plpar' must have one value for key 'usePLa'."));
         CHECK_THROWS_MATCHES(call("nlos", {{"An", {39.08}}, {"Bn", {13.54}}, {"LOSmax", {0.0, 1.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'LOSmax' must have one value."));
+                             Message("Input 'plpar' must have one value for key 'LOSmax'."));
     }
     SECTION("breakpoint factors")
     {
         CHECK_THROWS_MATCHES(call("dual_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E", {0.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'E' must be > 0."));
+                             Message("Input 'plpar' must have a value > 0 for key 'E'."));
         CHECK_THROWS_MATCHES(call("nlos", {{"An", {39.0}}, {"Bn", {13.5}}, {"A1", {22.0}}, {"B", {28.0}}, {"E", {-1.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'E' must be > 0."));
+                             Message("Input 'plpar' must have a value > 0 for key 'E'."));
         CHECK_NOTHROW(call("nlos", {{"An", {39.0}}, {"Bn", {13.5}}, {"LOSmax", {0.0}}, {"E", {-1.0}}}));
         CHECK_THROWS_MATCHES(call("tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {0.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'E1' must be > 0."));
+                             Message("Input 'plpar' must have a value > 0 for key 'E1'."));
         CHECK_THROWS_MATCHES(call("tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {4.0}}, {"E2", {-1.0}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'E2' must be > 0."));
+                             Message("Input 'plpar' must have a value > 0 for key 'E2'."));
         plpar_t p = full[3].second;
         p["A2"] = p["A1"];
         CHECK_THROWS_MATCHES(call("winner_los", p), std::invalid_argument,
-                             Message("Path-loss parameters 'A1' and 'A2' must differ for model 'winner_los'."));
+                             Message("Input 'plpar' must have different values for keys 'A1' and 'A2' for model 'winner_los'."));
         // G2n <= 0 makes lg(G2n·hm) infinite, and its default G1n = 0 then gives 0·Inf = NaN
         for (double g2n : {0.0, -1.0})
             CHECK_THROWS_MATCHES(call("nlos", {{"An", {30.0}}, {"Bn", {30.0}}, {"LOSmax", {0.0}}, {"G2n", {g2n}}}), std::invalid_argument,
-                                 Message("Path-loss parameter 'G2n' must be > 0."));
+                                 Message("Input 'plpar' must have a value > 0 for key 'G2n'."));
     }
     SECTION("finite parameters")
     {
@@ -1173,12 +1173,12 @@ TEST_CASE("path_loss - input validation")
                 p[e.first] = {(e.first == "B") ? NAN : -INFINITY};
                 INFO("model " << m.first << ", key " << e.first);
                 CHECK_THROWS_MATCHES(call(m.first, p), std::invalid_argument,
-                                     Message("Path-loss parameter '" + e.first + "' must be finite."));
+                                     Message("Input 'plpar' must have a finite value for key '" + e.first + "'."));
             }
         CHECK_THROWS_MATCHES(call("satellite", {{"D", {INFINITY}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'D' must be finite."));
+                             Message("Input 'plpar' must have a finite value for key 'D'."));
         CHECK_THROWS_MATCHES(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"SF", {INFINITY}}}), std::invalid_argument,
-                             Message("Path-loss parameter 'SF' must be finite."));
+                             Message("Input 'plpar' must have a finite value for key 'SF'."));
         CHECK_NOTHROW(call("logdist", {{"A", {20.0}}, {"B", {30.0}}, {"C", {20.0}}, {"Xyz", {NAN}}}));
     }
     SECTION("d2d_in")

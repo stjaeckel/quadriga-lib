@@ -95,7 +95,7 @@ directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, *, i_element
   see [[generate]] for the field layout
 - **`i_element`** — Element indices, 0-based, duplicates allowed; empty: all elements; `(n_out,)`; default: None (all elements)
 
-## Outputs:
+## Output:
 - **`directivity_dBi`** — Directivity in dBi; `(n_out,)` for a single-frequency input,
   `(n_out, n_freq)` for a multi-frequency input; `n_out = n_elements` when `i_element` is None
 
@@ -164,7 +164,7 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for
   acoustics; default: `299792458.0`
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Dict with the combined array antenna data; keys as in [[generate]]
 
 ## See also:
@@ -232,7 +232,7 @@ arrayant_out = quadriga_lib.arrayant.concat( arrayant1, arrayant2 )
 - **`arrayant2`** — Dict with the second array antenna; must use the same azimuth and elevation
   grids as `arrayant1`, and for 4D input the same number of frequency entries with matching `center_freq`
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Dict with the concatenated array antenna; same keys and layout as the
   inputs; single-frequency dict for 3D input, frequency-dependent dict for 4D input
 MD!*/
@@ -240,14 +240,14 @@ MD!*/
 py::dict arrayant_concat(const py::dict &arrayant1,
                          const py::dict &arrayant2)
 {
-    auto ant1 = qd_python_dict2arrayant_multi(arrayant1, false, false, true, false);
+    auto ant1 = qd_python_dict2arrayant_multi(arrayant1, true, false, true, false);
     auto ant2 = qd_python_dict2arrayant_multi(arrayant2, true, false, true, false);
 
     if (ant1.empty() || ant2.empty())
-        throw std::invalid_argument("'arrayant1' and 'arrayant2' cannot be empty.");
+        throw std::invalid_argument("Inputs 'arrayant1' and 'arrayant2' cannot be empty.");
 
     if (ant1.size() != ant2.size())
-        throw std::invalid_argument("'arrayant1' and 'arrayant2' must have the same number of frequency entries.");
+        throw std::invalid_argument("Inputs 'arrayant1' and 'arrayant2' must have the same number of frequency entries.");
 
     // Frequency-dependent: concatenate per entry (requires matching center_freq at each index)
     if (ant1.size() > 1)
@@ -292,7 +292,7 @@ arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, [0, 1], [2, 3] )
 - **`i_target`** — Index of the destination element(s); scalar int or 1D list or array of int; `(n_copy,)`;
   must have the same length as `i_source` unless `i_source` is a single index
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Dict with the modified array antenna data; same keys and layout as
   `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input
 MD!*/
@@ -306,10 +306,10 @@ py::dict arrayant_copy_element(const py::dict &arrayant,
     const auto dest = qd_python_numpy2arma_Col<arma::uword>(i_target, true, false, "i_target");
 
     if (source.n_elem == 0 || dest.n_elem == 0)
-        throw std::invalid_argument("'i_source' and 'i_target' cannot be empty.");
+        throw std::invalid_argument("Inputs 'i_source' and 'i_target' cannot be empty.");
 
     if (source.n_elem > 1 && source.n_elem != dest.n_elem)
-        throw std::invalid_argument("When copying multiple elements, 'i_source' and 'i_target' must have the same length.");
+        throw std::invalid_argument("Inputs 'i_source' and 'i_target' must have the same length when 'i_source' has more than one entry.");
 
     auto ant = qd_python_dict2arrayant_multi(arrayant, false, false, true, false);
 
@@ -359,7 +359,7 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, orientation, *, u
 - **`i_element`** — Element indices to rotate, 0-based, no duplicates; `None` or empty rotates all elements;
   default: `None`
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Dict with the rotated array antenna data; same keys and layout as
   `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input
 MD!*/
@@ -369,9 +369,7 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
                                  unsigned usage,
                                  const py::handle &i_element)
 {
-    const arma::vec ori = qd_python_numpy2arma_Col<double>(orientation, true);
-    if (ori.n_elem != 3)
-        throw std::invalid_argument("Input 'orientation' must have 3 elements.");
+    const arma::vec ori = qd_python_numpy2arma_Col<double>(orientation, true); // 3 elements, checked by C++
 
     // Element indices (0-based); empty = rotate all elements
     const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");

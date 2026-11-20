@@ -53,7 +53,7 @@ Approximation error of the ACF of a set of sinusoids
 - **`mse_dB`** — Error along the test directions in [dB]; scalar
 - **`mse_core_dB`** — Error within the core radius in [dB]; scalar
 - **`mse_all_dB`** — Error on the complete grid in [dB]; scalar
-- **`acf_tail`** — Approximated ACF beyond the fitted range; column vector; `[4]`
+- **`acf_tail`** — Approximated ACF beyond the fitted range; `[4, 1]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 

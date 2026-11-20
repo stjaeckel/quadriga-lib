@@ -62,7 +62,7 @@ Reads channel data from HDF5 files
 
 ## Usage:
 ```
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_snap, stack=False )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_snap, stack )
 ```
 
 ## Inputs:
@@ -72,7 +72,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Applies to every selected slot; raises an error if an index exceeds the number of snapshots of a selected slot.
-- **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
+- **`stack`** — If `True`, stack snapshots; default: `False` (return as list)
 
 ## Outputs:
 - **`chan`** — List of dicts with the following keys:<br><br>
@@ -93,8 +93,8 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `n_interact`       | Number of interaction points per path; int64                             | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
   | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(n_interact_s))`  | `(3, max(sum(n_interact)), n_snap)`  |
-  | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
-  | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int32, scalar                     | int32, scalar                        |
+  | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or `(1,)`             | `(n_snap,)` or `(1,)`                |
+  | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int                               | int                                  |
 
 - **`par`** — List of dicts with the unstructured data, one per entry of `chan` (empty dict if the slot has none).
 
@@ -115,7 +115,7 @@ py::tuple hdf5_read_channel(const py::handle &fn,
     // Occupied slots of the selection (None or empty selects the full extent), then their channels
     arma::u32_vec channel_id;
     const arma::u32_vec dims = quadriga_lib::hdf5_read_layout(fn_s, &channel_id);
-    const arma::u32_mat slots = qd_hdf5_select_slots(dims, channel_id,
+    const arma::u32_mat slots = qd_hdf5_select_slots(fn_s, dims, channel_id,
                                                      qd_python_numpy2arma_Col<unsigned>(ix, false, false, "ix"),
                                                      qd_python_numpy2arma_Col<unsigned>(iy, false, false, "iy"),
                                                      qd_python_numpy2arma_Col<unsigned>(iz, false, false, "iz"),
@@ -177,7 +177,7 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, *, prefix 
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
-## Outputs:
+## Output:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; `None` if the dataset is missing
 
 ## See also:
@@ -222,7 +222,7 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, *, prefix
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
 - **`prefix`** — Prefix used to identify unstructured datasets; `''` lists all datasets; str; default: `'par_'`
 
-## Outputs:
+## Output:
 - **`names`** — Names of the unstructured datasets at the slot whose names start with `prefix`, with the prefix
   stripped, in creation order; list of str
 
@@ -254,7 +254,7 @@ Read the storage layout of channel data inside an HDF5 file
 storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ```
 
-## Inputs:
+## Input:
 - **`fn`** — Filename of the HDF5 file
 
 ## Outputs:
@@ -365,7 +365,7 @@ code = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector of length `len(chan)`; default: 0
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
 
-## Outputs:
+## Output:
 - **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `(len(chan),)`; int64
 
 ## See also:
@@ -399,15 +399,15 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
             for (py::handle item : py::reinterpret_borrow<py::list>(par))
             {
                 if (!py::isinstance<py::dict>(item))
-                    throw std::invalid_argument("Each 'par' list entry must be a dict.");
+                    throw std::invalid_argument("Input 'par' must be a dict, a list of dicts, or None.");
                 par_vec.emplace_back(py::reinterpret_borrow<py::dict>(item));
             }
         }
         else
-            throw std::invalid_argument("'par' must be a dict, a list of dicts, or None.");
+            throw std::invalid_argument("Input 'par' must be a dict, a list of dicts, or None.");
 
         if ((arma::uword)par_vec.size() != n_chan)
-            throw std::invalid_argument("'par' must have the same number of entries as 'chan'.");
+            throw std::invalid_argument("Inputs 'par' and 'chan' must have the same number of entries.");
     }
 
     // Slot index: scalar, vector or None; 'ix' defaults to 0 ... n_chan-1, the others to 0
@@ -486,7 +486,7 @@ Write a single unstructured dataset to an HDF5 file
 quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, *, prefix )
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Filename of the HDF5 file
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
 - **`data`** — Data to be written; type must be supported (see above); cannot be empty

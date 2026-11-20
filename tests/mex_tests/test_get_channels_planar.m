@@ -76,7 +76,7 @@ try
     [~] = quadriga_lib.get_channels_planar( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod, eod, aoa, eoa, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Transmit antenna: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -90,7 +90,7 @@ try
     [~] = quadriga_lib.get_channels_planar( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod([1,2,2]), eod, aoa, eoa, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs ''aod'', ''eod'', ''aoa'', ''eoa'', ''path_gain'', ''path_length'', and ''polmat'' must have the same number of columns (n_paths)';
+    expectedErrorMessage = 'Inputs ''aod'', ''eod'', ''aoa'', ''eoa'', ''path_gain'', ''path_length'' and ''polmat'' must have the same number of columns (n_paths)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

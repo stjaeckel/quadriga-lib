@@ -631,7 +631,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
         const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 ```
 
-### Inputs:
+### Input:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
 
 ### Returns:
@@ -660,7 +660,7 @@ Not in: MATLAB, Python
 void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant);
 ```
 
-### Inputs:
+### Input:
 - **`ant`** — Valid arrayant; updated in-place
 
 ---
@@ -867,7 +867,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -887,7 +887,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -964,7 +964,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -1015,7 +1015,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Pytho
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(double res = 1.0);
 ```
 
-### Inputs:
+### Input:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
@@ -1222,8 +1222,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#qdant_write) · [Python](../
 
 - Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [qdant_write](#qdant_write).
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
-- All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
-  Invalid input throws and leaves an existing file unchanged.
+- The file must not exist yet; an existing file throws `std::runtime_error` and is left unchanged.
 - Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_freq`.
 
 ### Declaration:
@@ -1234,7 +1233,7 @@ void quadriga_lib::qdant_write_multi(
 ```
 
 ### Inputs:
-- **`fn`** — Path of the QDANT file to write; must not be empty
+- **`fn`** — Path of the QDANT file to write; must not be empty and must not exist
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects to store
 
 ### See also:

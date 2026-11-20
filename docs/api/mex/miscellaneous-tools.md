@@ -24,7 +24,7 @@ Also in: [C++](../cpp/miscellaneous-tools.md#quadriga_lib_version) · [Python](.
 version = quadriga_lib.version;
 ```
 
-### Outputs:
+### Output:
 - **`version`** — Version string (e.g. "0.11.5_AVX2_CUDA")
 
 ---

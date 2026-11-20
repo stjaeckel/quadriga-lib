@@ -239,16 +239,16 @@ static inline std::string qd_arrayant_is_valid_quick(const quadriga_lib::arrayan
 }
 
 // Validity check of the TX and RX arrays of the channel generators (qd_arrayant_is_valid_quick); throws
-// std::invalid_argument with the message prefixed by "Transmit antenna: " or "Receive antenna: "
+// std::invalid_argument with the message prefixed by "Input 'tx_array' is not valid: " or "Input 'rx_array' is not valid: "
 template <typename dtype>
 static inline void qd_arrayant_check_tx_rx(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array)
 {
     std::string error_message = qd_arrayant_is_valid_quick(tx_array);
     if (!error_message.empty())
-        throw std::invalid_argument("Transmit antenna: " + error_message);
+        throw std::invalid_argument("Input 'tx_array' is not valid: " + error_message);
     error_message = qd_arrayant_is_valid_quick(rx_array);
     if (!error_message.empty())
-        throw std::invalid_argument("Receive antenna: " + error_message);
+        throw std::invalid_argument("Input 'rx_array' is not valid: " + error_message);
 }
 
 // Throws std::invalid_argument if one of the outputs out[0 .. N-1] is a data member of 'ant' or shares memory with
@@ -268,7 +268,7 @@ static inline arma::uvec qd_arrayant_calc_element_list(const arma::uvec &i_eleme
     if (i_element.n_elem == 0) // A valid arrayant has at least one element
         return arma::regspace<arma::uvec>(0, n_elements - 1);
     if (arma::any(i_element >= n_elements))
-        throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+        throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
     return i_element;
 }
 

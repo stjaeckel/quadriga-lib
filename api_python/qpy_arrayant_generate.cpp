@@ -90,7 +90,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 - **`separate_beams`** — Produce one independent beam per angle pair (weights ignored); default: False
 - **`apply_weights`** — Apply the beamforming weights to the output coupling matrix; default: False
 
-## Outputs:
+## Output:
 - **`ant`** — Dict with fields:<br><br>
    | Field            | Description                                               | Size                                   |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -237,7 +237,7 @@ py::dict arrayant_generate(const std::string &type,
                                                                      separate_beams_b, apply_weights_b);
     }
     else
-        throw std::invalid_argument("Array type not supported!");
+        throw std::invalid_argument("Input 'type' has an unsupported value '" + type + "'.");
 
     arrayant.center_freq = freq;
     return qd_python_arrayant2dict(arrayant);
@@ -302,7 +302,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_
   `(n_freq,)` or None; default: None
 - **`angular_resolution_deg`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
-## Outputs:
+## Output:
 - **`speaker`** — Multi-frequency arrayant dict with the fields below; for `n_freq = 1` the pattern fields
   are 3D `(n_elevation, n_azimuth, n_elements)` and `center_freq` is a float:
   - `e_theta_re` — e-theta field component, real part; `(n_elevation, n_azimuth, n_elements, n_freq)`

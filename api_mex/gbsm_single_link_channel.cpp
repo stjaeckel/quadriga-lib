@@ -33,7 +33,7 @@ Channel coefficients of one link at one frequency over one segment
   per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `chan` has no `initial_position`. Validity limits: see `ssf_paths`
-- An error is raised for an invalid array (message prefixed with `Transmit antenna: ` or `Receive antenna: `), invalid
+- An error is raised for an invalid `tx_array` or `rx_array`, invalid
   `rays`, `'drift'` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a column
   or entry count other than 1 or `n_snap`
 

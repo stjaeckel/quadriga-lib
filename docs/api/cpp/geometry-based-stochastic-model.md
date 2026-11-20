@@ -562,7 +562,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_single_link_cha
   per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of the result stays 0. Validity limits: see `ssf_paths`
-- Throws `std::invalid_argument` for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `),
+- Throws `std::invalid_argument` for an invalid `tx_array` or `rx_array`,
   invalid `rays` (the `is_valid()` message), `"drift"` without scatterers or with a GR ray at moved ends without
   permittivity or below z = 0, and a column or entry count other than 1 or `n_snap`
 

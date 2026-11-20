@@ -340,7 +340,7 @@ try % wrong type (valid range is 0..5)
     quadriga_lib.ray_mesh_interact( 6, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Interaction type must be';
+    expectedErrorMessage = '''interaction_type'' must be 0 to 5';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -350,7 +350,7 @@ try % wrong freq
     quadriga_lib.ray_mesh_interact( 2, -1, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Center frequency must be provided in Hertz and have values > 0.';
+    expectedErrorMessage = '''center_freq'' must be > 0.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

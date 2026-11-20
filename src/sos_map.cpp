@@ -114,8 +114,7 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
     if (map.size() != n_gen)
         map.resize(n_gen);
     for (arma::uword g = 0; g < n_gen; ++g)
-        if (map[g].n_rows != ny || map[g].n_cols != nx || map[g].n_slices != nz)
-            map[g].set_size(ny, nx, nz);
+        map[g].set_size(ny, nx, nz);
 
     // Cubes that lie one after the other in memory (a single cube, or a 4-D array that a wrapper allocated
     // as one block) are the columns of one matrix [n_pos, n_gen]: the values are computed in place.

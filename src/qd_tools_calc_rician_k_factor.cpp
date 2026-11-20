@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <string>
 
 /*!SECTION
 Channel statistics
@@ -75,7 +76,7 @@ void quadriga_lib::calc_rician_k_factor(const std::vector<arma::Col<dtype>> &pow
     for (arma::uword i = 0; i < n_cir; ++i)
     {
         if (powers[i].n_elem != path_length[i].n_elem)
-            throw std::invalid_argument("Each element of 'powers' and 'path_length' must have the same number of elements.");
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Inputs 'powers' and 'path_length' must have the same number of elements.");
     }
 
     qd_check_alias(kf, "kf", &tx_pos, &rx_pos);

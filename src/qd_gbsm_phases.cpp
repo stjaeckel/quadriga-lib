@@ -213,8 +213,7 @@ namespace
         const arma::uword n_tab = (arma::uword)freq.size();
 
         // Fields of the Rx side (written to 'val') and of the Tx side ('b'), all evaluated as Normal
-        if (val.n_rows != n_link || val.n_cols != n_gen)
-            val.set_size(n_link, n_gen);
+        val.set_size(n_link, n_gen);
         arma::mat b;
         if (dual_mobility)
             b.set_size(n_link, n_gen);
@@ -653,8 +652,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
 
     if (n_link == 0 || n_gen == 0)
     {
-        if (rnd.n_rows != n_link || rnd.n_cols != n_gen)
-            rnd.set_size(n_link, n_gen);
+        rnd.set_size(n_link, n_gen);
         return;
     }
 

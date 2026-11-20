@@ -126,7 +126,7 @@ TEST_CASE("QDANT Multi - Float template roundtrip")
     std::filesystem::remove(fn);
 }
 
-TEST_CASE("QDANT Multi - Overwrite existing file")
+TEST_CASE("QDANT Multi - an existing file is not overwritten")
 {
     std::string fn = "test_speaker_overwrite.qdant";
 
@@ -140,19 +140,17 @@ TEST_CASE("QDANT Multi - Overwrite existing file")
     auto read3 = quadriga_lib::qdant_read_multi<double>(fn);
     REQUIRE(read3.size() == 3);
 
-    // Overwrite with a 2-entry file
+    // Writing a 2-entry vector to the existing file throws and leaves the file unchanged
     arma::vec freqs2 = {2000.0, 8000.0};
     auto spk2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0,
                                                         12.0, 12.0, 85.0, "monopole",
                                                         0.0, 0.0, 0.0, 0.15, 0.25, freqs2, 10.0);
-    quadriga_lib::qdant_write_multi(fn, spk2);
+    CHECK_THROWS_AS(quadriga_lib::qdant_write_multi(fn, spk2), std::runtime_error);
 
     auto read2 = quadriga_lib::qdant_read_multi<double>(fn);
-
-    // Should have 2 entries, not 3 or 5
-    REQUIRE(read2.size() == 2);
-    CHECK(std::abs(read2[0].center_freq - 2000.0) < tol_d);
-    CHECK(std::abs(read2[1].center_freq - 8000.0) < tol_d);
+    REQUIRE(read2.size() == 3);
+    CHECK(std::abs(read2[0].center_freq - 100.0) < tol_d);
+    CHECK(std::abs(read2[2].center_freq - 1000.0) < tol_d);
 
     std::filesystem::remove(fn);
 }

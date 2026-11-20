@@ -100,7 +100,7 @@ assert_throws( @() quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb, lb, pg, pl
 lz = lb;
 lz(3, 2) = 0.01;
 assert_throws( @() quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, lz, lz, pg, pl, M, [], pt ), ...
-    'The interaction point of the GR path must be on the ground' );
+    'Input ''lbs_pos'' must have z = 0' );
 assert_throws( @() quadriga_lib.gbsm_rays_from_paths( 0 * fc, tx, rx, fb, lb, pg, pl, M ), ...
     'Input ''center_freq'' must be finite and > 0.' );
 

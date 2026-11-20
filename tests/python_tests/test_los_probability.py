@@ -151,7 +151,7 @@ class test_case(unittest.TestCase):
         f = quadriga_lib.gbsm.los_probability
         with self.assertRaises(ValueError) as ctx:  # C++
             f("foo", self.d, 10.0, 1.5)
-        self.assertIn("Model 'foo' is not supported.", str(ctx.exception))
+        self.assertIn("Input 'model' has an unsupported value 'foo'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f("38.901_UMi", self.d, [10.0, 20.0], 1.5)
         self.assertIn("Number of elements in 'h_bs' must be 1 or match 'd2d_out'.", str(ctx.exception))

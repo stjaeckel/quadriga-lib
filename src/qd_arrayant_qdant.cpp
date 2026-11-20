@@ -230,7 +230,7 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
         if (!qd_qdant_parse_list(node, &coupling_abs_file))
             return "Malformed number list in 'CouplingAbs'.";
         if (coupling_abs_file.n_elem == 0ULL || coupling_abs_file.n_elem % n_elements != 0ULL)
-            return "'CouplingAbs' must be a matrix with number of rows equal to number of elements";
+            return "'CouplingAbs' must be a matrix with number of rows equal to number of elements.";
         n_ports = coupling_abs_file.n_elem / n_elements;
     }
 
@@ -706,7 +706,7 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     {
         node_qdant = doc.first_child();
         if (node_qdant.empty() || strcmp(node_qdant.name(), "qdant") != 0)
-            return "Exisiting file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
+            return "Existing file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
 
         // Read the namespace identifier from file
         pugi::xml_attribute attr = node_qdant.first_attribute();
@@ -718,7 +718,7 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
             else if (namespc.substr(0, 6) == "xmlns:")
                 pfx = namespc.substr(6) + ":";
             else
-                return "Exisiting file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
+                return "Existing file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
         }
 
         // Read all existing IDs in the file
@@ -985,7 +985,7 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
         {
             if (input_error != nullptr)
                 *input_error = true;
-            return "Layout contains reference to non-existing array antenna!";
+            return "Input 'layout' contains an ID that is not in the file.";
         }
 
         strm.str("");
@@ -999,7 +999,7 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
 
     bool success = doc.save_file(fn.c_str(), "");
     if (!success)
-        return "Error saving file";
+        return "Cannot write file '" + fn + "'.";
 
     *id_in_file = ID;
     return "";

@@ -23,7 +23,7 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
     cir_pos, cir_orientation, orig_pos, orig_orientation = quadriga_lib.channel.qrt_file_parse( fn )
 ```
 
-## Inputs:
+## Input:
 - **`fn`** — Path to the QRT file
 
 ## Outputs:
@@ -31,7 +31,7 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
 - **`n_orig`** — Number of origin points (TX)
 - **`n_dest`** — Number of destination points (RX)
 - **`n_freq`** — Number of frequency bands
-- **`cir_offset`** — Number of CIRs before each destination (offset of its first CIR), the first entry 0; `(n_dest,)`
+- **`cir_offset`** — Number of CIRs before each destination (offset of its first CIR), the first entry 0; int64; `(n_dest,)`
 - **`orig_names`** — Names of the origin points (TX); list of strings; length `n_orig`
 - **`dest_names`** — Names of the destination points (RX); list of strings; length `n_dest`
 - **`version`** — QRT file version number
@@ -57,7 +57,7 @@ py::tuple qrt_file_parse(const py::handle &fn)
                                  &orig_names, &dest_names, &version, &center_freq,
                                  &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
-    auto cir_offset_py = qd_python_copy2numpy(&cir_offset);
+    auto cir_offset_py = qd_python_copy2numpy<arma::uword, py::ssize_t>(&cir_offset);
     auto orig_names_py = qd_python_copy2list(orig_names);
     auto dest_names_py = qd_python_copy2list(dest_names);
     auto center_freq_py = qd_python_copy2numpy(&center_freq);
@@ -123,10 +123,10 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`
 - **`eoa`** — Arrival elevation angles; list of length `n_out`; entries `(n_path,)`
 - **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
-- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
+- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries int64 `(n_path,)`
 - **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(n_interact))`
 - **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
-  entries `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
+  entries uint8 `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
   193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ## See also:
@@ -180,7 +180,7 @@ py::tuple qrt_file_read(const py::handle &fn,
             aoa_py.append(qd_python_copy2numpy(&b.aoa[j]));
             eoa_py.append(qd_python_copy2numpy(&b.eoa[j]));
             path_coord_py.append(qd_python_copy2list(&b.path_coord[j]));
-            n_interact_py.append(qd_python_copy2numpy(&b.n_interact[j]));
+            n_interact_py.append(qd_python_copy2numpy<unsigned, py::ssize_t>(&b.n_interact[j]));
             coord_py.append(qd_python_copy2numpy(&b.coord[j]));
 
             const std::vector<uint8_t> &it = b.interact_type[j];

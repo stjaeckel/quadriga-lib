@@ -351,8 +351,7 @@ arma::Mat<dtype> quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
 
     if (ase != nullptr)
     {
-        if (ase->n_elem != ase_list.size())
-            ase->set_size(ase_list.size());
+        ase->set_size(ase_list.size());
         for (arma::uword i = 0; i < ase_list.size(); ++i)
             ase->at(i) = (dtype)ase_list[i];
     }
@@ -360,8 +359,7 @@ arma::Mat<dtype> quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
     if (test_dir != nullptr)
     {
         arma::uword nr = (n_dim == 1) ? 0 : n_test, nc = (n_dim == 1) ? 0 : n_dim - 1;
-        if (test_dir->n_rows != nr || test_dir->n_cols != nc)
-            test_dir->set_size(nr, nc);
+        test_dir->set_size(nr, nc);
         for (arma::uword t = 0; t < nr; ++t)
         {
             test_dir->at(t, 0) = (dtype)az[t];

@@ -40,16 +40,16 @@ class test_case(unittest.TestCase):
         f, f_new = np.array([3e9]), np.array([3.01e9, 2.99e9])
         npt.assert_array_equal(channel.baseband_freq_response_multi([c], [d], f, f_new),
                                channel.baseband_freq_response_multi([c[..., None]], [d], f, f_new))
-        with self.assertRaisesRegex(ValueError, 'must be 4D, got 3D'):
+        with self.assertRaisesRegex(ValueError, "Input 'coeff' must hold 4D arrays, got 3D"):
             channel.baseband_freq_response_multi([c], [d], np.array([1e9, 2e9]), f_new)
 
     def test_error_freq_dim_mismatch(self):
-        with self.assertRaisesRegex(ValueError, 'does not match the length of'):
+        with self.assertRaisesRegex(ValueError, "Input 'coeff' must have a 4th dimension of the length of 'freq'"):
             channel.baseband_freq_response_multi([np.zeros((1, 1, 1, 3), dtype=complex)], [np.zeros((1, 1, 1))],
                                                  np.array([1e9, 2e9]), np.array([1e9]))
 
     def test_error_delay_freq_dim_mismatch(self):
-        with self.assertRaisesRegex(ValueError, "4th dimension of 'delay'"):
+        with self.assertRaisesRegex(ValueError, "Input 'delay' must have a 4th dimension"):
             channel.baseband_freq_response_multi([np.zeros((1, 1, 1, 3), dtype=complex)], [np.zeros((1, 1, 1, 2))],
                                                  np.array([1e9, 2e9, 3e9]), np.array([1e9]))
 

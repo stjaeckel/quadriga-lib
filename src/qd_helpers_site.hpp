@@ -119,9 +119,9 @@ static inline int qd_kernel_auto_cuda(int use_kernel, size_t n_items)
     if (use_kernel < 0 || use_kernel > 3)
         throw std::invalid_argument("Input 'use_kernel' must be 0, 1, 2 or 3.");
     if (use_kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
-        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+        throw std::invalid_argument("Input 'use_kernel' cannot be 2 because the AVX2 kernel is not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
     if (use_kernel == 3 && !quadriga_lib::quadriga_lib_has_CUDA())
-        throw std::invalid_argument("CUDA kernel requested but not available (compile with BUILD_WITH_CUDA and run on CUDA-capable GPU).");
+        throw std::invalid_argument("Input 'use_kernel' cannot be 3 because the CUDA kernel is not available (compile with BUILD_WITH_CUDA and run on CUDA-capable GPU).");
     if (use_kernel != 0)
         return use_kernel;
     if (n_items >= 500 && quadriga_lib::quadriga_lib_has_CUDA())

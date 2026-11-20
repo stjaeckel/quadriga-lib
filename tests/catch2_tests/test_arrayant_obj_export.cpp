@@ -37,12 +37,14 @@ TEST_CASE("Arrayant OBJ Export")
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", nan), std::invalid_argument);
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", inf), std::invalid_argument);
 
-    // Non-finite field values
+    // Non-finite field values; the throw comes before any file is written
+    std::remove("testantenna.mtl");
     for (float v : {nan, inf})
     {
         auto b = ant;
         b.e_phi_re(b.n_elevation() / 2, b.n_azimuth() / 2, 0) = v; // A grid point the export samples
         REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", b), std::invalid_argument);
+        CHECK(!std::ifstream("testantenna.mtl").good());
     }
 
     quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", 0.4, 4);

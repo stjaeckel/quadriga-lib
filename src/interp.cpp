@@ -25,7 +25,7 @@ Perform linear interpolation (1D or 2D) on multiple data sets
 - `interp_1D` interpolates the columns of a matrix; a single data set is a matrix with one column.
 - Data types (`dtype`): `float` or `double`
 
-## Declarations:
+## Declaration:
 ```
 void quadriga_lib::interp_2D(
     const arma::Col<dtype> &x,
@@ -88,16 +88,19 @@ void quadriga_lib::interp_2D(const arma::Col<dtype> &x, const arma::Col<dtype> &
     const arma::uword mx = x_new.n_elem;
     const arma::uword my = y_new.n_elem;
 
-    if (input.n_elem == 0 || x.n_elem != nx || y.n_elem != ny || ne == 0)
-        throw std::invalid_argument("Data dimensions must match the given number of sample points.");
+    if (input.n_elem == 0)
+        throw std::invalid_argument("Input 'input' cannot be empty.");
+    if (x.n_elem != nx)
+        throw std::invalid_argument("Input 'x' must have one element per column of 'input'.");
+    if (y.n_elem != ny)
+        throw std::invalid_argument("Input 'y' must have one element per row of 'input'.");
     if (!x.is_finite())
         throw std::invalid_argument("Input 'x' must be finite.");
     if (!y.is_finite())
         throw std::invalid_argument("Input 'y' must be finite.");
     qd_check_alias(&output, "output", &input);
 
-    if (output.n_rows != my || output.n_cols != mx || output.n_slices != ne)
-        output.set_size(my, mx, ne);
+    output.set_size(my, mx, ne);
 
     if (mx == 0 || my == 0)
         return;
@@ -218,14 +221,15 @@ void quadriga_lib::interp_1D(const arma::Col<dtype> &x, const arma::Mat<dtype> &
                              const arma::Col<dtype> &x_new, arma::Mat<dtype> &output)
 {
     // Validated here, before 'output' is resized; the alias check needs the matrix objects
-    if (input.n_elem == 0 || x.n_elem != input.n_rows)
-        throw std::invalid_argument("Data dimensions must match the given number of sample points.");
+    if (input.n_elem == 0)
+        throw std::invalid_argument("Input 'input' cannot be empty.");
+    if (x.n_elem != input.n_rows)
+        throw std::invalid_argument("Input 'x' must have one element per row of 'input'.");
     if (!x.is_finite())
         throw std::invalid_argument("Input 'x' must be finite.");
     qd_check_alias(&output, "output", &input);
 
-    if (output.n_rows != x_new.n_elem || output.n_cols != input.n_cols)
-        output.set_size(x_new.n_elem, input.n_cols);
+    output.set_size(x_new.n_elem, input.n_cols);
 
     // The 1D case is the 2D case with one y sample: input [1, nx, ne], output [1, nx_new, ne]
     const arma::Col<dtype> y(1, arma::fill::zeros);

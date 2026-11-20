@@ -56,14 +56,14 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) �
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths); default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
-- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation);  `[n_mesh, 1]`;
+- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_sub, 1]`;
   default: `[]` (not using sub-meshes)
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect); default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
-  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
-  1 = resolve never
+  energy-conservation transmission) instead of EM TE/TM averaging; default: `false` (EM mode)
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always,
+  1 = resolve never; default: 0
 - **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
   distance, matching the `path_length` used by [qrt_file_read](channel-functions.md#qrt_file_read) for a
@@ -100,7 +100,6 @@ Construct a triangulated cube mesh
 
 Also in: [C++](../cpp/site-specific-simulation-tools.md#cube) · [Python](../python/site-specific-simulation-tools.md#cube)
 
-### Description:
 - Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1)
 - Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1
 - Optional uniform subdivision produces 12 · n_div^2 triangles
@@ -115,15 +114,15 @@ mesh = quadriga_lib.cube( scale, rotation, location, n_div );
 ```
 
 ### Inputs:
-- **`scale`** *(optional)* — Length 1 scales all axes uniformly; length 3 scales {x,y,z}
-  independently; empty or omitted = 1 (no scaling)
-- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
-  XYZ); length 3; empty or omitted = no rotation
-- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
-- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 12 · n_div^2 triangles;
+- **`scale`** — Length 1 scales all axes uniformly; length 3 scales {x,y,z}
+  independently; default: `[]` (1, no scaling)
+- **`rotation`** — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; default: `[]` (no rotation)
+- **`location`** — Translation {x,y,z}; length 3; default: `[]` (origin)
+- **`n_div`** — Number of subdivisions per edge; yields 12 · n_div^2 triangles;
   default: 1
 
-### Outputs:
+### Output:
 - **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[12 · n_div^2, 9]`
 
 ### See also:
@@ -163,7 +162,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_pat
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
-- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+- **`scalar_mode`** — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
   default: `false` (EM, `299792458 / center_freq`)
 
 ### Outputs:
@@ -198,7 +197,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#icosphere) · [Python](.
 ### Outputs:
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward
   from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
-- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces, 1]`
 - **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_faces, 9]`
 - **`direction`** — Directions of the vertex rays; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
@@ -245,7 +244,6 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 
 Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_read) · [Python](../python/site-specific-simulation-tools.md#obj_file_read)
 
-### Description:
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
   vertex). Index 0, or an index beyond the vertices defined before the face, raises an error, for any requested outputs
@@ -273,19 +271,19 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_read) · [Pytho
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
 - **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column;
   unmatched faces map to index 0 (no material) unless `csv_strict` is set; empty uses the built-in default table
-- **`csv_strict`** *(optional)* — If true, throw when a `usemtl` material is absent from the table;
+- **`csv_strict`** — If true, throw when a `usemtl` material is absent from the table;
   otherwise map to index 0 (no material); default: false
 
 ### Outputs:
 - **`mesh`** — Triangle vertex coordinates `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
 - **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** — 1-based vertex indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
-- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
+- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh, 1]`
 - **`obj_names`** — Object names; cell array of strings; length `max(obj_ind)`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh]`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh, 1]`
 - **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `n_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh]`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh, 1]`
 - **`csv_names`** — Material names from the table; cell array of strings; length `n_csv`
 - **`csv_prop`** — Material properties as a struct; each field is one CSV column (excluding `name`)
   holding a column vector of length `n_csv`
@@ -302,7 +300,7 @@ Write a Wavefront .obj file
 
 Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_write) · [Python](../python/site-specific-simulation-tools.md#obj_file_write)
 
-- Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is  an error
+- Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is an error
 - With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same
   object that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
@@ -345,8 +343,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_write) · [Pyth
 - **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; validated if given
 - **`csv_names`** *(optional)* — EM/acoustic material names; cell array of strings; required to write the `.csv`
 - **`csv_prop`** *(optional)* — Material properties as a struct; each field is one CSV column holding a vector of length `numel(csv_names)`
-- **`csv_write_defaults`** *(optional)* — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
-- **`split_loose_parts`** *(optional)* — If true, split each object into connected components; default: false
+- **`csv_write_defaults`** — If true, also write canonical columns absent from `csv_prop` using their defaults; default: false
+- **`split_loose_parts`** — If true, split each object into connected components; default: false
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
@@ -362,7 +360,6 @@ Construct a triangulated plane mesh
 
 Also in: [C++](../cpp/site-specific-simulation-tools.md#plane) · [Python](../python/site-specific-simulation-tools.md#plane)
 
-### Description:
 - Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices
   at +/-1, z = 0)
 - The quad is split into 2 triangles, yielding 2 triangles at n_div = 1
@@ -379,16 +376,16 @@ mesh = quadriga_lib.plane( scale, rotation, location, n_div );
 ```
 
 ### Inputs:
-- **`scale`** *(optional)* — Length 1 scales x and y uniformly; length 2 scales {x,y}
+- **`scale`** — Length 1 scales x and y uniformly; length 2 scales {x,y}
   independently; length 3 is accepted for compatibility with `cube`, but the third element is
-  ignored; empty or omitted = 1 (no scaling)
-- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
-  XYZ); length 3; empty or omitted = no rotation
-- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
-- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
+  ignored; default: `[]` (1, no scaling)
+- **`rotation`** — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; default: `[]` (no rotation)
+- **`location`** — Translation {x,y,z}; length 3; default: `[]` (origin)
+- **`n_div`** — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
   default: 1
 
-### Outputs:
+### Output:
 - **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[2 · n_div^2, 9]`
 
 ### See also:
@@ -415,11 +412,11 @@ aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, vec_size );
 
 ### Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_ind`** — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) 
-  to generate; uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
+- **`sub_cloud_ind`** — 1-based row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation)
+  to generate; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
-### Outputs:
+### Output:
 - **`aabb`** — Bounding box matrix; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
@@ -453,9 +450,9 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_cloud_segmentation
 
 ### Outputs:
 - **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `[n_points_out, 3]`
-- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `points_out`; `[n_sub]`
-- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; `[n_points_out]`
-- **`reverse_ind`** — 1-based row in `points_out` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `points_out`; uint32; `[n_sub, 1]`
+- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; uint32; `[n_points_out, 1]`
+- **`reverse_ind`** — 1-based row in `points_out` of each row of `points`; uint32; `[n_points, 1]`
 
 ---
 <a id="point_inside_mesh"></a>
@@ -483,11 +480,11 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object index per mesh element; 1-based; enables per-object output; `[n_mesh]`
 - **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are
-  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0
+  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; default: 0
 
 ### Output:
-- `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
-  index (with `obj_ind`); size `[n_points]`
+- **`result`** — Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
+  index (with `obj_ind`); uint64; `[n_points, 1]`
 
 ---
 <a id="ray_mesh_interact"></a>
@@ -530,11 +527,11 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output
   of [obj_file_read](#obj_file_read)); each field holds a vector of length `n_mtl`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
-- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; order
+- **`trivec`** — Beam wavefront triangle vertices relative to origin; order
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
-- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
+- **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
-- **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
+- **`compact`** — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
   transparent pass-through; logical; default: false
 
@@ -543,19 +540,19 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
-  single TE coefficient for types 3–5; `[n_rayN]`
+  single TE coefficient for types 3–5; `[n_rayN, 1]`
 - **`polmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
   `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`); includes interaction gain, TE/TM coefficients,
   incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
   `trivec`/`tridir` not provided
-- **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
-- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
+- **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN, 1]`
+- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN, 1]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit);
-  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN]`
+  requires the `trivec` and `tridir` inputs, returns all zeros without them; `[n_rayN, 1]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code, bit-encoded (uint32); `[n_rayN]`
+- **`out_typeN`** — Interaction type code, bit-encoded; uint32; `[n_rayN, 1]`
    |  Bit | Meaning                                                                 |
    | :--: | ----------------------------------------------------------------------- |
    |   0  | OK flag (0 = no valid interaction / undefined)                          |
@@ -583,7 +580,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
   for types 1/2/4/5; for undeviated transmission (types 1/4) this is the refracted direction, which
   differs from the geometric continuation used for `origN`/`destN`; `[n_rayN, 3]`
 - **`ray_indN`** — 1-based input ray index for each output ray (inverse of the compaction map,
-  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN]`
+  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN, 1]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for loading `mesh` and `mtl_prop` from OBJ file)
@@ -616,15 +613,15 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_point_intersect) · 
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
-- **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
+- **`sub_cloud_ind`** — Segment boundary indices for the point cloud, 1-based; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
-  uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
+  `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
   and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ### Outputs:
-- **`hit_count`** — Number of beams intersecting each point; `[n_points, 1]`
+- **`hit_count`** — Number of beams intersecting each point; uint32; `[n_points, 1]`
 - **`ray_ind`** — Per-point list of 1-based ray indices that intersected that point; zero-padded to
   a regular 2D array (zero entries indicate unused slots); uint32; `[max_hits, n_points]`
 
@@ -660,7 +657,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_triangle_intersect) 
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal;
   use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; `[n_sub]`; default: `[]` (not using sub-meshes)
 - **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; 
   if empty or omitted, AABBs are computed from `mesh`; `[n_sub, 6]`
@@ -671,9 +668,9 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_triangle_intersect) 
 ### Outputs:
 - **`fbs`** — First-bounce intersection points in GCS; `[n_ray, 3]`
 - **`sbs`** — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray]`
-- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray]`
-- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray]`
+- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray, 1]`
+- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray, 1]`
+- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray, 1]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (load mesh from OBJ file)
@@ -706,7 +703,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#subdivide_triangles) · 
 
 ### Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out]`; only
+- **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out, 1]`; only
   populated if `mtl_ind` is given
 
 ---
@@ -729,7 +726,7 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size );
 
 ### Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
-- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; 
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh`; use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate;
   `[n_sub]` or empty; default: `[]` (returns AABB of the entire mesh)
 - **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., 8 for AVX2); default: 1
 
@@ -770,7 +767,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#triangle_mesh_segmentati
 
 ### Outputs:
 - **`mesh_out`** — Reordered and padded triangle vertices; `[n_mesh_out, 9]`
-- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub]`
-- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out]`
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub, 1]`
+- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out, 1]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
-  `[n_mesh_out]`; only populated if `mtl_ind` is given
+  `[n_mesh_out, 1]`; only populated if `mtl_ind` is given

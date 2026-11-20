@@ -43,7 +43,7 @@ quadriga_lib.tools.write_png( fn, data, *, colormap, min_val, max_val, log_trans
 - **`max_val`** (optional)<br>
   Upper clipping bound; values above get the last colour. NaN (default): data maximum.
 
-- `**log_transform**` (optional)<br>
+- **`log_transform`** (optional)<br>
   If enabled, the `data` values are transformed to the log-domain (`10*log10(data)`) before processing.
   Default: false (disabled)
 MD!*/

@@ -196,8 +196,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
         {
             if (dst == nullptr)
                 return;
-            if (dst->n_rows != src.n_rows || dst->n_cols != src.n_cols || dst->n_slices != 1ULL)
-                dst->set_size(src.n_rows, src.n_cols, 1ULL);
+            dst->set_size(src.n_rows, src.n_cols, 1ULL);
             std::memcpy(dst->memptr(), src.memptr(), src.n_rows * src.n_cols * sizeof(dtype));
         };
         copy_slot(cr, &coeff_re), copy_slot(ci, &coeff_im), copy_slot(dl, &delay);
@@ -212,14 +211,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     {
         const arma::uword n_tx_ports = tx_array.n_ports(), n_rx_ports = rx_array.n_ports();
         for (arma::Cube<dtype> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
-            if (out != nullptr && (out->n_rows != n_rx_ports || out->n_cols != n_tx_ports || out->n_slices != 0ULL))
+            if (out != nullptr)
                 out->set_size(n_rx_ports, n_tx_ports, 0ULL);
         return;
     }
 
     // Check if the number of paths is consistent in all inputs
     if (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 || path_length.n_elem == 0 || polmat.n_elem == 0)
-        throw std::invalid_argument("Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, polmat");
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' cannot be empty.");
     if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || polmat.n_rows != 8)
         throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'polmat' must have 8 rows.");
 
@@ -233,11 +232,11 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     const arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
     if (lbs_pos.n_cols != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
-        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).");
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must have the same number of columns (n_paths).");
 
     // Set the output size
     for (arma::Cube<dtype> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
-        if (out != nullptr && (out->n_rows != n_rx_ports || out->n_cols != n_tx_ports || out->n_slices != n_out))
+        if (out != nullptr)
             out->set_size(n_rx_ports, n_tx_ports, n_out);
 
     // Map output memory to internal representation

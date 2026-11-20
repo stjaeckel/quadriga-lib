@@ -23,13 +23,13 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, *, vec_size )
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — 3D point coordinates; `(n_points, 3)`
-- **`sub_cloud_ind`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
-  use [[point_cloud_segmentation]] to generate; uint32; `(n_sub,)`; default: `None`
-- **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
+- **`sub_cloud_ind`** — 0-based row indices marking the start of each sub-cloud;
+  use [[point_cloud_segmentation]] to generate; `(n_sub,)`; default: `None`
+- **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
-## Output Argument:
+## Output:
 - **`aabb`** — Bounding box matrix; `(n_out, 6)` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ## See also:
@@ -70,16 +70,16 @@ points_out, sub_cloud_ind, forward_ind, reverse_ind = \
 
 ## Inputs:
 - **`points`** — Original 3D point cloud; `(n_points, 3)`
-- **`target_size`** *(optional)* — Maximum points per sub-cloud before padding; default: 1024
-- **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of
+- **`target_size`** — Maximum points per sub-cloud before padding; default: 1024
+- **`vec_size`** — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of
   this value; no padding when `1`; `ray_point_intersect` accepts any value, padding (e.g. 8 for AVX2) only
   improves its speed; default: 1
 
 ## Outputs:
 - **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `(n_points_out, 3)`
-- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `points_out`; uint32; `(n_sub,)`
-- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `points_out`; padding entries are `0`; uint32; `(n_points_out,)`
-- **`reverse_ind`** *(optional)* — 0-based row in `points_out` of each row of `points`; uint32; `(n_points,)`
+- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `points_out`; int64; `(n_sub,)`
+- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; int64; `(n_points_out,)`
+- **`reverse_ind`** — 0-based row in `points_out` of each row of `points`; int64; `(n_points,)`
 MD!*/
 
 py::tuple point_cloud_segmentation(const py::array_t<double> &points,
@@ -95,9 +95,9 @@ py::tuple point_cloud_segmentation(const py::array_t<double> &points,
                                                    target_size, vec_size, &forward_ind, &reverse_ind);
 
     auto points_out_p = qd_python_copy2numpy(&points_out);
-    auto sub_cloud_ind_p = qd_python_copy2numpy(&sub_cloud_ind);
-    auto forward_ind_p = qd_python_copy2numpy(&forward_ind);
-    auto reverse_ind_p = qd_python_copy2numpy(&reverse_ind);
+    auto sub_cloud_ind_p = qd_python_copy2numpy<unsigned, py::ssize_t>(&sub_cloud_ind);
+    auto forward_ind_p = qd_python_copy2numpy<unsigned, py::ssize_t>(&forward_ind);
+    auto reverse_ind_p = qd_python_copy2numpy<unsigned, py::ssize_t>(&reverse_ind);
 
     return py::make_tuple(points_out_p, sub_cloud_ind_p, forward_ind_p, reverse_ind_p);
 }
@@ -118,9 +118,9 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, *, vec_size 
 
 ## Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
-- **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
-  of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
-- **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes; if omitted, the AABB
+  of the entire mesh is returned; `(n_sub,)`; default: `None`
+- **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
 
 ## Output:
 - **`aabb`** — Axis-aligned bounding boxes, one row per sub-mesh; `(n_sub_aligned, 6)`
@@ -174,9 +174,9 @@ mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
 
 ## Outputs:
 - **`mesh_out`** — Reordered and padded triangle vertices; `(n_mesh_out, 9)`
-- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; uint32; `(n_sub,)`
-- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_mesh_out,)`
-- **`mtl_ind_out`** — Reordered and padded material indices; `(n_mesh_out,)`; empty if `mtl_ind` is not provided
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; int64; `(n_sub,)`
+- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); int64; `(n_mesh_out,)`
+- **`mtl_ind_out`** — Reordered and padded material indices; int64; `(n_mesh_out,)`; empty if `mtl_ind` is not provided
 MD!*/
 
 py::tuple triangle_mesh_segmentation(const py::array_t<double> &mesh,

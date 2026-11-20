@@ -832,7 +832,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
             for k in range(2, 7):  # Delays and angles do not depend on the kernel
                 npt.assert_allclose(res[k], ref[k], atol=1e-12, rtol=0)
         except ValueError as e:
-            self.assertIn("AVX2 kernel requested but not available", str(e))
+            self.assertIn("'use_kernel' cannot be 2", str(e))
         with self.assertRaises(ValueError) as ctx:
             channel.spherical(*args, use_kernel=3)
         self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))

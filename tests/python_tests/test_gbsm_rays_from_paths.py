@@ -121,7 +121,7 @@ class test_case(unittest.TestCase):
         lz[2, 1] = 0.01
         with self.assertRaises(ValueError) as ctx:
             gbsm.rays_from_paths(self.fc, self.tx, self.rx, lz, lz, self.pg, self.pl, self.M, path_type=self.pt)
-        self.assertIn("The interaction point of the GR path must be on the ground", str(ctx.exception))
+        self.assertIn("Input 'lbs_pos' must have z = 0", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.rays_from_paths(*self.args, tap=[-1, 0, 1])
         self.assertIn("Entries in 'tap' must be integers from 0 to 4294967295.", str(ctx.exception))

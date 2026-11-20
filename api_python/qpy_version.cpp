@@ -15,14 +15,13 @@ SECTION!*/
 # version
 Returns the quadriga-lib version number
 
+- If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
+  a suffix `_AVX2` is added after the version number
+
 ## Usage:
 ```
-version = quadriga_lib.version();
+version = quadriga_lib.version()
 ```
-
-## Caveat:
-- If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
-  an suffix `_AVX2` is added after the version number
 MD!*/
 
 std::string version()

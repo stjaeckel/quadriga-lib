@@ -215,7 +215,7 @@ try
     quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2, [], 5);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'out of bound';
+    expectedErrorMessage = 'Input ''i_freq'' is out of range.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -226,7 +226,7 @@ try
     quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 1.0, 2, [], 2);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'out of bound';
+    expectedErrorMessage = 'Input ''i_freq'' is out of range.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

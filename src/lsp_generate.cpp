@@ -280,11 +280,11 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
     // Outputs
     auto size3 = [&](arma::cube *c)
     {
-        if (c != nullptr && (c->n_rows != n_link || c->n_cols != n_freq || c->n_slices != 8))
+        if (c != nullptr)
             c->set_size(n_link, n_freq, 8);
     };
     size3(&lsp), size3(lsp_mu), size3(lsp_sigma);
-    if (eod_offset_deg != nullptr && (eod_offset_deg->n_rows != n_link || eod_offset_deg->n_cols != n_freq))
+    if (eod_offset_deg != nullptr)
         eod_offset_deg->set_size(n_link, n_freq);
 
     // Large-scale parameters and EoD offset, per link
@@ -349,8 +349,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
     // Absolute TOA offset
     if (abs_toa != nullptr)
     {
-        if (abs_toa->n_elem != n_link)
-            abs_toa->set_size(n_link);
+        abs_toa->set_size(n_link);
         const double toa_mu = sp.at("absTOA_mu"), toa_sigma = sp.at("absTOA_sigma"), l_max = sp.at("absTOA_Lmax");
         const double bound = (l_max > 0.0) ? 2.0 * l_max / qd_speed_of_light : std::numeric_limits<double>::infinity();
         for (arma::uword l = 0; l < n_link; ++l)
@@ -363,9 +362,9 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
     //   the table; wet j·1.65 vs. j·3.93). A caller who needs the table values uses eqs. (7.6-40) to (7.6-42)
     if (gr_eps_re != nullptr || gr_eps_im != nullptr)
     {
-        if (gr_eps_re != nullptr && (gr_eps_re->n_rows != n_link || gr_eps_re->n_cols != n_freq))
+        if (gr_eps_re != nullptr)
             gr_eps_re->set_size(n_link, n_freq);
-        if (gr_eps_im != nullptr && (gr_eps_im->n_rows != n_link || gr_eps_im->n_cols != n_freq))
+        if (gr_eps_im != nullptr)
             gr_eps_im->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq; ++k)
         {

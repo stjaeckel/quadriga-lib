@@ -173,22 +173,19 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
             keep.push_back(i);
     const arma::uword n_path = (arma::uword)keep.size(), n_sc = drift ? n_path : 0;
 
-    // Outputs: resized only when the size differs, so that pre-sized outputs keep their memory
-    if (path_gain.n_rows != n_path || path_gain.n_cols != n_freq)
-        path_gain.set_size(n_path, n_freq);
-    if (path_length.n_elem != n_path)
-        path_length.set_size(n_path);
-    if (polmat.n_rows != 8 || polmat.n_cols != n_path || polmat.n_slices != n_freq)
-        polmat.set_size(8, n_path, n_freq);
+    // Outputs
+    path_gain.set_size(n_path, n_freq);
+    path_length.set_size(n_path);
+    polmat.set_size(8, n_path, n_freq);
     for (arma::vec *v : {aod, eod, aoa, eoa})
-        if (v != nullptr && v->n_elem != n_path)
+        if (v != nullptr)
             v->set_size(n_path);
     for (arma::mat *m : {fbs_pos, lbs_pos})
-        if (m != nullptr && (m->n_rows != 3 || m->n_cols != n_sc))
+        if (m != nullptr)
             m->set_size(3, n_sc);
-    if (path_type != nullptr && path_type->n_elem != n_path)
+    if (path_type != nullptr)
         path_type->set_size(n_path);
-    if (ray_ind != nullptr && ray_ind->n_elem != n_path)
+    if (ray_ind != nullptr)
         ray_ind->set_size(n_path);
 
     const double c0 = qd_speed_of_light, pi2 = 6.283185307179586;

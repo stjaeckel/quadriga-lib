@@ -26,7 +26,7 @@ Writes array antenna data to QDANT files
   written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
   degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
-  1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
+  1-based IDs; in this mode appending to an existing file is not allowed and will cause an error
 
 ## Usage:
 ```
@@ -42,8 +42,8 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 - **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
   default: a row of all IDs in the file (replaces a layout written before)
 
-## Outputs:
-- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
+## Output:
+- **`id_in_file`** — ID assigned to the antenna in the file after writing; uint32; set to 0 in multi-frequency (struct array) mode
 
 ## See also:
 - [[qdant_read]] (for reading QDANT data)
@@ -60,6 +60,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     std::string fn = qd_mex_get_string(prhs[0], "", "fn");
+    // File IDs in 'id' and 'layout' are 1-based in C++ too; no shift intended
     unsigned id = (nrhs < 3) ? 0 : qd_mex_get_scalar<unsigned>(prhs[2], "id", 0);
     arma::u32_mat layout = (nrhs < 4) ? arma::u32_mat() : qd_mex_typecast_Mat<unsigned>(prhs[3], "layout");
 
@@ -78,11 +79,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         ant = qd_mex_struct2arrayant(prhs[1], true, false, "arrayant");
 
-    if (is_multi && std::filesystem::exists(fn))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File exists. Appending a multi-frequency array to an existing file is not allowed.");
-
     if (is_multi)
-        CALL_QD(qdant_write_multi(fn, ant_multi));
+        CALL_QD(quadriga_lib::qdant_write_multi(fn, ant_multi));
     else
         CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, layout));
 

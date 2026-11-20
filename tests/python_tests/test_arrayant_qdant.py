@@ -322,6 +322,22 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
+    def test_multi_existing_file(self):
+        """A multi-frequency write to an existing file raises and leaves the file unchanged."""
+        ant = make_dipole_multi(n_freq=2, res=10.0)
+        fn = _temp_qdant()
+        try:
+            arrayant.qdant_write(fn, make_dipole_single())
+            with open(fn, 'rb') as f:
+                before = f.read()
+            with self.assertRaises(RuntimeError) as ctx:
+                arrayant.qdant_write(fn, ant)
+            self.assertIn("Cannot write a multi-frequency arrayant to the existing file", str(ctx.exception))
+            with open(fn, 'rb') as f:
+                self.assertEqual(f.read(), before)
+        finally:
+            if os.path.exists(fn): os.unlink(fn)
+
     def test_xpol_multi_round_trip(self):
         """Write and read a multi-freq 2-element xpol; scaled patterns should round-trip."""
         ant = make_multi_freq_xpol(n_freq=4, res=10.0)

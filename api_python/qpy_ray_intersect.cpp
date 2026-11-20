@@ -24,7 +24,7 @@ Calculate intersections of ray beams with points in 3D space
 
 ## Usage:
 ```
-hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
+hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec, \
     tridir, sub_cloud_ind, *, use_kernel, gpu_id )
 ```
 
@@ -35,18 +35,18 @@ hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( point
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `(n_ray, 9)`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `(n_ray, 9)`
-- **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
+- **`sub_cloud_ind`** — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
-  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
-- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
+  `vec_size` is optional and only improves speed); `(n_sub,)`; default: `None`
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA; default: 0
+- **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ## Outputs:
 - **`hit_count`** — Number of beams intersecting each point; equals `numpy.diff(hit_offset)`; uint32;
   `(n_points,)`
-- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; `(n_hit,)`
+- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; int64; `(n_hit,)`
 - **`hit_offset`** — Start of each point's block within `hit_ind`; the last element equals `n_hit`;
   uint32; `(n_points + 1,)`
 
@@ -113,10 +113,10 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 ## Usage:
 ```
 # Output as tuple
-data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, *, use_kernel, gpu_id )
+data = quadriga_lib.RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 
 # Unpacked outputs
-fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
+fbs, sbs, n_interact, fbs_ind, sbs_ind = quadriga_lib.RTtools.ray_triangle_intersect( orig, dest, mesh, \
     sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 ```
 
@@ -124,13 +124,13 @@ fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, d
 - **`orig`** — Ray origins in GCS; `(n_ray, 3)`
 - **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `(n_mesh, 9)`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`; default: `None`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
+- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; `(n_sub,)`; default: `None`
+- **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
   `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`; default: `None`
-- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
+- **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
   throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2,
-  else GENERIC.
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
+  else GENERIC; default: 0
+- **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ## Outputs:
 - **`fbs`** — First-bounce intersection points in GCS; `(n_ray, 3)`

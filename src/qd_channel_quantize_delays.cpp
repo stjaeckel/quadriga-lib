@@ -267,7 +267,7 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_r
     arma::uword n_ant = n_rx * n_tx;
 
     if (n_rx == 0 || n_tx == 0)
-        throw std::invalid_argument("Input coefficient cubes must not be empty.");
+        throw std::invalid_argument("Input 'coeff_re' must have at least one row and one column.");
 
     // Per-snapshot path counts and cumulative offsets for flat indexing
     std::vector<arma::uword> n_path_vec(n_snap);
@@ -285,9 +285,9 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_r
         if (n_p > 0)
         {
             if (coeff_re.at(s).n_rows != n_rx || coeff_re.at(s).n_cols != n_tx)
-                throw std::invalid_argument("All cubes in 'coeff_re' must have the same number of rows and columns.");
+                throw std::invalid_argument("Snapshot " + std::to_string(s) + ": Input 'coeff_re' must have the number of rows and columns of the first snapshot.");
             if (coeff_im.at(s).n_rows != n_rx || coeff_im.at(s).n_cols != n_tx || coeff_im.at(s).n_slices != n_p)
-                throw std::invalid_argument("All cubes in 'coeff_im' must have the same size as 'coeff_re'.");
+                throw std::invalid_argument("Snapshot " + std::to_string(s) + ": Input 'coeff_im' must have the same size as 'coeff_re'.");
 
             bool snap_shared = (delay.at(s).n_rows == 1 && delay.at(s).n_cols == 1);
             if (!shared_delays_set)
@@ -296,17 +296,17 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_r
                 shared_delays_set = true;
             }
             else if (snap_shared != shared_delays)
-                throw std::invalid_argument("All snapshots must consistently use shared [1,1,n_path] or per-antenna [n_rx,n_tx,n_path] delays.");
+                throw std::invalid_argument("Snapshot " + std::to_string(s) + ": Input 'delay' must use shared [1, 1, n_path] or per-antenna [n_rx, n_tx, n_path] delays, as the other snapshots.");
 
             if (snap_shared)
             {
                 if (delay.at(s).n_rows != 1 || delay.at(s).n_cols != 1 || delay.at(s).n_slices != n_p)
-                    throw std::invalid_argument("All cubes in 'delay' must have consistent size.");
+                    throw std::invalid_argument("Snapshot " + std::to_string(s) + ": Input 'delay' must have size [1, 1, n_path].");
             }
             else
             {
                 if (delay.at(s).n_rows != n_rx || delay.at(s).n_cols != n_tx || delay.at(s).n_slices != n_p)
-                    throw std::invalid_argument("All cubes in 'delay' must have the same size as 'coeff_re'.");
+                    throw std::invalid_argument("Snapshot " + std::to_string(s) + ": Input 'delay' must have the same size as 'coeff_re'.");
             }
         }
 

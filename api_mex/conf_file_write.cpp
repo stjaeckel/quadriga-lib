@@ -83,13 +83,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs > 2)
         plpar = qd_mex_struct2plpar(prhs[2], pl_model, pl_order, "plpar");
 
-    std::vector<std::string> short_names, ref_sec;
-    if (nrhs > 3 && !mxIsEmpty(prhs[3]))
-    {
-        if (!mxIsCell(prhs[3]) && !mxIsChar(prhs[3]))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'short_names' must be a cell array of strings.");
-        short_names = qd_mex_get_strings(prhs[3], "short_names");
-    }
+    std::vector<std::string> ref_sec;
+    const std::vector<std::string> short_names = (nrhs < 4) ? std::vector<std::string>() : qd_mex_get_strings(prhs[3], "short_names");
 
     const std::string ref = (nrhs < 5) ? std::string() : qd_mex_get_string(prhs[4], "", "ref");
 

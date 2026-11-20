@@ -70,7 +70,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, pilot_grid, ba
 - **`i_snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
 
-## Outputs:
+## Output:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
 
 ## See also:
@@ -91,14 +91,14 @@ static void qd_python_baseband_read(const py::handle &coeff, const py::handle &d
                                     arma::uword &n_rx, arma::uword &n_tx)
 {
     if (!py::isinstance<py::list>(coeff))
-        throw std::invalid_argument("'coeff' must be a list.");
+        throw std::invalid_argument("Input 'coeff' must be a list.");
     if (!py::isinstance<py::list>(delay))
-        throw std::invalid_argument("'delay' must be a list.");
+        throw std::invalid_argument("Input 'delay' must be a list.");
     const py::list coeff_list = py::reinterpret_borrow<py::list>(coeff), delay_list = py::reinterpret_borrow<py::list>(delay);
 
     const size_t n_snap_total = coeff_list.size();
     if (delay_list.size() != n_snap_total)
-        throw std::invalid_argument("Length of 'delay' list does not match coefficient list length.");
+        throw std::invalid_argument("Inputs 'coeff' and 'delay' must have the same length.");
 
     snap = qd_snapshot_list(qd_python_numpy2arma_Col<arma::uword>(i_snap, true, false, "i_snap"), n_snap_total);
     const arma::uvec src = arma::unique(snap);
@@ -123,15 +123,15 @@ static void qd_python_baseband_read(const py::handle &coeff, const py::handle &d
         const size_t j = src[k];
         const auto &item = c_item[k].shape;
         if (c_item[k].ndim != ndim && !(ndim == 4 && n_frame == 1 && c_item[k].ndim == 3))
-            throw std::invalid_argument("Coefficient arrays must be " + std::to_string(ndim) + "D, got " + std::to_string(c_item[k].ndim) + "D.");
+            throw std::invalid_argument("Input 'coeff' must hold " + std::to_string(ndim) + "D arrays, got " + std::to_string(c_item[k].ndim) + "D.");
         if (item[0] != n_rx || item[1] != n_tx)
-            throw std::invalid_argument("Coefficient dimensions do not match the first selected snapshot.");
+            throw std::invalid_argument("Input 'coeff' must have the n_rx and n_tx of the first selected snapshot.");
         if (c_item[k].n_frames != n_frame)
-            throw std::invalid_argument("4th dimension of the coefficients does not match the length of 'freq'.");
+            throw std::invalid_argument("Input 'coeff' must have a 4th dimension of the length of 'freq'.");
         if (dl_item[k].ndim > ndim)
-            throw std::invalid_argument("Delay arrays must have at most " + std::to_string(ndim) + " dimensions, got " + std::to_string(dl_item[k].ndim) + "D.");
+            throw std::invalid_argument("Input 'delay' must hold arrays of at most " + std::to_string(ndim) + " dimensions, got " + std::to_string(dl_item[k].ndim) + "D.");
         if (dl_item[k].n_frames != 1 && dl_item[k].n_frames != n_frame)
-            throw std::invalid_argument("4th dimension of 'delay' does not match the length of 'freq'.");
+            throw std::invalid_argument("Input 'delay' must have a 4th dimension of 1 or the length of 'freq'.");
 
         cre[j].resize(n_frame), cim[j].resize(n_frame), dl[j].resize(n_frame);
         for (size_t f = 0; f < n_frame; ++f)
@@ -207,7 +207,7 @@ hmat = quadriga_lib.channel.baseband_freq_response_multi( coeff, delay, freq, fr
 - **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
 
-## Outputs:
+## Output:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
 
 ## See also:

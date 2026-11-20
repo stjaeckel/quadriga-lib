@@ -68,23 +68,23 @@ void calc_diffraction_gain(
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
-- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
+- **`lod`** *(optional)* — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [[generate_diffraction_paths]]
-- **`verbose`** — Verbosity level
-- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
-- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [[ray_triangle_intersect]]
-- **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
-- **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
+- **`verbose`** *(optional)* — Verbosity level
+- **`sub_mesh_ind`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_sub]`
+- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [[ray_triangle_intersect]]
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+- **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
   interaction type passed to [[ray_mesh_interact]] (4 vs. 1).
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude `ρ`: a series is summed where `ρ ≥ eps`; 0 = resolve always (default); `eps ≥ 1` re-emits every series whose `ρ` is below one, and a round trip at or above one is always summed; see [[ray_state_update]]
-- **`apply_fspl`** — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
+- **`thin_slab_threshold`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude `ρ`: a series is summed where `ρ ≥ eps`; 0 = resolve always (default); `eps ≥ 1` re-emits every series whose `ρ` is below one, and a round trip at or above one is always summed; see [[ray_state_update]]
+- **`apply_fspl`** *(optional)* — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
   the direct TX-RX distance, matching the `path_length` definition used by [[qrt_file_read]] for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
   `center_freq`.
-- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
+- **`apply_phase`** *(optional)* — If `true`, multiplies `polmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
   same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
   of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
   magnitude, `polmat` stays normalized. This is the phase contribution that
@@ -92,9 +92,9 @@ void calc_diffraction_gain(
   omni-radiator coefficient without running the channel generator.
 
 ## Outputs:
-- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
+- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
   i.e. bounded by 0 and 1; absolute propagation gain when `apply_fspl = true`.
-- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** *(optional)* — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
   For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row order
@@ -102,7 +102,7 @@ void calc_diffraction_gain(
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
-- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
+- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
   (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
 ## See also:
@@ -166,17 +166,18 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     // Material indices are carried as 14 bits of the signed 16-bit state words by ray_state_update.
     // Range and table validation happens inside ray_mesh_interact / ray_state_update.
     if (!mtl_ind.is_empty() && mtl_ind.max() > 16383)
-        throw std::invalid_argument("Material indices must not exceed 16383.");
+        throw std::invalid_argument("Input 'mtl_ind' must not exceed 16383.");
 
     qd_check_alias(gain, "gain", &orig, &dest, &mesh);
     qd_check_alias(polmat, "polmat", &orig, &dest, &mesh);
     qd_check_alias_outputs(gain, "gain", polmat, "polmat");
 
     // Initialize XPRMAT output
-    if (polmat && (polmat->n_rows != nXPR || polmat->n_cols != n_pos))
+    if (polmat)
+    {
         polmat->set_size(nXPR, n_pos);
-    if (polmat) // Initialize to unit matrix
-        quadriga_lib::polmat_update<dtype>(*polmat, {}, nullptr, true);
+        quadriga_lib::polmat_update<dtype>(*polmat, {}, nullptr, true); // Initialize to unit matrix
+    }
 
     // Generate diffraction paths
     arma::Cube<dtype> ray_x, ray_y, ray_z, weight;
@@ -548,10 +549,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
         }
     }
 
-    // Adjust size of the output containers, if needed
-    if (gain && gain->n_elem != n_pos)
+    // Size the output containers
+    if (gain)
         gain->set_size(n_pos);
-    if (coord && (coord->n_rows != 3 || coord->n_cols != n_seg - 1 || coord->n_slices != n_pos))
+    if (coord)
         coord->set_size(3, n_seg - 1, n_pos);
 
     // Write output data

@@ -34,7 +34,7 @@ mesh = quadriga_lib.RTtools.cube( scale, rotation, location, *, n_div )
 - **`location`** — Translation (x, y, z); shape `(3,)`; `None` or empty = origin; default: `None`
 - **`n_div`** — Number of subdivisions per edge; yields 12 · n_div^2 triangles; default: 1
 
-## Outputs:
+## Output:
 - **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(12 · n_div^2, 9)`
 MD!*/
 
@@ -80,7 +80,7 @@ mesh = quadriga_lib.RTtools.plane( scale, rotation, location, *, n_div )
 - **`location`** — Translation (x, y, z); shape `(3,)`; `None` or empty = origin; default: `None`
 - **`n_div`** — Number of subdivisions per edge; yields 2 · n_div^2 triangles; default: 1
 
-## Outputs:
+## Output:
 - **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(2 · n_div^2, 9)`
 MD!*/
 

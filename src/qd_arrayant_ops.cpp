@@ -335,7 +335,7 @@ void quadriga_lib::arrayant_calc_beamwidth(const arrayant<dtype> &ant, const arm
     const dtype threshold_dB = dtype(threshold_dB_in);
     const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
-        throw std::invalid_argument(error_message);
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
     if (!std::isfinite(threshold_dB) || threshold_dB <= dtype(0.0))
         throw std::invalid_argument("Input 'threshold_dB' must be positive and finite.");
 
@@ -402,7 +402,7 @@ arma::Col<dtype> quadriga_lib::arrayant_calc_directivity(const arrayant<dtype> &
 {
     const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
-        throw std::invalid_argument(error_message);
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, ant.e_theta_re.n_slices);
     arma::Col<dtype> directivity_dBi(i_out.n_elem, arma::fill::none);
@@ -458,7 +458,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
     const dtype propagation_speed = dtype(propagation_speed_in);
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     if (!(propagation_speed > dtype(0.0)) || !std::isfinite(propagation_speed))
         throw std::invalid_argument("Input 'propagation_speed' must be positive and finite.");
@@ -468,10 +468,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
     bool new_elgrid = elevation_grid_new.n_elem != 0;
 
     if (new_azgrid && !qd_in_range(azimuth_grid_new.memptr(), azimuth_grid_new.n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
-        throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in between -pi and pi (equivalent to -180 to 180 degree).");
+        throw std::invalid_argument("Input 'azimuth_grid_new' must be sorted and in [-pi, pi].");
 
     if (new_elgrid && !qd_in_range(elevation_grid_new.memptr(), elevation_grid_new.n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
-        throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
+        throw std::invalid_argument("Input 'elevation_grid_new' must be sorted and in [-pi/2, pi/2].");
 
     const dtype *p_azimuth_grid = (new_azgrid) ? azimuth_grid_new.memptr() : ant.azimuth_grid.memptr();
     const dtype *p_elevation_grid = (new_elgrid) ? elevation_grid_new.memptr() : ant.elevation_grid.memptr();
@@ -600,16 +600,16 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_concat(const arrayant<dtype
 {
     std::string error_message = qd_arrayant_is_valid_quick(ant_1);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant_1' is not valid: " + error_message);
     error_message = qd_arrayant_is_valid_quick(ant_2);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant_2' is not valid: " + error_message);
 
     // Check if grids are identical
     if (!arma::approx_equal(ant_1.azimuth_grid, ant_2.azimuth_grid, "absdiff", (dtype)1.0e-6))
-        throw std::invalid_argument("Azimuth sampling grids do not match.");
+        throw std::invalid_argument("Inputs 'ant_1' and 'ant_2' must have the same azimuth grid.");
     if (!arma::approx_equal(ant_1.elevation_grid, ant_2.elevation_grid, "absdiff", (dtype)1.0e-6))
-        throw std::invalid_argument("Elevation sampling grids do not match.");
+        throw std::invalid_argument("Inputs 'ant_1' and 'ant_2' must have the same elevation grid.");
 
     arma::uword n_elevation = ant_1.n_elevation();
     arma::uword n_azimuth = ant_1.n_azimuth();
@@ -694,15 +694,15 @@ template <typename dtype>
 void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword i_source, const arma::uvec &i_target)
 {
     if (i_target.n_elem == 0)
-        throw std::invalid_argument("Input 'i_target' is empty.");
+        throw std::invalid_argument("Input 'i_target' cannot be empty.");
 
     // The largest index cannot be reached by resizing: index + 1 would wrap to 0
     if (i_target.max() == std::numeric_limits<arma::uword>::max())
-        throw std::invalid_argument("Destination index out of bound.");
+        throw std::invalid_argument("Input 'i_target' is out of range.");
 
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     arma::uword n_el = ant.e_theta_re.n_rows;
     arma::uword n_az = ant.e_theta_re.n_cols;
@@ -711,7 +711,7 @@ void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword i_sou
     arma::uword n_element_max = i_target.max() + 1;
 
     if (i_source >= n_elements)
-        throw std::invalid_argument("Source index out of bound");
+        throw std::invalid_argument("Input 'i_source' is out of range.");
 
     // Enlarge the arrayant; empty positions and coupling are written out first (zeros, identity), so that the new
     // elements can be edited; resize keeps the values and sets new ones to zero
@@ -798,7 +798,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     const dtype object_radius = dtype(object_radius_in);
     std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     std::string fn_suffix = ".obj";
     std::string fn_mtl;
@@ -824,7 +824,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
     double range = -std::abs((double)directivity_range_dB);
     if (range == 0.0 || !std::isfinite(range))
-        throw std::invalid_argument("Directivity range must be finite and not 0.");
+        throw std::invalid_argument("Input 'directivity_range_dB' must be finite and not 0.");
 
     double radius = (double)object_radius;
     if (!(radius > 0.0) || !std::isfinite(radius))
@@ -835,30 +835,13 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     const arma::uvec i_element = (i_element_in.n_elem == 0) ? arma::regspace<arma::uvec>(0, no_elements - 1) : i_element_in;
 
     if (arma::any(i_element >= no_elements))
-        throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
+        throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
 
     size_t no_elements_t = (size_t)i_element.n_elem;
 
     // Colormap
     arma::uchar_mat cmap = quadriga_lib::colormap(colormap);
     size_t n_cmap = (size_t)cmap.n_rows;
-
-    // Export colormap to material file
-    std::ofstream outFile(fn_mtl);
-    if (!outFile.is_open())
-        throw std::runtime_error("Cannot open file '" + fn_mtl + "' for writing.");
-    {
-        outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
-        for (size_t i = 0; i < n_cmap; ++i)
-        {
-            double R = (double)cmap(i, 0) / 255.0;
-            double G = (double)cmap(i, 1) / 255.0;
-            double B = (double)cmap(i, 2) / 255.0;
-            outFile << "newmtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
-            outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
-        }
-        outFile.close();
-    }
 
     // Generate vertices and faces
     arma::mat vertices_icosphere;
@@ -955,14 +938,31 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
         find_max_pow();
     }
     if (has_nan) // NaN field values, or infinite ones (NaN after the rescaling)
-        throw std::invalid_argument("Field values must be finite.");
+        throw std::invalid_argument("Input 'ant' must have finite field values.");
     if (!(max_pow > 0.0))
         throw std::invalid_argument("Pattern is zero in all directions for the exported elements.");
+
+    // Export colormap to material file
+    std::ofstream outFile(fn_mtl);
+    if (!outFile.is_open())
+        throw std::runtime_error("Cannot create file '" + fn_mtl + "'.");
+    {
+        outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
+        for (size_t i = 0; i < n_cmap; ++i)
+        {
+            double R = (double)cmap(i, 0) / 255.0;
+            double G = (double)cmap(i, 1) / 255.0;
+            double B = (double)cmap(i, 2) / 255.0;
+            outFile << "newmtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
+            outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
+        }
+        outFile.close();
+    }
 
     // Write OBJ file
     outFile = std::ofstream(fn);
     if (!outFile.is_open())
-        throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
+        throw std::runtime_error("Cannot create file '" + fn + "'.");
     {
         outFile << "# QuaDRiGa " << "antenna pattern\n";
         outFile << "mtllib " << fn_mtl_base << "\n";
@@ -1165,7 +1165,7 @@ Remove zero-valued entries from antenna pattern data, reducing its size
 void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant);
 ```
 
-## Inputs:
+## Input:
 - **`ant`** — Valid arrayant; updated in-place
 MD!*/
 
@@ -1174,7 +1174,7 @@ void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant)
 {
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     unsigned long long n_el = ant.e_theta_re.n_rows;
     unsigned long long n_az = ant.e_theta_re.n_cols;
@@ -1216,7 +1216,7 @@ void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant)
     arma::vec el_sum = arma::sum(pow, 1);
     pow.reset();
     if (az_sum.has_nan()) // NaN or Inf in the field values
-        throw std::invalid_argument("Field values must be finite.");
+        throw std::invalid_argument("Input 'ant' must have finite field values.");
 
     // Determine which parts of the pattern should be kept; an all-zero pattern is kept unchanged
     arma::uvec keep_az(n_az, arma::fill::zeros), keep_el(n_el, arma::fill::zeros);
@@ -1332,11 +1332,11 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
 {
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     qd_xyz(orientation, "orientation");
     if (usage > 4)
-        throw std::invalid_argument("Input parameter 'usage' must be 0, 1, 2, 3 or 4.");
+        throw std::invalid_argument("Input 'usage' must be 0, 1, 2, 3 or 4.");
     // Set element indices; a subset without duplicates that holds every element counts as all elements
     const arma::uword n_elements = ant.e_theta_re.n_slices;
     arma::uvec i_out;
@@ -1345,7 +1345,7 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
     else
     {
         if (arma::any(i_element >= n_elements))
-            throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+            throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
         i_out = i_element;
         if (arma::find_unique(i_out).eval().n_elem != i_out.n_elem)
             throw std::invalid_argument("Input 'i_element' must not contain duplicates.");
@@ -1406,7 +1406,7 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
     if (update_grid)
     {
         if (!use_all_elements)
-            throw std::invalid_argument("Update of sampling grid cannot be done for single elements of an array antenna!");
+            throw std::invalid_argument("Input 'i_element' must select all elements when 'usage' 0 or 1 adjusts the sampling grid.");
 
         if (step > dtype(0.0017)) // >= 0.1 degree --> Use entire sphere
         {
@@ -1655,7 +1655,7 @@ unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> 
 {
     std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
     unsigned id_in_file = 0;
     bool input_error = false;

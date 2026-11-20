@@ -79,7 +79,7 @@ try
     cr_2 = quadriga_lib.get_channels_spherical( args{:}, 2 );
     assertElementsAlmostEqual( cr_2, coeff_re, 'absolute', 1e-5 );              % Single precision
 catch ME
-    if isempty(strfind(ME.message, 'AVX2 kernel requested but not available'))  %#ok<STREMP>
+    if isempty(strfind(ME.message, '''use_kernel'' cannot be 2'))  %#ok<STREMP>
         rethrow(ME);
     end
 end
@@ -103,7 +103,7 @@ try
     [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Transmit antenna: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -117,7 +117,7 @@ try
     [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos(:,[1,2,2]), fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''polmat'' must have the same number of columns (n_paths)';
+    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'' and ''polmat'' must have the same number of columns (n_paths)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

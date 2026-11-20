@@ -33,7 +33,7 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal;
   use [[triangle_mesh_segmentation]] to generate; `[n_sub]`; default: `[]` (not using sub-meshes)
 - **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; 
   if empty or omitted, AABBs are computed from `mesh`; `[n_sub, 6]`
@@ -44,9 +44,9 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 ## Outputs:
 - **`fbs`** — First-bounce intersection points in GCS; `[n_ray, 3]`
 - **`sbs`** — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray]`
-- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray]`
-- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray]`
+- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray, 1]`
+- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray, 1]`
+- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray, 1]`
 
 ## See also:
 - [[obj_file_read]] (load mesh from OBJ file)

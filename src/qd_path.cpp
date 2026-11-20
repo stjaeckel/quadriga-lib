@@ -114,7 +114,7 @@ float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0
 - **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
-## Function 'duplicate';
+## Function 'duplicate':
 Copies the path into an existing target object and returns its length
 
 - Performs a deep copy: the target receives an independent data buffer and all metadata
@@ -274,9 +274,9 @@ void quadriga_lib::path::free()
 void quadriga_lib::path::init(size_t segments, size_t frequencies, bool scalar)
 {
     if (segments > 255)
-        throw std::invalid_argument("Number of segments cannot exceed 255.");
+        throw std::invalid_argument("Input 'segments' cannot exceed 255.");
     if (frequencies == 0 || frequencies > 127)
-        throw std::invalid_argument("Number of frequencies must be between 1 and 127.");
+        throw std::invalid_argument("Input 'frequencies' must be between 1 and 127.");
 
     free();
 
@@ -328,7 +328,7 @@ quadriga_lib::path::path(size_t segments, size_t frequencies, bool scalar)
 const float *quadriga_lib::path::coord(size_t seg) const
 {
     if (seg >= (size_t)nSEG)
-        throw std::invalid_argument("Requested segment out-of-bound.");
+        throw std::invalid_argument("Input 'seg' is out of range.");
     return data ? data + seg * 3 : nullptr;
 }
 float *quadriga_lib::path::coord(size_t seg)
@@ -375,7 +375,7 @@ float quadriga_lib::path::calc_length(const float *D, const float *O)
 const float *quadriga_lib::path::polmat(size_t i_freq) const
 {
     if (i_freq >= n_freq())
-        throw std::invalid_argument("Requested frequency out-of-bound.");
+        throw std::invalid_argument("Input 'i_freq' is out of range.");
 
     if (i_freq == 0)
         return xprmat;
@@ -571,7 +571,7 @@ void quadriga_lib::path::set_interaction_type_codes(const std::vector<uint8_t> &
 {
     size_t n = (size_t)nSEG;
     if (codes.size() != n)
-        throw std::invalid_argument("Number of type codes must equal the number of segments.");
+        throw std::invalid_argument("Input 'codes' must have one entry per segment.");
 
     size_t n_inline = n < INLINE_TYPES ? n : INLINE_TYPES;
     for (size_t i = 0; i < n_inline; ++i)

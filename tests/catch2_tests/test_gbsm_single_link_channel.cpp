@@ -850,8 +850,8 @@ TEST_CASE("gbsm_single_link_channel - input validation")
         bad.e_theta_im.reset();
         const std::string m = bad.is_valid();
         REQUIRE(!m.empty());
-        msg("Transmit antenna: " + m, bad, omni, r, lg, "auto", "taps", 0);
-        msg("Receive antenna: " + m, omni, bad, r, lg, "auto", "taps", 0);
+        msg("Input 'tx_array' is not valid: " + m, bad, omni, r, lg, "auto", "taps", 0);
+        msg("Input 'rx_array' is not valid: " + m, omni, bad, r, lg, "auto", "taps", 0);
         rays_t x = r;
         x.method = "x";
         msg("Input 'rays.method' must be '38.901', '38.901_MF' or 'quadriga'.", omni, omni, x, lg, "auto", "taps", 0);

@@ -752,7 +752,7 @@ TEST_CASE("ssf_rays - input validation")
             {[](rays_in_t &x) { x.angle_model = "Additive"; }, "Input 'angle_model' must be 'additive' or 'rotation'."},
             {[](rays_in_t &x) { x.pol_model = "TR"; }, "Input 'pol_model' must be '38.901' or 'quadriga'."},
             {[](rays_in_t &x) { x.pol_model = "quadriga", x.pol_variability = true; },
-             "Input 'pol_variability' needs pol_model '38.901'."},
+             "Input 'pol_variability' requires 'pol_model' = '38.901'."},
             {[](rays_in_t &x) { x.sp["NumSubPaths"] = 0.0; },
              "Value of 'NumSubPaths' must be an integer from 1 to 1000."},
             {[](rays_in_t &x) { x.f.rx = x.f.rx.rows(0, 1); }, "Input 'rx_pos' must have 3 rows."},
@@ -818,7 +818,7 @@ TEST_CASE("ssf_rays - input validation")
         else if (!is_qd) // "quadriga" takes the one-frequency inputs of the "38.901" base as they are
         {
             bad.push_back({[](rays_in_t &x) { x.fc = arma::vec{3.5e9, 28e9}; },
-                           "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several "
+                           "Input 'center_freq' must have one element for method '38.901'; use '38.901_MF' or 'quadriga' for several "
                            "frequencies."});
             bad.push_back({[qd](rays_in_t &x) { qd(x), x.rnd(0, 3371, 0) = 1.5; },
                            "Values of block 14 of 'rnd_ray' must be in [0, 1]."});

@@ -164,15 +164,15 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
     std::string error_message = qd_arrayant_is_valid_quick(irs_array);
     if (error_message.length() != 0)
     {
-        error_message = "IRS array: " + error_message;
+        error_message = "Input 'irs_array' is not valid: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
 
     if (irs_array.coupling_re.n_cols == 0ULL)
-        throw std::invalid_argument("IRS must have a Coupling matrix containing the IRS weights (phase shifts) for each element.");
+        throw std::invalid_argument("Input 'irs_array' must have a coupling matrix holding the IRS weights (phase shifts) of the elements.");
 
     if (i_irs >= irs_array.coupling_re.n_cols)
-        throw std::invalid_argument("IRS codebook index out of bound.");
+        throw std::invalid_argument("Input 'i_irs' is out of range; the IRS coupling matrix has " + std::to_string(irs_array.coupling_re.n_cols) + " columns.");
 
     bool calc_angles = aod != nullptr || eod != nullptr || aoa != nullptr || eoa != nullptr;
 
@@ -183,12 +183,12 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
         error_message = qd_arrayant_is_valid_quick(irs_array_2);
         if (error_message.length() != 0)
         {
-            error_message = "IRS array 2: " + error_message;
+            error_message = "Input 'irs_array_2' is not valid: " + error_message;
             throw std::invalid_argument(error_message.c_str());
         }
 
         if (irs_array_2.e_theta_re.n_slices != n_elements_irs)
-            throw std::invalid_argument("IRS 2 must have the same number of elements as IRS 1");
+            throw std::invalid_argument("Input 'irs_array_2' must have the same number of elements as 'irs_array'.");
         // Its coupling and element_pos are not used: the weights and element positions come from irs_array
     }
 
@@ -310,7 +310,7 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
 
     bool use_threshold = active_path.empty();
     if (!use_threshold && active_path.size() != n_path)
-        throw std::invalid_argument("Optional input 'active_path' does not have the correct number of elements.");
+        throw std::invalid_argument("Input 'active_path' must have n_path_1 * n_path_2 elements.");
 
     arma::uword i_path = 0ULL, j_path = 0ULL;
     for (arma::uword i_path_1 = 0ULL; i_path_1 < n_path_1; ++i_path_1)

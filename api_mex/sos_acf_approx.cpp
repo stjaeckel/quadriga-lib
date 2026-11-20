@@ -38,7 +38,7 @@ ACF produced by a set of sinusoids
 
 ## Outputs:
 - **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above
-- **`dist_2d`** — Grid axis; column vector; `[n_grid]`
+- **`dist_2d`** — Grid axis; `[n_grid, 1]`
 
 ## See also:
 - [[sos_acf_2d]] (target ACF on the same grid)
@@ -47,7 +47,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 2 || nrhs > 2)
+    if (nrhs != 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");

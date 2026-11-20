@@ -52,7 +52,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, pilot_grid, ba
 - **`i_snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
 
-### Outputs:
+### Output:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
 
 ### See also:
@@ -103,7 +103,7 @@ hmat = quadriga_lib.channel.baseband_freq_response_multi( coeff, delay, freq, fr
 - **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
 
-### Outputs:
+### Output:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
 
 ### See also:
@@ -195,7 +195,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [MATLAB](../mex
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_snap, stack=False )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_snap, stack )
 ```
 
 ### Inputs:
@@ -205,7 +205,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Applies to every selected slot; raises an error if an index exceeds the number of snapshots of a selected slot.
-- **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
+- **`stack`** — If `True`, stack snapshots; default: `False` (return as list)
 
 ### Outputs:
 - **`chan`** — List of dicts with the following keys:
@@ -226,8 +226,8 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `n_interact`       | Number of interaction points per path; int64                             | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
   | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(n_interact_s))`  | `(3, max(sum(n_interact)), n_snap)`  |
-  | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
-  | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int32, scalar                     | int32, scalar                        |
+  | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or `(1,)`             | `(n_snap,)` or `(1,)`                |
+  | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int                               | int                                  |
 
 - **`par`** — List of dicts with the unstructured data, one per entry of `chan` (empty dict if the slot has none).
 
@@ -267,7 +267,7 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, *, prefix 
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
-### Outputs:
+### Output:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; `None` if the dataset is missing
 
 ### See also:
@@ -301,7 +301,7 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, *, prefix
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
 - **`prefix`** — Prefix used to identify unstructured datasets; `''` lists all datasets; str; default: `'par_'`
 
-### Outputs:
+### Output:
 - **`names`** — Names of the unstructured datasets at the slot whose names start with `prefix`, with the prefix
   stripped, in creation order; list of str
 
@@ -326,7 +326,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_layout) · [MATLAB](../mex/
 storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ```
 
-### Inputs:
+### Input:
 - **`fn`** — Filename of the HDF5 file
 
 ### Outputs:
@@ -404,7 +404,7 @@ code = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector of length `len(chan)`; default: 0
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
 
-### Outputs:
+### Output:
 - **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `(len(chan),)`; int64
 
 ### See also:
@@ -439,7 +439,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_write_dset) · [MATLAB](../mex/c
 quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, *, prefix )
 ```
 
-### Input Arguments:
+### Inputs:
 - **`fn`** — Filename of the HDF5 file
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
 - **`data`** — Data to be written; type must be supported (see above); cannot be empty
@@ -471,7 +471,7 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
     cir_pos, cir_orientation, orig_pos, orig_orientation = quadriga_lib.channel.qrt_file_parse( fn )
 ```
 
-### Inputs:
+### Input:
 - **`fn`** — Path to the QRT file
 
 ### Outputs:
@@ -479,7 +479,7 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
 - **`n_orig`** — Number of origin points (TX)
 - **`n_dest`** — Number of destination points (RX)
 - **`n_freq`** — Number of frequency bands
-- **`cir_offset`** — Number of CIRs before each destination (offset of its first CIR), the first entry 0; `(n_dest,)`
+- **`cir_offset`** — Number of CIRs before each destination (offset of its first CIR), the first entry 0; int64; `(n_dest,)`
 - **`orig_names`** — Names of the origin points (TX); list of strings; length `n_orig`
 - **`dest_names`** — Names of the destination points (RX); list of strings; length `n_dest`
 - **`version`** — QRT file version number
@@ -544,10 +544,10 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`
 - **`eoa`** — Arrival elevation angles; list of length `n_out`; entries `(n_path,)`
 - **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
-- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
+- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries int64 `(n_path,)`
 - **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(n_interact))`
 - **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
-  entries `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
+  entries uint8 `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
   193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
@@ -589,7 +589,7 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
 ### Usage:
 ```python
 coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff, delay, *, tap_spacing, max_taps, \
-    power_exponent, fix_taps, stack=False )
+    power_exponent, fix_taps, stack )
 ```
 
 ### Inputs:

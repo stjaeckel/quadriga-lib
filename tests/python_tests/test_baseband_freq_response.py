@@ -82,11 +82,11 @@ class test_case(unittest.TestCase):
                 channel.baseband_freq_response(**kw)
 
     def test_error_delay_not_list(self):
-        with self.assertRaisesRegex(ValueError, "'delay' must be a list"):
+        with self.assertRaisesRegex(ValueError, "Input 'delay' must be a list"):
             channel.baseband_freq_response([np.zeros((1, 1, 1), dtype=complex)], np.zeros((1, 1, 1)), PG, 1e6)
 
     def test_error_coeff_not_list(self):
-        with self.assertRaisesRegex(ValueError, "'coeff' must be a list"):
+        with self.assertRaisesRegex(ValueError, "Input 'coeff' must be a list"):
             channel.baseband_freq_response(np.zeros((1, 1, 1), dtype=complex), [np.zeros((1, 1, 1))], PG, 1e6)
 
     def test_error_delay_length_mismatch(self):
@@ -95,19 +95,19 @@ class test_case(unittest.TestCase):
             channel.baseband_freq_response(c, [np.zeros((1, 1, 1))], PG, 1e6)
 
     def test_error_2d_coeff(self):
-        with self.assertRaisesRegex(ValueError, 'must be 3D, got 2D'):
+        with self.assertRaisesRegex(ValueError, "Input 'coeff' must hold 3D arrays, got 2D"):
             channel.baseband_freq_response([np.zeros((2, 3), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6)
 
     def test_error_4d_coeff(self):
         # A multi-frequency item is an error, not a batch
-        with self.assertRaisesRegex(ValueError, 'must be 3D, got 4D'):
+        with self.assertRaisesRegex(ValueError, "Input 'coeff' must hold 3D arrays, got 4D"):
             channel.baseband_freq_response([np.zeros((1, 1, 1, 2), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6)
         c = [np.zeros((1, 1, 1), dtype=complex), np.zeros((1, 1, 1, 2), dtype=complex)]
-        with self.assertRaisesRegex(ValueError, 'Snapshot 1: .*must be 3D, got 4D'):
+        with self.assertRaisesRegex(ValueError, "Snapshot 1: Input 'coeff' must hold 3D arrays, got 4D"):
             channel.baseband_freq_response(c, [np.zeros((1, 1, 1))] * 2, PG, 1e6)
 
     def test_error_4d_delay(self):
-        with self.assertRaisesRegex(ValueError, 'Delay arrays must have at most 3 dimensions'):
+        with self.assertRaisesRegex(ValueError, "Input 'delay' must hold arrays of at most 3 dimensions"):
             channel.baseband_freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1, 2))], PG, 1e6)
 
     def test_error_empty_pilot_grid(self):

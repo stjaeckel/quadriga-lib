@@ -177,7 +177,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_acf_2d) ·
 
 ### Outputs:
 - **`acf_2d`** — ACF on the grid; `[n_grid, n_grid]`
-- **`dist_2d`** — Grid axis; column vector; `[n_grid]`
+- **`dist_2d`** — Grid axis; `[n_grid, 1]`
 
 ### See also:
 - [sos_acf_approx](#sos_acf_approx) (ACF produced by a set of sinusoids on the same grid)
@@ -214,7 +214,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_acf_approx
 
 ### Outputs:
 - **`acf_approx`** — Approximated ACF; size depends on `n_dim`, see above
-- **`dist_2d`** — Grid axis; column vector; `[n_grid]`
+- **`dist_2d`** — Grid axis; `[n_grid, 1]`
 
 ### See also:
 - [sos_acf_2d](#sos_acf_2d) (target ACF on the same grid)
@@ -267,9 +267,9 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_acf_estima
   device; default: -1
 
 ### Outputs:
-- **`acf_est`** — Estimated ACF; column vector; `[n_bin]`
-- **`dist_est`** — Mean distance of the pairs in each bin; column vector; `[n_bin]`
-- **`acf_est_dual`** — Estimated ACF for two devices on the same map; column vector; `[n_bin]`
+- **`acf_est`** — Estimated ACF; `[n_bin, 1]`
+- **`dist_est`** — Mean distance of the pairs in each bin; `[n_bin, 1]`
+- **`acf_est_dual`** — Estimated ACF for two devices on the same map; `[n_bin, 1]`
 
 ### See also:
 - [sos_acf_approx](#sos_acf_approx) (ACF of the sinusoids in closed form)
@@ -297,7 +297,7 @@ val = quadriga_lib.sos_acfi( acf, dist, d );
 - **`d`** — Distances; must be >= 0; `[n_d]`
 
 ### Output:
-- **`val`** — ACF at the distances `d`; column vector; `[n_d]`
+- **`val`** — ACF at the distances `d`; `[n_d, 1]`
 
 ### See also:
 - [sos_preset](#sos_preset) (ACF tables of the predefined models)
@@ -348,7 +348,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_calc_mse) 
 - **`mse_dB`** — Error along the test directions in [dB]; scalar
 - **`mse_core_dB`** — Error within the core radius in [dB]; scalar
 - **`mse_all_dB`** — Error on the complete grid in [dB]; scalar
-- **`acf_tail`** — Approximated ACF beyond the fitted range; column vector; `[4]`
+- **`acf_tail`** — Approximated ACF beyond the fitted range; `[4, 1]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 
@@ -416,8 +416,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_generate) 
 
 ### Outputs:
 - **`spatial_freq`** — Spatial frequencies; `[n_coeff, n_dim]`
-- **`ase`** — Mean squared error over the test directions after each pass, linear scale; column
-  vector; `[n_pass]`
+- **`ase`** — Mean squared error over the test directions after each pass, linear scale; `[n_pass, 1]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 
@@ -536,8 +535,8 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_preset) ·
 
 ### Outputs:
 - **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
-- **`acf`** — Target ACF; `[200]`
-- **`dist`** — Sample points of the ACF; `[200]`
+- **`acf`** — Target ACF; `[200, 1]`
+- **`dist`** — Sample points of the ACF; `[200, 1]`
 
 ### See also:
 - [sos_init_phases](#sos_init_phases) (random phases for the generator)

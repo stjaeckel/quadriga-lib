@@ -30,8 +30,8 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, transposed );
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
 - **`transposed`** — Returns the transpose of the rotation matrix; logical; default: false
 
-### Outputs:
-- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
+### Output:
+- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9, 1]`
 
 ---
 <a id="fast_cart2geo"></a>
@@ -127,13 +127,13 @@ cos_x = quadriga_lib.fast_sincos(x, true);
 ```
 
 ### Inputs:
-- **`x`** (input) — Input angles; radians; `[n_elem]`
+- **`x`** — Input angles; radians; vector, matrix or 3-D array
 - **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`sin_x`** — sin(x); single; `[n_elem]`
-- **`cos_x`** — cos(x); single; `[n_elem]`
+- **`sin_x`** — sin(x); single; size of `x`
+- **`cos_x`** — cos(x); single; size of `x`
 
 ---
 <a id="interp"></a>

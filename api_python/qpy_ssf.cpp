@@ -9,6 +9,20 @@
 Geometry-based stochastic model
 SECTION!*/
 
+// Complex permittivity 'gr_eps' -> real and imaginary part; a real array is cast to complex (imaginary part 0)
+static void qd_python_ssf_gr_eps(const py::handle &gr_eps, arma::mat &gr_eps_re, arma::mat &gr_eps_im)
+{
+    if (gr_eps.is_none())
+        return;
+    const auto gr_eps_c = py::cast<py::array_t<std::complex<double>>>(gr_eps);
+    if (gr_eps_c.ndim() > 2)
+        throw std::invalid_argument("Input 'gr_eps' must have size (n_link, n_freq).");
+    arma::cube re, im;
+    qd_python_copy2arma(gr_eps_c, re, im);
+    gr_eps_re = arma::mat(re.memptr(), re.n_rows, re.n_cols * re.n_slices);
+    gr_eps_im = arma::mat(im.memptr(), im.n_rows, im.n_cols * im.n_slices);
+}
+
 /*!MD
 # ssf_clusters
 Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
@@ -122,18 +136,8 @@ py::tuple ssf_clusters(py::handle scenpar,
     const auto o2i_in = qd_python_numpy2arma_Col<double>(o2i, true);
     const arma::u32_vec n_cluster_a = qd_python_u32_entries(n_cluster, "n_cluster");
 
-    // Complex permittivity -> real and imaginary part; a real array is cast to complex (imaginary part 0)
     arma::mat gr_eps_re, gr_eps_im;
-    if (!gr_eps.is_none())
-    {
-        const auto gr_eps_c = py::cast<py::array_t<std::complex<double>>>(gr_eps);
-        if (gr_eps_c.ndim() > 2)
-            throw std::invalid_argument("Input 'gr_eps' must have size (n_link, n_freq).");
-        arma::cube re, im;
-        qd_python_copy2arma(gr_eps_c, re, im);
-        gr_eps_re = arma::mat(re.memptr(), re.n_rows, re.n_cols * re.n_slices);
-        gr_eps_im = arma::mat(im.memptr(), im.n_rows, im.n_cols * im.n_slices);
-    }
+    qd_python_ssf_gr_eps(gr_eps, gr_eps_re, gr_eps_im);
 
     // O2I flags: nonzero = true
     std::vector<bool> o2i_a(o2i_in.n_elem);
@@ -318,18 +322,8 @@ py::list ssf_rays(py::handle scenpar,
     const bool pol_variability_b = qd_python_flag(pol_variability, false, "pol_variability");
     const bool random_phase_b = qd_python_flag(random_phase, true, "random_phase");
 
-    // Complex permittivity -> real and imaginary part; a real array is cast to complex (imaginary part 0)
     arma::mat gr_eps_re, gr_eps_im;
-    if (!gr_eps.is_none())
-    {
-        const auto gr_eps_c = py::cast<py::array_t<std::complex<double>>>(gr_eps);
-        if (gr_eps_c.ndim() > 2)
-            throw std::invalid_argument("Input 'gr_eps' must have size (n_link, n_freq).");
-        arma::cube re, im;
-        qd_python_copy2arma(gr_eps_c, re, im);
-        gr_eps_re = arma::mat(re.memptr(), re.n_rows, re.n_cols * re.n_slices);
-        gr_eps_im = arma::mat(im.memptr(), im.n_rows, im.n_cols * im.n_slices);
-    }
+    qd_python_ssf_gr_eps(gr_eps, gr_eps_re, gr_eps_im);
 
     // Output dicts in numpy memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the library
     // call throws its message before any output is needed

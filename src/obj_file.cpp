@@ -152,7 +152,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
     std::string line;
 
     if (!std::getline(in, line))
-        throw std::runtime_error("Error reading materials: '" + src + "' is empty.");
+        throw std::runtime_error("Material file '" + src + "' is empty.");
 
     // Strip UTF-8 BOM if present
     if (line.size() >= 3 && (unsigned char)line[0] == 0xEF &&
@@ -161,7 +161,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
 
     std::vector<std::string> header = qd_split_csv(line);
     if (header.empty())
-        throw std::runtime_error("Error reading materials: '" + src + "' has an empty header.");
+        throw std::runtime_error("Material file '" + src + "' has an empty header.");
 
     // Locate the mandatory "name" column
     arma::uword name_col = (arma::uword)header.size();
@@ -172,7 +172,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
             break;
         }
     if (name_col == (arma::uword)header.size())
-        throw std::runtime_error("Error reading materials: '" + src + "' is missing required column 'name'.");
+        throw std::runtime_error("Material file '" + src + "' is missing required column 'name'.");
 
     // Collect numeric columns, preserving CSV order
     std::vector<arma::uword> num_pos;
@@ -180,7 +180,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
         if (k != name_col)
         {
             if (header[k].empty())
-                throw std::runtime_error("Error reading materials: '" + src + "' has an empty column name in the header.");
+                throw std::runtime_error("Material file '" + src + "' has an empty column name in the header.");
             T.columns.push_back(header[k]);
             num_pos.push_back(k);
         }
@@ -201,10 +201,10 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
 
         const std::string &nm = cell[name_col];
         if (nm.empty())
-            throw std::runtime_error("Error reading materials: '" + src + "' line " +
+            throw std::runtime_error("Material file '" + src + "' line " +
                                      std::to_string(line_num) + " has an empty material name.");
         if (!seen.insert(nm).second)
-            throw std::runtime_error("Error reading materials: duplicate material name '" + nm + "' in '" + src + "'.");
+            throw std::runtime_error("Duplicate material name '" + nm + "' in '" + src + "'.");
 
         T.index[nm] = (arma::uword)T.names.size();
         T.names.push_back(nm);
@@ -225,7 +225,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
                     n_read = 0;
                 }
                 if (n_read != v.size() || !std::isfinite(d)) // the whole cell must be one finite number
-                    throw std::runtime_error("Error reading materials: '" + src + "' line " +
+                    throw std::runtime_error("Material file '" + src + "' line " +
                                              std::to_string(line_num) + " column '" + T.columns[c] +
                                              "' is not numeric ('" + v + "').");
             }
@@ -234,7 +234,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
     }
 
     if (T.names.empty())
-        throw std::runtime_error("Error reading materials: '" + src + "' contains no material rows.");
+        throw std::runtime_error("Material file '" + src + "' contains no material rows.");
 
     return T;
 }
@@ -248,10 +248,10 @@ static MtlTable qd_load_mtl_table(const std::string &fn_csv)
         return qd_parse_mtl_table(ss, "<default materials>");
     }
     if (!std::filesystem::exists(fn_csv))
-        throw std::runtime_error("Error opening file: CSV file '" + fn_csv + "' does not exist.");
+        throw std::runtime_error("CSV file '" + fn_csv + "' does not exist.");
     std::ifstream f(fn_csv);
     if (!f.is_open())
-        throw std::runtime_error("Error opening file: failed to open CSV file '" + fn_csv + "'.");
+        throw std::runtime_error("Cannot open file '" + fn_csv + "'.");
     return qd_parse_mtl_table(f, fn_csv);
 }
 
@@ -277,7 +277,7 @@ static void qd_read_mtl_bsdf(const std::filesystem::path &obj_file, const std::s
 
     std::ifstream fileR{mtl_file, std::ios::in};
     if (!fileR.is_open())
-        throw std::runtime_error("Error opening file: failed to open '" + mtl_file.filename().string() + "'.");
+        throw std::runtime_error("Cannot open file '" + mtl_file.filename().string() + "'.");
 
     const size_t n_mtl = names.size();
     bsdf->set_size(n_mtl, 17);
@@ -798,22 +798,22 @@ arma::uword quadriga_lib::obj_file_read(
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
-- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
+- **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
   to index 0 (no material) unless `csv_strict` is set. Empty uses the built-in ITU-R P.2040 default table.
-- **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
+- **`csv_strict`** *(optional)* — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
 
 ## Outputs:
-- **`mesh`** — Triangle vertex coordinates `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
-- **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
-- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `[n_mesh, 3]`
-- **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
-- **`obj_names`** — Object names; length `max(obj_ind)+1`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); length `n_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
-- **`csv_names`** — Material names from the table; length `n_csv` (the full table)
-- **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has
+- **`mesh`** *(optional)* — Triangle vertex coordinates `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
+- **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
+- **`face_ind`** *(optional)* — 0-based vertex indices into `vert_list` per triangle; `[n_mesh, 3]`
+- **`obj_ind`** *(optional)* — 0-based object index per triangle; `[n_mesh]`
+- **`obj_names`** *(optional)* — Object names; length `max(obj_ind)+1`
+- **`mtl_ind`** *(optional)* — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
+- **`mtl_names`** *(optional)* — Visual material names (raw `usemtl`); length `n_mtl`
+- **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
+- **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
+- **`csv_names`** *(optional)* — Material names from the table; length `n_csv` (the full table)
+- **`csv_prop`** *(optional)* — Material properties keyed by CSV column name (excluding `name`); each value has
   length `n_csv`. Columns absent from the table are defaulted by consumers; empty cells parse as 0.
 
 ## Returns:
@@ -908,13 +908,13 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
     // Open the .obj file
     std::filesystem::path obj_file{fn};
     if (!std::filesystem::exists(obj_file))
-        throw std::runtime_error("Error opening file: '" + fn + "' does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     if (!std::filesystem::is_regular_file(obj_file))
-        throw std::runtime_error("Error opening file: '" + fn + "' is not a regular file.");
+        throw std::runtime_error("File '" + fn + "' is not a regular file.");
 
     std::ifstream fileR{obj_file, std::ios::in};
     if (!fileR.is_open())
-        throw std::runtime_error("Error opening file: failed to open '" + fn + "'.");
+        throw std::runtime_error("Cannot open file '" + fn + "'.");
 
     // Pass 1: count vertices and faces
     arma::uword n_vert = 0, n_faces = 0;
@@ -1067,7 +1067,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         if (line.length() > 2 && line[0] == 'v' && line[1] == ' ')
         {
             if (i_vert >= n_vert)
-                throw std::runtime_error("Error reading vertex data in '" + fn + "'.");
+                throw std::runtime_error("Malformed vertex data in '" + fn + "'.");
             if (need_vert)
             {
                 double x = 0.0, y = 0.0, z = 0.0;
@@ -1084,13 +1084,13 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
         if (line.length() > 2 && line[0] == 'f' && line[1] == ' ')
         {
             if (i_face >= n_faces)
-                throw std::runtime_error("Error reading face data in '" + fn + "'.");
+                throw std::runtime_error("Malformed face data in '" + fn + "'.");
 
             unsigned long long mag[4];
             bool neg[4];
             const int n_ref = qd_parse_face_refs(line.c_str(), mag, neg);
             if (n_ref < 3)
-                throw std::runtime_error("Error reading face data in '" + fn + "'.");
+                throw std::runtime_error("Malformed face data in '" + fn + "'.");
             if (n_ref > 3)
                 throw std::runtime_error("Mesh in '" + fn + "' is not triangulated (quads/n-gons unsupported).");
 
@@ -1099,7 +1099,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> 
             for (int k = 0; k < 3; ++k)
             {
                 if (mag[k] == 0 || mag[k] > (unsigned long long)i_vert)
-                    throw std::runtime_error("Error reading face data in '" + fn + "': face " + std::to_string(i_face + 1) +
+                    throw std::runtime_error("Malformed face data in '" + fn + "': face " + std::to_string(i_face + 1) +
                                              " references a vertex that is 0 or beyond the " + std::to_string(i_vert) +
                                              " vertices defined before it.");
                 abc[k] = neg[k] ? i_vert - (arma::uword)mag[k] : (arma::uword)mag[k] - 1;
@@ -1262,24 +1262,24 @@ void obj_file_write(
 
 ## Inputs:
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
-- **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
-- **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
-- **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
-- **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
-- **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
-- **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [[obj_file_read]] for columns
-- **`threshold`** — Vertex co-location distance for merging within an object; default 1 mm
-- **`csv_ind`** — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; optional, validated if given
-- **`csv_names`** — EM/acoustic material names (the full table); writing the `.csv` requires this
-- **`csv_prop`** — Material properties keyed by column name; each vector must have one value per `csv_names` entry
-- **`csv_write_defaults`** — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
-- **`split_loose_parts`** — If `true`, split each object into connected components (faces sharing a vertex); parts of a split object are named `name.001`, `name.002`, ...
+- **`mesh`** *(optional)* — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
+- **`obj_ind`** *(optional)* — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
+- **`mtl_ind`** *(optional)* — 1-based material index per face (0 = no material); `[n_mesh]`; empty for no materials
+- **`obj_names`** *(optional)* — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
+- **`mtl_names`** *(optional)* — Material names; length ≥ `max(mtl_ind)` (1-based); required if `max(mtl_ind)` > 0
+- **`vert_list`** *(optional)* — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
+- **`face_ind`** *(optional)* — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
+- **`bsdf`** *(optional)* — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [[obj_file_read]] for columns
+- **`threshold`** *(optional)* — Vertex co-location distance for merging within an object; default 1 mm
+- **`csv_ind`** *(optional)* — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; optional, validated if given
+- **`csv_names`** *(optional)* — EM/acoustic material names (the full table); writing the `.csv` requires this
+- **`csv_prop`** *(optional)* — Material properties keyed by column name; each vector must have one value per `csv_names` entry
+- **`csv_write_defaults`** *(optional)* — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
+- **`split_loose_parts`** *(optional)* — If `true`, split each object into connected components (faces sharing a vertex); parts of a split object are named `name.001`, `name.002`, ...
 
 ## Outputs:
-- **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
-- **`face_ind_out`** — 0-based face indices derived from `mesh`, or a copy of `face_ind`; `[n_mesh, 3]`
+- **`vert_list_out`** *(optional)* — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
+- **`face_ind_out`** *(optional)* — 0-based face indices derived from `mesh`, or a copy of `face_ind`; `[n_mesh, 3]`
 
 ## See also:
 - [[obj_file_read]] (for reading OBJ files and the BSDF column layout)
@@ -1445,7 +1445,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     { return s.size() >= suf.size() && s.compare(s.size() - suf.size(), suf.size(), suf) == 0; };
 
     if (!ends_with(fn, ".obj"))
-        throw std::invalid_argument("Output file name must end with '.obj'.");
+        throw std::invalid_argument("Input 'fn' must end with '.obj'.");
 
     std::filesystem::path obj_path(fn);
     std::filesystem::path mtl_path = obj_path;
@@ -1567,7 +1567,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     // Write .obj (per-object self-contained vertex blocks)
     std::ofstream obj(obj_path, std::ios::out | std::ios::trunc);
     if (!obj.is_open())
-        throw std::runtime_error("Error opening file: failed to open '" + fn + "'.");
+        throw std::runtime_error("Cannot create file '" + fn + "'.");
 
     obj << "# Wavefront OBJ file written by quadriga-lib\n";
     if (write_materials)
@@ -1705,7 +1705,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     {
         std::ofstream mtl(mtl_path, std::ios::out | std::ios::trunc);
         if (!mtl.is_open())
-            throw std::runtime_error("Error opening file: failed to open '" + mtl_path.string() + "'.");
+            throw std::runtime_error("Cannot create file '" + mtl_path.string() + "'.");
 
         mtl << "# Wavefront MTL file written by quadriga-lib\n";
 
@@ -1801,7 +1801,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         std::ofstream csv(csv_path, std::ios::out | std::ios::trunc);
         if (!csv.is_open())
-            throw std::runtime_error("Error opening file: failed to open '" + csv_path.string() + "'.");
+            throw std::runtime_error("Cannot create file '" + csv_path.string() + "'.");
 
         csv << "name";
         for (const std::string &col : columns)

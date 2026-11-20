@@ -53,17 +53,17 @@ void quadriga_lib::ray_triangle_intersect(
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
-- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`sub_mesh_ind`** *(optional)* — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
+- **`aabb`** *(optional)* — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if empty, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ## Outputs:
-- **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
-- **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`n_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
-- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
-- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
+- **`fbs`** *(optional)* — First-bounce intersection points in GCS; `[n_ray, 3]`
+- **`sbs`** *(optional)* — Second-bounce intersection points in GCS; `[n_ray, 3]`
+- **`n_interact`** *(optional)* — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
+- **`fbs_ind`** *(optional)* — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
+- **`sbs_ind`** *(optional)* — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
 
 ## See also:
 - [[obj_file_read]] (load mesh from OBJ file)
@@ -87,7 +87,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
 
     // Input validation
     if (orig.n_elem == 0)
-        throw std::invalid_argument("Inputs cannot be empty.");
+        throw std::invalid_argument("Input 'orig' cannot be empty.");
     if (orig.n_cols < 3)
         throw std::invalid_argument("Input 'orig' must have at least 3 columns containing x,y,z coordinates.");
 
@@ -96,10 +96,10 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     if (dest.n_cols < 3)
         throw std::invalid_argument("Input 'dest' must have at least 3 columns containing x,y,z coordinates.");
     if (dest.n_rows != n_ray)
-        throw std::invalid_argument("Number of elements in 'orig' and 'dest' do not match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' do not match.");
 
     if (mesh.n_elem == 0)
-        throw std::invalid_argument("Inputs cannot be empty.");
+        throw std::invalid_argument("Input 'mesh' cannot be empty.");
     if (mesh.n_cols < 9)
         throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
 
@@ -177,8 +177,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     // Compute FBS location in GCS
     if (fbs != nullptr)
     {
-        if (fbs->n_rows != n_ray || fbs->n_cols != 3)
-            fbs->set_size(n_ray, 3);
+        fbs->set_size(n_ray, 3);
 
         dtype *px = fbs->colptr(0), *py = fbs->colptr(1), *pz = fbs->colptr(2);
         dtype *w = Wf.memptr();
@@ -194,8 +193,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     // Compute SBS location in GCS
     if (sbs != nullptr)
     {
-        if (sbs->n_rows != n_ray || sbs->n_cols != 3)
-            sbs->set_size(n_ray, 3);
+        sbs->set_size(n_ray, 3);
 
         dtype *px = sbs->colptr(0), *py = sbs->colptr(1), *pz = sbs->colptr(2);
         dtype *w = Ws.memptr();
@@ -212,20 +210,17 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const ar
     arma::uword no_bytes = (arma::uword)n_ray * sizeof(unsigned);
     if (n_interact != nullptr)
     {
-        if (n_interact->n_elem != n_ray)
-            n_interact->set_size(n_ray);
+        n_interact->set_size(n_ray);
         std::memcpy(n_interact->memptr(), p_hit_cnt, no_bytes);
     }
     if (fbs_ind != nullptr)
     {
-        if (fbs_ind->n_elem != n_ray)
-            fbs_ind->set_size(n_ray);
+        fbs_ind->set_size(n_ray);
         std::memcpy(fbs_ind->memptr(), If.memptr(), no_bytes);
     }
     if (sbs_ind != nullptr)
     {
-        if (sbs_ind->n_elem != n_ray)
-            sbs_ind->set_size(n_ray);
+        sbs_ind->set_size(n_ray);
         std::memcpy(sbs_ind->memptr(), Is.memptr(), no_bytes);
     }
 }

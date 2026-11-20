@@ -124,7 +124,7 @@ namespace quadriga_lib
         arma::Mat<dtype> *polmat = nullptr,                                  // Polarization transfer matrix; Size [8, n_pos] for EM or [2, n_pos] for scalar
         arma::Cube<dtype> *coord = nullptr,                                  // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
         int verbose = 0,                                                     // Verbosity level
-        const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),                 // Sub-mesh index, 0-based; Length: [ n_mesh ]
+        const arma::u32_vec &sub_mesh_ind = arma::u32_vec(),                 // Sub-mesh index, 0-based; Length: [ n_sub ]
         int use_kernel = 0,                                                  // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
         int gpu_id = 0,                                                      // CUDA device ID, ignored otherwise
         bool scalar_mode = false,                                            // Scalar (acoustic) mode
@@ -487,7 +487,7 @@ namespace quadriga_lib
         arma::Mat<dtype> *tridirN = nullptr,               // Output: Subdivided vertex-ray directions, format of 'tridir', [n_rayN, 6 or 9]
         arma::Mat<dtype> *destN = nullptr,                 // Output: Subdivided destinations, untouched if 'dest' is not given, [n_rayN, 3]
         const arma::u32_vec &index = arma::u32_vec(),      // Optional: 0-based ray indices, may repeat, sets output order, [n_subdiv]
-        bool transposed_output = false);                   // If true, all putputs are transposed: [3/6/9, n_rayN]
+        bool transposed_output = false);                   // If true, all outputs are transposed: [3/6/9, n_rayN]
 
     // Subdivide triangles into smaller triangles
     template <typename dtype>

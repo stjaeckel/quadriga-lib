@@ -45,8 +45,7 @@ void quadriga_lib::calc_rotation_matrix(const arma::Cube<dtype> &orientation, ar
     qd_check_alias(&rotation, "rotation", &orientation);
 
     arma::uword n_row = orientation.n_cols, n_col = orientation.n_slices;
-    if (rotation.n_rows != 9 || rotation.n_cols != n_row || rotation.n_slices != n_col)
-        rotation.set_size(9, n_row, n_col);
+    rotation.set_size(9, n_row, n_col);
     qd_rotation_matrix(orientation.memptr(), rotation.memptr(), n_row * n_col, transposed);
 }
 

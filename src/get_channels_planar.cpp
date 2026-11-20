@@ -163,15 +163,13 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
         // Copy slot 0 to the outputs
         auto copy_slot = [](const arma::Cube<dtype> &src, arma::Cube<dtype> &dst)
         {
-            if (dst.n_rows != src.n_rows || dst.n_cols != src.n_cols || dst.n_slices != 1ULL)
-                dst.set_size(src.n_rows, src.n_cols, 1ULL);
+            dst.set_size(src.n_rows, src.n_cols, 1ULL);
             std::memcpy(dst.memptr(), src.memptr(), src.n_rows * src.n_cols * sizeof(dtype));
         };
         copy_slot(cr, coeff_re), copy_slot(ci, coeff_im), copy_slot(dl, delay);
         if (rx_Doppler != nullptr)
         {
-            if (rx_Doppler->n_elem != 1ULL)
-                rx_Doppler->set_size(1ULL);
+            rx_Doppler->set_size(1ULL);
             rx_Doppler->at(0) = doppler.at(0);
         }
         return;
@@ -189,22 +187,19 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
 
     // Check if the number of paths is consistent in all inputs
     if (eod.n_elem != n_path || aoa.n_elem != n_path || eoa.n_elem != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
-        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).");
+        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' must have the same number of columns (n_paths).");
     if (polmat.n_rows != 8ULL && n_path != 0ULL)
-        throw std::invalid_argument("Polarization transfer matrix 'polmat' must have 8 rows.");
+        throw std::invalid_argument("Input 'polmat' must have 8 rows.");
 
     // Set the output size
-    if (coeff_re.n_rows != n_rx_ports || coeff_re.n_cols != n_tx_ports || coeff_re.n_slices != n_out)
-        coeff_re.set_size(n_rx_ports, n_tx_ports, n_out);
-    if (coeff_im.n_rows != n_rx_ports || coeff_im.n_cols != n_tx_ports || coeff_im.n_slices != n_out)
-        coeff_im.set_size(n_rx_ports, n_tx_ports, n_out);
-    if (delay.n_rows != n_rx_ports || delay.n_cols != n_tx_ports || delay.n_slices != n_out)
-        delay.set_size(n_rx_ports, n_tx_ports, n_out);
+    coeff_re.set_size(n_rx_ports, n_tx_ports, n_out);
+    coeff_im.set_size(n_rx_ports, n_tx_ports, n_out);
+    delay.set_size(n_rx_ports, n_tx_ports, n_out);
 
     // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
     if (n_out == 0ULL)
     {
-        if (rx_Doppler != nullptr && rx_Doppler->n_elem != 0ULL)
+        if (rx_Doppler != nullptr)
             rx_Doppler->set_size(0ULL);
         return;
     }
@@ -250,9 +245,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     {
         AOA_loc.set_size(n_rx, n_path);
         EOA_loc.set_size(n_rx, n_path);
-        if (rx_Doppler->n_elem != n_out)
-            rx_Doppler->zeros(n_out);
-        else if (add_fake_los_path)
+        rx_Doppler->set_size(n_out); // Every path slot is written below
+        if (add_fake_los_path)
             rx_Doppler->at(0) = zero;
     }
 

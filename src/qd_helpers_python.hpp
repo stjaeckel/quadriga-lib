@@ -66,11 +66,8 @@ static inline py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Col<dtyp
 
     const py::ssize_t n_bytes = sizeof(dtype_numpy);
     const py::ssize_t oe = (py::ssize_t)out_elem;
-    std::vector<py::ssize_t> shape, strides;
-    if (transpose)
-        shape = {1, oe}, strides = {oe * n_bytes, n_bytes};
-    else
-        shape = {oe}, strides = {n_bytes};
+    const std::vector<py::ssize_t> shape = transpose ? std::vector<py::ssize_t>{1, oe} : std::vector<py::ssize_t>{oe};
+    const std::vector<py::ssize_t> strides = transpose ? std::vector<py::ssize_t>{oe * n_bytes, n_bytes} : std::vector<py::ssize_t>{n_bytes};
     py::array_t<dtype_numpy> output(shape, strides);
     dtype_numpy *p_out = output.mutable_data();
 
@@ -961,8 +958,7 @@ static inline void qd_python_copy2arma(const dtype *src, const std::array<size_t
     const size_t nc = shape[1];
     const size_t ns = shape[2];
 
-    if (output.n_rows != nr || output.n_cols != nc || output.n_slices != ns)
-        output.set_size(nr, nc, ns);
+    output.set_size(nr, nc, ns);
 
     dtype *dst = output.memptr();
 
@@ -999,10 +995,8 @@ static inline void qd_python_copy2arma(const std::complex<dtype> *src, const std
     const size_t nc = shape[1];
     const size_t ns = shape[2];
 
-    if (real.n_rows != nr || real.n_cols != nc || real.n_slices != ns)
-        real.set_size(nr, nc, ns);
-    if (imag.n_rows != nr || imag.n_cols != nc || imag.n_slices != ns)
-        imag.set_size(nr, nc, ns);
+    real.set_size(nr, nc, ns);
+    imag.set_size(nr, nc, ns);
 
     dtype *dst_re = real.memptr();
     dtype *dst_im = imag.memptr();

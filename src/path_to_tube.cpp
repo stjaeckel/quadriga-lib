@@ -184,11 +184,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
     arma::uword n_vert = (n_coord + n_split) * n_edges;
     arma::uword n_faces = (n_coord - 1ULL) * n_edges;
 
-    if (vert.n_rows != 3ULL || vert.n_cols != n_vert)
-        vert.zeros(3ULL, n_vert);
-
-    if (faces.n_rows != 4 || faces.n_cols != n_faces)
-        faces.zeros(4ULL, n_faces);
+    vert.set_size(3ULL, n_vert);
+    faces.set_size(4ULL, n_faces);
 
     dtype *p_vert = vert.memptr();
     arma::uword *p_face = faces.memptr();

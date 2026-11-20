@@ -61,7 +61,7 @@ try
     O = quadriga_lib.interp( [],[],I,xo );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Data dimensions must match the given number of sample points.';
+    expectedErrorMessage = 'must have one element per column';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -71,7 +71,7 @@ try
     O = quadriga_lib.interp( x,[],[],xo );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Data dimensions must match the given number of sample points.';
+    expectedErrorMessage = 'Input ''input'' cannot be empty.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -84,7 +84,7 @@ try
     O = quadriga_lib.interp( x,[],1,xo );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Data dimensions must match the given number of sample points.';
+    expectedErrorMessage = 'must have one element per column';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

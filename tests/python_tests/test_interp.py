@@ -90,7 +90,7 @@ class test_case(unittest.TestCase):
         self.assertIn("2D", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.tools.interp(self.x[:3], self.y, self.data, self.x_new, self.y_new)
-        self.assertIn("Data dimensions", str(ctx.exception))
+        self.assertIn("Input 'x' must have one element per column of 'input'", str(ctx.exception))
         with self.assertRaises(TypeError):
             quadriga_lib.tools.interp(self.x, self.y, self.data)
         with self.assertRaises(TypeError):

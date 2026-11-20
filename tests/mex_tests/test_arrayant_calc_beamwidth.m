@@ -108,7 +108,7 @@ try
     [~] = quadriga_lib.arrayant_calc_beamwidth( ant_c, 2 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''i_element'' contains indices that exceed the number of elements.';
+    expectedErrorMessage = 'Input ''i_element'' contains an index that is out of range.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

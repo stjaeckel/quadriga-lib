@@ -29,7 +29,7 @@ static inline void qd_check_interpolation_inputs(const arma::Mat<dtype> &azimuth
 {
     const arma::uword n_ang = azimuth.n_cols;
     if (n_ang > (arma::uword)INT_MAX)
-        throw std::invalid_argument("Number of angles cannot exceed INT_MAX.");
+        throw std::invalid_argument("Input 'azimuth' cannot have more than INT_MAX columns.");
     if (azimuth.n_rows != 1 && azimuth.n_rows != n_out)
         throw std::invalid_argument("Input 'azimuth' must have 1 or n_out rows.");
     if (elevation.n_rows != azimuth.n_rows || elevation.n_cols != n_ang)
@@ -58,7 +58,7 @@ void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant,
     if (n_out == 0)
         throw std::invalid_argument("Input 'i_element' cannot be empty.");
     if (arma::any(i_element >= ant.e_theta_re.n_slices))
-        throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+        throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
     if (orientation.n_elem == 0 || element_pos.n_elem == 0)
         throw std::invalid_argument("Inputs 'orientation' and 'element_pos' cannot be empty.");
     qd_check_interpolation_inputs(azimuth, elevation, orientation, element_pos, n_out);
@@ -229,7 +229,7 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
     const arma::uword n_elements = ant.e_theta_re.n_slices;
     const bool has_i_element = i_element.n_elem != 0;
     if (has_i_element && arma::any(i_element >= n_elements))
-        throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+        throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
     const arma::uword n_out = has_i_element ? i_element.n_elem : n_elements;
     const arma::uword n_ang = azimuth.n_cols;
 
@@ -255,7 +255,7 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
         H_re.reset(), H_im.reset();
     auto fit = [&](auto *out)
     {
-        if (out != nullptr && (out->n_rows != n_out || out->n_cols != n_ang))
+        if (out != nullptr)
             out->set_size(n_out, n_ang);
     };
     for (arma::Mat<dtype> *out : {V ? nullptr : &V_re, V ? nullptr : &V_im, H ? nullptr : &H_re, H ? nullptr : &H_im,
@@ -388,7 +388,7 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
     const arma::uword n_elements = ant0.e_theta_re.n_slices;
     const bool has_i_element = i_element.n_elem != 0;
     if (has_i_element && arma::any(i_element >= n_elements))
-        throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+        throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
     const arma::uword n_out = has_i_element ? i_element.n_elem : n_elements;
     const arma::uword n_ang = azimuth.n_cols;
 
@@ -429,7 +429,7 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
         H_re.reset(), H_im.reset();
     auto fit = [&](auto *out)
     {
-        if (out != nullptr && (out->n_rows != n_out || out->n_cols != n_ang || out->n_slices != n_freq))
+        if (out != nullptr)
             out->set_size(n_out, n_ang, n_freq);
     };
     fit(V ? nullptr : &V_re), fit(V ? nullptr : &V_im), fit(H ? nullptr : &H_re), fit(H ? nullptr : &H_im), fit(V), fit(H);

@@ -19,7 +19,7 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 - Two-tap interpolation avoids discontinuities when delays cross tap boundaries
 - Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
 - If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped 
-  (nearest neighor selection) but tap-selection logic still applies
+  (nearest neighbor selection) but tap-selection logic still applies
 - Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared `[1, 1, n_path, n_snap]`; 
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`

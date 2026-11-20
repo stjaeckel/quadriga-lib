@@ -85,8 +85,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
-  only its patterns are used, its coupling and `element_pos` are ignored
-- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
+  only its patterns are used, its coupling and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
+- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`; default: `[]`
 - **`use_kernel`** — Kernel of both segments, as in [[get_channels_spherical]]: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
 
@@ -151,14 +151,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const auto active_path = (nrhs < 25 || mxIsEmpty(prhs[24])) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[24], "active_path");
     const int use_kernel = (nrhs < 26) ? 0 : qd_mex_get_scalar<int>(prhs[25], "use_kernel", 0);
-
-    const arma::uword n_codebook = irs_array.coupling_re.n_cols; // 0 = missing coupling, reported by C++
-    if (n_codebook != 0 && i_irs >= n_codebook)
-    {
-        std::string msg = "Input 'i_irs' must be from 1 to " + std::to_string(n_codebook == 0 ? 1 : n_codebook) +
-                          " (1-based codebook port index, one per column of the IRS coupling matrix).";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
 
     // Output sizes depend on threshold_dB and active_path and are set by C++
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;

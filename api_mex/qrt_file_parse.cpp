@@ -34,11 +34,11 @@ Read metadata from a QRT file
 - **`n_dest`** — Number of destination points (RX); uint64 scalar
 - **`n_freq`** — Number of frequency bands; uint64 scalar
 - **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
-  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
+  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest, 1]`
+- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig, 1]`
+- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest, 1]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq]`
+- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq, 1]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`

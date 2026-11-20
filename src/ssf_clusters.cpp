@@ -488,7 +488,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         throw std::invalid_argument("K-factor in 'lsp' must be >= 0.");
     if (m_tr && F > 1)
         throw std::invalid_argument(
-            "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several frequencies.");
+            "Input 'lsp' must have one frequency (n_freq = 1) for method '38.901'; use '38.901_MF' or 'quadriga' for several frequencies.");
 
     if (N == 0 ? rnd.n_elem != 0 : (rnd.n_rows != n_link || rnd.n_cols != 9 * N))
         throw std::invalid_argument("Input 'rnd' must have size [n_link, " + std::to_string(9 * N) + "].");
@@ -562,11 +562,9 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     // Outputs
     const arma::uword n_slot = 1 + (G ? 1 : 0) + N, n_fd = m_mf ? F : 1;
     for (arma::cube *c : {&delay, &aod, &eod, &aoa, &eoa})
-        if (c->n_rows != n_link || c->n_cols != n_slot || c->n_slices != n_fd)
-            c->set_size(n_link, n_slot, n_fd);
-    if (power.n_rows != n_link || power.n_cols != n_slot || power.n_slices != F)
-        power.set_size(n_link, n_slot, F);
-    if (n_active != nullptr && n_active->n_elem != n_link)
+        c->set_size(n_link, n_slot, n_fd);
+    power.set_size(n_link, n_slot, F);
+    if (n_active != nullptr)
         n_active->set_size(n_link);
 
     if (n_link == 0)

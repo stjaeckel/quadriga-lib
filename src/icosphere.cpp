@@ -37,13 +37,13 @@ arma::uword quadriga_lib::icosphere(
 ## Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 × n_div² faces
 - **`radius`** — Radius of icosphere in meters; finite and positive
-- **`direction_xyz`** (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
+- **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
 
 ## Outputs:
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
-- **`length`** (optional) — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
-- **`vert`** (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; `[n_faces, 9]`
-- **`direction`** (optional) — Directions of the vertex rays; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
+- **`length`** *(optional)* — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`vert`** *(optional)* — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; `[n_faces, 9]`
+- **`direction`** *(optional)* — Directions of the vertex rays; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
 
 ## Returns:
 - Number of generated triangular faces (20 × n_div²)
@@ -71,20 +71,17 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius_in, arma::M
     // Set sizes
     qd_check_alias_list<arma::Mat<dtype>>({&center, length, vert, direction}, {"center", "length", "vert", "direction"});
 
-    if (center.n_rows != n_faces || center.n_cols != 3)
-        center.set_size(n_faces, 3);
+    center.set_size(n_faces, 3);
 
-    if (length != nullptr && length->n_elem != n_faces)
+    if (length != nullptr)
         length->set_size(n_faces);
 
-    if (vert != nullptr && (vert->n_rows != n_faces || vert->n_cols != 9))
+    if (vert != nullptr)
         vert->set_size(n_faces, 9);
 
     int calc_directions = (direction == nullptr) ? 0 : (direction_xyz ? 2 : 1);
-    if (calc_directions == 1 && (direction->n_rows != n_faces || direction->n_cols != 6))
-        direction->set_size(n_faces, 6);
-    else if (calc_directions == 2 && (direction->n_rows != n_faces || direction->n_cols != 9))
-        direction->set_size(n_faces, 9);
+    if (direction != nullptr)
+        direction->set_size(n_faces, direction_xyz ? 9 : 6);
 
     // Vertex coordinates of a regular icosahedron
     double r = (double)radius, p = 1.618033988749895 * r, z = 0.0;

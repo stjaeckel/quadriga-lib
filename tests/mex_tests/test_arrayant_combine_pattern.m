@@ -154,7 +154,7 @@ try
         azimuth_grid, elevation_grid, element_pos, [1;1], [0;0]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = '''Coupling'' must be a matrix with rows equal to number of elements';
+    expectedErrorMessage = '''coupling_re'' must have one row per element';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

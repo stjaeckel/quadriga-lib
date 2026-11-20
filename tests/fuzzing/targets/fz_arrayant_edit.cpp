@@ -228,6 +228,7 @@ static void run(fz::input &in)
         default:
         {
             auto vec = fuzzed_vector<T>(in, a);
+            std::filesystem::remove(qdant);
             fz::clean([&] { quadriga_lib::qdant_write_multi(qdant, vec); });
             fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read_multi<T>(qdant, &lay); });
         }

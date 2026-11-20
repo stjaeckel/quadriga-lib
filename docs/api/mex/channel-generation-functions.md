@@ -34,9 +34,9 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_ieee_indoor) 
 ### Usage:
 ```matlab
 chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type, center_freq, ...
-   tap_spacing, n_users, observation_time, update_interval, speed_station_kmh, speed_env_kmh, ...
-   dist, n_floors, uplink, offset_angles_deg, n_subpath, doppler_effect, seed, ...
-   kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB, dist_breakpoint, n_walls, wall_loss_dB );
+    tap_spacing, n_users, observation_time, update_interval, speed_station_kmh, speed_env_kmh, ...
+    dist, n_floors, uplink, offset_angles_deg, n_subpath, doppler_effect, seed, ...
+    kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB, dist_breakpoint, n_walls, wall_loss_dB );
 ```
 
 ### Inputs:
@@ -163,8 +163,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
-  only its patterns are used, its coupling and `element_pos` are ignored
-- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
+  only its patterns are used, its coupling and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
+- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`; default: `[]`
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
 
@@ -321,9 +321,9 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 - **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
 - **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
   unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0
 
@@ -406,9 +406,9 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 - **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
   batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
   [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0

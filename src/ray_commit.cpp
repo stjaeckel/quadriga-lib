@@ -42,7 +42,7 @@ Commit the paths of a launch configuration that reach a receiver
   its coefficients, per frequency, via [[medium_gain]] on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
 - The receiver index is written to the committed path's `i_cir`, 0-based. Without `point_ind` it indexes
-  `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
+  `rx_points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [[point_cloud_segmentation]] needs no remapping afterwards.
 - Padding points inserted by [[point_cloud_segmentation]] for SIMD alignment sit at the center of their
   sub-cloud AABB and are therefore hit often. They are dropped when `point_ind` is supplied and committed
@@ -94,11 +94,11 @@ arma::uword quadriga_lib::ray_commit(
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
 - **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [[point_cloud_segmentation]]); `[n_sub]`. Empty → no partitioning
-- **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
+- **`point_ind`** *(optional)* — 1-based map from each row of `rx_points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [[point_cloud_segmentation]] for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
-  indexing. Empty → `points` is used as passed in and `i_cir` indexes it directly
+  indexing. Empty → `rx_points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [[ray_subdivide_flag]] for the
   same launch configuration. Empty → no ray is excluded on these grounds
@@ -290,7 +290,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
         throw std::invalid_argument("Some values in 'fbs_ind' exceed number of mesh elements.");
 
     if (bad & 2)
-        throw std::invalid_argument("Some values in 'mtl_ind_current' exceed the number of materials.");
+        throw std::invalid_argument("Input 'mtl_ind_current' contains an index that is out of range for 'mtl_prop'.");
 
     if (bad & 4)
         throw std::invalid_argument("All entries of 'paths' must have the same frequency count and layout.");

@@ -55,11 +55,11 @@ void quadriga_lib::ray_point_intersect(
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-## Optional outputs:
-- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
-- **`hit_offset`** — Start of each point's block within `hit_ind`, last element is `n_hit`; `[n_points + 1]`
-- **`hit_count`** — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
-- **`hits_per_point`** — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
+## Outputs:
+- **`hit_ind`** *(optional)* — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
+- **`hit_offset`** *(optional)* — Start of each point's block within `hit_ind`, last element is `n_hit`; `[n_points + 1]`
+- **`hit_count`** *(optional)* — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
+- **`hits_per_point`** *(optional)* — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
 
 ## See also:
 - [[icosphere]] (generate ray beams)
@@ -108,9 +108,9 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
 
     // Bound check
     if (n_point_t >= INT32_MAX)
-        throw std::invalid_argument("Number of points exceeds maximum supported number.");
+        throw std::invalid_argument("Input 'points' has too many rows; the limit is 2147483646.");
     if (n_ray_t >= INT32_MAX)
-        throw std::invalid_argument("Number of rays exceeds maximum supported number.");
+        throw std::invalid_argument("Input 'orig' has too many rows; the limit is 2147483646.");
 
     if (trivec.n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'trivec' do not match.");
@@ -295,10 +295,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     // CSR row pointers, written into the caller's buffer when one is provided
     arma::u32_vec off_vec;
     if (hit_offset != nullptr)
-    {
-        if (hit_offset->n_elem != n_point_t + 1)
-            hit_offset->set_size(n_point_t + 1);
-    }
+        hit_offset->set_size(n_point_t + 1);
     else
         off_vec.set_size(n_point_t + 1);
     unsigned *p_off = (hit_offset != nullptr) ? hit_offset->memptr() : off_vec.memptr();
@@ -362,8 +359,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     // Hit counter
     if (hit_count != nullptr)
     {
-        if (hit_count->n_elem != n_point_t)
-            hit_count->set_size(n_point_t);
+        hit_count->set_size(n_point_t);
 
         unsigned *p_cnt = hit_count->memptr();
         for (size_t i_point = 0; i_point < n_point_t; ++i_point)
@@ -373,19 +369,17 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
     // Split form, one arma::u32_vec per non-empty point
     if (hits_per_point != nullptr)
     {
-        hits_per_point->clear();
-        hits_per_point->resize(n_point_t);
+        hits_per_point->resize(n_point_t); // No-op at the right length, so wrapped entries keep their memory
         arma::u32_vec *p_out = hits_per_point->data();
+        for (size_t i_point = 0; i_point < n_point_t; ++i_point) // Serial, so that a size error is not thrown inside the parallel region
+            p_out[i_point].set_size(p_off[i_point + 1] - p_off[i_point]);
 
 #pragma omp parallel for schedule(static) if (n_point_l >= 4096)
         for (long long i_point = 0; i_point < n_point_l; ++i_point)
         {
             unsigned n_local = p_off[i_point + 1] - p_off[i_point];
-            if (n_local == 0)
-                continue;
-
-            p_out[i_point].set_size(n_local);
-            std::memcpy(p_out[i_point].memptr(), &p_idx[p_off[i_point]], n_local * sizeof(unsigned));
+            if (n_local != 0)
+                std::memcpy(p_out[i_point].memptr(), &p_idx[p_off[i_point]], n_local * sizeof(unsigned));
         }
     }
 }

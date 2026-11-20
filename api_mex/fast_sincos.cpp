@@ -32,13 +32,13 @@ cos_x = quadriga_lib.fast_sincos(x, true);
 ```
 
 ## Inputs:
-- **`x`** (input) — Input angles; radians; `[n_elem]`
+- **`x`** — Input angles; radians; vector, matrix or 3-D array
 - **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ## Outputs:
-- **`sin_x`** — sin(x); single; `[n_elem]`
-- **`cos_x`** — cos(x); single; `[n_elem]`
+- **`sin_x`** — sin(x); single; size of `x`
+- **`cos_x`** — cos(x); single; size of `x`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -81,7 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1 && !cos_only)
         plhs[1] = qd_mex_init_output(&Q, n_rows, n_cols, n_slices);
     else if (nlhs > 1 && cos_only)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Cannot have 2 outputs in cosine-only mode.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'cos_only' must be false when two outputs are requested.");
 
     // Flat vector views on the cube memory
     arma::fvec xs;

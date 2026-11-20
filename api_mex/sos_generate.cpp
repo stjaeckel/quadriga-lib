@@ -69,8 +69,7 @@ Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 ## Outputs:
 - **`spatial_freq`** — Spatial frequencies; `[n_coeff, n_dim]`
-- **`ase`** — Mean squared error over the test directions after each pass, linear scale; column
-  vector; `[n_pass]`
+- **`ase`** — Mean squared error over the test directions after each pass, linear scale; `[n_pass, 1]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
   `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
 

@@ -32,11 +32,11 @@ arma::uword quadriga_lib::subdivide_triangles(
 ## Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
-- **`mtl_ind`** — Material indices per triangle (the `csv_ind` output of [[obj_file_read]]); `[n_triangles_in]`
+- **`mtl_ind`** *(optional)* — Material indices per triangle (the `csv_ind` output of [[obj_file_read]]); `[n_triangles_in]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_ind_out`** — Material indices for subdivided triangles; `[n_triangles_out]`
+- **`mtl_ind_out`** *(optional)* — Material indices for subdivided triangles; `[n_triangles_out]`
 
 ## Returns:
 - `n_triangles_out` — Number of generated triangles
@@ -76,10 +76,9 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
     if (process_mtl_ind && mtl_ind.n_elem != n_triangles_in)
         throw std::invalid_argument("Number of triangles in 'triangles_in' and length of 'mtl_ind' do not match.");
 
-    if (triangles_out.n_cols != 9 || triangles_out.n_rows != n_triangles_out)
-        triangles_out.set_size(n_triangles_out, 9);
+    triangles_out.set_size(n_triangles_out, 9);
 
-    if (process_mtl_ind && mtl_ind_out->n_elem != n_triangles_out)
+    if (process_mtl_ind)
         mtl_ind_out->set_size(n_triangles_out);
 
     // Process each triangle

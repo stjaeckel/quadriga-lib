@@ -32,11 +32,11 @@ Read ray-tracing CIR data from a QRT file
 
 ## Inputs:
 - **`fn`** — Path to the QRT file; string
-- **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all; for a file
+- **`i_cir`** — Snapshot indices; 1-based; `[n_out]` or empty; default: `[]` (read all; for a file
   without CIRs, all outputs are empty with `n_out = 0`)
-- **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
+- **`i_orig`** — Origin index; 1-based; scalar; default: 1
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
-- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
     | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
@@ -47,29 +47,29 @@ Read ray-tracing CIR data from a QRT file
     Other values are rejected with an error.
 
 ## Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq]`
+- **`center_freq`** — Center frequency in Hz; `[n_freq, 1]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, n_out]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, n_out]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, n_out]`
 - **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, n_out]`
 - **`fbs_pos`** — First-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions;  Cell of length `n_out`; elements `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
 - **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path]`
+- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path, 1]`
 - **`polmat`** — Polarization transfer matrix; Cell of length `n_out`;
   elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path]`
-- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path]`
-- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path]`
-- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path]`
+- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
+- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
 - **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
   elements Cell of length `n_path`, each `[3, n_interact + 2]`
 - **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
-  Cell of length `n_out`; elements `[n_path]`
+  Cell of length `n_out`; elements `[n_path, 1]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(n_interact)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(n_interact)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  Cell of length `n_out`; elements `[sum(n_interact), 1]`. Empty for v4 legacy files. GBSM paths written with the C++ API
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ## See also:

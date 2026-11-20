@@ -87,10 +87,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
                                         const arma::vec &gr_eps_im)
 {
     const arma::uword n_freq = center_freq.n_elem, n_path = fbs_pos.n_cols;
-    if (n_freq == 0)
-        throw std::invalid_argument("Input 'center_freq' cannot be empty.");
-    if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))
-        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
+    qd_gbsm_check_fc(center_freq);
     qd_xyz(tx_pos, "tx_pos"), qd_xyz(rx_pos, "rx_pos");
     if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || lbs_pos.n_cols != n_path)
         throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have size [3, n_path].");
@@ -149,7 +146,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
     // 1 mm: float32 keeps z = 0 of a GR point for any x, y offset; a larger z means coordinates shifted in z
     for (arma::uword p = 0; p < n_path; ++p)
         if (type(p) == 1 && std::abs(lbs_pos(2, p)) > 1.0e-3)
-            throw std::invalid_argument("The interaction point of the GR path must be on the ground (z = 0); "
+            throw std::invalid_argument("Input 'lbs_pos' must have z = 0 (within 1 mm) for the GR path; "
                                         "shift local coordinates in x and y only.");
 
     auto check = [&](const auto &m)

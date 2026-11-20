@@ -234,7 +234,7 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
     pair_sums(n_all, false, acc);
 
     arma::Col<dtype> acf_est(n_bin, arma::fill::none);
-    if (dist_est != nullptr && dist_est->n_elem != n_bin)
+    if (dist_est != nullptr)
         dist_est->set_size(n_bin);
     for (arma::uword b = 0; b < n_bin; ++b)
     {
@@ -253,8 +253,7 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
         pv = val.memptr();
         pair_sums(n_pos, true, acc);
 
-        if (acf_est_dual->n_elem != n_bin)
-            acf_est_dual->set_size(n_bin);
+        acf_est_dual->set_size(n_bin);
         for (arma::uword b = 0; b < n_bin; ++b)
         {
             double coeff, mean_dist;

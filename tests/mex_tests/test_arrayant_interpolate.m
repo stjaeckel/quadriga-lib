@@ -68,7 +68,7 @@ try
     V_k = quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 2 );
 catch ME
     has_avx2 = false;
-    assertTrue( ~isempty(strfind(ME.message, 'AVX2 kernel requested but not available')) ); %#ok<STREMP>
+    assertTrue( ~isempty(strfind(ME.message, '''use_kernel'' cannot be 2')) ); %#ok<STREMP>
 end
 if has_avx2
     assertElementsAlmostEqual( V_k, V_re, 'absolute', 1e-6 );                           % Single precision
@@ -135,7 +135,7 @@ assert_throws( @() quadriga_lib.arrayant_interpolate( ant_bad, az, el ), 'Input 
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, [], [] ), 'Input ''azimuth'' must have 1 or n_out rows.' ); % C++
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el(1:2) ), ...
     'Input ''elevation'' must have the same size as ''azimuth''.' );                   % C++
-assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, 3 ), 'exceed the number of elements' ); % C++
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, 3 ), '''i_element'' contains an index that is out of range' ); % C++
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 3 ), ...
     'Input ''use_kernel'' must be 0, 1 or 2.' );                                       % C++
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant_m, az, el, [], [], [], [1e9, NaN] ), ...

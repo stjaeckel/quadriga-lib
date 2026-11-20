@@ -39,6 +39,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(version, 4)
 
         self.assertEqual(len(cir_offset), n_dest)
+        self.assertEqual(cir_offset.dtype, np.int64)
         self.assertEqual(cir_offset[0], 0)
         self.assertEqual(cir_offset[1], 1)
 
@@ -74,6 +75,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(version, 5)
 
         self.assertEqual(len(cir_offset), n_dest)
+        self.assertEqual(cir_offset.dtype, np.int64)
         self.assertEqual(cir_offset[0], 0)
         self.assertEqual(cir_offset[1], 1)
 
@@ -105,6 +107,8 @@ class test_case(unittest.TestCase):
         # Variable-per-snapshot outputs are lists of length n_out
         self.assertEqual(len(fbs_pos), 1)
         self.assertEqual(len(n_interact), 1)
+        self.assertEqual(n_interact[0].dtype, np.int64)
+        self.assertEqual(interact_type[0].dtype, np.uint8)
         self.assertEqual(len(coord), 1)
         self.assertIsInstance(path_coord[0], list)
 
@@ -277,7 +281,7 @@ class test_case(unittest.TestCase):
     # ---- qrt_file_read - error handling ----
     def test_read_errors(self):
         # CIR index out of range, checked before any CIR is read
-        with self.assertRaisesRegex(ValueError, "^Snapshot 1: CIR index exceeds"):
+        with self.assertRaisesRegex(ValueError, "^Snapshot 1: Input 'i_cir' is out of range"):
             channel.qrt_file_read(FN_V4, [0, 999], 0, uplink=False, normalize_polmat=1)
 
         # normalize_polmat other than 0 or 1

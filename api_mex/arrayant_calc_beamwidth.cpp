@@ -33,7 +33,7 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 ## Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`threshold_dB`** — Threshold in dB, positive and finite; default: 3 (equivalent to FWHM)
 
 ## Outputs:

@@ -40,17 +40,18 @@ static inline void qd_arrayant_fill_defaults(quadriga_lib::arrayant<double> &ant
 }
 
 // Occupied slots of an HDF5 slot selection, for hdf5_read_channel_vec (used by the MEX and Python read wrappers)
-// - dims, channel_id: layout {nx, ny, nz, nw} and channel ID per slot, as returned by hdf5_read_layout; dims = 0
-//   (missing file) throws std::runtime_error
+// - fn, dims, channel_id: file name, layout {nx, ny, nz, nw} and channel ID per slot, as returned by
+//   hdf5_read_layout; dims = 0 (missing file) throws std::runtime_error
 // - ix, iy, iz, iw: 0-based indices per dimension (any order, repeats allowed); empty = full extent; an index outside
 //   the layout throws std::invalid_argument
 // - Returns the slots with a non-zero channel ID in column-major order (ix fastest), one per column; [4, n_slot]
-static inline arma::u32_mat qd_hdf5_select_slots(const arma::u32_vec &dims, const arma::u32_vec &channel_id,
-                                                 const arma::u32_vec &ix, const arma::u32_vec &iy,
-                                                 const arma::u32_vec &iz, const arma::u32_vec &iw)
+static inline arma::u32_mat qd_hdf5_select_slots(const std::string &fn, const arma::u32_vec &dims,
+                                                 const arma::u32_vec &channel_id, const arma::u32_vec &ix,
+                                                 const arma::u32_vec &iy, const arma::u32_vec &iz,
+                                                 const arma::u32_vec &iw)
 {
     if (dims.n_elem != 4 || dims.at(0) == 0)
-        throw std::runtime_error("File does not exist.");
+        throw std::runtime_error("File '" + fn + "' does not exist.");
     const arma::u32_vec *given[4] = {&ix, &iy, &iz, &iw};
     const char *names[4] = {"ix", "iy", "iz", "iw"};
     arma::u32_vec sel[4];
@@ -175,7 +176,7 @@ static inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &
     auto st = std::make_shared<qd_qrt_chunk_state>();
     st->stream.open(fn, std::ios::in | std::ios::binary);
     if (!st->stream.is_open())
-        throw std::runtime_error("Cannot open file.");
+        throw std::runtime_error("Cannot open file '" + fn + "'.");
     st->cache = quadriga_lib::qrt_read_cache_init(fn, &st->stream);
 
     // Call without path outputs: checks all indices and options and reads the frequencies, but no path data

@@ -6,6 +6,7 @@
 #include "qd_helpers_shared.hpp"
 
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -71,9 +72,9 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
     for (arma::uword i = 0; i < n_cir; ++i)
     {
         if (delays[i].n_elem != powers[i].n_elem)
-            throw std::invalid_argument("Delays and powers must have the same number of elements for each CIR.");
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'powers' must have the same number of elements as 'delays'.");
         if (delays[i].n_elem == 0)
-            throw std::invalid_argument("Delay and power vectors must not be empty.");
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'delays' must not be empty.");
         qd_check_alias(mean_delay, "mean_delay", &delays[i], &powers[i]);
     }
 
@@ -81,7 +82,7 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
         throw std::invalid_argument("Input 'threshold_dB' must be > 0.");
 
     if (!(granularity >= (dtype)0.0) || !std::isfinite(granularity))
-        throw std::invalid_argument("Granularity must be a finite, non-negative number.");
+        throw std::invalid_argument("Input 'granularity' must be finite and non-negative.");
 
     // --- Granularity-based binning ---
     if (granularity > (dtype)0.0)
@@ -152,7 +153,7 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
     dtype *p_ds = ds.memptr();
 
     bool calc_mean = (mean_delay != nullptr);
-    if (calc_mean && mean_delay->n_elem != n_cir)
+    if (calc_mean)
         mean_delay->set_size(n_cir);
 
     for (arma::uword i = 0; i < n_cir; ++i)

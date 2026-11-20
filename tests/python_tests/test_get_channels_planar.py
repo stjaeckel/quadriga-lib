@@ -391,8 +391,8 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod, eod, aoa, eoa, pg, pl, M, 2997924580.0,
                 use_absolute_delays=True)
         self.assertEqual(str(ctx.exception),
-                         "Transmit antenna: Imaginary part of coupling matrix (phase component) "
-                         "defined without real part (absolute component)")
+                         "Input 'tx_array' is not valid: Imaginary part of coupling matrix (phase component) "
+                         "defined without real part (absolute component).")
 
     def test_no_coupling_keys_accepted(self):
         ant = minimal_ant()
@@ -413,7 +413,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod[[0, 1, 1]], eod, aoa, eoa, pg, pl, M,
                 2997924580.0, use_absolute_delays=True)
         self.assertEqual(str(ctx.exception),
-                         "Snapshot 0: Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'polmat' "
+                         "Snapshot 0: Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' "
                          "must have the same number of columns (n_paths).")
 
     def test_error_tx_pos_wrong_size(self):

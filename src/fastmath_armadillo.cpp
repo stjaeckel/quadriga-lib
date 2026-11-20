@@ -37,7 +37,7 @@ void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *sin_x = nullptr,
 
 ## Inputs:
 - **`x`** — Input angles; `[n_elem]`
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ## Outputs:
 - **`sin_x`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
@@ -55,9 +55,9 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *sin_x, arm
 
     qd_check_alias_list({sin_x, cos_x}, {"sin_x", "cos_x"}, &x);
 
-    if (sin_x != nullptr && sin_x->n_elem != n_val)
+    if (sin_x != nullptr)
         sin_x->set_size(n_val);
-    if (cos_x != nullptr && cos_x->n_elem != n_val)
+    if (cos_x != nullptr)
         cos_x->set_size(n_val);
 
     if (n_val == 0)
@@ -106,9 +106,9 @@ void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &asin_x, int use_ke
 
 ## Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [[fast_sincos]]; default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [[fast_sincos]]
 
-## Outputs:
+## Output:
 - **`asin_x`** — asin(x); `[n_elem]`
 MD!*/
 
@@ -119,8 +119,7 @@ void quadriga_lib::fast_asin(const arma::Col<dtype> &x, arma::fvec &asin_x, int 
     const arma::uword n_val = x.n_elem;
     qd_check_alias(&asin_x, "asin_x", &x);
 
-    if (asin_x.n_elem != n_val)
-        asin_x.set_size(n_val);
+    asin_x.set_size(n_val);
 
     if (n_val == 0)
         return;
@@ -154,9 +153,9 @@ void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &acos_x, int use_ke
 
 ## Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [[fast_sincos]]; default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [[fast_sincos]]
 
-## Outputs:
+## Output:
 - **`acos_x`** — acos(x); `[n_elem]`
 MD!*/
 
@@ -167,8 +166,7 @@ void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &acos_x, int 
     const arma::uword n_val = x.n_elem;
     qd_check_alias(&acos_x, "acos_x", &x);
 
-    if (acos_x.n_elem != n_val)
-        acos_x.set_size(n_val);
+    acos_x.set_size(n_val);
 
     if (n_val == 0)
         return;
@@ -204,9 +202,9 @@ void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fv
 ## Inputs:
 - **`y`** — Y-coordinates (numerator); `[n_elem]`
 - **`x`** — X-coordinates (denominator); `[n_elem]`
-- **`use_kernel`** — Kernel, as in [[fast_sincos]]; default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [[fast_sincos]]
 
-## Outputs:
+## Output:
 - **`atan2_yx`** — atan2(y, x); `[n_elem]`
 MD!*/
 
@@ -220,8 +218,7 @@ void quadriga_lib::fast_atan2(const arma::Col<dtype> &y, const arma::Col<dtype> 
         throw std::invalid_argument("Input vectors 'y' and 'x' must have the same length.");
     qd_check_alias(&atan2_yx, "atan2_yx", &y, &x);
 
-    if (atan2_yx.n_elem != n_val)
-        atan2_yx.set_size(n_val);
+    atan2_yx.set_size(n_val);
 
     if (n_val == 0)
         return;
@@ -272,7 +269,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 - **`B_re`** — Real part of source B; `[n_elem]`
 - **`B_im`** — Imaginary part of source B; `[n_elem]`
 - **`w`** — Per-element interpolation weight in [0, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [[fast_sincos]]; default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [[fast_sincos]]
 
 ## Outputs:
 - **`X_re`** — Real part of interpolated result; `[n_elem]`
@@ -289,13 +286,11 @@ void quadriga_lib::fast_slerp(const arma::Col<dtype> &A_re, const arma::Col<dtyp
     const arma::uword n_val = A_re.n_elem;
 
     if (A_im.n_elem != n_val || B_re.n_elem != n_val || B_im.n_elem != n_val || w.n_elem != n_val)
-        throw std::invalid_argument("All input vectors must have the same length.");
+        throw std::invalid_argument("Inputs 'A_im', 'B_re', 'B_im' and 'w' must have as many elements as 'A_re'.");
     qd_check_alias_list({&X_re, &X_im}, {"X_re", "X_im"}, &A_re, &A_im, &B_re, &B_im, &w);
 
-    if (X_re.n_elem != n_val)
-        X_re.set_size(n_val);
-    if (X_im.n_elem != n_val)
-        X_im.set_size(n_val);
+    X_re.set_size(n_val);
+    X_im.set_size(n_val);
 
     if (n_val == 0)
         return;
@@ -337,7 +332,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
 ## Declaration:
 ```
-void fast_geo2cart(
+void quadriga_lib::fast_geo2cart(
     const arma::Col<dtype> &az,
     const arma::Col<dtype> &el,
     arma::Col<dtype> &x,
@@ -355,7 +350,7 @@ void fast_geo2cart(
 - **`az`** — Azimuth angles; `[n_elem]`
 - **`el`** — Elevation angles; `[n_elem]`
 - **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
+- **`use_kernel`** *(optional)* — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ## Outputs:
 - **`x`** — X-coordinates; `[n_elem]`
@@ -389,22 +384,19 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
     qd_check_alias_list<arma::Col<dtype>>({&x, &y, &z, sin_az, cos_az, sin_el, cos_el}, {"x", "y", "z", "sin_az", "cos_az", "sin_el", "cos_el"},
                                           &az, &el, &len);
 
-    // Resize required outputs
-    if (x.n_elem != n_val)
-        x.set_size(n_val);
-    if (y.n_elem != n_val)
-        y.set_size(n_val);
-    if (z.n_elem != n_val)
-        z.set_size(n_val);
+    // Outputs
+    x.set_size(n_val);
+    y.set_size(n_val);
+    z.set_size(n_val);
 
     // Resize optional outputs
-    if (sin_az && sin_az->n_elem != n_val)
+    if (sin_az)
         sin_az->set_size(n_val);
-    if (cos_az && cos_az->n_elem != n_val)
+    if (cos_az)
         cos_az->set_size(n_val);
-    if (sin_el && sin_el->n_elem != n_val)
+    if (sin_el)
         sin_el->set_size(n_val);
-    if (cos_el && cos_el->n_elem != n_val)
+    if (cos_el)
         cos_el->set_size(n_val);
 
     if (n_val == 0)
@@ -465,7 +457,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 - **`x`** — X-coordinates; `[n_elem]`
 - **`y`** — Y-coordinates; `[n_elem]`
 - **`z`** — Z-coordinates; `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw; default `0`
+- **`use_kernel`** *(optional)* — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ## Outputs:
 - **`az`** — Azimuth angles; `[n_elem]`
@@ -489,11 +481,9 @@ void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtyp
     qd_check_alias_list<arma::Col<dtype>>({&az, &el, len}, {"az", "el", "len"}, &x, &y, &z);
 
     // Resize outputs
-    if (az.n_elem != n_val)
-        az.set_size(n_val);
-    if (el.n_elem != n_val)
-        el.set_size(n_val);
-    if (len != nullptr && len->n_elem != n_val)
+    az.set_size(n_val);
+    el.set_size(n_val);
+    if (len != nullptr)
         len->set_size(n_val);
 
     if (n_val == 0)

@@ -53,11 +53,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    const int n_out = (nlhs == 0) ? 1 : nlhs;
-
     std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     bool read_all = (nrhs < 2) || mxIsEmpty(prhs[1]);
-    unsigned id = read_all ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id", 1);
+    unsigned id = read_all ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id", 1); // 1-based file ID; no shift intended
 
     std::vector<quadriga_lib::arrayant<double>> arrayant;
     arma::u32_mat layout;
@@ -68,7 +66,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         CALL_QD(arrayant = quadriga_lib::qdant_read_multi<double>(fn, &layout));
 
         if (arrayant.empty())
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File does not contain any data.");
+        {
+            const std::string msg = "File '" + fn + "' does not contain any antenna data.";
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+        }
         else if (arrayant.size() > 1) // Multi-freq mode
         {
             // The entries must form a frequency set (same element count, grids, positions and coupling size)
@@ -81,7 +82,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             }
 
             plhs[0] = qd_mex_arrayant2struct_multi(arrayant);
-            if (n_out == 2)
+            if (nlhs > 1)
                 plhs[1] = qd_mex_copy2matlab(&layout);
             return;
         }
@@ -93,6 +94,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     plhs[0] = qd_mex_arrayant2struct(arrayant[0]);
-    if (n_out == 2)
+    if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&layout);
 }

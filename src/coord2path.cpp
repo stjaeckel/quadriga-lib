@@ -38,14 +38,14 @@ void quadriga_lib::coord2path(
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`n_interact`** — Number of interactions per path (0 = LOS); `[n_path]`
 - **`interact_coord`** — Interaction coordinates in path order; must have 3 rows; `[3, sum(n_interact)]`
-- **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
+- **`reverse_path`** *(optional)* — If `true`, swaps TX/RX and reverses interaction sequences
 
 ## Outputs:
-- **`path_length`** (optional) — Absolute path length TX to RX; `[n_path]`
-- **`fbs_pos`** (optional) — First-bounce scatterer positions; `[3, n_path]`
-- **`lbs_pos`** (optional) — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_angles`** (optional) — Departure and arrival angles {AOD, EOD, AOA, EOA}; `[n_path, 4]`
-- **`path_coord`** (optional) — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX; `[n_path]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_angles`** *(optional)* — Departure and arrival angles {AOD, EOD, AOA, EOA}; `[n_path, 4]`
+- **`path_coord`** *(optional)* — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
 MD!*/
 
 template <typename dtype>
@@ -88,13 +88,13 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
     constexpr double los_limit = 1.0e-4;
 
     // Set the output size
-    if (path_length != nullptr && path_length->n_elem != n_path)
+    if (path_length != nullptr)
         path_length->set_size(n_path);
-    if (fbs_pos != nullptr && (fbs_pos->n_rows != 3 || fbs_pos->n_cols != n_path))
+    if (fbs_pos != nullptr)
         fbs_pos->set_size(3, n_path);
-    if (lbs_pos != nullptr && (lbs_pos->n_rows != 3 || lbs_pos->n_cols != n_path))
+    if (lbs_pos != nullptr)
         lbs_pos->set_size(3, n_path);
-    if (path_angles != nullptr && (path_angles->n_rows != n_path || path_angles->n_cols != 4))
+    if (path_angles != nullptr)
         path_angles->set_size(n_path, 4);
     if (path_coord != nullptr && path_coord->size() != n_path)
         path_coord->resize(n_path);

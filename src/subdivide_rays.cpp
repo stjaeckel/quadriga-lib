@@ -38,7 +38,8 @@ arma::uword quadriga_lib::subdivide_rays(
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
-    const arma::u32_vec &index = arma::u32_vec());
+    const arma::u32_vec &index = arma::u32_vec(),
+    bool transposed_output = false);
 ```
 
 ## Inputs:
@@ -46,18 +47,18 @@ arma::uword quadriga_lib::subdivide_rays(
 - **`trivec`** — Vectors from origin to the wavefront vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian
   `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
-- **`dest`** (optional) — Ray destination points, ignored if empty; `[n_ray, 3]`
-- **`index`** (optional) — 0-based indices of the rays that should be subdivided, may repeat indices and
+- **`dest`** *(optional)* — Ray destination points, ignored if empty; `[n_ray, 3]`
+- **`index`** *(optional)* — 0-based indices of the rays that should be subdivided, may repeat indices and
   determines the output order; Invalid indices raise an exception after the loop has finished,
   outputs may be partially written by then; `[n_subdiv]`
-- **`transposed_output`** (optional) — If true, the outputs are written transposed with the rays in the
+- **`transposed_output`** *(optional)* — If true, the outputs are written transposed with the rays in the
   columns, e.g. `origN` becomes `[3, n_rayN]`; default = `false`
 
 ## Outputs:
-- **`origN`** — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
-- **`trivecN`** — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
-- **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
-- **`destN`** — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`origN`** *(optional)* — Subdivided ray origins, centroids of the sub-beam wavefronts; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
+- **`trivecN`** *(optional)* — Subdivided wavefront vectors, relative to `origN`; `[n_rayN, 9]` or `[9, n_rayN]` for `transposed_output`
+- **`tridirN`** *(optional)* — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]` or `[6/9, n_rayN]` for `transposed_output`
+- **`destN`** *(optional)* — Subdivided destinations, left untouched if `dest` is empty; `[n_rayN, 3]` or `[3, n_rayN]` for `transposed_output`
 
 ## Returns:
 - `n_rayN` — Number of rays written to the output, `4 * n_subdiv`
@@ -140,7 +141,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
         if (n_slotN == 0)
             n_slotN = n_slot;
         else if (n_slot != n_slotN)
-            throw std::invalid_argument("Pre-allocated output matrices must have the same number of rays.");
+            throw std::invalid_argument("Pre-sized outputs 'origN', 'trivecN', 'tridirN' and 'destN' must have the same number of rays.");
     }
     n_slotN = (n_slotN == 0) ? n_rayN : n_slotN;
 
@@ -358,7 +359,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     }
 
     if (out_of_bound != 0)
-        throw std::invalid_argument("Indices cannot exceed number of rays.");
+        throw std::invalid_argument("Input 'index' contains an index that is out of range for 'orig'.");
 
     return n_rayN;
 }

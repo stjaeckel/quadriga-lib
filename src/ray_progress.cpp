@@ -236,17 +236,17 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. Empty → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Empty with a partition present → boxes are computed internally via [[triangle_mesh_aabb]]
-- **`max_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
-- **`max_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
-- **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
-- **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
+- **`max_interactions`** *(optional)* — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
+- **`max_reflections`** *(optional)* — Reflections per ray, 0 to 255. 0 skips the reflection pass
+- **`max_transmissions`** *(optional)* — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
+- **`max_subdivisions`** *(optional)* — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `n_sub` saturates at 255 instead of wrapping
-- **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
-- **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
-- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [[ray_state_update]] as its `eps`; see there. Default 0.15
-- **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
-- **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
+- **`min_gain_dB`** *(optional)* — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
+- **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
+- **`thin_slab_threshold`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [[ray_state_update]] as its `eps`; see there. Default 0.15
+- **`refraction_mode`** *(optional)* — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
+- **`scalar_mode`** *(optional)* — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
 - **`n_interact_in`** *(optional)* — Externally computed intersection count per ray from [[ray_triangle_intersect]]; `[n_ray]`.
   When given, the internal intersector is skipped and `fbs_ind_in` and `sbs_ind_in` become mandatory
 - **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
@@ -349,7 +349,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 
     const arma::uword n_mtl = qd_material_count(mtl_prop);
     if (mtl_ind.max() > n_mtl)
-        throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
+        throw std::invalid_argument("Input 'mtl_ind' contains an index that is out of range for 'mtl_prop'.");
 
     const arma::uword n_freq = qd_check_center_freq(center_freq);
     float fRef_Hz = center_freq[0];

@@ -33,11 +33,11 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object index per mesh element; 1-based; enables per-object output; `[n_mesh]`
 - **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are
-  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0
+  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; default: 0
 
 ## Output:
-- `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
-  index (with `obj_ind`); size `[n_points]`
+- **`result`** — Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object
+  index (with `obj_ind`); uint64; `[n_points, 1]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -55,7 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Object index: MATLAB 1-based -> C++ 0-based
     const arma::uvec obj_ind_arma = (nrhs < 3) ? arma::uvec() : qd_mex_get_index_Col(prhs[2], "obj_ind");
 
-    arma::uvec res;
+    arma::uvec res; // C++ returns 1-based object indices (0 = outside); no shift intended
     CALL_QD(res = quadriga_lib::point_inside_mesh(points_arma, mesh_arma, obj_ind_arma, distance));
 
     plhs[0] = qd_mex_copy2matlab(&res);

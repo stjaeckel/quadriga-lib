@@ -61,9 +61,9 @@ void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &acos_x, int use_ke
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
-### Outputs:
+### Output:
 - **`acos_x`** — acos(x); `[n_elem]`
 
 ---
@@ -85,9 +85,9 @@ void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &asin_x, int use_ke
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
-### Outputs:
+### Output:
 - **`asin_x`** — asin(x); `[n_elem]`
 
 ---
@@ -111,9 +111,9 @@ void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fv
 ### Inputs:
 - **`y`** — Y-coordinates (numerator); `[n_elem]`
 - **`x`** — X-coordinates (denominator); `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
-### Outputs:
+### Output:
 - **`atan2_yx`** — atan2(y, x); `[n_elem]`
 
 ---
@@ -145,7 +145,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 - **`x`** — X-coordinates; `[n_elem]`
 - **`y`** — Y-coordinates; `[n_elem]`
 - **`z`** — Z-coordinates; `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw; default `0`
+- **`use_kernel`** *(optional)* — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ### Outputs:
 - **`az`** — Azimuth angles; `[n_elem]`
@@ -171,7 +171,7 @@ Also in: [MATLAB](../mex/math-functions.md#fast_geo2cart) · [Python](../python/
 
 ### Declaration:
 ```cpp
-void fast_geo2cart(
+void quadriga_lib::fast_geo2cart(
     const arma::Col<dtype> &az,
     const arma::Col<dtype> &el,
     arma::Col<dtype> &x,
@@ -189,7 +189,7 @@ void fast_geo2cart(
 - **`az`** — Azimuth angles; `[n_elem]`
 - **`el`** — Elevation angles; `[n_elem]`
 - **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n_elem]`
-- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
+- **`use_kernel`** *(optional)* — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); other values throw
 
 ### Outputs:
 - **`x`** — X-coordinates; `[n_elem]`
@@ -228,7 +228,7 @@ void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *sin_x = nullptr,
 
 ### Inputs:
 - **`x`** — Input angles; `[n_elem]`
-- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
 
 ### Outputs:
 - **`sin_x`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
@@ -269,7 +269,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 - **`B_re`** — Real part of source B; `[n_elem]`
 - **`B_im`** — Imaginary part of source B; `[n_elem]`
 - **`w`** — Per-element interpolation weight in [0, 1]; `[n_elem]`
-- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
+- **`use_kernel`** *(optional)* — Kernel, as in [fast_sincos](#fast_sincos)
 
 ### Outputs:
 - **`X_re`** — Real part of interpolated result; `[n_elem]`
@@ -290,7 +290,7 @@ Also in: [MATLAB](../mex/math-functions.md#interp) · [Python](../python/math-fu
 - `interp_1D` interpolates the columns of a matrix; a single data set is a matrix with one column.
 - Data types (`dtype`): `float` or `double`
 
-### Declarations:
+### Declaration:
 ```cpp
 void quadriga_lib::interp_2D(
     const arma::Col<dtype> &x,

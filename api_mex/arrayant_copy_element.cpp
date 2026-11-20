@@ -28,11 +28,11 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_targ
 ## Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
   [[arrayant_generate]]; a struct array may contain a frequency-dependent model
-- **`i_source`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
-- **`i_target`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+- **`i_source`** — Index of the source element(s); 1-based; scalar or `[n_copy]`
+- **`i_target`** — Index of the destination element(s); 1-based; scalar or `[n_copy]`;
   if `i_source` is a vector, must have the same length
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
   `arrayant_in`; a struct array of equal size is returned for multi-frequency input
 MD!*/
@@ -60,10 +60,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uvec dest = qd_mex_get_index_Col(prhs[2], "i_target");
 
     if (source.n_elem == 0 || dest.n_elem == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'i_source' and 'i_target' cannot be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'i_source' and 'i_target' cannot be empty.");
 
     if (source.n_elem > 1 && source.n_elem != dest.n_elem)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "When copying multiple elements, 'i_source' and 'i_target' must have the same length.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'i_source' and 'i_target' must have the same length when 'i_source' has more than one entry.");
 
     if (n_freq > 1)
     {

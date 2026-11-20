@@ -15,7 +15,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
   directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
-  results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
+  results via [[arrayant_concat]] and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
@@ -59,13 +59,13 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
 - **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
-- **`center_freq`** — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** — Frequency sample points; `[n_freq]`; default: `[]` (auto-generated third-octave bands)
 - **`angular_resolution_deg`** — Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
-## Outputs:
+## Output:
 - **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [[arrayant_generate]] for struct fields; `[n_freq]`
+  see [[arrayant_generate]] for struct fields; `[1, n_freq]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -193,7 +193,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         self.assertFalse(os.path.exists(self._path('ne.obj')))  # checked before any file is written
         with self.assertRaisesRegex(ValueError, "'radius_min' cannot be negative."):
             self._export('nr.obj', chan, radius_max=-1.0)
-        with self.assertRaisesRegex(ValueError, "'i_snap' cannot exceed"):
+        with self.assertRaisesRegex(ValueError, "'i_snap' contains an index that is out of range"):
             self._export('oor.obj', chan, i_snap=np.array([3], dtype=np.uint64))
 
 

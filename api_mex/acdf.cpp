@@ -21,7 +21,7 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 - `Inf` and `NaN` values are excluded from computation
 - A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu`
   and `sig`; if no set has finite values (possible only with `bins_in`), `cdf_avg`, `mu` and `sig` are NaN
-- If `bins` is empty, equally spaced bins spanning the data range are generated
+- If `bins_in` is empty, equally spaced bins spanning the data range are generated
 
 ## Usage:
 ```
@@ -40,10 +40,10 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 ## Outputs:
 - **`cdf_per_set`** — Individual CDFs; one per column of data (NaN for a set without finite values); `[n_bins_out, n_sets]`
 - **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
-  `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
-- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins]`
-- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
-- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9]`
+  `[n_bins_out, 1]` with `n_bins_out = n_bins` or `n_bins_out = n_bins_in`
+- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins_out, 1]`
+- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
+- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -78,12 +78,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!bins_in.empty())
         bins_out = bins_in;
 
-    arma::mat *p_cdf = cdf_per_set.empty() ? nullptr : &cdf_per_set;
-    arma::vec *p_avg = cdf_avg.empty() ? nullptr : &cdf_avg;
-    arma::vec *p_mu = mu.empty() ? nullptr : &mu;
-    arma::vec *p_sig = sig.empty() ? nullptr : &sig;
-
-    CALL_QD(quadriga_lib::acdf<double>(data, &bins_out, p_cdf, p_avg, p_mu, p_sig, n_bins));
+    CALL_QD(quadriga_lib::acdf<double>(data, &bins_out, &cdf_per_set,
+                                       (nlhs > 2) ? &cdf_avg : nullptr,
+                                       (nlhs > 3) ? &mu : nullptr,
+                                       (nlhs > 4) ? &sig : nullptr, n_bins));
 
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&bins_out);

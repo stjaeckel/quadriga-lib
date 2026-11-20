@@ -131,7 +131,18 @@ try
     data = quadriga_lib.arrayant_generate('bla');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Array type not supported!';
+    expectedErrorMessage = 'Input ''type'' has an unsupported value ''bla''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% A C++ error while building the custom 3GPP element pattern reaches MATLAB as an error
+try
+    data = quadriga_lib.arrayant_generate('3GPP', 0.05, [], 60, 60);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'must be finite and at least 0.1 degrees';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

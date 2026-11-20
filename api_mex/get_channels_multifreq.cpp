@@ -95,9 +95,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     auto ant_rx = qd_mex_struct2arrayant_multi(prhs[1], false, false, "rx_array");
 
     if (ant_tx.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "tx_array must not be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'tx_array' cannot be empty.");
     if (ant_rx.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "rx_array must not be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rx_array' cannot be empty.");
 
     const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6], false, "fbs_pos");
     const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");

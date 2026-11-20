@@ -144,7 +144,7 @@ class test_case(unittest.TestCase):
         # Thrown by the string list conversion
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.gbsm.conf_file_list(3)
-        self.assertIn("Expected a string", str(ctx.exception))
+        self.assertIn("Input 'dirs' must be a path", str(ctx.exception))
         with self.assertRaises(ValueError):
             quadriga_lib.gbsm.conf_file_list([self.d1, 3])
 

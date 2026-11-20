@@ -227,7 +227,7 @@ arma::mat quadriga_lib::path_loss(const std::string &pl_model,
     while (m < n_model && pl_model != names[m])
         ++m;
     if (m == n_model)
-        throw std::invalid_argument("Path-loss model '" + pl_model + "' is not supported.");
+        throw std::invalid_argument("Input 'pl_model' has an unsupported value '" + pl_model + "'.");
     const model_t model = static_cast<model_t>(m);
 
     // Parameters, in the order the model reads them: 'opt' returns false if the key is absent, 'req' throws
@@ -239,14 +239,14 @@ arma::mat quadriga_lib::path_loss(const std::string &pl_model,
         if (it == plpar.end())
             return false;
         if (it->second.size() != 1)
-            throw std::invalid_argument(std::string("Path-loss parameter '") + key + "' must have one value.");
+            throw std::invalid_argument(std::string("Input 'plpar' must have one value for key '") + key + "'.");
         if (!std::isfinite(it->second[0]))
-            throw std::invalid_argument(std::string("Path-loss parameter '") + key + "' must be finite.");
+            throw std::invalid_argument(std::string("Input 'plpar' must have a finite value for key '") + key + "'.");
         val = it->second[0];
         return true;
     };
     auto missing = [&](const char *key)
-    { return std::invalid_argument("Path-loss model '" + pl_model + "' requires the parameter '" + key + "'."); };
+    { return std::invalid_argument("Input 'plpar' must have the key '" + std::string(key) + "' for model '" + pl_model + "'."); };
     auto req = [&](const char *key, double &val)
     {
         if (!opt(key, val))
@@ -255,7 +255,7 @@ arma::mat quadriga_lib::path_loss(const std::string &pl_model,
     auto positive = [](const char *key, double val)
     {
         if (!(val > 0.0))
-            throw std::invalid_argument(std::string("Path-loss parameter '") + key + "' must be > 0.");
+            throw std::invalid_argument(std::string("Input 'plpar' must have a value > 0 for key '") + key + "'.");
     };
 
     // Parameters of the dual-slope model; the breakpoint factor is "E1 or E" for 'tripple_slope', "E" otherwise
@@ -305,7 +305,7 @@ arma::mat quadriga_lib::path_loss(const std::string &pl_model,
         for (int i = 0; i < 14; ++i)
             req(keys[i], w[i]);
         if (w[0] == w[1])
-            throw std::invalid_argument("Path-loss parameters 'A1' and 'A2' must differ for model 'winner_los'.");
+            throw std::invalid_argument("Input 'plpar' must have different values for keys 'A1' and 'A2' for model 'winner_los'.");
         break;
     }
     case m_winner_nlos:
@@ -400,7 +400,7 @@ arma::mat quadriga_lib::path_loss(const std::string &pl_model,
 
     // Outputs
     arma::mat pl_dB(n_link, n_freq, arma::fill::none);
-    if (sf_sigma_dB != nullptr && (sf_sigma_dB->n_rows != n_link || sf_sigma_dB->n_cols != n_freq))
+    if (sf_sigma_dB != nullptr)
         sf_sigma_dB->set_size(n_link, n_freq);
 
     const bool tx_single = tx.n_cols != n_link;

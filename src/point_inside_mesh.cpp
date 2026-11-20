@@ -64,7 +64,7 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
         throw std::invalid_argument("Number of elements in 'obj_ind' does not match number of rows in 'mesh'.");
 
     if (!(distance >= 0.0 && distance <= 20.0)) // Also rejects NaN
-        throw std::invalid_argument("Distance must be in between 0 and 20 meters.");
+        throw std::invalid_argument("Input 'distance' must be between 0 and 20 m.");
 
     if (points.n_rows == 0)
         return arma::uvec();

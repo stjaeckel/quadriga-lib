@@ -14,7 +14,6 @@ SECTION!*/
 # PLANE
 Construct a triangulated plane mesh
 
-## Description:
 - Generates a Blender-style plane: a 2 x 2 quad in the xy-plane centered at the origin (vertices
   at +/-1, z = 0)
 - The quad is split into 2 triangles, yielding 2 triangles at n_div = 1
@@ -31,16 +30,16 @@ mesh = quadriga_lib.plane( scale, rotation, location, n_div );
 ```
 
 ## Inputs:
-- **`scale`** *(optional)* — Length 1 scales x and y uniformly; length 2 scales {x,y}
+- **`scale`** — Length 1 scales x and y uniformly; length 2 scales {x,y}
   independently; length 3 is accepted for compatibility with `cube`, but the third element is
-  ignored; empty or omitted = 1 (no scaling)
-- **`rotation`** *(optional)* — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
-  XYZ); length 3; empty or omitted = no rotation
-- **`location`** *(optional)* — Translation {x,y,z}; length 3; empty or omitted = origin
-- **`n_div`** *(optional)* — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
+  ignored; default: `[]` (1, no scaling)
+- **`rotation`** — Euler angles about {x,y,z}, applied as R = Rz·Ry·Rx (Blender
+  XYZ); length 3; default: `[]` (no rotation)
+- **`location`** — Translation {x,y,z}; length 3; default: `[]` (origin)
+- **`n_div`** — Number of subdivisions per edge; yields 2 · n_div^2 triangles;
   default: 1
 
-## Outputs:
+## Output:
 - **`mesh`** — Triangle mesh; each row holds {x1,y1,z1,x2,y2,z2,x3,y3,z3}; `[2 · n_div^2, 9]`
 
 ## See also:

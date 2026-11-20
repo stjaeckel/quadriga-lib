@@ -39,11 +39,11 @@ arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dt
         return arma::Col<dtype>();
 
     if (chan.coeff_re.empty() && chan.polmat.empty())
-        throw std::invalid_argument("Neither coefficients nor polarization are provided.");
+        throw std::invalid_argument("Input 'chan' must contain 'coeff_re' or 'polmat'.");
 
     std::string error_message = chan.is_valid();
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'chan' is not valid: " + error_message);
 
     bool use_coeff = !chan.coeff_re.empty();
     bool has_path_gain = !chan.path_gain.empty();

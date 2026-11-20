@@ -188,7 +188,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
         }
 
         if (freq_vec.empty())
-            throw std::invalid_argument("Could not generate frequency samples in the audible range.");
+            throw std::invalid_argument("Inputs 'lower_cutoff' and 'upper_cutoff' must overlap the audible range (20 Hz to 20 kHz) when 'center_freq' is empty.");
 
         center_freq.set_size((arma::uword)freq_vec.size());
         for (arma::uword i = 0; i < (arma::uword)freq_vec.size(); ++i)

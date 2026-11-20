@@ -45,7 +45,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_calc_beamwidth) · [Py
 ### Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`threshold_dB`** — Threshold in dB, positive and finite; default: 3 (equivalent to FWHM)
 
 ### Outputs:
@@ -77,7 +77,7 @@ directivity_dBi = quadriga_lib.arrayant_calc_directivity( arrayant, i_element );
 ### Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 
 ### Output:
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
@@ -110,15 +110,14 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq_new, azi
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
-  recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
-   entry's `center_freq` unchanged.
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
+- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is
+  recomputed (interpolated) at each requested frequency; default: `[]` (each input entry's `center_freq` unchanged)
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; default: `[]` (input grid)
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; default: `[]` (input grid)
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
   default: 299792458
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when both input and
   `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
@@ -155,11 +154,11 @@ arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
 
 ### Inputs:
 - **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
-  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent  model
+  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
 - **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
   `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
   a struct array of equal size is returned for multi-frequency input
 
@@ -186,11 +185,11 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_targ
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
   [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
-- **`i_source`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
-- **`i_target`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+- **`i_source`** — Index of the source element(s); 1-based; scalar or `[n_copy]`
+- **`i_target`** — Index of the destination element(s); 1-based; scalar or `[n_copy]`;
   if `i_source` is a vector, must have the same length
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
   `arrayant_in`; a struct array of equal size is returned for multi-frequency input
 
@@ -207,8 +206,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [P
 
 ### Usage:
 ```matlab
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap,  object_radius, ...
-   icosphere_n_div, i_element, i_freq );
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, ...
+    icosphere_n_div, i_element, i_freq );
 ```
 
 ### Inputs:
@@ -219,9 +218,9 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, color
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object; default: 1 m
 - **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [icosphere](site-specific-simulation-tools.md#icosphere); default: 4
-- **`i_element`** — Element indices to export; 1-based; uint64; empty = export all elements
-- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based; 
-  uint64; default: 1; must satisfy `1 <= i_freq <= n_freq`
+- **`i_element`** — Element indices to export; 1-based; default: `[]` (all elements)
+- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based;
+  default: 1; must satisfy `1 <= i_freq <= n_freq`
 
 ### See also:
 - [icosphere](site-specific-simulation-tools.md#icosphere) (icosphere primitive used internally)
@@ -334,7 +333,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 - **`dir`** — Beam steering angles, `[3, n_beams]`; rows are `[azimuth_deg; elevation_deg; weight]`; 
   `multibeam` combines beams via MRT weighting, `multibeam_sep` produces one independent beam per column (weights ignored)
 
-### Outputs:
+### Output:
 - **`ant`** — Struct with fields:
    | Field            | Description                                               | Size                                   |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -455,7 +454,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, orientation, us
   rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
 - **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
 
-### Outputs:
+### Output:
 - **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
   field layout as documented in [arrayant_generate](#arrayant_generate)
 
@@ -469,7 +468,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [Python](.
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
   directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
-  results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
+  results via [arrayant_concat](#arrayant_concat) and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
@@ -513,13 +512,13 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
 - **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
-- **`center_freq`** — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** — Frequency sample points; `[n_freq]`; default: `[]` (auto-generated third-octave bands)
 - **`angular_resolution_deg`** — Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
-### Outputs:
+### Output:
 - **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [arrayant_generate](#arrayant_generate) for struct fields; `[n_freq]`
+  see [arrayant_generate](#arrayant_generate) for struct fields; `[1, n_freq]`
 
 ---
 <a id="qdant_read"></a>
@@ -581,7 +580,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#qdant_write) · [Python](../pyt
   written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
   degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
-  1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
+  1-based IDs; in this mode appending to an existing file is not allowed and will cause an error
 
 ### Usage:
 ```matlab
@@ -597,8 +596,8 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 - **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
   default: a row of all IDs in the file (replaces a layout written before)
 
-### Outputs:
-- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
+### Output:
+- **`id_in_file`** — ID assigned to the antenna in the file after writing; uint32; set to 0 in multi-frequency (struct array) mode
 
 ### See also:
 - [qdant_read](#qdant_read) (for reading QDANT data)

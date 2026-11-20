@@ -2289,9 +2289,9 @@ TEST_CASE("Get Channels Spherical - vec form errors")
     auto bad = ant;
     bad.e_theta_im.reset();
     CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(bad, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl),
-                      ContainsSubstring("Transmit antenna: ") && !ContainsSubstring("Snapshot"));
+                      ContainsSubstring("Input 'tx_array' is not valid: ") && !ContainsSubstring("Snapshot"));
     CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, bad, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
-                      ContainsSubstring("Receive antenna: ") && !ContainsSubstring("Snapshot"));
+                      ContainsSubstring("Input 'rx_array' is not valid: ") && !ContainsSubstring("Snapshot"));
     CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl,
                                                                      0.0, false, false, nullptr, nullptr, nullptr, nullptr, nullptr, 7),
                     std::invalid_argument);

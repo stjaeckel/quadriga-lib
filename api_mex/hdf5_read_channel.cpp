@@ -93,7 +93,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<quadriga_lib::channel<double>> channels;
     arma::u32_vec dims, channel_id;
     CALL_QD(dims = quadriga_lib::hdf5_read_layout(fn, &channel_id));
-    CALL_QD(channels = quadriga_lib::hdf5_read_channel_vec<double>(fn, qd_hdf5_select_slots(dims, channel_id, ix, iy, iz, iw), i_snap));
+    CALL_QD(channels = quadriga_lib::hdf5_read_channel_vec<double>(fn, qd_hdf5_select_slots(fn, dims, channel_id, ix, iy, iz, iw), i_snap));
 
     // Keep par-only channels (c.empty() ignores par_data); check the structured data
     channels.erase(std::remove_if(channels.begin(), channels.end(), [](const quadriga_lib::channel<double> &c)

@@ -344,7 +344,7 @@ TEST_CASE("gbsm_rays_from_paths - a GR point off the ground throws; permittivity
 {
     const quadriga_lib::gbsm_rays r = make_rays(41, true, true, 2, 2, "38.901", true);
     REQUIRE(r.path_type(1) == 1);
-    const std::string msg = "The interaction point of the GR path must be on the ground (z = 0); shift local "
+    const std::string msg = "Input 'lbs_pos' must have z = 0 (within 1 mm) for the GR path; shift local "
                             "coordinates in x and y only.";
     quadriga_lib::gbsm_rays o;
     in_t in = in_of(r);

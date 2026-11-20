@@ -14,7 +14,6 @@ SECTION!*/
 # OBJ_FILE_READ
 Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 
-## Description:
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
   vertex). Index 0, or an index beyond the vertices defined before the face, raises an error, for any requested outputs
@@ -42,19 +41,19 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
 - **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column;
   unmatched faces map to index 0 (no material) unless `csv_strict` is set; empty uses the built-in default table
-- **`csv_strict`** *(optional)* — If true, throw when a `usemtl` material is absent from the table;
+- **`csv_strict`** — If true, throw when a `usemtl` material is absent from the table;
   otherwise map to index 0 (no material); default: false
 
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
 - **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** — 1-based vertex indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
-- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
+- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh, 1]`
 - **`obj_names`** — Object names; cell array of strings; length `max(obj_ind)`
-- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh]`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh, 1]`
 - **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `n_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh]`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh, 1]`
 - **`csv_names`** — Material names from the table; cell array of strings; length `n_csv`
 - **`csv_prop`** — Material properties as a struct; each field is one CSV column (excluding `name`)
   holding a column vector of length `n_csv`

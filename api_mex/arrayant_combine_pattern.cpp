@@ -29,15 +29,14 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq_new, azi
 ## Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
-  recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
-   entry's `center_freq` unchanged.
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
+- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is
+  recomputed (interpolated) at each requested frequency; default: `[]` (each input entry's `center_freq` unchanged)
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; default: `[]` (input grid)
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; default: `[]` (input grid)
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
   default: 299792458
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [[arrayant_generate]]. Single struct when both input and
   `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or

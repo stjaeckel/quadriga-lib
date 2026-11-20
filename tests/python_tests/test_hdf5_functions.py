@@ -185,17 +185,17 @@ class test_case(unittest.TestCase):
         channel.hdf5_create_file(fn, 2)
         with self.assertRaises(RuntimeError) as ctx:  # thrown by C++
             channel.hdf5_create_file(fn, 2)
-        self.assertIn('File already exists.', str(ctx.exception))
+        self.assertIn('already exists.', str(ctx.exception))
         text = self.fn('not_hdf5.txt')  # any existing file, also one that is not an HDF5 file
         with open(text, 'w') as f:
             f.write('text')
         with self.assertRaises(RuntimeError) as ctx:
             channel.hdf5_create_file(text, 2)
-        self.assertIn('File already exists.', str(ctx.exception))
+        self.assertIn('already exists.', str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:  # thrown by C++
             channel.hdf5_create_file(self.fn('zero.hdf5'), 2, 0)
-        self.assertIn('cannot be 0', str(ctx.exception))
+        self.assertIn('must be at least 1', str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             channel.hdf5_create_file(self.fn('big.hdf5'), 65536, 65536)
         self.assertIn('too many slots', str(ctx.exception))
@@ -270,11 +270,11 @@ class test_case(unittest.TestCase):
         fn = self.fn('reshape_err.hdf5')
         with self.assertRaises(RuntimeError) as ctx:
             channel.hdf5_reshape_layout(fn, 4)
-        self.assertIn('File does not exist.', str(ctx.exception))
+        self.assertIn('does not exist.', str(ctx.exception))
         channel.hdf5_create_file(fn, 4, 3)
         with self.assertRaises(ValueError) as ctx:
             channel.hdf5_reshape_layout(fn, 13)
-        self.assertIn('Mismatch in number of elements', str(ctx.exception))
+        self.assertIn('must give the same number of slots as the file', str(ctx.exception))
         with self.assertRaises(TypeError):
             channel.hdf5_reshape_layout(fn, -12)
         with self.assertRaises(TypeError):
@@ -382,9 +382,9 @@ class test_case(unittest.TestCase):
             (dict(c, coeff_re=[np.ones((1, 1, 1))]), {}, "provide either 'coeff' (complex) or 'coeff_re'/'coeff_im'"),
             (dict(c, tx_pos=np.zeros((2, 1))), {}, "'tx_pos' is missing or ill-formatted"),  # from C++
             (dict(c, name='x' * 256), {}, 'Name can have at most 255 characters.'),
-            (c, {'par': 'abc'}, "'par' must be a dict, a list of dicts, or None."),
-            (c, {'par': [1]}, "Each 'par' list entry must be a dict."),
-            (c, {'par': [{}, {}]}, "'par' must have the same number of entries as 'chan'."),
+            (c, {'par': 'abc'}, "Input 'par' must be a dict, a list of dicts, or None."),
+            (c, {'par': [1]}, "Input 'par' must be a dict, a list of dicts, or None."),
+            (c, {'par': [{}, {}]}, "Inputs 'par' and 'chan' must have the same number of entries."),
             (c, {'par': {'x': np.ones(2, complex)}}, "Input 'x' has an unsupported type."),
             (c, {'par': {'a-b': 1.0}}, 'Parameter name must only contain letters, numbers and the underscore'),
             ([c, c], {'par': [{}, {'': 1.0}]}, 'Dataset name not provided.'),  # from C++
@@ -557,7 +557,7 @@ class test_case(unittest.TestCase):
         fn = self.fn('read_err.hdf5')
         with self.assertRaises(RuntimeError) as ctx:  # thrown by C++
             channel.hdf5_read_channel(fn)
-        self.assertIn('File does not exist.', str(ctx.exception))
+        self.assertIn('does not exist.', str(ctx.exception))
 
         channel.hdf5_create_file(fn, 3, 2, 1, 2)
         channel.hdf5_write_channel(fn, full_channel())
@@ -685,7 +685,7 @@ class test_case(unittest.TestCase):
         for f, kwargs in [(channel.hdf5_read_dset, {'name': 'x'}), (channel.hdf5_read_dset_names, {})]:
             with self.assertRaises(RuntimeError) as ctx:
                 f(fn, **kwargs)
-            self.assertIn('File does not exist.', str(ctx.exception))
+            self.assertIn('does not exist.', str(ctx.exception))
 
         # A missing file is created just large enough for the slot
         channel.hdf5_write_dset(self.fn('dset_new.hdf5'), name='x', data=1.0, ix=2)
@@ -694,11 +694,11 @@ class test_case(unittest.TestCase):
 
         channel.hdf5_create_file(fn, 2, 2)
         channel.hdf5_write_dset(fn, name='x', data=1.0)
-        for kwargs, msg in [({'name': '', 'data': 1.0}, 'Dataset name not provided.'),  # all thrown by C++
-                            ({'name': '', 'data': 1.0, 'prefix': ''}, 'Dataset name not provided.'),
-                            ({'ix': 3, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
-                            ({'ix': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
-                            ({'iy': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
+        for kwargs, msg in [({'name': '', 'data': 1.0}, "Input 'name' cannot be empty."),  # all thrown by C++
+                            ({'name': '', 'data': 1.0, 'prefix': ''}, "Input 'name' cannot be empty."),
+                            ({'ix': 3, 'name': 'y', 'data': 1.0}, 'must address a slot inside the storage layout'),
+                            ({'ix': 2, 'name': 'y', 'data': 1.0}, 'must address a slot inside the storage layout'),
+                            ({'iy': 2, 'name': 'y', 'data': 1.0}, 'must address a slot inside the storage layout'),
                             ({'name': 'a b', 'data': 1.0}, 'Parameter name must only contain letters'),
                             ({'name': 'y', 'data': np.ones(2, complex)}, "Input 'y' has an unsupported type.")]:
             with self.assertRaises(ValueError, msg=msg) as ctx:

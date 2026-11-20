@@ -43,7 +43,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, orientation, us
   rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
 - **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
 
-## Outputs:
+## Output:
 - **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
   field layout as documented in [[arrayant_generate]]
 MD!*/
@@ -57,9 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in' must be an arrayant struct or struct array.");
 
-    const arma::vec orientation = qd_mex_get_Col<double>(prhs[1], true, "orientation");
-    if (orientation.n_elem != 3)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'orientation' must have 3 elements.");
+    const arma::vec orientation = qd_mex_get_Col<double>(prhs[1], false, "orientation"); // 3 elements, checked by C++
     const unsigned usage = (nrhs < 3) ? 0 : qd_mex_get_scalar<unsigned>(prhs[2], "usage", 0);
 
     // Element indices: 1-based MATLAB -> 0-based C++ (empty = all elements)

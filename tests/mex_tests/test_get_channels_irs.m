@@ -242,7 +242,7 @@ try
         1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''polmat'' must have the same number of columns (n_paths).';
+    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'' and ''polmat'' must have the same number of columns (n_paths).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -259,7 +259,7 @@ try
         1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''polmat'' must have the same number of columns (n_paths).';
+    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'' and ''polmat'' must have the same number of columns (n_paths).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -324,7 +324,7 @@ try
         1, thr_keep_all, f0_zero, false, [], bad_mask );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Optional input ''active_path'' does not have the correct number of elements.';
+    expectedErrorMessage = 'Input ''active_path'' must have n_path_1 * n_path_2 elements.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -342,7 +342,7 @@ try
         1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Transmit antenna: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -360,7 +360,7 @@ try
         1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'IRS array: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''irs_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -386,7 +386,7 @@ ant_sw.coupling_re = ant_irs_diff.coupling_re(:, [2 1]);
 ant_sw.coupling_im = ant_irs_diff.coupling_im(:, [2 1]);
 args_sw = args; args_sw{3} = ant_sw;
 assertEqual( quadriga_lib.get_channels_irs( args_sw{:}, 1 ), cr_p2 );
-for bad = {{0, 'Input ''i_irs'' cannot be 0 (1-based index).'}, {3, 'Input ''i_irs'' must be from 1 to 2'}}
+for bad = {{0, 'Input ''i_irs'' cannot be 0 (1-based index).'}, {3, 'Input ''i_irs'' is out of range; the IRS coupling matrix has 2 columns.'}}
     failed = false;
     try
         [~] = quadriga_lib.get_channels_irs( args{:}, bad{1}{1} );
@@ -419,7 +419,7 @@ failed = false;
 try
     [~] = quadriga_lib.get_channels_irs( args{1:2}, ant_irs_nc, args{4:end} );
 catch ME
-    failed = ~isempty(strfind(ME.message, 'IRS must have a Coupling matrix'));
+    failed = ~isempty(strfind(ME.message, 'Input ''irs_array'' must have a coupling matrix'));
 end
 assertTrue( failed );
 

@@ -1572,7 +1572,7 @@ arma::Mat<dtype> quadriga_lib::sos_preset(const std::string &name,
     if (!qd_sos_preset_lookup(name, type, n_coeff))
         throw std::invalid_argument("Input 'name' is not a known preset.");
     if (!(dist_decorr > (dtype)0.0) || !std::isfinite((double)dist_decorr))
-        throw std::invalid_argument("Input 'dist_decorr' must be > 0.");
+        throw std::invalid_argument("Input 'dist_decorr' must be finite and > 0.");
 
     qd_check_alias_outputs(acf, "acf", dist, "dist");
 
@@ -1597,8 +1597,7 @@ arma::Mat<dtype> quadriga_lib::sos_preset(const std::string &name,
 
     if (acf != nullptr)
     {
-        if (acf->n_elem != 200)
-            acf->set_size(200);
+        acf->set_size(200);
         for (arma::uword i = 0; i < 200; ++i)
         {
             double x = 0.25 * (double)i / 10.0; // Distance in decorrelation distances
@@ -1609,8 +1608,7 @@ arma::Mat<dtype> quadriga_lib::sos_preset(const std::string &name,
 
     if (dist != nullptr)
     {
-        if (dist->n_elem != 200)
-            dist->set_size(200);
+        dist->set_size(200);
         for (arma::uword i = 0; i < 200; ++i)
             dist->at(i) = (dtype)(0.25 * (double)i * scale);
     }

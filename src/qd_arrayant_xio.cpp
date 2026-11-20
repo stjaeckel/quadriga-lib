@@ -19,8 +19,7 @@ Write a vector of arrayant objects to a single QDANT file
 
 - Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [[qdant_write]].
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
-- All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
-  Invalid input throws and leaves an existing file unchanged.
+- The file must not exist yet; an existing file throws `std::runtime_error` and is left unchanged.
 - Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_freq`.
 
 ## Declaration:
@@ -31,7 +30,7 @@ void quadriga_lib::qdant_write_multi(
 ```
 
 ## Inputs:
-- **`fn`** — Path of the QDANT file to write; must not be empty
+- **`fn`** — Path of the QDANT file to write; must not be empty and must not exist
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects to store
 
 ## See also:
@@ -57,9 +56,8 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
             throw std::invalid_argument("Entry " + std::to_string(i) + ": " + err);
     }
 
-    // Remove existing file to start fresh (only after all entries passed the validation)
     if (std::filesystem::exists(fn))
-        std::filesystem::remove(fn);
+        throw std::runtime_error("Cannot write a multi-frequency arrayant to the existing file '" + fn + "'.");
 
     // Write all entries without layout (layout validation requires all IDs to exist)
     for (arma::uword i = 0; i < n_entries; ++i)
@@ -277,7 +275,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
         const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 ```
 
-## Inputs:
+## Input:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
 
 ## Returns:
@@ -548,18 +546,19 @@ void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arra
         // Validate indices
         for (arma::uword k = 0; k < i_element.n_elem; ++k)
             if (i_element[k] >= n_elements_ref)
-                throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+                throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
     }
+
+    // Ensure the element counts match the reference before any entry is changed
+    for (size_t i = 0; i < arrayant_vec.size(); ++i)
+        if (arrayant_vec[i].n_elements() != n_elements_ref)
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Number of elements (" + std::to_string(arrayant_vec[i].n_elements()) +
+                                        ") does not match the first entry (" + std::to_string(n_elements_ref) + ").");
 
     // Apply to all entries
     for (size_t i = 0; i < arrayant_vec.size(); ++i)
     {
         quadriga_lib::arrayant<dtype> &ant = arrayant_vec[i];
-
-        // Ensure element count matches the reference
-        if (ant.n_elements() != n_elements_ref)
-            throw std::invalid_argument("Entry " + std::to_string(i) + ": Number of elements (" + std::to_string(ant.n_elements()) +
-                                        ") does not match the first entry (" + std::to_string(n_elements_ref) + ").");
 
         // Initialize element_pos if empty
         if (ant.element_pos.is_empty())
@@ -618,13 +617,16 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
     if (usage > 2)
-        throw std::invalid_argument("Input 'usage' must be 0, 1, or 2.");
+        throw std::invalid_argument("Input 'usage' must be 0, 1 or 2.");
 
     // Validate input vector before modifying any entries; the entries share the element count, so orientation and
     // index errors surface at entry 0 before anything is changed
     std::string err = qd_arrayant_is_valid_multi_quick(arrayant_vec);
     if (!err.empty())
         throw std::invalid_argument("Input 'arrayant_vec' is not valid: " + err);
+
+    if (orientation.n_elem != 3) // Checked once here, so that the error carries no entry prefix
+        throw std::invalid_argument("Input 'orientation' must have 3 elements.");
 
     // Map usage to no-grid-adjustment modes: 0→3, 1→4, 2→2
     const unsigned internal_usage = usage == 0 ? 3 : (usage == 1 ? 4 : usage);
@@ -706,12 +708,12 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
     arma::uword n_az = arrayant_vec1[0].n_azimuth();
 
     if (arrayant_vec2[0].n_elevation() != n_el)
-        throw std::invalid_argument("Elevation grid sizes do not match (" +
+        throw std::invalid_argument("Inputs 'arrayant_vec1' and 'arrayant_vec2' must have the same elevation grid size (" +
                                     std::to_string(n_el) + " vs " +
                                     std::to_string(arrayant_vec2[0].n_elevation()) + ").");
 
     if (arrayant_vec2[0].n_azimuth() != n_az)
-        throw std::invalid_argument("Azimuth grid sizes do not match (" +
+        throw std::invalid_argument("Inputs 'arrayant_vec1' and 'arrayant_vec2' must have the same azimuth grid size (" +
                                     std::to_string(n_az) + " vs " +
                                     std::to_string(arrayant_vec2[0].n_azimuth()) + ").");
 
@@ -719,13 +721,13 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
     const dtype *az_cur = arrayant_vec2[0].azimuth_grid.memptr();
     for (arma::uword k = 0; k < n_az; ++k)
         if (az_ref[k] != az_cur[k])
-            throw std::invalid_argument("Azimuth grid values do not match.");
+            throw std::invalid_argument("Inputs 'arrayant_vec1' and 'arrayant_vec2' must have the same azimuth grid.");
 
     const dtype *el_ref = arrayant_vec1[0].elevation_grid.memptr();
     const dtype *el_cur = arrayant_vec2[0].elevation_grid.memptr();
     for (arma::uword k = 0; k < n_el; ++k)
         if (el_ref[k] != el_cur[k])
-            throw std::invalid_argument("Elevation grid values do not match.");
+            throw std::invalid_argument("Inputs 'arrayant_vec1' and 'arrayant_vec2' must have the same elevation grid.");
 
     // --- Reference dimensions ---
     arma::uword n_elem1 = arrayant_vec1[0].n_elements();
@@ -849,17 +851,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     bool new_fgrid = freq_new.n_elem != 0;
 
     if (new_azgrid && !qd_in_range(azimuth_grid_new.memptr(), azimuth_grid_new.n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
-        throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in [-pi, pi].");
+        throw std::invalid_argument("Input 'azimuth_grid_new' must be sorted and in [-pi, pi].");
 
     if (new_elgrid && !qd_in_range(elevation_grid_new.memptr(), elevation_grid_new.n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
-        throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in [-pi/2, pi/2].");
+        throw std::invalid_argument("Input 'elevation_grid_new' must be sorted and in [-pi/2, pi/2].");
 
     if (new_fgrid)
     {
         const dtype *p_freq = freq_new.memptr();
         for (arma::uword i = 0; i < freq_new.n_elem; ++i)
             if (!(p_freq[i] > dtype(0.0)) || !std::isfinite(p_freq[i]))
-                throw std::invalid_argument("Values of 'freq_new' must be positive and finite.");
+                throw std::invalid_argument("Input 'freq_new' must be positive and finite.");
     }
 
     // Output grids

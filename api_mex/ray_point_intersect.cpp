@@ -32,15 +32,15 @@ Calculate intersections of ray beams with points in 3D space
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
-- **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to generate;
+- **`sub_cloud_ind`** — Segment boundary indices for the point cloud, 1-based; use [[point_cloud_segmentation]] to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
-  uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
+  `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
   and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** — CUDA device ID; ignored when not using CUDA; default: 0
 
 ## Outputs:
-- **`hit_count`** — Number of beams intersecting each point; `[n_points, 1]`
+- **`hit_count`** — Number of beams intersecting each point; uint32; `[n_points, 1]`
 - **`ray_ind`** — Per-point list of 1-based ray indices that intersected that point; zero-padded to
   a regular 2D array (zero entries indicate unused slots); uint32; `[max_hits, n_points]`
 
@@ -110,7 +110,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             for (arma::uword i_point = 0; i_point < n_points; ++i_point)
             {
                 const unsigned first = p_off[i_point], last = p_off[i_point + 1];
-                unsigned *p_col = p_ray_ind + unsigned(i_point * max_hits);
+                unsigned *p_col = p_ray_ind + i_point * max_hits;
 
                 for (unsigned k = first; k < last; ++k)
                     p_col[k - first] = p_idx[k] + 1u;

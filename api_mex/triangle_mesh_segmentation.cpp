@@ -38,10 +38,10 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 
 ## Outputs:
 - **`mesh_out`** — Reordered and padded triangle vertices; `[n_mesh_out, 9]`
-- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub]`
-- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out]`
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub, 1]`
+- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out, 1]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
-  `[n_mesh_out]`; only populated if `mtl_ind` is given
+  `[n_mesh_out, 1]`; only populated if `mtl_ind` is given
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

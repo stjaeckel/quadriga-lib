@@ -32,11 +32,11 @@ storage_space = quadriga_lib.hdf5_read_layout(fn);
 assertEqual(storage_space, uint32([65536, 1, 1, 1]));
 
 % Recreating an existing file errors, also a file that is not an HDF5 file (thrown by C++)
-assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn), 'File already exists.' );
+assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn), 'already exists.' );
 fid = fopen(non_hdf5, 'w');
 fprintf(fid, 'text');
 fclose(fid);
-assert_cpp_error( @() quadriga_lib.hdf5_create_file(non_hdf5), 'File already exists.' );
+assert_cpp_error( @() quadriga_lib.hdf5_create_file(non_hdf5), 'already exists.' );
 delete(non_hdf5);
 
 % Empty nx is the default
@@ -60,7 +60,7 @@ delete(fn);
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 1, 1, 1, 1, 1), 'Wrong number of input arguments.' );
 assert_cpp_error( @() out1(@quadriga_lib.hdf5_create_file, fn), 'Wrong number of output arguments.' );
-assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 0, 1), 'cannot be 0' );   % thrown by C++
+assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 0, 1), 'must be at least 1' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 2.5), 'Input ''nx'' must be an integer from 0 to 4294967295.' );
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(fn, 65536, 65536), 'too many slots' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_create_file(5), 'Input ''fn'' must be a string' );
@@ -79,8 +79,8 @@ quadriga_lib.hdf5_reshape_layout(fn, uint32(144), uint32(1));
 assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([144, 1, 1, 1]));
 
 % Errors
-assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 145), 'Mismatch in number of elements' );
-assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 0, 144), 'Mismatch in number of elements' );   % thrown by C++
+assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 145), 'must give the same number of slots as the file' );
+assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 0, 144), 'must give the same number of slots as the file' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(), 'Wrong number of input arguments.' );
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn), 'Wrong number of input arguments.' );   % nx is mandatory
 assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 144, 1, 1, 1, 1), 'Wrong number of input arguments.' );
@@ -93,11 +93,11 @@ quadriga_lib.hdf5_reshape_layout(fn, 65536);
 assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([65536, 1, 1, 1]));
 quadriga_lib.hdf5_reshape_layout(fn, 256, 256, [], []);
 assertEqual(quadriga_lib.hdf5_read_layout(fn), uint32([256, 256, 1, 1]));
-assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, []), 'Mismatch in number of elements' );
+assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, []), 'must give the same number of slots as the file' );
 delete(fn);
 
 % Reshape on missing file
-assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 144), 'File does not exist.' );
+assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 144), 'does not exist.' );
 
 % Stored data keeps its linear slot: 1-based (2, 3) in [4, 3] is slot 10
 quadriga_lib.hdf5_create_file(fn, 4, 3);
@@ -304,19 +304,19 @@ assert_cpp_error( @() out2(@quadriga_lib.hdf5_read_dset_names, fn), 'Wrong numbe
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset(fn, 'x', 1, 0), 'cannot be 0 (1-based index).' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset_names(fn, 1, 1, 0), 'cannot be 0 (1-based index).' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, 1, 1, 1, 0), 'cannot be 0 (1-based index).' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, 129, 1), 'Index out of bound.' );   % thrown by C++
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, 129, 1), 'must address a slot inside the storage layout' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', []), 'Input ''data'' cannot be empty.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', true), 'Input ''data'' has an unsupported data type.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', int16(1)), 'Input ''data'' has an unsupported data type.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', {1}), 'Input ''data'' has an unsupported data type.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1 + 2i), 'is complex; complex inputs are not supported.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'a-b', 1), 'Parameter name must only contain' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, '', 1), 'Dataset name not provided.' );   % thrown by C++
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, '', 1), 'Input ''name'' cannot be empty.' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, [], [], [], [], 'p-'), 'Parameter name must only contain' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 1, 1), 'Input ''name'' must be a string' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_dset(1, 'x'), 'Input ''fn'' must be a string' );
-assert_cpp_error( @() quadriga_lib.hdf5_read_dset(fn2, 'x'), 'File does not exist.' );
-assert_cpp_error( @() quadriga_lib.hdf5_read_dset_names(fn2), 'File does not exist.' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_dset(fn2, 'x'), 'does not exist.' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_dset_names(fn2), 'does not exist.' );
 
 %% Structured (chan) round-trip
 % File stores structured data in single precision; wrapper reads back as double.
@@ -543,7 +543,7 @@ assertTrue(~has_data(20, 1, 1, 1));
 % par size must match chan size
 chan2 = repmat(chan, 2, 1);
 par2  = repmat(struct('x', 1), 3, 1);
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan2, par2, [7, 1]), 'same number of elements' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan2, par2, [7, 1]), 'must have the same number of entries' );
 
 % Non-struct par is rejected
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [1, 2, 3], 7), 'must be a struct' );
@@ -672,7 +672,7 @@ assertEqual(parR(3).c, uint32(7));
 
 % par size must match chan size
 par_short = struct('a', {1, 2});  % length 2 vs chans length 3
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn2, chans, par_short), 'same number of elements' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn2, chans, par_short), 'must have the same number of entries' );
 
 % Index vector length must match chan length (when not scalar)
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn2, chans, [], [1, 2]), 'scalar or a vector of length' );  % 2 indices, 3 chans

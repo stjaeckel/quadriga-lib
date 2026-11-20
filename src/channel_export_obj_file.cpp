@@ -69,7 +69,7 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
 
     std::string error_message = chan.is_valid();
     if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        throw std::invalid_argument("Input 'chan' is not valid: " + error_message);
 
     if (chan.empty())
         throw std::invalid_argument("Input 'chan' cannot be empty.");
@@ -115,7 +115,7 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     const arma::uvec i_snap = (i_snap_sel.n_elem == 0ULL) ? arma::regspace<arma::uvec>(0ULL, n_snap_in - 1ULL) : i_snap_sel;
 
     if (arma::any(i_snap >= n_snap_in))
-        throw std::invalid_argument("Snapshot indices 'i_snap' cannot exceed the number of snapshots in the channel.");
+        throw std::invalid_argument("Input 'i_snap' contains an index that is out of range.");
 
     arma::uword n_snap_out = i_snap.n_elem;
 

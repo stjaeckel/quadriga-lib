@@ -40,7 +40,7 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
-- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+- **`scalar_mode`** — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
   default: `false` (EM, `299792458 / center_freq`)
 
 ## Outputs:

@@ -323,8 +323,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 dst.resize(src.size());
             for (size_t f = 0; f < src.size(); ++f)
             {
-                if (dst[f].n_rows != src[f].n_rows || dst[f].n_cols != src[f].n_cols || dst[f].n_slices != 1ULL)
-                    dst[f].set_size(src[f].n_rows, src[f].n_cols, 1ULL);
+                dst[f].set_size(src[f].n_rows, src[f].n_cols, 1ULL);
                 std::memcpy(dst[f].memptr(), src[f].memptr(), src[f].n_rows * src[f].n_cols * sizeof(*src[f].memptr()));
             }
         };
@@ -376,15 +375,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const arma::uword n_rx_ports = rx_array[0].n_ports();
     const arma::uword n_ports = n_tx_ports * n_rx_ports;
 
-    // Resize outputs (only if needed, preserves externally borrowed memory); a requested complex output replaces
-    // coeff_re / coeff_im, which are left empty
+    // Size the outputs (the vectors only if their length differs, which keeps externally borrowed memory); a requested
+    // complex output replaces coeff_re / coeff_im, which are left empty
     auto resize_output = [&](auto &out)
     {
         if (out.size() != n_freq_new)
             out.resize(n_freq_new);
         for (auto &c : out)
-            if (c.n_rows != n_rx_ports || c.n_cols != n_tx_ports || c.n_slices != n_out)
-                c.set_size(n_rx_ports, n_tx_ports, n_out);
+            c.set_size(n_rx_ports, n_tx_ports, n_out);
     };
     if (coeff != nullptr)
         coeff_re.clear(), coeff_im.clear(), resize_output(*coeff);

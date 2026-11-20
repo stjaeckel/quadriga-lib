@@ -85,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         auto d = qd_mex_get_CubeVec<double>(a, false, name);
         if (d.size() > 1 && d.size() != freq.n_elem)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "The 4th dimension of 'delay' must be 1 or the length of 'freq'.");
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'delay' must have a 4th dimension of 1 or the length of 'freq'.");
         d.resize(freq.n_elem);
         return d;
     };
@@ -111,7 +111,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_tx = (snap.is_empty() || coeff_re[snap[0]].empty()) ? 0 : coeff_re[snap[0]][0].n_cols;
     for (arma::uword s : snap)
         if (!coeff_re[s].empty() && (coeff_re[s][0].n_rows != n_rx || coeff_re[s][0].n_cols != n_tx))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "All snapshots of 'coeff_re' must have the same number of rows and columns.");
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'coeff_re' must have the n_rx and n_tx of the first selected snapshot.");
 
     std::vector<arma::cube> hmat_re, hmat_im;
     plhs[0] = qd_mex_init_output(&hmat_re, n_rx, n_tx, freq_new.n_elem, snap.n_elem);

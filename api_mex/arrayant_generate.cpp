@@ -113,7 +113,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 - **`dir`** — Beam steering angles, `[3, n_beams]`; rows are `[azimuth_deg; elevation_deg; weight]`; 
   `multibeam` combines beams via MRT weighting, `multibeam_sep` produces one independent beam per column (weights ignored)
 
-## Outputs:
+## Output:
 - **`ant`** — Struct with fields:<br><br>
    | Field            | Description                                               | Size                                   |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -200,10 +200,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             }
             else if (pol == 3 || pol == 6)
             {
-                CALL_QD(custom_array = quadriga_lib::generate_arrayant_omni(res));
-                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
+                CALL_QD(custom_array = quadriga_lib::generate_arrayant_omni(res);
+                        quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
+                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
+                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1));
             }
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array));
         }
@@ -222,18 +222,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         }
         else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
         {
-            auto custom_array = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, bfr, res);
+            quadriga_lib::arrayant<double> custom_array;
+            CALL_QD(custom_array = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, bfr, res));
             if (pol == 2 || pol == 5)
-            {
-                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, el_1);
-            }
+                CALL_QD(quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
+                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, el_1));
             else if (pol == 3 || pol == 6)
-            {
-                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
-            }
+                CALL_QD(quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
+                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
+                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1));
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, custom_array));
         }
         else // Use 3GPP default pattern
@@ -262,7 +259,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                                              az_bw, el_bw, bfr, res, separate_beams));
     }
     else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Array type not supported!");
+    {
+        const std::string msg = "Input 'type' has an unsupported value '" + array_type + "'.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
 
     arrayant.center_freq = freq;
 

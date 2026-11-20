@@ -329,8 +329,7 @@ static void qd_scenpar_write(const double *X, arma::mat *lsp_xcorr, std::vector<
 {
     if (lsp_xcorr != nullptr)
     {
-        if (lsp_xcorr->n_rows != 8 || lsp_xcorr->n_cols != 8)
-            lsp_xcorr->set_size(8, 8);
+        lsp_xcorr->set_size(8, 8);
         std::memcpy(lsp_xcorr->memptr(), X, 64 * sizeof(double));
     }
     if (key_order != nullptr)
@@ -1304,18 +1303,17 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         throw std::invalid_argument("Input 'pl_model' must be empty or one name.");
 
     std::vector<std::string> pl_keys; // Path-loss keys in write order
-    if (!plpar.empty())
-        for (const auto &entry : plpar)
-        {
-            if (!qd_conf_is_name(entry.first) || entry.first == "model")
-                throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' is not a valid parameter name.");
-            if (entry.second.empty())
-                throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' has no value.");
-            for (double v : entry.second)
-                if (std::isnan(v))
-                    throw std::invalid_argument("Value of '" + entry.first + "' in 'plpar' must not be NaN.");
-            pl_keys.push_back(entry.first);
-        }
+    for (const auto &entry : plpar)
+    {
+        if (!qd_conf_is_name(entry.first) || entry.first == "model")
+            throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' is not a valid parameter name.");
+        if (entry.second.empty())
+            throw std::invalid_argument("Key '" + entry.first + "' in 'plpar' has no value.");
+        for (double v : entry.second)
+            if (std::isnan(v))
+                throw std::invalid_argument("Value of '" + entry.first + "' in 'plpar' must not be NaN.");
+        pl_keys.push_back(entry.first);
+    }
 
     if (pl_order.empty())
         std::sort(pl_keys.begin(), pl_keys.end());
@@ -1330,28 +1328,22 @@ void quadriga_lib::conf_file_write(const std::string &fn,
         pl_keys = pl_order;
     }
 
-    if (!short_names.empty())
+    std::unordered_set<std::string> seen_short;
+    for (const auto &name : short_names)
     {
-        std::unordered_set<std::string> seen;
-        for (const auto &name : short_names)
-        {
-            if (!qd_conf_is_name(name))
-                throw std::invalid_argument("Entries of 'short_names' must be one name each.");
-            if (!seen.insert(name).second)
-                throw std::invalid_argument("Entries of 'short_names' must be distinct.");
-        }
+        if (!qd_conf_is_name(name))
+            throw std::invalid_argument("Entries of 'short_names' must be one name each.");
+        if (!seen_short.insert(name).second)
+            throw std::invalid_argument("Entries of 'short_names' must be distinct.");
     }
 
     if (qd_conf_has_newline(ref))
         throw std::invalid_argument("Input 'ref' must not contain a line break.");
-    if (!ref_sec.empty())
-    {
-        if (ref_sec.size() > QD_CONF_N_SEC)
-            throw std::invalid_argument("Input 'ref_sec' can have at most 10 entries.");
-        for (const auto &s : ref_sec)
-            if (qd_conf_has_newline(s))
-                throw std::invalid_argument("Entries of 'ref_sec' must not contain a line break.");
-    }
+    if (ref_sec.size() > QD_CONF_N_SEC)
+        throw std::invalid_argument("Input 'ref_sec' can have at most 10 entries.");
+    for (const auto &s : ref_sec)
+        if (qd_conf_has_newline(s))
+            throw std::invalid_argument("Entries of 'ref_sec' must not contain a line break.");
 
     if (!valid_range.empty() && (valid_range.n_rows != 4 || valid_range.n_cols != 2))
         throw std::invalid_argument("Input 'valid_range' must have size [4, 2].");

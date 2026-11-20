@@ -119,17 +119,10 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     qd_check_alias_outputs(&ray_z, "ray_z", &weight, "weight");
 
     // Adjust output size
-    if (ray_x.n_rows != n_pos || ray_x.n_cols != n_path || ray_x.n_slices != n_seg)
-        ray_x.set_size(n_pos, n_path, n_seg);
-
-    if (ray_y.n_rows != n_pos || ray_y.n_cols != n_path || ray_y.n_slices != n_seg)
-        ray_y.set_size(n_pos, n_path, n_seg);
-
-    if (ray_z.n_rows != n_pos || ray_z.n_cols != n_path || ray_z.n_slices != n_seg)
-        ray_z.set_size(n_pos, n_path, n_seg);
-
-    if (weight.n_rows != n_pos || weight.n_cols != n_path || weight.n_slices != n_seg + 1)
-        weight.set_size(n_pos, n_path, n_seg + 1);
+    ray_x.set_size(n_pos, n_path, n_seg);
+    ray_y.set_size(n_pos, n_path, n_seg);
+    ray_z.set_size(n_pos, n_path, n_seg);
+    weight.set_size(n_pos, n_path, n_seg + 1);
 
     // Normalized ellipsoid coordinates and weights
     arma::vec tx, ty, tz, tw;

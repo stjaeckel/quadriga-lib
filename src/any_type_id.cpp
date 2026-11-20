@@ -24,10 +24,10 @@ int quadriga_lib::any_type_id(
     unsigned long long *dims = nullptr);
 ```
 
-## Inputs:
+## Input:
 - **`data`** — Pointer to the `std::any` object to inspect
 
-## Outputs:
+## Output:
 - **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
 
 ## Returns:
