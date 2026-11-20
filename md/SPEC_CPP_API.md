@@ -1,373 +1,75 @@
-quadriga-lib is a C++ radio channel modelling library and the numerical core behind its MATLAB/Octave and Python APIs, so correctness, a stable interface and performance all matter. This document gives the conventions for adding a C++ function: the declaration in `include/`, the implementation in `src/`, the documentation block and the Catch2 test in `tests/catch2_tests/`. It is persistent and is used at every stage of the work: planning and spec writing (what a contract must settle), spec review, implementation and code review. It does not define the contract of a function, which is worked out in the plan or the spec, nor the workflow: who reviews when, and where the work stops for a decision, is set in the plan. Where this document says "ask", "on request" or "unless asked", the point belongs in the plan or the spec; an implementer who finds it unsettled stops and reports it instead of deciding it alone.
+quadriga-lib is a C++ radio channel modelling library and the numerical core behind its MATLAB / Octave and Python APIs, so correctness, a stable interface and performance all matter. This document gives the conventions for adding or changing a C++ function: the declaration in `include/`, the implementation in `src/`, its documentation block and its Catch2 test. The wrappers have their own documents, `md/SPEC_MATLAB_API.md` and `md/SPEC_PYTHON_API.md`. The work is test-first (see "Tests").
 
-# GENERAL CONVENTIONS
-- All functions and classes live in the `quadriga_lib` namespace. Language standard is C++17.
-- Armadillo is used for all array data. Complex data is split into `_re` / `_im` arrays (see "Complex data" in the glossary); a function may additionally offer an optional `std::complex` output next to the split form where a measured gain exists.
-- Templates are explicitly instantiated in the source file; nothing is implemented in the public headers.
-- `arma::uword`, `size_t` and `unsigned long long` are the same 64-bit type (enforced by `static_assert` in the headers) and can be used interchangeably.
-- Shared conventions and names are defined once, in the glossary of the API reference; see "Names, units and layouts" (under "PUBLIC HEADER").
-- Sources, headers and tests stand on their own. They may cite published material (papers, standards, the pages of quadriga-lib.org) and the persistent `md/SPEC_*.md`, but never temporary documents in `md/` (plans, notes, briefs) or internal labels (tracking ids, item numbers, review remarks). Those labels belong in the project plan, the spec or other internal documents.
-- Code is lean: reuse existing library functions and helpers before writing new ones, no layers or generality that nothing uses. Someone given only the source files should understand what each part is for and how it works. Names of variables and functions are clear and say what the thing is; their scope is as narrow as possible (see "File-local helpers").
-- The project has grown over several years. Older files deviate from this document in naming, documentation layout and style. For new code follow this document and the recent files named as examples; do not copy older conventions, and do not restyle existing files unless asked.
+These conventions are defaults that keep the library consistent, not rules to satisfy at any cost. Prefer the leaner design: fewer lines, fewer special cases, no layers or generality that nothing uses. Where a convention would make the code more complex than the case needs, deviate: a deviation inside the implementation is made and reported in the hand-over with its reason; one that changes the interface users see (names, argument order, defaults, outputs, units) is proposed first. Such cases are decided in the work and not recorded here. Results must be correct within reasonable numerical bounds; bit-identity with an earlier result is not a goal.
 
-# REPOSITORY LAYOUT AND BUILD
-- `include/` — public headers, the contract:
-  - `quadriga_lib.hpp` — version functions, the float-only ray-tracing pipeline (`ray_init`, `ray_progress`, `ray_commit`, ...); includes the headers below
-  - `quadriga_tools.hpp` — site-specific simulation tools, channel statistics, miscellaneous tools
-  - `quadriga_math.hpp` — math functions
-  - `quadriga_arrayant.hpp` — `arrayant` class and array antenna functions
-  - `quadriga_channel.hpp` — `channel` and `path` classes, channel functions, channel generation (`get_channels_*`); includes `quadriga_arrayant.hpp`
-  - `quadriga_sos.hpp` — sum-of-sinusoids random number generator
-  - `quadriga_gbsm.hpp` — geometry-based stochastic model: scenario parameters (conf files), large-scale and small-scale fading, single-link channel (`gbsm_single_link_channel`); includes `quadriga_channel.hpp`
-- `src/` — implementations (`*.cpp`) and internal headers (`*.hpp`, `*.h`); internal headers are not installed and may be included by tests that test internals.
-- `tests/catch2_tests/` — Catch2 (v3) tests, one file per function or topic; `tests/quadriga_lib_catch2_tests.cpp` holds `main`.
-- `tests/data/` — input files for tests.
-- Build system: CMake globs `src/*.cpp` and `tests/catch2_tests/*.cpp` (with `CONFIGURE_DEPENDS`, not recursive). A new source or test file needs no registration. Files in subfolders of `tests/catch2_tests/` are not compiled.
-- File name suffixes select special compilation: `src/*_avx2.cpp` is compiled with `-mavx2 -mfma` (only if AVX2 is enabled), `src/*_cuda.cu` with nvcc (only if CUDA is enabled). Do not use these suffixes for anything else.
-- Compile definitions for the library: `BUILD_WITH_AVX2` and `BUILD_WITH_CUDA` (0 or 1), `ARMA_DONT_USE_BLAS`, `ARMA_DONT_USE_LAPACK`, `_USE_MATH_DEFINES`.
-  - BLAS and LAPACK are disabled. Armadillo functions that need LAPACK (`inv`, `solve`, `eig_*`, `svd`, `det`, `pinv`, ...) are NOT available. Matrix products work but are not BLAS-accelerated. Write small linear algebra by hand.
-- The library is compiled with `-O3 -Wall -Wextra -Wpedantic`; new code must compile without warnings. The tests are compiled with `-w`.
-- The code must also compile with MSVC, which is not available on the Linux build machine; check it by reading. No GCC-only extensions (variable-length arrays, `__attribute__`, `__builtin_*`, `#pragma GCC`), OpenMP 2.0 only (see "OpenMP").
-- Commands (Linux, from the repository root):
-  - `make test matlab=OFF octave=OFF` — configures with tests enabled, builds, and runs the Catch2 suite (`build_linux/test_bin`); without the switches it also runs the MEX suites (both default to ON)
-  - `cmake --build build_linux --parallel` — rebuild after `make test`; valid until `make` or `make python` reconfigures with tests off
-  - `make test-asan` — builds the Catch2 suite with AddressSanitizer and UndefinedBehaviorSanitizer in `build_linux_asan` (CMake option `ENABLE_SANITIZERS=ON`) and runs it; stops at the first report. `make test-asan TEST_ARGS='"my_function*"'` runs only the matching cases. Another build folder: `ASAN_BUILD_DIR=<dir>`
-  - `build_linux/test_bin "my_function*"` — run only the test cases whose name matches; this is the normal way to iterate on one function
-  - Tests are run from the repository root; relative paths such as `tests/data/x.obj` depend on it.
+# Conventions
+- Namespace `quadriga_lib`, C++17, Armadillo for all array data.
+- Names, units, index bases, layouts and the shared conventions (complex data as `_re` / `_im`, flags, "not given", non-finite inputs, kernel selection) are defined once, in the Glossary of `docs_builder/content/api_intro_cpp.md`. A new function uses them; a new quantity that several functions share (in any API) gets its glossary entry in the same commit. After 1.0, released names stay unless a rename clearly outweighs the breakage.
+- Fit the neighbours' interface (names, argument types, patterns; their code style may be older). Read the functions the new one builds on in `docs/quadriga_lib_api_cpp.md` (generated; start with its Function Index and open only the section files you need in `docs/api/cpp/`), reuse library functions and the helpers in `src/qd_helpers_*.hpp` before writing new ones, and expose only what a caller needs.
+- Sources, headers and tests stand on their own: they may cite published material (papers, standards, quadriga-lib.org) and `md/SPEC_*.md`, never temporary documents in `md/` or internal labels such as tracking ids.
+- Older files deviate from this document; do not copy their style and do not restyle them unless asked. Exemplars: `src/o2i_loss.cpp` with `tests/catch2_tests/test_o2i_loss.cpp` (file layout, doc block, validation, optional outputs, test structure, diagnostics), `src/sos_acf_2d.cpp` (a template with explicit instantiations), `src/ray_triangle_intersect.cpp` (kernel dispatch only; its messages and doc block are older), `baseband_freq_response_vec` in `src/baseband_freq_response.cpp` (OpenMP batch form with `qd_batch_loop` only; its messages and output sizing are older), `conf_file_read` in `src/qd_scenpar.cpp` (a file reader: `std::runtime_error` with file name and line, outputs written only after all checks, fuzz target `tests/fuzzing/targets/fz_conf.cpp`), `qdant_read` in `src/qd_arrayant_xio.cpp` (a reader that throws `std::invalid_argument` for an ID the file does not contain).
 
-# CONTRACT: WHAT THE PLAN OR SPEC SETTLES
-The contract of a function is worked out in the plan or the spec, which is then reviewed. It settles:
-- The declaration in a public header in `include/` (see "PUBLIC HEADER"), the section (see "Section statement"), and the source files: which public functions share a file because they belong together or share helpers (see "Source file").
-- The behavior: sizes of all outputs as a function of the inputs; which arguments are optional and what omitting them means; what is validated and what is undefined; behavior for empty inputs; units and index bases.
-- The test coverage: which instantiations (`float`, `double`) are tested, the test cases and their oracles, as far as the plan asks for them before implementation.
-- The reference (e.g. a MATLAB implementation), if there is one, and which APIs are in scope: C++ only, or also MEX (`md/SPEC_MATLAB_API.md`) and Python (`md/SPEC_PYTHON_API.md`).
+# Build and platform
+- CMake globs `src/*.cpp` and `tests/catch2_tests/*.cpp`; a new file needs no registration. The suffixes `*_avx2.cpp` and `*_cuda.cu` select AVX2 and CUDA compilation and are used for nothing else.
+- BLAS and LAPACK are off: `inv`, `solve`, `eig_*`, `svd`, `det`, `pinv` are not available, and in the test binary matrix products above 4x4 (also `arma::norm`, `arma::dot`, `accu(a % b)`) do not link. Write small linear algebra by hand.
+- The library compiles without warnings under `-O3 -Wall -Wextra -Wpedantic` and must also compile with MSVC for the Windows builds: no GCC extensions (variable-length arrays, `__attribute__`, `__builtin_*`), OpenMP 2.0 only. A parameter unused in a build configuration is silenced with `[[maybe_unused]]` or with `(void)name;` inside the matching `#if`.
+- MEX files link the library and must load in MATLAB R2024a, whose bundled libstdc++ is old: no standard-library feature that needs a newer symbol version, such as `std::exception_ptr`. `make test` checks this when MATLAB is enabled, and checks that AVX2 code stays in the kernels.
+- Commands, from the repository root:
+  - `make test matlab=OFF octave=OFF python=OFF` builds and runs the Catch2 suite.
+  - `cmake -B build_linux -D ENABLE_TESTS=ON && cmake --build build_linux --target test_bin --parallel <n>` rebuilds the test binary; the first step is needed after `make` or `make python`, which configure without tests and drop the `test_bin` target (the old binary stays, stale).
+  - `OMP_WAIT_POLICY=passive build_linux/test_bin "my_function*"` runs the matching cases, as `make test` does.
+  - `make test-asan` runs the suite under ASan and UBSan.
+  - `make docs` regenerates `docs/` from the doc blocks; commit it with the change.
+  - `make test-fuzz` runs all fuzz targets (10 minutes on all cores by default); `make test-fuzz FUZZ_ARGS='--targets fz_<name>' FUZZ_TIME=1m FUZZ_JOBS=<n>` runs one briefly (as make arguments: the makefile's values override environment variables).
 
-To write or review a contract, read the neighbouring functions it builds on and fits in with. Their documentation is collected in `docs/quadriga_lib_api_cpp.md` (read-only, generated; see "Fixtures and oracles" for how to use its function index); the sources of the documentation blocks are in `src/*.cpp`.
+# Declarations
+- The C++ declaration is the interface of all three APIs: the wrappers take its names and defaults and, by default, its argument order. Choose them with MATLAB and Python users in mind; a function that reads or writes a file takes the file name first.
+- Put the declaration under the fitting `// ---- Topic ----` group of a header. A comment above it gives a one-line description, optionally followed by a few `// - ` lines with what a caller must know at a glance (the details are in the doc block); each argument has a trailing comment with meaning, unit, index base and size, e.g. `// Ray origins in GCS, [n_ray, 3]`.
+- Order: mandatory inputs, mandatory outputs, then the arguments with a default. Later extensions are appended with a default so that existing calls keep working.
+- Mandatory inputs and outputs, and data updated in place, are references. Optional inputs are `const` references with an empty default (`const arma::vec &x = arma::vec()`), so callers pass `{}` or values inline; a pointer only where an empty value has its own meaning. Optional outputs (and optional in/out data) are pointers defaulting to `nullptr`; a `nullptr` output is neither allocated nor computed. Strings and containers are not passed by value.
+- A single mandatory result is returned. Output arguments are for several results used together and for large arrays that a wrapper should let C++ write in place. Readers and factories return objects. An optional `std::complex` output next to an `_re` / `_im` pair is added only where a benchmark shows that the wrapper's copy matters.
+- Templates over `dtype` (`float`, `double`) are explicitly instantiated in the source file; nothing is implemented in public headers. A `dtype` that no mandatory argument fixes defaults to `double`. Default values appear only in the header.
 
-The implementer does not change the declaration (names, order, types, defaults). If the contract is ambiguous, contradicts the reference, or cannot be implemented as written, the implementer stops and reports it instead of deciding it alone.
-
-# IMPLEMENTATION ORDER
-The work is test-first: write the tests, see them fail against a stub, then implement and iterate until they pass. Do not start the implementation before the tests exist and their oracles have been evaluated. Whether the work stops for a review between the steps is set in the plan.
-
-1. **Stub that compiles.**
-   - Create the source file settled in the plan or spec (usually `src/<function_name>.cpp`) with: license statement, includes, section statement, a first version of the documentation block, the function definition, and the explicit template instantiations (see "REFERENCE SKELETON").
-   - The stub body does no computation. It only touches every argument (so that there are no unused-parameter warnings), sizes every requested output to its final shape and fills it with zeros, and returns a default value.
-   - Build the library. The stub must compile and link without warnings. This proves the interface, the includes and the instantiations before any logic exists.
-2. **Tests from first principles.**
-   - Create the test file (usually `tests/catch2_tests/test_<function_name>.cpp`, see "TESTS").
-   - Derive the expected values from first principles: closed-form results, hand-computed small cases, conservation laws, symmetries, limiting cases, and oracles that are implemented independently in the test file. Use the reference implementation as a source of expected numbers where it is trusted, not as the only oracle.
-   - Do NOT derive expectations from the implementation (see "Fixtures and oracles").
-   - Add diagnostic output (see "Diagnostics") so that the numbers behind the assertions can be inspected.
-   - Build and run only the new test cases against the stub, then evaluate the oracles:
-     - Checks on values are expected to fail against the stub. Confirm that each one fails for the right reason (zeros from the stub), not because of a mistake in the test.
-     - Check the oracles against each other and against the reference: do the independent expectations agree, do limiting cases reduce to known results, are tolerances realistic for `float` and `double`?
-     - Identify which expectations are uncertain or conflict with the contract or the reference. A conflict is reported before implementing.
-   - Keep a test record for the hand-over (or for the review, if the plan sets one here): the test cases with one line each on what is asserted and which oracle is used; the result of the run against the stub, including checks that pass or fail unexpectedly; the diagnostic tables that matter for judging the oracles; the tolerances and why; open points.
-3. **Implementation.**
-   - Replace the stub body with the implementation (see "IMPLEMENTATION GUIDELINES"). Input validation first, then the computation.
-   - Iterate with `build_linux/test_bin "my_function*"` until the new tests pass. If a test fails, first decide whether the implementation or the expectation is wrong; never adjust an expectation or a tolerance just to make a test pass without understanding the difference.
-4. **Finish.**
-   - All new tests pass, for every instantiation the plan or spec covers. The complete suite passes (`make test`); the library compiles without warnings.
-   - The documentation block describes what the function actually does, including the decisions made during the work that a caller needs to know (see "Documentation block").
-   - Run `make docs` and commit the changed files in `docs/` with the change (see `docs_builder/README.md`, "Quick start").
-
-# HAND-OVER REPORT
-The report at the end of the implementation, read by the code review:
-- the test record of step 2, and every expectation or tolerance changed after it, with the reason
-- test results (new cases and complete suite) with the actual output of the run; do not report a test as passing that was not run
-- compiler warnings, if any
-- the size limit of each new or changed OpenMP region, with the measurement it comes from
-- deviations from the contract or the reference, and known limitations
-
-# PUBLIC HEADER
-The conventions a declaration follows, for writing one in the plan or the spec and for reading an existing one correctly.
-- Declarations are grouped under a comment line such as `// ---- Channel statistics ----` in the header that fits the topic.
-- A comment block above the declaration gives a one-line description and, as `// - ...` lines, the facts a caller needs.
-- Each argument is on its own line with a trailing comment: meaning, unit, index base, and size, e.g. `// Ray origins in GCS, [n_ray, 3]`. In/out and optional arguments are marked in the comment.
-- Argument order: required inputs, mandatory outputs, then all arguments with a default (options, optional inputs, optional outputs, flags); later extensions are appended at the end with a default so that existing callers keep working.
-- Argument passing — the rule for new declarations:
-  - **Mandatory** inputs and outputs (and in-place updated data) are passed by **reference**: `const arma::Mat<dtype> &input`, `arma::Mat<dtype> &output`. No `nullptr` check is needed or possible.
-  - **Optional inputs** are passed by **`const` reference with an empty default** (`const arma::vec &x = arma::vec()`; an `arrayant` without elements counts as empty), so callers skip one with `{}` and pass values inline; use a pointer only where an empty value has its own meaning (e.g. `polmat_update` `ray_ind`: empty = zero updates).
-  - **Optional outputs** and optional in/out arguments are passed by **pointer**, default-initialized to `nullptr`: `arma::Mat<dtype> *output = nullptr`. A `nullptr` output is not allocated and not computed.
-  - Strings and Armadillo containers are never passed by value. A string option with a literal default stays a reference (`const std::string &colormap = "jet"`). `std::string_view` is not used for arguments of public functions.
-  - `ray_mesh_interact` and `ray_state_update` still pass mandatory arguments by pointer (older style, kept until the planned engine rework). Declare the mandatory arguments of every other function, new or changed, by reference.
-- Results: one mandatory result is returned, optional ones stay pointers. Output arguments serve several mandatory results used together and large results that a wrapper copy would cost (e.g. `gbsm_draw`, `sos_val`, `get_channels_*`). Readers and factories return objects; counts, status and scalars may be returned.
-- Default values exist only in the header, never in the definition.
-- Functions that are not templates use fixed types (e.g. the `float`-only ray-tracing pipeline). A `dtype` no mandatory argument fixes defaults to `double`.
-- A new function fits the existing API (`docs/quadriga_lib_api_cpp.md`): the names, units and layouts of the glossary (see "Names, units and layouts"), the same argument types and patterns as its neighbours, and no new public function or argument for what is an implementation detail. Expose only what a caller needs.
-
-## Names, units and layouts
-The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, rendered into `docs/quadriga_lib_api_cpp.md`) states the conventions and the shared quantities for users. This section gives the rules for authors.
-- One name per quantity, in all functions and in all three APIs. Users move between functions and between C++, MATLAB / Octave and Python, and the API pages link each function across the languages; a second name for the same quantity has to be learned and documented.
-- Strength: the glossary names, units and layouts are the default for every public signature, in C++ and in the wrappers. A deviation is proposed with its reason in the plan or the spec and needs the maintainer's explicit confirmation; the implementer does not decide it.
-- Not bound by the glossary: local variables, file-local helpers, internal headers and their layouts, comments.
-- A new quantity used by more than one function or API gets its glossary entry in the commit that introduces it; a changed quantity gets its entry changed in the same commit.
-- Entry format: one bullet under the fitting bold group label of the glossary (a new label where none fits). A quantity starts with its name in backticks, then meaning, unit, index base and shape in this order (as in the argument comments), leaving out what does not apply. A convention starts with a short label and goes under "General conventions". An entry gives its reason in a short clause only where the reason helps a user judge a deviation.
-- After 1.0, released names stay. A rename in a minor release needs a justification that its benefit clearly outweighs the breakage for users.
-
-# WRAPPER INTERFACE
-- The MATLAB / Octave and Python wrappers take the names, the argument order and the defaults of the C++ declaration, so that users learn one interface for all three APIs. Where a wrapper differs, its documentation block says how and why.
-- The file name is the first argument of every function that reads or writes a file; new arguments are appended, with a default.
-- In Python, optional arguments are keyword-only, except a few that a call almost always passes, and the positional arguments may be ordered differently from C++ where that reads better (`md/SPEC_PYTHON_API.md`, "Keyword-only arguments").
-
-# IMPLEMENTATION GUIDELINES
-
-## Source file
-- One public function per file, named after the function: `quadriga_lib::function_name` is implemented in `src/function_name.cpp`. Several public functions may share one file when they belong together, share helpers, or are easier to document together, e.g. the variants of one function (`_multi`, `_vec`) or the read and write functions of one file type; the file is then named after the group. Member functions of the `arrayant`, `channel` and `path` classes go into the existing `qd_arrayant*.cpp`, `qd_channel*.cpp`, `qd_path.cpp` files. Free functions that operate on one class may stay in that class's `qd_*.cpp` file when they belong to the same documentation section (e.g. `ssf_scatterers` in `qd_gbsm_rays.cpp`); the docs builder accepts one section per file.
-- File layout, in this order:
-  1. License statement
-  2. Includes: the public header that declares the function first, then internal headers, then standard headers
-  3. File-local helpers (see below)
-  4. Section statement
-  5. Documentation block
-  6. Function definition
-  7. Explicit template instantiations
-
-## License statement
-- At the top of every source, header and test file:
-```
-// SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-// Part of quadriga-lib — see LICENSE for terms.
-```
-
-## Includes
-- Include the narrowest public header that declares the function: usually `#include "quadriga_tools.hpp"`; `#include "quadriga_lib.hpp"` if the function is declared there or several public headers are needed.
-- Include every standard header whose names are used (`<stdexcept>`, `<cmath>`, `<algorithm>`, `<limits>`, `<vector>`, ...); do not rely on transitive includes.
-- Internal helpers are header-only, in `src/qd_helpers_*.hpp`; read the ones near the topic before writing a helper of your own:
-  - `qd_helpers_shared.hpp` — helpers used by several sections: `qd_batch_loop`, `OMP_SAFE_CALL`, the alias checks, `qd_snapshot_list` (also used by the wrappers), `qd_xyz`, `qd_kernel_auto_avx2`, `qd_calc_length`, `qd_rotation_matrix`, `qd_rotate_inplace`, `qd_multiply_scalar`, portable random numbers, `qd_interp_linear`, `qd_slerp_complex`, physical constants, `qd_gain_at_1m` and the ISO 9613-1 air absorption
-  - one header per section for helpers used only there: `qd_helpers_arrayant.hpp`, `qd_helpers_channel.hpp`, `qd_helpers_gbsm.hpp`, `qd_helpers_site.hpp`, `qd_helpers_sos.hpp`
-  - `qd_helpers_wrappers.hpp` — helpers shared by the MEX and Python wrappers; `qd_helpers_mex.hpp`, `qd_helpers_mex_types.hpp` (MEX only), `qd_helpers_python.hpp`, `qd_helpers_python_types.hpp` (Python only)
-  - headers of self-contained units: `qd_hdf5.hpp` (HDF5 file layer), `bits.hpp`, `ieee_channel_model_functions.hpp`, `fastmath_*.h`, `lodepng.h`, `cuda_common.hpp`
-  - `quadriga_lib_generic_functions.hpp`, `quadriga_lib_avx2_functions.hpp`, `quadriga_lib_cuda_functions.hpp` — declarations of the compute kernels only
-
-## Function definition
-- Define with the qualified name, without reopening the namespace and without `using namespace`; no default arguments in the definition.
-- A template ends the file with explicit instantiations for `float` and `double` (one per overload), spelling out the full argument list. See "REFERENCE SKELETON" for both.
-
-## File-local helpers
-- Helpers used only in this file are `static` (or in an anonymous namespace) and placed before the section statement. Prefix them with `qd_` to avoid clashes with other headers.
-- A helper used once is a lambda inside the function that uses it. Exception: a self-contained algorithm of more than about 20 lines (e.g. a numerical kernel, or a function that calls itself) may be a named file-local function, placed directly above its single caller (for a public function: above its section statement).
-- A helper used several times within one source file is `static inline` or in the anonymous namespace.
-- A helper that is needed by more than one source file goes into the `qd_helpers_*.hpp` header of its section (or `qd_helpers_shared.hpp` when several sections use it) as `static inline`, with a comment that documents its purpose, arguments and sizes. A new internal header or a new public function is settled in the plan or spec.
-- Implementation details (algorithm steps, formulas, derivations, numerical choices) are written as comments next to the code that implements them, not in the documentation block.
-
-## Input validation
-- Validate first, compute second: all checks run before any output is resized or written, so that a failed call leaves the outputs untouched. A batch form (`_vec`) checks only its shared inputs and leaves the item checks to the single call in its loop; its outputs may then be partly written.
-- Throw `std::invalid_argument` for invalid input (null, empty, wrong shape, out-of-range value or index, inconsistent sizes), also for an index outside the layout of a file or a name the file does not contain. Throw `std::runtime_error` for a problem with a file's access or content (missing, cannot be opened or written, already exists where that is refused, truncated, malformed, unsupported version; also a value in a file that fails a check) and for other runtime failures. An empty file name is a file that cannot be opened; it needs no separate check.
-- Message style: a full sentence naming the argument in single quotes, without the function name as a prefix, e.g.
-  - `"Input 'orig' cannot be NULL."`
-  - `"Input 'mesh' cannot be empty."`
-  - `"Input 'mesh' must have 9 columns."`
-  - `"Input 'dest' must have size [n_ray, 3]."`
-  - `"Number of elements in 'fbs_ind' does not match number of rows in 'orig'."`
-- A message that refers to one entry of a vector input (an arrayant of a multi-frequency vector, a snapshot) starts with the prefix `"Entry <i>: "`, for snapshots `"Snapshot <i>: "`, with the 0-based index, e.g. `"Entry 2: Number of elements (4) does not match the first entry (2)."`. This is the only form in which a message names an index: not `'coeff_re[3]'`, `"element 3 of 'az'"` or `"at index 3"`, and no index value in the text (`"the first entry"`, `"contains indices that exceed the number of elements"`). The MEX wrappers rewrite the prefixes to 1-based, so the message is right in all three languages. A message wrapping another keeps its prefix: `"Input 'arrayant_vec' is not valid: Entry 2: ..."`. The rule is for messages of the C++ library; a message a wrapper writes itself states its indices in the base of its language (1-based in MATLAB, 0-based in Python).
-- Check in this order per argument: not empty, shape, value range; then the consistency between arguments. Mandatory arguments passed by reference need no null check; the mandatory pointer arguments of `ray_mesh_interact` and `ray_state_update` are checked for `nullptr` first.
-- Validation must reject input that would otherwise cause undefined behavior (out-of-bounds indices into the mesh or the material table, zero where a division follows). Do not validate what is cheap to tolerate and expensive to check, unless the contract asks for it.
-- Parameters that are unused in a build configuration are silenced with `(void)name;` inside the matching `#if`.
-
-## Outputs
-- Mandatory outputs are references and are always computed. Optional outputs are pointers: when one is `nullptr`, skip both its allocation and the computational steps that only serve that output.
-- If a quantity belonging to an omitted optional output is needed internally (as an intermediate for another output), compute it in a variable that is local to the function; never allocate or write through the caller's pointer for it, and do not compute it at all when nothing needs it.
-- The same holds for optional inputs: an empty input (or a `nullptr` one, where the input is a pointer) selects the documented default behavior; a default object that is needed internally is local to the function.
-- Resize an output only if its size differs from the required size, then write into it in place:
-```
-if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
-    out->set_size(n_ray, 3);
-```
-  - Reason: the MEX and Python wrappers pre-allocate outputs in MATLAB / numpy memory and map Armadillo objects onto that memory. An unconditional `set_size`, `zeros(n, m)`, or assignment of a differently sized object would detach the output from that memory or throw. With the size check, a correctly pre-sized output is written zero-copy.
-  - Consequence: every element of an output must be written by the function (it may hold arbitrary data on entry), and the output size must be derivable from the inputs and documented.
-- Do not read from an output before writing it.
-- An output must not be the same object as an input or another output, nor share memory with one. Check this with `qd_check_alias`, `qd_check_alias_outputs` or `qd_check_alias_list` (`src/qd_helpers_shared.hpp`) after the null checks and before the first output is resized or written; such a call throws `std::invalid_argument`. The rule is stated once in the general C++ API documentation, not per function. A function that needs a different behaviour states it in its requirements and documentation.
-  - Reason: outputs are resized and written while inputs are still read. Supporting aliasing needs a copy of the input, which saves the caller no memory; a caller who wants the result in place uses a separate output and `swap()`.
-- In/out arguments (documented as "updated in-place") keep their size; validate it like an input.
-
-## Numerics and types
-- Access array data through raw pointers (`memptr()`, `colptr(i)`, `slice_memptr(i)`) in hot loops; Armadillo element access `(i, j)` and expression templates are fine for setup code. Remember the column-major layout when striding.
-- Sizes and counters are `arma::uword`. Indices stored in data use the type from the contract (`unsigned` / `arma::u32_vec`, `short`, `uint8_t`). Cast explicitly when mixing types; the compiler warnings are enabled.
-- For `dtype = float`, do intermediate math in `double` where cancellation or accumulation matters and cast the result once: `dtype(x)`. Write literals so that no unintended double-precision math enters a float kernel (`(dtype)0.5`, `1.0f`).
-- Never compare floating-point results for equality in the logic unless the contract defines an exact sentinel (e.g. 0 = disabled).
-- No global or static mutable state; functions must be re-entrant. Random numbers only through an explicit seed argument.
-- No output to `std::cout` from library code, except where the contract has a `verbose` argument.
+# Implementation
+- Functions that belong together share one source file: the `_multi` and `_vec` variants of a function, a reader and its writer, functions that share helpers, the free functions of one class. This keeps related logic in one place instead of spreading it over many small files and internal headers. They also share the documentation section, since the docs builder takes one section per file; the section alone is no reason to add a function to a file. The file is named after the function or the group (`src/<name>.cpp`).
+- File layout: the three-line license header, includes (the declaring public header first, then internal headers, then every standard header used), file-local helpers, section statement, doc block, definition with the qualified name, explicit instantiations.
+- Keep helpers as local as possible: used once, a lambda (a self-contained algorithm of more than about 20 lines may be a named `static` function above its caller); used several times in one file, `static` with a `qd_` prefix; used in several files, `static inline` in the `qd_helpers_*.hpp` of its section (`qd_helpers_shared.hpp` when several sections use it), with a comment on purpose, arguments and sizes.
+- Validate first: all checks run before an output is written, so a failed call leaves the outputs untouched. A batch form may check only its shared inputs and leave the item checks to the single call; its outputs may then be partly written. Reject what would cause undefined behaviour or a wrong result, but weigh the cost: a separate pass over a large input (e.g. a scan for NaN) can cost more than the computation. Such inputs may be checked inside the parallel workers, throwing on the first error after the region (the outputs may then be partly written, as with a batch form), or left unchecked with the doc block saying what invalid values give; which fits depends on the function.
+- Throw `std::invalid_argument` for a wrong argument (also an index outside the layout of a file) and `std::runtime_error` for a problem with a file's access or content. Messages are full sentences that name the argument in quotes, without the function name, e.g. `"Input 'mesh' must have 9 columns."`. A message about one entry of a vector input starts with `"Entry <i>: "` (`"Snapshot <i>: "` for snapshots), 0-based; this prefix is the only place where a message gives an index, so that the MEX wrappers can make it 1-based. `qd_batch_loop` adds it to the error of an item when its `prefix` argument is `"Entry"` or `"Snapshot"`.
+- Size an output with `set_size` and write every element. A wrapper may pass an output mapped onto MATLAB or numpy memory: `set_size` at the right size (or an assignment of a result of that size) keeps that memory, another number of elements throws, and the same number in another shape is accepted without error but leaves the wrapper's array in the wrong layout. Do not replace or resize a `std::vector` output that already has the right length (e.g. the per-frequency cubes of a 4D output); its entries would become new objects and the wrapper's array would stay unwritten. Do not read an output before writing it. A quantity needed only internally lives in a local variable, not behind the caller's pointer.
+- Outputs must not alias inputs or each other; check with `qd_check_alias`, `qd_check_alias_outputs` or `qd_check_alias_list` before the first output is written.
+- Hot loops use raw pointers (`memptr()`, `colptr(i)`); sizes are `arma::uword`. A `float` instantiation accumulates in `double` where cancellation matters and keeps its literals typed. No global mutable state; random numbers only from an explicit seed; no output to `std::cout` unless there is a `verbose` argument.
 
 ## OpenMP
-- Parallelize only loops that dominate the run time and are independent per iteration. Guard nothing with `#ifdef _OPENMP` unless OpenMP runtime functions are called; a plain `#pragma omp parallel for` is ignored by a compiler without OpenMP.
-- Every parallel region has an `if (...)` clause with a measured size limit, so that small calls run serially. Starting a thread team costs a few microseconds on an idle machine and up to a scheduler time slice (milliseconds) when other processes compete for the cores. The limit is the smallest size at which the default thread count is at least 2× faster than serial on an idle machine; where the tests do not reach that size, it is the size at which the serial work reaches about 20 µs at the measured cost per item. Express the limit in the quantity the work scales with (e.g. `n_ray * n_point`), and also require at least 2 iterations when the count of the parallel loop can be 1.
-- The loop variable of a parallel `for` must be a signed integer type (`int` or `long long`) for MSVC; cast to `arma::uword` inside the loop.
-- Exceptions must not leave a parallel region. Run the items of a batch with `qd_batch_loop`, which rethrows the error of the lowest failing item with its type and the `"Snapshot <i>: "` prefix; wrap other throwing calls in `OMP_SAFE_CALL` and throw `std::runtime_error` after the region (both in `src/qd_helpers_shared.hpp`). Do not use `std::exception_ptr`: it needs a libstdc++ symbol version (`CXXABI_1.3.13`) that the libstdc++ bundled with MATLAB R2024a lacks, so the MEX files would not load there. `make test` runs `tests/check_mex_symbol_versions.sh`, which fails when a MEX file needs a symbol version newer than that release provides.
-- The result must not depend on the number of threads (same values, same order). If a parallel and a serial path exist, a test compares them.
+- Parallelize only loops that dominate the run time. Every parallel region is switched by a measured size limit (its `if` clause, or the `parallel` argument of `qd_batch_loop`), so that small calls stay serial: the size at which the default thread count is at least 2x faster than serial on an idle machine, or, where the measured sizes do not reach that point, the size at which the serial work takes about 20 µs at the measured cost per item. The loop variable is signed (`int`, `long long`) for MSVC.
+- Exceptions must not leave a parallel region: run batches with `qd_batch_loop` and wrap other throwing calls in `OMP_SAFE_CALL` (`src/qd_helpers_shared.hpp`). The result must not depend on the number of threads beyond rounding: outputs keep their order and their values agree within the tolerance of the arithmetic. A reduction may differ in the last bits with the order of its terms; a test compares parallel and serial runs with a tolerance, not for bit-identity.
 
 ## AVX2 and CUDA kernels
-- New functions are implemented in portable C++ first. Vectorized or GPU kernels are reserved for the most performance-critical sections and are only added when the plan or spec asks for them, after benchmarking.
-- Where they exist, the layout is: public function in `function_name.cpp` validates, converts and dispatches; kernels are free functions `qd_XXX_GENERIC` / `qd_XXX_AVX2` / `qd_XXX_CUDA` in `function_name_generic.cpp` / `function_name_avx2.cpp` / `function_name_cuda.cu`, declared in the `quadriga_lib_*_functions.hpp` headers; calls are guarded by `#if BUILD_WITH_AVX2` / `#if BUILD_WITH_CUDA` and a runtime check; a `use_kernel` argument selects 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA and throws if the requested kernel is unavailable. See `ray_triangle_intersect.cpp`. All kernels must produce the same results within the documented tolerance, and a test compares them.
-- `*_avx2.cpp` files use no standard library templates or inline functions (containers, smart pointers, `std::numeric_limits`, `throw std::...`): they are compiled with AVX2 flags, and the linker may use such a copy for plain code, which then crashes on CPUs without AVX2. Use `qd_avx2_buffer` for heap buffers, `qd_avx2_throw_invalid_argument` / `qd_avx2_throw_bad_alloc` for exceptions and `<cfloat>` / `<cmath>` macros for constants (see `quadriga_lib_avx2_functions.hpp`). `make test` runs `tests/check_avx2_objects.sh`, which fails when a non-kernel function in an AVX2 object contains AVX code.
+- Only where a benchmark justifies them, next to a portable implementation. The public function validates and dispatches; the kernels `qd_<name>_GENERIC`, `_AVX2`, `_CUDA` live in `*_generic.cpp`, `*_avx2.cpp`, `*_cuda.cu`; `int use_kernel` selects 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA (followed by `gpu_id` where CUDA applies) and throws for a kernel that is not available. A test compares the kernels.
+- `*_avx2.cpp` files use no standard-library templates or inline functions, because the linker may pick their AVX2 copy for plain code, which then crashes on CPUs without AVX2; use the helpers in `src/quadriga_lib_avx2_functions.hpp`.
 
-## Section statement
-- Functions are grouped into sections for the generated documentation. Place the block before the documentation block:
-```
-/*!SECTION
-Site-specific simulation tools
-SECTION!*/
-```
-- Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
+# Documentation block
+- Format: `docs_builder/README.md`, section "API documentation from the sources". The block is the reference documentation: it is rendered into the website and `docs/`, and the wrapper blocks are derived from it.
+- As short as possible: what the function does and what it is for, layouts, sizes, ranges, units, index bases, what omitting an optional argument means (the default value itself is in the declaration), and the valid ranges of the inputs (a value outside them throws). Each fact once. Implementation details and derivations go into code comments; cite a published algorithm instead of restating it.
+- Layout: the name line, the one-line summary (the wrappers reuse it), the description as bullets without a heading, then `## Declaration:` (the header declaration with the qualified name `quadriga_lib::<name>` and its defaults, without comments and the `template` line), `## Inputs:`, `## Outputs:`, `## Returns:` and `## See also:` with one entry per related function as `- [[name]] (why it is related)`; the singular `## Input:` or `## Output:` for one entry, empty sub-blocks left out. An argument with a default or `nullptr` is marked *(optional)* and says what omitting it means; sizes are given in backticks with dimension names used consistently. `[[name]]` links a function of the same API in the text. `src/o2i_loss.cpp` shows the layout.
+- The section name must match one in use exactly (`grep -h -A1 '^/\*!SECTION$' src/*.cpp | sort -u`); facts shared by a whole section (the common model, data structures, how its functions work together) go into a `/*!SECTION_DESC ... SECTION_DESC!*/` block placed next to the section statement in one of the section's source files (e.g. `src/qd_scenpar.cpp`). A section may have several such blocks in different files; the page shows them one after another in file-name order below the section heading, so each states its own facts once.
 
-## Documentation block
-- The block is placed immediately before the function definition.
-- Doc-block format (delimiters, name and summary lines, sub-block headings, parameter lines, links, tables, line length and wrapping, formulas): see `docs_builder/README.md`, section "API documentation from the sources".
-- It is the reference documentation of the function: it is rendered into the website and the Markdown files in `docs/` (`make website`, `make docs`), and it is the input from which the MEX and Python wrappers and their documentation are derived. Sizes, units, index bases, defaults and optionality must therefore be complete and exact.
-- Keep it as short as possible and as long as needed. All blocks are merged into one public document that AI agents also read, so every line costs tokens. Ask: what does a caller need to use the function correctly? Leave out the rest.
-  - The block describes the API: what the function does and what it is for, the data layout, sizes, ranges, units, defaults and the errors a caller can trigger.
-  - No implementation details, formulas or derivations; they go into source comments (see "File-local helpers"). Where the function implements a specific published algorithm, cite it briefly instead of restating it.
-  - State each fact once, in the place where it fits best: the description, the argument list, or the section description. Do not repeat a fact from the description in an argument entry; a list of options goes in one place only.
-- Facts that concern all functions of a section (the common model, data structures, how the functions work together) go into one section description, a `/*!SECTION_DESC ... SECTION_DESC!*/` block next to the section statement in one of the section's source files (see `src/qd_scenpar.cpp`). The same rules apply there: only what is relevant, stated once.
-- Layout, in this order: name, one-line summary, description, `## Declaration:`, `## Inputs:`, `## Outputs:`, `## Returns:`, `## See also:`; see the block in "REFERENCE SKELETON".
-- The name line gives the function name as declared (member functions of a class with a leading `.`); the one-line summary that follows is reused verbatim by the wrappers.
-- The description follows after one empty line as a bullet list, without a `## Description:` heading. Start with a brief statement of what the function does and what it is for; then what a caller must know: conventions, edge cases, what is and is not validated, what happens for empty or omitted arguments. Do not narrate the implementation.
-- `## Declaration:` repeats the declaration from the header including the default values, without the per-argument comments and without the `template` line.
-- `## Inputs:`, `## Outputs:`, `## Returns:`; use the singular (`## Input:`, `## Output:`) when there is exactly one; omit a section that would be empty. In/out arguments are listed under Inputs and marked "updated in-place" (or under Outputs when they are primarily results).
-- Argument entries: the description, further facts, the size (entry syntax: `docs_builder/README.md`, section "Parameter lines").
-  - Mark every argument that has a default value or accepts `nullptr` as optional (the default itself is visible in the Declaration) and state what omitting it means.
-  - Give the size in backticks, with the symbolic dimension names used consistently across all arguments; define each dimension name where it first appears.
-  - State the unit when it is not SI, the index base for every index argument, and the meaning of sentinel values (0, NaN, negative).
-- `## See also:` lists related functions as links, each with a short reason.
-- Math notation only where plain text would be unclear; the rule against derivations still applies.
-- The existing blocks predate these rules and are longer than they allow; follow the rules, not the older blocks.
-
-# TESTS
-
-## File and structure
-- One file per function: `tests/catch2_tests/test_<function_name>.cpp`. Tests of internal kernels that include internal headers go into `test_<function_name>_internal.cpp`.
-- File layout: license statement; a header comment (see below); `#include <catch2/catch_test_macros.hpp>`; the public header; `"qd_test_diag.hpp"` (see "Diagnostics"); standard headers; fixtures and oracles; test cases.
-- Header comment: a short statement of what this suite pins down and what it leaves to other suites, where the oracles come from, and the conventions of the fixtures (geometry, materials, units). See `test_ray_commit.cpp`.
-- All test files are linked into one executable. Every helper function, struct and constant in a test file must be `static` or inside an anonymous namespace, and test case names must be unique across the whole suite.
-- Test case names: `"function_name - what is asserted"`, written as a statement about behavior, e.g. `"ray_commit - a receiver outside the beam tube is not committed"`. Tags are used only for topic groups (e.g. `[wave]`, `[acoustic]`); the cases of one function are selected by name.
-- Tests must run fast. The complete suite runs in every future session, so its run time sets the turnaround of all later work. Use the smallest inputs that show the behavior, no large sweeps or repetitions; a case that needs seconds needs a reason in a comment.
-- One behavior per `TEST_CASE`. Use `SECTION`s for variations that share a setup (e.g. one section per argument in the validation test).
-
-## Fixtures and oracles
-- Keep it lean. Separate two kinds of code in a test file:
-  - **Oracles** for the test object: these you build yourself, in the test file, independently of the library.
-  - **Supporting tasks** (scene geometry, intersections that feed the function under test, antenna patterns, coordinate conversions, file I/O, ...): use the library. It is fine and preferred to call library functions that are not related to the current test objective, e.g. `quadriga_lib::cube` to generate geometry or `quadriga_lib::ray_triangle_intersect` to produce the hit indices for a function that consumes them. They have their own tests; do not re-implement them in the test file. A dozen lines that rebuild what one library call does (a cube or plane mesh, a rotation, a coordinate conversion) are bloat.
-- A complete overview of all available C++ functions is in `docs/quadriga_lib_api_cpp.md`. Use it to find helpers before writing one.
-  - The file is generated by `make docs` from the documentation blocks in `src/`; never edit it.
-  - It starts with general usage notes and a "Function Index" table with the columns Function, Section and Summary. Read the index first, then open only the section file `docs/api/cpp/<section>.md` with the entries you need instead of reading the whole file.
-- Build the smallest input that isolates the behavior: one ray, one face, one path. Exact-by-construction geometry (axis-aligned, unit distances) gives expectations that need no tolerance discussion.
-- Put shared setup into a few small helper functions or a fixture struct at the top of the file. Write a helper only when it is used more than once or makes a test case readable; no helper layers, no generality that no test uses.
-- Oracles: closed-form formulas, direct transcription of the governing equations in scalar `double` math, brute-force evaluation of what the function computes cleverly. Comment each oracle with the formula and its range of validity.
-- An oracle never calls the function under test or non-public code it shares (internal headers, kernels): a shared bug would hide. A public function with its own suite may supply inputs, and may supply an oracle term only when the test says so and why.
-- Prefer checks that are independent of conventions and hard to satisfy by accident: energy conservation, reciprocity, symmetry, invariance under subdivision / reordering / partitioning, agreement of two independent code paths, known limiting cases.
-- Use distinctive inputs (non-trivial values, distinct values per element, permuted index maps) so that a swapped argument, an off-by-one or cross-talk between elements changes the result visibly.
-- Random inputs are fine as distinctive inputs, but no check may depend on their realisation. The test main reseeds the Armadillo generator before every test case and `SECTION` run, so a test draws the same values in the full suite and alone; `QD_TEST_SEED=<n> test_bin` repeats the suite with other draws. A test that needs a particular realisation (a stored value, a threshold that only some seeds meet) draws from a seeded library function or from the raw output of `std::mt19937` / `std::mt19937_64` (see `qd_test_rays.hpp`), not from `arma::randn`, `arma::randg` or `std::normal_distribution`, whose values differ between standard libraries.
-- The Catch2 test binary links no BLAS (by design, like the library), so tests must not use Armadillo matrix products above 4x4 (`A * B` with a dimension larger than 4); write small loops instead. Armadillo multiplies with its own code only up to 4x4 and calls BLAS beyond that, which does not link. The same holds for the calls that Armadillo maps to BLAS (`arma::norm`, `arma::dot`, `arma::accu(a % b)`).
-
-## Assertions
-- `CHECK` for the assertions under test (the case continues and reports all failures); `REQUIRE` only for preconditions without which the rest of the case would crash or be meaningless (output sizes before indexing).
-- Arrays: `CHECK(arma::approx_equal(A, B, "absdiff", tol));` (or `"reldiff"`). Scalars: `CHECK(std::abs(a - b) < tol);`. Integers, indices and flags are compared exactly. The Catch2 `Approx` class is not used in new tests.
-- Choose tolerances from the arithmetic, not from the observed error: near machine precision for exact-by-construction `double` results (1e-12 to 1e-14), a few `float` epsilons scaled by the magnitude for `float`, and the documented model accuracy where an approximation is tested. State the reason in a comment when a tolerance is loose.
-- Inside loops, add `INFO("angle " << a << ", type " << t);` before the checks so that a failure reports the case.
-- When `nullptr` is passed for a templated pointer argument (an optional output), give the template argument (`function<double>(...)`) or cast it (`(arma::mat *)nullptr`); a bare `nullptr` stops the deduction of `dtype` even when another argument would give it.
-
-## Default coverage
-The plan or spec may narrow or extend this list.
-- The values, against the oracles, for the normal cases and for every branch the contract distinguishes.
-- Output sizes and types for all outputs.
-- Optional arguments: omitted versus provided; each optional output requested alone and together with others gives the same values.
-- Edge cases named in the contract: empty optional inputs, a single element, sentinel values, degenerate geometry.
-- Pre-sized outputs: an output that already has the correct size is filled completely; an output with a wrong size or stale content is resized and overwritten.
-- `float` and `double`, where the function has both and the plan or spec covers both: both instantiations run; a parity case compares them within `float` accuracy.
-- Determinism: repeated calls give identical results; parallel and serial paths agree; where the function processes data in blocks, one case crosses the block size.
-- Input validation, in one test case named `"function_name - input validation"`: a valid baseline with `CHECK_NOTHROW`, then one section per argument in which exactly one thing is made invalid and `CHECK_THROWS_AS(call, std::invalid_argument)` is asserted. Pairing every negative case with the passing baseline shows that the guard is not over-eager.
-- Tests that write files use distinct file names in the working directory and remove them at the end of the case; input files come from `tests/data/`.
+# Tests
+- One file per function, `tests/catch2_tests/test_<function_name>.cpp`. All test files link into one binary: file-scope helpers are `static` or in an anonymous namespace, and case names are unique. A name states the behaviour (`"o2i_loss - the model is chosen by the cumulative weights"`). The file starts with a comment on what the suite pins down, its oracles and its fixtures.
+- Write the tests before the implementation and see each value check fail for the right reason: against a stub that sizes the outputs and writes zeros for a new function, against the current code for a change.
+- Expected values come from first principles: closed forms, hand-computed small cases, conservation laws, symmetries, limiting cases, brute force in the test file. Never from the implementation, and never through the function under test or the internal code it uses. Supporting tasks (geometry, antennas, coordinate conversions, file I/O) use library calls rather than re-implementations. Fixtures shared by several test files are in `tests/catch2_tests/qd_test_*.hpp`; extend one before writing a copy.
+- Use small, distinctive inputs (different values per element, non-square shapes, permuted indices), so that a swapped argument or an off-by-one shows.
+- Tests run from the repository root and read their input files from `tests/data/`; a test that writes files uses names no other test uses and removes them at the end.
+- Test what the function adds. Most often missed: optional outputs requested alone and together give the same values; pre-sized outputs are written in place; `float` and `double` agree where both exist; parallel and serial paths agree where both exist (on an input above the size limit; the serial run with `omp_set_num_threads(1)` under `#ifdef _OPENMP`, the count restored afterwards); a case `"<function_name> - input validation"` with a passing baseline and one section per invalid argument.
+- `CHECK` for assertions, `REQUIRE` only where the rest of the case would crash; `arma::approx_equal` for arrays, exact comparison for integers and indices. Tolerances follow from the arithmetic (1e-12 to 1e-14 for exact-by-construction `double` results, a few `float` epsilons scaled by the magnitude), must survive FMA and other code paths, and a loose one says why. A `nullptr` passed for a templated optional output needs the template argument (`f<double>(...)`), since it stops the deduction of `dtype`.
+- No check may depend on the realisation of random inputs; the test main reseeds before every case (`QD_TEST_SEED=<n> test_bin` repeats with other draws). A test that needs a fixed realisation draws from a seeded library function or from raw `std::mt19937` output.
+- Run time: the whole suite runs on every change, so a new test should not add noticeably to its run time; aim for well under a second per function (`test_bin "name*" --durations yes` shows the time per case). A case that needs seconds says why in a comment.
+- A new file reader, or a function whose inputs carry indices, offsets or ragged per-item layouts that address memory, gets a fuzz target or an extension of one (`tests/fuzzing/README.md`, "Adding a target").
 
 ## Diagnostics
-- Diagnostic output makes the numbers behind the assertions visible while the oracles and the implementation are being developed. It is off by default and switched per area by environment variables (see `tests/catch2_tests/qd_test_diag.hpp`). A test file includes `"qd_test_diag.hpp"`, selects its area once with `QD_TEST_DIAG_SWITCH("QD_DIAG_SOS")`, and prints with `QD_DIAG(...)` like `printf`. A new area adds its variable to the list in the header. Run e.g. `QD_DIAG_SOS=1 build_linux/test_bin "sos_val*"`.
-- Print tables in CSV form with a `# diag:` title line and a header line, one row per case, with the computed value, the oracle value and their difference:
-```
-QD_DIAG("\n# diag: thin sheet composite vs analytic slab, 1 GHz\n");
-QD_DIAG("material,angle,sheet_dB,ana_dB,d_dB\n");
-...
-QD_DIAG("%s,%.1f,%.6f,%.6f,%.6f\n", name, angle, a, b, a - b);
-```
-- Two kinds of test cases print diagnostics:
-  - Regular cases print the compared quantities next to their `CHECK`s.
-  - Pure diagnostic cases, named `"Diagnostic - ..."`, exist to produce numbers for a question that is still open. They assert only sanity (finite, non-negative, energy not created), so they stay green while the divergence they measure is being investigated. Explain in a comment what the table shows and how to read it.
-- The diagnostic cases and the `QD_DIAG` lines stay in the file for later investigations. Nothing but printing may depend on the switch.
+- Diagnostic output is optional; use it where it adds value, in tests whose oracles, tolerances or model accuracy need judgment. While such a feature is being developed, its tests print the numbers behind the checks: the computed value, the oracle and their difference per case, as CSV with a `# diag:` title line and a header line. These tables are the fastest feedback loop for judging oracles, tolerances and the implementation, and for iterating on them; once the feature is done, the output stays in the file, switched off, and the assertions guard against regressions.
+- The output is off by default and switched per area by an environment variable (`QD_DIAG_SOS=1 build_linux/test_bin "sos_val*"`; `QD_DIAG=1` switches on all areas). A test file selects its area once with `QD_TEST_DIAG_SWITCH("QD_DIAG_<area>")` and prints with `QD_DIAG(...)` like `printf`; a new area adds its variable to the list in `tests/catch2_tests/qd_test_diag.hpp`. Nothing but printing depends on the switch.
+- A question that is still open (a divergence from a reference, a model limit) may get a case named `"Diagnostic - ..."` that prints a table and asserts only sanity (finite values, no energy created), so that it stays green while the question is investigated; a comment says what the table shows and how to read it.
 
-# REFERENCE SKELETON
-
-Stub of step 1 (see "IMPLEMENTATION ORDER") for a function declared in `quadriga_tools.hpp` as
-
-```
-// Short description
-template <typename dtype>
-arma::uword my_function(const arma::Mat<dtype> &points,     // Points in GCS, [n_point, 3]
-                        arma::Col<dtype> *dist = nullptr,   // Optional output: Distance to the origin in [m], [n_point]
-                        dtype scale = 1.0);                 // Scaling factor
-```
-
-`src/my_function.cpp`:
-
-````
-// SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-// Part of quadriga-lib — see LICENSE for terms.
-
-#include "quadriga_tools.hpp"
-
-/*!SECTION
-Site-specific simulation tools
-SECTION!*/
-
-/*!MD
-# my_function
-Short description
-
-- First draft of the description; completed when the function is finished
-
-## Declaration:
-```
-arma::uword quadriga_lib::my_function(
-    const arma::Mat<dtype> &points,
-    arma::Col<dtype> *dist = nullptr,
-    dtype scale = 1.0);
-```
-
-## Inputs:
-- **`points`** — Points in GCS; `[n_point, 3]`
-- **`scale`** *(optional)* — Scaling factor
-
-## Output:
-- **`dist`** *(optional)* — Distance to the origin in [m]; `[n_point]`
-
-## Returns:
-- Number of points, `n_point`
-
-## See also:
-- [[other_function]] (short reason)
-MD!*/
-
-template <typename dtype>
-arma::uword quadriga_lib::my_function(const arma::Mat<dtype> &points,
-                                      arma::Col<dtype> *dist,
-                                      dtype scale)
-{
-    // STUB: no computation yet
-    (void)scale;
-
-    arma::uword n_point = points.n_rows;
-
-    if (dist != nullptr)
-    {
-        if (dist->n_elem != n_point)
-            dist->set_size(n_point);
-        dist->zeros();
-    }
-
-    return n_point;
-}
-
-template arma::uword quadriga_lib::my_function(const arma::Mat<float> &points, arma::Col<float> *dist, float scale);
-template arma::uword quadriga_lib::my_function(const arma::Mat<double> &points, arma::Col<double> *dist, double scale);
-````
-
-For a complete source and test file see `src/ray_commit.cpp` and `tests/catch2_tests/test_ray_commit.cpp` (layout, validation, test structure; the documentation block predates the lean rules).
+# Hand-over
+- The test results as actually run (the new cases, the full suite and, where a fuzz target was added or extended, its short run), compiler warnings, the measured OpenMP size limits, and every deviation from these conventions with its reason.
