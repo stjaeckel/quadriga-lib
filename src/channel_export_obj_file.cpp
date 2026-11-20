@@ -68,16 +68,16 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
         throw std::invalid_argument(error_message.c_str());
 
     if (chan.empty())
-        throw std::invalid_argument("Channel contains no data.");
+        throw std::invalid_argument("Input 'chan' cannot be empty.");
 
     if (chan.center_freq.empty())
-        throw std::invalid_argument("Center frequency is missing.");
+        throw std::invalid_argument("Input 'chan' must contain 'center_freq'.");
 
     if (chan.n_interact.empty() || chan.interact_coord.empty())
-        throw std::invalid_argument("Ray tracing data (n_interact, interact_coord) is missing.");
+        throw std::invalid_argument("Input 'chan' must contain 'n_interact' and 'interact_coord'.");
 
     if (chan.polmat.empty() && chan.coeff_re.empty())
-        throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
+        throw std::invalid_argument("Input 'chan' must contain 'coeff_re' or 'polmat'.");
 
     if (!std::isfinite(gain_max_dB) || !std::isfinite(gain_min_dB) || !(gain_max_dB > gain_min_dB))
         throw std::invalid_argument("Inputs 'gain_max_dB' and 'gain_min_dB' must be finite, with 'gain_max_dB' larger than 'gain_min_dB'.");
@@ -91,7 +91,7 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
         fn_mtl = fn.substr(0, fn.size() - fn_suffix.size()) + ".mtl";
     }
     else
-        throw std::invalid_argument("OBJ-File name must end with .obj");
+        throw std::invalid_argument("Input 'fn' must end with '.obj'.");
 
     // Extract the file name from the path
     std::string fn_mtl_base;
@@ -113,7 +113,7 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     arma::uword n_snap_out = i_snap.n_elem;
 
     if (radius_min < (dtype)0.0 || radius_max < (dtype)0.0)
-        throw std::invalid_argument("Radius cannot be negative.");
+        throw std::invalid_argument("Inputs 'radius_max' and 'radius_min' cannot be negative.");
 
     // Make sure that the minimum radius is smaller than the maximum
     radius_min = (radius_min < radius_max) ? radius_min : radius_max;
@@ -138,7 +138,7 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
         outFile.close();
     }
     else
-        throw std::runtime_error("Could not write material file.");
+        throw std::runtime_error("Cannot write file '" + fn_mtl + "'.");
 
     // Export paths to OBJ file
     outFile = std::ofstream(fn);
@@ -148,7 +148,7 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
         outFile << "mtllib " << fn_mtl_base << "\n";
     }
     else
-        throw std::runtime_error("Could not write OBJ file.");
+        throw std::runtime_error("Cannot write file '" + fn + "'.");
 
     bool moving_tx = chan.tx_pos.n_cols != 1ULL;
     bool moving_rx = chan.rx_pos.n_cols != 1ULL;

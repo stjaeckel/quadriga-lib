@@ -76,9 +76,9 @@ assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], [1
 
 %% Type handling of the shared MEX helpers, pinned so that a change is noticed
 % Complex arrays are rejected, also when their class matches the type the wrapper reads in place
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, complex(pos, pos + 1) ), 'Complex datatypes are not supported.' );
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, complex(phase, 1), pos ), 'Complex datatypes are not supported.' );
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, complex(single(pos), 1) ), 'Complex datatypes are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, complex(pos, pos + 1) ), 'is complex; complex inputs are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, complex(phase, 1), pos ), 'is complex; complex inputs are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, complex(single(pos), 1) ), 'is complex; complex inputs are not supported.' );
 % All real classes are read: 8- and 16-bit integers and logical arrays as their double values
 assertEqual( quadriga_lib.sos_val( spatial_freq, phase, uint8(pos) ), quadriga_lib.sos_val( spatial_freq, phase, double(uint8(pos)) ) );
 assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos > 0 ), quadriga_lib.sos_val( spatial_freq, phase, double(pos > 0) ) );
@@ -88,7 +88,7 @@ assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], []
 vi = quadriga_lib.sos_val( spatial_freq, phase, int32(pos), [], [], [], [], [], [], 1 );
 assertEqual( vi, quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1 ) );
 % Scalars: complex and non-integer values for integer arguments are rejected, uint8 is read
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase, [], [], complex(1, 1) ), 'Complex datatypes are not supported.' );
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase, [], [], complex(1, 1) ), 'is complex; complex inputs are not supported.' );
 assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], uint8(1) ), ...
     quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1 ) );
 assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1.7 ), ...

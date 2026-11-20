@@ -152,6 +152,8 @@ make gcc_version= matlab=OFF
 
 The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly. `ENABLE_SANITIZERS` (CMake only, default `OFF`) builds with AddressSanitizer and UndefinedBehaviorSanitizer for testing; it turns MATLAB, Octave and CUDA off. `ENABLE_FUZZING` (CMake only, default `OFF`, Clang) builds the fuzz targets of [tests/fuzzing](tests/fuzzing/README.md) instead of the interfaces.
 
+The shared library has the soname `libquadriga.so.<major>.<minor>`. The API may change between minor releases, so programs linked against the shared library are rebuilt for each minor release.
+
 ### Make targets
 
 | Target                | Does                                                                |

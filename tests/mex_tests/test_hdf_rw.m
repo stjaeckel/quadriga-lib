@@ -248,7 +248,7 @@ assertEqual(val, pi);
 
 % Complex data is rejected
 parC = struct('complex', 1 + 21i);
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, dummy_chan, parC, 8), 'Complex datatypes are not supported' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, dummy_chan, parC, 8), 'is complex; complex inputs are not supported.' );
 
 %% hdf5_write_dset, hdf5_read_dset, hdf5_read_dset_names: arguments
 
@@ -309,7 +309,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', []), 'Input ''data''
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', true), 'Input ''data'' has an unsupported data type.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', int16(1)), 'Input ''data'' has an unsupported data type.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', {1}), 'Input ''data'' has an unsupported data type.' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1 + 2i), 'Complex datatypes are not supported.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1 + 2i), 'is complex; complex inputs are not supported.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'a-b', 1), 'Parameter name must only contain' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, '', 1), 'Dataset name not provided.' );   % thrown by C++
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn, 'x', 1, [], [], [], [], 'p-'), 'Parameter name must only contain' );

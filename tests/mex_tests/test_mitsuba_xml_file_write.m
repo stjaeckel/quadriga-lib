@@ -78,11 +78,11 @@ assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, f0, obj_i
 assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, 0 * obj_ind, mtl_ind, obj_names, mtl_names ), ...
     'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
 assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, 0 * mtl_ind, obj_names, mtl_names ), ...
-    'mtl_ind == 0' );
+    'Input ''mtl_ind'' cannot contain 0' );
 assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list(:, 1:2), face_ind, obj_ind, mtl_ind, obj_names, mtl_names ), ...
     '3 columns' );
 assert_throws( @() quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names(1), mtl_names ), ...
-    'object names' );
+    '''obj_names''' );
 
 cleanup_files( fn, mesh_dir );
 end

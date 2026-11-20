@@ -749,7 +749,7 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
 
     // --- Range check: n_sub must fit in uint16 ---
     if (n_sub > 65535)
-        throw std::invalid_argument("qd_RTI_CUDA: n_sub > 65535 not supported (uint16 AABB index).");
+        throw std::invalid_argument("Number of sub-meshes exceeds the CUDA kernel limit of 65535.");
 
     bool count_hits = (hit_cnt != nullptr);
 
@@ -1155,7 +1155,7 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
             // worst case (BLOCK_SIZE * n_sub), so this is unreachable — but
             // failing loudly beats looping forever or silently dropping entries.
             if (n_ray_batch <= (size_t)BLOCK_SIZE)
-                throw std::runtime_error("qd_RTI_CUDA: work queue too small for a single block");
+                throw std::runtime_error("CUDA work queue is too small for a single block.");
 
             RTI_DBG("*** OVERFLOW batch %zu: n_ray_batch=%zu tail=%u cap=%zu hits/ray=%.2f -> chunk=%zu\n",
                     batch_idx, n_ray_batch, h_queue_tail[s], queue_capacity,

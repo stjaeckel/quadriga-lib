@@ -60,10 +60,10 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dt
 
     double radius_d = (double)radius;
     if (!std::isfinite(radius_d) || radius_d <= 0.0)
-        throw std::invalid_argument("Radius must be finite and larger than 0.");
+        throw std::invalid_argument("Input 'radius' must be finite and larger than 0.");
 
     if (n_edges < 3ULL)
-        throw std::invalid_argument("Number of edges mut be >= 3.");
+        throw std::invalid_argument("Input 'n_edges' must be at least 3.");
 
     // There might be co-located vertices on the path. These need to be merged together
     arma::uword n_coord = path_coord.n_cols;

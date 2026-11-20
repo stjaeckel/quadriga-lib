@@ -51,12 +51,12 @@ c = chan; c.delay = [];
 assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, c ), 'Delays are missing or incomplete.' ); % C++ check, passed through
 
 % Options
-assert_cpp_error( @() quadriga_lib.channel_export_obj_file( '', chan ), 'OBJ-File name must end with .obj' );
-assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, chan, [], [], [], 'bls' ), 'Colormap is not supported.' );
+assert_cpp_error( @() quadriga_lib.channel_export_obj_file( '', chan ), 'Input ''fn'' must end with ''.obj''.' );
+assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, chan, [], [], [], 'bls' ), 'Colormap ''bls'' is not supported.' );
 assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, chan, [], [], [], 'parula', [], [], [], 1 ), ...
-    'Number of edges mut be >= 3.' );
+    'Input ''n_edges'' must be at least 3.' );
 quadriga_lib.channel_export_obj_file( fn, chan, [], [], [], [], [], 0 ); % paths without a volume
-assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, chan, [], [], [], [], [], -1 ), 'Radius cannot be negative.' );
+assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, chan, [], [], [], [], [], -1 ), 'cannot be negative.' );
 assert_cpp_error( @() quadriga_lib.channel_export_obj_file( fn, chan, -1 ), 'Input ''max_paths'' must be a non-negative integer.' );
 
 % Snapshot indices: 1-based in MATLAB, 0-based in C++

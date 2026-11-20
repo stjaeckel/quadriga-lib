@@ -184,13 +184,13 @@ class test_channel_export_obj_file(unittest.TestCase):
 
     def test_error_options(self):
         chan = _make_chan()
-        with self.assertRaisesRegex(ValueError, 'must end with .obj'):
+        with self.assertRaisesRegex(ValueError, "'fn' must end with '.obj'"):
             quadriga_lib.channel.export_obj_file(self._path('bad.txt'), chan)
-        with self.assertRaisesRegex(ValueError, 'Colormap is not supported.'):
+        with self.assertRaisesRegex(ValueError, "Colormap 'not_a_colormap' is not supported."):
             self._export('cm.obj', chan, colormap='not_a_colormap')
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "'n_edges' must be at least 3"):
             self._export('ne.obj', chan, n_edges=1)
-        with self.assertRaisesRegex(ValueError, 'Radius cannot be negative.'):
+        with self.assertRaisesRegex(ValueError, "'radius_min' cannot be negative."):
             self._export('nr.obj', chan, radius_max=-1.0)
         with self.assertRaisesRegex(ValueError, "'i_snap' cannot exceed"):
             self._export('oor.obj', chan, i_snap=np.array([3], dtype=np.uint64))

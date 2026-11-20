@@ -702,7 +702,7 @@ void qd_RPI_CUDA(
     std::vector<std::vector<unsigned long long>> stage;
 
     if (n_sub > 65535)
-        throw std::invalid_argument("qd_RPI_CUDA: n_sub > 65535 is not supported (uint16_t sub_idx).");
+        throw std::invalid_argument("Number of sub-clouds exceeds the CUDA kernel limit of 65535.");
 
     CUDA_CHECK(cudaSetDevice(gpu_id));
 
@@ -778,7 +778,7 @@ void qd_RPI_CUDA(
         // Initial estimate: ignore CUB sort/RLE temp
         size_t fixed_no_cub = 2 * seg_table_per_stream;
         if (usable <= fixed_no_cub)
-            throw std::runtime_error("qd_RPI_CUDA: insufficient GPU memory.");
+            throw std::runtime_error("Insufficient GPU memory.");
 
         batch_size = (usable - fixed_no_cub) / (2 * per_ray_bytes);
         if (batch_size > n_ray)
@@ -810,7 +810,7 @@ void qd_RPI_CUDA(
                 // Shrink batch_size drastically and retry
                 batch_size = batch_size / 4;
                 if (batch_size == 0)
-                    throw std::runtime_error("qd_RPI_CUDA: insufficient GPU memory.");
+                    throw std::runtime_error("Insufficient GPU memory.");
                 continue;
             }
 

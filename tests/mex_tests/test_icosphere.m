@@ -2,7 +2,7 @@
 % Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 % Part of quadriga-lib — see LICENSE for terms.
 
-function test_icospere
+function test_icosphere
 % MEX interface test for quadriga_lib.icosphere.
 
 quadriga_lib.icosphere(1, 1);

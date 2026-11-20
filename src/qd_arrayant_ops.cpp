@@ -805,7 +805,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
         fn_mtl = fn.substr(0, fn.size() - fn_suffix.size()) + ".mtl";
     }
     else
-        throw std::invalid_argument("OBJ-File name must end with .obj");
+        throw std::invalid_argument("Input 'fn' must end with '.obj'.");
 
     std::string ant_name = ant.name;
     std::replace(ant_name.begin(), ant_name.end(), ' ', '_');
@@ -824,7 +824,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
     double radius = (double)object_radius;
     if (!(radius > 0.0) || !std::isfinite(radius))
-        throw std::invalid_argument("Object radius must be finite and larger than 0.");
+        throw std::invalid_argument("Input 'object_radius' must be finite and larger than 0.");
 
     arma::uword no_elements = ant.n_elements();
 

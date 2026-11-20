@@ -128,13 +128,13 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
                                           bool map_to_itu_materials)
 {
     if (face_ind.n_cols != 3)
-        throw std::invalid_argument("Face indices 'face_ind' must have 3 columns (triangle mesh).");
+        throw std::invalid_argument("Input 'face_ind' must have 3 columns.");
 
     if (obj_ind.n_elem != face_ind.n_rows)
-        throw std::invalid_argument("Found " + std::to_string(obj_ind.n_elem) + " object indices 'obj_ind', but 'face_ind' has " + std::to_string(face_ind.n_rows) + " faces.");
+        throw std::invalid_argument("Number of elements in 'obj_ind' does not match number of rows in 'face_ind'.");
 
     if (mtl_ind.n_elem != face_ind.n_rows)
-        throw std::invalid_argument("Found " + std::to_string(mtl_ind.n_elem) + " material indices 'mtl_ind', but 'face_ind' has " + std::to_string(face_ind.n_rows) + " faces.");
+        throw std::invalid_argument("Number of elements in 'mtl_ind' does not match number of rows in 'face_ind'.");
 
     arma::uvec unique_obj_ind = arma::unique(obj_ind);
     arma::uword n_obj = arma::max(unique_obj_ind) + 1; // Number of mesh objects
@@ -146,26 +146,26 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     arma::uword n_vert = arma::max(unique_face_ind) + 1; // Number of mesh vertices
 
     if (unique_obj_ind.n_elem != n_obj)
-        throw std::invalid_argument("Found " + std::to_string(unique_obj_ind.n_elem) + " object indices, but expected " + std::to_string(n_obj) + ".");
+        throw std::invalid_argument("Input 'obj_ind' must use every object index from 0 to max(obj_ind).");
 
     if (obj_names.size() != n_obj)
-        throw std::invalid_argument("Found " + std::to_string(obj_names.size()) + " object names, but expected " + std::to_string(n_obj) + ".");
+        throw std::invalid_argument("Number of entries in 'obj_names' must be max(obj_ind) + 1.");
 
     // mtl_ind is 1-based; 0 marks a face with no material, which cannot be exported.
     if (!unique_mtl_ind.is_empty() && unique_mtl_ind.min() == 0)
-        throw std::invalid_argument("Found faces with no material (mtl_ind == 0); every face must reference a material for Mitsuba/Sionna export.");
+        throw std::invalid_argument("Input 'mtl_ind' cannot contain 0; every face needs a material.");
 
-    if (!unique_mtl_ind.is_empty() && unique_mtl_ind.max() > n_mtl)
-        throw std::invalid_argument("Material index " + std::to_string(unique_mtl_ind.max()) + " exceeds the " + std::to_string(n_mtl) + " available material names.");
+    if (!unique_mtl_ind.is_empty() && unique_mtl_ind.max() != n_mtl)
+        throw std::invalid_argument("Number of entries in 'mtl_names' must be max(mtl_ind).");
 
     if (unique_face_ind.n_elem != n_vert)
-        throw std::invalid_argument("Found " + std::to_string(unique_face_ind.n_elem) + " reference in 'face_ind', but expected " + std::to_string(n_vert) + ".");
+        throw std::invalid_argument("Input 'face_ind' must use every vertex index from 0 to max(face_ind).");
 
     if (vert_list.n_rows != n_vert)
-        throw std::invalid_argument("Found " + std::to_string(vert_list.n_rows) + " vertices, but expected " + std::to_string(n_vert) + ".");
+        throw std::invalid_argument("Number of rows in 'vert_list' must be max(face_ind) + 1.");
 
     if (vert_list.n_cols != 3)
-        throw std::invalid_argument("Vertex list must have 3 columns.");
+        throw std::invalid_argument("Input 'vert_list' must have 3 columns.");
 
     // Fix invalid characters in obj names
     std::vector<std::string> obj_names_valid;
@@ -184,7 +184,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     {
         auto [it, inserted] = seen.insert(name);
         if (!inserted)
-            throw std::invalid_argument("Duplicate object name: '" + name + "'");
+            throw std::invalid_argument("Input 'obj_names' contains the name '" + name + "' twice.");
     }
 
     // Check for duplicate material names
@@ -194,16 +194,16 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     {
         auto [it, inserted] = seen.insert(name);
         if (!inserted)
-            throw std::invalid_argument("Duplicate material name: '" + name + "'");
+            throw std::invalid_argument("Input 'mtl_names' contains the name '" + name + "' twice.");
     }
 
     bool use_bsdf = false;
     if (bsdf.n_rows != 0)
     {
         if (bsdf.n_rows != n_mtl)
-            throw std::invalid_argument("Found " + std::to_string(bsdf.n_rows) + " BSDF entries, but expected " + std::to_string(n_mtl) + ".");
+            throw std::invalid_argument("Number of rows in 'bsdf' does not match number of entries in 'mtl_names'.");
         if (bsdf.n_cols != 17)
-            throw std::invalid_argument("BSDF Matrix must have 17 columns.");
+            throw std::invalid_argument("Input 'bsdf' must have 17 columns.");
         use_bsdf = true;
     }
 
@@ -311,7 +311,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     {
         auto [it, inserted] = seen.insert(name);
         if (!inserted)
-            throw std::invalid_argument("Duplicate object name: '" + name + "'");
+            throw std::invalid_argument("Splitting the objects by material gives the object name '" + name + "' twice; rename the entries of 'obj_names'.");
     }
 
     // Create folder for the mesh data

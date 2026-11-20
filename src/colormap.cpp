@@ -103,7 +103,7 @@ arma::uchar_mat quadriga_lib::colormap(const std::string &map, bool high_res)
                 cmap = arma::uchar_mat(&rgb[0][0], 3, 256).t();
             }
         else
-            throw std::invalid_argument("Colormap is not supported.");
+            throw std::invalid_argument("Colormap '" + map + "' is not supported.");
 
         return cmap;
     }
@@ -180,7 +180,7 @@ arma::uchar_mat quadriga_lib::colormap(const std::string &map, bool high_res)
                 cmap = arma::uchar_mat(&rgb[0][0], 3, 64).t();
             }
         else
-            throw std::invalid_argument("Colormap is not supported.");
+            throw std::invalid_argument("Colormap '" + map + "' is not supported.");
 
         return cmap;
     }

@@ -196,7 +196,12 @@ inline void qd_mex_integer_error(const std::string &var_name, bool scalar, bool 
 inline void qd_mex_check_input(const mxArray *input, const std::string &var_name = "", size_t max_dims = 4)
 {
     if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex datatypes are not supported.");
+    {
+        if (var_name.empty())
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex inputs are not supported.");
+        const std::string msg = "Input '" + var_name + "' is complex; complex inputs are not supported.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
     if (mxIsSparse(input))
     {
         if (var_name.empty())
