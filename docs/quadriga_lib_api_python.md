@@ -1443,9 +1443,11 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [MATLAB](quadriga_lib_api_mex.md#get_channels_irs)
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
-- IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
-- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` dict without
-  `coupling_re` / `coupling_im` raises, unlike in the other functions, where it stands for identity
+- IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
+  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
+- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` dict without `coupling_re` /
+  `coupling_im` raises, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
@@ -1502,7 +1504,8 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
 - **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
-  elements and the same coupling size as `irs_array`; default: `None` (`irs_array` for both sides)
+  elements as `irs_array`; only its patterns are used, its coupling and `element_pos` are ignored; default: `None`
+  (`irs_array` for both sides)
 - **`active_path`** — Mask selecting active path pairs, bool or numeric (nonzero = active); overrides `threshold_dB`
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
 - **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single

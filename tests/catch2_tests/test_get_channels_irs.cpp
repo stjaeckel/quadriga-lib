@@ -134,8 +134,9 @@ TEST_CASE("Get Channels IRS - Minimal test")
                                            coeff_re, coeff_im, delay, 0, -6.0, f0, 1, &aod, &eod, &aoa, &eoa,
                                            {}, {}, &keep);
 
-    // First path should be close to 1.8, 0.2 path gain * 3 * 3 (IRS array gain)
-    arma::mat T(3, 3, arma::fill::value(1.8));
+    // First path: 0.2 path gain times 3, the in-phase sum of the 3 IRS elements (each reflects once); the other
+    // pairs are below -6 dB (measured -30.0, -13.0 and -13.2 dB)
+    arma::mat T(3, 3, arma::fill::value(0.6));
     CHECK(arma::approx_equal(coeff_re.slice(0), T, "absdiff", 1e-3));
 
     T.zeros();
@@ -144,18 +145,18 @@ TEST_CASE("Get Channels IRS - Minimal test")
     T.fill(40.0 / C);
     CHECK(arma::approx_equal(delay.slice(0), T, "absdiff", 1e-6));
 
-    CHECK(coeff_re.n_elem == 3 * 3 * 2);
-    CHECK(coeff_im.n_elem == 3 * 3 * 2);
-    CHECK(delay.n_elem == 3 * 3 * 2);
-    CHECK(aod.n_elem == 3 * 3 * 2);
-    CHECK(eod.n_elem == 3 * 3 * 2);
-    CHECK(aoa.n_elem == 3 * 3 * 2);
-    CHECK(eoa.n_elem == 3 * 3 * 2);
+    CHECK(coeff_re.n_elem == 3 * 3);
+    CHECK(coeff_im.n_elem == 3 * 3);
+    CHECK(delay.n_elem == 3 * 3);
+    CHECK(aod.n_elem == 3 * 3);
+    CHECK(eod.n_elem == 3 * 3);
+    CHECK(aoa.n_elem == 3 * 3);
+    CHECK(eoa.n_elem == 3 * 3);
 
     CHECK(keep.size() == 4);
     CHECK(keep[0]);
     CHECK(!keep[1]);
-    CHECK(keep[2]);
+    CHECK(!keep[2]);
     CHECK(!keep[3]);
 
     // Second codebook contains only zeros - should create no paths
@@ -865,13 +866,14 @@ TEST_CASE("Get Channels IRS - Empty element_pos and coupling_im of any shape")
 
 TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged")
 {
-    // irs_array_2 is used for the RX-facing side only; both arrays are inputs and keep their data, so a repeated call
-    // gives the same result, and the second array may use another angle grid
+    // irs_array_2 gives the patterns of the RX-facing side only; the weights and element positions come from irs_array,
+    // its own are ignored. Both arrays are inputs and keep their data, so a repeated call gives the same result, and the
+    // second array may use another angle grid.
     auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
     auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 10.0);
     irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_im.zeros(4, 3);
     auto irs2 = irs;
-    irs2.e_theta_re *= 0.5, irs2.coupling_re *= 3.0, irs2.element_pos.fill(0.1);
+    irs2.e_theta_re *= 0.5;
     const quadriga_lib::arrayant<double> irs_copy = irs, irs2_copy = irs2;
     const arma::mat fb1 = arma::mat({5.0, 5.0, 7.0}).t(), fb2 = arma::mat({15.0, 5.0, 3.0}).t();
     const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
@@ -883,9 +885,10 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
                                                fb1, fb1, g, l, M, fb2, fb2, g, l, M, cr, ci, dl, 1, -140.0, 3.5e9, false,
                                                nullptr, nullptr, nullptr, nullptr, irs_2);
     };
-    arma::cube cr_1, ci_1, cr_2, ci_2;
-    run(irs2, cr_1, ci_1), run(irs2, cr_2, ci_2);
+    arma::cube cr_0, ci_0, cr_1, ci_1, cr_2, ci_2;
+    run({}, cr_0, ci_0), run(irs2, cr_1, ci_1), run(irs2, cr_2, ci_2);
     REQUIRE(cr_1.n_slices == 1);
+    CHECK(arma::approx_equal(cr_1, 0.5 * cr_0, "absdiff", 1e-14)); // Vertically polarized: e_theta scales the channel
     CHECK(arma::approx_equal(cr_1, cr_2, "absdiff", 0.0));
     CHECK(arma::approx_equal(ci_1, ci_2, "absdiff", 0.0));
     for (const auto *p : {&irs, &irs2})
@@ -896,13 +899,107 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
         CHECK(arma::approx_equal(p->coupling_re, c.coupling_re, "absdiff", 0.0));
     }
 
+    // The coupling and element positions of irs_array_2 are ignored: empty or other values give the same result
+    auto irs_e = irs2, irs_w = irs2;
+    irs_e.coupling_re.reset(), irs_e.coupling_im.reset(), irs_e.element_pos.reset();
+    irs_w.coupling_re *= 3.0, irs_w.coupling_im(1, 1) = 0.5, irs_w.element_pos.fill(0.1);
+    for (const auto *a : {&irs_e, &irs_w})
+    {
+        arma::cube cr_e, ci_e;
+        run(*a, cr_e, ci_e);
+        CHECK(arma::approx_equal(cr_e, cr_1, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ci_e, ci_1, "absdiff", 0.0));
+    }
+
     // The same second IRS on a 5 degree grid
     auto irs3 = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 5.0);
-    irs3.e_theta_re *= 0.5, irs3.coupling_re = irs2.coupling_re, irs3.coupling_im.reset(), irs3.element_pos = irs2.element_pos;
+    irs3.e_theta_re *= 0.5, irs3.coupling_re = irs.coupling_re, irs3.coupling_im.reset(), irs3.element_pos = irs.element_pos;
     arma::cube cr_3, ci_3;
     REQUIRE_NOTHROW(run(irs3, cr_3, ci_3));
     CHECK(arma::approx_equal(cr_3, cr_1, "absdiff", 1e-6));
     CHECK(arma::approx_equal(ci_3, ci_1, "absdiff", 1e-6));
+}
+
+TEST_CASE("Get Channels IRS - Each element reflects once")
+{
+    // The cascade H = B diag(w) A: the per-element channels A (TX -> IRS elements) and B (IRS elements -> RX) from
+    // get_channels_spherical with identity IRS coupling, the weights w applied once; delays and angles are the
+    // |w|^2-weighted means over the elements (angles from the mean unit direction vector)
+    const double fc = 3.5e9;
+    const auto tx = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    const auto rx = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.5, {}, 10.0);
+    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, fc, 0.5, {}, 10.0);
+    const arma::cx_vec w = {{0.8, 0.3}, {-0.2, 1.1}, {0.5, -0.7}, {1.0, 0.0}};
+    irs.coupling_re = arma::real(w), irs.coupling_im = arma::imag(w);
+    auto ide = irs;
+    ide.coupling_re.eye(4, 4), ide.coupling_im.zeros(4, 4);
+
+    const arma::mat tp = {0.0, 0.0, 10.0}, to = {0.0, 0.0, 0.0}, rp = {40.0, 5.0, 1.5}, ro = {0.0, 0.0, 0.3};
+    const arma::mat ip = {20.0, -10.0, 5.0}, io = {0.0, 0.2, 1.7};
+    const arma::mat f1 = {{10.0, 15.0}, {-5.0, 3.0}, {7.5, 2.0}}, f2 = {{30.0, 28.0}, {-2.5, 4.0}, {3.25, 1.0}};
+    const arma::vec g1 = {1.0, 0.5}, g2 = {0.8, 0.3}, l = {0.0, 0.0};
+    const arma::mat M1 = {{1.0, 0.2}, {0.0, 0.1}, {0.1, 0.3}, {0.0, 0.0}, {0.0, -0.2}, {0.1, 0.0}, {-1.0, 0.8}, {0.0, 0.2}};
+    const arma::mat M2 = {{0.9, 0.5}, {0.1, 0.0}, {0.0, 0.2}, {0.2, 0.1}, {0.3, 0.0}, {0.0, -0.1}, {-0.7, 1.0}, {0.1, 0.0}};
+
+    arma::cube a_re, a_im, a_dl, a_az, a_el, b_re, b_im, b_dl, b_az, b_el;
+    quadriga_lib::get_channels_spherical<double>(tx, ide, tp, to, ip, io, f1, f1, g1, l, M1, a_re, a_im, a_dl, fc, true, false, &a_az, &a_el);
+    quadriga_lib::get_channels_spherical<double>(ide, rx, ip, io, rp, ro, f2, f2, g2, l, M2, b_re, b_im, b_dl, fc, true, false,
+                                                 nullptr, nullptr, &b_az, &b_el);
+
+    arma::cube cr, ci, dl, aod, eod, aoa, eoa;
+    quadriga_lib::get_channels_irs<double>(tx, rx, irs, tp, to, rp, ro, ip, io, f1, f1, g1, l, M1, f2, f2, g2, l, M2,
+                                           cr, ci, dl, 0, -300.0, fc, true, &aod, &eod, &aoa, &eoa);
+    REQUIRE(cr.n_slices == 4);
+
+    // Reference by explicit loops (the test binary links no BLAS)
+    arma::vec p(4);
+    for (arma::uword k = 0; k < 4; ++k)
+        p(k) = std::norm(w(k));
+    p /= p(0) + p(1) + p(2) + p(3);
+    const arma::uword n_tx = 2, n_rx = 2, n_irs = 4;
+    auto dir = [](double az, double el, double wk, double *v)
+    { v[0] += wk * std::cos(el) * std::cos(az), v[1] += wk * std::cos(el) * std::sin(az), v[2] += wk * std::sin(el); };
+    double h_max = 0.0, h_err = 0.0, d_err = 0.0, a_err = 0.0;
+    for (arma::uword i1 = 0; i1 < 2; ++i1)
+        for (arma::uword i2 = 0; i2 < 2; ++i2)
+        {
+            const arma::uword s = i1 * 2 + i2;
+            for (arma::uword t = 0; t < n_tx; ++t)
+                for (arma::uword r = 0; r < n_rx; ++r)
+                {
+                    std::complex<double> h = 0.0;
+                    double d = 0.0, v1[3] = {0.0, 0.0, 0.0}, v2[3] = {0.0, 0.0, 0.0};
+                    for (arma::uword k = 0; k < n_irs; ++k)
+                    {
+                        h += std::complex<double>(b_re(r, k, i2), b_im(r, k, i2)) * w(k) * std::complex<double>(a_re(k, t, i1), a_im(k, t, i1));
+                        d += p(k) * (a_dl(k, t, i1) + b_dl(r, k, i2));
+                        dir(a_az(k, t, i1), a_el(k, t, i1), p(k), v1), dir(b_az(r, k, i2), b_el(r, k, i2), p(k), v2);
+                    }
+                    h_max = std::max(h_max, std::abs(h));
+                    h_err = std::max(h_err, std::abs(std::complex<double>(cr(r, t, s), ci(r, t, s)) - h));
+                    d_err = std::max(d_err, std::abs(dl(r, t, s) - d));
+                    const double ang[4] = {std::atan2(v1[1], v1[0]), std::atan2(v1[2], std::hypot(v1[0], v1[1])),
+                                           std::atan2(v2[1], v2[0]), std::atan2(v2[2], std::hypot(v2[0], v2[1]))};
+                    const double out[4] = {aod(r, t, s), eod(r, t, s), aoa(r, t, s), eoa(r, t, s)};
+                    for (int j = 0; j < 4; ++j)
+                        a_err = std::max(a_err, std::abs(out[j] - ang[j]));
+                }
+        }
+    CHECK(h_err < 1e-12 * h_max);
+    CHECK(d_err < 1e-15);
+    CHECK(a_err < 1e-12);
+
+    // One element: the weight phase appears once (30 degree, not 60), at f = 0 without the delay phase
+    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto one = omni;
+    one.coupling_re = arma::mat({std::cos(arma::datum::pi / 6.0)}), one.coupling_im = arma::mat({std::sin(arma::datum::pi / 6.0)});
+    const arma::mat fs1 = arma::mat({10.0, 0.0, 1.0}).t(), fs2 = arma::mat({30.0, 0.0, 1.0}).t();
+    const arma::mat MS = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::vec gs = {1.0}, ls = {0.0};
+    quadriga_lib::get_channels_irs<double>(omni, omni, one, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
+                                           fs1, fs1, gs, ls, MS, fs2, fs2, gs, ls, MS, cr, ci, dl);
+    REQUIRE(cr.n_elem == 1);
+    CHECK(std::abs(std::atan2(ci(0), cr(0)) - arma::datum::pi / 6.0) < 1e-12);
 }
 
 TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is GENERIC")

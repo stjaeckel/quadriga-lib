@@ -158,7 +158,7 @@ i_irs1 = 2;
     i_irs1, thr_keep_all, f0_zero, false, [], all_mask );
 assertTrue(any(abs(cr_i0(:)-cr_i1(:))>1e-12));
 
-%% A second IRS array (irs_array_2) changes the result
+%% A second IRS array (irs_array_2) changes the result through its patterns; its coupling is ignored
 [cr_sym,~,~,~,~,~,~,~] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
@@ -409,22 +409,19 @@ for k = [1:3, 5:8]
 end
 assertTrue( isempty(o0{4}) );
 
-%% The IRS coupling holds the IRS weights: a struct without coupling throws
+%% The IRS coupling of irs_array holds the IRS weights: a struct without coupling throws; the coupling and element_pos
+% of irs_array_2 are ignored
 ant_irs_nc = rmfield(ant_irs, {'coupling_re', 'coupling_im'});
-for k = 1:2
-    failed = false;
-    try
-        if k == 1
-            [~] = quadriga_lib.get_channels_irs( args{1:2}, ant_irs_nc, args{4:end} );
-        else
-            [~] = quadriga_lib.get_channels_irs( args{:}, 1, -140, 0, false, ant_irs_nc );
-        end
-    catch ME
-        expected = {'IRS must have a Coupling matrix', 'Input ''irs_array_2'' must have a coupling matrix'};
-        failed = ~isempty(strfind(ME.message, expected{k}));
-    end
-    assertTrue( failed );
+ant_irs_2 = rmfield(ant_irs_diff, {'coupling_re', 'coupling_im'}); ant_irs_2.element_pos = ones(3, n_elem_irs);
+assertEqual( quadriga_lib.get_channels_irs( args{:}, 1, -140, 0, false, ant_irs_2 ), ...
+    quadriga_lib.get_channels_irs( args{:}, 1, -140, 0, false ) );
+failed = false;
+try
+    [~] = quadriga_lib.get_channels_irs( args{1:2}, ant_irs_nc, args{4:end} );
+catch ME
+    failed = ~isempty(strfind(ME.message, 'IRS must have a Coupling matrix'));
 end
+assertTrue( failed );
 
 %% Each segment reaches its arguments: reference from two get_channels_spherical calls
 % A single unit IRS weight on element 1 makes a pair the product of its segment channels; pair (i_1, i_2) is at

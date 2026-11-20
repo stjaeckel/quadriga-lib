@@ -11,6 +11,7 @@
 #include "quadriga_channel.hpp"
 #include "qd_helpers_shared.hpp"
 #include "qd_helpers_arrayant.hpp"
+#include "qd_helpers_channel.hpp"
 
 /*!SECTION
 Channel generation functions
@@ -21,7 +22,9 @@ SECTION!*/
 Calculate MIMO channel coefficients for IRS-assisted communication
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
-- IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
+  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
 - The IRS coupling matrix holds the IRS weights and must be given: an empty coupling of `irs_array` throws, unlike
   in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
@@ -35,7 +38,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
   `active_path_out`, and the output keeps this order
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
-- Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
+- Optional `irs_array_2` provides the patterns of the RX-facing side (asymmetric IRS); the weights and element positions
+  come from `irs_array`
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
@@ -105,7 +109,7 @@ void quadriga_lib::get_channels_irs(
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; empty (no elements): `irs_array` on both sides; see [[arrayant]]
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its coupling and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [[arrayant]]
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 - **`use_kernel`** *(optional)* — Kernel of both segments, passed to [[get_channels_spherical]]: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
@@ -185,14 +189,12 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
 
         if (irs_array_2.e_theta_re.n_slices != n_elements_irs)
             throw std::invalid_argument("IRS 2 must have the same number of elements as IRS 1");
-
-        if (irs_array_2.coupling_re.n_cols != irs_array.coupling_re.n_cols)
-            throw std::invalid_argument("Input 'irs_array_2' must have a coupling matrix (the IRS weights) of the same size as 'irs_array'.");
+        // Its coupling and element_pos are not used: the weights and element positions come from irs_array
     }
 
-    // IRS arrays with only the desired weight vector: read-only views of the pattern data of a valid array. Each
-    // segment gets its own object, since assigning to a view copies into the viewed data. An empty element_pos or
-    // coupling_im (of any shape) has no data to view and is replaced by zeros.
+    // IRS arrays without coupling (one port per element), as read-only views of the pattern data of a valid array.
+    // Each segment gets its own object, since assigning to a view copies into the viewed data. An empty element_pos
+    // has no data to view and is replaced by zeros.
     auto irs_view = [&](arrayant<dtype> &dst, const arrayant<dtype> &src)
     {
         const arma::uword n_az = src.e_theta_re.n_cols, n_el = src.e_theta_re.n_rows;
@@ -203,16 +205,10 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
         dst.azimuth_grid = arma::Col<dtype>(const_cast<dtype *>(src.azimuth_grid.memptr()), n_az, false, true);
         dst.elevation_grid = arma::Col<dtype>(const_cast<dtype *>(src.elevation_grid.memptr()), n_el, false, true);
 
-        if (src.element_pos.is_empty())
+        if (irs_array.element_pos.is_empty())
             dst.element_pos.zeros(3ULL, n_elements_irs);
         else
-            dst.element_pos = arma::Mat<dtype>(const_cast<dtype *>(src.element_pos.memptr()), 3ULL, n_elements_irs, false, true);
-
-        dst.coupling_re = arma::Mat<dtype>(const_cast<dtype *>(src.coupling_re.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
-        if (src.coupling_im.is_empty())
-            dst.coupling_im.zeros(n_elements_irs, 1ULL);
-        else
-            dst.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(src.coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
+            dst.element_pos = arma::Mat<dtype>(const_cast<dtype *>(irs_array.element_pos.memptr()), 3ULL, n_elements_irs, false, true);
 
         if (center_freq > dtype(1.0e-5))
             dst.center_freq = center_freq;
@@ -223,13 +219,13 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
         irs_view(irs_2, irs_array_2);
     const quadriga_lib::arrayant<dtype> &irs = irs_1, &irs_rx = irs_array_2.n_elements() != 0 ? irs_2 : irs_1;
 
-    // Calculate the channel coefficients of the first segment from the TX to the IRS
+    // Per-element channels of the first segment from the TX to the IRS, [n_irs, n_tx, n_path_1]
     arma::Cube<dtype> coeff_re_1, coeff_im_1, delay_1, aod_1, eod_1;
     quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1,
                                                 coeff_re_1, coeff_im_1, delay_1, center_freq, true, false,
                                                 calc_angles ? &aod_1 : nullptr, calc_angles ? &eod_1 : nullptr, nullptr, nullptr, use_kernel);
 
-    // Calculate channel coefficients of the second segment from the IRS to the RX
+    // Per-element channels of the second segment from the IRS to the RX, [n_rx, n_irs, n_path_2]
     arma::Cube<dtype> coeff_re_2, coeff_im_2, delay_2, aoa_2, eoa_2;
     quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2,
                                                 coeff_re_2, coeff_im_2, delay_2, center_freq, true, false,
@@ -240,13 +236,62 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
     if (!use_absolute_delays)
         los_delay = qd_calc_length(p_tp[0], p_tp[1], p_tp[2], p_rp[0], p_rp[1], p_rp[2]) * dtype(1.0 / qd_speed_of_light);
 
-    // Combine the two channel segments
-    arma::uword n_path_1 = coeff_re_1.n_slices;
-    arma::uword n_path_2 = coeff_re_2.n_slices;
-    arma::uword n_path = n_path_1 * n_path_2;
-    arma::uword n_tx = coeff_re_1.n_cols;
-    arma::uword n_rx = coeff_re_2.n_rows;
+    const arma::uword n_path_1 = coeff_re_1.n_slices;
+    const arma::uword n_path_2 = coeff_re_2.n_slices;
+    const arma::uword n_path = n_path_1 * n_path_2;
+    const arma::uword n_tx = coeff_re_1.n_cols;
+    const arma::uword n_rx = coeff_re_2.n_rows;
+    const arma::uword n_irs = n_elements_irs;
 
+    // IRS weights w of the codebook entry and their powers |w|^2, normalized to sum 1 (uniform if all are 0)
+    const dtype *w_re = irs_array.coupling_re.colptr(i_irs);
+    const dtype *w_im = irs_array.coupling_im.is_empty() ? nullptr : irs_array.coupling_im.colptr(i_irs);
+    std::vector<dtype> w_pwr(n_irs);
+    qd_power_mat(n_irs, 1, w_pwr.data(), true, w_re, w_im);
+
+    // Delays and angles of each segment path: |w|^2-weighted means over the IRS elements (angles from the mean of the
+    // unit direction vectors); the elements are the rows (segment 1) or the columns (segment 2)
+    auto reduce = [&](const arma::Cube<dtype> &dl, const arma::Cube<dtype> &az, const arma::Cube<dtype> &el, bool irs_rows,
+                      arma::Mat<dtype> &dl_out, arma::Mat<dtype> &az_out, arma::Mat<dtype> &el_out)
+    {
+        const arma::uword n_ant = irs_rows ? dl.n_cols : dl.n_rows, n_p = dl.n_slices;
+        dl_out.zeros(n_ant, n_p);
+        if (calc_angles)
+            az_out.set_size(n_ant, n_p), el_out.set_size(n_ant, n_p);
+        for (arma::uword p = 0; p < n_p; ++p)
+            for (arma::uword a = 0; a < n_ant; ++a)
+            {
+                double d = 0.0, x = 0.0, y = 0.0, z = 0.0;
+                for (arma::uword k = 0; k < n_irs; ++k)
+                {
+                    const arma::uword i = irs_rows ? k + a * n_irs : a + k * n_ant;
+                    const double wk = (double)w_pwr[k];
+                    d += wk * (double)dl.slice_memptr(p)[i];
+                    if (calc_angles)
+                    {
+                        const double ca = std::cos((double)az.slice_memptr(p)[i]), sa = std::sin((double)az.slice_memptr(p)[i]);
+                        const double ce = std::cos((double)el.slice_memptr(p)[i]), se = std::sin((double)el.slice_memptr(p)[i]);
+                        x += wk * ce * ca, y += wk * ce * sa, z += wk * se;
+                    }
+                }
+                dl_out(a, p) = (dtype)d;
+                if (calc_angles)
+                    az_out(a, p) = (dtype)std::atan2(y, x), el_out(a, p) = (dtype)std::atan2(z, std::sqrt(x * x + y * y));
+            }
+    };
+    arma::Mat<dtype> dl_1, az_1, el_1, dl_2, az_2, el_2;
+    reduce(delay_1, aod_1, eod_1, true, dl_1, az_1, el_1);
+    reduce(delay_2, aoa_2, eoa_2, false, dl_2, az_2, el_2);
+
+    // Apply the weights to the first segment once: c1(k, tx) := w(k) * c1(k, tx)
+    for (arma::uword i = 0; i < coeff_re_1.n_elem; ++i)
+    {
+        const arma::uword k = i % n_irs;
+        const dtype a = coeff_re_1[i], b = coeff_im_1[i], c = w_re[k], d = w_im ? w_im[k] : dtype(0.0);
+        coeff_re_1[i] = a * c - b * d, coeff_im_1[i] = a * d + b * c;
+    }
+
+    // Combine the two segments: each element reflects once, h(rx, tx) = sum_k c2(rx, k) * w(k) * c1(k, tx)
     arma::Cube<dtype> coeff_re_local(n_rx, n_tx, n_path, arma::fill::none);
     arma::Cube<dtype> coeff_im_local(n_rx, n_tx, n_path, arma::fill::none);
     arma::Cube<dtype> delay_local(n_rx, n_tx, n_path, arma::fill::none);
@@ -270,51 +315,45 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
     arma::uword i_path = 0ULL, j_path = 0ULL;
     for (arma::uword i_path_1 = 0ULL; i_path_1 < n_path_1; ++i_path_1)
     {
-        dtype *c1r = coeff_re_1.slice_memptr(i_path_1);
-        dtype *c1i = coeff_im_1.slice_memptr(i_path_1);
-        dtype *d1 = delay_1.slice_memptr(i_path_1);
-        dtype *p_aod_1 = calc_angles ? aod_1.slice_memptr(i_path_1) : nullptr;
-        dtype *p_eod_1 = calc_angles ? eod_1.slice_memptr(i_path_1) : nullptr;
+        const dtype *c1r = coeff_re_1.slice_memptr(i_path_1), *c1i = coeff_im_1.slice_memptr(i_path_1);
+        const dtype *d1 = dl_1.colptr(i_path_1);
 
         for (arma::uword i_path_2 = 0ULL; i_path_2 < n_path_2; ++i_path_2)
         {
-            dtype *c2r = coeff_re_2.slice_memptr(i_path_2);
-            dtype *c2i = coeff_im_2.slice_memptr(i_path_2);
-            dtype *d2 = delay_2.slice_memptr(i_path_2);
-            dtype *p_aoa_2 = calc_angles ? aoa_2.slice_memptr(i_path_2) : nullptr;
-            dtype *p_eoa_2 = calc_angles ? eoa_2.slice_memptr(i_path_2) : nullptr;
+            const dtype *c2r = coeff_re_2.slice_memptr(i_path_2), *c2i = coeff_im_2.slice_memptr(i_path_2);
+            const dtype *d2 = dl_2.colptr(i_path_2);
 
             dtype *cr = coeff_re_local.slice_memptr(i_path);
             dtype *ci = coeff_im_local.slice_memptr(i_path);
             dtype *dl = delay_local.slice_memptr(i_path);
-            dtype *p_aod = calc_angles ? aod_local.slice_memptr(i_path) : nullptr;
-            dtype *p_eod = calc_angles ? eod_local.slice_memptr(i_path) : nullptr;
-            dtype *p_aoa = calc_angles ? aoa_local.slice_memptr(i_path) : nullptr;
-            dtype *p_eoa = calc_angles ? eoa_local.slice_memptr(i_path) : nullptr;
 
             dtype pow = dtype(0.0);
             for (arma::uword i_tx = 0ULL; i_tx < n_tx; ++i_tx)
             {
-                dtype a = c1r[i_tx], b = c1i[i_tx], dd1 = d1[i_tx];
+                const dtype *ar = &c1r[i_tx * n_irs], *ai = &c1i[i_tx * n_irs];
                 for (arma::uword i_rx = 0ULL; i_rx < n_rx; ++i_rx)
                 {
-                    dtype c = c2r[i_rx], d = c2i[i_rx];
-                    dtype re = a * c - b * d;
-                    dtype im = a * d + b * c;
+                    dtype re = dtype(0.0), im = dtype(0.0);
+                    for (arma::uword k = 0ULL; k < n_irs; ++k)
+                    {
+                        const dtype c = c2r[i_rx + k * n_rx], d = c2i[i_rx + k * n_rx];
+                        re += ar[k] * c - ai[k] * d;
+                        im += ar[k] * d + ai[k] * c;
+                    }
 
                     arma::uword i = i_tx * n_rx + i_rx;
                     cr[i] = re, ci[i] = im;
-                    dl[i] = dd1 + d2[i_rx] - los_delay;
+                    dl[i] = d1[i_tx] + d2[i_rx] - los_delay;
 
                     re = re * re + im * im;
                     pow = (re > pow) ? re : pow;
 
                     if (calc_angles)
                     {
-                        p_aod[i] = p_aod_1[i_tx];
-                        p_eod[i] = p_eod_1[i_tx];
-                        p_aoa[i] = p_aoa_2[i_rx];
-                        p_eoa[i] = p_eoa_2[i_rx];
+                        aod_local.slice_memptr(i_path)[i] = az_1(i_tx, i_path_1);
+                        eod_local.slice_memptr(i_path)[i] = el_1(i_tx, i_path_1);
+                        aoa_local.slice_memptr(i_path)[i] = az_2(i_rx, i_path_2);
+                        eoa_local.slice_memptr(i_path)[i] = el_2(i_rx, i_path_2);
                     }
                 }
             }

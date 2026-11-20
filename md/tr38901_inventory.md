@@ -413,7 +413,7 @@ The library has no sensing-specific code (no target, RCS or monostatic model). T
 | Step 1: layout, scattering points | 7.9.4.0 | Partial | `get_channels_spherical` (`src/get_channels_spherical.cpp:145`) | Generic positions, patterns, orientations; no target object with scattering points. |
 | Steps 2–4: LOS, PL, LSPs per link | 7.9.4.1 | Partial | `los_probability`, `path_loss`, `lsp_generate` | The monostatic rule (identical LSPs for both links of a point) is the caller's. |
 | Steps 5–8: clusters and rays per link | 7.9.4.1 | Partial | `ssf_clusters`, `ssf_rays` | Monostatic equalities of angles and coupling are not available. |
-| Step 9: coupling across the two links | 7.9.4.1 | Partial | `get_channels_irs` (`src/get_channels_irs.cpp:133`); `combine_irs_coord` (`src/combine_irs_coord.cpp:62`) | Building block only: the IRS cascade combines all path pairs (Option 1). Option 2 and the LOS-LOS rule are missing. |
+| Step 9: coupling across the two links | 7.9.4.1 | Partial | `get_channels_irs` (`src/get_channels_irs.cpp:137`); `combine_irs_coord` (`src/combine_irs_coord.cpp:62`) | Building block only: the IRS cascade combines all path pairs (Option 1). Option 2 and the LOS-LOS rule are missing. |
 | Step 10: path power with RCS, X dB pruning | 7.9.4.1, eq. 7.9.4-1 | No | – | |
 | Step 11: absolute delay of the combined path | 7.9.4.1, eq. 7.9.4-2 | Partial | `get_channels_irs` | Sum of segment delays; Δτ rules are the caller's. |
 | Steps 12–13: XPR and phases at the point | 7.9.4.1, eq. 7.9.4-3 | No | – | |

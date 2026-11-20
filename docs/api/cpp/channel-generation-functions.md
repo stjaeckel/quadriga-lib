@@ -110,7 +110,9 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · [Python](../python/channel-generation-functions.md#channel.irs)
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
-- IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
+  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
 - The IRS coupling matrix holds the IRS weights and must be given: an empty coupling of `irs_array` throws, unlike
   in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
@@ -124,7 +126,8 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · [P
   `active_path_out`, and the output keeps this order
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
-- Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
+- Optional `irs_array_2` provides the patterns of the RX-facing side (asymmetric IRS); the weights and element positions
+  come from `irs_array`
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
@@ -194,7 +197,7 @@ void quadriga_lib::get_channels_irs(
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; empty (no elements): `irs_array` on both sides; see [arrayant](array-antenna-class.md#arrayant)
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its coupling and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [arrayant](array-antenna-class.md#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 - **`use_kernel`** *(optional)* — Kernel of both segments, passed to [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in

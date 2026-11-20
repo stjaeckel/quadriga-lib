@@ -102,9 +102,11 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Python](../python/channel-generation-functions.md#channel.irs)
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
-- IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
-- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` struct without
-  `coupling_re` / `coupling_im` throws, unlike in the other functions, where it stands for identity
+- IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
+  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
+- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` struct without `coupling_re` /
+  `coupling_im` throws, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
@@ -117,7 +119,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - The outputs come in another order than in C++: `active_path_out` comes before the angles, so that the rarely needed angles can be left off at the end
-- Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
+- Optional `irs_array_2` provides the patterns of the RX-facing side (asymmetric IRS); the weights and element positions
+  come from `irs_array`
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
@@ -135,7 +138,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 ### Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
 - **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`irs_array`** — IRS antenna array (TX-facing side); `n_irs` = number of ports
+- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the coupling matrix holds the IRS weights,
+  one codebook entry per column, `[n_irs, n_codebook]`
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
@@ -158,8 +162,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
-- **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements and the same
-  coupling size as `irs_array`; enables asymmetric IRS patterns
+- **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
+  only its patterns are used, its coupling and `element_pos` are ignored
 - **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0

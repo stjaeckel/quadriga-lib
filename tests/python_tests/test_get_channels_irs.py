@@ -220,14 +220,17 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             self.call(active_path=[True, False])
         self.assertIn("active_path", str(ctx.exception))
-        # IRS dicts without coupling (weights) are rejected, also for irs_array_2
+        # The IRS weights come from irs_array: a dict without coupling is rejected; the coupling and element_pos of
+        # irs_array_2 are ignored
         no_coupling = {k: v for k, v in self.irs.items() if not k.startswith("coupling")}
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.channel.irs(*self.args(irs=no_coupling))
         self.assertIn("Coupling matrix", str(ctx.exception))
-        with self.assertRaises(ValueError) as ctx:
-            self.call(irs_array_2=no_coupling)
-        self.assertIn("Input 'irs_array_2' must have a coupling matrix (the IRS weights)", str(ctx.exception))
+        npt.assert_array_equal(self.call(irs_array_2=no_coupling)[0], self.call()[0])
+        patterns_only = {k: self.irs[k] for k in MANDATORY_KEYS}
+        npt.assert_array_equal(self.call(irs_array_2=patterns_only, i_irs=1)[0], self.call(i_irs=1)[0])
+        other = dict(self.irs, coupling_re=2.0 * self.irs["coupling_re"], element_pos=np.ones((3, 2)))
+        npt.assert_array_equal(self.call(irs_array_2=other)[0], self.call()[0])
         # From the wrapper and the input conversion
         with self.assertRaises(TypeError) as ctx:
             self.call(irs_array_2=5)
