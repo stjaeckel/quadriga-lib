@@ -103,7 +103,7 @@ arma::mat quadriga_lib::o2i_loss(const arma::vec &center_freq,
             if (models[j] == names[t])
                 type[j] = t;
         if (type[j] < 0)
-            throw std::invalid_argument("Model '" + models[j] + "' is not supported.");
+            throw std::invalid_argument("Input 'models' has an unsupported entry '" + models[j] + "'.");
     }
 
     // Weights
@@ -152,9 +152,9 @@ arma::mat quadriga_lib::o2i_loss(const arma::vec &center_freq,
 
     // Outputs
     arma::mat loss_dB(n_ut, n_freq, arma::fill::none);
-    if (d2d_in != nullptr && d2d_in->n_elem != n_ut)
+    if (d2d_in != nullptr)
         d2d_in->set_size(n_ut);
-    if (model_ind != nullptr && model_ind->n_elem != n_ut)
+    if (model_ind != nullptr)
         model_ind->set_size(n_ut);
 
     for (arma::uword u = 0; u < n_ut; ++u)

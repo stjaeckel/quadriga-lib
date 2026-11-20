@@ -90,8 +90,7 @@ arma::Mat<dtype> quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
 
     if (dist_2d != nullptr)
     {
-        if (dist_2d->n_elem != n_grid)
-            dist_2d->set_size(n_grid);
+        dist_2d->set_size(n_grid);
         for (long long i = -half; i <= half; ++i)
             dist_2d->at((arma::uword)(i + half)) = (dtype)((double)i * step);
     }

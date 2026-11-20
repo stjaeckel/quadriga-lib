@@ -380,13 +380,13 @@ TEST_CASE("o2i_loss - input validation")
         CHECK_THROWS_MATCHES(call(fc, rnd5, {}, arma::vec(), 25.0), std::invalid_argument,
                              Message("Input 'models' cannot be empty."));
         CHECK_THROWS_MATCHES(call(fc, rnd5, {"low", "high_v14"}, w, 25.0), std::invalid_argument,
-                             Message("Model 'high_v14' is not supported."));
+                             Message("Input 'models' has an unsupported entry 'high_v14'."));
         CHECK_THROWS_MATCHES(call(fc, rnd5, {"Low", "high"}, w, 25.0), std::invalid_argument,
-                             Message("Model 'Low' is not supported."));
+                             Message("Input 'models' has an unsupported entry 'Low'."));
         CHECK_THROWS_MATCHES(call(fc, rnd5, {"low", "mmMAGIC"}, w, 25.0), std::invalid_argument,
-                             Message("Model 'mmMAGIC' is not supported."));
+                             Message("Input 'models' has an unsupported entry 'mmMAGIC'."));
         CHECK_THROWS_MATCHES(call(fc, rnd5, {"low", ""}, w, 25.0), std::invalid_argument,
-                             Message("Model '' is not supported."));
+                             Message("Input 'models' has an unsupported entry ''."));
     }
     SECTION("weights")
     {

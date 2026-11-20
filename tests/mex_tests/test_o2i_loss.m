@@ -66,7 +66,7 @@ assert_throws( @() quadriga_lib.o2i_loss( fc, [ rnd, rnd(:, 1:2) ], models, weig
 assert_throws( @() quadriga_lib.o2i_loss( fc, rnd, models, [ 0.5, 0.3, 0.1 ] ), ...
     'Input ''weights'' must sum to 1.' );                                                           % C++
 assert_throws( @() quadriga_lib.o2i_loss( fc, rnd, { 'low', 'foo' }, [ 0.5, 0.5 ] ), ...
-    'Model ''foo'' is not supported.' );                                                            % C++
+    'Input ''models'' has an unsupported entry ''foo''.' );                                                            % C++
 
 end
 

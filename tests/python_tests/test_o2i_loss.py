@@ -77,20 +77,13 @@ class test_case(unittest.TestCase):
         _, _, i_s = quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, ["car", "low", "high"], [0.0, 0.5, 0.5])
         npt.assert_array_equal(i_s, [1, 2, 2])  # weight 0 never chosen
 
-    def test_array_layout_and_dtype(self):
-        f = quadriga_lib.gbsm.o2i_loss
-        npt.assert_array_equal(f(self.fc, np.asfortranarray(self.rnd), self.models, self.weights)[0], self.out[0])
-        npt.assert_array_equal(f(self.fc, np.ascontiguousarray(self.rnd), self.models, self.weights)[0], self.out[0])
-        big = np.zeros((6, 8))
-        big[::2, ::2] = self.rnd
-        npt.assert_array_equal(f(self.fc, big[::2, ::2], self.models, self.weights)[0], self.out[0])
-        lt, dt, it = f(self.fc.astype(np.float32), self.rnd.astype(np.float32), self.models,
-                       self.weights.astype(np.float32))
+    def test_other_dtype_and_layout(self):
+        # One call with lists, float32 and Fortran order; the conversions themselves are tested centrally
+        lt, dt, it = quadriga_lib.gbsm.o2i_loss(self.fc.tolist(), np.asfortranarray(self.rnd.astype(np.float32)),
+                                                self.models, self.weights.tolist())
         npt.assert_allclose(lt, self.out[0], atol=1e-5, rtol=0)  # rnd rounded to float32
         npt.assert_allclose(dt, self.out[1], atol=1e-5, rtol=0)
         npt.assert_array_equal(it, self.out[2])
-        npt.assert_array_equal(f(self.fc.tolist(), self.rnd.tolist(), self.models, self.weights.tolist())[0],
-                               self.out[0])
 
     def test_zero_uts(self):
         loss_dB, d2d_in, idx = quadriga_lib.gbsm.o2i_loss(self.fc, np.zeros((0, 4)), self.models, self.weights)
@@ -115,7 +108,7 @@ class test_case(unittest.TestCase):
         self.assertIn("Input 'weights' must sum to 1.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.fc, self.rnd, ["low", "foo"], [0.5, 0.5])
-        self.assertIn("Model 'foo' is not supported.", str(ctx.exception))
+        self.assertIn("Input 'models' has an unsupported entry 'foo'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.fc, self.rnd, [], self.weights)
         self.assertIn("Input 'models' cannot be empty.", str(ctx.exception))
