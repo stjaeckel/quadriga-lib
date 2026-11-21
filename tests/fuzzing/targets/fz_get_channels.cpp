@@ -23,9 +23,11 @@ static quadriga_lib::arrayant<T> antenna(fz::input &in)
         fz::clean([&] { a = quadriga_lib::generate_arrayant_ula<T>(in.size(4), T(3.5e9), in.value<T>(), {}, T(30)); });
         break;
     case 3:
-        fz::clean([&] { a = quadriga_lib::generate_arrayant_3GPP<T>(in.size(2), in.size(2), T(3.5e9), in.ConsumeIntegralInRange<unsigned>(1, 6),
-                                                                    T(5), T(0.5), 1, 1, T(0.5), T(0.5), {}, T(30)); });
+    {
+        const arma::uword M = in.size(2), N = in.size(2), M_P = in.ConsumeBool() ? 1 : 0, pol = in.ConsumeIntegralInRange<unsigned>(1, 3);
+        fz::clean([&] { a = quadriga_lib::generate_arrayant_3GPP<T>({M, N}, 3.5e9, {}, {M_P}, {pol}, {5.0}, {}, {}, 30.0); });
         break;
+    }
     default:
         return fz::arrayant<T>(in);
     }

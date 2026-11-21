@@ -28,7 +28,7 @@ def re_im(out, at=0, n=2):
 
 def make_single_freq_ant(n_el=19, n_az=37, n_elem=1, freq=1e9, res=10.0):
     """Helper: create a single-frequency arrayant via generate('omni')."""
-    ant = arrayant.generate('omni', res, freq=freq)
+    ant = arrayant.generate('omni', res, center_freq=freq)
     if n_elem > 1:
         for i in range(1, n_elem):
             ant = arrayant.copy_element(ant, i_source=np.array([0], dtype=np.uint64),
@@ -63,7 +63,7 @@ def make_multi_freq_ant(n_elem=1, n_freq=3, res=10.0):
 
 def make_dipole_single(res=10.0, freq=1e9):
     """Helper: create a single-frequency dipole antenna."""
-    return arrayant.generate('dipole', res, freq=freq)
+    return arrayant.generate('dipole', res, center_freq=freq)
 
 
 def make_dipole_multi(n_freq=3, res=10.0):
@@ -376,14 +376,14 @@ class TestRotatePatternConvention(unittest.TestCase):
     """Orientation as in arrayant.interpolate; a positive tilt points down (3GPP TR 38.901)."""
 
     def test_positive_tilt_points_down(self):
-        ant = arrayant.generate('custom', 5.0, az_3dB=30.0, el_3dB=30.0, rear_gain_lin=0.0)
+        ant = arrayant.generate('custom', 5.0, element=[30.0, 30.0])
         out = arrayant.rotate_pattern(ant, [0.0, np.pi / 18, 0.0], usage=3)
         ie, ia = np.unravel_index(np.argmax(out['e_theta_re'][:, :, 0]), out['e_theta_re'].shape[:2])
         self.assertAlmostEqual(np.rad2deg(out['elevation_grid'][ie]), -10.0, places=9)
         self.assertAlmostEqual(out['azimuth_grid'][ia], 0.0, places=9)
 
     def test_equals_interpolate_with_same_orientation(self):
-        ant = arrayant.generate('custom', 10.0, az_3dB=60.0, el_3dB=60.0, rear_gain_lin=0.1)
+        ant = arrayant.generate('custom', 10.0, element=[60.0, 60.0, 10.0])
         o = np.array([0.2, 0.3, -0.4])
         out = arrayant.rotate_pattern(ant, o, usage=3)
         el, az = np.meshgrid(ant['elevation_grid'], ant['azimuth_grid'], indexing='ij')

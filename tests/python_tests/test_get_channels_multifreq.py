@@ -36,9 +36,9 @@ def gen_xpol():
     return quadriga_lib.arrayant.generate('xpol')
 
 
-def gen_custom(az_3dB=90.0, el_3dB=90.0, rear_gain=0.0):
+def gen_custom(az_3dB=90.0, el_3dB=90.0):
     """Generate a custom antenna dictionary."""
-    return quadriga_lib.arrayant.generate('custom', 1, freq=az_3dB, az_3dB=el_3dB, el_3dB=rear_gain)
+    return quadriga_lib.arrayant.generate('custom', 1, element=[az_3dB, el_3dB])
 
 
 def copy_element(ant, src):
@@ -457,7 +457,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
     def test_freq_dependent_pattern(self):
         """Frequency-dependent pattern (scaled by frequency) should increase amplitude."""
         ghz_freqs = [1.0e9, 2.0e9, 3.0e9]
-        base = gen_custom(90.0, 90.0, 0.0)
+        base = gen_custom(90.0, 90.0)
         n_el, n_az, n_elem = base['e_theta_re'].shape
         etr = np.zeros((n_el, n_az, n_elem, 3), order='F')
         eti = np.zeros((n_el, n_az, n_elem, 3), order='F')

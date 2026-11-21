@@ -32,17 +32,17 @@ def _temp_qdant():
 
 def make_dipole_single(res=10.0, freq=1e9):
     """Helper: create a single-frequency dipole antenna."""
-    return arrayant.generate('dipole', res, freq=freq)
+    return arrayant.generate('dipole', res, center_freq=freq)
 
 
 def make_custom_single(az=30.0, el=30.0, res=10.0, freq=2.4e9):
     """Helper: create a single-frequency custom beam antenna."""
-    return arrayant.generate('custom', res, az_3dB=az, el_3dB=el, freq=freq)
+    return arrayant.generate('custom', res, center_freq=freq, element=[az, el])
 
 
 def make_xpol_single(res=10.0, freq=1e9):
     """Helper: create a single-frequency cross-polarized antenna (2 elements)."""
-    return arrayant.generate('xpol', res, freq=freq)
+    return arrayant.generate('xpol', res, center_freq=freq)
 
 
 def make_dipole_multi(n_freq=3, res=10.0):

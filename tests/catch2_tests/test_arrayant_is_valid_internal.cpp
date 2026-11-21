@@ -231,14 +231,14 @@ TEST_CASE("Arrayant quick check - Library functions do not mark their inputs")
 // The generators return marked antennas, so the computing functions take the quick path
 TEST_CASE("Arrayant quick check - Generated antennas are marked")
 {
-    arma::vec az = {0.0, 20.0, 40.0}, el = {0.0, 10.0, 0.0}, w = {1.0, 1.0, 1.0};
-    for (unsigned pol : {1u, 2u, 3u})
+    const arma::mat beams = {{0.0, 20.0, 40.0}, {0.0, 10.0, 0.0}, {1.0, 1.0, 1.0}}; // az; el; weight
+    for (arma::uword pol : {1ULL, 2ULL, 3ULL})
         for (arma::uword M : {1ULL, 2ULL, 4ULL})
             for (bool sep : {false, true})
             {
-                auto a = quadriga_lib::generate_arrayant_multibeam<double>(M, 2, az, el, w, 3.0e9, pol, 0.5, 120.0, 120.0, 0.0, 10.0, sep, false);
+                auto a = quadriga_lib::generate_arrayant_multibeam<double>({M, 2}, 3.0e9, {}, {pol}, {}, beams, 10.0, sep, false);
                 CHECK(qd_arrayant_cache_matches(a));
             }
     CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_omni<double>(10.0)));
-    CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0)));
+    CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3.0e9, {}, {}, {1}, {}, {}, {}, 10.0)));
 }

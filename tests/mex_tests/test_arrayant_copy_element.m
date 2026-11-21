@@ -90,8 +90,8 @@ for k = 1:2
 end
 
 %% Multi-frequency with distinct entries: each modified independently
-ant_a = quadriga_lib.arrayant_generate('custom', [], [], 30, 20, 0);
-ant_b = quadriga_lib.arrayant_generate('custom', [], [], 60, 40, 0);
+ant_a = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [30, 20]);
+ant_b = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [60, 40]);
 ant_mf_diff = [ant_a, ant_b];
 ant_mf_out = quadriga_lib.arrayant_copy_element(ant_mf_diff, 1, 2);
 assert( numel(ant_mf_out) == 2 );

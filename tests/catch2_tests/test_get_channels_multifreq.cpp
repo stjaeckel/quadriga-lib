@@ -1446,7 +1446,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
         std::vector<quadriga_lib::arrayant<dtype>> tx, rx;
         for (dtype f : {dtype(1.0e9), dtype(2.0e9)})
         {
-            auto a = quadriga_lib::generate_arrayant_3GPP<dtype>(1, 2, dtype(1.0e9), 3, 0, 0.5, 1, 1, 0.5, 0.5, {}, 10);
+            auto a = quadriga_lib::generate_arrayant_3GPP<dtype>({1, 2}, dtype(1.0e9), {}, {}, {3}, {}, {}, {}, 10);
             a.center_freq = f;
             a.e_theta_re *= f / dtype(1.0e9);
             if (coupling == 1)
@@ -1455,7 +1455,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
             if (coupling == 2)
                 a.coupling_re = {{1.0, 0.0}, {0.5, 0.0}, {0.0, 1.0}, {0.0, -0.5}}, a.coupling_im.zeros(4, 2);
             tx.push_back(a);
-            rx.push_back(quadriga_lib::generate_arrayant_3GPP<dtype>(1, 1, dtype(1.0e9), 3, 0, 0.5, 1, 1, 0.5, 0.5, {}, 10));
+            rx.push_back(quadriga_lib::generate_arrayant_3GPP<dtype>({1, 1}, dtype(1.0e9), {}, {}, {3}, {}, {}, {}, 10));
             rx.back().center_freq = f;
         }
         arma::Mat<dtype> fbs = {{20.0, 25.0, 30.0}, {20.0, 0.0, -25.0}, {0.0, 0.0, 5.0}}; // Path 1 is the LOS path

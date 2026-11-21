@@ -10,237 +10,118 @@ SECTION!*/
 
 /*!MD
 # generate
-Generates predefined array antenna models
+Generate an array antenna of a given type
 
-- Dispatches to one of several C++ generator functions based on the `type` string
-- Supported types: `omni`, `dipole` (or `short-dipole`), `half-wave-dipole`, `xpol`, `custom`,
-  `ula`, `3gpp` (or `3GPP`), `multibeam`
-- `res` applies to all types; the arguments after it are keyword-only and type-specific; defaults are filled
-  where omitted
-- For `3gpp` and `ula`, a `pattern` dict can override the default per-element pattern
-- `multibeam` combines beams via MRT weighting; set `separate_beams=True` for one beam per direction
+- One function for all antenna types. The panel types take the parameters of 3GPP TR 38.901 clause 7.3 as tuples: trailing entries may be omitted; 0 (in `panel`, `ports`, `pol`) or NaN (in `spacing`, `steer`, `element`) selects the default of that entry; more entries than listed raise `ValueError`.
+- An input that a type does not use raises `ValueError`, also `separate_beams` or `apply_weights` set to `True`. The result has the given `center_freq`.
+- Panel arrays: elements ordered polarization fastest, then `m` (upwards along z), `n` (along +y), `mg`, `ng`, positions centred on the origin; ports in the same order with `m_p`, `n_p`. Each port feeds a sub-array of `M / M_P` × `N / N_P` elements with the weights of TR 38.901 eq. 7.3-1 (`tilt`, and by analogy along y `pan`), stored in the coupling matrix.
+- `multibeam`: maximum-ratio-transmission weights for the directions in `beams`; one port per polarization, with `separate_beams` one per polarization and beam.
 
 ## Usage:
 ```
-# Simple antennas (v-pol)
-ant = quadriga_lib.arrayant.generate('omni')
-ant = quadriga_lib.arrayant.generate('dipole')
-ant = quadriga_lib.arrayant.generate('half-wave-dipole')
+# omni, xpol, dipole, half-wave-dipole
+ant = quadriga_lib.arrayant.generate( type, res, *, center_freq )
 
-# Cross-polarized isotropic
-ant = quadriga_lib.arrayant.generate('xpol')
+# Custom-shape element
+ant = quadriga_lib.arrayant.generate( 'custom', res, *, center_freq, element )
 
-# Custom 3dB beamwidth
-ant = quadriga_lib.arrayant.generate('custom', az_3dB=90.0, el_3dB=90.0, rear_gain_lin=0.0)
+# Uniform linear array (omni element) and TR 38.901 panel array
+ant = quadriga_lib.arrayant.generate( 'ula', res, *, center_freq, panel, spacing, ports, pol, steer, \
+    pattern, apply_weights )
+ant = quadriga_lib.arrayant.generate( '3GPP', res, *, center_freq, panel, spacing, ports, pol, steer, \
+    element, pattern, apply_weights )
 
-# Uniform linear array
-ant = quadriga_lib.arrayant.generate('ula', N=4, freq=2.4e9, spacing=0.7, pol=1)
-
-# 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
-
-# 3GPP-NR array with custom per-element pattern dict
-ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, pattern=my_pattern)
-
-# Multi-beam M×N array
-ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
-    beam_az=[-30.0, 30.0], beam_el=[0.0, 0.0], separate_beams=False)
+# Multi-beam panel array
+ant = quadriga_lib.arrayant.generate( 'multibeam', res, *, center_freq, panel, spacing, pol, element, \
+    beams, separate_beams, apply_weights )
 ```
 
-## Inputs (common):
-- **`type`** — Antenna model type; str
-- **`res`** — Pattern sampling grid resolution in degrees, 0.1 to 90; default: 10 for `omni` and `xpol`, 1 otherwise
-- **`freq`** — Center frequency in Hz; default: 299792458 (λ = 1 m)
+## Inputs:
+- **`type`** — Antenna type and the inputs it takes besides `res` and `center_freq`; str:<br><br>
+   | `type`                                           | Inputs                                                                             |
+   | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+   | `omni`, `xpol`                                   | none                                                                               |
+   | `dipole` (or `short-dipole`), `half-wave-dipole` | none                                                                               |
+   | `custom`                                         | `element`                                                                          |
+   | `ula`                                            | `panel`, `spacing`, `ports`, `pol`, `steer`, `pattern`, `apply_weights`            |
+   | `3GPP` (or `3gpp`)                               | `panel`, `spacing`, `ports`, `pol`, `steer`, `element`, `pattern`, `apply_weights` |
+   | `multibeam`                                      | `panel`, `spacing`, `pol`, `element`, `beams`, `separate_beams`, `apply_weights`  |
+- **`res`** — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: default; default: 10 for `omni` and `xpol`, 1 otherwise
+- **`center_freq`** — Center frequency in Hz; positive and finite; default: 299792458
+- **`panel`** — `[M, N, Mg, Ng]`: elements per column, columns per panel, panels per column, panels per row; int or `(n,)` of int; at most 1e7 elements per polarization; default: `None` (1; `ula`: `panel=8` is a vertical column, `[1, 8]` a horizontal row)
+- **`spacing`** — `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); >= 0; default: `None` (`[0.5, d_V, M d_V, N d_H]`)
+- **`ports`** — `[M_P, N_P]`: ports per column and per row of a panel and polarization; int or `(n,)` of int; must divide `M` and `N`; default: `None` (`[M, N]`, one port per element)
+- **`pol`** — `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°); model 1 or 2 (TR 38.901 Model-1, Model-2); int or `(n,)` of int; default: `None` (`[1, 1]`)
+- **`steer`** — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt (positive down) and pan (positive towards +y); `(2,)` (a 1D input is one row) for all panels or `(Mg Ng, 2)` with one row per panel; one column: pan 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`; default: `None` (0)
+- **`element`** — Element parameters: `custom` `[az_3dB, el_3dB, floor_dB]` in degrees, degrees and dB below the peak (> 0, NaN: no floor), default `[90, 90, NaN]`; `multibeam` the same with default `[120, 120, NaN]`; `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` of TR 38.901 Table 7.3-1 in degrees, degrees, dB, dB and dBi (NaN: peak gain equal to the directivity), default `[65, phi_3dB, 30, SLA_V, 8]`; default: `None`
+- **`pattern`** — Element pattern dict replacing the default element (keys as the output); only its radiation pattern is used; one with more than one element is used as given and needs `pol` [1, 1]; default: `None` (the element of the type)
+- **`beams`** — `(2, n_beams)` or `(3, n_beams)`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); a 1D input is one beam; default: `None` (`[[0], [0], [1]]`)
+- **`separate_beams`** — If `True`, one port per beam (weights ignored); default: `False`
+- **`apply_weights`** — If `True`, combine each port into one pattern at its sub-array centre; default: `False`
 
-## Inputs (custom, 3gpp, multibeam):
-- **`az_3dB`** — Azimuth 3dB beamwidth in degrees; default: 90 for `custom`, 67 for `3gpp`, 120 for `multibeam`
-- **`el_3dB`** — Elevation 3dB beamwidth in degrees; same defaults as `az_3dB`
-- **`rear_gain_lin`** — Back-to-front gain ratio (linear scale); default: 0.0
-
-## Inputs (ula, 3gpp, multibeam):
-- **`M`** — Number of vertical elements per panel; default: 1; ignored for `ula`
-- **`N`** — Number of horizontal elements per panel; default: 1
-- **`pol`** — Polarization mode (1..6); default: 1<br><br>
-   | `pol` | Description                                              |
-   | :---: | -------------------------------------------------------- |
-   | 1     | Vertical polarization                                    |
-   | 2     | H/V polarization (2NM elements)                          |
-   | 3     | ±45° polarization (2NM elements)                         |
-   | 4     | Vertical, vertical elements combined (N elements)        |
-   | 5     | H/V, vertical elements combined (2N elements)            |
-   | 6     | ±45°, vertical elements combined (2N elements)           |
-- **`spacing`** — Inter-element spacing in wavelengths; default: 0.5
-
-## Inputs (3gpp only):
-- **`tilt`** — Electrical downtilt in degrees; applies to `pol = 4/5/6`; default: 0.0
-- **`Mg`** — Number of vertically stacked panels; default: 1
-- **`Ng`** — Number of horizontally stacked panels; default: 1
-- **`dgv`** — Panel spacing in vertical direction in wavelengths; default: 0.5
-- **`dgh`** — Panel spacing in horizontal direction in wavelengths; default: 0.5
-
-## Inputs (ula, 3gpp):
-- **`pattern`** — Custom per-element pattern dict (same field layout as the output);
-  overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element positions,
-  coupling and center frequency of the pattern are ignored; default: `None` (use built-in pattern)
-
-## Inputs (multibeam only):
-- **`beam_az`** — Azimuth beam angles in degrees; `(n_beams,)`; default: `[0.0]`
-- **`beam_el`** — Elevation beam angles in degrees; `(n_beams,)`; default: `[0.0]`
-- **`beam_weight`** — Per-beam scaling factor; not normalized; same length as `beam_az`; default: `[1.0, 1.0, ...]` (all-ones)
-- **`separate_beams`** — Produce one independent beam per angle pair (weights ignored); default: False
-- **`apply_weights`** — Apply the beamforming weights to the output coupling matrix; default: False
-
-## Output:
-- **`ant`** — Dict with fields:<br><br>
-   | Field            | Description                                               | Size                                   |
+## Outputs:
+- **`ant`** — Dict with keys:<br><br>
+   | Key              | Description                                               | Shape                                  |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
-   | `e_theta_re`     | e-theta field component, real part                        | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_theta_im`     | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_re`       | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_im`       | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[n_azimuth]`                          |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[n_elevation]`                        |
-   | `element_pos`    | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
-   | `coupling_re`    | Coupling matrix, real part                                | `[n_elements, n_ports]`                |
-   | `coupling_im`    | Coupling matrix, imaginary part                           | `[n_elements, n_ports]`                |
+   | `e_theta_re`     | e-theta field component, real part                        | `(n_elevation, n_azimuth, n_elements)` |
+   | `e_theta_im`     | e-theta field component, imaginary part                   | `(n_elevation, n_azimuth, n_elements)` |
+   | `e_phi_re`       | e-phi field component, real part                          | `(n_elevation, n_azimuth, n_elements)` |
+   | `e_phi_im`       | e-phi field component, imaginary part                     | `(n_elevation, n_azimuth, n_elements)` |
+   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `(n_azimuth,)`                         |
+   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `(n_elevation,)`                       |
+   | `element_pos`    | Element (x,y,z) positions in meters                       | `(3, n_elements)`                      |
+   | `coupling_re`    | Coupling matrix, real part                                | `(n_elements, n_ports)`                |
+   | `coupling_im`    | Coupling matrix, imaginary part                           | `(n_elements, n_ports)`                |
    | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`              | scalar                                 |
-   | `name`           | Name of the array antenna object                          | string                                 |
+   | `name`           | Name of the array antenna object                          | str                                    |
 MD!*/
 
 py::dict arrayant_generate(const std::string &type,
                            double res,
-                           double freq,
-                           double az_3dB,
-                           double el_3dB,
-                           double rear_gain_lin,
-                           arma::uword M,
-                           arma::uword N,
-                           unsigned pol,
-                           double tilt,
-                           double spacing,
-                           arma::uword Mg,
-                           arma::uword Ng,
-                           double dgv,
-                           double dgh,
-                           py::handle beam_az,
-                           py::handle beam_el,
-                           py::handle beam_weight,
-                           py::handle separate_beams,
-                           py::handle apply_weights,
-                           const py::handle &pattern)
+                           double center_freq,
+                           const py::handle &panel,
+                           const py::handle &spacing,
+                           const py::handle &ports,
+                           const py::handle &pol,
+                           const py::handle &steer,
+                           const py::handle &element,
+                           const py::handle &pattern,
+                           const py::handle &beams,
+                           const py::handle &separate_beams,
+                           const py::handle &apply_weights)
 {
-    const bool separate_beams_b = qd_python_flag(separate_beams, false, "separate_beams");
-    const bool apply_weights_b = qd_python_flag(apply_weights, false, "apply_weights");
+    // None is an empty container (not given); the C++ function fills the defaults per type
+    const auto panel_a = qd_python_numpy2arma_Col<arma::uword>(panel, true, false, "panel");
+    const auto spacing_a = qd_python_numpy2arma_Col<double>(spacing, true);
+    const auto ports_a = qd_python_numpy2arma_Col<arma::uword>(ports, true, false, "ports");
+    const auto pol_a = qd_python_numpy2arma_Col<arma::uword>(pol, true, false, "pol");
+    const auto element_a = qd_python_numpy2arma_Col<double>(element, true);
+    const auto beams_a = qd_python_numpy2arma_Mat<double>(beams, true);
 
-    py::dict pattern_d;
+    arma::mat steer_a = qd_python_numpy2arma_Mat<double>(steer, false); // Copy: a 1D input is turned into one row
+    if (!steer.is_none())
+    {
+        const py::array steer_arr = py::array::ensure(steer);
+        if (steer_arr && steer_arr.ndim() < 2)
+            arma::inplace_trans(steer_a);
+    }
+
+    quadriga_lib::arrayant<double> pattern_a;
     if (!pattern.is_none())
     {
         if (!py::isinstance<py::dict>(pattern))
             throw py::type_error("Input 'pattern' must be a dict or None.");
-        pattern_d = py::reinterpret_borrow<py::dict>(pattern);
+        const auto pattern_d = py::reinterpret_borrow<py::dict>(pattern);
+        if (!pattern_d.empty()) // An empty dict is no pattern, as [] in MATLAB
+            pattern_a = qd_python_dict2arrayant(pattern_d, true); // Validated by the C++ function
     }
-    const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
 
-    if (res == 0.0)
-        res = (type == "omni" || type == "xpol") ? 10.0 : 1.0;
+    const bool separate_beams_b = qd_python_flag(separate_beams, false, "separate_beams");
+    const bool apply_weights_b = qd_python_flag(apply_weights, false, "apply_weights");
 
-    quadriga_lib::arrayant<double> arrayant;
-
-    if (type == "omni")
-        arrayant = quadriga_lib::generate_arrayant_omni<double>(res);
-    else if (type == "dipole" || type == "short-dipole")
-        arrayant = quadriga_lib::generate_arrayant_dipole<double>(res);
-    else if (type == "half-wave-dipole")
-        arrayant = quadriga_lib::generate_arrayant_half_wave_dipole<double>(res);
-    else if (type == "xpol")
-        arrayant = quadriga_lib::generate_arrayant_xpol<double>(res);
-    else if (type == "custom")
-    {
-        double az = (az_3dB > 0.0) ? az_3dB : 90.0;
-        double el = (el_3dB > 0.0) ? el_3dB : 90.0;
-        arrayant = quadriga_lib::generate_arrayant_custom<double>(az, el, rear_gain_lin, res);
-    }
-    else if (type == "ula")
-    {
-        if (!pattern_d.empty()) // Use custom pattern dict
-        {
-            const auto custom_array = qd_python_dict2arrayant(pattern_d, true);
-            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array);
-        }
-        else if (pol == 2 || pol == 5 || pol == 3 || pol == 6) // Dual-polarized base pattern
-        {
-            quadriga_lib::arrayant<double> custom_array;
-            if (pol == 2 || pol == 5)
-                custom_array = quadriga_lib::generate_arrayant_xpol<double>(res);
-            else // pol == 3 || pol == 6
-            {
-                custom_array = quadriga_lib::generate_arrayant_omni<double>(res);
-                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
-            }
-            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array);
-        }
-        else // Isotropic per-element pattern
-            arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, {}, res);
-        arrayant.name = "ula";
-    }
-    else if (type == "3GPP" || type == "3gpp")
-    {
-        if (!pattern_d.empty()) // Use custom pattern dict
-        {
-            auto custom_array = qd_python_dict2arrayant(pattern_d, true);
-            arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
-                                                                    Mg, Ng, dgv, dgh, custom_array);
-        }
-        else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
-        {
-            auto custom_array = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, rear_gain_lin, res);
-            if (pol == 2 || pol == 5)
-            {
-                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, el_1);
-            }
-            else if (pol == 3 || pol == 6)
-            {
-                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
-                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1);
-            }
-            arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
-                                                                    Mg, Ng, dgv, dgh, custom_array);
-        }
-        else // Use 3GPP default pattern
-            arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
-                                                                    Mg, Ng, dgv, dgh, {}, res);
-    }
-    else if (type == "multibeam")
-    {
-        const auto az = qd_python_numpy2arma_Col<double>(beam_az, true);
-        const auto el = qd_python_numpy2arma_Col<double>(beam_el, true);
-        const auto weight = qd_python_numpy2arma_Col<double>(beam_weight, true);
-
-        arma::Col<double> az_default = {0.0};
-        arma::Col<double> el_default = {0.0};
-        const arma::Col<double> &az_use = az.empty() ? az_default : az;
-        const arma::Col<double> &el_use = el.empty() ? el_default : el;
-        arma::Col<double> weight_use = weight.empty()
-                                           ? arma::Col<double>(az_use.n_elem, arma::fill::ones)
-                                           : weight;
-
-        // Match the C++ default element beamwidth (120°/120°) when the user passed nothing or zero
-        double az_bw = (az_3dB > 0.0) ? az_3dB : 120.0;
-        double el_bw = (el_3dB > 0.0) ? el_3dB : 120.0;
-        arrayant = quadriga_lib::generate_arrayant_multibeam<double>(M, N, az_use, el_use, weight_use,
-                                                                     freq, pol, spacing,
-                                                                     az_bw, el_bw, rear_gain_lin, res,
-                                                                     separate_beams_b, apply_weights_b);
-    }
-    else
-        throw std::invalid_argument("Input 'type' has an unsupported value '" + type + "'.");
-
-    arrayant.center_freq = freq;
-    return qd_python_arrayant2dict(arrayant);
+    const auto ant = quadriga_lib::arrayant_generate<double>(type, res, center_freq, panel_a, spacing_a, ports_a, pol_a, steer_a,
+                                                             element_a, pattern_a, beams_a, separate_beams_b, apply_weights_b);
+    return qd_python_arrayant2dict(ant);
 }
 
 /*!MD

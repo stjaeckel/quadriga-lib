@@ -13,7 +13,7 @@ void fuzz_seeds(const fz::seeds &s)
 
     // Two IDs and a layout in one file
     std::string fn = s.path("two_ids.qdant");
-    quadriga_lib::qdant_write(fn, quadriga_lib::generate_arrayant_3GPP<double>(2, 1, 3.5e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 30.0), 1);
+    quadriga_lib::qdant_write(fn, quadriga_lib::generate_arrayant_3GPP<double>({2, 1}, 3.5e9, {}, {}, {3}, {}, {}, {}, 30.0), 1);
     const arma::u32_mat layout = {{1, 2}};
     quadriga_lib::qdant_write(fn, quadriga_lib::generate_arrayant_half_wave_dipole<double>(45.0), 2, layout);
 }

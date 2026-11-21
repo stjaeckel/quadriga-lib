@@ -147,7 +147,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
         throw std::invalid_argument("Input 'upper_cutoff' must be finite and larger than 'lower_cutoff'.");
     if (!std::isfinite(sensitivity_dB))
         throw std::invalid_argument("Input 'sensitivity_dB' must be finite.");
-    if (angular_resolution_deg <= dtype(0.0))
+    if (!(angular_resolution_deg > dtype(0.0))) // NaN too
         throw std::invalid_argument("Input 'angular_resolution_deg' must be in the range from 0.1 to 90 deg.");
     for (dtype v : {hor_coverage_deg, ver_coverage_deg, horn_control_freq})
         if (std::isinf(v))

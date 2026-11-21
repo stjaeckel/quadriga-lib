@@ -22,7 +22,7 @@
 
 TEST_CASE("Arrayant OBJ Export")
 {
-    auto ant = quadriga_lib::generate_arrayant_3GPP<float>(1, 2);
+    auto ant = quadriga_lib::generate_arrayant_3GPP<float>({1, 2});
     CHECK(ant.name == "3gpp");
     ant.name = "g_pp";
 

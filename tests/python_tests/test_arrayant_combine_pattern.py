@@ -103,7 +103,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(out["name"], "bla")
 
     def test_grid_interpolation_and_directivity(self):
-        ant = arrayant.generate("3gpp", res=10, N=2, spacing=0.0)
+        ant = arrayant.generate("3gpp", 10, panel=[1, 2], spacing=0.0)
         ant["e_theta_re"][:, :, 1] = 2.0 * ant["e_theta_re"][:, :, 1]
         ant["coupling_re"] = [1, 1]
         ant["coupling_im"] = [0, 0]
@@ -242,7 +242,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 1], np.full((3, 4), 4.0), atol=1e-12, rtol=0)
 
     def test_multifreq_directivity(self):
-        ant = arrayant.generate("3gpp", res=10, N=2, spacing=0.0)
+        ant = arrayant.generate("3gpp", 10, panel=[1, 2], spacing=0.0)
         ant["coupling_re"] = np.ones((2, 1))
         ant["coupling_im"] = np.zeros((2, 1))
         ant["element_pos"][1, :] = [-0.25, 0.25]

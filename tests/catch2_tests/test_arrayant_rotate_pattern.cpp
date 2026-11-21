@@ -375,7 +375,7 @@ TEST_CASE("Rotate Pattern - Single element rotation only affects that element")
     // Use a directive 2-element antenna (3GPP H/V pol) so that z-rotation actually
     // changes the sampled pattern values. The xpol antenna is spatially uniform (constant
     // 1.0 across all angles), so rotation just samples the same constant and appears unchanged.
-    auto ant = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3e8, 2); // H/V polarized, 2 elements
+    auto ant = quadriga_lib::generate_arrayant_3GPP<double>({1, 1}, 3e8, {}, {}, {2}); // H/V polarized, 2 elements
     REQUIRE(ant.n_elements() == 2);
     auto ref = ant;
 
@@ -643,7 +643,7 @@ TEST_CASE("Rotate Pattern - Result is always valid (multiple usage modes)")
 
 TEST_CASE("Rotate Pattern - 3GPP 2x2 array rotation preserves all elements")
 {
-    auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3e9, 1);
+    auto ant = quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3e9, {}, {}, {1});
     REQUIRE(ant.n_elements() == 4);
 
     auto ref = ant;
@@ -944,7 +944,7 @@ TEST_CASE("arrayant_rotate_pattern - a positive tilt points the beam and the ele
 TEST_CASE("arrayant_rotate_pattern - the rotated pattern equals arrayant_interpolate with the same orientation")
 {
     // At the grid points, the rotated pattern is the unrotated one seen by an antenna with this orientation
-    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, 3); // +/-45 degree, 2 elements
+    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>({1, 1}, 3.5e9, {}, {}, {3}); // +/-45 degree, 2 elements
     const arma::vec o = {0.2, 0.3, -0.4};
     arma::mat az(1, ant.n_elevation() * ant.n_azimuth()), el(1, ant.n_elevation() * ant.n_azimuth());
     for (arma::uword a = 0, k = 0; a < ant.n_azimuth(); ++a)
@@ -970,7 +970,7 @@ TEST_CASE("arrayant_rotate_pattern - the rotated pattern equals arrayant_interpo
 
 TEST_CASE("arrayant_rotate_pattern - an element subset is rotated in one call")
 {
-    auto ant = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0);
+    auto ant = quadriga_lib::generate_arrayant_3GPP<double>({1, 1}, 3.5e9, {}, {}, {3}, {}, {}, {}, 10.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos = {{0.0, 0.1, 0.2}, {0.3, 0.4, 0.5}, {0.6, 0.7, 0.8}};
     const arma::vec o = {0.1, 0.2, 0.3};

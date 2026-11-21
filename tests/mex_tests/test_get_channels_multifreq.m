@@ -207,7 +207,7 @@ end
 
 
 % use_kernel (input 17) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 is rejected by C++
-tx = quadriga_lib.arrayant_generate('custom', 10, [], 90, 90, 0);
+tx = quadriga_lib.arrayant_generate('custom', 10, [], [], [], [], [], [], [90, 90]);
 args = { tx, tx, [0;0;10], [0;0;0], [50;0;1.5], [0;0;0], [20; 5; 3], [20; 5; 3], [1, 1], 0, repmat([1;0;0;0;0;0;-1;0], [1, 1, 2]), ...
     [3e9; 3.6e9], [3e9; 3.3e9], false, false, 299792458.0 };
 cr_d = quadriga_lib.get_channels_multifreq( args{:} );

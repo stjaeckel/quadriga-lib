@@ -57,6 +57,17 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 - `polmat`: polarization transfer matrix, the 2×2 polarization matrix of TR 38.901 per path or ray, rows rx, columns tx, stored column-major; `[8, n]` real interleaved: rows 0–1 (rx V, tx V), 2–3 (rx H, tx V), 4–5 (rx V, tx H), 6–7 (rx H, tx H). In scalar (acoustic) mode `[2, n]` holds the real and imaginary part of the complex scalar coefficient. Labels such as `ReHV` name the rx polarization first. The HDF5 file stores it as `path_polarization`.
 
+**Array antenna generators (TR 38.901 tuples)**
+
+- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `arma::uvec` for counts and codes, `arma::vec` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
+- `panel`: `[M, N, Mg, Ng]`: elements per column (along z), columns per panel (along y), panels per column, panels per row; default 1.
+- `spacing`: `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); defaults 0.5, `d_V`, `M d_V`, `N d_H`.
+- `ports`: `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; they divide `M` and `N`; default `[M, N]` (one port per element).
+- `pol`: `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°), 4 to 6 reserved; model 1 or 2 (TR 38.901 Model-1, Model-2); default `[1, 1]`.
+- `steer`: `[tilt, pan]` in degrees: electrical downtilt (positive down) and pan (positive towards +y) of the sub-array weights; one row for all panels or one row per panel; default 0.
+- `element`: the element parameters of a generator type, unit per entry in its documentation, e.g. `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` in degrees, degrees, dB, dB and dBi for the TR element.
+- `beams`: `[2 or 3, n_beams]`: azimuth and elevation in degrees, weight (linear).
+
 **Kernel selection**
 
 - `use_kernel`: compute kernel of a function with more than one kernel; `0` = auto, `1` = GENERIC, `2` = AVX2, `3` = CUDA (only where a CUDA kernel exists). Auto selects per function, as stated in each function; where it is not the fastest kernel, the function says so. Throws if the requested kernel is unavailable.

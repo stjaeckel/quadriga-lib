@@ -54,7 +54,7 @@ namespace
     // Dual-polarised (+-45 deg) 2x2 panel, 8 ports, 5 deg pattern grid
     arr_t panel(double f)
     {
-        return quadriga_lib::generate_arrayant_3GPP<double>(2, 2, f, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 5.0);
+        return quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, f, {}, {}, {3}, {}, {}, {}, 5.0);
     }
 
     arma::vec mirror(const arma::vec &x) { return arma::vec{x(0), x(1), -x(2)}; }

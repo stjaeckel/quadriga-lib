@@ -188,7 +188,7 @@ class test_case(unittest.TestCase):
                 self.assertIn("'%s'" % flag, str(ctx.exception))
 
     def test_memory_layout_and_dtype(self):
-        ant = quadriga_lib.arrayant.generate("3gpp", M=2, N=2, pol=2, res=10.0)
+        ant = quadriga_lib.arrayant.generate("3gpp", 10.0, panel=[2, 2], pol=2)
         n_out = ant["e_theta_re"].shape[2]
         rng = np.random.default_rng(0)
         az = rng.uniform(-3.0, 3.0, (n_out, 20)).astype(np.float32).astype(np.float64)

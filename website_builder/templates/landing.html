@@ -51,11 +51,11 @@
       <div class="qs-tabs"><div class="ltabs" data-lang-tabs><input type="radio" name="qs" id="qs-python" value="python" checked><input type="radio" name="qs" id="qs-matlab" value="matlab"><input type="radio" name="qs" id="qs-cpp" value="cpp"><div class="tablist" role="presentation"><label for="qs-python">Python</label><label for="qs-matlab">MATLAB / Octave</label><label for="qs-cpp">C++</label></div><div class="panel code"><pre><code class="language-python">{% filter highlight("python") %}
 import quadriga_lib
 
-ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)
+ant = quadriga_lib.arrayant.generate('3gpp', panel=[2, 2], center_freq=3.7e9)
 print(quadriga_lib.version())
 print(quadriga_lib.arrayant.calc_directivity(ant, 0))
 {% endfilter %}</code></pre></div><div class="panel code"><pre><code class="language-matlab">{% filter highlight("matlab") %}
-ant = quadriga_lib.arrayant_generate('3GPP', 1, 3.7e9, [], [], [], 2, 2);
+ant = quadriga_lib.arrayant_generate('3GPP', 1, 3.7e9, [2, 2]);
 disp(quadriga_lib.version())
 disp(quadriga_lib.arrayant_calc_directivity(ant, 1))
 {% endfilter %}</code></pre></div><div class="panel code"><pre><code class="language-cpp">{% filter highlight("cpp") %}

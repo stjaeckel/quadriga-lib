@@ -308,70 +308,71 @@ namespace quadriga_lib
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_half_wave_dipole(double res = 1.0);
 
-    // Generate an antenna with a custom 3dB beam with (FWHM)
+    // Generate an antenna with a custom 3 dB beamwidth (FWHM), normalized to its directivity
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_custom(
-        double az_3dB = 90.0,       // Azimuth 3dB beam with in degree
-        double el_3dB = 90.0,       // Elevation 3dB beam with in degree
-        double rear_gain_lin = 0.0, // Front-back ration, linear value
-        double res = 1.0);          // Resolution of the antenna pattern sampling grid in degree
+        double az_3dB = 90.0,       // Azimuth 3 dB beamwidth in degree, > 0; NaN = 90
+        double el_3dB = 90.0,       // Elevation 3 dB beamwidth in degree, > 0; NaN = 90
+        double rear_gain_lin = 0.0, // Floor of the power pattern relative to the peak, linear, in [0, 1); NaN = 0
+        double res = 1.0);          // Grid resolution in degree, 0.1 to 90; NaN or <= 0 = 1
 
-    // Generate : Unified Linear Array
-    // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
-    // Values for coupling, element positions and center frequency of the custom pattern are ignored.
+    // Generate a uniform linear array (ULA) of N elements along y
+    // - The panel array of generate_arrayant_3GPP with panel = {1, N} and the omni element (or 'pattern')
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_ula(
-        arma::uword N = 1,                                  // Number of elements
-        double center_freq = 299792458.0,                   // The center frequency in [Hz]
-        double spacing = 0.5,                               // Element spacing in [λ]
-        const arrayant<dtype> &pattern = arrayant<dtype>(), // Optional custom per-element pattern; empty = default
-        double res = 1.0);                                  // Resolution in degree, ignored if custom pattern is given
+        arma::uword N = 1,                                  // Number of elements; 0 = 1
+        double center_freq = 299792458.0,                   // Center frequency in Hz, positive, finite
+        double spacing = 0.5,                               // Element spacing in wavelengths, >= 0; NaN = 0.5
+        const arrayant<dtype> &pattern = arrayant<dtype>(), // Optional element pattern (only its radiation pattern is used); empty = omni
+        double res = 1.0);                                  // Grid resolution in degree; ignored with 'pattern'
 
-    // Generate : Antenna model for the 3GPP-NR channel model
-    // Polarization indicator:
-    //   1. K=1, vertical polarization only
-    //   2. K=1, H/V polarized elements
-    //   3. K=1, +/-45 degree polarized elements
-    //   4. K=M, vertical polarization only
-    //   5. K=M, H/V polarized elements
-    //   6. K=M, +/-45 degree polarized elements
-    // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
-    // Values for coupling, element positions and center frequency of the custom pattern are ignored.
+    // Generate a TR 38.901 panel array antenna (clause 7.3) with TXRU sub-arrays (eq. 7.3-1) and Model-1 or Model-2 polarization
+    // - Tuples: trailing entries may be omitted; 0 (integer tuples) or NaN (real tuples) selects the default of an entry
+    // - Elements: polarization fastest, then m (along z), n (along y), mg, ng; ports: polarization, m_p, n_p, mg, ng
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_3GPP(
-        arma::uword M = 1,                                  // Number of vertical elements
-        arma::uword N = 1,                                  // Number of horizontal elements
-        double center_freq = 299792458.0,                   // The center frequency in [Hz]
-        unsigned pol = 1,                                   // Polarization indicator
-        double tilt = 0.0,                                  // The electric downtilt angle in [deg] for pol = 4,5,6
-        double spacing = 0.5,                               // Element spacing in [λ]
-        arma::uword Mg = 1,                                 // Number of nested panels in a column (Mg)
-        arma::uword Ng = 1,                                 // Number of nested panels in a row (Ng)
-        double dgv = 0.5,                                   // Panel spacing in vertical direction (dg,V) in [λ]
-        double dgh = 0.5,                                   // Panel spacing in horizontal direction (dg,H) in [λ]
-        const arrayant<dtype> &pattern = arrayant<dtype>(), // Optional custom per-element pattern; empty = default
-        double res = 1.0);                                  // Resolution in degree, ignored if custom pattern is given
+        const arma::uvec &panel = {},                       // [M, N, Mg, Ng]; default 1
+        double center_freq = 299792458.0,                   // Center frequency in Hz, positive, finite
+        const arma::vec &spacing = {},                      // [d_V, d_H, d_gV, d_gH] in wavelengths, >= 0; default [0.5, d_V, M d_V, N d_H]
+        const arma::uvec &ports = {},                       // [M_P, N_P], dividing M and N; default [M, N]
+        const arma::uvec &pol = {},                         // [polarization, model]: 1 V, 2 H/V, 3 +/-45 deg; model 1 or 2; default [1, 1]
+        const arma::mat &steer = {},                        // [tilt, pan] in degree, [1, 2] or [Mg Ng, 2]; default 0
+        const arma::vec &element = {},                      // [phi_3dB, theta_3dB, SLA_V, A_max, G_max] in deg, deg, dB, dB, dBi; default [65, phi_3dB, 30, SLA_V, 8]
+        const arrayant<dtype> &pattern = arrayant<dtype>(), // Optional element pattern replacing the TR element (only its radiation pattern is used)
+        double res = 1.0,                                   // Grid resolution in degree; ignored with 'pattern'
+        bool apply_weights = false);                        // Combine each port into one pattern at its sub-array centre
 
-    // Generate multi-beam antenna
-    // - Generates a planar M x N array that forms mutiple beams pointing in different directions
-    // - Beamforming weights are phasors only
-    // - Polarization indicator: (1) Vertical polarization only, (2) H/V polarized elements, (3) +/-45 degree polarized elements
+    // Generate a planar multi-beam array with maximum-ratio-transmission weights (phasors only)
     template <typename dtype = double>
     arrayant<dtype> generate_arrayant_multibeam(
-        arma::uword M = 1,                // Number of vertical elements
-        arma::uword N = 1,                // Number of horizontal elements
-        arma::Col<dtype> az = {0.0},      // Azimuth beam angles in degree
-        arma::Col<dtype> el = {0.0},      // Elevation beam angles in degree
-        arma::Col<dtype> weight = {1.0},  // Scaling factor for the beams
-        double center_freq = 299792458.0, // The center frequency in [Hz]
-        unsigned pol = 1,                 // Polarization indicator
-        double spacing = 0.5,             // Element spacing in [λ]
-        double az_3dB = 120.0,            // Azimuth per-element 3dB beam with in degree
-        double el_3dB = 120.0,            // Elevation per-element 3dB beam with in degree
-        double rear_gain_lin = 0.0,       // Front-back ration, linear value
-        double res = 1.0,                 // Resolution of the antenna pattern sampling grid in degree
-        bool separate_beams = false,      // If true, create a separate beam for each angle pair (ignores weights)
-        bool apply_weights = false);      // Switch to apply the beamforming weights
+        const arma::uvec &panel = {},     // [M, N, Mg, Ng]; default 1
+        double center_freq = 299792458.0, // Center frequency in Hz, positive, finite
+        const arma::vec &spacing = {},    // [d_V, d_H, d_gV, d_gH] in wavelengths, >= 0; default [0.5, d_V, M d_V, N d_H]
+        const arma::uvec &pol = {},       // [polarization, model]: 1 V, 2 H/V, 3 +/-45 deg; model 1 or 2; default [1, 1]
+        const arma::vec &element = {},    // Custom-shape element [az_3dB, el_3dB, floor_dB] in deg, deg, dB; default [120, 120, NaN = no floor]
+        const arma::mat &beams = {},      // [2 or 3, n_beams]: azimuth in deg; elevation in deg; weight (2 rows: 1); default [0; 0; 1]
+        double res = 1.0,                 // Grid resolution in degree, 0.1 to 90; NaN or <= 0 = 1
+        bool separate_beams = false,      // One port per beam (weights ignored) instead of one combined beam
+        bool apply_weights = false);      // Combine each port into one pattern
+
+    // Generate an array antenna of a given type: the generators above in one function with the TR 38.901 tuples
+    // - Types: 'omni', 'xpol', 'dipole' (or 'short-dipole'), 'half-wave-dipole', 'custom', 'ula', '3GPP' (or '3gpp'), 'multibeam'
+    // - An input a type does not use throws; the result has the given center_freq
+    template <typename dtype = double>
+    arrayant<dtype> arrayant_generate(
+        const std::string &type,                            // Antenna type
+        double res = NAN,                                   // Grid resolution in degree, 0.1 to 90; NaN or <= 0 = 10 (omni, xpol) or 1
+        double center_freq = 299792458.0,                   // Center frequency in Hz, positive, finite
+        const arma::uvec &panel = {},                       // [M, N, Mg, Ng] (ula, 3GPP, multibeam)
+        const arma::vec &spacing = {},                      // [d_V, d_H, d_gV, d_gH] in wavelengths (ula, 3GPP, multibeam)
+        const arma::uvec &ports = {},                       // [M_P, N_P] (ula, 3GPP)
+        const arma::uvec &pol = {},                         // [polarization, model] (ula, 3GPP, multibeam)
+        const arma::mat &steer = {},                        // [tilt, pan] in degree, one row or one per panel (ula, 3GPP)
+        const arma::vec &element = {},                      // Element parameters per type (custom, 3GPP, multibeam)
+        const arrayant<dtype> &pattern = arrayant<dtype>(), // Element pattern (ula, 3GPP)
+        const arma::mat &beams = {},                        // [2 or 3, n_beams] in degree; weights (multibeam)
+        bool separate_beams = false,                        // One port per beam (multibeam)
+        bool apply_weights = false);                        // Combine each port into one pattern (ula, 3GPP, multibeam)
 
     // Generate a parametric loudspeaker model
     // - Returns a vector of arrayant objects, one per frequency sample

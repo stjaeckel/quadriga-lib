@@ -3,6 +3,8 @@
 # Part of quadriga-lib — see LICENSE for terms.
 
 # Python interface test for quadriga_lib.arrayant.generate.
+# Scope: each argument once on one type, omitted and None arguments, output dict, layouts and dtypes of 'beams' and
+# 'pattern', error paths. Physics validation lives in the Catch2 suite (test_arrayant_generate.cpp).
 
 import sys
 import os
@@ -10,117 +12,170 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 
-# Append the directory containing your package to sys.path
+# Append the directory containing the package to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-package_path = os.path.join(current_dir, '../../lib')
+package_path = os.path.join(current_dir, "../../lib")
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-from quadriga_lib import arrayant
+import quadriga_lib
+
+OPTIONAL = ("center_freq", "panel", "spacing", "ports", "pol", "steer", "element", "pattern", "beams",
+            "separate_beams", "apply_weights")
+
 
 class test_case(unittest.TestCase):
 
-    def test(self):
+    def test_basic_call(self):
+        ant = quadriga_lib.arrayant.generate("omni", 30)
+        self.assertIsInstance(ant, dict)
+        self.assertEqual(ant["e_theta_re"].shape, (7, 13, 1))
+        self.assertEqual(ant["e_theta_re"].dtype, np.float64)
+        self.assertTrue(ant["e_theta_re"].flags.f_contiguous)
+        npt.assert_array_equal(ant["e_theta_re"], np.ones((7, 13, 1)))
+        npt.assert_array_equal(ant["e_phi_re"], np.zeros((7, 13, 1)))
+        npt.assert_allclose(ant["azimuth_grid"], np.linspace(-np.pi, np.pi, 13), atol=1e-14, rtol=0)
+        npt.assert_allclose(ant["elevation_grid"], np.linspace(-np.pi / 2, np.pi / 2, 7), atol=1e-14, rtol=0)
+        npt.assert_array_equal(ant["element_pos"], np.zeros((3, 1)))
+        npt.assert_array_equal(ant["coupling_re"], [[1.0]])
+        npt.assert_array_equal(ant["coupling_im"], [[0.0]])
+        self.assertEqual(ant["center_freq"], 299792458.0)
+        self.assertEqual(ant["name"], "omni")
+        ref = quadriga_lib.arrayant.generate(type="omni", res=30)  # by keyword
+        for key in ant:
+            npt.assert_array_equal(ant[key], ref[key])
 
-        # Omni antenna, 10 deg
-        data = arrayant.generate("omni", 10)
+    def test_omitted_and_none(self):
+        ref = quadriga_lib.arrayant.generate("omni")
+        self.assertEqual(ref["e_theta_re"].shape, (19, 37, 1))  # res default 10 for omni
+        for res in (np.nan, 0.0, -1.0):
+            npt.assert_array_equal(quadriga_lib.arrayant.generate("omni", res)["e_theta_re"], ref["e_theta_re"])
+        for name in OPTIONAL[1:]:
+            out = quadriga_lib.arrayant.generate("omni", **{name: None})
+            for key in ref:
+                npt.assert_array_equal(out[key], ref[key])
+        out = quadriga_lib.arrayant.generate("omni", pattern={})  # an empty dict is no pattern
+        npt.assert_array_equal(out["e_theta_re"], ref["e_theta_re"])
 
-        npt.assert_almost_equal(data["e_theta_re"], np.ones((19, 37, 1)), decimal=14)
-        npt.assert_almost_equal(data["e_theta_im"], np.zeros((19, 37, 1)), decimal=14)
-        npt.assert_almost_equal(data["e_phi_re"], np.zeros((19, 37, 1)), decimal=14)
-        npt.assert_almost_equal(data["e_phi_im"], np.zeros((19, 37, 1)), decimal=14)
-        npt.assert_almost_equal(data["center_freq"], 299792458.0, decimal=14)
-        npt.assert_almost_equal(data["azimuth_grid"], np.linspace(-np.pi, np.pi, 37), decimal=14)
-        npt.assert_almost_equal(data["elevation_grid"], np.linspace(-np.pi/2, np.pi/2, 19), decimal=14)
-        npt.assert_almost_equal(data["coupling_re"], 1.0, decimal=14)
-        npt.assert_almost_equal(data["coupling_im"], 0.0, decimal=14)
-        assert data["name"] == 'omni'
+    def test_arguments(self):
+        f = quadriga_lib.arrayant.generate
+        a = f("xpol", 30, center_freq=3e9)
+        self.assertEqual(a["e_theta_re"].shape, (7, 13, 2))
+        self.assertEqual(a["center_freq"], 3e9)
 
-        # Xpol antenna
-        data = arrayant.generate("xpol", 400.0, freq=3.0e9)
-        npt.assert_almost_equal(data["e_theta_re"][:,:,0], np.ones((3, 5)), decimal=14)
-        npt.assert_almost_equal(data["e_theta_re"][:,:,1], np.zeros((3, 5)), decimal=14)
-        npt.assert_almost_equal(data["e_phi_re"][:,:,1], np.ones((3, 5)), decimal=14)
-        npt.assert_almost_equal(data["e_phi_re"][:,:,0], np.zeros((3, 5)), decimal=14)
-        npt.assert_almost_equal(data["e_theta_im"], np.zeros((3, 5, 2)), decimal=14)
-        npt.assert_almost_equal(data["e_phi_im"], np.zeros((3, 5, 2)), decimal=14)
-        npt.assert_almost_equal(data["center_freq"], 3.0e9, decimal=14)
-        npt.assert_almost_equal(data["azimuth_grid"], np.linspace(-np.pi, np.pi, 5), decimal=14)
-        npt.assert_almost_equal(data["elevation_grid"], np.linspace(-np.pi/2, np.pi/2, 3), decimal=14)
-        assert data["name"] == 'xpol'
+        a = f("3gpp", 30, panel=[2, 3])
+        self.assertEqual(a["e_theta_re"].shape[2], 6)
+        npt.assert_allclose(a["element_pos"][:, :2], [[0, 0], [-0.5, -0.5], [-0.25, 0.25]], atol=1e-12, rtol=0)
+        npt.assert_array_equal(f("3gpp", 30, panel=2)["element_pos"], f("3gpp", 30, panel=[2])["element_pos"])
 
-        # Custom antenna
-        data = arrayant.generate("custom", 10, freq=90, az_3dB=90, el_3dB=0)
-        assert data["e_theta_re"].shape == (19, 37, 1)
-        assert data["e_theta_re"].flags.f_contiguous
-        assert data["name"] == 'custom'
+        a = f("ula", 30, panel=[1, 2], spacing=0.7)
+        npt.assert_allclose(a["element_pos"], [[0, 0], [-0.35, 0.35], [0, 0]], atol=1e-12, rtol=0)
 
-        # 3GPP default
-        data = arrayant.generate("3gpp")
-        assert data["e_theta_re"].shape == (181, 361, 1)
-        npt.assert_almost_equal(data["e_theta_re"][0,0,0], 0.0794328, decimal=7)
-        npt.assert_almost_equal(data["e_theta_re"][90,180,0], 2.51188, decimal=5)
-        assert data["name"] == '3gpp'
+        self.assertEqual(f("3gpp", 30, panel=4, ports=1)["coupling_re"].shape, (4, 1))
 
-        data = arrayant.generate("3gpp", pol=2)
-        npt.assert_almost_equal(data["e_theta_re"][0,0,0], 0.0794328, decimal=7)
-        npt.assert_almost_equal(data["e_theta_re"][90,180,0], 2.51188, decimal=5)
-        npt.assert_almost_equal(data["e_phi_re"][0,0,1], -0.0794328, decimal=7)
-        npt.assert_almost_equal(data["e_phi_re"][90,180,1], 2.51188, decimal=5)
+        a = f("3gpp", 30, pol=[2, 2])  # Model-2, zeta = 90 deg
+        self.assertEqual(a["e_theta_re"].shape[2], 2)
+        npt.assert_allclose(a["e_theta_re"][:, :, 1], 0.0, atol=1e-12, rtol=0)
 
-        data = arrayant.generate("3gpp", pol=3)
-        npt.assert_almost_equal(data["e_theta_re"][90,180,0], 1.776172, decimal=5)
-        npt.assert_almost_equal(data["e_theta_re"][90,180,1], 1.776172, decimal=5)
-        npt.assert_almost_equal(data["e_phi_re"][90,180,0], 1.776172, decimal=5)
-        npt.assert_almost_equal(data["e_phi_re"][90,180,1], -1.776172, decimal=5)
+        # steer: eq. 7.3-1 with d_V = 0.5; a 1D input is one row [tilt, pan], as the 2D (1, 2) input
+        for steer in ([30.0, 0.0], np.array([[30.0, 0.0]])):
+            a = f("3gpp", 30, panel=2, ports=1, steer=steer)
+            npt.assert_allclose(a["coupling_re"], [[0.5], [0.5]], atol=1e-12, rtol=0)
+            npt.assert_allclose(a["coupling_im"], [[-0.5], [0.5]], atol=1e-12, rtol=0)
+        a = f("3gpp", 30, panel=[1, 2], ports=[1, 1], steer=[0.0, 30.0])  # pan: d_H = 0.5, the beam towards +y
+        npt.assert_allclose(a["coupling_re"], [[0.5], [0.5]], atol=1e-12, rtol=0)
+        npt.assert_allclose(a["coupling_im"], [[0.5], [-0.5]], atol=1e-12, rtol=0)
+        a = f("3gpp", 30, panel=[2, 1, 2], ports=1, steer=[[30.0], [-30.0]])  # one row per panel, pan 0
+        npt.assert_allclose(a["coupling_im"][:2, 0], [-0.5, 0.5], atol=1e-12, rtol=0)
+        npt.assert_allclose(a["coupling_im"][2:, 1], [0.5, -0.5], atol=1e-12, rtol=0)
 
-        # Use custom pattern
-        pat = arrayant.generate("custom", 10)
+        a = f("custom", 30, element=[60.0, 90.0, 10.0])  # floor 10 dB below the peak
+        p = a["e_theta_re"] ** 2
+        npt.assert_allclose(p.min() / p.max(), 0.1, atol=1e-12, rtol=0)
+        self.assertGreater(np.abs(a["e_theta_re"] - f("custom", 30, element=60.0)["e_theta_re"]).max(), 0.01)
 
-        data = arrayant.generate("3gpp", az_3dB=90, el_3dB=90, res=10, N=2)
-        npt.assert_almost_equal(data["e_theta_re"][:,:,0], pat["e_theta_re"][:,:,0], decimal=14)
-        npt.assert_almost_equal(data["e_theta_re"][:,:,1], pat["e_theta_re"][:,:,0], decimal=14)
-        npt.assert_almost_equal(data["element_pos"], [[0.0,0.0],[-0.25,0.25],[0.0,0.0]], decimal=14)
-    
-        data = arrayant.generate("3gpp", pattern=pat, M=2)
-        npt.assert_almost_equal(data["e_theta_re"][:,:,0], pat["e_theta_re"][:,:,0], decimal=14)
-        npt.assert_almost_equal(data["e_theta_re"][:,:,1], pat["e_theta_re"][:,:,0], decimal=14)
-        npt.assert_almost_equal(data["element_pos"], [[0.0,0.0],[0.0,0.0],[-0.25,0.25]], decimal=14)
+        pat = f("custom", 30, element=[60.0, 40.0])
+        a = f("3gpp", panel=2, pattern=pat)
+        self.assertEqual(a["e_theta_re"].shape, (7, 13, 2))
+        npt.assert_allclose(a["e_theta_re"][:, :, 1], pat["e_theta_re"][:, :, 0], atol=1e-12, rtol=0)
 
-        # Errors
-        trash = {"e_theta_re":0.0}
-        with self.assertRaises(KeyError) as context:
-            arrayant.generate("3gpp", pattern=trash)
-        self.assertEqual(str(context.exception), "'e_theta_im'")
+        beams = [[-30.0, 30.0], [0.0, 0.0]]
+        self.assertEqual(f("multibeam", 30, panel=[1, 4], beams=beams, separate_beams=True)["coupling_re"].shape, (4, 2))
+        self.assertEqual(f("multibeam", 30, panel=[1, 4], beams=beams)["coupling_re"].shape, (4, 1))
 
-        trash = {"e_theta_re":"Bla"}
-        with self.assertRaises(ValueError) as context:
-            arrayant.generate("3gpp", pattern=trash)
-        self.assertEqual(str(context.exception), "could not convert string to float: 'Bla'")
+        a = f("3gpp", 30, panel=2, ports=1, apply_weights=np.bool_(True))
+        self.assertEqual(a["e_theta_re"].shape, (7, 13, 1))
+        npt.assert_allclose(a["element_pos"], np.zeros((3, 1)), atol=1e-12, rtol=0)
 
-        with self.assertRaises(ValueError) as context:
-            arrayant.generate("bla")
-        self.assertEqual(str(context.exception), "Input 'type' has an unsupported value 'bla'.")
-            
-    def test_none_and_flag_types(self):
-        # The flags only act on 'multibeam', 'pattern' only on '3gpp' and 'ula'
-        mb = dict(M=2, N=2, beam_az=[0.0, 40.0], beam_el=[0.0, 0.0], res=30)
-        ref = arrayant.generate("multibeam", **mb)
-        out = arrayant.generate("multibeam", **mb, separate_beams=None, apply_weights=None)
-        for key in ("e_theta_re", "e_phi_re", "coupling_re"):
-            npt.assert_array_equal(out[key], ref[key])
-        ref = arrayant.generate("3gpp", res=30)
-        for kw in ({"pattern": None}, {"pattern": {}}):
-            npt.assert_array_equal(arrayant.generate("3gpp", res=30, **kw)["e_theta_re"], ref["e_theta_re"])
+    def test_beams_layout_and_dtype(self):
+        f = quadriga_lib.arrayant.generate
+        b = np.array([[20.0, 0.0], [-7.0, 30.0], [2.0, 1.0]])
+        ref = f("multibeam", 30, panel=[2, 3], beams=b)
+        for beams in (b.tolist(), np.asfortranarray(b), b.astype(np.float32), np.ascontiguousarray(b), b.astype(np.int64)):
+            out = f("multibeam", 30, panel=[2, 3], beams=beams)
+            npt.assert_allclose(out["coupling_re"], ref["coupling_re"], atol=1e-6, rtol=0)
+            npt.assert_allclose(out["coupling_im"], ref["coupling_im"], atol=1e-6, rtol=0)
+        two = f("multibeam", 30, panel=[2, 3], beams=b[:2])  # 2 rows: weight 1
+        npt.assert_array_equal(two["coupling_re"], f("multibeam", 30, panel=[2, 3], beams=np.vstack((b[:2], [1, 1])))["coupling_re"])
+        one = f("multibeam", 30, panel=[2, 3], beams=[20.0, -7.0])  # 1D: one beam
+        npt.assert_array_equal(one["coupling_re"], f("multibeam", 30, panel=[2, 3], beams=[[20.0], [-7.0]])["coupling_re"])
 
+    def test_pattern_layout_and_dtype(self):
+        f = quadriga_lib.arrayant.generate
+        pat = f("custom", 30, element=[60.0, 40.0])
+        ref = f("3gpp", panel=2, pattern=pat)
+        variants = [{k: (v.astype(np.float32) if isinstance(v, np.ndarray) and k.startswith("e_") else v) for k, v in pat.items()},
+                    {k: (np.ascontiguousarray(v) if isinstance(v, np.ndarray) else v) for k, v in pat.items()},
+                    {k: pat[k] for k in ("e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im", "azimuth_grid", "elevation_grid")}]
+        for p in variants:
+            out = f("3gpp", panel=2, pattern=p)
+            npt.assert_allclose(out["e_theta_re"], ref["e_theta_re"], atol=1e-6, rtol=0)
+            npt.assert_allclose(out["element_pos"], ref["element_pos"], atol=1e-12, rtol=0)
+
+    def test_inputs_not_modified(self):
+        pat = quadriga_lib.arrayant.generate("custom", 30, element=[60.0, 40.0])
+        keep = {k: (v.copy() if isinstance(v, np.ndarray) else v) for k, v in pat.items()}
+        steer = np.array([30.0, 5.0])
+        beams = np.array([[20.0, 0.0], [-7.0, 30.0], [2.0, 1.0]])
+        s0, b0 = steer.copy(), beams.copy()
+        quadriga_lib.arrayant.generate("3gpp", panel=[2, 2], ports=[1, 1], pol=[3, 2], steer=steer, pattern=pat)
+        quadriga_lib.arrayant.generate("multibeam", 30, panel=[2, 3], beams=beams, apply_weights=True)
+        npt.assert_array_equal(steer, s0)
+        npt.assert_array_equal(beams, b0)
+        for k in keep:
+            npt.assert_array_equal(pat[k], keep[k])
+
+    def test_errors(self):
+        f = quadriga_lib.arrayant.generate
+        with self.assertRaises(ValueError) as ctx:  # C++
+            f("omni", 30, element=[90.0])
+        self.assertIn("Input 'element' is not used by type 'omni'.", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:  # C++
+            f("bla")
+        self.assertIn("Input 'type' has an unsupported value 'bla'.", str(ctx.exception))
+        for name, value in (("panel", -1), ("ports", 1.5), ("pol", np.nan)):  # integer tuples
+            with self.assertRaises(ValueError) as ctx:
+                f("3gpp", 30, **{name: value})
+            self.assertIn("Input '" + name + "' must contain integers from 0 to", str(ctx.exception))
         for name in ("separate_beams", "apply_weights"):
-            with self.assertRaises(TypeError) as context:
-                arrayant.generate("multibeam", **mb, **{name: 2.5})
-            self.assertIn("'" + name + "'", str(context.exception))
+            with self.assertRaises(TypeError) as ctx:
+                f("multibeam", 30, **{name: 1})
+            self.assertIn("Input '" + name + "' must be a bool or None.", str(ctx.exception))
+        with self.assertRaises(TypeError) as ctx:
+            f("3gpp", 30, pattern=[1.0])
+        self.assertIn("Input 'pattern' must be a dict or None.", str(ctx.exception))
+        with self.assertRaises(KeyError):
+            f("3gpp", 30, pattern={"e_theta_re": np.ones((7, 13, 1))})
+        with self.assertRaises(TypeError) as ctx:  # pybind11: center_freq is keyword-only
+            f("omni", 30, 3e9)
+        self.assertIn("incompatible function arguments", str(ctx.exception))
+        with self.assertRaises(TypeError):
+            f("omni", 30, freq=3e9)  # the old name
+        with self.assertRaises(TypeError):
+            f()
+        with self.assertRaises(TypeError):
+            f("omni", None)
 
-        with self.assertRaises(TypeError) as context:
-            arrayant.generate("3gpp", pattern=[1.0])
-        self.assertIn("Input 'pattern' must be a dict or None.", str(context.exception))
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

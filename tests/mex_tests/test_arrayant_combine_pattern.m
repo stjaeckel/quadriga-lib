@@ -68,7 +68,7 @@ assertElementsAlmostEqual( out.e_phi_re, e_phi_re, 'absolute', 1e-14 );
 assertElementsAlmostEqual( out.e_phi_im, e_phi_im, 'absolute', 1e-14 );
 
 % Grid interpolation
-ant = quadriga_lib.arrayant_generate('3gpp', 10, [], [], [], [], 2, [], [], [], 0.0);
+ant = quadriga_lib.arrayant_generate('3gpp', 10, [], 2, 0.0);
 ant.e_theta_re(:,:,2) = 2 * ant.e_theta_re(:,:,2);
 ant.coupling_re = [1;1];
 ant.coupling_im = [0;0];
@@ -349,7 +349,7 @@ assertEqual( size(out(1).coupling_re, 2), 1 );
 
 % Element-position-induced gain at multi-freq → 2 elements with offset → directivity gain
 clear ant_dir;
-ant_3gpp = quadriga_lib.arrayant_generate('3gpp', 10, [], [], [], [], 2, [], [], [], 0.0);
+ant_3gpp = quadriga_lib.arrayant_generate('3gpp', 10, [], 2, 0.0);
 ant_3gpp.coupling_re = [1;1];
 ant_3gpp.coupling_im = [0;0];
 ant_3gpp.element_pos(2,:) = [-0.25, 0.25];

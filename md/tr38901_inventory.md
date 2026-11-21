@@ -55,7 +55,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 |---|---|---|---|---|---|
 | 7.1 Coordinate system (3.1) | 6 | 6 | 0 | 0 | 0 |
 | 7.2 Scenarios (3.2) | 5 | 0 | 5 | 0 | 0 |
-| 7.3 Antenna modelling (3.3) | 8 | 3 | 1 | 4 | 0 |
+| 7.3 Antenna modelling (3.3) | 8 | 5 | 0 | 3 | 0 |
 | 7.4 Path loss, LOS probability, penetration (3.4) | 20 | 17 | 3 | 0 | 0 |
 | 7.5 Fast fading model incl. parameter tables (3.5) | 46 | 43 | 2 | 1 | 0 |
 | 7.6 Additional modelling components (3.6) | 36 | 17 | 4 | 14 | 1 |
@@ -92,13 +92,13 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| BS panel array (Mg, Ng, M, N, P) | 7.3.0, Fig. 7.3-1 | Partial | `generate_arrayant_3GPP` (`src/qd_arrayant_generate.cpp:500`; vertical stacking `:599`, horizontal `:645`, panels `:665`) | One `spacing` (in wavelengths) for both d_H and d_V, so d_H ≠ d_V is not available. Element order: polarisation, then m, then n, then panels; positions centred. The numbering of Fig. 7.3-1 was not checked. |
-| BS element pattern | 7.3.0, Table 7.3-1 | Yes | `generate_arrayant_3GPP` (`src/qd_arrayant_generate.cpp:500`; block `:558`) | 65° beamwidths, SLA_V = A_max = 30 dB, 8 dBi. Peak and floor tested (`tests/catch2_tests/test_arrayant_generate.cpp:108`). |
+| BS panel array (Mg, Ng, M, N, P) | 7.3.0, Fig. 7.3-1 | Yes | `generate_arrayant_3GPP`, `arrayant_generate` type `3GPP` (`src/qd_arrayant_generate.cpp:759`; tuples filled in `qd_panel_fill` `:43`, positions and coupling in `qd_arrayant_panel` `:198`) | Tuples `panel = [M, N, Mg, Ng]`, `spacing = [d_V, d_H, d_gV, d_gH]` in λ (d_H = d_V, panel spacing M·d_V and N·d_H by default; 0 allowed for co-located elements). Element order: polarisation, then m (upwards along z), n (along +y), Mg, Ng, as Fig. 7.3-1; positions centred. Tested against the configurations of Tables 7.8-2 (configs 1, 2), 7.8-2A (configs 3, 4), 7.8-6A (configs 1, 2) and 7.8-6C: counts, positions and weights in closed form ("TR 38.901 calibration configurations"). |
+| BS element pattern | 7.3.0, Table 7.3-1 | Yes | `qd_tr38901_element` (`src/qd_arrayant_generate.cpp:133`), `element = [φ_3dB, θ_3dB, SLA_V, A_max, G_max]` | Default 65°, 65°, 30 dB, 30 dB, 8 dBi; G_max NaN normalises to the directivity (9.83 dBi for the default). Shape tested within 1e-10 dB for the Table 7.3-1 and the Table 7.3-2 constants, G_max NaN against the directivity within 0.01 dB. |
 | UT antenna model (handheld, CPE: positions, device size, Ω_UT) | 7.3.0, Fig. 7.3-2 to 7.3-6 | No | – | No generator. Building blocks: `element_pos`, per-element `arrayant_rotate_pattern` (`src/qd_arrayant_ops.cpp`), Rx orientation. |
 | Handheld UT element pattern | 7.3.0, Table 7.3-2 | No | – | No preset for 125° beamwidths, 22.5 dB, 5.3 dBi. `generate_arrayant_custom` uses a different pattern shape. The antenna-imbalance note is not implemented. |
-| Port mapping (vertical combining with electrical tilt) | 7.3.1, eq. 7.3-1 | Yes | `generate_arrayant_3GPP` `pol` 4–6 (`src/qd_arrayant_generate.cpp:500`; block `:622`) | Weights (1/√M)·exp(j2π z_m sin(tilt)/λ), equal to 7.3-1 up to a common phase. `tilt` is the electrical downtilt in degrees (TR θ_etilt = 90° + tilt). The beam peak direction is pinned by the test case "generate_arrayant_3GPP - a positive electrical tilt points the beam down". |
-| Polarised antenna Model-1 | 7.3.2, eq. 7.3-2 to 7.3-3b | Yes | `generate_arrayant_3GPP` `pol` 2/3/5/6 (`src/qd_arrayant_generate.cpp:568`); `arrayant_rotate_pattern` usage 2 (`src/qd_arrayant_ops.cpp`) | Slant applied as a polarisation-only rotation, which gives the angle-dependent split of 7.3-3a/b; the power pattern is not rotated. Tested against eq. 7.3-3 on and off the rotation axis (`test_arrayant_generate.cpp:382`); on the axis the polarisation is not rotated (8551c68). |
-| Polarised antenna Model-2 | 7.3.2, eq. 7.3-4, 7.3-5 | No | – | No option for the angle-independent split; can be built by filling `e_theta`/`e_phi`. |
+| Port mapping (TXRU sub-arrays with electrical tilt and pan) | 7.3.1, eq. 7.3-1 | Yes | `generate_arrayant_3GPP` `ports = [M_P, N_P]`, `steer = [tilt, pan]` per panel, `apply_weights` (`qd_arrayant_panel`, `src/qd_arrayant_generate.cpp:198`) | Eq. 7.3-1 per sub-array of M/M_P elements (1/√K, phase reference at the sub-array centre, equal to 7.3-1 up to a constant phase per port); horizontal weights for `pan` by analogy along y with d_H (a reading, not TR text). `tilt` is the electrical downtilt (θ_etilt = 90° + tilt). Weights in the coupling matrix by default; `apply_weights` combines each port into one pattern at the sub-array centre (equal within 1e-12). Tilt and pan signs pinned by tests ("a positive electrical tilt points the beam down", "a positive pan turns the beam towards +y"). |
+| Polarised antenna Model-1 | 7.3.2, eq. 7.3-2 to 7.3-3b | Yes | `qd_apply_polarization` (`src/qd_arrayant_generate.cpp:162`), `pol = [2 or 3, 1]`; `arrayant_rotate_pattern` usage 3 (`src/qd_arrayant_ops.cpp`) | The element is turned by ζ about its boresight, pattern and polarisation together, so F″ is evaluated at (θ″, φ″) as in eq. 7.3-3; also applied to a one-element custom `pattern`. Tested against eq. 7.3-3 with A″(θ″, φ″) on and off the rotation axis; on the axis the polarisation is not rotated (8551c68). |
+| Polarised antenna Model-2 | 7.3.2, eq. 7.3-4, 7.3-5 | Yes | `qd_apply_polarization` (`src/qd_arrayant_generate.cpp:162`), `pol = [2 or 3, 2]` | F_θ = √A′ cos ζ, F_φ = √A′ sin ζ with A′ = \|F_θ\|² + \|F_φ\|² of the element; also for a one-element custom `pattern` (e.g. the isotropic element of the panel UT configs). Tested against eq. 7.3-4/7.3-5 within 1e-12. |
 | Handheld UT polarised model (CR 0032) | 7.3.2, eq. 7.3-6 to 7.3-8, Fig. 7.3-7 to 7.3-10 | No | – | No per-antenna (α_u, β_u, γ_u) construction and no dual-pattern rule. |
 
 ### 3.4 Pathloss, LOS probability and penetration modelling (7.4)
@@ -358,7 +358,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Full calibration setup | 7.8.2, Tables 7.8-2, 7.8-2A | Partial | `lsp_generate`, `ssf_clusters`, `ssf_rays`, `gbsm_single_link_channel`, `generate_arrayant_3GPP` | Chain and BS arrays exist; config 1 port mapping needs a caller-set coupling; the handheld UT configurations are missing (7.3). |
+| Full calibration setup | 7.8.2, Tables 7.8-2, 7.8-2A | Partial | `lsp_generate`, `ssf_clusters`, `ssf_rays`, `gbsm_single_link_channel`, `generate_arrayant_3GPP` | Chain and BS arrays exist (the BS configurations of Tables 7.8-2 and 7.8-2A, including the config 1 port mapping, are `generate_arrayant_3GPP` tuples, see 3.3); the handheld UT configurations are missing (7.3). |
 | Full metric: DS and AS CDFs | Table 7.8-2 | Partial | `calc_delay_spread` (`src/qd_tools_calc_delay_spread.cpp:54`); `calc_angular_spread` (`src/qd_tools_calc_angular_spread.cpp:150`) | **Drift:** the metric asks for the TR 25.996 circular AS; the library uses another definition (see Annex A.1). |
 | Full metric: PRB singular values | Table 7.8-2 | Partial | `baseband_freq_response` (`src/baseband_freq_response.cpp:68`) | H per subcarrier; PRB averaging and eigenvalues are the caller's. |
 | Full comparison with 3GPP results | 7.8.2 | No | – | Open item in ssf_notes section 7. |
@@ -496,8 +496,6 @@ Large-scale model and path loss:
 
 Antennas and coordinates:
 
-- **Polarised Model-1 (3.3):** `generate_arrayant_3GPP(pol = 3)` and `arrayant_interpolate` at (θ′, φ′) = (60°, 40°), (120°, −70°), (30°, 150°); compare F_θ′, F_φ′ with eq. 7.3-3a/b for ζ = ±45°.
-- **Port mapping (3.3):** `generate_arrayant_3GPP(M = 8, N = 1, pol = 4, tilt = 10)`; the beam peak should be at −10° elevation (θ = 100°).
 - **LCS/GCS (3.1):** `arrayant_interpolate` with (bank, tilt, heading) = (20°, −15°, 40°) at random angles; compare local angles and `gamma` with eq. 7.1-7, 7.1-8 and 7.1-15; repeat with downtilt only against 7.1-24 to 7.1-26.
 
 Fast fading and additional components:
@@ -537,4 +535,4 @@ Ray tracer and clause 8:
 - **CRs of v19.1 to v19.5:** Annex B gives only the subject of each CR, and the CR texts are not part of this review, so the mapping of a CR to individual table entries cannot be shown. The code and the scenario files match the v19.5.0 text in all reviewed clauses, which includes the effect of the 7–24 GHz corrections (CR 0028, 0036, 0040, 0042) and of CR 0043 (ZOD generation, tested at `tests/catch2_tests/test_lsp_generate.cpp:530`). CR 0032 (handheld UT polarised model) and the ISAC CRs (0029, 0031, 0033, 0038, 0039) are not implemented. CR 0035 (UL/DL reciprocity) is covered as described in 3.5.
 - **Scenario keys stored but unused:** `NF_*`, `SNS_*` and `LOS_scatter_radius` are validated but read by no function of this version (`src/qd_scenpar.cpp:1030`); `LOS_state_lambda` and `IO_state_lambda` are read by the caller.
 - **TR text oddities found in passing (no code impact):** TDL-E tap 14 has delay 20.6519 where CDL-E cluster 14 has 20.6419; Table 7.7.5.1-1 has a stray value in the CDL-E ASD-25 row; Annex A.1 (circular standard deviation) and 7.8.2 metric 3 (TR 25.996 definition) name two different angular-spread definitions.
-- **Uncertain readings:** whether TR Model-1 rotates the power pattern by ζ (the library rotates the polarisation only); whether O2I links count as NLOS for 7.6.9; which cluster count enters C_φ and C_θ after the −25 dB removal; the element numbering of Fig. 7.3-1.
+- **Uncertain readings:** whether O2I links count as NLOS for 7.6.9; which cluster count enters C_φ and C_θ after the −25 dB removal.

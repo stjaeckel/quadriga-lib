@@ -849,7 +849,7 @@ TEST_CASE("arrayant_interpolate - GENERIC and AVX2 agree on a 3GPP panel")
     auto check = [](auto dtype_tag, arma::uword n_out, arma::uword n_ang_rows, arma::uword n_ang, arma::uword n_ori_slices, const char *what)
     {
         using dtype = decltype(dtype_tag);
-        const auto ant_gen = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3);
+        const auto ant_gen = quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3.0e9, {}, {}, {3});
         const auto ant = convert<dtype>(ant_gen);
         const auto ant_d = convert<double>(ant); // Reference on the samples the dtype run sees
         double M, S;
@@ -1081,7 +1081,7 @@ TEST_CASE("arrayant_interpolate - float and double agree")
     // kernel comparison
     QD_DIAG("\n# diag: GENERIC float against GENERIC double, 3GPP panel\n");
     QD_DIAG("path,dtype,d_field,q_field,d_angle,q_angle,d_dist,q_dist\n");
-    const auto ant_f = convert<float>(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3));
+    const auto ant_f = convert<float>(quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3.0e9, {}, {}, {3}));
     const auto ant_d = convert<double>(ant_f); // Same samples in both precisions
     double M, S;
     pattern_scale(ant_d, M, S);
@@ -1101,7 +1101,7 @@ TEST_CASE("arrayant_interpolate - repeated calls are identical and a large call 
 {
     // Large enough for the OpenMP regions of both kernels; for AVX2 the orientation does not vary per angle, since
     // slicing a per-angle orientation to one angle selects another AVX2 code path
-    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 5.0);
+    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3.0e9, {}, {}, {3}, {}, {}, {}, 5.0);
     const arma::uvec i_element = {7, 0, 3, 3, 5, 1, 6, 2, 4, 0, 7};
     const arma::uword n_ang = 300;
     qd_uniform rnd(41);
@@ -1177,7 +1177,7 @@ TEST_CASE("arrayant_interpolate - complex outputs equal the split outputs bit fo
     auto check = [](auto dtype_tag, int kernel, arma::uword n_out, arma::uword n_ang_rows)
     {
         using dtype = decltype(dtype_tag);
-        const auto ant = convert<dtype>(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, {}, 10.0));
+        const auto ant = convert<dtype>(quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3.0e9, {}, {}, {3}, {}, {}, {}, 10.0));
         const arma::uvec i_element = arma::uvec({7, 0, 3, 3, 5, 1, 6, 2, 4, 0, 7}).head(n_out);
         qd_uniform rnd(47);
         const auto az = random_angles<dtype>(rnd, n_ang_rows, 13, -pi, pi);

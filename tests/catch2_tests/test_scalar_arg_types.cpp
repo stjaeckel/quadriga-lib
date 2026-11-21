@@ -47,8 +47,9 @@ static void calls_with_literals()
     a = quadriga_lib::generate_arrayant_half_wave_dipole<T>(10);
     a = quadriga_lib::generate_arrayant_custom<T>(90, 90.0, 0, 10);
     a = quadriga_lib::generate_arrayant_ula(4, 3.5e9, 0.5, a, 10);
-    a = quadriga_lib::generate_arrayant_3GPP(2, 2, 3.5e9, 1, 6, 0.5, 1, 1, 0.5, 0.5, a, 10);
-    a = quadriga_lib::generate_arrayant_multibeam<T>(2, 2, col, col, col, 3.5e9, 1, 0.5, 120, 120, 0, 10);
+    a = quadriga_lib::generate_arrayant_3GPP({2, 2}, 3.5e9, {0.5}, {1}, {1}, {6, 0}, {}, a, 10);
+    a = quadriga_lib::generate_arrayant_multibeam<T>({2, 2}, 3.5e9, {0.5}, {1}, {120, 120}, {}, 10);
+    a = quadriga_lib::arrayant_generate<T>("3GPP", 10, 3.5e9, {2, 2}, {0.5}, {1}, {3, 2}, {6, 0});
     av = quadriga_lib::generate_speaker<T>("piston", 0.05, 80, 12000, 12, 12, 85, "hemisphere", 90, 60, 1000, 0.15, 0.25, col, 5);
     quadriga_lib::arrayant<double> ad = quadriga_lib::generate_arrayant_omni(10); // dtype defaults to double
 

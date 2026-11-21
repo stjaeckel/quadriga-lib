@@ -1315,7 +1315,7 @@ void quadriga_lib::arrayant_rotate_pattern(
 
 ## Example:
 ```
-auto ant = quadriga_lib::generate_arrayant_3GPP<double>(4, 1);
+auto ant = quadriga_lib::generate_arrayant_3GPP<double>({4});
 arma::vec downtilt = {0.0, 10.0 * arma::datum::pi / 180.0, 0.0}; // 10 degree mechanical downtilt
 quadriga_lib::arrayant_rotate_pattern(ant, downtilt);
 ```

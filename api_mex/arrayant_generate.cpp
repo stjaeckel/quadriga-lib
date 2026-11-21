@@ -10,110 +10,56 @@ SECTION!*/
 
 /*!MD
 # ARRAYANT_GENERATE
-Generates predefined array antenna models
+Generate an array antenna of a given type
 
-- Dispatches to one of several C++ generator functions based on the `type` string
-- Supported types: `omni`, `dipole` (or `short-dipole`), `half-wave-dipole`, `xpol`, `custom`,
-  `ula`, `3GPP` (or `3gpp`), `multibeam`, `multibeam_sep`
-- All positional arguments after `type` are optional and type-specific; use `[]` to skip and fall
-  back to defaults
+- One function for all antenna types. The panel types take the parameters of 3GPP TR 38.901 clause 7.3 as tuples: trailing entries may be omitted; 0 (in `panel`, `ports`, `pol`) or NaN (in `spacing`, `steer`, `element`) selects the default of that entry; more entries than listed raise an error.
+- An input that a type does not use raises an error, also `separate_beams` or `apply_weights` set to `true`. The result has the given `center_freq`.
+- Panel arrays: elements ordered polarization fastest, then `m` (upwards along z), `n` (along +y), `mg`, `ng`, positions centred on the origin; ports in the same order with `m_p`, `n_p`. Each port feeds a sub-array of `M / M_P` × `N / N_P` elements with the weights of TR 38.901 eq. 7.3-1 (`tilt`, and by analogy along y `pan`), stored in the coupling matrix.
+- `multibeam`: maximum-ratio-transmission weights for the directions in `beams`; one port per polarization, with `separate_beams` one per polarization and beam.
 
 ## Usage:
 ```
-% Simple antennas (v-pol)
-ant = quadriga_lib.arrayant_generate('omni', res);
-ant = quadriga_lib.arrayant_generate('dipole', res);
-ant = quadriga_lib.arrayant_generate('half-wave-dipole', res);
+% omni, xpol, dipole, half-wave-dipole
+ant = quadriga_lib.arrayant_generate( type, res, center_freq );
 
-% Cross-polarized isotropic
-ant = quadriga_lib.arrayant_generate('xpol', res);
+% Custom-shape element
+ant = quadriga_lib.arrayant_generate( 'custom', res, center_freq, [], [], [], [], [], element );
 
-% Custom 3dB beamwidth
-ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3dB, bfr);
+% Uniform linear array (omni element) and TR 38.901 panel array
+ant = quadriga_lib.arrayant_generate( 'ula', res, center_freq, panel, spacing, ports, pol, steer, [], ...
+    pattern, [], [], apply_weights );
+ant = quadriga_lib.arrayant_generate( '3GPP', res, center_freq, panel, spacing, ports, pol, steer, element, ...
+    pattern, [], [], apply_weights );
 
-% Uniform linear array (N horizontal elements, half-wavelength spacing by default)
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, pol, [], spacing);
-
-% Uniform linear array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], ...
-    [], [], pattern);
-
-% 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
-    Ng, dgv, dgh);
-
-% 3GPP-NR array with custom element beamwidth
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, ...
-    spacing, Mg, Ng, dgv, dgh);
-
-% 3GPP-NR array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
-    Ng, dgv, dgh, pattern);
-
-% Multi-beam M×N array (one combined beam / one beam per direction)
-ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, ...
-    spacing);
-ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, ...
-    dir, spacing);
+% Multi-beam panel array
+ant = quadriga_lib.arrayant_generate( 'multibeam', res, center_freq, panel, spacing, [], pol, [], element, ...
+    [], beams, separate_beams, apply_weights );
 ```
 
-## Mapping table with defaults:<br>
-| Position          | 2   | 3    | 4      | 5      | 6   | 7   | 8   | 9   | 10       | 11      | 12  | 13  | 14  | 15  | 16      |
-| ----------------- | --: | ---: | -----: | -----: | --: | --: | --: | --: | -------: | ------: | --: | --: | --: | --: | ------: |
-|  **Variable**     | res | freq | az_3dB | el_3dB | bfr |   M |   N | pol | tilt_dir | spacing | Mg  | Ng  | dgv | dgh | pattern |
-|  **Type / Unit**  | deg |   Hz |    deg |    deg | lin | int | int | int |      deg |       λ | int | int | dbl | dbl |  struct |
-| omni              |  10 | 300k |      — |      — |   — |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
-| dipole            |   1 | 300k |      — |      — |   — |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
-| half-wave-dipole  |   1 | 300k |      — |      — |   — |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
-| xpol              |  10 | 300k |      — |      — |   — |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
-| custom            |   1 | 300k |     90 |     90 |   0 |   — |   — |   — |        — |       — |   — |   — |   — |   — |       — |
-| ula               |   1 | 300k |      — |      — |   — |   — |   1 |   1 |        — |       — |   — |   — |   — |   — |       ✓ |
-| 3GPP              |   1 | 300k |     67 |     67 |   0 |   1 |   1 |   1 | tilt = 0 |     0.5 |   1 |   1 | 0.5 | 0.5 |       ✓ |
-| multibeam         |   1 | 300k |    120 |    120 |   0 |   1 |   1 |   1 |  [0;0;1] |     0.5 |   — |   — |   — |   — |       — |
-| multibeam_sep     |   1 | 300k |    120 |    120 |   0 |   1 |   1 |   1 |  [0;0;1] |     0.5 |   — |   — |   — |   — |       — |
+## Inputs:
+- **`type`** — Antenna type and the inputs it takes besides `res` and `center_freq`:<br><br>
+   | `type`                                           | Inputs                                                                             |
+   | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+   | `omni`, `xpol`                                   | none                                                                               |
+   | `dipole` (or `short-dipole`), `half-wave-dipole` | none                                                                               |
+   | `custom`                                         | `element`                                                                          |
+   | `ula`                                            | `panel`, `spacing`, `ports`, `pol`, `steer`, `pattern`, `apply_weights`            |
+   | `3GPP` (or `3gpp`)                               | `panel`, `spacing`, `ports`, `pol`, `steer`, `element`, `pattern`, `apply_weights` |
+   | `multibeam`                                      | `panel`, `spacing`, `pol`, `element`, `beams`, `separate_beams`, `apply_weights`  |
+- **`res`** — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: default; default: 10 for `omni` and `xpol`, 1 otherwise
+- **`center_freq`** — Center frequency in Hz; positive and finite; default: 299792458
+- **`panel`** — `[M, N, Mg, Ng]`: elements per column, columns per panel, panels per column, panels per row; at most 1e7 elements per polarization; default: 1 (`ula`: `panel = 8` is a vertical column, `[1, 8]` a horizontal row)
+- **`spacing`** — `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); >= 0; default: `[0.5, d_V, M d_V, N d_H]`
+- **`ports`** — `[M_P, N_P]`: ports per column and per row of a panel and polarization; must divide `M` and `N`; default: `[M, N]` (one port per element)
+- **`pol`** — `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°); model 1 or 2 (TR 38.901 Model-1, Model-2); default: `[1, 1]`
+- **`steer`** — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt (positive down) and pan (positive towards +y); `[1, 2]` for all panels or `[Mg Ng, 2]` with one row per panel; one column: pan 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`; default: 0
+- **`element`** — Element parameters: `custom` `[az_3dB, el_3dB, floor_dB]` in degrees, degrees and dB below the peak (> 0, NaN: no floor), default `[90, 90, NaN]`; `multibeam` the same with default `[120, 120, NaN]`; `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` of TR 38.901 Table 7.3-1 in degrees, degrees, dB, dB and dBi (NaN: peak gain equal to the directivity), default `[65, phi_3dB, 30, SLA_V, 8]`
+- **`pattern`** — Element pattern struct replacing the default element; only its radiation pattern is used; one with more than one element is used as given and needs `pol` [1, 1]; default: the element of the type
+- **`beams`** — `[2 or 3, n_beams]`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); default: `[0; 0; 1]`
+- **`separate_beams`** — If `true`, one port per beam (weights ignored); default: `false`
+- **`apply_weights`** — If `true`, combine each port into one pattern at its sub-array centre; default: `false`
 
-## Inputs (common):
-- **`type`** — Antenna model type; string (see usage above)
-- **`res`** — Pattern sampling grid resolution in degrees, 0.1 to 90; default: 10 for types omni+xpol, 1 otherwise
-- **`freq`** — Center frequency in Hz; default: 299792458; equivalent to λ = 1 m
-
-## Inputs (type custom, 3GPP, multibeam, multibeam_sep):
-- **`az_3dB`** — Azimuth 3dB beamwidth in degrees; default: 90 for `custom`, 120 (per element) for `multibeam` and
-  `multibeam_sep`; for `3GPP`, 0 or `[]` selects the 3GPP default element pattern
-- **`el_3dB`** — Elevation 3dB beamwidth in degrees; same defaults as `az_3dB`
-- **`bfr`** — Back-to-front gain ratio (linear); default: 0
-
-## Inputs (type ula, 3GPP, multibeam, multibeam_sep):
-- **`M`** — Number of vertical elements per panel; default: 1; ignored for `ula`
-- **`N`** — Number of horizontal elements per panel; default: 1
-- **`pol`** — Polarization mode; default: 1:<br><br>
-   | `pol` | Description                                              |
-   | :---: | -------------------------------------------------------- |
-   | 1     | Vertical polarization                                    |
-   | 2     | H/V polarization (2NM elements)                          |
-   | 3     | ±45° polarization (2NM elements)                         |
-   | 4     | Vertical, vertical elements combined (N elements)        |
-   | 5     | H/V, vertical elements combined (2N elements)            |
-   | 6     | ±45°, vertical elements combined (2N elements)           |
-- **`spacing`** — Inter-element spacing in wavelengths; default: 0.5
-
-## Inputs (type 3GPP only):
-- **`tilt`** — Electrical downtilt in degrees; applies to `pol = 4/5/6`; default: 0
-- **`Mg`** — Number of vertically stacked panels; default: 1
-- **`Ng`** — Number of horizontally stacked panels; default: 1
-- **`dgv`** — Panel spacing in vertical direction in wavelengths; default: 0.5
-- **`dgh`** — Panel spacing in horizontal direction in wavelengths; default: 0.5
-
-## Inputs (type ula, 3GPP):
-- **`pattern`** — Custom per-element pattern struct used for 3GPP or ULA; same format as
-  outputs; overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element
-  positions, coupling and center frequency of the pattern are ignored, as are other struct fields
-
-## Inputs (type multibeam, multibeam_sep):
-- **`dir`** — Beam steering angles, `[3, n_beams]`; rows are `[azimuth_deg; elevation_deg; weight]`; 
-  `multibeam` combines beams via MRT weighting, `multibeam_sep` produces one independent beam per column (weights ignored)
-
-## Output:
+## Outputs:
 - **`ant`** — Struct with fields:<br><br>
    | Field            | Description                                               | Size                                   |
    | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -121,150 +67,45 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
    | `e_theta_im`     | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
    | `e_phi_re`       | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
    | `e_phi_im`       | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[n_azimuth]`                          |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[n_elevation]`                        |
+   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[1, n_azimuth]`                       |
+   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[1, n_elevation]`                     |
    | `element_pos`    | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
    | `coupling_re`    | Coupling matrix, real part                                | `[n_elements, n_ports]`                |
    | `coupling_im`    | Coupling matrix, imaginary part                           | `[n_elements, n_ports]`                |
    | `center_freq`    | Center frequency in Hz                                    | scalar                                 |
    | `name`           | Name of the array antenna object                          | string                                 |
 
-   If `ant` is used as an input to other functions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, 
-   `e_phi_im`, `azimuth_grid`, `elevation_grid` are mandatory; remaining fields are optional (defaults: 
-   unit coupling, zero positions, 299792458 Hz).
+   If `ant` is used as an input to other functions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are mandatory; remaining fields are optional (defaults: unit coupling, zero positions, 299792458 Hz).
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
-
-    if (nrhs < 1 || nrhs > 16)
+    if (nrhs < 1 || nrhs > 13)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    std::string array_type = qd_mex_get_string(prhs[0], "", "type");
-    double res = (nrhs < 2) ? 0.0 : qd_mex_get_scalar<double>(prhs[1], "res", 0.0);
-    double freq = (nrhs < 3) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[2], "freq", 299792458.0);
-    double az_3dB = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "az_3dB", 0.0);
-    double el_3dB = (nrhs < 5) ? 0.0 : qd_mex_get_scalar<double>(prhs[4], "el_3dB", 0.0);
-    double bfr = (nrhs < 6) ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "bfr", 0.0);
-    unsigned M = (nrhs < 7) ? 1 : qd_mex_get_scalar<unsigned>(prhs[6], "M", 1);
-    unsigned N = (nrhs < 8) ? 1 : qd_mex_get_scalar<unsigned>(prhs[7], "N", 1);
-    unsigned pol = (nrhs < 9) ? 1 : qd_mex_get_scalar<unsigned>(prhs[8], "pol", 1);
-    double spacing = (nrhs < 11) ? 0.5 : qd_mex_get_scalar<double>(prhs[10], "spacing", 0.5);
-    unsigned Mg = (nrhs < 12) ? 1 : qd_mex_get_scalar<unsigned>(prhs[11], "Mg", 1);
-    unsigned Ng = (nrhs < 13) ? 1 : qd_mex_get_scalar<unsigned>(prhs[12], "Ng", 1);
-    double dgv = (nrhs < 14) ? 0.5 : qd_mex_get_scalar<double>(prhs[13], "dgv", 0.5);
-    double dgh = (nrhs < 15) ? 0.5 : qd_mex_get_scalar<double>(prhs[14], "dgh", 0.5);
+    // Omitted or [] inputs are empty containers (not given); the C++ function fills the defaults per type
+    const std::string type = qd_mex_get_string(prhs[0], "", "type");
+    const double res = (nrhs < 2) ? NAN : qd_mex_get_scalar<double>(prhs[1], "res"); // [] gives NaN
+    const double center_freq = (nrhs < 3) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[2], "center_freq", 299792458.0);
+    const arma::uvec panel = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], false, "panel");
+    const arma::vec spacing = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4], false, "spacing");
+    const arma::uvec ports = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], false, "ports");
+    const arma::uvec pol = (nrhs < 7) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[6], false, "pol");
+    const arma::mat steer = (nrhs < 8) ? arma::mat() : qd_mex_get_Mat<double>(prhs[7], false, "steer");
+    const arma::vec element = (nrhs < 9) ? arma::vec() : qd_mex_get_Col<double>(prhs[8], false, "element");
+    const quadriga_lib::arrayant<double> pattern = (nrhs < 10 || mxIsEmpty(prhs[9]))
+                                                       ? quadriga_lib::arrayant<double>()
+                                                       : qd_mex_struct2arrayant(prhs[9], false, false, "pattern"); // Validated by the C++ function
+    const arma::mat beams = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10], false, "beams");
+    const bool separate_beams = (nrhs < 12) ? false : qd_mex_get_scalar<bool>(prhs[11], "separate_beams", false);
+    const bool apply_weights = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "apply_weights", false);
 
-    if (res == 0.0)
-    {
-        if (array_type == "omni" || array_type == "xpol")
-            res = 10.0;
-        else
-            res = 1.0;
-    }
+    quadriga_lib::arrayant<double> ant;
+    CALL_QD(ant = quadriga_lib::arrayant_generate<double>(type, res, center_freq, panel, spacing, ports, pol, steer, element,
+                                                          pattern, beams, separate_beams, apply_weights));
 
-    quadriga_lib::arrayant<double> arrayant;
-
-    if (array_type == "omni")
-        CALL_QD(arrayant = quadriga_lib::generate_arrayant_omni<double>(res));
-    else if (array_type == "dipole" || array_type == "short-dipole")
-        CALL_QD(arrayant = quadriga_lib::generate_arrayant_dipole<double>(res));
-    else if (array_type == "half-wave-dipole")
-        CALL_QD(arrayant = quadriga_lib::generate_arrayant_half_wave_dipole<double>(res));
-    else if (array_type == "xpol")
-        CALL_QD(arrayant = quadriga_lib::generate_arrayant_xpol<double>(res));
-    else if (array_type == "custom")
-    {
-        // Match C++ defaults (90°/90°) when user passed nothing or zero
-        double az = (az_3dB > 0.0) ? az_3dB : 90.0;
-        double el = (el_3dB > 0.0) ? el_3dB : 90.0;
-        CALL_QD(arrayant = quadriga_lib::generate_arrayant_custom<double>(az, el, bfr, res));
-    }
-    else if (array_type == "ula")
-    {
-        if (nrhs > 15) // Use custom pattern
-        {
-            auto custom_array = qd_mex_struct2arrayant(prhs[15], true, false, "pattern");
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array));
-        }
-        else if (pol == 2 || pol == 5 || pol == 3 || pol == 6) // Build dual-polarized base pattern and pass to ULA
-        {
-            quadriga_lib::arrayant<double> custom_array;
-            if (pol == 2 || pol == 5)
-            {
-                CALL_QD(custom_array = quadriga_lib::generate_arrayant_xpol(res));
-            }
-            else if (pol == 3 || pol == 6)
-            {
-                CALL_QD(custom_array = quadriga_lib::generate_arrayant_omni(res);
-                        quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
-                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1));
-            }
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, custom_array));
-        }
-        else // Use isotropic
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, {}, res));
-        arrayant.name = "ula";
-    }
-    else if (array_type == "3GPP" || array_type == "3gpp")
-    {
-        // Position 10 is a scalar tilt here and a direction matrix for multibeam
-        const double tilt = (nrhs < 10) ? 0.0 : qd_mex_get_scalar<double>(prhs[9], "tilt_dir", 0.0);
-        if (nrhs > 15) // Use custom pattern
-        {
-            auto custom_array = qd_mex_struct2arrayant(prhs[15], true, false, "pattern");
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, custom_array));
-        }
-        else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
-        {
-            quadriga_lib::arrayant<double> custom_array;
-            CALL_QD(custom_array = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, bfr, res));
-            if (pol == 2 || pol == 5)
-                CALL_QD(quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, el_1));
-            else if (pol == 3 || pol == 6)
-                CALL_QD(quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_0);
-                        quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, el_1));
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, custom_array));
-        }
-        else // Use 3GPP default pattern
-            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, {}, res));
-    }
-    else if (array_type == "multibeam" || array_type == "multibeam_sep")
-    {
-        arma::mat dir(3, 1);
-        if (nrhs > 9)
-            dir = qd_mex_get_Mat<double>(prhs[9], false, "dir");
-        else
-            dir(2, 0) = 1.0;
-
-        if (dir.n_rows < 2)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'dir' must have at least 2 rows for a multi-beam antenna.");
-
-        arma::vec az = dir.row(0).as_col();
-        arma::vec el = dir.row(1).as_col();
-        arma::vec weight = (dir.n_rows > 2) ? dir.row(2).as_col() : arma::vec(dir.n_cols, arma::fill::ones);
-
-        // Match the C++ default element beamwidth (120°/120°) when user passed nothing or zero
-        double az_bw = (az_3dB > 0.0) ? az_3dB : 120.0;
-        double el_bw = (el_3dB > 0.0) ? el_3dB : 120.0;
-        bool separate_beams = array_type == "multibeam_sep";
-        CALL_QD(arrayant = quadriga_lib::generate_arrayant_multibeam<double>(M, N, az, el, weight, freq, pol, spacing,
-                                                                             az_bw, el_bw, bfr, res, separate_beams));
-    }
-    else
-    {
-        const std::string msg = "Input 'type' has an unsupported value '" + array_type + "'.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
-
-    arrayant.center_freq = freq;
-
-    plhs[0] = qd_mex_arrayant2struct(arrayant);
+    plhs[0] = qd_mex_arrayant2struct(ant);
 }

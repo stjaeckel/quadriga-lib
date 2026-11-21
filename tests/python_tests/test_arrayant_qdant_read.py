@@ -140,8 +140,8 @@ class test_default_id(unittest.TestCase):
     def test(self):
         with tempfile.TemporaryDirectory() as tmp:
             fn = os.path.join(tmp, 'freq.qdant')
-            arrayant.qdant_write(fn, arrayant.generate('omni', freq=1e9), 1)
-            arrayant.qdant_write(fn, arrayant.generate('omni', freq=2e9), 2)
+            arrayant.qdant_write(fn, arrayant.generate('omni', center_freq=1e9), 1)
+            arrayant.qdant_write(fn, arrayant.generate('omni', center_freq=2e9), 2)
             for r, _ in (arrayant.qdant_read(fn), arrayant.qdant_read(fn, None)):
                 self.assertEqual(r['e_theta_re'].ndim, 4)
                 npt.assert_array_equal(r['center_freq'], [1e9, 2e9])

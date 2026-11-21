@@ -810,7 +810,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
     # ---- Kernel selection: use_kernel (after freq) ----
 
     def test_use_kernel(self):
-        ant = arrayant.generate('3gpp', M=1, N=2, pol=3, res=10.0)
+        ant = arrayant.generate('3gpp', 10.0, panel=[1, 2], pol=3)
         rng = np.random.default_rng(0)
         fbs_pos = np.asfortranarray(rng.uniform(-30, 30, (3, 5)))
         args = (ant, xpol(), [0, 0, 10], [0.1, 0.2, 0.3], [40, 5, 1.5], [0, 0, 0], fbs_pos, fbs_pos, np.ones(5),
@@ -922,7 +922,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
     def test_input_memory_layouts_give_equal_results(self):
         rng = np.random.default_rng(7)
-        ant = arrayant.generate('3gpp', M=2, N=1, pol=2, res=10.0)
+        ant = arrayant.generate('3gpp', 10.0, panel=[2, 1], pol=2)
         n_out, n_freq = 4, 2
         cf = np.array([2.0e9, 3.5e9])
         def u(lo, hi, shape):  # float32-exact values, so that the float32 variant converts losslessly

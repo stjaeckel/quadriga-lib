@@ -3,7 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Array antenna generators with fuzzed parameters: generate_arrayant_omni, _xpol, _dipole, _half_wave_dipole, _custom,
-// _ula, _3GPP (also with a fuzzed custom pattern), _multibeam and generate_speaker
+// _ula, _3GPP (also with a fuzzed custom pattern), _multibeam, the dispatcher arrayant_generate (all types, tuples of
+// fuzzed lengths and values, also inputs a type does not use) and generate_speaker
 
 #include "fuzz_target.hpp"
 
@@ -56,13 +57,28 @@ static quadriga_lib::arrayant<T> pattern(fz::input &in, bool &use)
     return p;
 }
 
+// An integer tuple of 0 to n_max + 1 entries (one too many sometimes) with values up to v_max, or rarely a huge value
+static arma::uvec utuple(fz::input &in, arma::uword n_max, arma::uword v_max)
+{
+    arma::uvec t(in.size(n_max + 1));
+    for (arma::uword &x : t)
+        x = in.ConsumeIntegralInRange<int>(0, 31) == 0 ? (arma::uword(1) << 40) : in.ConsumeIntegralInRange<arma::uword>(0, v_max);
+    return t;
+}
+
+// A real tuple of 0 to n_max + 1 entries with any values (NaN selects the default of an entry)
+static arma::vec vtuple(fz::input &in, arma::uword n_max)
+{
+    return in.col<double>(in.size(n_max + 1));
+}
+
 template <typename T>
 static void run(fz::input &in)
 {
     const T res = resolution<T>(in);
     const bool c = coarse(res);
 
-    switch (in.ConsumeIntegralInRange<int>(0, 8))
+    switch (in.ConsumeIntegralInRange<int>(0, 9))
     {
     case 0:
         fz::clean([&] { quadriga_lib::generate_arrayant_omni<T>(res); });
@@ -85,7 +101,7 @@ static void run(fz::input &in)
     case 5:
     {
         arma::uword N = in.size(c ? 8 : 2);
-        T fc = in.value<T>(), spacing = in.value<T>();
+        double fc = in.value<double>(), spacing = in.value<double>();
         bool use;
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
         fz::clean([&] { quadriga_lib::generate_arrayant_ula<T>(N, fc, spacing, fz::opt(use, p), res); });
@@ -93,26 +109,38 @@ static void run(fz::input &in)
     }
     case 6:
     {
-        arma::uword M = in.size(c ? 3 : 1), N = in.size(c ? 3 : 1), Mg = in.size(c ? 2 : 1), Ng = in.size(c ? 2 : 1);
-        T fc = in.value<T>(), tilt = in.value<T>(), spacing = in.value<T>(), dgv = in.value<T>(), dgh = in.value<T>();
-        unsigned pol = in.ConsumeIntegralInRange<unsigned>(0, 7);
-        bool use;
+        arma::uvec panel = utuple(in, 4, c ? 3 : 1), ports = utuple(in, 2, 3), pol = utuple(in, 2, 7);
+        arma::vec spacing = vtuple(in, 4), element = vtuple(in, 5);
+        arma::mat steer = in.mat<double>(in.size(3), in.size(3));
+        double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
+        bool use, apply = in.ConsumeBool();
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_arrayant_3GPP<T>(M, N, fc, pol, tilt, spacing, Mg, Ng, dgv, dgh,
-                                                                fz::opt(use, p), res); });
+        fz::clean([&] { quadriga_lib::generate_arrayant_3GPP<T>(panel, fc, spacing, ports, pol, steer, element, fz::opt(use, p),
+                                                                res, apply); });
         break;
     }
     case 7:
     {
-        arma::uword M = in.size(c ? 3 : 1), N = in.size(c ? 3 : 1);
-        arma::uword n_beam = in.size(4);
-        arma::Col<T> az = in.col<T>(n_beam), el = in.col<T>(in.ConsumeBool() ? n_beam : in.size(4)),
-                     w = in.col<T>(in.ConsumeBool() ? n_beam : in.size(4));
-        T fc = in.value<T>(), spacing = in.value<T>(), az3 = in.value<T>(), el3 = in.value<T>(), rear = in.value<T>();
-        unsigned pol = in.ConsumeIntegralInRange<unsigned>(0, 4);
+        arma::uvec panel = utuple(in, 4, c ? 3 : 1), pol = utuple(in, 2, 7);
+        arma::vec spacing = vtuple(in, 4), element = vtuple(in, 3);
+        arma::mat beams = in.mat<double>(in.size(4), in.size(4));
+        double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool separate = in.ConsumeBool(), apply = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::generate_arrayant_multibeam<T>(M, N, az, el, w, fc, pol, spacing, az3, el3, rear,
-                                                                     res, separate, apply); });
+        fz::clean([&] { quadriga_lib::generate_arrayant_multibeam<T>(panel, fc, spacing, pol, element, beams, res, separate, apply); });
+        break;
+    }
+    case 8:
+    {
+        const char *types[] = {"omni", "xpol", "dipole", "short-dipole", "half-wave-dipole", "custom", "ula", "3GPP", "3gpp", "multibeam"};
+        std::string type = in.ConsumeIntegralInRange<int>(0, 15) != 0 ? types[in.ConsumeIntegralInRange<int>(0, 9)] : in.ConsumeRandomLengthString(12);
+        arma::uvec panel = utuple(in, 4, c ? 3 : 1), ports = utuple(in, 2, 3), pol = utuple(in, 2, 7);
+        arma::vec spacing = vtuple(in, 4), element = vtuple(in, 5);
+        arma::mat steer = in.mat<double>(in.size(3), in.size(3)), beams = in.mat<double>(in.size(4), in.size(4));
+        double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
+        bool use, separate = in.ConsumeBool(), apply = in.ConsumeBool();
+        quadriga_lib::arrayant<T> p = pattern<T>(in, use);
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>(type, res, fc, panel, spacing, ports, pol, steer, element, fz::opt(use, p),
+                                                           beams, separate, apply); });
         break;
     }
     default:
