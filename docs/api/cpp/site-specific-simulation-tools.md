@@ -948,13 +948,15 @@ void polmat_update(
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
   broadcasts one matrix to every update; empty applies the identity (no multiply).
-- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
+- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`. The gain of a ray is a power,
+  the max column power `max(|col 0|², |col 1|²)`, in both directions:
   - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
     normalization. With `normalize == false` this measures the gain without modifying the matrix
     part of `polmat` (gain extraction); with `normalize == true` it reports the gain that was
     removed. A value of 0 flags a degenerate (zero / non-finite) matrix the caller should prune.
-  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the
-    corresponding `gain` value *after* normalization. Must be non-null and length `n_rayU`.
+  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the square
+    root of the corresponding `gain` value *after* normalization. Must be non-null, length `n_rayU`,
+    finite and `>= 0`.
 - **`initialize`** — If `true`, each touched column is set to unity (identity for EM, `[1,0]` for
   scalar) before the update. With an `update` this is a copy-through (the column becomes the
   update, prior contents discarded); without an `update` it is a pure reset. Use this to
@@ -992,12 +994,12 @@ polmat_update(polmat, {}, &g);                      // g[k] = gain( polmat[:,k] 
 polmat_update(polmat, U, &g);                       // apply U, then measure into g (no normalize)
 
 // (4) Normalizing (scale each column to unit gain; optionally update first)
-polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / sqrt( gain( polmat[:,k] ) )
 polmat_update(polmat, U, nullptr, false, true);     // update, then normalize, one pass
 
 // (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
-//     'g' is read here (apply_gain = true):
-polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+//     'g' is read here (apply_gain = true); a 'g' from (3) gives the original matrix back:
+polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := sqrt( g[k] / gain( polmat[:,k] ) ) * polmat[:,k]
 polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
 ```
 

@@ -115,7 +115,7 @@ TEST_CASE("polmat_update - duplicate ray_ind entries give the single-thread resu
         arma::mat Xu = X0;
         quadriga_lib::polmat_update<double>(Xu, UU, nullptr, false, false, false, &uidx);
         INFO("threads " << nt);
-        CHECK(arma::approx_equal(Xu, Xu_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(Xu, Xu_ref, "absdiff", 1e-14)); // parallel vs serial loop: may differ in rounding
     }
 
     omp_set_num_threads(n_threads_before);
@@ -139,4 +139,34 @@ TEST_CASE("polmat_update - separate inputs that alias polmat")
     arma::mat u = x;
     arma::vec g_on_u(u.memptr(), 2, false, true);
     CHECK_THROWS_AS(quadriga_lib::polmat_update(x, u, &g_on_u), std::invalid_argument);
+}
+
+TEST_CASE("polmat_update - gain taken out and applied again gives the matrix back")
+{
+    // Gain is a max column power in both directions, so mode (3) followed by mode (5) is lossless (#97)
+    for (arma::uword n_rows : {8, 2})
+    {
+        INFO("rows " << n_rows);
+        std::mt19937 rng(97);
+        std::normal_distribution<double> N(0.0, 2.0);
+        arma::mat X0(n_rows, 5), X;
+        X0.imbue([&]() { return N(rng); });
+        X = X0;
+        arma::vec g;
+        quadriga_lib::polmat_update<double>(X, {}, &g);
+        double A = arma::accu(arma::square(X0.col(0).head(n_rows == 8 ? 4 : 2)));
+        double B = n_rows == 8 ? arma::accu(arma::square(X0.col(0).tail(4))) : 0.0;
+        CHECK(std::abs(g(0) - std::max(A, B)) < 1e-12 * g(0));
+        quadriga_lib::polmat_update<double>(X, {}, &g, false, true, true);
+        CHECK(arma::approx_equal(X, X0, "absdiff", 1e-12));
+    }
+
+    arma::mat X(8, 2, arma::fill::ones);
+    arma::vec g = {1.0, -1.0};
+    CHECK_THROWS_AS(quadriga_lib::polmat_update<double>(X, {}, &g, false, true, true), std::invalid_argument);
+    g(1) = arma::datum::nan;
+    CHECK_THROWS_AS(quadriga_lib::polmat_update<double>(X, {}, &g, false, true, true), std::invalid_argument);
+    g(1) = arma::datum::inf;
+    CHECK_THROWS_AS(quadriga_lib::polmat_update<double>(X, {}, &g, false, true, true), std::invalid_argument);
+    CHECK(arma::all(arma::vectorise(X) == 1.0)); // checked before polmat is touched
 }

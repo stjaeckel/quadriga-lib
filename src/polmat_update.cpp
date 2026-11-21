@@ -55,13 +55,15 @@ void polmat_update(
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
   broadcasts one matrix to every update; empty applies the identity (no multiply).
-- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
+- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`. The gain of a ray is a power,
+  the max column power `max(|col 0|², |col 1|²)`, in both directions:
   - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
     normalization. With `normalize == false` this measures the gain without modifying the matrix
     part of `polmat` (gain extraction); with `normalize == true` it reports the gain that was
     removed. A value of 0 flags a degenerate (zero / non-finite) matrix the caller should prune.
-  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the
-    corresponding `gain` value *after* normalization. Must be non-null and length `n_rayU`.
+  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the square
+    root of the corresponding `gain` value *after* normalization. Must be non-null, length `n_rayU`,
+    finite and `>= 0`.
 - **`initialize`** — If `true`, each touched column is set to unity (identity for EM, `[1,0]` for
   scalar) before the update. With an `update` this is a copy-through (the column becomes the
   update, prior contents discarded); without an `update` it is a pure reset. Use this to
@@ -99,12 +101,12 @@ polmat_update(polmat, {}, &g);                      // g[k] = gain( polmat[:,k] 
 polmat_update(polmat, U, &g);                       // apply U, then measure into g (no normalize)
 
 // (4) Normalizing (scale each column to unit gain; optionally update first)
-polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, {}, nullptr, false, true);    // polmat[:,k] := polmat[:,k] / sqrt( gain( polmat[:,k] ) )
 polmat_update(polmat, U, nullptr, false, true);     // update, then normalize, one pass
 
 // (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
-//     'g' is read here (apply_gain = true):
-polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+//     'g' is read here (apply_gain = true); a 'g' from (3) gives the original matrix back:
+polmat_update(polmat, {}, &g, false, true, true);   // polmat[:,k] := sqrt( g[k] / gain( polmat[:,k] ) ) * polmat[:,k]
 polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
 ```
 
@@ -174,17 +176,6 @@ namespace
         }
     }
 
-    // Copy one interaction matrix straight into a ray's slot: oX <- nX. Used for the copy-through
-    // init, where unity * nX == nX, so the identity multiply is skipped. Does not read oX, so it is
-    // safe on freshly allocated (uninitialized) storage.
-    template <typename dtype>
-    static inline void assign_one(dtype *oX, const dtype *nX, bool scalar_mode)
-    {
-        oX[0] = nX[0], oX[1] = nX[1];
-        if (!scalar_mode)
-            oX[2] = nX[2], oX[3] = nX[3], oX[4] = nX[4], oX[5] = nX[5], oX[6] = nX[6], oX[7] = nX[7];
-    }
-
     // Multiply one ray's Jones matrix in place by a real scalar (uniform, shape-preserving).
     template <typename dtype>
     static inline void scale_one(dtype *oX, dtype s, bool scalar_mode)
@@ -194,11 +185,9 @@ namespace
             oX[2] *= s, oX[3] *= s, oX[4] *= s, oX[5] *= s, oX[6] *= s, oX[7] *= s;
     }
 
-    // Return one ray's gain (max column power). If apply == true, also scale the matrix to unit
-    // gain in place. A degenerate matrix (squares underflow, or a NaN is present) returns 0; if
-    // apply, it is reset to the identity so the state stays well-formed.
+    // Return one ray's gain (max column power), or 0 for a degenerate matrix (squares underflow, or a NaN is present).
     template <typename dtype>
-    static inline dtype gain_one(dtype *oX, bool scalar_mode, bool apply)
+    static inline dtype gain_one(const dtype *oX, bool scalar_mode)
     {
         dtype A = oX[0] * oX[0] + oX[1] * oX[1], B = (dtype)0.0; // |col 0|^2
         if (!scalar_mode)
@@ -207,32 +196,13 @@ namespace
             B = oX[4] * oX[4] + oX[5] * oX[5] + oX[6] * oX[6] + oX[7] * oX[7]; // |col 1|^2
         }
         // The gain is the max column power by convention (as documented for calc_diffraction_gain, qrt_file_read
-        // normalize_polmat and path::calc_gain); apply_gain multiplies by the gain as an amplitude, not by its square root
+        // normalize_polmat and path::calc_gain); apply_gain reads it as a power too and scales by its square root
         dtype gain = A > B ? A : B;
 
-        // Guard in the squared domain: AB below the smallest normal means the squares have already
-        // underflowed (float: entry magnitude < ~1.1e-19). Anything finite and >= that is safe, and
-        // every element is bounded by sqrt(AB), so the scaled result cannot overflow. NaN fails the
-        // comparison and lands in the degenerate branch instead of laundering through the divide.
-        if (gain >= std::numeric_limits<dtype>::min())
-        {
-            dtype amplitude = std::sqrt(gain);
-            if (apply)
-            {
-                dtype scale = (dtype)1.0 / amplitude;
-                oX[0] *= scale, oX[1] *= scale;
-                if (!scalar_mode)
-                    oX[2] *= scale, oX[3] *= scale, oX[4] *= scale, oX[5] *= scale, oX[6] *= scale, oX[7] *= scale;
-            }
-            return gain;
-        }
-
-        // Degenerate: a fully absorbing interaction drove the matrix to zero, or a NaN slipped in.
-        // Reset to identity (only if we are modifying the state) and report zero gain; the caller
-        // should treat gain == 0 as "prune this ray".
-        if (apply)
-            update_one<dtype>(oX, (const dtype *)nullptr, scalar_mode);
-        return (dtype)0.0;
+        // Guard in the squared domain: a gain below the smallest normal means the squares have already
+        // underflowed (float: entry magnitude < ~1.1e-19); NaN fails the comparison. Both are degenerate
+        // (a fully absorbing interaction, or a NaN slipped in): the caller should prune the ray.
+        return gain >= std::numeric_limits<dtype>::min() ? gain : (dtype)0.0;
     }
 }
 
@@ -351,6 +321,9 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
             throw std::invalid_argument("'apply_gain' is set but no 'gain' vector was provided.");
         if (gain->n_elem != n_rayU)
             throw std::invalid_argument("Input 'gain' must have one element per updated column (the length of 'ray_ind', else the columns of 'polmat') when 'apply_gain' is set.");
+        for (const dtype v : *gain)
+            if (!(v >= (dtype)0.0 && v <= std::numeric_limits<dtype>::max())) // also rejects NaN and Inf
+                throw std::invalid_argument("Input 'gain' must be finite and not negative when 'apply_gain' is set; it is a power.");
     }
     else if (gain)
         gain->set_size(n_rayU);
@@ -365,7 +338,7 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
         polmat.set_size(nXPR, n_ray);
 
     // Seed a column to unity before the update when the caller asks (initialize) or when the buffer
-    // was just allocated and holds no valid state. With an update this becomes a direct copy.
+    // was just allocated and holds no valid state. With an update this becomes a copy (unity * update).
     const bool seed = initialize || !have_state;
 
     dtype *p_xpr = polmat.memptr();
@@ -388,25 +361,26 @@ void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
         dtype *oX = &p_xpr[nXPR * g];
         const dtype *nX = p_upd ? (broadcast ? p_upd : &p_upd[nXPR * iU]) : (const dtype *)nullptr;
 
-        if (seed)
-        {
-            if (nX)
-                assign_one<dtype>(oX, nX, scalar_mode); // copy-through init
-            else
-                update_one<dtype>(oX, (const dtype *)nullptr, scalar_mode); // reset to unity
-        }
-        else if (nX)
-            update_one<dtype>(oX, nX, scalar_mode); // accumulate
+        if (seed) // reset to unity; written before it is read, so safe on uninitialized storage
+            update_one<dtype>(oX, (const dtype *)nullptr, scalar_mode);
+        if (nX) // accumulate (copy-through after a seed)
+            update_one<dtype>(oX, nX, scalar_mode);
 
-        if (need_measure) // Gain extraction and/or normalization
+        dtype scale = (dtype)1.0; // normalize and apply_gain combined into one scaling
+        if (need_measure)         // Gain extraction and/or normalization
         {
-            dtype gv = gain_one<dtype>(oX, scalar_mode, /*apply=*/normalize);
+            dtype gv = gain_one<dtype>(oX, scalar_mode);
             if (write_gain)
                 p_gain[iU] = gv;
+            if (normalize && gv == (dtype)0.0) // degenerate: reset to identity so the state stays well-formed
+                update_one<dtype>(oX, (const dtype *)nullptr, scalar_mode);
+            else if (normalize)
+                scale = (dtype)1.0 / std::sqrt(gv);
         }
-
-        if (apply_gain) // Re-impose a separately tracked scalar gain (read from *gain)
-            scale_one<dtype>(oX, p_gain[iU], scalar_mode);
+        if (apply_gain) // Re-impose a separately tracked power gain (read from *gain)
+            scale *= std::sqrt(p_gain[iU]);
+        if (normalize || apply_gain)
+            scale_one<dtype>(oX, scale, scalar_mode);
     };
 
     // Single OMP region, guarded so small update sets (including the 1-ray-in-a-loop case) run

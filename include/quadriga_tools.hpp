@@ -547,7 +547,7 @@ namespace quadriga_lib
     void polmat_update(
         arma::Mat<dtype> &polmat,                            // Polarization transfer matrix; Updated in-place; EM mode [8, n_ray]; Scalar mode [2, n_ray]; Initialized if empty
         const arma::Mat<dtype> &update = arma::Mat<dtype>(), // Update matrix; [8 or 2, 1] broadcasts; empty = unitary; otherwise [8 or 2, n_rayU]
-        arma::Col<dtype> *gain = nullptr,                    // The per-ray gain; Length [n_rayU]
+        arma::Col<dtype> *gain = nullptr,                    // Per-ray power gain (max column power); Length [n_rayU]
         bool initialize = false,                             // Initialize polmat to unity before applying the update
         bool normalize = false,                              // Normalize result after updating (only n_rayU updated columns, ignores rest)
         bool apply_gain = false,                             // If true, read gain from *gain and apply it to polmat after normalization
