@@ -702,7 +702,9 @@ TEST_CASE("lsp_generate - the symmetric square root is the principal root of R")
 
     // DS/KF/SF block singular to rounding (the singular -0.6 / 0.8 / 0 one ulp off, smallest eigenvalue about
     // 1e-17): scenpar_validate and both Cholesky orders accept it, the iteration stalls and then diverges. The
-    // iterate with the smallest error is kept: finite, residual about 2e-12 (1e-10 allows for rounding)
+    // iterate with the smallest error is kept: finite, residual about 2e-12, 4e-8 with FMA contraction (rounding
+    // amplified by about 1/sqrt(smallest eigenvalue) where the iteration stalls; 1e-6 is far below what a
+    // correlation needs)
     arma::mat R_sing = arma::eye(8, 8);
     R_sing(0, 1) = R_sing(1, 0) = -0.6000000000000001;
     R_sing(0, 2) = R_sing(2, 0) = 0.8;
@@ -715,7 +717,7 @@ TEST_CASE("lsp_generate - the symmetric square root is the principal root of R")
     const arma::mat X = root_from_lsp(lsp);
     QD_DIAG("singular to rounding,%.3e,%.3e\n", arma::abs(mm(X, X) - R_sing).max(), arma::abs(X - X.t()).max());
     REQUIRE(X.is_finite());
-    CHECK(arma::abs(mm(X, X) - R_sing).max() <= 1e-10);
+    CHECK(arma::abs(mm(X, X) - R_sing).max() <= 1e-6);
     CHECK(arma::abs(X - X.t()).max() <= 1e-12);
 }
 

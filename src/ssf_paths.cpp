@@ -208,7 +208,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         // outside; τ_Δ of eq. (7.6-1) is not added: each path's own length is used
         const double tab[17] = {0.0, 1.0, 2.2, 4.0, 6.6, 9.7, 12.6, 14.6, 15.0,
                                 14.6, 14.3, 10.5, 6.8, 3.9, 1.9, 1.0, 0.0};
-        const double f = rays.center_freq(k) * 1e-9 - 52.0;
+        const double f = rays.center_freq(k) / 1e9 - 52.0; // division: exact at whole GHz, also with FMA contraction
         alpha(k) = 0.0;
         if (oxygen && f > 0.0 && f < 16.0) // index only inside the table: the cast of a larger f overflows int
         {

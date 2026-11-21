@@ -139,10 +139,13 @@ namespace
             // Step 6': eqs. (7.6.30a) to (7.6.30h), normalized in the log domain; the LOS power is in slot 0
             const double *s = sp + 5 * k;
             double g[5];
-            g[0] = std::max(r * sp0[0] - s[0], 0.0) / (s[0] * r * sp0[0]);
-            for (arma::uword i = 1; i < 5; ++i)
-                g[i] = (i < 3) ? std::sqrt(std::max(r * sp0[i] * r * sp0[i] - s[i] * s[i], 0.0)) / (s[i] * r * sp0[i])
-                               : std::max(r * sp0[i] - s[i], 0.0) / (s[i] * r * sp0[i]);
+            // r·sp0 rounded once, (rs - s)·(rs + s) for rs² - s², and a comparison: g = 0 for s >= r·sp0 also with
+            // FMA contraction
+            for (arma::uword i = 0; i < 5; ++i)
+            {
+                const double rs = r * sp0[i], d = (s[i] < rs) ? rs - s[i] : 0.0;
+                g[i] = ((i == 1 || i == 2) ? std::sqrt(d * (rs + s[i])) : d) / (s[i] * rs);
+            }
             double l_max = -INFINITY, sum = 0.0;
             for (arma::uword n = 0; n < N_l; ++n)
             {
@@ -247,7 +250,7 @@ namespace
 
             // Scaling powers, paper eqs. (6), (12), normalized in the log domain; the LOS power split into LOS and
             // ground reflection
-            double l_max = -INFINITY, sum = 0.0, e = 0.0, c = 0.0;
+            double l_max = -INFINITY, sum = 0.0, e = 0.0, c = 0.0, v = 0.0;
             for (arma::uword n = 0; n < N_l; ++n)
             {
                 lam[n] = -tt[n] * g[0] - at[n] * at[n] * g[1] - at[N_l + n] * at[N_l + n] * g[2] -
@@ -262,11 +265,17 @@ namespace
                 P[n] /= sum * (1.0 + kf[k]), power[k * N_l + n] = P[n];
                 e += P[n] * tt[n], c += P[n] * tt[n] * tt[n];
             }
+            for (arma::uword n = 1; n < N_l; ++n) // sum_i P_i * sum_j P_j * (t_i - t_j)^2 = W·c - e², W = sum P
+                for (arma::uword j = 0; j < n; ++j)
+                    v += P[n] * P[j] * (tt[n] - tt[j]) * (tt[n] - tt[j]);
 
             // Delay scale, paper eqs. (13), (14), in closed form with the ground reflection as a fixed path; clusters
-            // without delay spread (one active cluster or equal values) have nothing to scale: scale 0, delay 0
-            const double den = c - e * e, a2 = s[0] * s[0], B = s_gr * tau_gr * tau_gr, D = s_gr * tau_gr;
-            const double t = std::max(a2 * c - a2 * e * e - B * c + B * e * e + c * D * D, 0.0);
+            // without delay spread (one active cluster or equal values) have nothing to scale: scale 0, delay 0.
+            // den = c - e² in the cancellation-free form (W·c - e²)/W + K·e², W = 1/(1 + K): exactly 0 for one
+            // cluster or equal values in NLOS and with K = 0, also with FMA contraction
+            const double den = v * (1.0 + kf[k]) + kf[k] * e * e;
+            const double a2 = s[0] * s[0], B = s_gr * tau_gr * tau_gr, D = s_gr * tau_gr;
+            const double t = std::max((a2 - B) * den + c * D * D, 0.0);
             s_tau += ((den > 0.0) ? (gr ? (std::sqrt(t) + D * e) / den : s[0] / std::sqrt(den)) : 0.0) / (double)F;
 
             // Angle scales: the input spread over the wrapped spread of the initial angles, then iterated on the
