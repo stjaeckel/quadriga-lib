@@ -70,7 +70,7 @@ static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double
 
 TEST_CASE("IEEE Chan - A + 1user + Xpol")
 {
-    auto ant = quadriga_lib::generate_arrayant_xpol<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A");
 
     REQUIRE(chan.size() == 1);
@@ -114,7 +114,7 @@ TEST_CASE("IEEE Chan - A + 1user + Xpol")
 TEST_CASE("IEEE Chan - A + 2user + Steering")
 {
     // Generate a probe antenna with 10° steps
-    auto ant = quadriga_lib::generate_arrayant_custom(6.0, 10.0);
+    auto ant = quadriga_lib::arrayant_generate("custom", 1.0, NAN, {6.0, 10.0});
     quadriga_lib::arrayant_copy_element(ant, 0, arma::regspace<arma::uvec>(1, 35));
     for (int i = 1; i < 36; ++i)
         qd_rotate(ant, 0.0, 0.0, double(i) * arma::datum::pi / 18.0, 0, i); // 10 degree steps
@@ -221,7 +221,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     arma::vec dist = {4.0, 8.0, 2.0};
     arma::uvec n_floors = {0, 0, 1};
 
-    auto ant = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, {}, 30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("ula", 30.0, 2.4e9, {}, {1, 4}, {0.5});
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", ant.center_freq,
                                                        tap_spacing, n_users, observation_time, update_interval,
                                                        speed_station_kmh, speed_env_kmh, dist, n_floors);
@@ -336,7 +336,7 @@ TEST_CASE("IEEE Chan - A + Doppler Shift")
     double speed_station_kmh = 50.0;
     double speed_env_kmh = 0.0;
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 30.0);
 
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A", fGHz * 1e9,
                                                        tap_spacing_ns / 1e9, 1, observation_time_s, update_interval,
@@ -404,7 +404,7 @@ TEST_CASE("IEEE Chan - C + TGn Bell Doppler integrated shape")
     double speed_station_kmh = 0.0; // TGn: stations static
     double speed_env_kmh = 1.2;     // TGn environmental speed
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 30.0);
 
     auto chan = quadriga_lib::get_channels_ieee_indoor(
         ant, ant, "C",
@@ -735,7 +735,7 @@ TEST_CASE("IEEE Chan - Doppler from moving vehicle")
     double speed_env_kmh = 0.0;      // TGn environmental speed
     double speed_vehicle_kmh = 40.0; // moving vehicle of model F
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 30.0);
 
     auto chan = quadriga_lib::get_channels_ieee_indoor(
         ant, ant, "F",
@@ -775,8 +775,8 @@ TEST_CASE("IEEE Chan - Reciprocity")
     // the baseband convention of the library (as get_channels_spherical with TX and RX swapped). A moving
     // station gives the same Doppler shift in both directions; a conjugate transpose would reverse it.
     double fc = 2.4e9;
-    auto ant_AP = quadriga_lib::generate_arrayant_ula<double>(4, fc, 0.5);
-    auto ant_STA = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.7);
+    auto ant_AP = quadriga_lib::arrayant_generate<double>("ula", 1.0, fc, {}, {1, 4}, {0.5});
+    auto ant_STA = quadriga_lib::arrayant_generate<double>("ula", 1.0, fc, {}, {1, 2}, {0.7});
 
     arma::vec pilot_grid = arma::regspace<arma::vec>(-0.5, 0.01, 0.5);
 
@@ -852,7 +852,7 @@ TEST_CASE("IEEE Chan - B + Wall loss")
     // RNG draws, so the SF realisation is identical and the total power ratio
     // in dB equals -n_walls * wall_loss_dB exactly (per user).
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     arma::sword seed = 42;
 
     // ---- Single user, default wall_loss_dB = 5.0 ----------------------------
@@ -918,7 +918,7 @@ TEST_CASE("IEEE Chan - B + TGax floor loss formula")
     // and SF realisation are identical at a fixed seed; the total power ratio
     // is then determined purely by the floor-loss term.
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     arma::sword seed = 7;
 
     auto FL = [](double n)
@@ -953,8 +953,8 @@ TEST_CASE("IEEE Chan - Doppler sign of a moving station matches get_channels_sph
     // The uplink (reciprocal channel) has the same Doppler shift as the downlink.
 
     double fc = 2.4e9, v_kmh = 5.0, dt = 1.0e-3;
-    auto ap = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.5);
-    auto sta = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.5);
+    auto ap = quadriga_lib::arrayant_generate<double>("ula", 1.0, fc, {}, {1, 2}, {0.5});
+    auto sta = quadriga_lib::arrayant_generate<double>("ula", 1.0, fc, {}, {1, 2}, {0.5});
 
     // One user; AoD LOS = 30 deg, AoA LOS = 50 deg: the station heads 50 deg off the direction to the AP
     arma::mat offsets(4, 1);
@@ -1015,7 +1015,7 @@ TEST_CASE("IEEE Chan - Floors add attenuation, not delay")
     // n_floors adds floor penetration loss (and the TGah shadow fading below 1 GHz) but no delay: the station
     // is placed 3 m per floor above the AP, and the same 3-D distance is used for the path lengths and the
     // relative delays, so the first tap stays at 0 for any number of floors.
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     arma::vec T = {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0};
 
     for (double fc : {5.25e9, 0.9e9})
@@ -1050,7 +1050,7 @@ TEST_CASE("IEEE Chan - Number of paths does not depend on distance, floors and w
 {
     // Zero-power taps are removed from the normalised power-delay profile, before path loss and shadow fading,
     // so the number of paths (and the delay spread) does not depend on the link budget.
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
 
     for (double fc : {5.25e9, 0.9e9})
         for (double d : {10.0, 30.0, 40.0, 60.0, 100.0, 300.0})
@@ -1073,7 +1073,7 @@ TEST_CASE("IEEE Chan - Override rules")
 {
     // NaN selects the model default. kf and the SF spreads must otherwise be finite and >= 0, xpr_nlos and
     // dist_breakpoint finite and > 0 (XPR = 0 or Inf has no Jones matrix, a zero breakpoint gives log10(0)).
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     const double nan = arma::datum::nan, inf = arma::datum::inf;
     auto run = [&](double kf, double xpr, double sf_los, double sf_nlos, double dbp)
     {
@@ -1109,7 +1109,7 @@ TEST_CASE("IEEE Chan - Override rules")
 
 TEST_CASE("IEEE Chan - Non-finite observation time and update interval")
 {
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     auto run = [&](double observation_time, double update_interval)
     {
         return quadriga_lib::get_channels_ieee_indoor(omni, omni, "A", 5.25e9, 10e-9, 1, observation_time, update_interval);
@@ -1131,7 +1131,7 @@ TEST_CASE("IEEE Chan - Tap spacing 10 ns / 2^k and non-finite carrier frequency,
 {
     // A tap spacing that is not 10 ns / 2^k (e.g. 7 ns) throws; so do NaN and Inf carrier frequency, distance and
     // speeds
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     auto run = [&](double fc, double tap, double dist, double v_sta, double v_env)
     {
         return quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", fc, tap, 1, 0.0, 1e-3, v_sta, v_env, {dist}, {0},
@@ -1182,7 +1182,7 @@ TEST_CASE("IEEE Chan - Tap spacing 10 ns / 2^k and non-finite carrier frequency,
 
 TEST_CASE("IEEE Chan - The largest seed is valid and reproducible")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     const arma::sword s_max = std::numeric_limits<arma::sword>::max();
     auto run = [&]()
     { return quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {}, {}, false, {}, 20, 50.0, s_max); };

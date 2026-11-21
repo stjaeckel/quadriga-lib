@@ -222,7 +222,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     const double Tb = 0.0, Tt = 0.0, Th = 0.0;
 
     // Get a cross-polarized probe antenna to compute the antenna-neutral power after complex-sum of the sub-paths
-    auto probe_antenna = quadriga_lib::generate_arrayant_xpol(15.0);
+    auto probe_antenna = quadriga_lib::arrayant_generate("xpol", 15.0);
     arma::uword n_probe = probe_antenna.n_elements();
 
     // Constants for Doppler calculation

@@ -22,7 +22,7 @@
 
 TEST_CASE("Arrayant OBJ Export")
 {
-    auto ant = quadriga_lib::generate_arrayant_3GPP<float>({1, 2});
+    auto ant = quadriga_lib::arrayant_generate<float>("3GPP", 1.0, NAN, {}, {1, 2});
     CHECK(ant.name == "3gpp");
     ant.name = "g_pp";
 
@@ -50,7 +50,7 @@ TEST_CASE("Arrayant OBJ Export")
     quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", 0.4, 4);
 
     // An all-zero pattern has no shape to draw
-    auto z = quadriga_lib::generate_arrayant_omni<float>(10.0f);
+    auto z = quadriga_lib::arrayant_generate<float>("omni", 10.0f);
     z.e_theta_re.zeros();
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file("testantenna.obj", z), std::invalid_argument);
 
@@ -79,7 +79,7 @@ TEST_CASE("Arrayant OBJ Export - tiny range and tiny pattern give finite vertice
         return n > 0;
     };
 
-    auto ant = quadriga_lib::generate_arrayant_dipole<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("dipole", 10.0);
     quadriga_lib::arrayant_export_obj_file("testantenna_tiny.obj", ant, std::numeric_limits<double>::denorm_min(), "jet", 1.0, 2);
     CHECK(vertices_finite("testantenna_tiny.obj"));
 
@@ -92,7 +92,7 @@ TEST_CASE("Arrayant OBJ Export - tiny range and tiny pattern give finite vertice
 TEST_CASE("Arrayant OBJ Export - every vertex is written once per element")
 {
     // Each vertex is written once, not again for every face that uses it
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {1}); // two elements
     ant.element_pos(0, 1) = 2.0;
     quadriga_lib::arrayant_export_obj_file("testantenna_unique.obj", ant, 30.0, "jet", 0.4, 3);

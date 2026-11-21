@@ -983,8 +983,8 @@ TEST_CASE("Speaker - set_element_pos_multi: out-of-range index throws")
 TEST_CASE("Speaker - set_element_pos_multi: an entry with another element count leaves all entries untouched")
 {
     // Entry 0 has 1 element, entry 1 has 2; the check of entry 1 must come before entry 0 is changed
-    std::vector<quadriga_lib::arrayant<double>> ants = {quadriga_lib::generate_arrayant_omni<double>(10.0),
-                                                       quadriga_lib::generate_arrayant_xpol<double>(10.0)};
+    std::vector<quadriga_lib::arrayant<double>> ants = {quadriga_lib::arrayant_generate<double>("omni", 10.0),
+                                                       quadriga_lib::arrayant_generate<double>("xpol", 10.0)};
     const arma::mat pos0 = ants[0].element_pos, pos = arma::mat({1.0, 2.0, 3.0}).t();
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(ants, pos), std::invalid_argument);
     CHECK(arma::approx_equal(ants[0].element_pos, pos0, "absdiff", 0.0));

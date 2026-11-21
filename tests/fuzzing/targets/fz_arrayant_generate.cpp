@@ -2,9 +2,9 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Array antenna generators with fuzzed parameters: generate_arrayant_omni, _xpol, _dipole, _half_wave_dipole, _custom,
-// _ula, _3GPP (also with a fuzzed custom pattern), _multibeam, the dispatcher arrayant_generate (all types, tuples of
-// fuzzed lengths and values, also inputs a type does not use) and generate_speaker
+// Array antenna generators with fuzzed parameters: arrayant_generate per type with its own inputs (3GPP and ula also
+// with a fuzzed custom pattern), all types with tuples of fuzzed lengths and values (also inputs a type does not use),
+// and generate_speaker
 
 #include "fuzz_target.hpp"
 
@@ -36,7 +36,7 @@ static quadriga_lib::arrayant<T> pattern(fz::input &in, bool &use)
     const int mode = in.ConsumeIntegralInRange<int>(0, 3);
     use = mode != 0;
     if (mode == 1)
-        fz::clean([&] { p = quadriga_lib::generate_arrayant_custom<T>(in.value<T>(), in.value<T>(), in.value<T>(), T(30)); });
+        fz::clean([&] { p = quadriga_lib::arrayant_generate<T>("custom", T(30), NAN, {in.value<T>(), in.value<T>(), in.value<T>()}); });
     else if (mode >= 2)
     {
         arma::uword n_el = in.size(6), n_az = in.size(8), n_e = in.size(3);
@@ -81,21 +81,21 @@ static void run(fz::input &in)
     switch (in.ConsumeIntegralInRange<int>(0, 9))
     {
     case 0:
-        fz::clean([&] { quadriga_lib::generate_arrayant_omni<T>(res); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("omni", res); });
         break;
     case 1:
-        fz::clean([&] { quadriga_lib::generate_arrayant_xpol<T>(res); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("xpol", res); });
         break;
     case 2:
-        fz::clean([&] { quadriga_lib::generate_arrayant_dipole<T>(res); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("dipole", res); });
         break;
     case 3:
-        fz::clean([&] { quadriga_lib::generate_arrayant_half_wave_dipole<T>(res); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("half-wave-dipole", res); });
         break;
     case 4:
     {
-        T az = in.value<T>(), el = in.value<T>(), rear = in.value<T>();
-        fz::clean([&] { quadriga_lib::generate_arrayant_custom<T>(az, el, rear, res); });
+        T az = in.value<T>(), el = in.value<T>(), floor_dB = in.value<T>();
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("custom", res, NAN, {az, el, floor_dB}); });
         break;
     }
     case 5:
@@ -104,7 +104,7 @@ static void run(fz::input &in)
         double fc = in.value<double>(), spacing = in.value<double>();
         bool use;
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_arrayant_ula<T>(N, fc, spacing, fz::opt(use, p), res); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("ula", res, fc, {}, {1, N}, {spacing}, {}, {}, {}, {}, fz::opt(use, p)); });
         break;
     }
     case 6:
@@ -115,8 +115,7 @@ static void run(fz::input &in)
         double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool use, apply = in.ConsumeBool();
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_arrayant_3GPP<T>(panel, fc, spacing, ports, pol, steer, element, fz::opt(use, p),
-                                                                res, apply); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("3GPP", res, fc, element, panel, spacing, pol, ports, steer, {}, fz::opt(use, p), false, apply); });
         break;
     }
     case 7:
@@ -126,7 +125,7 @@ static void run(fz::input &in)
         arma::mat beams = in.mat<double>(in.size(4), in.size(4));
         double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool separate = in.ConsumeBool(), apply = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::generate_arrayant_multibeam<T>(panel, fc, spacing, pol, element, beams, res, separate, apply); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>("multibeam", res, fc, element, panel, spacing, pol, {}, {}, beams, {}, separate, apply); });
         break;
     }
     case 8:
@@ -139,8 +138,7 @@ static void run(fz::input &in)
         double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool use, separate = in.ConsumeBool(), apply = in.ConsumeBool();
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::arrayant_generate<T>(type, res, fc, panel, spacing, ports, pol, steer, element, fz::opt(use, p),
-                                                           beams, separate, apply); });
+        fz::clean([&] { quadriga_lib::arrayant_generate<T>(type, res, fc, element, panel, spacing, pol, ports, steer, beams, fz::opt(use, p), separate, apply); });
         break;
     }
     default:

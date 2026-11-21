@@ -187,7 +187,7 @@ TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
     const std::string fn = "test_qdant_missing_id.qdant";
     std::remove(fn.c_str());
 
-    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     a.name = "two";
     quadriga_lib::qdant_write(fn, a, 2);
     a.name = "three";

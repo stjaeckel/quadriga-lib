@@ -99,7 +99,7 @@ TEST_CASE("Arrayant quick check - Detects resized members with unchanged data po
 // The quick check does not write to the object, a failed public check leaves the cache unchanged.
 TEST_CASE("Arrayant quick check - Passes a marked object changed in place, the public check does not")
 {
-    auto a = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     a.azimuth_grid.memptr()[0] = a.azimuth_grid.memptr()[1]; // Not strictly ascending
 
     const std::string msg = "Values of 'azimuth_grid' must be sorted in strictly ascending order.";
@@ -111,14 +111,14 @@ TEST_CASE("Arrayant quick check - Passes a marked object changed in place, the p
     quadriga_lib::arrayant<double> c = a;
     CHECK(unmarked(c));
 
-    std::vector<quadriga_lib::arrayant<double>> vec(2, quadriga_lib::generate_arrayant_omni<double>(30.0));
+    std::vector<quadriga_lib::arrayant<double>> vec(2, quadriga_lib::arrayant_generate<double>("omni", 30.0));
     for (auto &v : vec) // The same change in all entries, so that only the per-entry check can see it
         v.azimuth_grid.memptr()[0] = v.azimuth_grid.memptr()[1];
     CHECK(qd_arrayant_is_valid_multi_quick(vec).empty());
     CHECK(quadriga_lib::arrayant_is_valid_multi(vec) == "Entry 0: " + msg);
 
     // An unmarked object gets the full check
-    auto b = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto b = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     qd_arrayant_clear_mark(b);
     b.azimuth_grid.memptr()[0] = b.azimuth_grid.memptr()[1];
     CHECK(qd_arrayant_is_valid_quick(b) == msg);
@@ -146,7 +146,7 @@ TEST_CASE("Arrayant quick check - is_valid marks a valid object")
 // Small members (up to 16 values) are stored inside the Armadillo objects, so a move copies them to new addresses.
 TEST_CASE("Arrayant copy and move - The target of a valid source is marked with its own data")
 {
-    auto big = quadriga_lib::generate_arrayant_xpol<double>(10.0); // Pattern on the heap
+    auto big = quadriga_lib::arrayant_generate<double>("xpol", 10.0); // Pattern on the heap
     quadriga_lib::arrayant<double> small;                         // All members inside the objects
     small.e_theta_re.ones(1, 2, 1), small.e_theta_im.zeros(1, 2, 1), small.e_phi_re.zeros(1, 2, 1), small.e_phi_im.zeros(1, 2, 1);
     small.azimuth_grid = {-1.0, 1.0}, small.elevation_grid = {0.0};
@@ -236,9 +236,9 @@ TEST_CASE("Arrayant quick check - Generated antennas are marked")
         for (arma::uword M : {1ULL, 2ULL, 4ULL})
             for (bool sep : {false, true})
             {
-                auto a = quadriga_lib::generate_arrayant_multibeam<double>({M, 2}, 3.0e9, {}, {pol}, {}, beams, 10.0, sep, false);
+                auto a = quadriga_lib::arrayant_generate<double>("multibeam", 10.0, 3.0e9, {}, {M, 2}, {}, {pol}, {}, {}, beams, {}, sep);
                 CHECK(qd_arrayant_cache_matches(a));
             }
-    CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_omni<double>(10.0)));
-    CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, 3.0e9, {}, {}, {1}, {}, {}, {}, 10.0)));
+    CHECK(qd_arrayant_cache_matches(quadriga_lib::arrayant_generate<double>("omni", 10.0)));
+    CHECK(qd_arrayant_cache_matches(quadriga_lib::arrayant_generate<double>("3GPP", 10.0, 3.0e9, {}, {2, 2}, {}, {1})));
 }

@@ -711,8 +711,8 @@ TEST_CASE("quantize_delays - Relative delays of get_channels_spherical")
 {
     // get_channels_spherical with relative delays (default) returns slightly negative delays for elements that are
     // closer than the phase centre; all of their power must go to tap 0
-    auto tx = quadriga_lib::generate_arrayant_ula<double>(8, 3.5e9, 0.5);
-    auto rx = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5);
+    auto tx = quadriga_lib::arrayant_generate<double>("ula", 1.0, 3.5e9, {}, {1, 8}, {0.5});
+    auto rx = quadriga_lib::arrayant_generate<double>("ula", 1.0, 3.5e9, {}, {1, 4}, {0.5});
     arma::mat fbs = {{50.0, 50.0}, {0.0, 30.0}, {10.0, 2.0}}, lbs = fbs; // path 0: LOS, path 1: NLOS
     arma::vec gain = {1.0, 0.5}, len = {0.0, 0.0};
     arma::mat M(8, 2, arma::fill::zeros);
@@ -969,10 +969,10 @@ TEST_CASE("quantize_delays - Relative delays of an acoustic array")
     // relative delays below -tap_spacing / 2 (about -1 tap). Relative delays throw with a message that points to
     // absolute delays; absolute delays quantize.
     const double c = 343.0, f = 1000.0, ts = 1.0 / 48000.0;
-    auto mic = quadriga_lib::generate_arrayant_ula<double>(2, f, 0.5);
+    auto mic = quadriga_lib::arrayant_generate<double>("ula", 1.0, f, {}, {1, 2}, {0.5});
     mic.element_pos.col(0) = arma::vec{0.0, -0.025, 0.0};
     mic.element_pos.col(1) = arma::vec{0.0, 0.025, 0.0};
-    std::vector<quadriga_lib::arrayant<double>> rx = {mic}, tx = {quadriga_lib::generate_arrayant_omni<double>()};
+    std::vector<quadriga_lib::arrayant<double>> rx = {mic}, tx = {quadriga_lib::arrayant_generate<double>("omni", 1.0)};
     rx[0].center_freq = f;
     arma::mat fbs = {{2.5, 2.5}, {0.0, 1.5}, {1.5, 0.2}}; // path 0 on the TX-RX line (LOS)
     arma::mat pg(2, 1);

@@ -35,55 +35,56 @@ end
 a = quadriga_lib.arrayant_generate( 'xpol', 30, 3e9 );                                % res, center_freq
 assertEqual( size(a.e_theta_re), [7, 13, 2] );
 assertEqual( a.center_freq, 3e9 );
+a = quadriga_lib.arrayant_generate( 'omni', 30, NaN );                                % NaN: default
+assertEqual( a.center_freq, 299792458 );
 
-a = quadriga_lib.arrayant_generate( '3gpp', 30, [], [2, 3] );                         % panel [M, N]
+a = quadriga_lib.arrayant_generate('3gpp', 30, [], [], [2, 3]);                         % panel [M, N]
 assertEqual( size(a.e_theta_re, 3), 6 );
 assertElementsAlmostEqual( a.element_pos(:, 1:2), [0, 0; -0.5, -0.5; -0.25, 0.25], 'absolute', 1e-12 );
 
-a = quadriga_lib.arrayant_generate( 'ula', 30, [], [1, 2], 0.7 );                     % spacing
+a = quadriga_lib.arrayant_generate('ula', 30, [], [], [1, 2], 0.7);                     % spacing
 assertElementsAlmostEqual( a.element_pos, [0, 0; -0.35, 0.35; 0, 0], 'absolute', 1e-12 );
 
-a = quadriga_lib.arrayant_generate( '3gpp', 30, [], 4, [], 1 );                       % ports
+a = quadriga_lib.arrayant_generate('3gpp', 30, [], [], 4, [], [], 1);                       % ports
 assertEqual( size(a.coupling_re), [4, 1] );
 
-a = quadriga_lib.arrayant_generate( '3gpp', 30, [], [], [], [], [2, 2] );             % pol [polarization, model]
+a = quadriga_lib.arrayant_generate('3gpp', 30, [], [], [], [], [2, 2]);             % pol [polarization, model]
 assertEqual( size(a.e_theta_re, 3), 2 );
 assertElementsAlmostEqual( a.e_theta_re(:, :, 2), zeros(7, 13), 'absolute', 1e-12 );   % Model-2, zeta = 90 deg
 
-a = quadriga_lib.arrayant_generate( '3gpp', 30, [], 2, [], 1, [], [30, 0] );          % steer: eq. 7.3-1, d_V = 0.5
+a = quadriga_lib.arrayant_generate('3gpp', 30, [], [], 2, [], [], 1, [30, 0]);          % steer: eq. 7.3-1, d_V = 0.5
 assertElementsAlmostEqual( [a.coupling_re, a.coupling_im], [0.5, -0.5; 0.5, 0.5], 'absolute', 1e-12 );
-a = quadriga_lib.arrayant_generate( '3gpp', 30, [], [1, 2], [], [1, 1], [], [0, 30] );  % pan: d_H = 0.5
+a = quadriga_lib.arrayant_generate('3gpp', 30, [], [], [1, 2], [], [], [1, 1], [0, 30]);  % pan: d_H = 0.5
 assertElementsAlmostEqual( [a.coupling_re, a.coupling_im], [0.5, 0.5; 0.5, -0.5], 'absolute', 1e-12 );
 
-a = quadriga_lib.arrayant_generate( 'custom', 30, [], [], [], [], [], [], [60, 90, 10] ); % element, floor 10 dB
-b = quadriga_lib.arrayant_generate( 'custom', 30, [], [], [], [], [], [], 60 );
+a = quadriga_lib.arrayant_generate('custom', 30, [], [60, 90, 10]); % element, floor 10 dB
+b = quadriga_lib.arrayant_generate('custom', 30, [], 60);
 p = a.e_theta_re.^2;
 assertElementsAlmostEqual( min(p(:)) / max(p(:)), 0.1, 'absolute', 1e-12 );
 assertTrue( max(abs(a.e_theta_re(:) - b.e_theta_re(:))) > 0.01 );
 
-pat = quadriga_lib.arrayant_generate( 'custom', 30, [], [], [], [], [], [], [60, 40] );
-a = quadriga_lib.arrayant_generate( '3gpp', [], [], 2, [], [], [], [], [], pat );     % pattern
+pat = quadriga_lib.arrayant_generate('custom', 30, [], [60, 40]);
+a = quadriga_lib.arrayant_generate('3gpp', [], [], [], 2, [], [], [], [], [], pat);     % pattern
 assertEqual( size(a.e_theta_re), [7, 13, 2] );
 assertElementsAlmostEqual( a.e_theta_re(:, :, 2), pat.e_theta_re, 'absolute', 1e-12 );
 
 beams = [ -30, 30; 0, 0 ];
-a = quadriga_lib.arrayant_generate( 'multibeam', 30, [], [1, 4], [], [], [], [], [], [], beams, true ); % beams, separate_beams
+a = quadriga_lib.arrayant_generate('multibeam', 30, [], [], [1, 4], [], [], [], [], beams, [], true); % beams, separate_beams
 assertEqual( size(a.coupling_re), [4, 2] );
-a = quadriga_lib.arrayant_generate( 'multibeam', 30, [], [1, 4], [], [], [], [], [], [], beams );
+a = quadriga_lib.arrayant_generate('multibeam', 30, [], [], [1, 4], [], [], [], [], beams);
 assertEqual( size(a.coupling_re), [4, 1] );
 
-a = quadriga_lib.arrayant_generate( '3gpp', 30, [], 2, [], 1, [], [], [], [], [], [], true ); % apply_weights
+a = quadriga_lib.arrayant_generate('3gpp', 30, [], [], 2, [], [], 1, [], [], [], [], true); % apply_weights
 assertEqual( size(a.e_theta_re), [7, 13] );
 assertElementsAlmostEqual( a.element_pos, [0; 0; 0], 'absolute', 1e-12 );
 
 %% Other classes and orientation (one call)
-a = quadriga_lib.arrayant_generate( '3gpp', 30, 3e9, [2; 3], 0.7, [1, 1], [3, 1], [10, 5] );
-b = quadriga_lib.arrayant_generate( '3gpp', single(30), single(3e9), int32([2, 3]), single(0.7), ...
-    uint8([1; 1]), [3; 1], single([10, 5]) );
+a = quadriga_lib.arrayant_generate('3gpp', 30, 3e9, [], [2; 3], 0.7, [3, 1], [1, 1], [10, 5]);
+b = quadriga_lib.arrayant_generate('3gpp', single(30), single(3e9), [], int32([2, 3]), single(0.7), [3; 1], uint8([1; 1]), single([10, 5]));
 assertElementsAlmostEqual( b.e_theta_re, a.e_theta_re, 'absolute', 1e-12 );
 assertElementsAlmostEqual( b.coupling_im, a.coupling_im, 'absolute', 1e-6 );         % steer rounded to single
 assertElementsAlmostEqual( b.element_pos, a.element_pos, 'absolute', 1e-6 );         % spacing rounded to single
-a = quadriga_lib.arrayant_generate( 'multibeam', 30, [], 2, [], [], [], [], [], [], [], 1, int8(1) ); % numeric flags
+a = quadriga_lib.arrayant_generate('multibeam', 30, [], [], 2, [], [], [], [], [], [], 1, int8(1)); % numeric flags
 assertEqual( size(a.e_theta_re, 3), 1 );
 
 %% Errors
@@ -92,15 +93,15 @@ assert_throws( @() quadriga_lib.arrayant_generate( 'omni', [], [], [], [], [], [
     'Wrong number of input arguments.' );
 assert_throws( @() out2( 'omni' ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.arrayant_generate( 'omni', [10, 20] ), 'Input ''res'' must be a scalar.' );
-assert_throws( @() quadriga_lib.arrayant_generate( '3gpp', 30, [], -1 ), ...
+assert_throws( @() quadriga_lib.arrayant_generate('3gpp', 30, [], [], -1), ...
     'Entries in ''panel'' must be non-negative integers.' );
-assert_throws( @() quadriga_lib.arrayant_generate( '3gpp', 30, [], [], [], 1.5 ), ...
+assert_throws( @() quadriga_lib.arrayant_generate('3gpp', 30, [], [], [], [], [], 1.5), ...
     'Entries in ''ports'' must be non-negative integers.' );
-assert_throws( @() quadriga_lib.arrayant_generate( '3gpp', 30, [], [], [], [], NaN ), ...
+assert_throws( @() quadriga_lib.arrayant_generate('3gpp', 30, [], [], [], [], NaN), ...
     'Entries in ''pol'' must be non-negative integers.' );
-assert_throws( @() quadriga_lib.arrayant_generate( '3gpp', 30, [], [], [], [], [], [], [], 0.1 ), ...
+assert_throws( @() quadriga_lib.arrayant_generate('3gpp', 30, [], [], [], [], [], [], [], [], 0.1), ...
     'Input ''pattern'' must be a struct.' );
-assert_throws( @() quadriga_lib.arrayant_generate( 'omni', 30, [], [], [], [], [], [], 90 ), ...
+assert_throws( @() quadriga_lib.arrayant_generate('omni', 30, [], 90), ...
     'Input ''element'' is not used by type ''omni''.' );                                             % C++
 assert_throws( @() quadriga_lib.arrayant_generate( 'bla' ), 'Input ''type'' has an unsupported value ''bla''.' ); % C++
 

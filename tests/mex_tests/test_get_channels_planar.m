@@ -138,7 +138,7 @@ assertTrue( isempty(dop) );
 
 
 % use_kernel (input 17) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 is rejected by C++
-tx = quadriga_lib.arrayant_generate('custom', 10, [], [], [], [], [], [], [90, 90]);
+tx = quadriga_lib.arrayant_generate('custom', 10, [], [90, 90]);
 args = { tx, tx, [0;0;10], [0;0;0], [50;0;1.5], [0;0;0], [0.1, 0.5], [0, 0.2], [3, 2.5], ...
     [0, -0.2], [1, 0.5], [60, 70], [1, 1; 0, 0; 0, 0; 0, 0; 0, 0; 0, 0; -1, -1; 0, 0], 3e9, false, false };
 cr_d = quadriga_lib.get_channels_planar( args{:} );

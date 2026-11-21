@@ -370,7 +370,7 @@ TEST_CASE("calc_angular_spread - phi and theta are the local angles of the outpu
     const std::vector<arma::vec> az = {arma::vec{28.0 * d, 32.0 * d, 30.0 * d, 35.0 * d}};
     const std::vector<arma::vec> el = {arma::vec{18.0 * d, 22.0 * d, 20.0 * d, 19.0 * d}};
     const std::vector<arma::vec> pw = {arma::vec{1.0, 1.0, 1.0, 2.0}};
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     for (bool bank : {false, true})
     {
         arma::mat ori;

@@ -4,7 +4,7 @@
 
 // Beamwidth and pointing angles of arrayant_calc_beamwidth and its vector and _multi forms: threshold dependence,
 // rotated and tilted patterns, element selection, the main-lobe search across +-180 deg and the poles. Oracles:
-// generate_arrayant_custom patterns, whose FWHM equals the requested beamwidth, rotated by arrayant_rotate_pattern
+// custom-type patterns of arrayant_generate, whose FWHM equals the requested beamwidth, rotated by arrayant_rotate_pattern
 // (helpers in qd_test_arrayant.hpp); results in degrees.
 
 #include <catch2/catch_test_macros.hpp>
@@ -18,7 +18,7 @@ TEST_CASE("Arrayant calc_beamwidth - Custom antenna, default 3dB threshold")
 {
     // Custom antenna: az_3dB = 30°, el_3dB = 20°, no rear lobe, 1° sampling.
     // The pattern is constructed such that the measured FWHM equals the input.
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(30.0f, 20.0f);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {30.0f, 20.0f});
 
     float bw_az = 0.0f, bw_el = 0.0f, az_pt = 999.0f, el_pt = 999.0f;
     qd_beamwidth(ant, 0, 3.0f, &bw_az, &bw_el, &az_pt, &el_pt);
@@ -31,7 +31,7 @@ TEST_CASE("Arrayant calc_beamwidth - Custom antenna, default 3dB threshold")
 
 TEST_CASE("Arrayant calc_beamwidth - Threshold dependence")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(30.0f, 30.0f);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {30.0f, 30.0f});
 
     float bw1 = 0.0f, bw3 = 0.0f, bw6 = 0.0f;
     qd_beamwidth(ant, 0, 1.0f, &bw1, nullptr, nullptr, nullptr);
@@ -45,7 +45,7 @@ TEST_CASE("Arrayant calc_beamwidth - Threshold dependence")
 
 TEST_CASE("Arrayant calc_beamwidth - Rotated antenna (heading)")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {20.0f, 20.0f});
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0); // heading +45° around z
 
     float bw_az = 0.0f, bw_el = 0.0f, az_pt = 0.0f, el_pt = 0.0f;
@@ -60,7 +60,7 @@ TEST_CASE("Arrayant calc_beamwidth - Rotated antenna (heading)")
 TEST_CASE("Arrayant calc_beamwidth - Tilted antenna (elevation pointing)")
 {
     // A tilt of -pi/6 (an uptilt, 3GPP TR 38.901) moves the main beam to elevation +30°
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {20.0f, 20.0f});
     qd_rotate(ant, 0.0, -arma::datum::pi / 6.0, 0.0);
 
     float az_pt = 999.0f, el_pt = 999.0f;
@@ -73,7 +73,7 @@ TEST_CASE("Arrayant calc_beamwidth - Tilted antenna (elevation pointing)")
 TEST_CASE("Arrayant calc_beamwidth - Multi-element selection")
 {
     // Three elements pointing at -60°, 0°, +60° respectively
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {20.0f, 20.0f});
     quadriga_lib::arrayant_copy_element(ant, 0, arma::uvec({1, 2}));
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 3.0, 0, 1);
     qd_rotate(ant, 0.0, 0.0, -arma::datum::pi / 3.0, 0, 2);
@@ -94,7 +94,7 @@ TEST_CASE("Arrayant calc_beamwidth - Omni antenna")
 {
     // Constant pattern: every direction is above any negative-dB threshold,
     // so the measured beamwidth equals the full grid extent.
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
 
     float bw_az = 0.0f, bw_el = 0.0f;
     qd_beamwidth(ant, 0, 3.0f, &bw_az, &bw_el, nullptr, nullptr);
@@ -105,7 +105,7 @@ TEST_CASE("Arrayant calc_beamwidth - Omni antenna")
 
 TEST_CASE("Arrayant calc_beamwidth - Selective output pointers")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(30.0f, 30.0f);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {30.0f, 30.0f});
 
     // All-null call must be a no-op (no crash, early return).
     CHECK_NOTHROW(qd_beamwidth(ant, 0, 3.0f, nullptr, nullptr, nullptr, nullptr));
@@ -121,7 +121,7 @@ TEST_CASE("Arrayant calc_beamwidth - Selective output pointers")
 
 TEST_CASE("Arrayant calc_beamwidth - Invalid element index")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0);
     float bw = 0.0f;
     REQUIRE_THROWS_AS(qd_beamwidth(ant, 5, 3.0f, &bw), std::invalid_argument);
 }
@@ -130,7 +130,7 @@ TEST_CASE("Arrayant calc_beamwidth - Invalid element index")
 // across the poles in elevation.
 TEST_CASE("Arrayant calc_beamwidth - Main lobe across +-180 deg azimuth and at the poles")
 {
-    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 1.0); // 90 deg FWHM in az and el
+    auto a = quadriga_lib::arrayant_generate<double>("custom", 1.0, NAN, {90.0, 90.0}); // 90 deg FWHM in az and el
     double bw_az0 = 0.0, bw_el0 = 0.0, paz = 0.0, pel = 0.0;
     qd_beamwidth(a, 0, 3.0, &bw_az0, &bw_el0, &paz, &pel);
     CHECK(std::abs(bw_az0 - 90.0) < 1.0);
@@ -159,7 +159,7 @@ TEST_CASE("Arrayant calc_beamwidth - Main lobe across +-180 deg azimuth and at t
     }
 
     // Side lobes above the threshold are not part of the main lobe: two separate lobes at az = 0 and az = 90 deg
-    auto c = quadriga_lib::generate_arrayant_custom<double>(20.0, 20.0, 0.0, 1.0);
+    auto c = quadriga_lib::arrayant_generate<double>("custom", 1.0, NAN, {20.0, 20.0});
     auto c2 = c;
     qd_rotate(c2, 0.0, 0.0, arma::datum::pi / 2.0, 3);
     c.e_theta_re.slice(0) += 0.9 * c2.e_theta_re.slice(0);
@@ -175,7 +175,7 @@ TEST_CASE("Arrayant calc_beamwidth - Main lobe across +-180 deg azimuth and at t
 TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and multi-frequency vectors")
 {
     const double tol = 1.0e-10; // degree or dB
-    auto a = quadriga_lib::generate_arrayant_custom<double>(40.0, 30.0, 0.0, 10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {40.0, 30.0});
     quadriga_lib::arrayant_copy_element(a, 0, arma::uvec{1, 2});
     qd_rotate(a, 0.0, 0.0, arma::datum::pi / 3.0, 0, 1);
     qd_rotate(a, 0.0, -arma::datum::pi / 9.0, 0.0, 0, 2);
@@ -245,7 +245,7 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and mult
     CHECK(arma::approx_equal(o_az.col(0), bw_az, "absdiff", tol));
 
     // float: _multi equals the single-frequency function
-    auto af = quadriga_lib::generate_arrayant_custom<float>(40.0f, 30.0f, 0.0f, 10.0f);
+    auto af = quadriga_lib::arrayant_generate<float>("custom", 10.0f, NAN, {40.0f, 30.0f});
     arma::fvec f_az, f_d;
     arma::fmat fm_az, fm_d;
     quadriga_lib::arrayant_calc_beamwidth(af, {}, 3.0f, &f_az);
@@ -260,7 +260,7 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Element lists and mult
 
 TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Input validation")
 {
-    auto a = quadriga_lib::generate_arrayant_custom<double>(40.0, 30.0, 0.0, 10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {40.0, 30.0});
     quadriga_lib::arrayant_copy_element(a, 0, arma::uvec{1, 2});
     const std::vector<quadriga_lib::arrayant<double>> v = {a, a};
     arma::vec bw, d;
@@ -273,7 +273,7 @@ TEST_CASE("Arrayant calc_beamwidth and calc_directivity - Input validation")
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(broken, {}, 3.0, &bw), std::invalid_argument);
         CHECK_THROWS_AS(d = quadriga_lib::arrayant_calc_directivity(broken), std::invalid_argument);
 
-        const std::vector<quadriga_lib::arrayant<double>> v_empty, v_bad = {a, quadriga_lib::generate_arrayant_omni<double>()};
+        const std::vector<quadriga_lib::arrayant<double>> v_empty, v_bad = {a, quadriga_lib::arrayant_generate<double>("omni", 1.0)};
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v_empty, {}, 3.0, &m), std::invalid_argument);
         CHECK_THROWS_AS(m = quadriga_lib::arrayant_calc_directivity_multi(v_empty), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v_bad, {}, 3.0, &m), std::invalid_argument);

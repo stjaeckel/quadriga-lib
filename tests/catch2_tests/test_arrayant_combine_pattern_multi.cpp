@@ -369,7 +369,7 @@ TEST_CASE("Combine multi - Custom azimuth_grid_new used in output")
 {
     // Build an entry with broad angular coverage
     double pi = arma::datum::pi;
-    auto base = quadriga_lib::generate_arrayant_omni<double>();
+    auto base = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     base.center_freq = 1.0e9;
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
 
@@ -385,7 +385,7 @@ TEST_CASE("Combine multi - Custom azimuth_grid_new used in output")
 TEST_CASE("Combine multi - Custom elevation_grid_new used in output")
 {
     double pi = arma::datum::pi;
-    auto base = quadriga_lib::generate_arrayant_omni<double>();
+    auto base = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     base.center_freq = 1.0e9;
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
 
@@ -401,7 +401,7 @@ TEST_CASE("Combine multi - Custom elevation_grid_new used in output")
 TEST_CASE("Combine multi - All three grids custom")
 {
     double pi = arma::datum::pi;
-    auto base = quadriga_lib::generate_arrayant_omni<double>();
+    auto base = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     base.center_freq = 1.0e9;
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
 
@@ -766,7 +766,7 @@ TEST_CASE("Combine multi - GHz antenna with varying pattern and coupling")
     std::vector<quadriga_lib::arrayant<double>> vec;
     for (arma::uword i = 0; i < ghz_freqs.n_elem; ++i)
     {
-        auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+        auto ant = quadriga_lib::arrayant_generate<double>("custom", 1.0, NAN, {90.0, 90.0});
         ant.center_freq = ghz_freqs[i];
         double scale = 1.0 + 0.1 * (double)i;
         ant.e_theta_re *= scale;
@@ -916,7 +916,7 @@ TEST_CASE("Combine multi - Single output frequency entry produces single output"
 
 TEST_CASE("Combine multi - Float instantiation")
 {
-    auto ant_f = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant_f = quadriga_lib::arrayant_generate<float>("omni", 1.0);
     ant_f.center_freq = 1.0e9f;
     std::vector<quadriga_lib::arrayant<float>> vec = {ant_f};
 
@@ -946,7 +946,7 @@ TEST_CASE("Combine multi - Custom angular grid resamples pattern correctly")
 {
     double pi = arma::datum::pi;
     // Omni antenna with constant pattern 1.0 over the full sphere
-    auto base = quadriga_lib::generate_arrayant_omni<double>();
+    auto base = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     base.center_freq = 1.0e9;
     std::vector<quadriga_lib::arrayant<double>> vec = {base};
 

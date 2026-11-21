@@ -14,7 +14,7 @@ assertElementsAlmostEqual( bw_el,  90.0, 'absolute', 0.5  );  % cos^2 -> ±45°
 assertElementsAlmostEqual( el_pt,   0.0, 'absolute', 0.5  );  % broadside
 
 %% Custom antenna recovers its input 3dB beamwidth
-ant_c = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [30, 20]);
+ant_c = quadriga_lib.arrayant_generate('custom', [], [], [30, 20]);
 [bw_az, bw_el, az_pt, el_pt] = quadriga_lib.arrayant_calc_beamwidth(ant_c);
 assertElementsAlmostEqual( bw_az, 30.0, 'absolute', 0.5 );
 assertElementsAlmostEqual( bw_el, 20.0, 'absolute', 0.5 );

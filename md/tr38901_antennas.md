@@ -14,7 +14,7 @@ Decided 2026-11-16: the panel type keeps the name `3GPP` (or `3gpp`; BS and pane
 
 ## 2. BS session
 
-Status: done (the panel type `3GPP` with the tuples below, Model-2, sub-array weights, steering per panel, G_max, the ULA on the panel path, multibeam with `beams`, the C++ dispatcher `arrayant_generate` behind thin MEX and Python wrappers). The library documentation (doc blocks of `arrayant_generate` and `generate_arrayant_3GPP`, the glossary) is the reference for the interface; this section keeps what the UT session builds on.
+Status: done (the panel type `3GPP` with the tuples below, Model-2, sub-array weights, steering per panel, G_max, the ULA on the panel path, multibeam with `beams`, the C++ dispatcher `arrayant_generate` behind thin MEX and Python wrappers). The library documentation (doc block of `arrayant_generate`, the glossary) is the reference for the interface; this section keeps what the UT session builds on.
 
 Encoding (shared by all types). Parameters are TR tuples as arrays, the same in C++, MEX and Python. Trailing entries may be omitted; inside a tuple, NaN (real tuples) or 0 (integer tuples `panel`, `ports`, `pol`, C++ `arma::uvec`) selects the default of that entry. Inputs a type does not use throw. The tuples carry degrees and dB without a `_deg` / `_dB` suffix; the glossary states the unit per entry. New shared names get their glossary entry in the same commit (`device_size`, `locations` with the UT session).
 

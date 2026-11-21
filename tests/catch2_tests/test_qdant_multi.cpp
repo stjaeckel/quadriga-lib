@@ -328,15 +328,15 @@ TEST_CASE("QDANT Multi - Non-speaker arrayant roundtrip")
 
     std::vector<quadriga_lib::arrayant<double>> vec;
 
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     omni.center_freq = 1000.0;
     vec.push_back(omni);
 
-    auto dipole = quadriga_lib::generate_arrayant_dipole<double>(10.0);
+    auto dipole = quadriga_lib::arrayant_generate<double>("dipole", 10.0);
     dipole.center_freq = 2000.0;
     vec.push_back(dipole);
 
-    auto hw = quadriga_lib::generate_arrayant_half_wave_dipole<double>(10.0);
+    auto hw = quadriga_lib::arrayant_generate<double>("half-wave-dipole", 10.0);
     hw.center_freq = 3000.0;
     vec.push_back(hw);
 
@@ -395,7 +395,7 @@ TEST_CASE("QDANT Multi - Invalid entry keeps existing file")
 {
     // Validation must happen before an existing file is removed
     std::string fn = "test_qdant_multi_invalid_keep.qdant";
-    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::qdant_write(fn, a);
     REQUIRE(std::filesystem::exists(fn));
     auto size_before = std::filesystem::file_size(fn);

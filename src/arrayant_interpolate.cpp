@@ -190,7 +190,7 @@ void quadriga_lib::arrayant_interpolate(
 
 ## Example:
 ```
-auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+auto ant = quadriga_lib::arrayant_generate<double>("custom");
 arma::mat azimuth = {0.0, 0.5 * arma::datum::pi, -0.5 * arma::datum::pi, arma::datum::pi};
 arma::mat elevation(1, azimuth.n_elem, arma::fill::zeros);
 arma::mat V_re, V_im, H_re, H_im;

@@ -11,7 +11,7 @@
 // powers; b_med (lower weighted median) and b_eff = (sum P / sum (P / b²))^(1/2) from the scatterers; the limits
 // sqrt(lambda·b_eff / 8) and 0.2·b_med and the displacement ratios. Fixture: make_rays of qd_test_rays.hpp (Tx (3,
 // -4, 25), Rx (120, 45, 1.5)). Supporting tasks: ssf_paths, get_channels_planar, get_channels_spherical,
-// generate_arrayant_*, ssf_scatterers, gbsm_rays_from_paths, qrt_paths_from_scatterers, qrt_file_*.
+// arrayant_generate, ssf_scatterers, gbsm_rays_from_paths, qrt_paths_from_scatterers, qrt_file_*.
 // Units: [m], [s], [rad], [Hz].
 // Tolerances: coefficients 1e-12 relative to the largest coefficient of the snapshot (sums over rays can cancel);
 // delays 1e-12 relative to the largest delay; displacements up to 1 m, so that different evaluation orders of the
@@ -54,7 +54,7 @@ namespace
     // Dual-polarised (+-45 deg) 2x2 panel, 8 ports, 5 deg pattern grid
     arr_t panel(double f)
     {
-        return quadriga_lib::generate_arrayant_3GPP<double>({2, 2}, f, {}, {}, {3}, {}, {}, {}, 5.0);
+        return quadriga_lib::arrayant_generate<double>("3GPP", 5.0, f, {}, {2, 2}, {}, {3});
     }
 
     arma::vec mirror(const arma::vec &x) { return arma::vec{x(0), x(1), -x(2)}; }
@@ -467,7 +467,7 @@ TEST_CASE("gbsm_single_link_channel - use_absolute_delays in phase and drift")
 
 TEST_CASE("gbsm_single_link_channel - n_ray = 0 and a single kept ray")
 {
-    const arr_t tx = panel(3.5e9), rx = quadriga_lib::generate_arrayant_xpol<double>(5.0);
+    const arr_t tx = panel(3.5e9), rx = quadriga_lib::arrayant_generate<double>("xpol", 5.0);
     const rays_t e0 = make_rays(57, false, false, 0, 1, "38.901");
     rays_t one = make_rays(57, false, false, 3, 1, "38.901", true);
     one.power(1, 0) = 0.0; // rays 1 and 2 have power 0: only ray 0 is kept
@@ -496,7 +496,7 @@ TEST_CASE("gbsm_single_link_channel - n_ray = 0 and a single kept ray")
 
 TEST_CASE("gbsm_single_link_channel - LOS and GR taps are always present and taps are ascending")
 {
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     rays_t r = make_rays(58, true, true, 6, 1, "38.901");
     args_t a{&omni, &omni, &r};
     a.out = "taps";
@@ -524,7 +524,7 @@ TEST_CASE("gbsm_single_link_channel - LOS and GR taps are always present and tap
 
 TEST_CASE("gbsm_single_link_channel - par holds the validity report")
 {
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     rays_t s = make_rays(59, true, true, 6, 1, "38.901", true); // given scatterers, Tx and Rx distances differ
     const double lam = c0 / s.center_freq(0);
     double bm[2], be[2];
@@ -628,7 +628,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
 
 TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output")
 {
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     const rays_t g = make_rays(60, true, true, 6, 1, "38.901", true);
     const rays_t n = make_rays(60, true, false, 6, 1, "38.901", true);
     for (const rays_t *r : {&g, &n})
@@ -679,7 +679,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
 
 TEST_CASE("gbsm_single_link_channel - the snapshot count follows the positions and orientations")
 {
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     const rays_t r = make_rays(61, true, true, 6, 1, "38.901");
     const arma::mat one = arma::vec{120.0, 45.0, 1.5}, four = arma::repmat(one, 1, 4), ori4(3, 4, arma::fill::zeros);
     const arma::mat ori3(3, 3, arma::fill::zeros), two = arma::repmat(one, 1, 2);
@@ -808,7 +808,7 @@ TEST_CASE("gbsm_single_link_channel - results do not depend on the thread count"
 
 TEST_CASE("gbsm_single_link_channel - the channel is valid and stores the positions as columns")
 {
-    const arr_t tx = panel(3.5e9), rx = quadriga_lib::generate_arrayant_xpol<double>(5.0);
+    const arr_t tx = panel(3.5e9), rx = quadriga_lib::arrayant_generate<double>("xpol", 5.0);
     rays_t r = make_rays(64, true, true, 6, 1, "38.901", true);
     args_t a{&tx, &rx, &r};
     a.R = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}.t(), a.Ro = arma::vec{0.1, 0.2, 0.3};
@@ -830,7 +830,7 @@ TEST_CASE("gbsm_single_link_channel - the channel is valid and stores the positi
 
 TEST_CASE("gbsm_single_link_channel - input validation")
 {
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     rays_t r = make_rays(65, true, true, 6, 1, "quadriga", true), u = make_rays(65, true, true, 6, 1, "quadriga");
     const arma::vec lg = {-80.0};
     auto call = [&](const arr_t &tx, const arr_t &rx, const rays_t &x, const arma::vec &g, const std::string &mob,
@@ -909,8 +909,8 @@ TEST_CASE("gbsm_single_link_channel - a positive tilt points down (3GPP TR 38.90
     // LOS only, the Rx 10.5 degree below the Tx: a Tx beam along x, turned to the Rx heading, reaches the Rx when
     // tilted down by +10.5 degree and misses it when tilted up by the same angle
     const rays_t r = make_rays(5, true, false, 0, 1, "38.901");
-    const arr_t beam = quadriga_lib::generate_arrayant_custom<double>(20.0, 20.0, 0.0, 5.0);
-    const arr_t omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const arr_t beam = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {20.0, 20.0});
+    const arr_t omni = quadriga_lib::arrayant_generate<double>("omni", 5.0);
     const double h = std::atan2(49.0, 117.0), e = std::atan2(23.5, std::hypot(117.0, 49.0));
     args_t a{&beam, &omni, &r};
     auto power = [&](double tilt)
@@ -950,7 +950,7 @@ TEST_CASE("gbsm_single_link_channel - [1, 3] positions and orientations equal th
 {
     const rays_t r = make_rays(66, true, true, 6, 1, "38.901", true);
     const arr_t tx = panel(3.5e9);
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     const arma::vec lg = {-80.0};
     const arma::mat T = arma::vec{3.2, -4.1, 25.0}, R = arma::vec{120.3, 45.2, 1.5};
     const arma::mat To = arma::vec{0.1, -0.2, 0.7}, Ro = arma::vec{0.0, 0.3, -2.0};
@@ -974,7 +974,7 @@ TEST_CASE("gbsm_single_link_channel - an empty position or orientation counts as
 {
     const rays_t r = make_rays(67, true, true, 6, 1, "38.901", true);
     const arr_t tx = panel(3.5e9);
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     const arma::vec lg = {-80.0};
     const arma::mat e, R = arma::mat{{120.3, 45.2, 1.5}, {120.6, 45.3, 1.6}}.t();
     for (const char *mob : {"phase", "drift"})

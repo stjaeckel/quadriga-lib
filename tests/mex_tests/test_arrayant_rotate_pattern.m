@@ -8,7 +8,7 @@ function test_arrayant_rotate_pattern
 
 %% Single-frequency tests
 
-ant = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [5, 20]);
+ant = quadriga_lib.arrayant_generate('custom', [], [], [5, 20]);
 
 out = quadriga_lib.arrayant_rotate_pattern(ant, [0; 0; pi/2]);
 
@@ -177,7 +177,7 @@ end
 %% Multi-frequency (struct-array) tests
 
 % Build a 2-entry frequency-dependent struct array
-mf_ant = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [5, 20]);
+mf_ant = quadriga_lib.arrayant_generate('custom', [], [], [5, 20]);
 mf_ant.center_freq = 1e9;  % ensure field exists for struct-array assembly
 
 clear mf_multi

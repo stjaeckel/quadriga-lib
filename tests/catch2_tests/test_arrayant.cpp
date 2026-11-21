@@ -21,8 +21,8 @@
 
 TEST_CASE("Arrayant append")
 {
-    auto ant1 = quadriga_lib::generate_arrayant_dipole<float>();
-    auto ant2 = quadriga_lib::generate_arrayant_custom<float>(10.0, 10.0);
+    auto ant1 = quadriga_lib::arrayant_generate<float>("dipole");
+    auto ant2 = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {10.0, 10.0});
 
     ant1.coupling_re.at(0) = 2.0;
     ant2.coupling_re.at(0) = 3.0;
@@ -43,7 +43,7 @@ TEST_CASE("Arrayant append")
 // is_valid always checks the data: a value changed in place is found although the data pointers are unchanged
 TEST_CASE("Arrayant is_valid - Checks the data")
 {
-    auto a = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     a.azimuth_grid.memptr()[1] = 4.0; // Out of range, written in place
     CHECK(a.is_valid() == "Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).");
 
@@ -70,12 +70,12 @@ TEST_CASE("Arrayant is_valid - Checks the data")
 // of ports differs from the number of elements, and treat an empty coupling_im as zeros.
 TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than elements")
 {
-    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(a, 0, {1});
     a.coupling_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
     a.coupling_im = arma::mat(arma::colvec{0.5, -0.5});
 
-    auto b = quadriga_lib::generate_arrayant_xpol<double>(10.0); // 2 elements, 2 ports (identity)
+    auto b = quadriga_lib::arrayant_generate<double>("xpol", 10.0); // 2 elements, 2 ports (identity)
     b.coupling_re = {{2.0, 0.0}, {0.0, 3.0}};
     b.coupling_im = {{0.0, 0.25}, {0.0, 0.0}};
 
@@ -106,7 +106,7 @@ TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than eleme
 
 TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
 {
-    auto b = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto b = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     b.coupling_re = arma::mat(1, 1, arma::fill::value(2.0));
     b.coupling_im.reset();
     REQUIRE(b.is_valid().empty());
@@ -120,7 +120,7 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
     CHECK(arma::all(arma::vectorise(d.coupling_im) == 0.0));
 
     // Both couplings empty (allowed by is_valid): identity blocks
-    auto e = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    auto e = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
     e.coupling_re.reset(), e.coupling_im.reset();
     REQUIRE(e.is_valid().empty());
     auto f = quadriga_lib::arrayant_concat(e, b);
@@ -140,7 +140,7 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
 // pattern is left unchanged.
 TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
 {
-    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0); // 37 x 73
+    auto a = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {90.0, 90.0}); // 37 x 73
     const double d_ref = qd_directivity(a, 0);
     quadriga_lib::arrayant<double> o_ref;
     o_ref = a, quadriga_lib::arrayant_remove_zeros(o_ref);
@@ -158,7 +158,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
     }
 
     // Float pattern scaled by 1e-8 (power 1e-16)
-    auto af = quadriga_lib::generate_arrayant_custom<float>(90.0f, 90.0f, 0.0f, 5.0f);
+    auto af = quadriga_lib::arrayant_generate<float>("custom", 5.0f, NAN, {90.0f, 90.0f});
     const float df_ref = qd_directivity(af, 0);
     quadriga_lib::arrayant<float> of_ref;
     of_ref = af, quadriga_lib::arrayant_remove_zeros(of_ref);
@@ -170,7 +170,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
     CHECK(of.n_azimuth() == of_ref.n_azimuth());
 
     // All-zero pattern: unchanged (in place and into an output), directivity 0
-    auto z = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto z = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     z.e_theta_re.zeros();
     CHECK(qd_directivity(z, 0) == 0.0);
     quadriga_lib::arrayant<double> oz;
@@ -225,7 +225,7 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
 // Copy_element must reject an empty destination with a clear message.
 TEST_CASE("Arrayant copy_element - Empty destination")
 {
-    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
 
     try
     {
@@ -352,7 +352,7 @@ TEST_CASE("Arrayant remove_zeros - non-finite field values")
     // A NaN in every azimuth column would remove all columns; an Inf would keep the pattern unchanged
     for (double v : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})
     {
-        auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+        auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
         a.e_theta_re.slice(0).row(3).fill(v);
         CHECK_THROWS_AS(quadriga_lib::arrayant_remove_zeros(a), std::invalid_argument);
         CHECK(a.n_azimuth() == 37);
@@ -361,7 +361,7 @@ TEST_CASE("Arrayant remove_zeros - non-finite field values")
 
 TEST_CASE("Arrayant calc_beamwidth - outputs that are the same variable")
 {
-    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 60.0, 0.0, 10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 60.0});
     arma::vec bw_az, bw_el, p_az, p_el, d;
     CHECK_NOTHROW(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_el, &p_az, &p_el));
     CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_az), std::invalid_argument);

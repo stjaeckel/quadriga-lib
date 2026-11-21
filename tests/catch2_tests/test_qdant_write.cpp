@@ -233,7 +233,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
     for (double scale : {1e-6, 1e-12, 1e-30})
     {
         std::remove(fn.c_str());
-        auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.1, 10.0);
+        auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 90.0, 10.0});
         a.e_theta_re *= scale;
         quadriga_lib::qdant_write(fn, a);
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
@@ -244,7 +244,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
     // One sample at about -110 dB (about -120 dB below the peak) and one exact zero in a normal pattern
     {
         std::remove(fn.c_str());
-        auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.1, 10.0);
+        auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 90.0, 10.0});
         a.e_theta_re(1, 0, 0) = 3e-6;
         a.e_theta_re(2, 0, 0) = 0.0;
         quadriga_lib::qdant_write(fn, a);
@@ -258,7 +258,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
     // Element 2 of 3 is zero everywhere, element 3 is at -200 dB (accurate relative to its own peak)
     {
         std::remove(fn.c_str());
-        auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.1, 10.0);
+        auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 90.0, 10.0});
         quadriga_lib::arrayant_copy_element(a, 0, arma::uvec{1, 2});
         a.e_theta_re.slice(1).zeros(), a.e_theta_im.slice(1).zeros(), a.e_phi_re.slice(1).zeros(), a.e_phi_im.slice(1).zeros();
         a.e_theta_re.slice(2) *= 1e-10;
@@ -274,7 +274,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
     // (about -400) as float, whose resolution there is 3e-5 dB, i.e. 2e-6 of the amplitude
     {
         std::remove(fn.c_str());
-        auto a = quadriga_lib::generate_arrayant_custom<float>(90.0f, 90.0f, 0.1f, 10.0f);
+        auto a = quadriga_lib::arrayant_generate<float>("custom", 10.0f, NAN, {90.0f, 90.0f, 10.0});
         a.e_theta_re *= 1e-20f;
         quadriga_lib::qdant_write(fn, a);
         auto b = quadriga_lib::qdant_read<float>(fn, 1);
@@ -358,7 +358,7 @@ TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
         return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     };
 
-    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(a, 0, {1, 2});
     a.element_pos = {{1200.0, 0.0001, 2.5e-7}, {-0.0, 1e-5, 1e15}, {123456.0, 0.1, 16777216.0}};
     std::remove(fn.c_str());
@@ -399,7 +399,7 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     const std::string fn = "test_qdant_layout_reset.qdant";
     std::remove(fn.c_str());
 
-    auto a = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    auto a = quadriga_lib::arrayant_generate<double>("omni", 30.0);
     quadriga_lib::qdant_write(fn, a, 1), quadriga_lib::qdant_write(fn, a, 2), quadriga_lib::qdant_write(fn, a, 3);
     arma::u32_mat L = {{1, 2}, {3, 3}};
     quadriga_lib::qdant_write(fn, a, 3, L);
@@ -440,7 +440,7 @@ TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace pr
           << "<xx:EthetaMag>0 0 0 0 0 0 0 0 0</xx:EthetaMag>\n</xx:arrayant></qdant>\n";
     }
 
-    auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
     ant.name = "second";
     unsigned id = quadriga_lib::qdant_write(fn, ant); // appended with ID 2
     CHECK(id == 2);
@@ -474,7 +474,7 @@ TEST_CASE("Arrayant writing to QDANT file - Field values with power above the do
     // |E|^2 overflows double for amplitudes above about 1e154; the written dB values must stay finite
     const std::string fn = "test_qdant_large.qdant";
     std::remove(fn.c_str());
-    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 30.0);
+    auto a = quadriga_lib::arrayant_generate<double>("custom", 30.0, NAN, {90.0, 90.0});
     a.e_theta_re *= 1.0e160;
     a.e_phi_im = a.e_theta_re * 0.5;
     quadriga_lib::qdant_write(fn, a, 1);

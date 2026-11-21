@@ -58,14 +58,14 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("res") = NAN,
           py::kw_only(),
           py::arg("center_freq") = 299792458.0,
+          py::arg("element") = py::none(),
           py::arg("panel") = py::none(),
           py::arg("spacing") = py::none(),
-          py::arg("ports") = py::none(),
           py::arg("pol") = py::none(),
+          py::arg("ports") = py::none(),
           py::arg("steer") = py::none(),
-          py::arg("element") = py::none(),
-          py::arg("pattern") = py::none(),
           py::arg("beams") = py::none(),
+          py::arg("pattern") = py::none(),
           py::arg("separate_beams") = false,
           py::arg("apply_weights") = false);
 

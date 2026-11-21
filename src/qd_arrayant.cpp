@@ -11,7 +11,7 @@
 #include "qd_helpers_arrayant.hpp"
 
 /*!SECTION
-Array antenna class
+Array antenna functions
 SECTION!*/
 
 /*!MD
@@ -43,25 +43,24 @@ Class for storing and manipulating array antenna models
 | `dtype center_freq`          | scalar                                 | Center frequency                                               |
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
-## Simple member functions:<br>
-| Function         | Description                                                            |
-| ---------------- | ---------------------------------------------------------------------- |
-| `.n_elevation()` | Number of elevation angles                                             |
-| `.n_azimuth()`   | Number of azimuth angles                                               |
-| `.n_elements()`  | Number of antenna elements                                             |
-| `.n_ports()`     | Number of ports (columns of coupling matrix)                           |
-| `.reset()`       | Clears all data, resetting size to zero                                |
-| `.is_valid()`    | Returns `""` if valid, or an error message string                      |
+## Member functions:<br>
+| Function                                                  | Description                                                                                                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.n_elevation()`                                          | Number of elevation angles                                                                                                                                          |
+| `.n_azimuth()`                                            | Number of azimuth angles                                                                                                                                            |
+| `.n_elements()`                                           | Number of antenna elements                                                                                                                                          |
+| `.n_ports()`                                              | Number of ports (columns of coupling matrix)                                                                                                                        |
+| `.reset()`                                                | Clears all data, resetting size to zero                                                                                                                             |
+| `.set_size(n_elevation, n_azimuth, n_elements, n_ports)` | Resizes all members (`arma::uword` sizes); no-op if they match; after a resize `element_pos` is zero, `coupling_re` identity, `coupling_im` zero, field data undefined |
+| `.is_valid()`                                             | `std::string`: empty if the object is valid, else an error message                                                                                                  |
 
-## Complex member functions:<br>
-| Function      | Description                           |
-| ------------- | ------------------------------------- |
-| .[[set_size]] | Resize the arrayant to new dimensions |
-| .[[is_valid]] | Validate arrayant integrity           |
+- `is_valid()` always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and coupling matrix; empty `element_pos` and coupling are allowed
+- A passing check marks the object as validated: the library functions then skip the full check as long as no data member was reallocated or resized; values changed in place after the check are not seen by them
+- The mark is updated atomically, so `is_valid()` may be called while other threads read the object; a copy is marked if its source passes the full check, a moved-to object takes over the mark of its source
+- The free functions of this section compute on an arrayant and read and write it (e.g. [[arrayant_calc_beamwidth]], [[arrayant_calc_directivity]], [[arrayant_concat]], [[arrayant_combine_pattern]], [[arrayant_copy_element]], [[arrayant_rotate_pattern]], [[qdant_write]]); [[arrayant_generate]] creates one
 
-Computations and file I/O on an arrayant are free functions, see section "Array antenna functions"
-(e.g. [[arrayant_calc_beamwidth]], [[arrayant_calc_directivity]], [[arrayant_concat]], [[arrayant_combine_pattern]],
-[[arrayant_copy_element]], [[arrayant_rotate_pattern]], [[qdant_write]]).
+## See also:
+- [[arrayant_is_valid_multi]] (multi-frequency counterpart of `is_valid()`)
 MD!*/
 
 template <typename dtype>
@@ -124,29 +123,6 @@ void quadriga_lib::arrayant<dtype>::reset()
     center_freq = dtype(qd_speed_of_light);
 }
 
-/*!MD
-# .set_size
-Resize an arrayant object to new dimensions
-
-- No-op if current dimensions already match
-- After resize: element_pos is zeroed, coupling_re set to identity, coupling_im zeroed; all other field data is undefined
-
-## Declaration:
-```
-void quadriga_lib::arrayant<dtype>::set_size(
-    arma::uword n_elevation,
-    arma::uword n_azimuth,
-    arma::uword n_elements,
-    arma::uword n_ports);
-```
-
-## Inputs:
-- **`n_elevation`** — Number of elevation samples
-- **`n_azimuth`** — Number of azimuth samples
-- **`n_elements`** — Number of antenna elements
-- **`n_ports`** — Number of ports (columns of coupling matrix)
-MD!*/
-
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uword n_azimuth,
                                              arma::uword n_elements, arma::uword n_ports)
@@ -169,29 +145,6 @@ void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uwor
     if (coupling_im.n_rows != n_elements || coupling_im.n_cols != n_ports)
         coupling_im.zeros(n_elements, n_ports);
 }
-
-/*!MD
-# .is_valid
-Validate the integrity of an arrayant object
-
-- Always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and
-  coupling matrix; empty `element_pos` and coupling are allowed
-- A passing check marks the object as validated: the library functions then skip the full check as long as no data
-  member was reallocated or resized; values changed in place after the check are not seen by them
-- The mark is updated atomically, so `is_valid` may be called while other threads read the object
-- A copy is marked if its source passes the full check; a moved-to object takes over the mark of its source
-
-## Declaration:
-```
-std::string quadriga_lib::arrayant<dtype>::is_valid() const;
-```
-
-## Returns:
-- Empty string if valid; error message string if invalid
-
-## See also:
-- [[arrayant_is_valid_multi]] (multi-freq counterpart)
-MD!*/
 
 // Range and order of an angle grid in one pass; stops at the first value out of range
 template <typename dtype>

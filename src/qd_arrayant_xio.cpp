@@ -282,7 +282,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 - Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match the first entry."`
 
 ## See also:
-- .[[is_valid]] (per-entry validation called internally)
+- [[arrayant]] (`is_valid()`, the per-entry validation called internally)
 - [[generate_speaker]] (typical source of multi-frequency arrayant vectors)
 MD!*/
 

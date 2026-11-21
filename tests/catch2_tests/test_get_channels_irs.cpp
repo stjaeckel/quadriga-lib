@@ -13,7 +13,7 @@
 
 TEST_CASE("Get Channels IRS - Path loss test")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
 
     arma::fmat fbs_pos_1(3, 2); //     FBS @ 11 m height
     fbs_pos_1(0, 0) = 10.0;     //      |
@@ -86,7 +86,7 @@ TEST_CASE("Get Channels IRS - Minimal test")
     double C = 299792458.0;
     double f0 = C / lambda;
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     quadriga_lib::arrayant_copy_element(ant, 0, {2});
@@ -565,7 +565,7 @@ TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths")
     // TX (0,0,0) -> IRS (50,0,0) -> RX (100,0,0); one NLOS path per segment whose path_length exceeds the
     // TX-FBS-LBS-IRS (IRS-FBS-LBS-RX) polyline. The IRS has one element and a single unit codebook entry.
     const double C = 299792458.0, fc = 3.0e9, k = 2.0 * arma::datum::pi * fc / C;
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     auto irs = ant;
     irs.coupling_re.ones(1, 1);
     irs.coupling_im.reset();
@@ -681,7 +681,7 @@ TEST_CASE("Tools - Combine IRS Coord - shapes of interact_coord_1 / _2 are check
 TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
 {
     // get_channels_spherical returns empty segment outputs, so the IRS channel is [n_rx_ports, n_tx_ports, 0]
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     auto irs = ant;
     irs.coupling_re = arma::mat({{1.0, 0.0}, {0.0, 1.0}});
@@ -729,7 +729,7 @@ TEST_CASE("combine_irs_coord - outputs that alias inputs")
 
 TEST_CASE("Get Channels IRS - outputs that alias inputs")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     auto irs = ant;
     irs.coupling_re = arma::mat({1.0});
     irs.coupling_im = arma::mat({0.0});
@@ -764,8 +764,8 @@ TEST_CASE("get_channels_irs - a positive tilt points down (3GPP TR 38.901)")
     // (heading pi). A beam along x reaches the other end only when turned toward it: TX tilt +pi/4 (down), RX tilt
     // -pi/4 (up, heading 0 toward the IRS), IRS tilt -pi/4 (up, toward the TX; the level RX is 45 degree off either way).
     const double q = arma::datum::pi / 4.0, pi = arma::datum::pi;
-    const auto beam = quadriga_lib::generate_arrayant_custom<double>(40.0, 40.0, 0.0, 5.0);
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const auto beam = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {40.0, 40.0});
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 5.0);
     const arma::mat pos_1(arma::vec{5.0, 0.0, 5.0}); // A scatterer on the LOS of the TX-IRS segment
     const arma::vec gain = {1.0}, length = {0.0};
     arma::mat M(8, 1, arma::fill::zeros);
@@ -788,7 +788,7 @@ TEST_CASE("get_channels_irs - a positive tilt points down (3GPP TR 38.901)")
 TEST_CASE("Get Channels IRS - Position and orientation shapes")
 {
     // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     auto irs = ant;
     irs.coupling_re = arma::mat({1.0});
     irs.coupling_im = arma::mat({0.0});
@@ -829,8 +829,8 @@ TEST_CASE("Get Channels IRS - Empty element_pos and coupling_im of any shape")
 {
     // An empty element_pos ([0, n] as well as [0, 0]) places all IRS elements at the phase centre, an empty coupling_im
     // ([n, 0] as well as [0, 0]) means real weights; both are valid and give the result of the explicit zeros
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto irs = quadriga_lib::arrayant_generate<double>("ula", 10.0, 3.5e9, {}, {1, 4}, {0.5});
     irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_re(1, 2) = -1.0;
     irs.element_pos.zeros(3, 4), irs.coupling_im.zeros(4, 3);
     const arma::mat fb1 = arma::mat({5.0, 5.0, 7.0}).t(), fb2 = arma::mat({15.0, 5.0, 3.0}).t();
@@ -869,8 +869,8 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
     // irs_array_2 gives the patterns of the RX-facing side only; the weights and element positions come from irs_array,
     // its own are ignored. Both arrays are inputs and keep their data, so a repeated call gives the same result, and the
     // second array may use another angle grid.
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto irs = quadriga_lib::arrayant_generate<double>("ula", 10.0, 3.5e9, {}, {1, 4}, {0.5});
     irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_im.zeros(4, 3);
     auto irs2 = irs;
     irs2.e_theta_re *= 0.5;
@@ -912,7 +912,7 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
     }
 
     // The same second IRS on a 5 degree grid
-    auto irs3 = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, {}, 5.0);
+    auto irs3 = quadriga_lib::arrayant_generate<double>("ula", 5.0, 3.5e9, {}, {1, 4}, {0.5});
     irs3.e_theta_re *= 0.5, irs3.coupling_re = irs.coupling_re, irs3.coupling_im.reset(), irs3.element_pos = irs.element_pos;
     arma::cube cr_3, ci_3;
     REQUIRE_NOTHROW(run(irs3, cr_3, ci_3));
@@ -926,9 +926,9 @@ TEST_CASE("Get Channels IRS - Each element reflects once")
     // get_channels_spherical with identity IRS coupling, the weights w applied once; delays and angles are the
     // |w|^2-weighted means over the elements (angles from the mean unit direction vector)
     const double fc = 3.5e9;
-    const auto tx = quadriga_lib::generate_arrayant_xpol<double>(10.0);
-    const auto rx = quadriga_lib::generate_arrayant_ula<double>(2, fc, 0.5, {}, 10.0);
-    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, fc, 0.5, {}, 10.0);
+    const auto tx = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
+    const auto rx = quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 2}, {0.5});
+    auto irs = quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 4}, {0.5});
     const arma::cx_vec w = {{0.8, 0.3}, {-0.2, 1.1}, {0.5, -0.7}, {1.0, 0.0}};
     irs.coupling_re = arma::real(w), irs.coupling_im = arma::imag(w);
     auto ide = irs;
@@ -990,7 +990,7 @@ TEST_CASE("Get Channels IRS - Each element reflects once")
     CHECK(a_err < 1e-12);
 
     // One element: the weight phase appears once (30 degree, not 60), at f = 0 without the delay phase
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     auto one = omni;
     one.coupling_re = arma::mat({std::cos(arma::datum::pi / 6.0)}), one.coupling_im = arma::mat({std::sin(arma::datum::pi / 6.0)});
     const arma::mat fs1 = arma::mat({10.0, 0.0, 1.0}).t(), fs2 = arma::mat({30.0, 0.0, 1.0}).t();
@@ -1006,9 +1006,9 @@ TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is
 {
     // The kernel reaches both segments: AVX2 agrees with GENERIC; auto selects GENERIC (identical results); invalid
     // values throw
-    const auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
-    const auto rx = quadriga_lib::generate_arrayant_xpol<double>(10.0);
-    auto irs = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    const auto tx = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {90.0, 90.0});
+    const auto rx = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
+    auto irs = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(irs, 0, {1, 2});
     irs.element_pos(1, 0) = 0.05, irs.element_pos(1, 2) = -0.05;
     irs.coupling_re.ones(3, 1), irs.coupling_im.reset();

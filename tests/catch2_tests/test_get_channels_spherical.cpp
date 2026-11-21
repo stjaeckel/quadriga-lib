@@ -22,7 +22,7 @@ TEST_CASE("Get Channels Spherical - Minimal test")
 {
     float pi = 3.141592653589793f;
 
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 1) = -1.0;
@@ -145,13 +145,13 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
 {
     double pi = 3.141592653589793f;
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 15;
     ant.element_pos(1, 1) = -15;
     ant.e_theta_re.slice(1) *= 2;
 
-    auto probe = quadriga_lib::generate_arrayant_xpol<double>();
+    auto probe = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
 
     arma::mat fbs_pos(3, 1);
     fbs_pos(0, 0) = 10.0;
@@ -239,7 +239,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS")
 
     float pi = 3.141592653589793f;
 
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
 
     // LOS-Path and LBS / FBS are reversed
 
@@ -315,7 +315,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS")
 
 TEST_CASE("Get Channels Spherical - Coupling")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 2) = -1.0;
@@ -426,7 +426,7 @@ TEST_CASE("Get Channels Spherical - Coupling")
 
 TEST_CASE("Get Channels Spherical - Error handling: Dimension mismatches")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 2, arma::fill::zeros);
     fbs_pos(0, 0) = 10.0;
@@ -499,8 +499,8 @@ TEST_CASE("Get Channels Spherical - Error handling: Dimension mismatches")
 TEST_CASE("Get Channels Spherical - SISO single path LOS")
 {
     // Simplest possible scenario: 1 TX element, 1 RX element, 1 LOS path along x-axis
-    auto tx = quadriga_lib::generate_arrayant_omni<double>();
-    auto rx = quadriga_lib::generate_arrayant_omni<double>();
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    auto rx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double dist = 100.0;
 
@@ -559,7 +559,7 @@ TEST_CASE("Get Channels Spherical - SISO single path LOS")
 
 TEST_CASE("Get Channels Spherical - Zero center frequency disables phase")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -592,7 +592,7 @@ TEST_CASE("Get Channels Spherical - Zero center frequency disables phase")
 
 TEST_CASE("Get Channels Spherical - Absolute vs relative delays")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double dist = 50.0;
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
@@ -641,7 +641,7 @@ TEST_CASE("Get Channels Spherical - Absolute vs relative delays")
 TEST_CASE("Get Channels Spherical - Optional angle outputs as nullptr")
 {
     // Verify the function works when angle outputs are not requested
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -689,7 +689,7 @@ TEST_CASE("Get Channels Spherical - Optional angle outputs as nullptr")
 TEST_CASE("Get Channels Spherical - Multiple NLOS paths, relative delays")
 {
     // SISO scenario with 3 paths: 1 LOS + 2 NLOS
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double dist = 100.0;
     double C = 299792458.0;
@@ -758,7 +758,7 @@ TEST_CASE("Get Channels Spherical - Multiple NLOS paths, relative delays")
 
 TEST_CASE("Get Channels Spherical - Path gain zero produces zero coefficients")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 2, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0; // LOS midpoint
@@ -797,8 +797,8 @@ TEST_CASE("Get Channels Spherical - Path gain zero produces zero coefficients")
 TEST_CASE("Get Channels Spherical - Double precision SISO")
 {
     // Repeat of the single-path LOS test in double precision to verify template instantiation
-    auto tx = quadriga_lib::generate_arrayant_omni<double>();
-    auto rx = quadriga_lib::generate_arrayant_omni<double>();
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    auto rx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double dist = 200.0;
     double C = 299792458.0;
@@ -836,8 +836,8 @@ TEST_CASE("Get Channels Spherical - Double precision SISO")
 TEST_CASE("Get Channels Spherical - Float precision SISO")
 {
     // Same test in float to verify float template instantiation
-    auto tx = quadriga_lib::generate_arrayant_omni<float>();
-    auto rx = quadriga_lib::generate_arrayant_omni<float>();
+    auto tx = quadriga_lib::arrayant_generate<float>("omni", 1.0);
+    auto rx = quadriga_lib::arrayant_generate<float>("omni", 1.0);
 
     float dist = 200.0f;
     float C = 299792458.0f;
@@ -876,7 +876,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS with single path")
 {
     // When add_fake_los_path = true, output should have n_path + 1 slices
     // The fake LOS path (slice 0) should have zero power
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -916,7 +916,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS with single path")
 TEST_CASE("Get Channels Spherical - Vertical path (elevation angles)")
 {
     // TX at origin, RX directly above → departure elevation = 90 deg
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double pi = 3.141592653589793;
     double height = 50.0;
@@ -956,7 +956,7 @@ TEST_CASE("Get Channels Spherical - Vertical path (elevation angles)")
 TEST_CASE("Get Channels Spherical - Diagonal path (non-trivial azimuth + elevation)")
 {
     // TX at origin, RX at (100, 100, 0) → AOD should be 45 deg
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double pi = 3.141592653589793;
     double d = 100.0;
@@ -1002,7 +1002,7 @@ TEST_CASE("Get Channels Spherical - Diagonal path (non-trivial azimuth + elevati
 TEST_CASE("Get Channels Spherical - Complex polarization transfer matrix M")
 {
     // Test with non-trivial imaginary components in M
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -1043,8 +1043,8 @@ TEST_CASE("Get Channels Spherical - RX rotation")
     // Test that rotating the RX antenna affects the channel coefficients
     double pi = 3.141592653589793;
 
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    auto probe = quadriga_lib::generate_arrayant_xpol<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    auto probe = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -1097,7 +1097,7 @@ TEST_CASE("Get Channels Spherical - RX rotation")
 TEST_CASE("Get Channels Spherical - TX along negative x-axis")
 {
     // Verify angles when RX is in the -x direction from TX
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     double pi = 3.141592653589793;
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
@@ -1131,7 +1131,7 @@ TEST_CASE("Get Channels Spherical - TX along negative x-axis")
 TEST_CASE("Get Channels Spherical - FBS and LBS at different positions")
 {
     // Verify delay computation when FBS != LBS (two-bounce scenario)
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     double C = 299792458.0;
 
     // TX at (0,0,0), RX at (100,0,0)
@@ -1183,7 +1183,7 @@ TEST_CASE("Get Channels Spherical - FBS and LBS at different positions")
 TEST_CASE("Get Channels Spherical - Phase with center frequency")
 {
     // Verify that center frequency correctly introduces phase shifts
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     double dist = 100.0;
     double C = 299792458.0;
@@ -1247,14 +1247,14 @@ TEST_CASE("Get Channels Spherical - Phase with center frequency")
 TEST_CASE("Get Channels Spherical - Output size with MIMO and multiple paths")
 {
     // Verify output cube dimensions for 2x3 MIMO with 4 paths
-    auto tx = quadriga_lib::generate_arrayant_omni<double>();
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     quadriga_lib::arrayant_copy_element(tx, 0, {2});
     tx.element_pos(1, 0) = 0.5;
     tx.element_pos(1, 1) = 0.0;
     tx.element_pos(1, 2) = -0.5;
 
-    auto rx = quadriga_lib::generate_arrayant_omni<double>();
+    auto rx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(rx, 0, {1});
     rx.element_pos(1, 0) = 0.5;
     rx.element_pos(1, 1) = -0.5;
@@ -1327,7 +1327,7 @@ TEST_CASE("Get Channels Spherical - Output size with MIMO and multiple paths")
 
 TEST_CASE("Get Channels Spherical - Physical consistency: delays positive and monotonic ordering")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 3, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -1366,7 +1366,7 @@ TEST_CASE("Get Channels Spherical - Physical consistency: delays positive and mo
 TEST_CASE("Get Channels Spherical - TX/RX at same height, path along y-axis")
 {
     // TX and RX separated along y-axis only
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     double pi = 3.141592653589793;
 
     double dist = 80.0;
@@ -1406,12 +1406,12 @@ TEST_CASE("Get Channels Spherical - TX/RX at same height, path along y-axis")
 TEST_CASE("Get Channels Spherical - Asymmetric TX/RX antennas")
 {
     // TX has 2 elements, RX has 1 element → output should be [1, 2, n_path]
-    auto tx = quadriga_lib::generate_arrayant_omni<double>();
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos(1, 0) = 0.5;
     tx.element_pos(1, 1) = -0.5;
 
-    auto rx = quadriga_lib::generate_arrayant_omni<double>();
+    auto rx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
     fbs_pos(0, 0) = 50.0;
@@ -1443,7 +1443,7 @@ TEST_CASE("Get Channels Spherical - Asymmetric TX/RX antennas")
 TEST_CASE("Get Channels Spherical - Offset TX/RX positions")
 {
     // TX and RX not at origin, verify position handling
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     double C = 299792458.0;
 
     double Tx = 10.0, Ty = 20.0, Tz = 5.0;
@@ -1488,7 +1488,7 @@ TEST_CASE("Get Channels Spherical - Cross-polarization transfer via M matrix")
     // Test that VH and HV entries in M produce cross-polarization coupling.
     // The xpol antenna has e_phi = 0 at azimuth 0 and pi (boresight/back).
     // We must use an off-axis scatterer so the H-pol (phi) response is non-zero.
-    auto probe = quadriga_lib::generate_arrayant_xpol<double>();
+    auto probe = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
 
     // Scatterer at (50, 50, 0): AOD = 45 deg, AOA = 135 deg → non-zero e_phi
     arma::mat fbs_pos(3, 1, arma::fill::zeros);
@@ -1558,7 +1558,7 @@ TEST_CASE("Get Channels Spherical - Cross-polarization transfer via M matrix")
 TEST_CASE("Get Channels Spherical - Large number of paths")
 {
     // Stress test with many paths to verify no crashes or memory issues
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::uword n_path = 100;
     arma::mat fbs_pos(3, n_path, arma::fill::zeros);
@@ -1603,7 +1603,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS swaps true LOS to first slice")
 {
     // When the true LOS path is not path 0, add_fake_los_path should
     // ensure the real LOS coefficients end up in slice 0
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
 
     // Path 0: NLOS (off-axis scatterer)
     // Path 1: true LOS (fbs = lbs at midpoint, path_length ≈ distance)
@@ -1652,7 +1652,7 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
     // return it: FBS = first, LBS = last interaction, path_length = full length 50 + 2 * 28.284 + 50 = 156.5685 m.
     // The geometric TX-FBS-LBS-RX polyline is only 140 m.
     const double C = 299792458.0, fc = 3.0e9, k = 2.0 * arma::datum::pi * fc / C;
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
 
     arma::u32_vec n_interact = {3};
     arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
@@ -1694,11 +1694,11 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
     }
 
     // MIMO: the per-element spherical offsets of the polyline are kept, the phase-centre length is path_length
-    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos.zeros(3, 2);
     tx.element_pos(1, 0) = -0.3, tx.element_pos(1, 1) = 0.3, tx.element_pos(2, 1) = 0.1;
-    auto rx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto rx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(rx, 0, {1});
     quadriga_lib::arrayant_copy_element(rx, 0, {2});
     rx.element_pos.zeros(3, 3);
@@ -1728,7 +1728,7 @@ TEST_CASE("Get Channels Spherical - add_fake_los_path layout")
     // add_fake_los_path always adds one output path; slot 0 holds the LOS path (zero power if none was found);
     // if a LOS path was present, its original slot holds a zero-power path.
     const double C = 299792458.0;
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     arma::mat F(3, 3); // TX (0,0,0), RX (50,0,0)
     F.col(0) = arma::vec({20, 20, 0}), F.col(2) = arma::vec({30, -25, 0});
     arma::vec G = {0.5, 1.0, 0.25};
@@ -1767,7 +1767,7 @@ TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by 
 {
     // M is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H), column-major,
     // Re/Im interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
-    auto v = quadriga_lib::generate_arrayant_omni<double>(10.0); // V-pol
+    auto v = quadriga_lib::arrayant_generate<double>("omni", 10.0); // V-pol
     auto h = v;                                                  // H-pol
     std::swap(h.e_theta_re, h.e_phi_re);
     std::swap(h.e_theta_im, h.e_phi_im);
@@ -1801,11 +1801,11 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
 
     // The AVX2 antenna interpolation must not set the result to zero where all corner amplitudes are small
     // (here 1e-9 times a directional pattern); it must agree with the generic interpolation.
-    auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
+    auto tx = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {90.0, 90.0});
     const double s = 1e-9, ph = 0.7;
     tx.e_theta_im = tx.e_theta_re * (s * std::sin(ph));
     tx.e_theta_re *= s * std::cos(ph);
-    auto rx = quadriga_lib::generate_arrayant_omni<double>();
+    auto rx = quadriga_lib::arrayant_generate<double>("omni", 1.0);
 
     arma::arma_rng::set_seed(5);
     const arma::uword n_path = 21;
@@ -1839,8 +1839,8 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
 template <typename dtype>
 static void get_channels_spherical_avx2_tail_check()
 {
-    auto rx = quadriga_lib::generate_arrayant_omni<dtype>(10.0);
-    auto tx = quadriga_lib::generate_arrayant_xpol<dtype>(10.0); // 2 elements, 1 RX element: n_links = 2
+    auto rx = quadriga_lib::arrayant_generate<dtype>("omni", 10.0);
+    auto tx = quadriga_lib::arrayant_generate<dtype>("xpol", 10.0); // 2 elements, 1 RX element: n_links = 2
     arma::arma_rng::set_seed(17);
     const arma::uword n_path = 100;
     arma::Mat<dtype> fbs = arma::randu<arma::Mat<dtype>>(3, n_path);
@@ -1887,7 +1887,7 @@ TEST_CASE("Get Channels Spherical - AVX2 with per-element angles, n_links not a 
 template <typename dtype>
 static void get_channels_spherical_vertical_link_check()
 {
-    const auto ant = quadriga_lib::generate_arrayant_xpol<dtype>(10.0);
+    const auto ant = quadriga_lib::arrayant_generate<dtype>("xpol", 10.0);
     arma::Mat<dtype> fbs(3, 1, arma::fill::zeros);
     fbs(2) = dtype(5.0);
     const arma::Col<dtype> gain(1, arma::fill::ones), len(1, arma::fill::zeros);
@@ -1925,7 +1925,7 @@ TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
     // The output holds exactly the zero-power LOS path; its delays and angles per antenna pair equal those of a real
     // LOS path with the same geometry (which is moved to slot 0); without add_fake_los_path, the outputs are empty
     const double C = 299792458.0;
-    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     auto rx = tx;
@@ -1967,7 +1967,7 @@ TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
     }
 
     // Single-element antennas: delay = TX-RX distance / c, or 0 for relative delays
-    auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     arma::cube cr, ci, dl;
     quadriga_lib::get_channels_spherical<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
                                                  f0, f0, e, e, M0, cr, ci, dl, 1e9, true, true);
@@ -1986,7 +1986,7 @@ TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
 TEST_CASE("Get Channels Spherical - 0 paths without add_fake_los_path")
 {
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0], also into outputs that held data before
-    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
@@ -2015,7 +2015,7 @@ TEST_CASE("Get Channels Spherical - 0 paths without add_fake_los_path")
 
 TEST_CASE("Get Channels Spherical - outputs that alias inputs")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
     arma::vec gain = {1.0}, length = {0.0};
     arma::cube cr, ci, dl, aod, eod, aoa, eoa;
@@ -2043,7 +2043,7 @@ TEST_CASE("Get Channels Spherical - outputs that alias inputs")
 
 TEST_CASE("Get Channels Spherical - non-finite TX or RX position or orientation throws")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     arma::mat fbs = arma::vec({5.0, 5.0, 0.0});
     arma::vec gain = {1.0}, length = {15.0};
     arma::mat M = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
@@ -2081,7 +2081,7 @@ static void check_fake_los_slot_far_rx(dtype ry)
     // TX at the origin, RX at (0, ry, 0), six NLOS paths via a scatterer at (5, 5, 0). The squared TX-RX
     // distance overflows, so the distance is inf. Slot 0 still holds the LOS direction: departure along +y,
     // arrival from -y, both horizontal.
-    auto ant = quadriga_lib::generate_arrayant_omni<dtype>();
+    auto ant = quadriga_lib::arrayant_generate<dtype>("omni", 1.0);
     const arma::uword n = 6;
     arma::Mat<dtype> fbs = arma::repmat(arma::Mat<dtype>({5.0, 5.0, 0.0}).t(), 1, n);
     arma::Mat<dtype> M = arma::repmat(arma::Mat<dtype>({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t(), 1, n);
@@ -2110,8 +2110,8 @@ TEST_CASE("get_channels_spherical - a positive tilt points down (3GPP TR 38.901)
     // The TX is 10 m above the RX and 10 m away: the RX is 45 degree below the TX. A beam along x reaches the other
     // end only when turned toward it: TX tilt +pi/4 (down); RX heading pi and tilt -pi/4 (up).
     const double q = arma::datum::pi / 4.0;
-    const auto beam = quadriga_lib::generate_arrayant_custom<double>(40.0, 40.0, 0.0, 5.0);
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const auto beam = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {40.0, 40.0});
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 5.0);
     const arma::mat pos(arma::vec{5.0, 0.0, 5.0}); // A scatterer on the LOS
     const arma::vec gain = {1.0}, length = {0.0};
     arma::mat M(8, 1, arma::fill::zeros);
@@ -2130,7 +2130,7 @@ TEST_CASE("get_channels_spherical - a positive tilt points down (3GPP TR 38.901)
 TEST_CASE("Get Channels Spherical - Position and orientation shapes")
 {
     // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
     const arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
     const arma::vec gain = {1.0}, length = {0.0};
     const arma::mat col[4] = {arma::vec{0.0, 0.0, 1.0}, arma::vec{0.1, 0.2, 0.3}, arma::vec{20.0, 0.0, 1.0}, arma::vec{0.0, -0.1, 0.5}};
@@ -2162,7 +2162,7 @@ TEST_CASE("Get Channels Spherical - Position and orientation shapes")
 TEST_CASE("Get Channels Spherical - vec form equals single calls")
 {
     // 40 snapshots (enough for the parallel region), shared or per-snapshot positions, snapshots without paths
-    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     tx.e_phi_re.slice(1) += 0.5;
@@ -2231,7 +2231,7 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
         }
 
     // Float, without angles; output entries of the right size are written in place
-    auto txf = quadriga_lib::generate_arrayant_omni<float>(10.0);
+    auto txf = quadriga_lib::arrayant_generate<float>("omni", 10.0);
     std::vector<arma::fmat> fbs_f = {arma::fmat({1.0f, 2.0f, 3.0f}).t()}, M_f = {arma::fmat({1, 0, 0, 0, 0, 0, -1, 0}).t()};
     std::vector<arma::fvec> gain_f = {arma::fvec({1.0f})}, len_f = {arma::fvec({0.0f})};
     std::vector<arma::fcube> cr(1, arma::fcube(1, 1, 1)), ci, dl;
@@ -2266,7 +2266,7 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
 
 TEST_CASE("Get Channels Spherical - vec form errors")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     std::vector<arma::mat> fbs(3, arma::mat(3, 1, arma::fill::ones)), M(3, arma::mat(8, 1, arma::fill::ones));
     std::vector<arma::vec> gain(3, arma::vec({1.0})), len(3, arma::vec({0.0}));
     const arma::mat p1(3, 1, arma::fill::zeros), p3(3, 3, arma::fill::zeros), p2(3, 2, arma::fill::zeros), r1 = arma::mat({10.0, 0.0, 0.0}).t();

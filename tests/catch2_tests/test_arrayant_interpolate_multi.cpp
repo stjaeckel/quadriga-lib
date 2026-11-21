@@ -100,7 +100,7 @@ namespace
     // center frequencies cf[i]; the blend of two of them is linear in the amplitude
     ant_vec scaled_entries(const arma::vec &cf, const arma::vec &scale)
     {
-        const auto base = quadriga_lib::generate_arrayant_3GPP<double>({1, 2}, 3.0e9, {}, {}, {3}, {}, {}, {}, 10.0);
+        const auto base = quadriga_lib::arrayant_generate<double>("3GPP", 10.0, 3.0e9, {}, {1, 2}, {}, {3});
         ant_vec vec;
         for (arma::uword i = 0; i < cf.n_elem; ++i)
         {
@@ -434,7 +434,7 @@ TEST_CASE("arrayant_interpolate_multi - complex outputs equal the split outputs 
     ant_vec vec;
     for (double f : {1.0e9, 2.0e9, 3.0e9})
     {
-        vec.push_back(quadriga_lib::generate_arrayant_3GPP<double>({1, 2}, 1.0e9, {}, {}, {3}, {}, {}, {}, 10.0));
+        vec.push_back(quadriga_lib::arrayant_generate<double>("3GPP", 10.0, 1.0e9, {}, {1, 2}, {}, {3}));
         vec.back().center_freq = f;
         vec.back().e_theta_re *= f / 1.0e9; // Different patterns per entry
         vec.back().e_phi_im += 0.1 * f / 1.0e9;
@@ -566,7 +566,7 @@ TEST_CASE("arrayant_interpolate_multi - input validation")
 TEST_CASE("arrayant_interpolate_multi - a positive tilt points down (3GPP TR 38.901)")
 {
     // A beam along x, tilted by +10 degree, has its largest gain 10 degree below the horizon at every frequency
-    auto beam = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0, 0.0, 5.0);
+    auto beam = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {30.0, 30.0});
     std::vector<quadriga_lib::arrayant<double>> vec = {beam, beam};
     vec[1].center_freq = 2.0 * beam.center_freq;
     const arma::mat el = arma::regspace<arma::rowvec>(-30.0, 1.0, 30.0) * arma::datum::pi / 180.0;

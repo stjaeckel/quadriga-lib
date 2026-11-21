@@ -16,7 +16,7 @@
 
 TEST_CASE("Arrayant combine pattern - Minimal test")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.coupling_re.ones(3, 1);
     ant.coupling_im.reset();
@@ -48,7 +48,7 @@ TEST_CASE("Arrayant combine pattern - Minimal test")
 
 TEST_CASE("Arrayant rotation - Minimal test")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(5.0, 5.0);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {5.0, 5.0});
 
     arma::uword i = ant.e_theta_re.index_max();
     arma::uvec s = arma::ind2sub(arma::size(ant.e_theta_re), i);
@@ -62,7 +62,7 @@ TEST_CASE("Arrayant rotation - Minimal test")
     CHECK(s(0) == 90);
     CHECK(s(1) == 270);
 
-    ant = quadriga_lib::generate_arrayant_custom<float>(5.0, 5.0);
+    ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {5.0, 5.0});
     qd_rotate(ant, 0.0, -arma::datum::pi / 4.0);
 
     i = ant.e_theta_re.index_max();
@@ -73,7 +73,7 @@ TEST_CASE("Arrayant rotation - Minimal test")
 
 TEST_CASE("Arrayant rotation - Full sphere, inplace")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(5.0, 5.0);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {5.0, 5.0});
     arma::fmat T = {1.0, 2.0, 3.0};
     ant.element_pos = T.t();
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
@@ -120,7 +120,7 @@ TEST_CASE("Arrayant rotation - Partial sphere, inplace")
 {
     arma::fmat T = {1.0, 2.0, 3.0};
 
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
     ant.e_theta_re.zeros();
     ant.e_theta_re.at(90, 180, 0) = 1.0f;
     quadriga_lib::arrayant_remove_zeros(ant);
@@ -151,7 +151,7 @@ TEST_CASE("Arrayant rotation - Partial sphere, inplace")
 TEST_CASE("Arrayant combine pattern - Propagation speed")
 {
     // Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
-    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos = {{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}};
     ant.coupling_re = arma::mat(2, 1, arma::fill::ones);
@@ -180,7 +180,7 @@ TEST_CASE("Arrayant combine pattern - Propagation speed")
     CHECK(arma::approx_equal(em.e_theta_im, em2.e_theta_im, "absdiff", 0.0));
 
     // Float
-    auto antf = quadriga_lib::generate_arrayant_omni<float>(10.0f);
+    auto antf = quadriga_lib::arrayant_generate<float>("omni", 10.0f);
     quadriga_lib::arrayant_copy_element(antf, 0, {1});
     antf.element_pos = {{0.0f, 0.0f}, {-0.1f, 0.1f}, {0.0f, 0.0f}};
     antf.coupling_re = arma::fmat(2, 1, arma::fill::ones);

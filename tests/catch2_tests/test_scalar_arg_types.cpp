@@ -41,17 +41,13 @@ static void calls_with_literals()
     quadriga_lib::arrayant_export_obj_file("a.obj", a, 30.0, "jet", 1.0);
     quadriga_lib::arrayant_calc_beamwidth_multi(av, ui, 3);
     quadriga_lib::arrayant_combine_pattern_multi(av, col, col, col, 343);
-    a = quadriga_lib::generate_arrayant_omni<T>(10);
-    a = quadriga_lib::generate_arrayant_xpol<T>(10);
-    a = quadriga_lib::generate_arrayant_dipole<T>(10);
-    a = quadriga_lib::generate_arrayant_half_wave_dipole<T>(10);
-    a = quadriga_lib::generate_arrayant_custom<T>(90, 90.0, 0, 10);
-    a = quadriga_lib::generate_arrayant_ula(4, 3.5e9, 0.5, a, 10);
-    a = quadriga_lib::generate_arrayant_3GPP({2, 2}, 3.5e9, {0.5}, {1}, {1}, {6, 0}, {}, a, 10);
-    a = quadriga_lib::generate_arrayant_multibeam<T>({2, 2}, 3.5e9, {0.5}, {1}, {120, 120}, {}, 10);
-    a = quadriga_lib::arrayant_generate<T>("3GPP", 10, 3.5e9, {2, 2}, {0.5}, {1}, {3, 2}, {6, 0});
+    a = quadriga_lib::arrayant_generate<T>("omni", 10);
+    a = quadriga_lib::arrayant_generate<T>("custom", 10, NAN, {90, 90.0});
+    a = quadriga_lib::arrayant_generate("ula", 10, 3.5e9, {}, {1, 4}, {0.5}, {}, {}, {}, {}, a);
+    a = quadriga_lib::arrayant_generate<T>("multibeam", 10, 3.5e9, {120, 120}, {2, 2}, {0.5}, {1});
+    a = quadriga_lib::arrayant_generate<T>("3GPP", 10, 3.5e9, {}, {2, 2}, {0.5}, {3, 2}, {1}, {6, 0});
     av = quadriga_lib::generate_speaker<T>("piston", 0.05, 80, 12000, 12, 12, 85, "hemisphere", 90, 60, 1000, 0.15, 0.25, col, 5);
-    quadriga_lib::arrayant<double> ad = quadriga_lib::generate_arrayant_omni(10); // dtype defaults to double
+    quadriga_lib::arrayant<double> ad = quadriga_lib::arrayant_generate("omni", 10); // dtype defaults to double
 
     // quadriga_channel.hpp
     quadriga_lib::channel_export_obj_file("a.obj", c, 0, -60, -140, "jet", ui, 0.05, 0.01);
@@ -98,8 +94,8 @@ TEST_CASE("Scalar argument types - literals of any type with float data")
         calls_with_literals();
 
     // The converted values arrive: int and double literals give the same result as float ones
-    quadriga_lib::arrayant<T> a = quadriga_lib::generate_arrayant_custom<T>(60, 30.0, 0, 10);
-    quadriga_lib::arrayant<T> b = quadriga_lib::generate_arrayant_custom<T>(60.0f, 30.0f, 0.0f, 10.0f);
+    quadriga_lib::arrayant<T> a = quadriga_lib::arrayant_generate<T>("custom", 10, NAN, {60, 30.0});
+    quadriga_lib::arrayant<T> b = quadriga_lib::arrayant_generate<T>("custom", 10.0f, NAN, {60.0f, 30.0f});
     CHECK(a.azimuth_grid.n_elem == 37);
     CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0));
 
@@ -115,6 +111,6 @@ TEST_CASE("Scalar argument types - literals of any type with float data")
     CHECK(bw_int(0) > T(1.5) * bw_3dB(0));
 
     // dtype defaults to double for the generators
-    quadriga_lib::arrayant<double> d = quadriga_lib::generate_arrayant_omni(10);
+    quadriga_lib::arrayant<double> d = quadriga_lib::arrayant_generate("omni", 10);
     CHECK(d.azimuth_grid.n_elem == 37);
 }

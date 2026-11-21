@@ -32,7 +32,7 @@ assert( numel(obj_names) == 2 );
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 %% icosphere_n_div: an icosphere has 20 * n_div^2 faces
-ant_c = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [30, 20, 10]);  % 1 element
+ant_c = quadriga_lib.arrayant_generate('custom', [], [], [30, 20, 10]);  % 1 element
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 1.0, 1);
 mesh_low = quadriga_lib.obj_file_read('test_mex.obj');
@@ -101,8 +101,8 @@ end
 assertFalse( exist('test_mex.obj', 'file') == 2 );
 
 %% Multi-frequency dispatch via 'freq' input
-ant_a = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [30, 20]);
-ant_b = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [90, 60]);
+ant_a = quadriga_lib.arrayant_generate('custom', [], [], [30, 20]);
+ant_b = quadriga_lib.arrayant_generate('custom', [], [], [90, 60]);
 ant_mf = [ant_a, ant_b];
 
 % freq=1 -> uses ant_a entry

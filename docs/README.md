@@ -23,8 +23,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 
 ## API sections
 - [C++: General usage notes](api/cpp/general-usage-notes.md)
-- [C++: Array antenna class](api/cpp/array-antenna-class.md): 3 functions
-- [C++: Array antenna functions](api/cpp/array-antenna-functions.md): 32 functions
+- [C++: Array antenna functions](api/cpp/array-antenna-functions.md): 25 functions
 - [C++: Channel class](api/cpp/channel-class.md): 2 functions
 - [C++: Channel functions](api/cpp/channel-functions.md): 26 functions
 - [C++: Channel generation functions](api/cpp/channel-generation-functions.md): 7 functions

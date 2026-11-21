@@ -20,7 +20,7 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
-OPTIONAL = ("center_freq", "panel", "spacing", "ports", "pol", "steer", "element", "pattern", "beams",
+OPTIONAL = ("center_freq", "element", "panel", "spacing", "pol", "ports", "steer", "beams", "pattern",
             "separate_beams", "apply_weights")
 
 
@@ -62,6 +62,7 @@ class test_case(unittest.TestCase):
         a = f("xpol", 30, center_freq=3e9)
         self.assertEqual(a["e_theta_re"].shape, (7, 13, 2))
         self.assertEqual(a["center_freq"], 3e9)
+        self.assertEqual(f("omni", 30, center_freq=float("nan"))["center_freq"], 299792458.0)  # NaN: default
 
         a = f("3gpp", 30, panel=[2, 3])
         self.assertEqual(a["e_theta_re"].shape[2], 6)

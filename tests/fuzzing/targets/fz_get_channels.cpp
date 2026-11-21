@@ -16,16 +16,16 @@ static quadriga_lib::arrayant<T> antenna(fz::input &in)
     switch (in.ConsumeIntegralInRange<int>(0, 5))
     {
     case 0:
-        return quadriga_lib::generate_arrayant_omni<T>(T(30));
+        return quadriga_lib::arrayant_generate<T>("omni", T(30));
     case 1:
-        return quadriga_lib::generate_arrayant_xpol<T>(T(30));
+        return quadriga_lib::arrayant_generate<T>("xpol", T(30));
     case 2:
-        fz::clean([&] { a = quadriga_lib::generate_arrayant_ula<T>(in.size(4), T(3.5e9), in.value<T>(), {}, T(30)); });
+        fz::clean([&] { a = quadriga_lib::arrayant_generate<T>("ula", T(30), T(3.5e9), {}, {1, in.size(4)}, {in.value<T>()}); });
         break;
     case 3:
     {
         const arma::uword M = in.size(2), N = in.size(2), M_P = in.ConsumeBool() ? 1 : 0, pol = in.ConsumeIntegralInRange<unsigned>(1, 3);
-        fz::clean([&] { a = quadriga_lib::generate_arrayant_3GPP<T>({M, N}, 3.5e9, {}, {M_P}, {pol}, {5.0}, {}, {}, 30.0); });
+        fz::clean([&] { a = quadriga_lib::arrayant_generate<T>("3GPP", 30.0, 3.5e9, {}, {M, N}, {}, {pol}, {M_P}, {5.0}); });
         break;
     }
     default:

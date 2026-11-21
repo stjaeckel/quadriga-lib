@@ -67,7 +67,7 @@ ant_out = quadriga_lib.arrayant_concat(ant1_n, ant2_n);
 assert( strcmp(ant_out.name, 'first') );
 
 %% Asymmetric element counts: 1 + 2 = 3
-ant_c = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [30, 20]);  % 1 element
+ant_c = quadriga_lib.arrayant_generate('custom', [], [], [30, 20]);  % 1 element
 ant_out = quadriga_lib.arrayant_concat(ant_c, ant1);
 assert( size(ant_out.e_theta_re, 3) == 3 );
 assert( all(size(ant_out.coupling_re) == [3, 3]) );
@@ -93,10 +93,10 @@ for k = 1:2
 end
 
 %% Multi-frequency with distinct content per entry
-ant_a1 = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [30, 20]);
-ant_a2 = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [60, 40]);
-ant_b1 = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [90, 50]);
-ant_b2 = quadriga_lib.arrayant_generate('custom', [], [], [], [], [], [], [], [45, 30]);
+ant_a1 = quadriga_lib.arrayant_generate('custom', [], [], [30, 20]);
+ant_a2 = quadriga_lib.arrayant_generate('custom', [], [], [60, 40]);
+ant_b1 = quadriga_lib.arrayant_generate('custom', [], [], [90, 50]);
+ant_b2 = quadriga_lib.arrayant_generate('custom', [], [], [45, 30]);
 ant_mf_a = [ant_a1, ant_a2];
 ant_mf_b = [ant_b1, ant_b2];
 ant_mf_out = quadriga_lib.arrayant_concat(ant_mf_a, ant_mf_b);

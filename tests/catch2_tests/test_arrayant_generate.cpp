@@ -4,7 +4,7 @@
 
 // Array antenna generators: grid sizes, field values at the main lobe and directivities (short dipole 1.76 dBi,
 // half-wave dipole 2.15 dBi, stored values for the custom pattern); the half-wave dipole pattern as a closed form.
-// TR 38.901 panel arrays (generate_arrayant_3GPP, _ula, _multibeam, arrayant_generate) against closed forms written
+// TR 38.901 panel arrays (arrayant_generate types 3GPP, ula, multibeam) against closed forms written
 // independently of the library's loop: the Table 7.3-1 shape, Model-1 (eq. 7.3-3) and Model-2 (eq. 7.3-4/7.3-5), the
 // element positions and the sub-array weights of eq. 7.3-1 for the calibration configurations of Tables 7.8-2, 7.8-2A,
 // 7.8-6A and 7.8-6C; the kept elements against the combined ports; the beam directions of tilt and pan; the fill rules
@@ -104,7 +104,7 @@ static void peak_direction(const quadriga_lib::arrayant<dtype> &a, arma::uword i
 
 TEST_CASE("Generate Arrayant - Minimal test omni")
 {
-    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
     CHECK(ant.name == "omni");
     CHECK(ant.n_elevation() == 181);
     CHECK(ant.n_azimuth() == 361);
@@ -116,7 +116,7 @@ TEST_CASE("Generate Arrayant - Minimal test omni")
     CHECK(arma::approx_equal(ant.e_theta_im.slice(0), Z, "absdiff", 1e-7));
     CHECK(arma::approx_equal(ant.e_phi_im.slice(0), Z, "absdiff", 1e-7));
 
-    auto ant2 = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto ant2 = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     CHECK(ant2.name == "omni");
     CHECK(ant2.n_elevation() == 19);
     CHECK(ant2.n_azimuth() == 37);
@@ -124,7 +124,7 @@ TEST_CASE("Generate Arrayant - Minimal test omni")
 
 TEST_CASE("Generate Arrayant - Minimal test xpol")
 {
-    auto ant = quadriga_lib::generate_arrayant_xpol<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("xpol", 1.0);
     CHECK(ant.name == "xpol");
     CHECK(ant.n_elevation() == 181);
     CHECK(ant.n_azimuth() == 361);
@@ -142,19 +142,19 @@ TEST_CASE("Generate Arrayant - Minimal test xpol")
     CHECK(arma::approx_equal(ant.e_phi_im.slice(0), Z, "absdiff", 1e-7));
     CHECK(arma::approx_equal(ant.e_phi_im.slice(1), Z, "absdiff", 1e-7));
 
-    auto ant2 = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    auto ant2 = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
     CHECK(ant2.n_elevation() == 19);
     CHECK(ant2.n_azimuth() == 37);
 }
 
 TEST_CASE("Generate Arrayant - Minimal test dipole")
 {
-    auto ant = quadriga_lib::generate_arrayant_dipole<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("dipole");
     float directivity = qd_directivity(ant, 0);
     CHECK(std::abs(directivity - 1.760964f) < 0.0001f);
     REQUIRE_THROWS_AS(qd_directivity(ant, 1), std::invalid_argument);
 
-    auto ant2 = quadriga_lib::generate_arrayant_dipole<double>(5.0);
+    auto ant2 = quadriga_lib::arrayant_generate<double>("dipole", 5.0);
     CHECK(ant2.n_elevation() == 37);
     CHECK(ant2.n_azimuth() == 73);
     double directivity2 = qd_directivity(ant2, 0);
@@ -163,11 +163,11 @@ TEST_CASE("Generate Arrayant - Minimal test dipole")
 
 TEST_CASE("Generate Arrayant - Minimal test Half-wave dipole")
 {
-    auto ant = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
+    auto ant = quadriga_lib::arrayant_generate<float>("half-wave-dipole");
     float directivity = qd_directivity(ant, 0);
     CHECK(std::abs(directivity - 2.15f) < 0.001f);
 
-    auto ant2 = quadriga_lib::generate_arrayant_half_wave_dipole<double>(5.0);
+    auto ant2 = quadriga_lib::arrayant_generate<double>("half-wave-dipole", 5.0);
     CHECK(ant2.n_elevation() == 37);
     CHECK(ant2.n_azimuth() == 73);
     double directivity2 = qd_directivity(ant2, 0);
@@ -176,18 +176,18 @@ TEST_CASE("Generate Arrayant - Minimal test Half-wave dipole")
 
 TEST_CASE("Generate Arrayant - Custom")
 {
-    auto ant = quadriga_lib::generate_arrayant_custom<float>(10.0, 10.0);
+    auto ant = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {10.0, 10.0});
     float directivity = qd_directivity(ant, 0);
     CHECK(std::abs(directivity - 25.627f) < 0.001f);
 
-    auto ant2 = quadriga_lib::generate_arrayant_custom<double>(10.0, 10.0, 0.0, 5.0);
+    auto ant2 = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {10.0, 10.0});
     CHECK(ant2.n_elevation() == 37);
     CHECK(ant2.n_azimuth() == 73);
     double directivity2 = qd_directivity(ant2, 0);
     CHECK(std::abs(directivity2 - 25.62) < 0.01f);
 }
 
-TEST_CASE("generate_arrayant_3GPP - the element follows the Table 7.3-1 shape, also with other constants")
+TEST_CASE("arrayant_generate 3GPP - the element follows the Table 7.3-1 shape, also with other constants")
 {
     // Field in dB = G_max + A_dB of Table 7.3-1 at every grid point: the default constants, those of Table 7.3-2
     // (handheld UT), others with theta_3dB != phi_3dB and A_max != SLA_V, and infinite entries; float equals double
@@ -197,8 +197,8 @@ TEST_CASE("generate_arrayant_3GPP - the element follows the Table 7.3-1 shape, a
     for (const double *c : {c_def, c_ut, c_x, c_inf, c_inf2})
     {
         const arma::vec element = (c == c_def) ? arma::vec() : arma::vec(c, 5);
-        const auto d = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, element, {}, 5.0);
-        const auto f = quadriga_lib::generate_arrayant_3GPP<float>({}, 3.5e9, {}, {}, {}, {}, element, {}, 5.0);
+        const auto d = quadriga_lib::arrayant_generate<double>("3GPP", 5.0, 3.5e9, element);
+        const auto f = quadriga_lib::arrayant_generate<float>("3GPP", 5.0, 3.5e9, element);
         REQUIRE(d.n_elements() == 1);
         REQUIRE(d.n_azimuth() == 73);
         REQUIRE(d.n_elevation() == 37);
@@ -218,21 +218,21 @@ TEST_CASE("generate_arrayant_3GPP - the element follows the Table 7.3-1 shape, a
     }
 }
 
-TEST_CASE("generate_arrayant_3GPP - G_max NaN sets the peak gain to the directivity")
+TEST_CASE("arrayant_generate 3GPP - G_max NaN sets the peak gain to the directivity")
 {
     // The default element has its peak at G_max = 8 dBi, below its directivity of 9.83 dBi; NaN normalizes the peak to
     // the directivity (the directivity on the 1 degree grid, so 0.01 dB)
-    const auto a = quadriga_lib::generate_arrayant_3GPP<double>();
+    const auto a = quadriga_lib::arrayant_generate<double>("3GPP", 1.0);
     CHECK(std::abs(20.0 * std::log10(a.e_theta_re.max()) - 8.0) < 1e-12);
     CHECK(std::abs(qd_directivity(a, 0) - 9.83) < 0.01);
     for (const arma::vec &element : {arma::vec{65.0, 65.0, 30.0, 30.0, qd_nan}, arma::vec{125.0, qd_nan, 22.5, qd_nan, qd_nan}})
     {
-        const auto b = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, element);
+        const auto b = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, element);
         CHECK(std::abs(20.0 * std::log10(b.e_theta_re.max()) - qd_directivity(b, 0)) < 0.01);
     }
 }
 
-TEST_CASE("generate_arrayant_3GPP - turned polarizations follow TR 38.901 Model-1, also on the rotation axis")
+TEST_CASE("arrayant_generate 3GPP - turned polarizations follow TR 38.901 Model-1, also on the rotation axis")
 {
     // pol = 2 and 3 turn the vertical TR element by the slant zeta (0 and 90 degree; +45 and -45 degree) about its
     // boresight. TR 38.901 eq. 7.3-3 with the angles of eq. 7.1-7 (alpha = beta = 0, gamma = zeta), theta the zenith angle:
@@ -249,12 +249,12 @@ TEST_CASE("generate_arrayant_3GPP - turned polarizations follow TR 38.901 Model-
     const double deg = arma::datum::pi / 180.0, c_tr[4] = {65.0, 65.0, 30.0, 30.0};
     auto F = [&](double th2, double ph2) // sqrt(A'') at the turned angles in rad
     { return std::pow(10.0, 0.05 * (8.0 + tr_pattern_dB(ph2 / deg, 90.0 - th2 / deg, c_tr))); };
-    const auto v = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9);
+    const auto v = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9);
     const double peak = v.e_theta_re.max();
     for (arma::uword pol : {2ULL, 3ULL})
     {
-        const auto d = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {pol});
-        const auto f = quadriga_lib::generate_arrayant_3GPP<float>({}, 3.5e9, {}, {}, {pol});
+        const auto d = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {pol});
+        const auto f = quadriga_lib::arrayant_generate<float>("3GPP", 1.0, 3.5e9, {}, {}, {}, {pol});
         REQUIRE(d.n_elements() == 2);
         const double zeta[2] = {pol == 2 ? 0.0 : 45.0 * deg, pol == 2 ? 90.0 * deg : -45.0 * deg};
         double d_off = 0.0, d_axis = 0.0, d_float = 0.0;
@@ -290,21 +290,21 @@ TEST_CASE("generate_arrayant_3GPP - turned polarizations follow TR 38.901 Model-
         CHECK(d_float < 1e-5); // Single-precision field tolerance
         CHECK(arma::abs(d.e_theta_im).max() + arma::abs(d.e_phi_im).max() == 0.0);
     }
-    const auto d = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {2});
+    const auto d = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {2});
     CHECK(arma::approx_equal(d.e_theta_re.slice(0), v.e_theta_re.slice(0), "absdiff", 0.0));
     CHECK(arma::abs(d.e_phi_re.slice(0)).max() == 0.0);
 }
 
-TEST_CASE("generate_arrayant_3GPP - Model-2 follows eq. 7.3-4 and 7.3-5")
+TEST_CASE("arrayant_generate 3GPP - Model-2 follows eq. 7.3-4 and 7.3-5")
 {
     // F_theta = sqrt(A') cos(zeta), F_phi = sqrt(A') sin(zeta) with A' = |F_theta|^2 + |F_phi|^2 of the element: on the
     // TR element sqrt(A') is the vertical element (pol 1 with zeta = 0, pol 2 with 0 and 90, pol 3 with +45 and -45 degree)
-    const auto v = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {}, {}, 5.0);
+    const auto v = quadriga_lib::arrayant_generate<double>("3GPP", 5.0, 3.5e9);
     const double s = std::sqrt(0.5), peak = v.e_theta_re.max();
     const double cz[3][2] = {{1.0, 0.0}, {1.0, 0.0}, {s, s}}, sz[3][2] = {{0.0, 0.0}, {0.0, 1.0}, {s, -s}};
     for (arma::uword pol = 1; pol <= 3; ++pol)
     {
-        const auto a = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {pol, 2}, {}, {}, {}, 5.0);
+        const auto a = quadriga_lib::arrayant_generate<double>("3GPP", 5.0, 3.5e9, {}, {}, {}, {pol, 2});
         REQUIRE(a.n_elements() == (pol == 1 ? 1 : 2));
         for (arma::uword i = 0; i < a.n_elements(); ++i)
         {
@@ -318,20 +318,20 @@ TEST_CASE("generate_arrayant_3GPP - Model-2 follows eq. 7.3-4 and 7.3-5")
 
     // A one-element pattern with a phi component and a phase (|F|^2 = 1): Model-2 replaces its polarization, Model-1
     // with pol = 1 uses it as given
-    auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto p = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     p.e_theta_re.fill(0.36), p.e_theta_im.fill(0.48), p.e_phi_im.fill(0.8);
-    const auto m2 = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {3, 2}, {}, {}, p);
+    const auto m2 = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {3, 2}, {}, {}, {}, p);
     REQUIRE(m2.n_elements() == 2);
     CHECK(arma::abs(m2.e_theta_re - s).max() < 1e-12);
     CHECK(arma::abs(m2.e_phi_re.slice(0) - s).max() < 1e-12);
     CHECK(arma::abs(m2.e_phi_re.slice(1) + s).max() < 1e-12);
     CHECK(arma::abs(m2.e_theta_im).max() + arma::abs(m2.e_phi_im).max() == 0.0);
-    const auto m1 = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {1, 1}, {}, {}, p);
+    const auto m1 = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 1}, {}, {}, {}, p);
     p.center_freq = 3.5e9;
     CHECK(max_diff(m1, p) == 0.0);
 }
 
-TEST_CASE("generate_arrayant_3GPP - TR 38.901 calibration configurations: counts, positions and sub-array weights")
+TEST_CASE("arrayant_generate 3GPP - TR 38.901 calibration configurations: counts, positions and sub-array weights")
 {
     // (M, N, P, Mg, Ng; M_P, N_P) of Tables 7.8-2 (config 1: one port per polarization and panel; config 2: one port per
     // element), 7.8-2A (configs 3, 4), 7.8-6A (UMi configs 1, 2 and the indoor config with 3 columns per port) and 7.8-6C;
@@ -364,7 +364,7 @@ TEST_CASE("generate_arrayant_3GPP - TR 38.901 calibration configurations: counts
     {
         INFO(c.name);
         const arma::uword P = c.lay.P;
-        const auto a = quadriga_lib::generate_arrayant_3GPP<double>(c.panel, c.fc, c.spacing, c.ports, {P == 2 ? 3ULL : 1ULL, 2ULL}, c.steer, {}, {}, 30.0);
+        const auto a = quadriga_lib::arrayant_generate<double>("3GPP", 30.0, c.fc, {}, c.panel, c.spacing, {P == 2 ? 3ULL : 1ULL, 2ULL}, c.ports, c.steer);
         REQUIRE(a.n_elements() == c.n_el);
         REQUIRE(a.n_ports() == c.n_port);
 
@@ -390,7 +390,7 @@ TEST_CASE("generate_arrayant_3GPP - TR 38.901 calibration configurations: counts
     }
 }
 
-TEST_CASE("generate_arrayant_3GPP - kept elements with coupling equal the combined ports at the sub-array centres")
+TEST_CASE("arrayant_generate 3GPP - kept elements with coupling equal the combined ports at the sub-array centres")
 {
     // Two panels with their own steering rows and sub-arrays of 2 x 2 elements; apply_weights combines each port at its
     // sub-array centre (the mean position of its elements). The port responses, with the phase of the element or port
@@ -399,8 +399,8 @@ TEST_CASE("generate_arrayant_3GPP - kept elements with coupling equal the combin
     const arma::vec spacing = {0.5, 0.6, 2.5, 3.0};
     const arma::mat steer = {{10.0, 20.0}, {-5.0, -30.0}};
     const double fc = 3.5e9, k = 2.0 * arma::datum::pi * fc / 299792458.0;
-    const auto kept = quadriga_lib::generate_arrayant_3GPP<double>(panel, fc, spacing, ports, pol, steer, {}, {}, 10.0);
-    const auto comb = quadriga_lib::generate_arrayant_3GPP<double>(panel, fc, spacing, ports, pol, steer, {}, {}, 10.0, true);
+    const auto kept = quadriga_lib::arrayant_generate<double>("3GPP", 10.0, fc, {}, panel, spacing, pol, ports, steer);
+    const auto comb = quadriga_lib::arrayant_generate<double>("3GPP", 10.0, fc, {}, panel, spacing, pol, ports, steer, {}, {}, false, true);
     REQUIRE(kept.n_elements() == 64);
     REQUIRE(kept.n_ports() == 16);
     REQUIRE(comb.n_elements() == 16);
@@ -433,22 +433,22 @@ TEST_CASE("generate_arrayant_3GPP - kept elements with coupling equal the combin
     CHECK(arma::abs(H_kept - H_comb).max() < 1e-12 * peak);
 }
 
-TEST_CASE("generate_arrayant_3GPP - a positive electrical tilt points the beam down")
+TEST_CASE("arrayant_generate 3GPP - a positive electrical tilt points the beam down")
 {
     // A positive electrical tilt is a downtilt (TR 38.901): 8 vertical elements combined into one port with tilt 10
     // degree, the main beam at elevation -10 degree
-    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>({8}, 3.5e9, {}, {1}, {}, {10.0}, {}, {}, 1.0, true);
+    const auto ant = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {8}, {}, {}, {1}, {10.0}, {}, {}, false, true);
     REQUIRE(ant.n_elements() == 1);
     double el, az;
     peak_direction(ant, 0, el, az);
     CHECK(std::abs(el + 10.0) < 1.01);
 }
 
-TEST_CASE("generate_arrayant_3GPP - a positive pan turns the beam towards +y")
+TEST_CASE("arrayant_generate 3GPP - a positive pan turns the beam towards +y")
 {
     // 8 columns of omni elements combined into one port (N_P = 1) with pan 20 degree: the main beam at azimuth +20 degree
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>(1.0);
-    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>({1, 8}, 3.5e9, {}, {0, 1}, {}, {0.0, 20.0}, {}, omni, 1.0, true);
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    const auto ant = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {1, 8}, {}, {}, {0, 1}, {0.0, 20.0}, {}, omni, false, true);
     REQUIRE(ant.n_elements() == 1);
     double el, az;
     peak_direction(ant, 0, el, az);
@@ -456,15 +456,15 @@ TEST_CASE("generate_arrayant_3GPP - a positive pan turns the beam towards +y")
     CHECK(std::abs(el) < 1.01);
 }
 
-TEST_CASE("generate_arrayant_3GPP - each panel has its own steering row")
+TEST_CASE("arrayant_generate 3GPP - each panel has its own steering row")
 {
     // Two co-located panels (panel spacing 0) of 8 x 1 omni elements, one port per panel, tilt 10 and -20 degree: the
     // beams point to elevation -10 and +20 degree from the same position
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>(1.0), omni_10 = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0), omni_10 = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     const arma::mat steer = {{10.0, 0.0}, {-20.0, 0.0}};
-    const auto kept = quadriga_lib::generate_arrayant_3GPP<double>({8, 1, 1, 2}, 3.5e9, {0.5, 0.5, 0.0, 0.0}, {1}, {}, steer, {}, omni_10);
+    const auto kept = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {8, 1, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {}, {1}, steer, {}, omni_10);
     CHECK(arma::approx_equal(kept.element_pos.cols(0, 7), kept.element_pos.cols(8, 15), "absdiff", 0.0));
-    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>({8, 1, 1, 2}, 3.5e9, {0.5, 0.5, 0.0, 0.0}, {1}, {}, steer, {}, omni, 1.0, true);
+    const auto ant = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {8, 1, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {}, {1}, steer, {}, omni, false, true);
     REQUIRE(ant.n_elements() == 2);
     CHECK(arma::abs(ant.element_pos).max() < 1e-12 * 0.3);
     double el, az;
@@ -474,7 +474,7 @@ TEST_CASE("generate_arrayant_3GPP - each panel has its own steering row")
     CHECK(std::abs(el - 20.0) < 1.01);
 }
 
-TEST_CASE("generate_arrayant_3GPP - omitted entries, 0 and NaN select the defaults")
+TEST_CASE("arrayant_generate 3GPP - omitted entries, 0 and NaN select the defaults")
 {
     // Fill rules of the tuples, once: omitted entries, 0 (integer tuples) and NaN (real tuples) give the explicit defaults
     // with the same arithmetic (exact); dependent defaults d_H = d_V, d_gV = M d_V, d_gH = N d_H, ports [M, N],
@@ -482,7 +482,7 @@ TEST_CASE("generate_arrayant_3GPP - omitted entries, 0 and NaN select the defaul
     const double n = qd_nan;
     auto g = [](const arma::uvec &panel, const arma::vec &spacing, const arma::uvec &ports, const arma::uvec &pol,
                 const arma::mat &steer, const arma::vec &element)
-    { return quadriga_lib::generate_arrayant_3GPP<double>(panel, 3.5e9, spacing, ports, pol, steer, element, {}, 30.0); };
+    { return quadriga_lib::arrayant_generate<double>("3GPP", 30.0, 3.5e9, element, panel, spacing, pol, ports, steer); };
 
     const auto ref1 = g({1, 1, 1, 1}, {0.5, 0.5, 0.5, 0.5}, {1, 1}, {1, 1}, {0.0, 0.0}, {65.0, 65.0, 30.0, 30.0, 8.0});
     CHECK(max_diff(g({}, {}, {}, {}, {}, {}), ref1) == 0.0);
@@ -502,13 +502,12 @@ TEST_CASE("generate_arrayant_3GPP - omitted entries, 0 and NaN select the defaul
     CHECK(max_diff(g(panel, {}, {1, 1}, {}, arma::mat{{n, n}}, {}), g(panel, {}, {1, 1}, {}, {}, {})) == 0.0);
 }
 
-TEST_CASE("generate_arrayant_ula - the 3GPP panel path with the omni element")
+TEST_CASE("arrayant_generate ula - the 3GPP panel path with the omni element")
 {
-    // N omni elements along y at (n - (N-1)/2) spacing lambda, one port each; the same array as arrayant_generate with
-    // type 'ula' and panel [1, N]; N = 0 is 1, NaN spacing is 0.5; panel = 8 of type 'ula' is a vertical column
+    // N omni elements along y at (n - (N-1)/2) spacing lambda, one port each; N = 0 is 1, NaN spacing is 0.5; panel = 8 of type 'ula' is a vertical column
     const double fc = 2.4e9, lambda = 299792458.0 / fc;
-    const auto u = quadriga_lib::generate_arrayant_ula<double>(5, fc, 0.6, {}, 10.0);
-    const auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    const auto u = quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 5}, {0.6});
+    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     REQUIRE(u.n_elements() == 5);
     CHECK(u.name == "ula");
     CHECK(u.center_freq == fc);
@@ -520,11 +519,10 @@ TEST_CASE("generate_arrayant_ula - the 3GPP panel path with the omni element")
     CHECK(arma::abs(u.element_pos.row(1) - y).max() < 1e-12 * 1.2 * lambda);
     CHECK(arma::abs(u.element_pos.row(0)).max() + arma::abs(u.element_pos.row(2)).max() == 0.0);
 
-    CHECK(max_diff(quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {1, 5}, {0.6}), u) == 0.0);
-    CHECK(max_diff(quadriga_lib::generate_arrayant_ula<double>(0, fc, 0.5, {}, 10.0), quadriga_lib::generate_arrayant_ula<double>(1, fc, 0.5, {}, 10.0)) == 0.0);
-    CHECK(max_diff(quadriga_lib::generate_arrayant_ula<double>(3, fc, qd_nan, {}, 10.0), quadriga_lib::generate_arrayant_ula<double>(3, fc, 0.5, {}, 10.0)) == 0.0);
+    CHECK(max_diff(quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 0}, {0.5}), quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 1}, {0.5})) == 0.0);
+    CHECK(max_diff(quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 3}, {qd_nan}), quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {1, 3}, {0.5})) == 0.0);
 
-    const auto col = quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {8});
+    const auto col = quadriga_lib::arrayant_generate<double>("ula", 10.0, fc, {}, {8});
     REQUIRE(col.n_elements() == 8);
     CHECK(arma::abs(col.element_pos.row(1)).max() == 0.0);
     CHECK(std::abs(col.element_pos(2, 7) - 3.5 * 0.5 * lambda) < 1e-12 * lambda);
@@ -532,9 +530,9 @@ TEST_CASE("generate_arrayant_ula - the 3GPP panel path with the omni element")
 
 // The ULA and 3GPP generators use only the radiation pattern of a custom pattern; its element positions and
 // coupling are ignored (as documented); the elements of the pattern are the fastest index.
-TEST_CASE("generate_arrayant_ula - ULA and 3GPP ignore positions and coupling of a custom pattern")
+TEST_CASE("arrayant_generate ula - ULA and 3GPP ignore positions and coupling of a custom pattern")
 {
-    auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto p = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     quadriga_lib::arrayant_copy_element(p, 0, {1});
     p.element_pos = {{0.3, 0.3}, {0.0, 0.0}, {0.7, -0.7}};
     p.coupling_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
@@ -542,7 +540,7 @@ TEST_CASE("generate_arrayant_ula - ULA and 3GPP ignore positions and coupling of
     p.center_freq = 1e9;
 
     const double lambda = 299792458.0 / 3e9;
-    auto u = quadriga_lib::generate_arrayant_ula<double>(2, 3e9, 0.5, p);
+    auto u = quadriga_lib::arrayant_generate<double>("ula", 1.0, 3e9, {}, {1, 2}, {0.5}, {}, {}, {}, {}, p);
     CHECK(u.n_elements() == 4);
     CHECK(u.n_ports() == 4);
     CHECK(arma::approx_equal(u.coupling_re, arma::mat(4, 4, arma::fill::eye), "absdiff", 0.0));
@@ -553,14 +551,14 @@ TEST_CASE("generate_arrayant_ula - ULA and 3GPP ignore positions and coupling of
     CHECK(arma::approx_equal(u.element_pos.row(1), y, "absdiff", 1e-12));
     CHECK(u.center_freq == 3e9);
 
-    auto g = quadriga_lib::generate_arrayant_3GPP<double>({}, 3e9, {}, {}, {}, {}, {}, p);
+    auto g = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3e9, {}, {}, {}, {}, {}, {}, {}, p);
     CHECK(g.n_elements() == 2);
     CHECK(g.n_ports() == 2);
     CHECK(arma::approx_equal(g.coupling_re, arma::mat(2, 2, arma::fill::eye), "absdiff", 0.0));
     CHECK(arma::all(arma::vectorise(g.element_pos) == 0.0));
 
     // Vertical stacking: z positions come from the array geometry only
-    auto g2 = quadriga_lib::generate_arrayant_3GPP<double>({2}, 3e9, {}, {}, {}, {}, {}, p);
+    auto g2 = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3e9, {}, {2}, {}, {}, {}, {}, {}, p);
     CHECK(g2.n_elements() == 4);
     CHECK(g2.n_ports() == 4);
     CHECK(arma::all(g2.element_pos.row(0) == 0.0));
@@ -568,7 +566,7 @@ TEST_CASE("generate_arrayant_ula - ULA and 3GPP ignore positions and coupling of
     CHECK(arma::approx_equal(g2.element_pos.row(2), z, "absdiff", 1e-12));
 }
 
-TEST_CASE("generate_arrayant_3GPP - float equals double")
+TEST_CASE("arrayant_generate 3GPP - float equals double")
 {
     // Table 7.8-6A config 1 with 4 columns per port, tilt and pan: patterns 1e-5 absolute, positions 1e-6 of the aperture, coupling phases
     // 1e-6 (1 + k aperture), the float rounding of the phase argument
@@ -576,8 +574,8 @@ TEST_CASE("generate_arrayant_3GPP - float equals double")
     const arma::vec spacing = {0.7, 0.5};
     const arma::mat steer = {12.0, 7.0};
     const double fc = 7e9, k = 2.0 * arma::datum::pi * fc / 299792458.0;
-    const auto d = quadriga_lib::generate_arrayant_3GPP<double>(panel, fc, spacing, ports, pol, steer, {}, {}, 30.0);
-    const auto f = quadriga_lib::generate_arrayant_3GPP<float>(panel, fc, spacing, ports, pol, steer, {}, {}, 30.0);
+    const auto d = quadriga_lib::arrayant_generate<double>("3GPP", 30.0, fc, {}, panel, spacing, pol, ports, steer);
+    const auto f = quadriga_lib::arrayant_generate<float>("3GPP", 30.0, fc, {}, panel, spacing, pol, ports, steer);
     REQUIRE(f.n_elements() == d.n_elements());
     const double aperture = arma::abs(d.element_pos).max();
     CHECK(arma::abs(arma::conv_to<arma::cube>::from(f.e_theta_re) - d.e_theta_re).max() < 1e-5);
@@ -587,161 +585,155 @@ TEST_CASE("generate_arrayant_3GPP - float equals double")
     CHECK(arma::abs(cf - cd).max() < 1e-6 * (1.0 + k * aperture));
 }
 
-TEST_CASE("generate_arrayant_3GPP - input validation")
+TEST_CASE("arrayant_generate 3GPP - input validation")
 {
-    using quadriga_lib::generate_arrayant_3GPP;
+    using quadriga_lib::arrayant_generate;
     const double n = qd_nan, inf = qd_inf;
-    REQUIRE_NOTHROW(generate_arrayant_3GPP<double>({4, 2, 1, 2}, 3.5e9, {0.5, 0.5, 0.0, 0.0}, {2, 1}, {3, 2}, {{10.0, 5.0}, {0.0, 0.0}}, {65.0, 65.0, 30.0, 30.0, n}, {}, 30.0));
+    REQUIRE_NOTHROW(arrayant_generate<double>("3GPP", 30.0, 3.5e9, {65.0, 65.0, 30.0, 30.0, n}, {4, 2, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {3, 2}, {2, 1}, {{10.0, 5.0}, {0.0, 0.0}}));
 
     SECTION("panel")
     {
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({1, 1, 1, 1, 1}), "Input 'panel' must have at most 4 entries.");
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({1ULL << 40, 1ULL << 40}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, NAN, {}, {1, 1, 1, 1, 1}), "Input 'panel' must have at most 4 entries.");
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, NAN, {}, {1ULL << 40, 1ULL << 40}), std::invalid_argument);
     }
     SECTION("center_freq")
     {
-        for (double fc : {0.0, -1.0, n, inf})
-            CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, fc), "Input 'center_freq' must be positive and finite.");
+        for (double fc : {0.0, -1.0, -inf, inf})
+            CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, fc), "Input 'center_freq' must be positive and finite.");
     }
     SECTION("spacing")
     {
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {0.5, 0.5, 0.5, 0.5, 0.5}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {n, -0.1}), "Input 'spacing' (d_H) must be finite and >= 0.");
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {0.5, 0.5, 0.5, 0.5, 0.5}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {n, -0.1}), "Input 'spacing' (d_H) must be finite and >= 0.");
         for (double x : {-0.5, inf, -inf})
             for (arma::uword i = 0; i < 4; ++i)
             {
                 arma::vec s(4, arma::fill::value(n));
                 s(i) = x;
-                CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, s), std::invalid_argument);
+                CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, s), std::invalid_argument);
             }
     }
     SECTION("ports")
     {
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({4, 4}, 3.5e9, {}, {1, 1, 1}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({4, 4}, 3.5e9, {}, {3}), "Input 'ports' (M_P) must divide 'panel' (M).");
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({4, 4}, 3.5e9, {}, {0, 8}), "Input 'ports' (N_P) must divide 'panel' (N).");
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {4, 4}, {}, {}, {1, 1, 1}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {4, 4}, {}, {}, {3}), "Input 'ports' (M_P) must divide 'panel' (M).");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {4, 4}, {}, {}, {0, 8}), "Input 'ports' (N_P) must divide 'panel' (N).");
     }
     SECTION("pol")
     {
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {1, 1, 1}), std::invalid_argument);
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 1, 1}), std::invalid_argument);
         for (arma::uword p : {4ULL, 5ULL, 6ULL})
-            CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {p}),
+            CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {p}),
                               "Input 'pol' (polarization) values 4 to 6 are reserved; elements are combined through 'ports'.");
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {7}), "Input 'pol' (polarization) must be 1, 2 or 3.");
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {1, 3}), "Input 'pol' (model) must be 1 or 2.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {7}), "Input 'pol' (polarization) must be 1, 2 or 3.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 3}), "Input 'pol' (model) must be 1 or 2.");
     }
     SECTION("steer")
     {
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {0.0, 0.0, 0.0}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({2, 1, 1, 3}, 3.5e9, {}, {}, {}, {{0.0, 0.0}, {0.0, 0.0}}),
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {}, {}, {0.0, 0.0, 0.0}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {2, 1, 1, 3}, {}, {}, {}, {{0.0, 0.0}, {0.0, 0.0}}),
                           "Input 'steer' must have one row or one row per panel.");
         for (double x : {91.0, -90.5, inf})
-            CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {0.0, x}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({2, 2, 1, 2}, 3.5e9, {}, {2, 1}, {}, {{0.0, 5.0}, {1.0, 0.0}}),
+            CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {}, {}, {0.0, x}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {2, 2, 1, 2}, {}, {}, {2, 1}, {{0.0, 5.0}, {1.0, 0.0}}),
                           "Input 'steer' has a non-zero tilt, but 'ports' gives one element per sub-array in the vertical; tilt needs combined elements.");
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({2, 2, 1, 2}, 3.5e9, {}, {1, 2}, {}, {{1.0, 0.0}, {0.0, 5.0}}),
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {2, 2, 1, 2}, {}, {}, {1, 2}, {{1.0, 0.0}, {0.0, 5.0}}),
                           "Input 'steer' has a non-zero pan, but 'ports' gives one element per sub-array in the horizontal; pan needs combined elements.");
     }
     SECTION("element")
     {
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {65.0, 65.0, 30.0, 30.0, 8.0, 1.0}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {0.0}), "Input 'element' (phi_3dB) must be > 0 degrees (Inf: no taper).");
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, -inf}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, -1.0}), "Input 'element' (SLA_V) must be >= 0, an attenuation in dB below the peak (Inf: no limit).");
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, n, -inf}), std::invalid_argument);
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, n, n, -inf}), std::invalid_argument);
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {65.0, 65.0, 30.0, 30.0, 8.0, 1.0}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {0.0}), "Input 'element' (phi_3dB) must be > 0 degrees (Inf: no taper).");
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {n, -inf}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {n, n, -1.0}), "Input 'element' (SLA_V) must be >= 0, an attenuation in dB below the peak (Inf: no limit).");
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {n, n, n, -inf}), std::invalid_argument);
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {n, n, n, n, -inf}), std::invalid_argument);
     }
     SECTION("pattern")
     {
-        auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {65.0}, p), "Inputs 'element' and 'pattern' cannot be given together.");
+        auto p = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {65.0}, {}, {}, {}, {}, {}, {}, p), "Inputs 'element' and 'pattern' cannot be given together.");
         quadriga_lib::arrayant_copy_element(p, 0, {1});
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {2}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {1, 2}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({2}, 1e-300, {}, {}, {}, {}, {}, p), "Inputs 'spacing' and 'center_freq' give non-finite element positions.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {2}, {}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 2}, {}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 1.0, 1e-300, {}, {2}, {}, {}, {}, {}, {}, p), "Inputs 'spacing' and 'center_freq' give non-finite element positions.");
         p.azimuth_grid.resize(3);
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {}, p), std::invalid_argument);
+        CHECK_THROWS_AS(arrayant_generate<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {}, {}, {}, {}, p), std::invalid_argument);
     }
 }
 
-TEST_CASE("generate_arrayant_custom - input validation")
+TEST_CASE("arrayant_generate custom - element defaults, flat cuts and validation")
 {
-    // NaN selects the defaults (90, 90, 0); a beamwidth must be > 0 (Inf: flat cut), rear_gain_lin in [0, 1)
-    const auto ref = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 10.0);
-    CHECK(max_diff(quadriga_lib::generate_arrayant_custom<double>(qd_nan, qd_nan, qd_nan, 10.0), ref) == 0.0);
+    // NaN selects the defaults (90, 90, Inf); a beamwidth must be > 0 (Inf: flat cut), floor_dB > 0 (Inf: no floor)
+    const auto ref = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 90.0});
+    CHECK(max_diff(quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {qd_nan, qd_nan, qd_nan}), ref) == 0.0);
     for (double bw : {0.0, -5.0, -qd_inf})
     {
-        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(bw, 90.0, 0.0, 10.0), "Input 'az_3dB' must be > 0 degrees (Inf: no taper), or NaN for the default.");
-        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(90.0, bw, 0.0, 10.0), "Input 'el_3dB' must be > 0 degrees (Inf: no taper), or NaN for the default.");
+        CHECK_THROWS_WITH(quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {bw, 90.0}), "Input 'element' (az_3dB) must be > 0 degrees (Inf: no taper).");
+        CHECK_THROWS_WITH(quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, bw}), "Input 'element' (el_3dB) must be > 0 degrees (Inf: no taper).");
     }
     // An infinite beamwidth gives a flat cut: every elevation row is constant over azimuth, every azimuth column over elevation
-    const auto flat_az = quadriga_lib::generate_arrayant_custom<double>(qd_inf, 40.0, 0.0, 10.0);
-    const auto flat_el = quadriga_lib::generate_arrayant_custom<double>(40.0, qd_inf, 0.0, 10.0);
+    const auto flat_az = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {qd_inf, 40.0});
+    const auto flat_el = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {40.0, qd_inf});
     const arma::mat Pa = flat_az.e_theta_re.slice(0), Pe = flat_el.e_theta_re.slice(0);
     CHECK(arma::abs(Pa.each_col() - Pa.col(0)).max() < 1e-14 * Pa.max());
     CHECK(arma::abs(Pe.each_row() - Pe.row(Pe.n_rows / 2)).max() < 1e-14 * Pe.max());
     CHECK(Pa.col(0).min() < 0.5 * Pa.max()); // the other cut keeps its taper
-    for (double r : {-0.1, 1.0, 1.5, qd_inf})
-        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, r, 10.0), "Input 'rear_gain_lin' must be in [0, 1), or NaN for the default.");
+    // floor_dB is the power floor in dB below the peak: the poles, where the taper is 0, sit 10 dB below the boresight
+    const arma::mat P = arma::square(quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {30.0, 30.0, 10.0}).e_theta_re.slice(0));
+    CHECK(std::abs(P.min() / P.max() - 0.1) < 1e-12);
+    for (double f : {0.0, -10.0, -qd_inf})
+        CHECK_THROWS_WITH(quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 90.0, f}), "Input 'element' (floor_dB) must be > 0, the attenuation of the floor in dB below the peak (Inf: no floor).");
 }
 
 TEST_CASE("Array antenna generators - grid resolution")
 {
-    // NaN and values <= 0 select the default (1 degree); infinite values and values below 0.1 or above 90 degree throw
+    // NaN and values <= 0 select the default (1 degree; omni and xpol 10 degree); infinite values and values below 0.1 or above 90 degree throw
     for (double res : {qd_inf, -qd_inf, 0.09, 1.0e-300, 90.5, 1000.0})
     {
         INFO("res = " << res);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_omni<double>(res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_xpol<double>(res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_dipole<double>(res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_half_wave_dipole<double>(res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_ula<double>(2, 3.0e9, 0.5, {}, res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_3GPP<double>({}, 3.0e9, {}, {}, {}, {}, {}, {}, res), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::generate_arrayant_multibeam<double>({}, 3.0e9, {}, {}, {}, {}, res), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("omni", res), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("xpol", res), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("dipole", res), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("half-wave-dipole", res), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("custom", res, NAN, {90.0, 90.0}), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("ula", res, 3.0e9, {}, {1, 2}, {0.5}), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("3GPP", res, 3.0e9), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_generate<double>("multibeam", res, 3.0e9), std::invalid_argument);
     }
-    CHECK_THROWS_AS(quadriga_lib::generate_arrayant_omni<float>(std::numeric_limits<float>::denorm_min()), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_generate<float>("omni", std::numeric_limits<float>::denorm_min()), std::invalid_argument);
     for (double res : {qd_nan, 0.0, -5.0})
-        CHECK(quadriga_lib::generate_arrayant_omni<double>(res).n_azimuth() == 361);
-    CHECK(quadriga_lib::generate_arrayant_omni<double>(90.0).n_azimuth() == 5);
+        CHECK(quadriga_lib::arrayant_generate<double>("dipole", res).n_azimuth() == 361);
+    CHECK(quadriga_lib::arrayant_generate<double>("omni", 90.0).n_azimuth() == 5);
 }
 
-TEST_CASE("arrayant_generate - each type once, with its default resolution")
+TEST_CASE("arrayant_generate - aliases, default resolution and center frequency")
 {
-    // The dispatcher equals the generator of each type (exact); res NaN or <= 0 is 10 degree for omni and xpol, 1 degree
-    // otherwise; every result has the given center frequency
-    using namespace quadriga_lib;
+    // res NaN or <= 0 is 10 degree for omni and xpol, 1 degree otherwise; the aliases give the same antenna (exact);
+    // every result has the given center frequency
+    using quadriga_lib::arrayant_generate;
     const double fc = 2.0e9;
-    auto same = [&](const arrayant<double> &a, arrayant<double> b)
-    {
-        b.center_freq = fc;
-        return max_diff(a, b) == 0.0 && a.center_freq == fc;
-    };
-    CHECK(same(arrayant_generate<double>("omni", qd_nan, fc), generate_arrayant_omni<double>(10.0)));
-    CHECK(same(arrayant_generate<double>("xpol", 0.0, fc), generate_arrayant_xpol<double>(10.0)));
-    CHECK(same(arrayant_generate<double>("dipole", -1.0, fc), generate_arrayant_dipole<double>(1.0)));
-    CHECK(same(arrayant_generate<double>("short-dipole", 5.0, fc), generate_arrayant_dipole<double>(5.0)));
-    CHECK(same(arrayant_generate<double>("half-wave-dipole", qd_nan, fc), generate_arrayant_half_wave_dipole<double>(1.0)));
-    CHECK(same(arrayant_generate<double>("custom", 10.0, fc, {}, {}, {}, {}, {}, {30.0, 20.0, 10.0}),
-               generate_arrayant_custom<double>(30.0, 20.0, std::pow(10.0, -1.0), 10.0)));
-    CHECK(same(arrayant_generate<double>("custom", 10.0, fc), generate_arrayant_custom<double>(90.0, 90.0, 0.0, 10.0)));
-    CHECK(same(arrayant_generate<double>("3GPP", 10.0, fc, {2, 2}, {}, {1}, {3, 2}, {6.0}), generate_arrayant_3GPP<double>({2, 2}, fc, {}, {1}, {3, 2}, {6.0}, {}, {}, 10.0)));
-    CHECK(same(arrayant_generate<double>("3gpp", qd_nan, fc), generate_arrayant_3GPP<double>({}, fc)));
-    CHECK(same(arrayant_generate<double>("ula", 10.0, fc, {1, 3}, {}, {}, {}, {}, {}, generate_arrayant_xpol<double>(10.0)),
-               generate_arrayant_ula<double>(3, fc, 0.5, generate_arrayant_xpol<double>(10.0))));
+    CHECK(arrayant_generate<double>("omni", qd_nan, fc).n_azimuth() == 37);
+    CHECK(arrayant_generate<double>("xpol", 0.0, fc).n_azimuth() == 37);
+    CHECK(arrayant_generate<double>("dipole", -1.0, fc).n_azimuth() == 361);
+    CHECK(arrayant_generate<double>("half-wave-dipole", qd_nan, fc).n_azimuth() == 361);
+    CHECK(arrayant_generate<double>("custom", qd_nan, fc).n_azimuth() == 361);
+    CHECK(arrayant_generate<double>("3GPP", qd_nan, fc).n_azimuth() == 361);
+    CHECK(max_diff(arrayant_generate<double>("short-dipole", 5.0, fc), arrayant_generate<double>("dipole", 5.0, fc)) == 0.0);
+    CHECK(max_diff(arrayant_generate<double>("3gpp", 10.0, fc, {}, {2, 2}), arrayant_generate<double>("3GPP", 10.0, fc, {}, {2, 2})) == 0.0);
     const arma::mat beams = {{10.0, -20.0}, {0.0, 5.0}};
-    CHECK(same(arrayant_generate<double>("multibeam", 10.0, fc, {2, 2}, {}, {}, {2}, {}, {}, {}, beams, true, false),
-               generate_arrayant_multibeam<double>({2, 2}, fc, {}, {2}, {}, beams, 10.0, true, false)));
+    for (const std::string type : {"omni", "xpol", "dipole", "half-wave-dipole", "custom", "ula", "3GPP"})
+        CHECK(arrayant_generate<double>(type, 10.0, fc).center_freq == fc);
+    CHECK(arrayant_generate<double>("multibeam", 10.0, fc, {}, {2, 2}, {}, {2}, {}, {}, beams, {}, true).center_freq == fc);
     CHECK(arrayant_generate<float>("omni").center_freq == 299792458.0f);
 }
 
 TEST_CASE("arrayant_generate - input validation")
 {
     using quadriga_lib::arrayant_generate;
-    const auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    const auto p = quadriga_lib::arrayant_generate<double>("omni", 10.0);
     const arma::mat beams = column({0.0, 0.0});
-    REQUIRE_NOTHROW(arrayant_generate<double>("3GPP", 30.0, 3.5e9, {2}, {0.5}, {1}, {3}, {5.0}, {}, p, {}, false, true));
+    REQUIRE_NOTHROW(arrayant_generate<double>("3GPP", 30.0, 3.5e9, {}, {2}, {0.5}, {3}, {1}, {5.0}, {}, p, false, true));
 
     SECTION("type")
     {
@@ -750,52 +742,56 @@ TEST_CASE("arrayant_generate - input validation")
     }
     SECTION("inputs a type does not use")
     {
-        CHECK_THROWS_WITH(arrayant_generate<double>("omni", 10.0, 3e9, {2}), "Input 'panel' is not used by type 'omni'.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("xpol", 10.0, 3e9, {}, {0.5}), "Input 'spacing' is not used by type 'xpol'.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("dipole", 10.0, 3e9, {}, {}, {1}), "Input 'ports' is not used by type 'dipole'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("omni", 10.0, 3e9, {}, {2}), "Input 'panel' is not used by type 'omni'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("xpol", 10.0, 3e9, {}, {}, {0.5}), "Input 'spacing' is not used by type 'xpol'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("dipole", 10.0, 3e9, {}, {}, {}, {}, {1}), "Input 'ports' is not used by type 'dipole'.");
         CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {1}), "Input 'pol' is not used by type 'custom'.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {5.0}), "Input 'steer' is not used by type 'multibeam'.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("ula", 10.0, 3e9, {}, {}, {}, {}, {}, {65.0}), "Input 'element' is not used by type 'ula'.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, p), "Input 'pattern' is not used by type 'multibeam'.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, beams), "Input 'beams' is not used by type '3GPP'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {5.0}), "Input 'steer' is not used by type 'multibeam'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("ula", 10.0, 3e9, {65.0}), "Input 'element' is not used by type 'ula'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, p), "Input 'pattern' is not used by type 'multibeam'.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("3GPP", 10.0, 3e9, {}, {}, {}, {}, {}, {}, beams), "Input 'beams' is not used by type '3GPP'.");
         CHECK_THROWS_WITH(arrayant_generate<double>("ula", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, true), "Input 'separate_beams' is not used by type 'ula'.");
         CHECK_THROWS_WITH(arrayant_generate<double>("half-wave-dipole", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, false, true),
                           "Input 'apply_weights' is not used by type 'half-wave-dipole'.");
     }
     SECTION("center_freq")
     {
-        for (double fc : {0.0, qd_nan, qd_inf})
+        for (double fc : {0.0, -qd_inf, qd_inf})
             CHECK_THROWS_WITH(arrayant_generate<double>("omni", 10.0, fc), "Input 'center_freq' must be positive and finite.");
+        // NaN is the default 299792458 Hz: a wavelength of 1 m, here the element spacing of a ULA
+        const auto u = arrayant_generate<double>("ula", 10.0, qd_nan, {}, {1, 2}, {0.5});
+        CHECK(u.center_freq == 299792458.0);
+        CHECK(std::abs(u.element_pos(1, 1) - u.element_pos(1, 0) - 0.5) < 1e-14);
     }
     SECTION("element of custom and multibeam")
     {
-        CHECK_THROWS_AS(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {90.0, 90.0, 10.0, 1.0}), std::invalid_argument);
-        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {0.0}), "Input 'element' (az_3dB) must be > 0 degrees (Inf: no taper).");
-        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {qd_nan, -qd_inf}), "Input 'element' (el_3dB) must be > 0 degrees (Inf: no taper).");
+        CHECK_THROWS_AS(arrayant_generate<double>("custom", 10.0, 3e9, {90.0, 90.0, 10.0, 1.0}), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {0.0}), "Input 'element' (az_3dB) must be > 0 degrees (Inf: no taper).");
+        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {qd_nan, -qd_inf}), "Input 'element' (el_3dB) must be > 0 degrees (Inf: no taper).");
         for (double x : {0.0, -3.0, -qd_inf, 1e-17})
-            CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {qd_nan, qd_nan, x}),
+            CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {qd_nan, qd_nan, x}),
                               "Input 'element' (floor_dB) must be > 0, the attenuation of the floor in dB below the peak (Inf: no floor).");
         // floor_dB = Inf is no floor, the default; NaN selects it
         const auto c0 = arrayant_generate<double>("custom", 10.0, 3e9);
-        CHECK(max_diff(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {90.0, 90.0, qd_inf}), c0) == 0.0);
-        CHECK(max_diff(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {90.0, 90.0, qd_nan}), c0) == 0.0);
+        CHECK(max_diff(arrayant_generate<double>("custom", 10.0, 3e9, {90.0, 90.0, qd_inf}), c0) == 0.0);
+        CHECK(max_diff(arrayant_generate<double>("custom", 10.0, 3e9, {90.0, 90.0, qd_nan}), c0) == 0.0);
     }
     SECTION("beams")
     {
-        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, arma::mat{{0.0, 1.0}}), "Input 'beams' must have 2 or 3 rows.");
-        CHECK_THROWS_AS(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, arma::mat(4, 1, arma::fill::zeros)), std::invalid_argument);
-        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, column({0.0, qd_nan})), "Input 'beams' must be finite.");
+        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, arma::mat{{0.0, 1.0}}), "Input 'beams' must have 2 or 3 rows.");
+        CHECK_THROWS_AS(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, arma::mat(4, 1, arma::fill::zeros)), std::invalid_argument);
+        CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, column({0.0, qd_nan})), "Input 'beams' must be finite.");
     }
 }
 
-TEST_CASE("generate_arrayant_multibeam - a single beam has the MRT gain of the array")
+TEST_CASE("arrayant_generate multibeam - a single beam has the MRT gain of the array")
 {
     // One beam towards a grid direction: the weights are phasors that align the 36 element contributions there, so the
     // combined port has |F| = 36 |F_element| in that direction (planar wave; MRT is optimal for one beam, so the refinement
     // keeps the requested angles)
     const double az = 20.0, el = -6.0;
     const arma::mat beams = column({az, el});
-    const auto ant = quadriga_lib::generate_arrayant_multibeam<double>({6, 6}, 3.75e9, {0.4}, {}, {}, beams, 2.0);
+    const auto ant = quadriga_lib::arrayant_generate<double>("multibeam", 2.0, 3.75e9, {}, {6, 6}, {0.4}, {}, {}, {}, beams);
     REQUIRE(ant.n_elements() == 36);
     REQUIRE(ant.n_ports() == 1);
     CHECK(ant.name == "multibeam");
@@ -808,30 +804,30 @@ TEST_CASE("generate_arrayant_multibeam - a single beam has the MRT gain of the a
     CHECK(std::abs(F / (36.0 * ant.e_theta_re(i, j, 0)) - 1.0) < 1e-9);
 }
 
-TEST_CASE("generate_arrayant_multibeam - beams, weights, ports and polarization")
+TEST_CASE("arrayant_generate multibeam - beams, weights, ports and polarization")
 {
     // Two beams with weights 2 and 1 equal three unit beams with the first one twice (the same sum); 2 rows of 'beams'
     // equal weights 1; omitted beams equal [0; 0; 1]. Ports: one per polarization, with separate beams one per
     // polarization and beam (polarization fastest); elements: polarization fastest, the weights equal for both
     const double fc = 3.75e9;
     const arma::mat b2 = {{20.0, 0.0}, {-7.0, 30.0}, {2.0, 1.0}}, b3 = {{20.0, 0.0, 20.0}, {-7.0, 30.0, -7.0}};
-    const auto a2 = quadriga_lib::generate_arrayant_multibeam<double>({6, 6}, fc, {0.4}, {}, {}, b2, 15.0);
-    const auto a3 = quadriga_lib::generate_arrayant_multibeam<double>({6, 6}, fc, {0.4}, {}, {}, b3, 15.0);
+    const auto a2 = quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b2);
+    const auto a3 = quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3);
     CHECK(arma::abs(a2.coupling_re - a3.coupling_re).max() < 1e-12);
     CHECK(arma::abs(a2.coupling_im - a3.coupling_im).max() < 1e-12);
 
     const arma::mat b3w = arma::join_cols(b3, arma::mat(1, 3, arma::fill::ones));
-    CHECK(max_diff(a3, quadriga_lib::generate_arrayant_multibeam<double>({6, 6}, fc, {0.4}, {}, {}, b3w, 15.0)) == 0.0);
-    CHECK(max_diff(quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, fc), quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, fc, {}, {}, {}, column({0.0, 0.0, 1.0}))) == 0.0);
+    CHECK(max_diff(a3, quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3w)) == 0.0);
+    CHECK(max_diff(quadriga_lib::arrayant_generate<double>("multibeam", 1.0, fc, {}, {2, 2}), quadriga_lib::arrayant_generate<double>("multibeam", 1.0, fc, {}, {2, 2}, {}, {}, {}, {}, column({0.0, 0.0, 1.0}))) == 0.0);
 
-    const auto s = quadriga_lib::generate_arrayant_multibeam<double>({6, 6}, fc, {0.4}, {}, {}, b3, 15.0, true);
+    const auto s = quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3, {}, true);
     CHECK(s.n_elements() == 36);
     CHECK(s.n_ports() == 3);
 
     for (bool sep : {false, true})
     {
-        const auto v = quadriga_lib::generate_arrayant_multibeam<double>({3, 2}, fc, {}, {}, {}, b3, 15.0, sep);
-        const auto x = quadriga_lib::generate_arrayant_multibeam<double>({3, 2}, fc, {}, {3, 2}, {}, b3, 15.0, sep);
+        const auto v = quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {3, 2}, {}, {}, {}, {}, b3, {}, sep);
+        const auto x = quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {3, 2}, {}, {3, 2}, {}, {}, b3, {}, sep);
         REQUIRE(x.n_elements() == 12);
         REQUIRE(x.n_ports() == 2 * v.n_ports());
         for (arma::uword e = 0; e < 6; ++e)
@@ -846,27 +842,27 @@ TEST_CASE("generate_arrayant_multibeam - beams, weights, ports and polarization"
     }
 
     // apply_weights: one pattern per port
-    const auto c = quadriga_lib::generate_arrayant_multibeam<double>({6, 6}, fc, {0.4}, {}, {}, b3, 15.0, false, true);
+    const auto c = quadriga_lib::arrayant_generate<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3, {}, false, true);
     CHECK(c.n_elements() == 1);
     CHECK(max_diff(c, quadriga_lib::arrayant_combine_pattern(a3)) < 1e-12 * arma::abs(c.e_theta_re).max());
 
     // The element shape: NaN beamwidths are 120 degree; a floor of 20 dB
-    CHECK(max_diff(quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, fc, {}, {}, {qd_nan, qd_nan, qd_nan}, b3, 10.0),
-                   quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, fc, {}, {}, {120.0, 120.0}, b3, 10.0)) == 0.0);
-    const auto f = quadriga_lib::generate_arrayant_multibeam<double>({}, fc, {}, {}, {90.0, 60.0, 20.0}, {}, 10.0);
-    const auto f_ref = quadriga_lib::generate_arrayant_custom<double>(90.0, 60.0, 0.01, 10.0);
-    CHECK(arma::approx_equal(f.e_theta_re, f_ref.e_theta_re, "absdiff", 0.0));
+    CHECK(max_diff(quadriga_lib::arrayant_generate<double>("multibeam", 10.0, fc, {qd_nan, qd_nan, qd_nan}, {2, 2}, {}, {}, {}, {}, b3),
+                   quadriga_lib::arrayant_generate<double>("multibeam", 10.0, fc, {120.0, 120.0}, {2, 2}, {}, {}, {}, {}, b3)) == 0.0);
+    const auto f = quadriga_lib::arrayant_generate<double>("multibeam", 10.0, fc, {90.0, 60.0, 20.0});
+    const auto f_ref = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 60.0, 20.0});
+    CHECK(arma::approx_equal(f.e_theta_re, f_ref.e_theta_re, "absdiff", 1e-14 * f_ref.e_theta_re.max()));
 }
 
 // A beam towards a pole, where the element pattern is exactly 0, still gets finite, non-zero beam weights and one
 // port per polarization
-TEST_CASE("generate_arrayant_multibeam - beams towards the poles")
+TEST_CASE("arrayant_generate multibeam - beams towards the poles")
 {
     for (double el : {90.0, -90.0})
         for (arma::uword pol : {1ULL, 2ULL, 3ULL})
         {
             quadriga_lib::arrayant<double> a;
-            REQUIRE_NOTHROW(a = quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, 3e9, {}, {pol}, {}, column({0.0, el})));
+            REQUIRE_NOTHROW(a = quadriga_lib::arrayant_generate<double>("multibeam", 1.0, 3e9, {}, {2, 2}, {}, {pol}, {}, {}, column({0.0, el})));
             const arma::uword n_el = pol == 1 ? 4 : 8;
             CHECK(a.n_elements() == n_el);
             CHECK(a.n_ports() == (pol == 1 ? 1 : 2));
@@ -877,19 +873,19 @@ TEST_CASE("generate_arrayant_multibeam - beams towards the poles")
         }
 
     // Separate beams, one of them towards the zenith
-    auto b = quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, 3e9, {}, {2}, {}, arma::mat{{0.0, 30.0}, {90.0, 0.0}}, 10.0, true);
+    auto b = quadriga_lib::arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {2, 2}, {}, {2}, {}, {}, arma::mat{{0.0, 30.0}, {90.0, 0.0}}, {}, true);
     CHECK(b.n_elements() == 8);
     CHECK(b.n_ports() == 4);
     CHECK(b.is_valid().empty());
 }
 
-TEST_CASE("generate_arrayant_multibeam - turned polarizations: float equals double, also on the rotation axis")
+TEST_CASE("arrayant_generate multibeam - turned polarizations: float equals double, also on the rotation axis")
 {
     // The beams of pol = 2 and 3 combine turned elements; their rotation axes lie on the default 1 degree grid
     for (arma::uword pol : {2ULL, 3ULL})
     {
-        const auto d = quadriga_lib::generate_arrayant_multibeam<double>({2, 2}, 3.5e9, {}, {pol});
-        const auto f = quadriga_lib::generate_arrayant_multibeam<float>({2, 2}, 3.5e9, {}, {pol});
+        const auto d = quadriga_lib::arrayant_generate<double>("multibeam", 1.0, 3.5e9, {}, {2, 2}, {}, {pol});
+        const auto f = quadriga_lib::arrayant_generate<float>("multibeam", 1.0, 3.5e9, {}, {2, 2}, {}, {pol});
         const double peak = std::max(arma::abs(d.e_theta_re).max(), arma::abs(d.e_phi_re).max());
         const double d_float = std::max({arma::abs(arma::conv_to<arma::cube>::from(f.e_theta_re) - d.e_theta_re).max(),
                                          arma::abs(arma::conv_to<arma::cube>::from(f.e_phi_re) - d.e_phi_re).max(),
@@ -900,10 +896,10 @@ TEST_CASE("generate_arrayant_multibeam - turned polarizations: float equals doub
     }
 }
 
-TEST_CASE("generate_arrayant_half_wave_dipole - pattern equals cos(pi/2 sin(el)) / cos(el), also at the poles")
+TEST_CASE("arrayant_generate half-wave-dipole - pattern equals cos(pi/2 sin(el)) / cos(el), also at the poles")
 {
-    const auto d = quadriga_lib::generate_arrayant_half_wave_dipole<double>();
-    const auto f = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
+    const auto d = quadriga_lib::arrayant_generate<double>("half-wave-dipole");
+    const auto f = quadriga_lib::arrayant_generate<float>("half-wave-dipole");
     const double scale = 1.280968208215292, pih = 0.5 * arma::datum::pi;
     double d_model = 0.0, d_float = 0.0;
     for (arma::uword i = 1; i + 1 < d.n_elevation(); ++i)

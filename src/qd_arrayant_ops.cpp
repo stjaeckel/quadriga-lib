@@ -316,7 +316,7 @@ void quadriga_lib::arrayant_calc_beamwidth(
 
 ## Example:
 ```
-auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 20.0);
+auto ant = quadriga_lib::arrayant_generate<double>("custom", 1.0, NAN, {30.0, 20.0});
 arma::vec bw_az, bw_el;
 quadriga_lib::arrayant_calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
 ```
@@ -387,7 +387,7 @@ arma::Col<dtype> quadriga_lib::arrayant_calc_directivity(
 
 ## Example:
 ```
-auto ant = quadriga_lib::generate_arrayant_dipole<double>();
+auto ant = quadriga_lib::arrayant_generate<double>("dipole");
 arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant); // about 1.76 dBi
 ```
 
@@ -681,7 +681,7 @@ void quadriga_lib::arrayant_copy_element(
 
 ## Example:
 ```
-auto ant = quadriga_lib::generate_arrayant_dipole<double>();
+auto ant = quadriga_lib::arrayant_generate<double>("dipole");
 quadriga_lib::arrayant_copy_element(ant, 0, {1, 2, 3}); // 4 identical elements
 ant.element_pos.row(1) = arma::rowvec({-0.75, -0.25, 0.25, 0.75});
 ```
@@ -1315,7 +1315,7 @@ void quadriga_lib::arrayant_rotate_pattern(
 
 ## Example:
 ```
-auto ant = quadriga_lib::generate_arrayant_3GPP<double>({4});
+auto ant = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, NAN, {}, {4});
 arma::vec downtilt = {0.0, 10.0 * arma::datum::pi / 180.0, 0.0}; // 10 degree mechanical downtilt
 quadriga_lib::arrayant_rotate_pattern(ant, downtilt);
 ```
@@ -1422,7 +1422,7 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
         }
         else // step < 0.1 degree --> Use subsampled sphere
         {
-            auto sub = quadriga_lib::generate_arrayant_omni<dtype>();
+            auto sub = quadriga_lib::arrayant_generate<dtype>("omni", 1.0);
             sub.e_theta_re.zeros();
             arma::Col<unsigned> has_az(361), has_el(181);
 
