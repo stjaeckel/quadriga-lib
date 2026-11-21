@@ -65,7 +65,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `ports`: `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; they divide `M` and `N`; default `[M, N]` (one port per element).
 - `pol`: `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°), 4 to 6 reserved; model 1 or 2 (TR 38.901 Model-1, Model-2); default `[1, 1]`.
 - `steer`: `[tilt, pan]` in degrees: electrical downtilt (positive down) and pan (positive towards +y) of the sub-array weights; one row for all panels or one row per panel; default 0.
-- `element`: the element parameters of a generator type, unit per entry in its documentation, e.g. `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` in degrees, degrees, dB, dB and dBi for the TR element.
+- `element`: the element parameters of a generator type, unit per entry in its documentation, e.g. `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` in degrees, degrees, dB, dB and dBi for the TR element. Attenuations (`SLA_V`, `A_max`, `floor_dB`) are positive dB values below the peak, as in TR 38.901 (30 dB), and Inf removes the limit; an infinite beamwidth gives a flat cut.
 - `beams`: `[2 or 3, n_beams]`: azimuth and elevation in degrees, weight (linear).
 
 **Kernel selection**

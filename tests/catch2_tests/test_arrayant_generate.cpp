@@ -190,10 +190,11 @@ TEST_CASE("Generate Arrayant - Custom")
 TEST_CASE("generate_arrayant_3GPP - the element follows the Table 7.3-1 shape, also with other constants")
 {
     // Field in dB = G_max + A_dB of Table 7.3-1 at every grid point: the default constants, those of Table 7.3-2
-    // (handheld UT) and others with theta_3dB != phi_3dB and A_max != SLA_V; float equals double
+    // (handheld UT), others with theta_3dB != phi_3dB and A_max != SLA_V, and infinite entries; float equals double
     const double c_def[5] = {65.0, 65.0, 30.0, 30.0, 8.0}, c_ut[5] = {125.0, 125.0, 22.5, 22.5, 5.3}, c_x[5] = {50.0, 80.0, 25.0, 35.0, 6.0};
+    const double c_inf[5] = {qd_inf, 80.0, qd_inf, qd_inf, 6.0}, c_inf2[5] = {50.0, qd_inf, 25.0, 35.0, 6.0}; // Inf: no taper, no limit
     const double rad2deg = 180.0 / arma::datum::pi;
-    for (const double *c : {c_def, c_ut, c_x})
+    for (const double *c : {c_def, c_ut, c_x, c_inf, c_inf2})
     {
         const arma::vec element = (c == c_def) ? arma::vec() : arma::vec(c, 5);
         const auto d = quadriga_lib::generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, element, {}, 5.0);
@@ -644,10 +645,10 @@ TEST_CASE("generate_arrayant_3GPP - input validation")
     SECTION("element")
     {
         CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {65.0, 65.0, 30.0, 30.0, 8.0, 1.0}), std::invalid_argument);
-        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {0.0}), "Input 'element' (phi_3dB) must be finite and > 0.");
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, inf}), std::invalid_argument);
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, -1.0}), std::invalid_argument);
-        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, n, inf}), std::invalid_argument);
+        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {0.0}), "Input 'element' (phi_3dB) must be > 0 degrees (Inf: no taper).");
+        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, -inf}), std::invalid_argument);
+        CHECK_THROWS_WITH(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, -1.0}), "Input 'element' (SLA_V) must be >= 0, an attenuation in dB below the peak (Inf: no limit).");
+        CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, n, -inf}), std::invalid_argument);
         CHECK_THROWS_AS(generate_arrayant_3GPP<double>({}, 3.5e9, {}, {}, {}, {}, {n, n, n, n, -inf}), std::invalid_argument);
     }
     SECTION("pattern")
@@ -665,14 +666,21 @@ TEST_CASE("generate_arrayant_3GPP - input validation")
 
 TEST_CASE("generate_arrayant_custom - input validation")
 {
-    // NaN selects the defaults (90, 90, 0); a beamwidth must be finite and > 0, rear_gain_lin in [0, 1)
+    // NaN selects the defaults (90, 90, 0); a beamwidth must be > 0 (Inf: flat cut), rear_gain_lin in [0, 1)
     const auto ref = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 10.0);
     CHECK(max_diff(quadriga_lib::generate_arrayant_custom<double>(qd_nan, qd_nan, qd_nan, 10.0), ref) == 0.0);
-    for (double bw : {0.0, -5.0, qd_inf})
+    for (double bw : {0.0, -5.0, -qd_inf})
     {
-        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(bw, 90.0, 0.0, 10.0), "Input 'az_3dB' must be finite and > 0, or NaN for the default.");
-        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(90.0, bw, 0.0, 10.0), "Input 'el_3dB' must be finite and > 0, or NaN for the default.");
+        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(bw, 90.0, 0.0, 10.0), "Input 'az_3dB' must be > 0 degrees (Inf: no taper), or NaN for the default.");
+        CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(90.0, bw, 0.0, 10.0), "Input 'el_3dB' must be > 0 degrees (Inf: no taper), or NaN for the default.");
     }
+    // An infinite beamwidth gives a flat cut: every elevation row is constant over azimuth, every azimuth column over elevation
+    const auto flat_az = quadriga_lib::generate_arrayant_custom<double>(qd_inf, 40.0, 0.0, 10.0);
+    const auto flat_el = quadriga_lib::generate_arrayant_custom<double>(40.0, qd_inf, 0.0, 10.0);
+    const arma::mat Pa = flat_az.e_theta_re.slice(0), Pe = flat_el.e_theta_re.slice(0);
+    CHECK(arma::abs(Pa.each_col() - Pa.col(0)).max() < 1e-14 * Pa.max());
+    CHECK(arma::abs(Pe.each_row() - Pe.row(Pe.n_rows / 2)).max() < 1e-14 * Pe.max());
+    CHECK(Pa.col(0).min() < 0.5 * Pa.max()); // the other cut keeps its taper
     for (double r : {-0.1, 1.0, 1.5, qd_inf})
         CHECK_THROWS_WITH(quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, r, 10.0), "Input 'rear_gain_lin' must be in [0, 1), or NaN for the default.");
 }
@@ -762,11 +770,15 @@ TEST_CASE("arrayant_generate - input validation")
     SECTION("element of custom and multibeam")
     {
         CHECK_THROWS_AS(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {90.0, 90.0, 10.0, 1.0}), std::invalid_argument);
-        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {0.0}), "Input 'element' (az_3dB) must be finite and > 0.");
-        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {qd_nan, qd_inf}), "Input 'element' (el_3dB) must be finite and > 0.");
-        for (double x : {0.0, -3.0, qd_inf})
+        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {0.0}), "Input 'element' (az_3dB) must be > 0 degrees (Inf: no taper).");
+        CHECK_THROWS_WITH(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {qd_nan, -qd_inf}), "Input 'element' (el_3dB) must be > 0 degrees (Inf: no taper).");
+        for (double x : {0.0, -3.0, -qd_inf, 1e-17})
             CHECK_THROWS_WITH(arrayant_generate<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {qd_nan, qd_nan, x}),
-                              "Input 'element' (floor_dB) must be finite and > 0, or NaN for no floor.");
+                              "Input 'element' (floor_dB) must be > 0, the attenuation of the floor in dB below the peak (Inf: no floor).");
+        // floor_dB = Inf is no floor, the default; NaN selects it
+        const auto c0 = arrayant_generate<double>("custom", 10.0, 3e9);
+        CHECK(max_diff(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {90.0, 90.0, qd_inf}), c0) == 0.0);
+        CHECK(max_diff(arrayant_generate<double>("custom", 10.0, 3e9, {}, {}, {}, {}, {}, {90.0, 90.0, qd_nan}), c0) == 0.0);
     }
     SECTION("beams")
     {

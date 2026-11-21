@@ -494,8 +494,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_generate(
 - **`ports`** *(optional)* — `[M_P, N_P]`: ports per column and per row of a panel and polarization; default `[M, N]`
 - **`pol`** *(optional)* — `[polarization, model]`: 1 vertical, 2 H/V, 3 ±45°; model 1 or 2; default `[1, 1]`
 - **`steer`** *(optional)* — `[tilt, pan]` in degrees, one row for all panels or one row per panel; default 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`
-- **`element`** *(optional)* — Element parameters: `custom` `[az_3dB, el_3dB, floor_dB]` in degrees, degrees and dB below the peak (> 0, NaN: no floor), default `[90, 90, NaN]`; `multibeam` the same with default `[120, 120, NaN]`; `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` in degrees, degrees, dB, dB and dBi (NaN: peak gain equal to the directivity), default `[65, phi_3dB, 30, SLA_V, 8]`
-- **`pattern`** *(optional)* — Element pattern replacing the default element; only its radiation pattern is used
+- **`element`** *(optional)* — Element parameters per type:
+  - `custom` `[az_3dB, el_3dB, floor_dB]`: 3 dB beamwidths in degrees (> 0, Inf: no taper); floor of the power pattern as a positive attenuation in dB below the peak (10: 10 dB below the peak; Inf: no floor); default `[90, 90, Inf]`
+  - `multibeam`: the same, default `[120, 120, Inf]`
+  - `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` of TR 38.901 Table 7.3-1: beamwidths in degrees (> 0, Inf: no taper); SLA_V and A_max as positive attenuations in dB below the peak, as in the TR (>= 0, Inf: no limit); G_max in dBi; default `[65, 65, 30, 30, 8]`; entries left off at the end or set to NaN take their default, where `theta_3dB` defaults to `phi_3dB` and `A_max` to `SLA_V` (e.g. `[90]` gives `[90, 90, 30, 30, 8]`); `G_max` left off is 8 dBi, NaN sets the peak gain to the directivity
+- **`pattern`** *(optional)* — Element to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; empty (no elements): the element of the type
 - **`beams`** *(optional)* — `[2 or 3, n_beams]`: azimuth in degrees; elevation in degrees; weight (2 rows: 1); default `[0; 0; 1]`
 - **`separate_beams`** *(optional)* — If `true`, one port per beam
 - **`apply_weights`** *(optional)* — If `true`, combine each port into one pattern
@@ -844,7 +847,7 @@ Generate a TR 38.901 panel array antenna
 
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Python](../python/array-antenna-functions.md#generate)
 
-- The uniform rectangular panel array of 3GPP TR 38.901 clause 7.3: `Mg × Ng` panels of `M × N` elements with one or two polarizations (P = 1 or 2); the element is the Table 7.3-1 pattern or the radiation pattern of `pattern`.
+- The uniform rectangular panel array of 3GPP TR 38.901 clause 7.3: `Mg × Ng` panels of `M × N` elements with one or two polarizations (P = 1 or 2); the element is the Table 7.3-1 pattern or the field patterns of `pattern`.
 - Elements: polarization fastest, then `m` (upwards along z), `n` (along +y, Fig. 7.3-1), `mg`, `ng`; positions centred on the origin, panel spacings centre to centre. Ports: polarization fastest, then `m_p`, `n_p`, `mg`, `ng`.
 - Each port feeds a sub-array (TXRU) of `K = M / M_P` × `L = N / N_P` elements. Eq. 7.3-1 applies per sub-array, vertically with `tilt` (θ_etilt = 90° + `tilt`, a positive tilt points the beam down) and by analogy horizontally with `pan` (a positive pan turns the beam towards +y): element `(k, l)` of a sub-array has the weight `exp(j 2π ((k - (K-1)/2) d_V sin(tilt) - (l - (L-1)/2) d_H sin(pan))) / sqrt(K L)`, phase reference at the sub-array centre.
 - By default all elements are kept and the weights form the coupling matrix `[n_elements, n_ports]`; `apply_weights` combines each port into one pattern ([arrayant_combine_pattern](#arrayant_combine_pattern)) placed at its sub-array centre.
@@ -873,8 +876,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`ports`** *(optional)* — `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; must divide `M` and `N`; default `[M, N]` (one port per element)
 - **`pol`** *(optional)* — `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°), 4 to 6 reserved; model 1 (Model-1) or 2 (Model-2); default `[1, 1]`
 - **`steer`** *(optional)* — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt and pan of the sub-array weights; `[1, 2]` for all panels or `[Mg Ng, 2]` with one row per panel (panel order `mg`, `ng`); one column: pan 0; default 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`
-- **`element`** *(optional)* — Table 7.3-1 constants `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]`: beamwidths in degrees (> 0), SLA_V and A_max in dB (>= 0), G_max in dBi (finite, or NaN: peak gain equal to the directivity); default `[65, phi_3dB, 30, SLA_V, 8]`; not together with `pattern`
-- **`pattern`** *(optional)* — Element pattern replacing the TR element; only its radiation pattern is used (element positions, coupling and center frequency are ignored); empty (no elements): TR element
+- **`element`** *(optional)* — Table 7.3-1 constants `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]`: beamwidths in degrees (> 0, Inf: no taper), SLA_V and A_max as positive attenuations in dB below the peak, as in the TR (>= 0, Inf: no limit), G_max in dBi (finite or NaN); default `[65, 65, 30, 30, 8]`; entries left off at the end or set to NaN take their default, where `theta_3dB` defaults to `phi_3dB` and `A_max` to `SLA_V` (e.g. `[90]` gives `[90, 90, 30, 30, 8]`); `G_max` left off is 8 dBi, NaN sets the peak gain to the directivity; not together with `pattern`
+- **`pattern`** *(optional)* — Element to use instead of the TR element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; empty (no elements): TR element
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: 1°; ignored if `pattern` is provided
 - **`apply_weights`** *(optional)* — If `true`, combine each port into one pattern at its sub-array centre
 
@@ -913,8 +916,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
 ```
 
 ### Inputs:
-- **`az_3dB`** *(optional)* — Azimuth 3 dB beamwidth in degrees; finite and > 0; NaN: 90
-- **`el_3dB`** *(optional)* — Elevation 3 dB beamwidth in degrees; finite and > 0; NaN: 90
+- **`az_3dB`** *(optional)* — Azimuth 3 dB beamwidth in degrees; > 0, Inf: no taper (flat in azimuth); NaN: 90
+- **`el_3dB`** *(optional)* — Elevation 3 dB beamwidth in degrees; > 0, Inf: no taper (flat in elevation); NaN: 90
 - **`rear_gain_lin`** *(optional)* — Floor of the power pattern relative to its peak, linear; in [0, 1) (1 would be isotropic); NaN: 0
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: 1°
 
@@ -993,7 +996,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`center_freq`** *(optional)* — Center frequency in Hz; positive and finite
 - **`spacing`** *(optional)* — `[d_V, d_H, d_gV, d_gH]` in wavelengths; see [generate_arrayant_3GPP](#generate_arrayant_3GPP)
 - **`pol`** *(optional)* — `[polarization, model]`; see [generate_arrayant_3GPP](#generate_arrayant_3GPP)
-- **`element`** *(optional)* — Custom-shape element `[az_3dB, el_3dB, floor_dB]`: beamwidths in degrees (> 0), floor of the power pattern in dB below the peak (> 0, NaN: no floor); default `[120, 120, NaN]`
+- **`element`** *(optional)* — Custom-shape element `[az_3dB, el_3dB, floor_dB]`: 3 dB beamwidths in degrees (> 0, Inf: no taper) and the floor of the power pattern as a positive attenuation in dB below the peak (10: 10 dB below the peak; Inf: no floor); default `[120, 120, Inf]`
 - **`beams`** *(optional)* — `[2, n_beams]` or `[3, n_beams]`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); finite; default `[0; 0; 1]`
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: 1°
 - **`separate_beams`** *(optional)* — If `true`, generate one independent beam per column of `beams`
@@ -1030,7 +1033,6 @@ Generate a uniform linear array (ULA)
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_generate) · [Python](../python/array-antenna-functions.md#generate)
 
 - Returns `N` elements along the y-axis (horizontal), centred on the origin: the panel array of [generate_arrayant_3GPP](#generate_arrayant_3GPP) with `panel = {1, N}` and the vertically polarized omni element; [arrayant_generate](#arrayant_generate) with type `ula` takes all panel tuples.
-- If `pattern` is provided, its radiation pattern is used for each element (a pattern with several elements gives a group of elements per position); element positions, coupling, and center frequency from `pattern` are ignored.
 
 ### Declaration:
 ```cpp
@@ -1046,7 +1048,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 - **`N`** *(optional)* — Number of elements; 0: 1
 - **`center_freq`** *(optional)* — Center frequency in Hz; positive and finite
 - **`spacing`** *(optional)* — Element spacing in wavelengths; finite and >= 0; NaN: 0.5
-- **`pattern`** *(optional)* — Custom per-element antenna pattern; empty (no elements): omni
+- **`pattern`** *(optional)* — Element to use instead of the omni element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position (a pattern with several elements gives a group of elements per position); its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; empty (no elements): omni
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: 1°; ignored if `pattern` is provided
 
 ### Returns:
