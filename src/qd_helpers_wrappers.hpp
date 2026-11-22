@@ -78,6 +78,27 @@ static inline arma::u32_mat qd_hdf5_select_slots(const std::string &fn, const ar
     return arma::u32_mat(slots.data(), 4, slots.size() / 4);
 }
 
+// ---- qrt_file_read with a byte limit shared by several calls (defined in qd_channel_qrt.cpp) ----
+// - Declared here only, to keep the wrapper header out of the core sources; a signature that differs from the
+//   definition fails at link time (the parameter types are part of the symbol name)
+// - 'bytes_read': path-block bytes read so far by all calls; 'repeat': largest number of times one CIR occurs in the
+//   whole list, computed by the first call that gets the whole list (0: not computed yet); nullptr: per call
+// - Throws std::runtime_error when the bytes read exceed 'repeat' times the file size
+template <typename dtype>
+void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
+                           arma::Col<dtype> *center_freq, arma::Mat<dtype> *tx_pos, arma::Mat<dtype> *tx_orientation,
+                           arma::Mat<dtype> *rx_pos, arma::Mat<dtype> *rx_orientation,
+                           std::vector<arma::Mat<dtype>> *fbs_pos, std::vector<arma::Mat<dtype>> *lbs_pos,
+                           std::vector<arma::Mat<dtype>> *path_gain, std::vector<arma::Col<dtype>> *path_length,
+                           std::vector<arma::Cube<dtype>> *polmat,
+                           std::vector<arma::Col<dtype>> *aod, std::vector<arma::Col<dtype>> *eod,
+                           std::vector<arma::Col<dtype>> *aoa, std::vector<arma::Col<dtype>> *eoa,
+                           std::vector<std::vector<arma::Mat<dtype>>> *path_coord, int normalize_polmat,
+                           std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
+                           std::vector<std::vector<uint8_t>> *interact_type,
+                           std::ifstream *file, const quadriga_lib::qrt_read_cache *cache,
+                           size_t *bytes_read, size_t *repeat);
+
 // ---- Chunked, double-buffered reading of QRT CIRs (qrt_file_read) ----
 // - A reader thread reads the next chunk of CIRs while the calling thread converts the previous one, so that file
 //   reading and conversion overlap; the peak memory is the converted output plus two chunks
@@ -116,6 +137,7 @@ struct qd_qrt_chunk_state
 {
     std::ifstream stream;
     quadriga_lib::qrt_read_cache cache;
+    size_t bytes_read = 0, repeat = 0; // byte limit shared by all chunks: one list of CIRs
     arma::uvec i_cir;
     arma::uword i_orig = 0, chunk_size = 1, n_chunk = 0;
     bool uplink = false;
@@ -154,12 +176,12 @@ struct qd_qrt_chunk_state
         b.i_cir = i_cir.subvec(first, last);
         auto r = [this](int i, auto *p)
         { return n_req > i ? p : nullptr; };
-        quadriga_lib::qrt_file_read<double>("", b.i_cir, i_orig, uplink, nullptr, r(1, &b.tx_pos), r(2, &b.tx_orientation),
-                                            r(3, &b.rx_pos), r(4, &b.rx_orientation), r(5, &b.fbs_pos), r(6, &b.lbs_pos),
-                                            r(7, &b.path_gain), r(8, &b.path_length), r(9, &b.polmat), r(10, &b.aod),
-                                            r(11, &b.eod), r(12, &b.aoa), r(13, &b.eoa), r(14, &b.path_coord),
-                                            normalize_polmat, r(15, &b.n_interact), r(16, &b.coord), r(17, &b.interact_type),
-                                            &stream, &cache);
+        qd_qrt_file_read_impl<double>("", b.i_cir, i_orig, uplink, nullptr, r(1, &b.tx_pos), r(2, &b.tx_orientation),
+                                      r(3, &b.rx_pos), r(4, &b.rx_orientation), r(5, &b.fbs_pos), r(6, &b.lbs_pos),
+                                      r(7, &b.path_gain), r(8, &b.path_length), r(9, &b.polmat), r(10, &b.aod),
+                                      r(11, &b.eod), r(12, &b.aoa), r(13, &b.eoa), r(14, &b.path_coord),
+                                      normalize_polmat, r(15, &b.n_interact), r(16, &b.coord), r(17, &b.interact_type),
+                                      &stream, &cache, &bytes_read, &repeat);
     }
 };
 
@@ -171,7 +193,7 @@ struct qd_qrt_chunk_state
 // - Errors of the reader are rethrown on the calling thread after the reader has stopped
 template <typename Unlock, typename Init, typename Consume>
 static inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
-                                int normalize_polmat, int n_req, Init init, Consume consume, arma::uword chunk_size = 16)
+                                       int normalize_polmat, int n_req, Init init, Consume consume, arma::uword chunk_size = 16)
 {
     auto st = std::make_shared<qd_qrt_chunk_state>();
     st->stream.open(fn, std::ios::in | std::ios::binary);
@@ -179,11 +201,13 @@ static inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &
         throw std::runtime_error("Cannot open file '" + fn + "'.");
     st->cache = quadriga_lib::qrt_read_cache_init(fn, &st->stream);
 
-    // Call without path outputs: checks all indices and options and reads the frequencies, but no path data
+    // Call without path outputs: checks all indices and options, reads the frequencies, but no path data, and counts
+    // the repeats of the whole list for the byte limit of the chunks
     arma::vec center_freq;
-    quadriga_lib::qrt_file_read<double>("", i_cir, i_orig, uplink, &center_freq, nullptr, nullptr, nullptr, nullptr,
-                                        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                        nullptr, normalize_polmat, nullptr, nullptr, nullptr, &st->stream, &st->cache);
+    qd_qrt_file_read_impl<double>("", i_cir, i_orig, uplink, &center_freq, nullptr, nullptr, nullptr, nullptr,
+                                  nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                  nullptr, normalize_polmat, nullptr, nullptr, nullptr, &st->stream, &st->cache,
+                                  &st->bytes_read, &st->repeat);
 
     st->i_cir = i_cir;
     if (st->i_cir.empty() && st->cache.n_cir != 0)
@@ -280,7 +304,8 @@ static inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &
         {
             Unlock unlock;
             std::unique_lock<std::mutex> lk(st->mtx);
-            st->wait(lk, [&] { return st->n_produced > k || st->error != 0; });
+            st->wait(lk, [&]
+                     { return st->n_produced > k || st->error != 0; });
             if (st->n_produced <= k) // Reader failed before this chunk
                 break;
         }

@@ -2408,7 +2408,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
   come from the header.
 - Throws `std::invalid_argument` for an index out of range, before any CIR is read or any output is changed. Throws `std::runtime_error` if
   the file cannot be opened, is not a QRT file of a supported version, is truncated, or if a count or offset in it
-  does not fit the file size (path data: only when it is read); outputs may then be partly written. A message about
+  does not fit the file size or the path blocks of different requested CIRs overlap (path data: only when it is
+  read); outputs may then be partly written. A message about
   one requested CIR starts with `"Snapshot <k>: "`, with k its position in `i_cir`.
 
 ### Declaration:
@@ -2518,7 +2519,7 @@ Not in: MATLAB, Python
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [qrt_file_init](#qrt_file_init) but never written by [qrt_file_append](#qrt_file_append) returns an empty vector.
 - Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
-  or if a count or offset in it does not fit the file size.
+  if a count or offset in it does not fit the file size, or if the path blocks of different CIRs overlap.
 - For tight loops over many origins, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache to avoid
   re-parsing the header on each call.
 
@@ -2612,7 +2613,7 @@ Not in: MATLAB, Python
 - For a TX slot reserved by [qrt_file_init](#qrt_file_init) but not yet written, `orig_index` and `path_data_offset`
   are `0`; [qrt_file_read](#qrt_file_read) treats that as an empty (unwritten) origin.
 - Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
-  or if a count or offset in it does not fit the file size.
+  if a count or offset in it does not fit the file size, or if two origins share one data block.
 
 ### Declaration:
 ```cpp

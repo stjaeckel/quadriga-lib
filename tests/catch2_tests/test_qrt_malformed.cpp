@@ -7,6 +7,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
+#include "qd_helpers_wrappers.hpp"
 
 #include <chrono>
 #include <cstdio>
@@ -184,6 +185,108 @@ TEST_CASE("QRT Reader - v4 file without origins")
     CHECK(cache.n_freq == 1);
     REQUIRE(cache.freq.n_elem == cache.n_freq);
     CHECK(cache.freq(0) == 0.0f);
+
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("QRT Reader - CIRs that share one path block")
+{
+    // Path blocks of different CIRs must not overlap; otherwise a small file could return its largest block once per
+    // CIR, and the output would grow with the square of the file size
+    const std::string fn = "tests/data/test_qrt_shared_block.qrt";
+    const arma::uword n_cir = 4;
+    quadriga_lib::qrt_file_init<double>(fn, arma::vec{3.0e9}, arma::mat(n_cir, 3, arma::fill::ones), arma::mat(), {"RX"},
+                                        {0}, 2);
+    std::vector<quadriga_lib::path> pd(50); // all in CIR 0; the other CIRs have no paths
+    quadriga_lib::qrt_file_append<double>(fn, pd, arma::vec{0.0, 0.0, 10.0});
+    quadriga_lib::qrt_file_append<double>(fn, std::vector<quadriga_lib::path>(1), arma::vec{0.0, 0.0, 10.0}); // origin 1
+
+    std::vector<arma::vec> pl;
+    auto read = [&](const arma::uvec &i_cir, arma::uword i_orig = 0)
+    {
+        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            nullptr, nullptr, &pl);
+    };
+
+    // The written file reads back, also with a CIR listed twice
+    read({});
+    REQUIRE(pl.size() == n_cir);
+    CHECK(pl[0].n_elem == 50);
+    CHECK(quadriga_lib::qrt_file_read_raw(fn, 0).size() == 50);
+    read({0, 0, 0});
+    CHECK(pl.size() == 3);
+
+    std::ifstream i(fn, std::ios::binary);
+    const std::vector<char> good((std::istreambuf_iterator<char>(i)), std::istreambuf_iterator<char>());
+    i.close();
+    const auto cache = quadriga_lib::qrt_read_cache_init(fn);
+    const size_t pdo = (size_t)cache.path_data_offset(0), pdo1 = (size_t)cache.path_data_offset(1);
+    auto write_index = [&](size_t pos, const std::vector<size_t> &value) // writes 'value' at byte 'pos' of the good file
+    {
+        std::vector<char> data = good;
+        std::memcpy(data.data() + pos, value.data(), value.size() * sizeof(size_t));
+        qrt_write_bytes(fn, data, data.size());
+    };
+    std::vector<size_t> idx(n_cir); // path_data_index of origin 0
+    std::memcpy(idx.data(), good.data() + pdo, n_cir * sizeof(size_t));
+
+    // All CIRs point to the block of CIR 0: each block runs into the next one
+    write_index(pdo, {idx[0], idx[0], idx[0], idx[0]});
+    qrt_require_fast_throw([&]
+                           { read({}); });
+    qrt_require_fast_throw([&]
+                           { read({1}); });
+    qrt_require_fast_throw([&]
+                           { quadriga_lib::qrt_file_read_raw(fn, 0); });
+
+    // CIRs 0 and 2 point to the block of CIR 0, each followed by a valid offset: a list with gaps reads it twice, more
+    // than the file holds, also when the wrappers read the list in chunks of one CIR
+    write_index(pdo, {idx[0], idx[1], idx[0], idx[3]});
+    read({0});
+    CHECK(pl.at(0).n_elem == 50);
+    read({2, 2}); // one CIR listed twice
+    CHECK(pl.size() == 2);
+    qrt_require_fast_throw([&]
+                           { read({0, 2}); });
+    struct no_unlock
+    {
+    };
+    auto read_chunked = [&](const arma::uvec &i_cir)
+    {
+        qd_qrt_read_chunked<no_unlock>(fn, i_cir, 0, false, 1, 9, [](const arma::vec &, arma::uword) {},
+                                       [](const qd_qrt_chunk &, arma::uword) {}, 1);
+    };
+    read_chunked({0, 0}); // one CIR listed twice, in two chunks
+    qrt_require_fast_throw([&]
+                           { read_chunked({0, 2}); });
+
+    // The last CIR of origin 0 points to the path block of origin 1, behind the end of its own origin block
+    size_t idx1 = 0; // first entry of the path_data_index of origin 1
+    std::memcpy(&idx1, good.data() + pdo1, sizeof(size_t));
+    write_index(pdo + (n_cir - 1) * sizeof(size_t), {idx1});
+    qrt_require_fast_throw([&]
+                           { read({n_cir - 1}); });
+
+    // CIR 0 of origin 1 points to the path block of origin 0, before its own path_data_index
+    write_index(pdo1, {idx[0]});
+    qrt_require_fast_throw([&]
+                           { read({0}, 1); });
+    qrt_require_fast_throw([&]
+                           { quadriga_lib::qrt_file_read_raw(fn, 1); });
+
+    // Origin 1 uses the data block of origin 0
+    {
+        std::vector<char> data = good;
+        size_t pos = 0; // orig_index entry of origin 1: the 8 bytes after the entry of origin 0 in the header
+        for (size_t p = 0; p + 16 <= pdo; ++p)
+            if (std::memcmp(data.data() + p, &cache.orig_index[0], 8) == 0 && std::memcmp(data.data() + p + 8, &cache.orig_index[1], 8) == 0)
+                pos = p + 8;
+        REQUIRE(pos != 0);
+        std::memcpy(data.data() + pos, &cache.orig_index[0], 8);
+        qrt_write_bytes(fn, data, data.size());
+    }
+    qrt_require_fast_throw([&]
+                           { quadriga_lib::qrt_read_cache_init(fn); });
 
     std::remove(fn.c_str());
 }
