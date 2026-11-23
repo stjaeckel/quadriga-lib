@@ -11,7 +11,7 @@ These conventions are defaults that keep the library consistent, not rules to sa
 
 # Build and platform
 - CMake globs `src/*.cpp` and `tests/catch2_tests/*.cpp`; a new file needs no registration. The suffixes `*_avx2.cpp` and `*_cuda.cu` select AVX2 and CUDA compilation and are used for nothing else.
-- BLAS and LAPACK are off: `inv`, `solve`, `eig_*`, `svd`, `det`, `pinv` are not available, and in the test binary matrix products above 4x4 (also `arma::norm`, `arma::dot`, `accu(a % b)`) do not link. Write small linear algebra by hand.
+- BLAS and LAPACK are off in the library and the test binary: `inv`, `solve`, `eig_*`, `svd`, `det`, `pinv` are not available. Write small linear algebra by hand.
 - The library compiles without warnings under `-O3 -Wall -Wextra -Wpedantic -Wfloat-conversion` and must also compile with MSVC for the Windows builds: no GCC extensions (variable-length arrays, `__attribute__`, `__builtin_*`), OpenMP 2.0 only. A parameter unused in a build configuration is silenced with `[[maybe_unused]]` or with `(void)name;` inside the matching `#if`.
 - MEX files link the library and must load in MATLAB R2024a, whose bundled libstdc++ is old: no standard-library feature that needs a newer symbol version, such as `std::exception_ptr`. `make test` checks this when MATLAB is enabled, and checks that AVX2 code stays in the kernels.
 - Commands, from the repository root:

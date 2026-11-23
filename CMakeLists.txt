@@ -626,10 +626,13 @@ if (ENABLE_TESTS)
         target_compile_definitions(test_bin PRIVATE BUILD_WITH_AVX2=1)
     endif()
 
+    # As in the library: nothing links BLAS or LAPACK, so Armadillo must not emit calls to them
+    target_compile_definitions(test_bin PRIVATE ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
+
     if(MSVC)
         target_link_libraries(test_bin PRIVATE shlwapi.lib)
         target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /MP)
-        target_compile_definitions(test_bin PRIVATE _USE_MATH_DEFINES ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
+        target_compile_definitions(test_bin PRIVATE _USE_MATH_DEFINES)
     else()
         target_compile_options(test_bin PRIVATE -w)
     endif()
