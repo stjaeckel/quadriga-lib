@@ -73,7 +73,8 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#apply_port_weights) �
 - Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
 - Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
   and including the phase of each element position
-- The result has one element per port, identity port weights and all element positions at the origin
+- The result has one element per port and identity port weights; its elements are at the origin, or at the centers
+  of their ports with `center_ports`
 
 ### Usage:
 ```python
@@ -88,6 +89,9 @@ arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, *, freq_new, 
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, propagation_speed=343.0 )
+
+# Ports at the centers of their coupled elements
+arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, center_ports=True )
 ```
 
 ### Inputs:
@@ -99,6 +103,10 @@ arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, propagation_s
 - **`elevation_grid`** — Output elevation grid in rad; `(n_elevation_out,)`; default: `None` (the input grid)
 - **`propagation_speed`** — Wave propagation speed $c$ in m/s, positive and finite; the default is the speed of light
   for radio waves, use about 343 for acoustic arrays (e.g. from [generate_speaker](#generate_speaker)); default: 299792458.0
+- **`center_ports`** — If `True`, places each port $p$ at the power-weighted center of its elements,
+  $\sum_i \lvert w_{i,p} \rvert^2 x_i / \sum_i \lvert w_{i,p} \rvert^2$, with the phase referenced there; a port with
+  zero weights stays at the origin. A plane-wave channel is unchanged, and the slower phase over angle makes
+  interpolation of coupled sub-arrays more accurate; default: `False`
 
 ### Output:
 - **`arrayant_out`** — Arrayant dict with `n_ports` elements, each holding the pattern of that port; `name` is kept,
@@ -452,9 +460,9 @@ speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_
 - **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** — Enclosure radiation model: `monopole` (no change), `hemisphere` (sealed box with baffle-step
   transition), `dipole` (figure-8, rear hemisphere inverted) or `cardioid`; default: `hemisphere`
-- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, between the -6 dB points at full pattern
+- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, below 180, between the -6 dB points at full pattern
   control; NaN or <= 0: 90°; default: NaN
-- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, as above; NaN or <= 0: 60°; default: NaN
+- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, below 180, as above; NaN or <= 0: 60°; default: NaN
 - **`horn_control_freq`** — `horn`: frequency in Hz above which the horn controls its pattern; NaN or <= 0:
   $c / (2\pi a)$ with the speed of sound $c$ and $a$ = `radius`; default: NaN
 - **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere`; default: 0.15

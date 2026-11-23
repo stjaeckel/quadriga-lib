@@ -39,9 +39,9 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** — Enclosure radiation model: `monopole` (no change), `hemisphere` (sealed box with baffle-step
   transition), `dipole` (figure-8, rear hemisphere inverted) or `cardioid`; default: `hemisphere`
-- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, between the -6 dB points at full pattern
+- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, below 180, between the -6 dB points at full pattern
   control; NaN or <= 0: 90°; default: NaN
-- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, as above; NaN or <= 0: 60°; default: NaN
+- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, below 180, as above; NaN or <= 0: 60°; default: NaN
 - **`horn_control_freq`** — `horn`: frequency in Hz above which the horn controls its pattern; NaN or <= 0: `c / (2π a)`
   with the speed of sound c and a = `radius`; default: NaN
 - **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere`; default: 0.15

@@ -336,7 +336,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#apply_port_weights) · [Python](quadri
 - Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
 - Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
   and including the phase of each element position
-- The result has one element per port, identity port weights and all element positions at the origin
+- The result has one element per port and identity port weights; its elements are at the origin, or at the centers
+  of their ports with `center_ports`
 
 ### Declarations:
 ```cpp
@@ -344,14 +345,16 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(
     const arrayant<dtype> &ant,
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    double propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0,
+    bool center_ports = false);
 
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    double propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0,
+    bool center_ports = false);
 ```
 
 ### Inputs:
@@ -363,6 +366,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
   the entries, one output per input entry; `[n_freq_new]`
 - **`propagation_speed`** *(optional)* — Wave propagation speed $c$ in m/s, positive and finite; the default is the
   speed of light for radio waves, use about 343 for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
+- **`center_ports`** *(optional)* — If `true`, places each port $p$ at the power-weighted center of its elements,
+  $\sum_i \lvert w_{i,p} \rvert^2 x_i / \sum_i \lvert w_{i,p} \rvert^2$, with the phase referenced there; a port with
+  zero weights stays at the origin. A plane-wave channel is unchanged, and the slower phase over angle makes
+  interpolation of coupled sub-arrays more accurate
 
 ### Returns:
 - New `arrayant` with `n_ports` elements, each holding the pattern of that port; `name` is kept, and so is `center_freq`
@@ -774,9 +781,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`sensitivity_dB`** *(optional)* — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"` (no change), `"hemisphere"` (sealed box
   with baffle-step transition), `"dipole"` (figure-8, rear hemisphere inverted) or `"cardioid"`
-- **`hor_coverage_deg`** *(optional)* — `"horn"`: horizontal coverage in degrees, between the -6 dB points at
+- **`hor_coverage_deg`** *(optional)* — `"horn"`: horizontal coverage in degrees, below 180, between the -6 dB points at
   full pattern control; NaN or <= 0: 90°
-- **`ver_coverage_deg`** *(optional)* — `"horn"`: vertical coverage in degrees, as above; NaN or <= 0: 60°
+- **`ver_coverage_deg`** *(optional)* — `"horn"`: vertical coverage in degrees, below 180, as above; NaN or <= 0: 60°
 - **`horn_control_freq`** *(optional)* — `"horn"`: frequency in Hz above which the horn controls its pattern; NaN or <=
   0: $c / (2\pi a)$ with the speed of sound $c$ and $a$ = `radius`
 - **`baffle_width`, `baffle_height`** *(optional)* — Baffle size in m, > 0; used by `"hemisphere"`

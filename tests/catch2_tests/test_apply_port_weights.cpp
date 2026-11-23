@@ -12,6 +12,8 @@
 #include "quadriga_lib.hpp"
 #include "qd_test_arrayant.hpp"
 
+#include <algorithm>
+#include <complex>
 #include <iostream>
 #include <string>
 #include <cmath>
@@ -1205,4 +1207,68 @@ TEST_CASE("Apply port weights, vector - Propagation speed")
     // Invalid speeds
     for (double v : {0.0, -344.0, arma::datum::nan, arma::datum::inf})
         CHECK_THROWS_AS(quadriga_lib::apply_port_weights<double>(two, {}, {}, {}, v), std::invalid_argument);
+}
+
+TEST_CASE("Apply port weights - Port centers")
+{
+    // Two ports of 4 coupled columns each, half-wavelength spacing at a wavelength of 1 m
+    auto ant = quadriga_lib::generate_antenna<double>("3GPP", 15.0, 299792458.0, {}, {1, 8}, {}, {}, {1, 2});
+
+    // The moved port must give the same plane-wave field as the port at the origin
+    auto check_same_field = [](const quadriga_lib::arrayant<double> &centered, const quadriga_lib::arrayant<double> &origin)
+    {
+        const double k = 2.0 * arma::datum::pi * centered.center_freq / 299792458.0;
+        double max_err = 0.0;
+        for (arma::uword p = 0; p < centered.n_elements(); ++p)
+            for (arma::uword ia = 0; ia < centered.n_azimuth(); ++ia)
+                for (arma::uword ie = 0; ie < centered.n_elevation(); ++ie)
+                {
+                    const double az = centered.azimuth_grid(ia), el = centered.elevation_grid(ie);
+                    const double proj = centered.element_pos(0, p) * std::cos(el) * std::cos(az) +
+                                        centered.element_pos(1, p) * std::cos(el) * std::sin(az) + centered.element_pos(2, p) * std::sin(el);
+                    const std::complex<double> phase = std::polar(1.0, k * proj);
+                    const std::complex<double> v(centered.e_theta_re(ie, ia, p), centered.e_theta_im(ie, ia, p));
+                    const std::complex<double> h(centered.e_phi_re(ie, ia, p), centered.e_phi_im(ie, ia, p));
+                    max_err = std::max(max_err, std::abs(v * phase - std::complex<double>(origin.e_theta_re(ie, ia, p), origin.e_theta_im(ie, ia, p))));
+                    max_err = std::max(max_err, std::abs(h * phase - std::complex<double>(origin.e_phi_re(ie, ia, p), origin.e_phi_im(ie, ia, p))));
+                }
+        CHECK(max_err < 1e-9);
+    };
+
+    SECTION("Single form")
+    {
+        auto c = quadriga_lib::apply_port_weights<double>(ant, {}, {}, 299792458.0, true);
+        CHECK(arma::approx_equal(c.element_pos.row(1), arma::rowvec({-1.0, 1.0}), "absdiff", 1e-12));
+        CHECK(c.is_valid().empty());
+        check_same_field(c, quadriga_lib::apply_port_weights(ant));
+    }
+
+    SECTION("Vector form")
+    {
+        std::vector<quadriga_lib::arrayant<double>> vec = {ant, ant};
+        vec[1].center_freq = 2.0 * ant.center_freq;
+        auto c = quadriga_lib::apply_port_weights<double>(vec, {}, {}, {}, 299792458.0, true);
+        auto o = quadriga_lib::apply_port_weights(vec);
+        REQUIRE(c.size() == 2);
+        CHECK(arma::approx_equal(c[1].element_pos.row(1), arma::rowvec({-1.0, 1.0}), "absdiff", 1e-12));
+        check_same_field(c[0], o[0]);
+        check_same_field(c[1], o[1]);
+    }
+
+    SECTION("Power weighting, zero-weight port and identity weights")
+    {
+        auto a = ant;
+        a.port_weights_re.zeros(), a.port_weights_im.zeros();
+        a.port_weights_re(0, 0) = 1.0, a.port_weights_re(1, 0) = 2.0; // Powers 1 and 4, port 1 has no weights
+        auto c = quadriga_lib::apply_port_weights<double>(a, {}, {}, 299792458.0, true);
+        const double expected = (a.element_pos(1, 0) + 4.0 * a.element_pos(1, 1)) / 5.0;
+        CHECK(std::abs(c.element_pos(1, 0) - expected) < 1e-12);
+        CHECK(arma::approx_equal(c.element_pos.col(1), arma::vec(3, arma::fill::zeros), "absdiff", 1e-15));
+
+        auto b = ant;
+        b.port_weights_re.reset(), b.port_weights_im.reset();
+        auto d = quadriga_lib::apply_port_weights<double>(b, {}, {}, 299792458.0, true);
+        CHECK(arma::approx_equal(d.element_pos, ant.element_pos, "absdiff", 1e-12));
+        CHECK(arma::approx_equal(d.e_theta_re, ant.e_theta_re, "absdiff", 1e-9));
+    }
 }

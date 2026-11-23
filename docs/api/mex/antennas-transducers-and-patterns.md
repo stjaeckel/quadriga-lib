@@ -69,12 +69,13 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#apply_port_weights) �
 - Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
 - Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
   and including the phase of each element position
-- The result has one element per port, identity port weights and all element positions at the origin
+- The result has one element per port and identity port weights; its elements are at the origin, or at the centers
+  of their ports with `center_ports`
 
 ### Usage:
 ```matlab
 arrayant_out = quadriga_lib.apply_port_weights( arrayant_in, freq_new, azimuth_grid_new, ...
-    elevation_grid_new, propagation_speed );
+    elevation_grid_new, propagation_speed, center_ports );
 ```
 
 ### Inputs:
@@ -86,6 +87,10 @@ arrayant_out = quadriga_lib.apply_port_weights( arrayant_in, freq_new, azimuth_g
 - **`elevation_grid_new`** — Output elevation grid in rad; default: the input grid (of the first entry)
 - **`propagation_speed`** — Wave propagation speed in m/s, positive and finite; 299792458 is the speed of light for
   radio waves, use about 343 for acoustic arrays (e.g. from [generate_speaker](#generate_speaker)); default: 299792458
+- **`center_ports`** — If `true`, places each port at the power-weighted center of its elements,
+  `sum(|w|² x) / sum(|w|²)`, with the phase referenced there; a port with zero weights stays at the origin. A
+  plane-wave channel is unchanged, and the slower phase over angle makes interpolation of coupled sub-arrays more
+  accurate; default: `false`
 
 ### Output:
 - **`arrayant_out`** — Arrayant struct with `n_ports` elements, each holding the pattern of that port; `name` is kept,
@@ -432,9 +437,9 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** — Enclosure radiation model: `monopole` (no change), `hemisphere` (sealed box with baffle-step
   transition), `dipole` (figure-8, rear hemisphere inverted) or `cardioid`; default: `hemisphere`
-- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, between the -6 dB points at full pattern
+- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, below 180, between the -6 dB points at full pattern
   control; NaN or <= 0: 90°; default: NaN
-- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, as above; NaN or <= 0: 60°; default: NaN
+- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, below 180, as above; NaN or <= 0: 60°; default: NaN
 - **`horn_control_freq`** — `horn`: frequency in Hz above which the horn controls its pattern; NaN or <= 0: `c / (2π a)`
   with the speed of sound c and a = `radius`; default: NaN
 - **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere`; default: 0.15

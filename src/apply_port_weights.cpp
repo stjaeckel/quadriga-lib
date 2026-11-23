@@ -13,6 +13,43 @@
 #include <string>
 #include <vector>
 
+// Power-weighted center of the elements of each port, [3, n_ports]; a port without finite power stays at the origin
+template <typename dtype>
+static arma::Mat<dtype> qd_port_centers(const arma::Mat<dtype> &element_pos, const arma::Mat<std::complex<dtype>> &pw)
+{
+    arma::Mat<dtype> centers(3, pw.n_cols, arma::fill::zeros);
+    for (arma::uword o = 0ULL; o < pw.n_cols; ++o)
+    {
+        double total = 0.0, sum[3] = {0.0, 0.0, 0.0};
+        for (arma::uword i = 0ULL; i < pw.n_rows; ++i)
+        {
+            const double p = (double)std::norm(pw.at(i, o));
+            total += p;
+            for (arma::uword d = 0ULL; d < 3ULL; ++d)
+                sum[d] += p * (double)element_pos.at(d, i);
+        }
+        if (total > 0.0 && std::isfinite(total))
+            for (arma::uword d = 0ULL; d < 3ULL; ++d)
+                centers.at(d, o) = dtype(sum[d] / total);
+    }
+    return centers;
+}
+
+// Moves the phase reference of each port from the origin to its center; V and H are [n_ang, n_ports]
+template <typename dtype>
+static void qd_move_port_phase(arma::Mat<std::complex<dtype>> &V, arma::Mat<std::complex<dtype>> &H, const arma::Mat<dtype> &centers,
+                               const arma::Mat<dtype> &azimuth, const arma::Mat<dtype> &elevation, double wave_no)
+{
+    for (arma::uword o = 0ULL; o < V.n_cols; ++o)
+        for (arma::uword a = 0ULL; a < V.n_rows; ++a)
+        {
+            const double az = (double)azimuth[a], el = (double)elevation[a], cel = std::cos(el);
+            const double proj = centers.at(0, o) * cel * std::cos(az) + centers.at(1, o) * cel * std::sin(az) + centers.at(2, o) * std::sin(el);
+            const std::complex<dtype> shift(dtype(std::cos(wave_no * proj)), dtype(-std::sin(wave_no * proj))); // exp(j k d) with d = -proj
+            V.at(a, o) *= shift, H.at(a, o) *= shift;
+        }
+}
+
 /*!SECTION
 Antennas, transducers and patterns
 SECTION!*/
@@ -24,7 +61,8 @@ Apply the port weights of an antenna array: one pattern per port
 - Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
 - Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
   and including the phase of each element position
-- The result has one element per port, identity port weights and all element positions at the origin
+- The result has one element per port and identity port weights; its elements are at the origin, or at the centers
+  of their ports with `center_ports`
 
 ## Declarations:
 ```
@@ -32,14 +70,16 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(
     const arrayant<dtype> &ant,
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    double propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0,
+    bool center_ports = false);
 
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    double propagation_speed = 299792458.0);
+    double propagation_speed = 299792458.0,
+    bool center_ports = false);
 ```
 
 ## Inputs:
@@ -51,6 +91,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
   the entries, one output per input entry; `[n_freq_new]`
 - **`propagation_speed`** *(optional)* — Wave propagation speed $c$ in m/s, positive and finite; the default is the
   speed of light for radio waves, use about 343 for acoustic arrays (e.g. from [[generate_speaker]])
+- **`center_ports`** *(optional)* — If `true`, places each port $p$ at the power-weighted center of its elements,
+  $\sum_i \lvert w_{i,p} \rvert^2 x_i / \sum_i \lvert w_{i,p} \rvert^2$, with the phase referenced there; a port with
+  zero weights stays at the origin. A plane-wave channel is unchanged, and the slower phase over angle makes
+  interpolation of coupled sub-arrays more accurate
 
 ## Returns:
 - New `arrayant` with `n_ports` elements, each holding the pattern of that port; `name` is kept, and so is `center_freq`
@@ -72,7 +116,8 @@ template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dtype> &ant,
                                                                      const arma::Col<dtype> &azimuth_grid_new,
                                                                      const arma::Col<dtype> &elevation_grid_new,
-                                                                     double propagation_speed_in)
+                                                                     double propagation_speed_in,
+                                                                     bool center_ports)
 {
     const dtype propagation_speed = dtype(propagation_speed_in);
     std::string error_message = qd_arrayant_check(ant);
@@ -132,11 +177,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dt
     // Apply port weights
     arma::uword n_ports_out = ant.port_weights_re.empty() ? n_elements : ant.port_weights_re.n_cols;
     arma::Mat<std::complex<dtype>> Vo(n_ang, n_ports_out), Ho(n_ang, n_ports_out);
+    arma::Mat<dtype> port_pos(3, n_ports_out, arma::fill::zeros);
     if (!ant.port_weights_re.empty())
     {
         arma::Mat<dtype> port_weights_im_empty(n_elements, n_ports_out, arma::fill::zeros);
         const auto p_port_weights_im = ant.port_weights_im.empty() ? &port_weights_im_empty : &ant.port_weights_im;
         arma::Mat<std::complex<dtype>> pw(ant.port_weights_re, *p_port_weights_im);
+        if (center_ports)
+            port_pos = qd_port_centers(*p_element_pos, pw);
 
         for (arma::uword i = 0ULL; i < n_elements; ++i)
         {
@@ -149,7 +197,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dt
         }
     }
     else // Identity port weights: one output per element, the angles along the rows
+    {
         Vo = Vi.st(), Ho = Hi.st();
+        if (center_ports)
+            port_pos = *p_element_pos;
+    }
+    if (center_ports)
+        qd_move_port_phase(Vo, Ho, port_pos, azimuth, elevation, (double)wave_no);
 
     // Write output data
     quadriga_lib::arrayant<dtype> output;
@@ -172,7 +226,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dt
         cpy = arma::imag(Ho);
         std::memcpy(output.e_phi_im.memptr(), cpy.memptr(), n_bytes);
 
-        output.element_pos.zeros();
+        output.element_pos = port_pos;
         output.port_weights_re.eye();
         output.port_weights_im.zeros();
         output.center_freq = ant.center_freq;
@@ -184,8 +238,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dt
     return output;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::apply_port_weights(const arrayant<float> &, const arma::Col<float> &, const arma::Col<float> &, double);
-template quadriga_lib::arrayant<double> quadriga_lib::apply_port_weights(const arrayant<double> &, const arma::Col<double> &, const arma::Col<double> &, double);
+template quadriga_lib::arrayant<float> quadriga_lib::apply_port_weights(const arrayant<float> &, const arma::Col<float> &, const arma::Col<float> &, double, bool);
+template quadriga_lib::arrayant<double> quadriga_lib::apply_port_weights(const arrayant<double> &, const arma::Col<double> &, const arma::Col<double> &, double, bool);
 
 template <typename dtype>
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
@@ -193,7 +247,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const arma::Col<dtype> &azimuth_grid_new,
     const arma::Col<dtype> &elevation_grid_new,
     const arma::Col<dtype> &freq_new,
-    double propagation_speed_in)
+    double propagation_speed_in,
+    bool center_ports)
 {
     const dtype propagation_speed = dtype(propagation_speed_in);
     if (arrayant_vec.empty())
@@ -382,6 +437,13 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
             }
         }
 
+        arma::Mat<dtype> port_pos(3, n_ports_out, arma::fill::zeros);
+        if (center_ports)
+        {
+            port_pos = qd_port_centers(element_pos_used, pw);
+            qd_move_port_phase(Vo, Ho, port_pos, azimuth, elevation, 2.0 * arma::datum::pi * f_new / C0);
+        }
+
         // Write output entry
         quadriga_lib::arrayant<dtype> &out = output[f];
         out.set_size(n_elevation_out, n_azimuth_out, n_ports_out, n_ports_out);
@@ -399,7 +461,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
         cpy = arma::imag(Ho);
         std::memcpy(out.e_phi_im.memptr(), cpy.memptr(), n_bytes);
 
-        out.element_pos.zeros();
+        out.element_pos = port_pos;
         out.port_weights_re.eye();
         out.port_weights_im.zeros();
         out.center_freq = dtype(f_new);
@@ -413,8 +475,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::apply_port_weights(
     const std::vector<quadriga_lib::arrayant<float>> &,
-    const arma::Col<float> &, const arma::Col<float> &, const arma::Col<float> &, double);
+    const arma::Col<float> &, const arma::Col<float> &, const arma::Col<float> &, double, bool);
 
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::apply_port_weights(
     const std::vector<quadriga_lib::arrayant<double>> &,
-    const arma::Col<double> &, const arma::Col<double> &, const arma::Col<double> &, double);
+    const arma::Col<double> &, const arma::Col<double> &, const arma::Col<double> &, double, bool);

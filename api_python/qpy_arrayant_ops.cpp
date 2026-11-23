@@ -176,7 +176,8 @@ Apply the port weights of an antenna array: one pattern per port
 - Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
 - Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
   and including the phase of each element position
-- The result has one element per port, identity port weights and all element positions at the origin
+- The result has one element per port and identity port weights; its elements are at the origin, or at the centers
+  of their ports with `center_ports`
 
 ## Usage:
 ```
@@ -191,6 +192,9 @@ arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, *, freq_new, 
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, propagation_speed=343.0 )
+
+# Ports at the centers of their coupled elements
+arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, center_ports=True )
 ```
 
 ## Inputs:
@@ -202,6 +206,10 @@ arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, propagation_s
 - **`elevation_grid`** — Output elevation grid in rad; `(n_elevation_out,)`; default: `None` (the input grid)
 - **`propagation_speed`** — Wave propagation speed $c$ in m/s, positive and finite; the default is the speed of light
   for radio waves, use about 343 for acoustic arrays (e.g. from [[generate_speaker]]); default: 299792458.0
+- **`center_ports`** — If `True`, places each port $p$ at the power-weighted center of its elements,
+  $\sum_i \lvert w_{i,p} \rvert^2 x_i / \sum_i \lvert w_{i,p} \rvert^2$, with the phase referenced there; a port with
+  zero weights stays at the origin. A plane-wave channel is unchanged, and the slower phase over angle makes
+  interpolation of coupled sub-arrays more accurate; default: `False`
 
 ## Output:
 - **`arrayant_out`** — Arrayant dict with `n_ports` elements, each holding the pattern of that port; `name` is kept,
@@ -224,7 +232,8 @@ py::dict apply_port_weights(const py::dict &arrayant,
                             py::handle freq_new,
                             py::handle azimuth_grid,
                             py::handle elevation_grid,
-                            double propagation_speed)
+                            double propagation_speed,
+                            bool center_ports)
 {
     // Optional output grids (empty Col = keep the input grid)
     const auto azimuth_grid_a = qd_python_numpy2arma_Col<double>(azimuth_grid, true);
@@ -241,14 +250,14 @@ py::dict apply_port_weights(const py::dict &arrayant,
     // Multi-frequency branch: frequency-dependent input, or a freq_new vector with > 1 entry
     if (ant.size() > 1 || freq_new_a.n_elem > 1)
     {
-        auto out = quadriga_lib::apply_port_weights(ant, azimuth_grid_a, elevation_grid_a, freq_new_a, propagation_speed);
+        auto out = quadriga_lib::apply_port_weights(ant, azimuth_grid_a, elevation_grid_a, freq_new_a, propagation_speed, center_ports);
         return qd_python_arrayant2dict_multi(out);
     }
 
     if (freq_new_a.n_elem == 1)
         ant[0].center_freq = freq_new_a[0];
 
-    auto arrayant_out = quadriga_lib::apply_port_weights(ant[0], azimuth_grid_a, elevation_grid_a, propagation_speed);
+    auto arrayant_out = quadriga_lib::apply_port_weights(ant[0], azimuth_grid_a, elevation_grid_a, propagation_speed, center_ports);
     return qd_python_arrayant2dict(arrayant_out);
 }
 

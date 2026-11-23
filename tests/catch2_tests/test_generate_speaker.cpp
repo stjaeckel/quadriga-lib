@@ -1884,3 +1884,42 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
                         std::invalid_argument);
     }
 }
+
+TEST_CASE("Speaker - Horn coverage must be below 180 degrees")
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const arma::vec f = {1000.0};
+    const auto call = [&](const char *driver, double hor, double ver)
+    {
+        return quadriga_lib::generate_speaker<double>(driver, 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole", hor, ver,
+                                                      0.0, 0.15, 0.25, f, 30.0);
+    };
+    const auto message = [&](double hor, double ver) -> std::string
+    {
+        try
+        {
+            call("horn", hor, ver);
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return e.what();
+        }
+        return "";
+    };
+
+    for (double v : {180.0, 200.0, 720.0})
+    {
+        CHECK(message(v, 60.0) == "Input 'hor_coverage_deg' must be below 180 degrees.");
+        CHECK(message(90.0, v) == "Input 'ver_coverage_deg' must be below 180 degrees.");
+    }
+    CHECK_NOTHROW(call("horn", 179.0, 179.0));
+
+    // NaN and values <= 0 select the defaults of 90 and 60 degrees
+    const arma::cube reference = call("horn", 90.0, 60.0)[0].e_theta_re;
+    for (double v : {nan, 0.0, -200.0})
+        CHECK(arma::approx_equal(call("horn", v, v)[0].e_theta_re, reference, "absdiff", 1e-14));
+
+    // Other drivers ignore the coverage
+    for (const char *driver : {"piston", "omni"})
+        CHECK_NOTHROW(call(driver, 200.0, 200.0));
+}

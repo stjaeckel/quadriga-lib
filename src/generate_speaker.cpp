@@ -60,9 +60,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`sensitivity_dB`** *(optional)* — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"` (no change), `"hemisphere"` (sealed box
   with baffle-step transition), `"dipole"` (figure-8, rear hemisphere inverted) or `"cardioid"`
-- **`hor_coverage_deg`** *(optional)* — `"horn"`: horizontal coverage in degrees, between the -6 dB points at
+- **`hor_coverage_deg`** *(optional)* — `"horn"`: horizontal coverage in degrees, below 180, between the -6 dB points at
   full pattern control; NaN or <= 0: 90°
-- **`ver_coverage_deg`** *(optional)* — `"horn"`: vertical coverage in degrees, as above; NaN or <= 0: 60°
+- **`ver_coverage_deg`** *(optional)* — `"horn"`: vertical coverage in degrees, below 180, as above; NaN or <= 0: 60°
 - **`horn_control_freq`** *(optional)* — `"horn"`: frequency in Hz above which the horn controls its pattern; NaN or <=
   0: $c / (2\pi a)$ with the speed of sound $c$ and $a$ = `radius`
 - **`baffle_width`, `baffle_height`** *(optional)* — Baffle size in m, > 0; used by `"hemisphere"`
@@ -185,6 +185,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
             hor_coverage_deg = dtype(90.0);
         if (!(ver_coverage_deg > dtype(0.0)))
             ver_coverage_deg = dtype(60.0);
+        if (hor_coverage_deg >= dtype(180.0))
+            throw std::invalid_argument("Input 'hor_coverage_deg' must be below 180 degrees.");
+        if (ver_coverage_deg >= dtype(180.0))
+            throw std::invalid_argument("Input 'ver_coverage_deg' must be below 180 degrees.");
     }
 
     // --- Generate third-octave frequency samples if not provided ---

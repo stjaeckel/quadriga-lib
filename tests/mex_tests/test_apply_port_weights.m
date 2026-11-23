@@ -6,6 +6,13 @@ function test_apply_port_weights
 % MEX interface test for quadriga_lib.apply_port_weights.
 % Physics validation lives in the Catch2 suite (test_apply_port_weights.cpp).
 
+%% Port centers
+two = quadriga_lib.generate_antenna('3GPP', 30, 299792458, [], [1, 4], [], [], [1, 2]);
+out = quadriga_lib.apply_port_weights( two, [], [], [], [], true );
+assertElementsAlmostEqual( out.element_pos(2,:), [-0.5, 0.5], 'absolute', 1e-6 );
+out = quadriga_lib.apply_port_weights( two );
+assertElementsAlmostEqual( out.element_pos(2,:), [0, 0], 'absolute', 1e-12 );
+
 %% Single-frequency
 
 azimuth_grid    = [-1.5,0,1.5,2] * pi/2;
@@ -97,7 +104,7 @@ assertTrue(directivity_out > directivity_ant + 1.2);
 
 %% Errors
 try
-    out = quadriga_lib.apply_port_weights( ant, [],[],[],[],[]);
+    out = quadriga_lib.apply_port_weights( ant, [],[],[],[],[],[]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -400,7 +407,7 @@ end
 
 % Split mode (the arrayant fields as separate inputs) is not supported
 try
-    out = quadriga_lib.apply_port_weights( [], [1e9, 2e9], [], [], ones(3,4), zeros(3,4) );
+    out = quadriga_lib.apply_port_weights( [], [1e9, 2e9], [], [], ones(3,4), zeros(3,4), 1 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';

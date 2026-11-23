@@ -97,7 +97,8 @@ static void run(fz::input &in)
                 az = arma::sort(az), el = arma::sort(el);
             const int mode = in.ConsumeIntegralInRange<int>(0, 3);
             T speed = in.ConsumeBool() ? T(299792458.0) : in.value<T>();
-            fz::clean([&] { a = quadriga_lib::apply_port_weights(a, fz::opt(mode & 1, az), fz::opt(mode & 2, el), speed); });
+            const bool center = in.ConsumeBool();
+            fz::clean([&] { a = quadriga_lib::apply_port_weights(a, fz::opt(mode & 1, az), fz::opt(mode & 2, el), speed, center); });
             break;
         }
         case 6:
@@ -219,8 +220,9 @@ static void run(fz::input &in)
             arma::Col<T> az = in.col<T>(in.size(16)), el = in.col<T>(in.size(16)), fr = in.col<T>(in.size(4));
             const int mode = in.ConsumeIntegralInRange<int>(0, 7);
             T speed = in.ConsumeBool() ? T(343.0) : in.value<T>();
+            const bool center = in.ConsumeBool();
             fz::clean([&] { quadriga_lib::apply_port_weights(vec, fz::opt(mode & 1, az), fz::opt(mode & 2, el),
-                                                                         fz::opt(mode & 4, fr), speed); });
+                                                                         fz::opt(mode & 4, fr), speed, center); });
             break;
         }
         default:

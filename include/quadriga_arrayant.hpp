@@ -101,13 +101,14 @@ namespace quadriga_lib
         const arma::uvec &i_element = arma::uvec());      // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
 
     // Apply the port weights: sum the element patterns, with the phase of the element positions, into one pattern per port
-    // - Returns a new arrayant with n_ports elements, identity port weights and all positions at the origin
+    // - Returns a new arrayant with n_ports elements and identity port weights, at the origin or with center_ports at the port centers
     template <typename dtype>
     arrayant<dtype> apply_port_weights(
         const arrayant<dtype> &ant,                                      // Valid arrayant
         const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
         const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(), // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-        double propagation_speed = 299792458.0);                         // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+        double propagation_speed = 299792458.0,                          // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+        bool center_ports = false);                                      // Place each port at the power-weighted center of its elements instead of the origin
 
     // Vector form: one output entry per output frequency; port weights are interpolated between the bracketing entries
     template <typename dtype>
@@ -116,7 +117,8 @@ namespace quadriga_lib
         const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
         const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(), // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
         const arma::Col<dtype> &freq_new = arma::Col<dtype>(),           // Output frequency grid in Hz; defaults to input grid
-        double propagation_speed = 299792458.0);                         // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+        double propagation_speed = 299792458.0,                          // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+        bool center_ports = false);                                      // Place each port at the power-weighted center of its elements instead of the origin
 
     // Join the elements of two arrays into a new array (block-diagonal port weights)
     template <typename dtype>

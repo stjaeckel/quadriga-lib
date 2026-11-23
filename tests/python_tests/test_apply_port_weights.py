@@ -377,6 +377,12 @@ class test_case(unittest.TestCase):
             arrayant.apply_port_weights(mf)
 
 
+    def test_center_ports(self):
+        ant = arrayant.generate_antenna("3GPP", res=30, panel=[1, 4], ports=[1, 2])
+        out = arrayant.apply_port_weights(ant, center_ports=True)
+        np.testing.assert_allclose(out["element_pos"][1], [-0.5, 0.5], atol=1e-6)
+        np.testing.assert_allclose(arrayant.apply_port_weights(ant)["element_pos"], 0.0, atol=1e-12)
+
     def test_propagation_speed(self):
         # Two omni elements 0.2 m apart on the y-axis at 1 kHz, summed into one port
         omni = arrayant.generate_antenna("omni", res=10)

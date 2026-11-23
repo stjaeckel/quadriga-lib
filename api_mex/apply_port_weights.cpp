@@ -59,12 +59,13 @@ Apply the port weights of an antenna array: one pattern per port
 - Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
 - Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
   and including the phase of each element position
-- The result has one element per port, identity port weights and all element positions at the origin
+- The result has one element per port and identity port weights; its elements are at the origin, or at the centers
+  of their ports with `center_ports`
 
 ## Usage:
 ```
 arrayant_out = quadriga_lib.apply_port_weights( arrayant_in, freq_new, azimuth_grid_new, ...
-    elevation_grid_new, propagation_speed );
+    elevation_grid_new, propagation_speed, center_ports );
 ```
 
 ## Inputs:
@@ -76,6 +77,10 @@ arrayant_out = quadriga_lib.apply_port_weights( arrayant_in, freq_new, azimuth_g
 - **`elevation_grid_new`** — Output elevation grid in rad; default: the input grid (of the first entry)
 - **`propagation_speed`** — Wave propagation speed in m/s, positive and finite; 299792458 is the speed of light for
   radio waves, use about 343 for acoustic arrays (e.g. from [[generate_speaker]]); default: 299792458
+- **`center_ports`** — If `true`, places each port at the power-weighted center of its elements,
+  `sum(|w|² x) / sum(|w|²)`, with the phase referenced there; a port with zero weights stays at the origin. A
+  plane-wave channel is unchanged, and the slower phase over angle makes interpolation of coupled sub-arrays more
+  accurate; default: `false`
 
 ## Output:
 - **`arrayant_out`** — Arrayant struct with `n_ports` elements, each holding the pattern of that port; `name` is kept,
@@ -96,7 +101,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 5)
+    if (nrhs < 1 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -107,12 +112,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec az = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2], false, "azimuth_grid_new");
     const arma::vec el = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3], false, "elevation_grid_new");
     const double propagation_speed = (nrhs < 5) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[4], "propagation_speed", 299792458.0);
+    const bool center_ports = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "center_ports", false);
 
     if (freq_new.n_elem > 1 || mxGetNumberOfElements(prhs[0]) > 1) // Multi-frequency
     {
         const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant_in"); // Validated by the C++ function
         std::vector<quadriga_lib::arrayant<double>> out;
-        CALL_QD(out = quadriga_lib::apply_port_weights(ant_multi, az, el, freq_new, propagation_speed));
+        CALL_QD(out = quadriga_lib::apply_port_weights(ant_multi, az, el, freq_new, propagation_speed, center_ports));
         plhs[0] = (out.size() == 1) ? qd_mex_arrayant2struct(out[0]) : qd_mex_arrayant2struct_multi(out);
         return;
     }
@@ -122,6 +128,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant.center_freq = freq_new[0];
 
     quadriga_lib::arrayant<double> arrayant_out;
-    CALL_QD(arrayant_out = quadriga_lib::apply_port_weights(ant, az, el, propagation_speed));
+    CALL_QD(arrayant_out = quadriga_lib::apply_port_weights(ant, az, el, propagation_speed, center_ports));
     plhs[0] = qd_mex_arrayant2struct(arrayant_out);
 }

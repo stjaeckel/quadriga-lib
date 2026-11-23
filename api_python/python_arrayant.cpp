@@ -31,7 +31,8 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("freq_new") = py::none(),
           py::arg("azimuth_grid") = py::none(),
           py::arg("elevation_grid") = py::none(),
-          py::arg("propagation_speed") = 299792458.0);
+          py::arg("propagation_speed") = 299792458.0,
+          py::arg("center_ports") = false);
 
     m.def("join_arrays", &join_arrays,
           py::arg("arrayant1"),

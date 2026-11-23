@@ -431,6 +431,12 @@ class TestSpeakerGenerate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "radius"):
             arrayant.generate_speaker(radius=0.0, center_freq=np.array([1000.0]), angular_resolution_deg=90.0)
 
+    def test_horn_coverage_limit_throws(self):
+        """A horn coverage of 180 degrees or more is an error."""
+        with self.assertRaisesRegex(ValueError, "hor_coverage_deg"):
+            arrayant.generate_speaker('horn', hor_coverage_deg=180.0, center_freq=np.array([1000.0]),
+                                      angular_resolution_deg=90.0)
+
     # ---- Reproduce with different parameters ----
 
     def test_radius_affects_directivity(self):

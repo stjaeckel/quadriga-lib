@@ -382,4 +382,17 @@ catch ME
     end
 end
 
+% Horn coverage of 180 degrees or more
+try
+    ant = quadriga_lib.generate_speaker('horn', 0.05, 80, 12000, 12, 12, 85, 'monopole', 180);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Input ''hor_coverage_deg'' must be below 180 degrees.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || ...
+       isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ...
+              ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+
 end
