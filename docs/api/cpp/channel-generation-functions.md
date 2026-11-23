@@ -66,8 +66,8 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 ```
 
 ### Inputs:
-- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [arrayant](array-antenna-functions.md#arrayant)
-- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [arrayant](array-antenna-functions.md#arrayant)
+- **`ap_array`** — Access point antenna array; `n_tx` = number of ports after port weights, see [arrayant](antennas-transducers-and-patterns.md#arrayant)
+- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports after port weights, see [arrayant](antennas-transducers-and-patterns.md#arrayant)
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`center_freq`** *(optional)* — Carrier frequency in Hz (finite, above 100 MHz)
 - **`tap_spacing`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
@@ -96,7 +96,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 
 ### See also:
 - [get_channels_planar](#get_channels_planar) (used internally to compute MIMO coefficients per user)
-- [arrayant](array-antenna-functions.md#arrayant) (antenna array type for ap_array and sta_array)
+- [arrayant](antennas-transducers-and-patterns.md#arrayant) (antenna array type for ap_array and sta_array)
 - [IEEE 802.11-03/940r4 - TGn Channel Models](https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc)
 - [IEEE 802.11-09/0308r12 - TGac Channel Model Addendum](https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc)
 - [IEEE 802.11-11/0968r4 - TGah Channel Model](https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx)
@@ -111,9 +111,9 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · [P
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
   channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS coupling matrix holds the IRS weights and must be given: an empty coupling of `irs_array` throws, unlike
+- The IRS port weights holds the IRS weights and must be given: empty port weights of `irs_array` throws, unlike
   in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
@@ -172,9 +172,9 @@ void quadriga_lib::get_channels_irs(
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](array-antenna-functions.md#arrayant)
-- **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](array-antenna-functions.md#arrayant)
-- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [arrayant](array-antenna-functions.md#arrayant)
+- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](antennas-transducers-and-patterns.md#arrayant)
+- **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](antennas-transducers-and-patterns.md#arrayant)
+- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [arrayant](antennas-transducers-and-patterns.md#arrayant)
 - **`tx_pos`** — Transmitter position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
@@ -197,7 +197,7 @@ void quadriga_lib::get_channels_irs(
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its coupling and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [arrayant](array-antenna-functions.md#arrayant)
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its port weights and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [arrayant](antennas-transducers-and-patterns.md#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 - **`use_kernel`** *(optional)* — Kernel of both segments, passed to [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
@@ -218,7 +218,7 @@ void quadriga_lib::get_channels_irs(
 - [combine_irs_coord](site-specific-simulation-tools.md#combine_irs_coord) (coordinate setup for IRS geometry)
 - [get_channels_spherical](#get_channels_spherical) (single-segment spherical-wave channel)
 - [get_channels_planar](#get_channels_planar) (single-segment planar-wave channel)
-- [arrayant](array-antenna-functions.md#arrayant) (antenna array class)
+- [arrayant](antennas-transducers-and-patterns.md#arrayant) (antenna array class)
 
 ---
 <a id="get_channels_multifreq"></a>
@@ -230,7 +230,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq)
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (from `tx_array[i].center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
-- TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [arrayant_interpolate_multi](array-antenna-functions.md#arrayant_interpolate_multi))
+- TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern))
 - `path_gain` interpolated linearly; `polmat` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (~343 m/s) simulations
@@ -241,7 +241,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq)
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
   FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry
 - LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm
-- Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
+- Port weights interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
   (zero power if no LOS path was found); a LOS path found in the input is moved to slot 0 and leaves a zero-power path
   in its original slot (input index + 1); all other paths keep their order, shifted by one slot
@@ -286,8 +286,8 @@ void quadriga_lib::get_channels_multifreq(
 ```
 
 ### Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [arrayant_is_valid_multi](array-antenna-functions.md#arrayant_is_valid_multi)
-- **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [arrayant_is_valid_multi](array-antenna-functions.md#arrayant_is_valid_multi)
+- **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [is_valid](antennas-transducers-and-patterns.md#is_valid)
+- **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [is_valid](antennas-transducers-and-patterns.md#is_valid)
 - **`tx_pos`** — TX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
 - **`tx_orientation`** — TX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — RX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
@@ -307,7 +307,7 @@ void quadriga_lib::get_channels_multifreq(
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 - **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
-  [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)
+  [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern)
 
 ### Outputs:
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_new`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
@@ -318,9 +318,9 @@ void quadriga_lib::get_channels_multifreq(
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)
-- [arrayant_interpolate_multi](array-antenna-functions.md#arrayant_interpolate_multi) (underlying pattern interpolation)
-- [arrayant_concat_multi](array-antenna-functions.md#arrayant_concat_multi) (building multi-frequency arrays)
-- [generate_speaker](array-antenna-functions.md#generate_speaker) (acoustic source construction)
+- [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern) (underlying pattern interpolation)
+- [join_arrays](antennas-transducers-and-patterns.md#join_arrays) (building multi-frequency arrays)
+- [generate_speaker](antennas-transducers-and-patterns.md#generate_speaker) (acoustic source construction)
 
 ---
 <a id="get_channels_planar"></a>
@@ -396,7 +396,7 @@ void quadriga_lib::get_channels_planar(
   found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
-  [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)
+  [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern)
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -410,7 +410,7 @@ void quadriga_lib::get_channels_planar(
 - [get_channels_ieee_indoor](#get_channels_ieee_indoor) (for generating IEEE compliant channels using `get_channels_planar` internally)
 - [baseband_freq_response](channel-functions.md#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed grid)
-- [arrayant](array-antenna-functions.md#arrayant) (antenna array class)
+- [arrayant](antennas-transducers-and-patterns.md#arrayant) (antenna array class)
 
 ---
 <a id="get_channels_planar_vec"></a>
@@ -540,8 +540,8 @@ void quadriga_lib::get_channels_spherical(
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](array-antenna-functions.md#arrayant)
-- **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](array-antenna-functions.md#arrayant)
+- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](antennas-transducers-and-patterns.md#arrayant)
+- **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](antennas-transducers-and-patterns.md#arrayant)
 - **`tx_pos`** — Transmitter position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
@@ -559,7 +559,7 @@ void quadriga_lib::get_channels_spherical(
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`use_kernel`** *(optional)* — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto,
   1 = GENERIC, 2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto
-  selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)
+  selects GENERIC in this version, see [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern)
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -575,7 +575,7 @@ void quadriga_lib::get_channels_spherical(
 - [get_channels_planar](#get_channels_planar) (planar wave variant)
 - [get_channels_multifreq](#get_channels_multifreq) (multi-freq counterpart)
 - [get_channels_irs](#get_channels_irs) (for IRS-assisted communication)
-- [arrayant](array-antenna-functions.md#arrayant) (antenna array class)
+- [arrayant](antennas-transducers-and-patterns.md#arrayant) (antenna array class)
 - [baseband_freq_response](channel-functions.md#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed grid)
 

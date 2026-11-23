@@ -50,8 +50,8 @@ Calculate MIMO channel coefficients for planar wave paths
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [[arrayant_generate]]
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [[arrayant_generate]]
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [[generate_antenna]]
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [[generate_antenna]]
 - **`tx_pos`** — Transmitter position; `[3, 1]`, or `[3, n_snap]` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
   batch mode
@@ -70,7 +70,7 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [[arrayant_interpolate]]; default: 0
+  unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]]; default: 0
 
 
 ## Outputs:
@@ -82,7 +82,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ## See also:
 - [[get_channels_spherical]] (spherical wave variant accounting for per-element angle differences)
 - [[get_channels_ieee_indoor]] (for generating IEEE compliant channels using `get_channels_planar` internally)
-- [[arrayant_generate]] (antenna array generator)
+- [[generate_antenna]] (antenna array generator)
 - [[baseband_freq_response]] (for calculating the frequency response)
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/

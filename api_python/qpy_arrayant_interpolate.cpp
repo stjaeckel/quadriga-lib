@@ -5,12 +5,12 @@
 #include "qd_helpers_python_types.hpp"
 
 /*!SECTION
-Array antenna functions
+Antennas, transducers and patterns
 SECTION!*/
 
 /*!MD
-# interpolate
-Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
+# interpolate_pattern
+Interpolate the polarimetric field pattern of an antenna array at given azimuth and elevation angles
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
@@ -31,19 +31,19 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 ## Usage:
 ```
 # Single-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, *, i_element, orientation, \
+V, H = quadriga_lib.arrayant.interpolate_pattern( arrayant, azimuth, elevation, *, i_element, orientation, \
     element_pos, use_kernel )
 
 # Single-frequency mode with the projected distance and the local angles
-V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
+V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate_pattern( arrayant, azimuth, \
     elevation, ..., dist=True, local_angles=True )
 
 # Multi-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
+V, H = quadriga_lib.arrayant.interpolate_pattern( arrayant, azimuth, elevation, ..., freq_new=freqs )
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict containing the arrayant data; layout as documented in [[generate]]; 4D pattern arrays contain
+- **`arrayant`** — Dict containing the arrayant data; layout as documented in [[generate_antenna]]; 4D pattern arrays contain
   a frequency-dependent model
 - **`azimuth`** — Azimuth angles in GCS; `(1, n_ang)` (same angles for all outputs) or `(n_out, n_ang)` (one angle
   per output)
@@ -74,22 +74,22 @@ V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., fre
   `local_angles` is `True`
 
 ## See also:
-- [[generate]] (arrayant dict layout)
+- [[generate_antenna]] (arrayant dict layout)
 - [[qdant_read]] (load arrayant data)
 - [[generate_speaker]] (typical source of multi-frequency arrayants)
 MD!*/
 
-py::tuple arrayant_interpolate(const py::dict &arrayant,
-                               const py::array_t<double> &azimuth,
-                               const py::array_t<double> &elevation,
-                               py::handle i_element,
-                               py::handle orientation,
-                               py::handle element_pos,
-                               py::handle freq_new,
-                               py::handle dist,
-                               py::handle local_angles,
-                               py::handle fast_access,
-                               int use_kernel)
+py::tuple interpolate_pattern(const py::dict &arrayant,
+                              const py::array_t<double> &azimuth,
+                              const py::array_t<double> &elevation,
+                              py::handle i_element,
+                              py::handle orientation,
+                              py::handle element_pos,
+                              py::handle freq_new,
+                              py::handle dist,
+                              py::handle local_angles,
+                              py::handle fast_access,
+                              int use_kernel)
 {
     const bool want_dist = qd_python_flag(dist, false, "dist");
     const bool want_local_angles = qd_python_flag(local_angles, false, "local_angles");
@@ -118,7 +118,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
         auto V_py = qd_python_init_output(n_out, n_ang, n_freq, &V);
         auto H_py = qd_python_init_output(n_out, n_ang, n_freq, &H);
 
-        quadriga_lib::arrayant_interpolate_multi<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
+        quadriga_lib::interpolate_pattern<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
                                                          freq_new_a,
                                                          i_element_a, orientation_a, element_pos_a,
                                                          &V, &H, use_kernel);
@@ -139,7 +139,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
         gamma_py = qd_python_init_output(n_out, n_ang, &gamma);
     }
 
-    quadriga_lib::arrayant_interpolate<double>(ant[0], azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
+    quadriga_lib::interpolate_pattern<double>(ant[0], azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
                                                i_element_a, orientation_a, element_pos_a,
                                                want_dist ? &dist_a : nullptr,
                                                want_local_angles ? &azimuth_loc : nullptr,

@@ -1,6 +1,6 @@
 # TR 38.901 antenna model: plan and decisions
 
-Goal (maintainer, 2026-11-16): every TR 38.901 antenna item in the inventory is "Yes". One wrapper for all generators (`arrayant_generate`) is kept. The coverage state per TR item is in [tr38901_inventory.md](tr38901_inventory.md), section 3.3; this document holds the plan and the decisions for the remaining work (TR v19.5.0).
+Goal (maintainer, 2026-11-16): every TR 38.901 antenna item in the inventory is "Yes". One wrapper for all generators (`generate_antenna`) is kept. The coverage state per TR item is in [tr38901_inventory.md](tr38901_inventory.md), section 3.3; this document holds the plan and the decisions for the remaining work (TR v19.5.0).
 
 Order: the BS session (section 2, done) first, then the UT session (section 3).
 
@@ -14,7 +14,7 @@ Decided 2026-11-16: the panel type keeps the name `3GPP` (or `3gpp`; BS and pane
 
 ## 2. BS session
 
-Status: done (the panel type `3GPP` with the tuples below, Model-2, sub-array weights, steering per panel, G_max, the ULA on the panel path, multibeam with `beams`, the C++ dispatcher `arrayant_generate` behind thin MEX and Python wrappers). The library documentation (doc block of `arrayant_generate`, the glossary) is the reference for the interface; this section keeps what the UT session builds on.
+Status: done (the panel type `3GPP` with the tuples below, Model-2, sub-array weights, steering per panel, G_max, the ULA on the panel path, multibeam with `beams`, the C++ dispatcher `generate_antenna` behind thin MEX and Python wrappers). The library documentation (doc block of `generate_antenna`, the glossary) is the reference for the interface; this section keeps what the UT session builds on.
 
 Encoding (shared by all types). Parameters are TR tuples as arrays, the same in C++, MEX and Python. Trailing entries may be omitted; inside a tuple, NaN (real tuples) or 0 (integer tuples `panel`, `ports`, `pol`, C++ `arma::uvec`) selects the default of that entry. Inputs a type does not use throw. The tuples carry degrees and dB without a `_deg` / `_dB` suffix; the glossary states the unit per entry. New shared names get their glossary entry in the same commit (`device_size`, `locations` with the UT session).
 
@@ -23,7 +23,7 @@ Encoding (shared by all types). Parameters are TR tuples as arrays, the same in 
 - G_max: the TR constant per type (8 dBi for `3GPP`, 5.3 dBi for the UT); the Table 7.3-1 shape has a directivity of 9.83 dBi, the Table 7.3-2 shape 5.33 dBi.
 - Element and port order: polarisation fastest, then the array indices (for the panel m, n, Mg, Ng).
 
-Building blocks in `src/qd_arrayant_generate.cpp` for the UT types: `qd_tr38901_element` (the Table 7.3-1 / 7.3-2 shape from `[φ_3dB, θ_3dB, SLA_V, A_max, G_max]`, filled by `qd_tr38901_element_fill`; the Table 7.3-2 constants are tested), `qd_apply_polarization` (Model-1 / Model-2), `qd_arrayant_panel` (positions and coupling of a panel from one element; used by `3GPP-CPE`), and the dispatcher `arrayant_generate`, which fills every default in one place.
+Building blocks in `src/generate_antenna.cpp` for the UT types: `qd_tr38901_element` (the Table 7.3-1 / 7.3-2 shape from `[φ_3dB, θ_3dB, SLA_V, A_max, G_max]`, filled by `qd_tr38901_element_fill`; the Table 7.3-2 constants are tested), `qd_apply_polarization` (Model-1 / Model-2), `qd_arrayant_panel` (positions and coupling of a panel from one element; used by `3GPP-CPE`), and the dispatcher `generate_antenna`, which fills every default in one place.
 
 Test scope and limits (plan rule; the SPECs stay): Catch2 tests the fill rules once, other validation one section per tuple; each wrapper tests each position once on one type, with one loop over omitted / `[]` / None; Python layout and dtype tests only for array inputs that are new. Limits: exact (0) for omitted versus 0 / NaN versus the explicit default and for alternative input forms; 1e-12 relative (double) between two code paths; 1e-10 dB for the Table 7.3-1/7.3-2 shapes; 0.01 dB for G_max against the directivity; float against double 1e-5 absolute for patterns, 1e-6 relative to the aperture for positions.
 
@@ -62,7 +62,7 @@ What the TR gives for the two device classes (clause 7.3.0):
 
 Content of `3GPP-UT`: handheld positions from the device size (15 × 7 × 0 cm, candidate locations 1 to 8 of Fig. 7.3-2), per-antenna orientation (α_u, β_u, γ_u), one or two field patterns per location (eq. 7.3-6 to 7.3-8; two patterns: γ_u − 45°), Tables A.6-1 and A.6-2, element pattern of Table 7.3-2. The panel UT configs (UT config A of Tables 7.8-2 / 7.8-2A: M = N = 1, P = 2, X-pol 0°/+90°; Config A of Table 7.8-6A: M = 2, N = 1, P = 2) are the panel type with an isotropic element and Model-2, not a UT type. The device orientation Ω_UT (clause 7.3.0: β = 45°, 90° etc.) is the receiver orientation of the channel functions, not a generator input.
 
-Rotation: each handheld antenna is the reference element rotated by (bank, tilt, heading) = (γ_u, β_u, α_u) with `arrayant_rotate_pattern`, pattern and polarisation together (usage 0 or 3), which is eq. 7.1-7/7.1-8 with eq. 7.3-6; the session implements the rotation, not eq. 7.3-7/7.3-8 literally (their denominator vanishes on the z'' axis; the NOTE after eq. 7.3-8 allows any computation of ψ_u, and the pole handling of 8551c68 covers the axis). To be checked against eq. 7.1-7/7.1-8 in a test.
+Rotation: each handheld antenna is the reference element rotated by (bank, tilt, heading) = (γ_u, β_u, α_u) with `rotate_pattern`, pattern and polarisation together (usage 0 or 3), which is eq. 7.1-7/7.1-8 with eq. 7.3-6; the session implements the rotation, not eq. 7.3-7/7.3-8 literally (their denominator vanishes on the z'' axis; the NOTE after eq. 7.3-8 allows any computation of ψ_u, and the pole handling of 8551c68 covers the axis). To be checked against eq. 7.1-7/7.1-8 in a test.
 
 Test cases: Table 7.8-2A metric 5 (F_u,θ' and F_u,φ' in the UT LCS for Config D, single polarisation, locations 1 to 8) is the reference fixture for `3GPP-UT`; Table 7.8-2A Configs B (locations (1, 7, 3, 5)) and C (dual polarisation, 1 to 8); Table 7.8-6C Configs A and B.
 

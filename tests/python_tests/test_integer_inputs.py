@@ -24,7 +24,7 @@ import quadriga_lib
 class test_case(unittest.TestCase):
 
     def setUp(self):
-        ant = quadriga_lib.arrayant.generate("omni")
+        ant = quadriga_lib.arrayant.generate_antenna("omni")
         self.ant = quadriga_lib.arrayant.copy_element(ant, 0, [1, 2])
         self.tri = np.array([[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]])
 

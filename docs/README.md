@@ -13,7 +13,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Tutorials](http://quadriga-lib.org/tutorials.md): worked examples as Jupyter notebooks
 
 ## Data formats
-- [QuaDRiGa Array Antenna Exchange Format (QDANT)](formats/qdant.md): XML file format for array antenna patterns: elements, positions, coupling and the layout of several antennas
+- [QuaDRiGa Array Antenna Exchange Format (QDANT)](formats/qdant.md): XML file format for antenna array patterns: elements, positions, coupling and the layout of several antennas
 - [Material Properties](formats/materials.md): The material table of the ray functions: CSV columns, built-in EM materials and the .mtl mapping
 
 ## API reference
@@ -23,7 +23,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 
 ## API sections
 - [C++: General usage notes](api/cpp/general-usage-notes.md)
-- [C++: Array antenna functions](api/cpp/array-antenna-functions.md): 25 functions
+- [C++: Antennas, transducers and patterns](api/cpp/antennas-transducers-and-patterns.md): 16 functions
 - [C++: Channel class](api/cpp/channel-class.md): 2 functions
 - [C++: Channel functions](api/cpp/channel-functions.md): 26 functions
 - [C++: Channel generation functions](api/cpp/channel-generation-functions.md): 7 functions
@@ -34,7 +34,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 35 functions
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](api/mex/general-usage-notes.md)
-- [MATLAB / Octave: Array antenna functions](api/mex/array-antenna-functions.md): 12 functions
+- [MATLAB / Octave: Antennas, transducers and patterns](api/mex/antennas-transducers-and-patterns.md): 12 functions
 - [MATLAB / Octave: Channel functions](api/mex/channel-functions.md): 14 functions
 - [MATLAB / Octave: Channel generation functions](api/mex/channel-generation-functions.md): 5 functions
 - [MATLAB / Octave: Channel statistics](api/mex/channel-statistics.md): 5 functions
@@ -44,7 +44,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: Site-specific simulation tools](api/mex/site-specific-simulation-tools.md): 17 functions
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](api/python/general-usage-notes.md)
-- [Python: Array antenna functions](api/python/array-antenna-functions.md): 12 functions
+- [Python: Antennas, transducers and patterns](api/python/antennas-transducers-and-patterns.md): 12 functions
 - [Python: Channel functions](api/python/channel-functions.md): 14 functions
 - [Python: Channel generation functions](api/python/channel-generation-functions.md): 5 functions
 - [Python: Channel statistics](api/python/channel-statistics.md): 5 functions

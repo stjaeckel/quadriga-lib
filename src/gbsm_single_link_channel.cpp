@@ -71,7 +71,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ```
 
 ## Inputs:
-- **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
+- **`tx_array`**, **`rx_array`** — Tx and Rx antenna array with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [[gbsm_rays]]
 - **`link_gain_dB`** — Link gain (see Terms) at `rays.center_freq(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)

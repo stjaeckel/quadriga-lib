@@ -14,18 +14,18 @@ namespace py = pybind11;
 
 void quadriga_lib_arrayant(py::module_ &m)
 {
-    m.def("calc_beamwidth", &arrayant_calc_beamwidth,
+    m.def("calc_beamwidth", &calc_beamwidth,
           py::arg("arrayant"),
           py::kw_only(),
           py::arg("i_element") = py::none(),
           py::arg("threshold_dB") = 3.0);
 
-    m.def("calc_directivity", &arrayant_calc_directivity,
+    m.def("calc_directivity", &calc_directivity,
           py::arg("arrayant"),
           py::kw_only(),
           py::arg("i_element") = py::none());
 
-    m.def("combine_pattern", &arrayant_combine_pattern,
+    m.def("apply_port_weights", &apply_port_weights,
           py::arg("arrayant"),
           py::kw_only(),
           py::arg("freq_new") = py::none(),
@@ -33,16 +33,16 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("elevation_grid") = py::none(),
           py::arg("propagation_speed") = 299792458.0);
 
-    m.def("concat", &arrayant_concat,
+    m.def("join_arrays", &join_arrays,
           py::arg("arrayant1"),
           py::arg("arrayant2"));
 
-    m.def("copy_element", &arrayant_copy_element,
+    m.def("copy_element", &copy_element,
           py::arg("arrayant"),
           py::arg("i_source").none(false),
           py::arg("i_target").none(false));
 
-    m.def("export_obj_file", &arrayant_export_obj_file,
+    m.def("export_pattern_obj", &export_pattern_obj,
           py::arg("fn"),
           py::arg("arrayant"),
           py::kw_only(),
@@ -53,7 +53,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("i_element") = py::none(),
           py::arg("i_freq") = 0);
 
-    m.def("generate", &arrayant_generate,
+    m.def("generate_antenna", &generate_antenna,
           py::arg("type"),
           py::arg("res") = NAN,
           py::kw_only(),
@@ -87,7 +87,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("center_freq") = py::none(),
           py::arg("angular_resolution_deg") = 5.0);
 
-    m.def("interpolate", &arrayant_interpolate,
+    m.def("interpolate_pattern", &interpolate_pattern,
           py::arg("arrayant").none(false),
           py::arg("azimuth").none(false),
           py::arg("elevation").none(false),
@@ -101,7 +101,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("fast_access") = false,
           py::arg("use_kernel") = 0);
 
-    m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("id") = py::none());
+    m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("ids") = py::none());
 
     m.def("qdant_write", &qdant_write,
           py::arg("fn"),
@@ -110,7 +110,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::kw_only(),
           py::arg("layout") = py::none());
 
-    m.def("rotate_pattern", &arrayant_rotate_pattern,
+    m.def("rotate_pattern", &rotate_pattern,
           py::arg("arrayant"),
           py::arg("orientation").none(false),
           py::kw_only(),

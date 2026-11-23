@@ -28,17 +28,17 @@ def re_im(out, at=0, n=1):
 
 def gen_omni():
     """Generate an omnidirectional antenna dictionary (single-frequency, 3D patterns)."""
-    return quadriga_lib.arrayant.generate('omni')
+    return quadriga_lib.arrayant.generate_antenna('omni')
 
 
 def gen_xpol():
     """Generate a cross-polarized antenna dictionary."""
-    return quadriga_lib.arrayant.generate('xpol')
+    return quadriga_lib.arrayant.generate_antenna('xpol')
 
 
 def gen_custom(az_3dB=90.0, el_3dB=90.0):
     """Generate a custom antenna dictionary."""
-    return quadriga_lib.arrayant.generate('custom', 1, element=[az_3dB, el_3dB])
+    return quadriga_lib.arrayant.generate_antenna('custom', 1, element=[az_3dB, el_3dB])
 
 
 def copy_element(ant, src):
@@ -48,8 +48,8 @@ def copy_element(ant, src):
         ant[key] = np.concatenate([ant[key], ant[key][:, :, src:src + 1]], axis=2)
     ant['element_pos'] = np.concatenate([ant['element_pos'], ant['element_pos'][:, src:src + 1]], axis=1)
     n_elem = ant['e_theta_re'].shape[2]
-    ant['coupling_re'] = np.eye(n_elem, order='F')
-    ant['coupling_im'] = np.zeros((n_elem, n_elem), order='F')
+    ant['port_weights_re'] = np.eye(n_elem, order='F')
+    ant['port_weights_im'] = np.zeros((n_elem, n_elem), order='F')
     return ant
 
 
@@ -76,7 +76,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             angular_resolution_deg=10.0)
 
         # Omnidirectional microphone as RX (single-frequency, clamped for all output frequencies)
-        rx = quadriga_lib.arrayant.generate('omni')
+        rx = quadriga_lib.arrayant.generate_antenna('omni')
 
         # Simple LOS path setup
         fbs_pos = np.array([[0.5], [0.0], [0.0]])
@@ -783,7 +783,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
 
     # ---- Coupling interpolation across frequency ----
 
-    def test_freq_dependent_coupling(self):
+    def test_freq_dependent_port_weights(self):
         """Frequency-dependent coupling should produce different coefficients."""
         base = gen_omni()
         base = copy_element(base, 0)
@@ -809,8 +809,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         cpl_re[0, 0, 0] = 1.0; cpl_re[1, 0, 0] = 0.5
         cpl_re[0, 1, 0] = 0.5; cpl_re[1, 1, 0] = 1.0
         cpl_re[0, 0, 1] = 1.0; cpl_re[1, 1, 1] = 1.0
-        tx['coupling_re'] = cpl_re
-        tx['coupling_im'] = np.zeros((2, 2, 2), order='F')
+        tx['port_weights_re'] = cpl_re
+        tx['port_weights_im'] = np.zeros((2, 2, 2), order='F')
 
         rx = gen_omni()
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')
@@ -917,7 +917,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and MATLAB)
     def test(self):
-        ant = quadriga_lib.arrayant.generate('omni')
+        ant = quadriga_lib.arrayant.generate_antenna('omni')
         fc = 3e9
         ant['center_freq'] = fc
         cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
@@ -930,7 +930,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0, n_freq_new), as in C++ and MATLAB
     def test_without_fake_los(self):
-        ant = quadriga_lib.arrayant.generate('xpol')
+        ant = quadriga_lib.arrayant.generate_antenna('xpol')
         fc = 3e9
         ant['center_freq'] = fc
         out = quadriga_lib.channel.multifreq(

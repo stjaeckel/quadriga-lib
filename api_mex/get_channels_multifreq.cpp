@@ -25,7 +25,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
   FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.
-- Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
+- Port weights are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 1 holds the LOS path
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
@@ -51,8 +51,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ```
 
 ## Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [[arrayant_generate]]
-- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [[arrayant_generate]]
+- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [[generate_antenna]]
+- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [[generate_antenna]]
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
@@ -71,7 +71,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [[arrayant_interpolate]]; default: 0
+  unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]]; default: 0
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`

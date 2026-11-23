@@ -35,7 +35,7 @@ assertTrue( isempty(rays(1).fbs_pos) );                                       % 
 assertEqual( size(b_med), [2, 2] );
 assertEqual( size(b_eff), [2, 2] );
 assertTrue( all( b_med(:) > 0 & b_eff(:) > 0 ) );
-ant = quadriga_lib.arrayant_generate( 'omni' );
+ant = quadriga_lib.generate_antenna( 'omni' );
 for k = 1 : 2
     [ ~, par ] = quadriga_lib.gbsm_single_link_channel( ant, ant, r, 0, 'drift', 'taps', k );
     assertEqual( b_med(:, k), par.b_med );

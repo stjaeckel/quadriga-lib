@@ -211,8 +211,8 @@ ant_irs2 = rmfield(ant_irs, 'element_pos');
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     1, thr_keep_all, f0_zero, false, [], [] );
 
-ant_tx2 = rmfield(ant_tx2, 'coupling_re');
-ant_tx2 = rmfield(ant_tx2, 'coupling_im');
+ant_tx2 = rmfield(ant_tx2, 'port_weights_re');
+ant_tx2 = rmfield(ant_tx2, 'port_weights_im');
 [~] = quadriga_lib.get_channels_irs( ...
     ant_tx2, ant_rx2, ant_irs2, ...
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
@@ -330,9 +330,9 @@ catch ME
     end
 end
 
-%% Error: TX coupling_im without coupling_re
+%% Error: TX port_weights_im without port_weights_re
 ant_tx_bad = ant_tx;
-ant_tx_bad = rmfield(ant_tx_bad,'coupling_re');
+ant_tx_bad = rmfield(ant_tx_bad,'port_weights_re');
 try
     [~] = quadriga_lib.get_channels_irs( ...
         ant_tx_bad, ant_rx, ant_irs, ...
@@ -342,15 +342,15 @@ try
         1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of port weights (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-%% Error: IRS coupling_im without coupling_re
+%% Error: IRS port_weights_im without port_weights_re
 ant_irs_bad = ant_irs;
-ant_irs_bad = rmfield(ant_irs_bad,'coupling_re');
+ant_irs_bad = rmfield(ant_irs_bad,'port_weights_re');
 try
     [~] = quadriga_lib.get_channels_irs( ...
         ant_tx, ant_rx, ant_irs_bad, ...
@@ -360,7 +360,7 @@ try
         1, thr_keep_all, f0_zero, false, [], [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''irs_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''irs_array'' is not valid: Imaginary part of port weights (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -382,11 +382,11 @@ assertEqual( cr_e, cr_p1 );
 assertTrue( any(abs(cr_p1(:) - cr_p2(:)) > 1e-12) );
 % Port 1 uses the first coupling column only: an IRS whose first column equals port 2 of ant_irs_diff gives cr_p2
 ant_sw = ant_irs_diff;
-ant_sw.coupling_re = ant_irs_diff.coupling_re(:, [2 1]);
-ant_sw.coupling_im = ant_irs_diff.coupling_im(:, [2 1]);
+ant_sw.port_weights_re = ant_irs_diff.port_weights_re(:, [2 1]);
+ant_sw.port_weights_im = ant_irs_diff.port_weights_im(:, [2 1]);
 args_sw = args; args_sw{3} = ant_sw;
 assertEqual( quadriga_lib.get_channels_irs( args_sw{:}, 1 ), cr_p2 );
-for bad = {{0, 'Input ''i_irs'' cannot be 0 (1-based index).'}, {3, 'Input ''i_irs'' is out of range; the IRS coupling matrix has 2 columns.'}}
+for bad = {{0, 'Input ''i_irs'' cannot be 0 (1-based index).'}, {3, 'Input ''i_irs'' is out of range; the IRS port weights have 2 columns.'}}
     failed = false;
     try
         [~] = quadriga_lib.get_channels_irs( args{:}, bad{1}{1} );
@@ -411,22 +411,22 @@ assertTrue( isempty(o0{4}) );
 
 %% The IRS coupling of irs_array holds the IRS weights: a struct without coupling throws; the coupling and element_pos
 % of irs_array_2 are ignored
-ant_irs_nc = rmfield(ant_irs, {'coupling_re', 'coupling_im'});
-ant_irs_2 = rmfield(ant_irs_diff, {'coupling_re', 'coupling_im'}); ant_irs_2.element_pos = ones(3, n_elem_irs);
+ant_irs_nc = rmfield(ant_irs, {'port_weights_re', 'port_weights_im'});
+ant_irs_2 = rmfield(ant_irs_diff, {'port_weights_re', 'port_weights_im'}); ant_irs_2.element_pos = ones(3, n_elem_irs);
 assertEqual( quadriga_lib.get_channels_irs( args{:}, 1, -140, 0, false, ant_irs_2 ), ...
     quadriga_lib.get_channels_irs( args{:}, 1, -140, 0, false ) );
 failed = false;
 try
     [~] = quadriga_lib.get_channels_irs( args{1:2}, ant_irs_nc, args{4:end} );
 catch ME
-    failed = ~isempty(strfind(ME.message, 'Input ''irs_array'' must have a coupling matrix'));
+    failed = ~isempty(strfind(ME.message, 'Input ''irs_array'' must have port weights'));
 end
 assertTrue( failed );
 
 %% Each segment reaches its arguments: reference from two get_channels_spherical calls
 % A single unit IRS weight on element 1 makes a pair the product of its segment channels; pair (i_1, i_2) is at
 % (i_1 - 1) * n_path_2 + i_2
-irs_1 = ant_irs; irs_1.coupling_re = ant_irs.coupling_re(:, 1); irs_1.coupling_im = ant_irs.coupling_im(:, 1);
+irs_1 = ant_irs; irs_1.port_weights_re = ant_irs.port_weights_re(:, 1); irs_1.port_weights_im = ant_irs.port_weights_im(:, 1);
 to = [0.1; 0.2; 0.3]; ro = [-0.2; 0.1; 2.0]; io = [0.3; -0.1; 1.2];
 [r1, i1, d1, aod1, eod1] = quadriga_lib.get_channels_spherical( ant_tx, irs_1, tx_pos, to, ...
     irs_pos, io, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, 3.5e9, true );
@@ -461,7 +461,7 @@ assertElementsAlmostEqual( o{8}, eoa2(:, :, p2) + z, 'absolute', 1e-14 );
         for k=1:min(nelem,nports), C(k,k)=1; end
         % Add slight port scaling so i_irs effect is observable
         if nports>=2, C(:,2)=C(:,2)*0.5*scale; end
-        ant.coupling_re = C;
-        ant.coupling_im = zeros(size(C));
+        ant.port_weights_re = C;
+        ant.port_weights_im = zeros(size(C));
     end
 end

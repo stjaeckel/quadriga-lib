@@ -25,18 +25,18 @@
 #include <vector>
 
 // Defaults of the optional arrayant fields after reading a MATLAB struct or Python dict: an empty 'element_pos' becomes
-// zeros [3, n_elements], an empty coupling (both parts empty) identity [n_elements, n_elements], an empty
-// 'coupling_im' zeros of the size of 'coupling_re'; given members stay unchanged. The library treats empty members
+// zeros [3, n_elements], empty port weights (both parts empty) identity [n_elements, n_elements], an empty
+// 'port_weights_im' zeros of the size of 'port_weights_re'; given members stay unchanged. The library treats empty members
 // the same way, so this changes only the arrays that the wrappers return.
 static inline void qd_arrayant_fill_defaults(quadriga_lib::arrayant<double> &ant)
 {
     const arma::uword n_elements = ant.e_theta_re.n_slices;
     if (ant.element_pos.is_empty())
         ant.element_pos.zeros(3, n_elements);
-    if (ant.coupling_re.is_empty() && ant.coupling_im.is_empty())
-        ant.coupling_re.eye(n_elements, n_elements);
-    if (ant.coupling_im.is_empty())
-        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+    if (ant.port_weights_re.is_empty() && ant.port_weights_im.is_empty())
+        ant.port_weights_re.eye(n_elements, n_elements);
+    if (ant.port_weights_im.is_empty())
+        ant.port_weights_im.zeros(ant.port_weights_re.n_rows, ant.port_weights_re.n_cols);
 }
 
 // Occupied slots of an HDF5 slot selection, for hdf5_read_channel_vec (used by the MEX and Python read wrappers)

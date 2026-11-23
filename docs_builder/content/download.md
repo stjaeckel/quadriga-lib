@@ -109,7 +109,7 @@ All three examples create a 2 × 2 3GPP antenna array at 3.7 GHz and print the d
 ```python
 import quadriga_lib as qd
 
-ant = qd.arrayant.generate('3gpp', panel=[2, 2], center_freq=3.7e9)
+ant = qd.arrayant.generate_antenna('3gpp', panel=[2, 2], center_freq=3.7e9)
 print(qd.version())
 print(qd.arrayant.calc_directivity(ant, i_element=0))
 ```
@@ -117,9 +117,9 @@ print(qd.arrayant.calc_directivity(ant, i_element=0))
 ### MATLAB / Octave
 
 ```matlab
-ant = quadriga_lib.arrayant_generate('3GPP', 1, 3.7e9, [], [2, 2]);
+ant = quadriga_lib.generate_antenna('3GPP', 1, 3.7e9, [], [2, 2]);
 disp(quadriga_lib.version())
-disp(quadriga_lib.arrayant_calc_directivity(ant, 1))
+disp(quadriga_lib.calc_directivity(ant, 1))
 ```
 
 ### C++
@@ -130,9 +130,9 @@ disp(quadriga_lib.arrayant_calc_directivity(ant, 1))
 
 int main()
 {
-    auto ant = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.7e9, {}, {2, 2});
+    auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.7e9, {}, {2, 2});
     std::cout << quadriga_lib::quadriga_lib_version() << "\n";
-    arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant);
+    arma::vec directivity_dBi = quadriga_lib::calc_directivity(ant);
     std::cout << directivity_dBi(0) << " dBi\n";
 }
 ```

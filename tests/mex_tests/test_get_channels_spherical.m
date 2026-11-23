@@ -7,14 +7,14 @@ function test_get_channels_spherical
 % Physics validation lives in the Catch2 suite (test_get_channels_spherical.cpp).
 
 %% Setup: test antenna
-ant = quadriga_lib.arrayant_generate('omni');
+ant = quadriga_lib.generate_antenna('omni');
 ant.e_theta_re(:,:,2) = 2;
 ant.e_theta_im(:,:,2) = 0;
 ant.e_phi_re(:,:,2) = 0;
 ant.e_phi_im(:,:,2) = 0;
 ant.element_pos = [0,0; 1,-1; 0,0];
-ant.coupling_re = eye(2);
-ant.coupling_im = zeros(2);
+ant.port_weights_re = eye(2);
+ant.port_weights_im = zeros(2);
 
 fbs_pos = [10,0 ; 0,10 ; 1 11];
 path_gain = [1,0.25];
@@ -98,18 +98,18 @@ end
 ant = rmfield(ant,'element_pos');
 [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
 
-ant = rmfield(ant,'coupling_re');
+ant = rmfield(ant,'port_weights_re');
 try
     [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of port weights (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-ant = rmfield(ant,'coupling_im');
+ant = rmfield(ant,'port_weights_im');
 [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
 
 % Mismatching n_path
@@ -136,7 +136,7 @@ end
 
 % NLOS delay and phase follow path_length when it is longer than the TX-FBS-LBS-RX polyline
 % 3-bounce path via (30,40,0), (50,60,0), (70,40,0), TX (0,0,0), RX (100,0,0): 100 + 40*sqrt(2) m, polyline 140 m
-ant = quadriga_lib.arrayant_generate('omni');
+ant = quadriga_lib.generate_antenna('omni');
 C = 299792458.0;
 fc = 3.0e9;
 L_true = 100.0 + 40.0 * sqrt(2.0);
@@ -150,7 +150,7 @@ for L = [L_true, 0.0]
 end
 
 % 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
-ant1 = quadriga_lib.arrayant_generate('omni');
+ant1 = quadriga_lib.generate_antenna('omni');
 e = zeros(0, 1);
 [cr, ci, dl, ad, ed, aa, ea] = quadriga_lib.get_channels_spherical(ant1, ant1, [0;0;0], [0;0;0], [10;0;0], [0;0;0], zeros(3,0), zeros(3,0), e, e, zeros(8,0), 1e9, true, true);
 assertEqual( [cr, ci], [0, 0] );
@@ -160,7 +160,7 @@ assertElementsAlmostEqual( [ad, ed, abs(aa), ea], [0, 0, pi, 0], 'absolute', 1e-
 assertEqual( dl, 0 );
 % Per antenna pair: the delays and angles of a real LOS path (moved to slot 0) with the same geometry
 ant2 = ant1; ant2.e_theta_re(:,:,2) = 1; ant2.e_theta_im(:,:,2) = 0; ant2.e_phi_re(:,:,2) = 0; ant2.e_phi_im(:,:,2) = 0;
-ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.coupling_re = [1, 0.3; 0, 1]; ant2.coupling_im = [0, 0.2; 0, 0];
+ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.port_weights_re = [1, 0.3; 0, 1]; ant2.port_weights_im = [0, 0.2; 0, 0];
 tx = [1;2;3]; rx = [11;-3;5];
 for abs_dl = [true, false]
     o0 = cell(1, 7); oL = cell(1, 7);

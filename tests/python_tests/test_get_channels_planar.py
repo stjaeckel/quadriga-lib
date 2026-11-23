@@ -30,11 +30,11 @@ PI = math.pi
 
 
 def omni():
-    return arrayant.generate('omni')
+    return arrayant.generate_antenna('omni')
 
 
 def xpol():
-    return arrayant.generate('xpol')
+    return arrayant.generate_antenna('xpol')
 
 
 def make_M(n_path, vv=1.0, hh=-1.0):
@@ -57,8 +57,8 @@ def minimal_ant():
     ant['e_phi_re'][:, :, 1] = 0.0
     ant['e_phi_im'][:, :, 1] = 0.0
     ant['element_pos'] = np.array([[0, 0], [1, -1], [0, 0]], order='F', dtype=float)
-    ant['coupling_re'] = np.eye(2, order='F')
-    ant['coupling_im'] = np.zeros((2, 2), order='F')
+    ant['port_weights_re'] = np.eye(2, order='F')
+    ant['port_weights_im'] = np.zeros((2, 2), order='F')
     return ant
 
 
@@ -139,7 +139,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
     # ---- Coupling (mirrors C++ "Coupling" test, 3 sub-cases) ----
 
-    def test_coupling(self):
+    def test_port_weights(self):
         # 3-element array. Only elements 0 and 2 are copies of the omni source;
         # index 1 is left as a zero pattern (copy_element 0 -> 2 only), so it
         # contributes no field. Elements 0 and 2 are offset in y by +/-1.
@@ -172,8 +172,8 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
         # Case 2: all elements summed into a single port (weight 1)
         ant = base_ant()
-        ant['coupling_re'] = np.ones((3, 1), order='F')
-        ant.pop('coupling_im', None)
+        ant['port_weights_re'] = np.ones((3, 1), order='F')
+        ant.pop('port_weights_im', None)
         cr, ci, delay, _ = re_im(channel.planar(
             ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod, eod, aoa, eoa, path_gain, path_length, M,
             0.0, use_absolute_delays=True, add_fake_los_path=False))
@@ -185,8 +185,8 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
         # Case 3: single port, coupling weight 2
         ant = base_ant()
-        ant['coupling_re'] = np.ones((3, 1), order='F') * 2.0
-        ant.pop('coupling_im', None)
+        ant['port_weights_re'] = np.ones((3, 1), order='F') * 2.0
+        ant.pop('port_weights_im', None)
         cr, ci, delay, _ = re_im(channel.planar(
             ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod, eod, aoa, eoa, path_gain, path_length, M,
             0.0, use_absolute_delays=True, add_fake_los_path=False))
@@ -318,14 +318,14 @@ class TestGetChannelsPlanar(unittest.TestCase):
         tx = arrayant.copy_element(tx, 0, 1)
         tx = arrayant.copy_element(tx, 0, 2)
         tx['element_pos'] = np.array([[0, 0, 0], [0.5, 0.0, -0.5], [0, 0, 0]], order='F', dtype=float)
-        tx['coupling_re'] = np.eye(3, order='F')
-        tx['coupling_im'] = np.zeros((3, 3), order='F')
+        tx['port_weights_re'] = np.eye(3, order='F')
+        tx['port_weights_im'] = np.zeros((3, 3), order='F')
 
         rx = omni()
         rx = arrayant.copy_element(rx, 0, 1)
         rx['element_pos'] = np.array([[0, 0], [0.5, -0.5], [0, 0]], order='F', dtype=float)
-        rx['coupling_re'] = np.eye(2, order='F')
-        rx['coupling_im'] = np.zeros((2, 2), order='F')
+        rx['port_weights_re'] = np.eye(2, order='F')
+        rx['port_weights_im'] = np.zeros((2, 2), order='F')
 
         n_path = 4
         aod = np.array([0.0, 0.1, -0.1, 0.2])
@@ -381,24 +381,24 @@ class TestGetChannelsPlanar(unittest.TestCase):
             use_absolute_delays=True))
         self.assertEqual(len(result), 4)
 
-    def test_error_coupling_im_without_re(self):
+    def test_error_port_weights_im_without_re(self):
         ant = minimal_ant()
         ant.pop('element_pos', None)
-        ant.pop('coupling_re', None)   # leaves coupling_im only
+        ant.pop('port_weights_re', None)   # leaves port_weights_im only
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
         with self.assertRaises(ValueError) as ctx:
             channel.planar(
                 ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod, eod, aoa, eoa, pg, pl, M, 2997924580.0,
                 use_absolute_delays=True)
         self.assertEqual(str(ctx.exception),
-                         "Input 'tx_array' is not valid: Imaginary part of coupling matrix (phase component) "
+                         "Input 'tx_array' is not valid: Imaginary part of port weights (phase component) "
                          "defined without real part (absolute component).")
 
-    def test_no_coupling_keys_accepted(self):
+    def test_no_port_weights_keys_accepted(self):
         ant = minimal_ant()
         ant.pop('element_pos', None)
-        ant.pop('coupling_re', None)
-        ant.pop('coupling_im', None)
+        ant.pop('port_weights_re', None)
+        ant.pop('port_weights_im', None)
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
         result = re_im(channel.planar(
             ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], aod, eod, aoa, eoa, pg, pl, M, 2997924580.0,
@@ -434,7 +434,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 np.array([[1.0, 0, 0, 0, 0, 0, 1, 0]]).T)
 
     def test_none_and_flag_types(self):
-        o = arrayant.generate('omni')
+        o = arrayant.generate_antenna('omni')
         args = (o, o) + self._planar_args()
         ref = channel.planar(*args, 1e9)
         for name in ("use_absolute_delays", "add_fake_los_path"):
@@ -458,7 +458,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         self.assertIn("has 4D (multi-frequency) patterns", str(ctx.exception))
 
     def test_position_with_more_than_3_elements_raises(self):
-        o = arrayant.generate('omni')
+        o = arrayant.generate_antenna('omni')
         args = list(self._planar_args())
         for i in (0, 1, 2, 3):  # tx_pos, tx_orientation, rx_pos, rx_orientation
             bad = list(args)
@@ -470,7 +470,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
     def test_center_freq_array_single_frequency(self):
         import warnings
-        o = arrayant.generate('omni')
+        o = arrayant.generate_antenna('omni')
         with warnings.catch_warnings():
             warnings.simplefilter('error')
             o['center_freq'] = 2e9
@@ -490,7 +490,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and MATLAB)
     def test(self):
-        ant = arrayant.generate('omni')
+        ant = arrayant.generate_antenna('omni')
         e = np.zeros(0)
         cr, ci, dl, dop = re_im(channel.planar(ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], e, e, e, e, e, e,
                                          np.zeros((8, 0)), 1e9, use_absolute_delays=True, add_fake_los_path=True))
@@ -503,7 +503,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0), as in C++ and MATLAB
     def test_without_fake_los(self):
-        ant = arrayant.generate('xpol')
+        ant = arrayant.generate_antenna('xpol')
         e = np.zeros(0)
         cr, ci, dl, dop = re_im(channel.planar(ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], e, e, e, e, e, e,
                                          np.zeros((8, 0)), 1e9, use_absolute_delays=True, add_fake_los_path=False))

@@ -8,15 +8,6 @@
 # Value: the MATLAB name.
 
 [families]
-arrayant_calc_beamwidth = ["arrayant_calc_beamwidth", "arrayant_calc_beamwidth_multi"]
-arrayant_calc_directivity = ["arrayant_calc_directivity", "arrayant_calc_directivity_multi"]
-arrayant_combine_pattern = ["arrayant_combine_pattern", "arrayant_combine_pattern_multi"]
-arrayant_concat = ["arrayant_concat", "arrayant_concat_multi"]
-arrayant_copy_element = ["arrayant_copy_element", "arrayant_copy_element_multi"]
-arrayant_interpolate = ["arrayant_interpolate", "arrayant_interpolate_multi"]
-arrayant_rotate_pattern = ["arrayant_rotate_pattern", "arrayant_rotate_pattern_multi"]
-qdant_read = ["qdant_read", "qdant_read_multi"]
-qdant_write = ["qdant_write", "qdant_write_multi"]
 get_channels_planar = ["get_channels_planar", "get_channels_planar_vec"]
 get_channels_spherical = ["get_channels_spherical", "get_channels_spherical_vec"]
 hdf5_read_channel = ["hdf5_read_channel", "hdf5_read_channel_vec"]
@@ -25,15 +16,6 @@ interp = ["interp_2D"]
 version = ["quadriga_lib_version", "quadriga_lib_has_AVX2", "quadriga_lib_has_CUDA"]
 
 [python_names]
-calc_beamwidth = "arrayant_calc_beamwidth"
-calc_directivity = "arrayant_calc_directivity"
-combine_pattern = "arrayant_combine_pattern"
-concat = "arrayant_concat"
-copy_element = "arrayant_copy_element"
-export_obj_file = "arrayant_export_obj_file"
-generate = "arrayant_generate"
-interpolate = "arrayant_interpolate"
-rotate_pattern = "arrayant_rotate_pattern"
 "channel.ieee_indoor" = "get_channels_ieee_indoor"
 "channel.irs" = "get_channels_irs"
 "channel.multifreq" = "get_channels_multifreq"

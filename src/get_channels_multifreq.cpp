@@ -115,7 +115,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (from `tx_array[i].center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
-- TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [[arrayant_interpolate_multi]])
+- TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [[interpolate_pattern]])
 - `path_gain` interpolated linearly; `polmat` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (~343 m/s) simulations
@@ -126,7 +126,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
   FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry
 - LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm
-- Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
+- Port weights interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
   (zero power if no LOS path was found); a LOS path found in the input is moved to slot 0 and leaves a zero-power path
   in its original slot (input index + 1); all other paths keep their order, shifted by one slot
@@ -171,8 +171,8 @@ void quadriga_lib::get_channels_multifreq(
 ```
 
 ## Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
-- **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
+- **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [[is_valid]]
+- **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [[is_valid]]
 - **`tx_pos`** — TX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
 - **`tx_orientation`** — TX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — RX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
@@ -192,7 +192,7 @@ void quadriga_lib::get_channels_multifreq(
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 - **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
-  [[arrayant_interpolate]]
+  [[interpolate_pattern]]
 
 ## Outputs:
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_new`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
@@ -203,8 +203,8 @@ void quadriga_lib::get_channels_multifreq(
 
 ## See also:
 - [[get_channels_spherical]] (single-frequency equivalent)
-- [[arrayant_interpolate_multi]] (underlying pattern interpolation)
-- [[arrayant_concat_multi]] (building multi-frequency arrays)
+- [[interpolate_pattern]] (underlying pattern interpolation)
+- [[join_arrays]] (building multi-frequency arrays)
 - [[generate_speaker]] (acoustic source construction)
 MD!*/
 
@@ -238,7 +238,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2];
 
     // Kernel of the antenna interpolation, checked before any early return (the pattern size of AVX2 per call)
-    const int kernel = qd_arrayant_interpolate_kernel(use_kernel, 0);
+    const int kernel = qd_interpolate_pattern_kernel(use_kernel, 0);
 
     // Outputs: no cube may share memory with an input or with any other output cube
     const std::vector<arma::Cube<dtype>> *outs[] = {&coeff_re, &coeff_im, &delay};
@@ -279,10 +279,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     }
 
     {
-        std::string err = qd_arrayant_check_multi(tx_array);
+        std::string err = qd_arrayant_vec_check(tx_array);
         if (!err.empty())
             throw std::invalid_argument("Input 'tx_array' is not valid: " + err);
-        err = qd_arrayant_check_multi(rx_array);
+        err = qd_arrayant_vec_check(rx_array);
         if (!err.empty())
             throw std::invalid_argument("Input 'rx_array' is not valid: " + err);
     }
@@ -420,20 +420,20 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                                                      i_rx_element, rx_element_pos_interp, dist_rx_tx);
     const arma::Cube<dtype> tx_ori(const_cast<dtype *>(p_to), 3, 1, 1), rx_ori(const_cast<dtype *>(p_ro), 3, 1, 1);
 
-    // Element coupling, skipped when it is the identity at all frequencies
+    // Port weights, skipped when it is the identity at all frequencies
     const bool different_output_size = (n_tx != n_tx_ports || n_rx != n_rx_ports);
-    bool apply_element_coupling = different_output_size;
+    bool apply_element_port_weights = different_output_size;
     for (const auto *arr : {&tx_array, &rx_array})
         for (const auto &a : *arr)
-            apply_element_coupling = apply_element_coupling || !qd_coupling_is_identity(a.coupling_re, a.coupling_im);
+            apply_element_port_weights = apply_element_port_weights || !qd_port_weights_is_identity(a.port_weights_re, a.port_weights_im);
 
-    // Coupling of one array at an output frequency, interpolated between its bracket entries (SLERP per complex entry;
-    // empty coupling_re = identity, empty coupling_im = zero), and its column-normalized power for the delays
-    auto interpolate_coupling = [](const std::vector<quadriga_lib::arrayant<dtype>> &arr, arma::uword lo, arma::uword hi,
+    // Port weights of one array at an output frequency, interpolated between its bracket entries (SLERP per complex entry;
+    // empty port_weights_re = identity, empty port_weights_im = zero), and its column-normalized power for the delays
+    auto interpolate_port_weights = [](const std::vector<quadriga_lib::arrayant<dtype>> &arr, arma::uword lo, arma::uword hi,
                                    dtype w, bool exact, arma::uword n_el, arma::uword n_pt,
                                    arma::Mat<dtype> &cpl_re, arma::Mat<dtype> &cpl_im, arma::Mat<dtype> &cpl_pwr)
     {
-        const arma::Mat<dtype> &re_lo = arr[lo].coupling_re, &im_lo = arr[lo].coupling_im;
+        const arma::Mat<dtype> &re_lo = arr[lo].port_weights_re, &im_lo = arr[lo].port_weights_im;
         if (exact)
         {
             if (re_lo.n_elem != 0)
@@ -447,7 +447,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         }
         else
         {
-            const arma::Mat<dtype> &re_hi = arr[hi].coupling_re, &im_hi = arr[hi].coupling_im;
+            const arma::Mat<dtype> &re_hi = arr[hi].port_weights_re, &im_hi = arr[hi].port_weights_im;
             arma::Mat<dtype> eye;
             if (re_lo.n_elem == 0 || re_hi.n_elem == 0)
                 eye.eye(n_el, n_pt);
@@ -473,17 +473,17 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         if (exact)
         {
             OMP_SAFE_CALL(omp_failed, omp_error,
-                          qd_arrayant_interpolate_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
+                          qd_interpolate_pattern_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
                                                                   V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr, nullptr, kernel));
             return;
         }
         arma::Mat<dtype> Vr_lo(n_links, 1), Vi_lo(n_links, 1), Hr_lo(n_links, 1), Hi_lo(n_links, 1);
         arma::Mat<dtype> Vr_hi(n_links, 1), Vi_hi(n_links, 1), Hr_hi(n_links, 1), Hi_hi(n_links, 1);
         OMP_SAFE_CALL(omp_failed, omp_error,
-                      qd_arrayant_interpolate_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
+                      qd_interpolate_pattern_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
                                                               Vr_lo, Vi_lo, Hr_lo, Hi_lo, nullptr, nullptr, nullptr, nullptr, kernel));
         OMP_SAFE_CALL(omp_failed, omp_error,
-                      qd_arrayant_interpolate_dispatch<dtype>(arr[hi], az, el, i_element, ori, pos,
+                      qd_interpolate_pattern_dispatch<dtype>(arr[hi], az, el, i_element, ori, pos,
                                                               Vr_hi, Vi_hi, Hr_hi, Hi_hi, nullptr, nullptr, nullptr, nullptr, kernel));
         for (arma::uword k = 0; k < n_links; ++k)
         {
@@ -553,13 +553,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             }
         }
 
-        // Interpolate coupling matrices at this frequency
+        // Interpolate port weights at this frequency
         arma::Mat<dtype> tx_cpl_re_f, tx_cpl_im_f, rx_cpl_re_f, rx_cpl_im_f;
-        arma::Mat<dtype> tx_coupling_pwr_f, rx_coupling_pwr_f;
-        if (apply_element_coupling)
+        arma::Mat<dtype> tx_port_weights_pwr_f, rx_port_weights_pwr_f;
+        if (apply_element_port_weights)
         {
-            interpolate_coupling(tx_array, tx_lo, tx_hi, tx_w, tx_exact, n_tx, n_tx_ports, tx_cpl_re_f, tx_cpl_im_f, tx_coupling_pwr_f);
-            interpolate_coupling(rx_array, rx_lo, rx_hi, rx_w, rx_exact, n_rx, n_rx_ports, rx_cpl_re_f, rx_cpl_im_f, rx_coupling_pwr_f);
+            interpolate_port_weights(tx_array, tx_lo, tx_hi, tx_w, tx_exact, n_tx, n_tx_ports, tx_cpl_re_f, tx_cpl_im_f, tx_port_weights_pwr_f);
+            interpolate_port_weights(rx_array, rx_lo, rx_hi, rx_w, rx_exact, n_rx, n_rx_ports, rx_cpl_re_f, rx_cpl_im_f, rx_port_weights_pwr_f);
         }
 
         // Internal storage for this frequency (if output size differs from element size)
@@ -635,16 +635,16 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
         }
 
-        // Apply antenna element coupling (using interpolated coupling matrices); without different_output_size the
-        // data is in the outputs and the coupling runs in place
-        if (apply_element_coupling)
+        // Apply port weights (using interpolated port weights); without different_output_size the
+        // data is in the outputs and the port weights run in place
+        if (apply_element_port_weights)
         {
             std::vector<dtype> temp;
             for (arma::uword j = 0; j < n_out; ++j)
             {
                 const arma::uword o_slice = j * n_links;
-                qd_coupling_apply_slot(rx_cpl_re_f.memptr(), rx_cpl_im_f.memptr(), tx_cpl_re_f.memptr(), tx_cpl_im_f.memptr(),
-                                       rx_coupling_pwr_f.memptr(), tx_coupling_pwr_f.memptr(), n_rx, n_rx_ports, n_tx, n_tx_ports,
+                qd_port_weights_apply_slot(rx_cpl_re_f.memptr(), rx_cpl_im_f.memptr(), tx_cpl_re_f.memptr(), tx_cpl_im_f.memptr(),
+                                       rx_port_weights_pwr_f.memptr(), tx_port_weights_pwr_f.memptr(), n_rx, n_rx_ports, n_tx, n_tx_ports,
                                        &p_coeff_re[o_slice], &p_coeff_im[o_slice], &p_delays_f[o_slice],
                                        different_output_size ? out_re.slice_memptr(j) : &p_coeff_re[o_slice],
                                        different_output_size ? out_im.slice_memptr(j) : &p_coeff_im[o_slice],

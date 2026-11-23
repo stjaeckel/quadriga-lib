@@ -24,7 +24,7 @@ Compute the baseband frequency response of a MIMO channel
   paths do not change the result)
 - Multi-frequency coefficients (e.g. from [[get_channels_multifreq]]) and absolute carrier frequencies are handled by
   [[baseband_freq_response_multi]]; the two functions take different arguments, so they are two functions, while
-  [[arrayant_interpolate]] serves both of its cases with one argument set
+  [[interpolate_pattern]] serves both of its cases with one argument set
 - `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
 - The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
   before sin / cos are evaluated in single precision; coefficients and sums are single precision; double inputs are

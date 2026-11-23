@@ -7,14 +7,14 @@ function test_get_channels_planar
 % Physics validation lives in the Catch2 suite (test_get_channels_planar.cpp).
 
 %% Setup: test antenna
-ant = quadriga_lib.arrayant_generate('omni');
+ant = quadriga_lib.generate_antenna('omni');
 ant.e_theta_re(:,:,2) = 2;
 ant.e_theta_im(:,:,2) = 0;
 ant.e_phi_re(:,:,2) = 0;
 ant.e_phi_im(:,:,2) = 0;
 ant.element_pos = [0,0; 1,-1; 0,0];
-ant.coupling_re = eye(2);
-ant.coupling_im = zeros(2);
+ant.port_weights_re = eye(2);
+ant.port_weights_im = zeros(2);
 
 aod = [0, 90] * pi/180;
 eod = [0, 45] * pi/180;
@@ -46,14 +46,14 @@ assertElementsAlmostEqual( delay(:,:,2), [e0,e2;e1,e3]/C, 'absolute', 1.2e-10 );
 Doppler = cos(aoa(2)) * cos(eoa(2));
 assertElementsAlmostEqual( rx_Doppler, [-1, Doppler], 'absolute', 1e-13 );
 
-% Rectangular coupling with omitted imaginary part: the default coupling_im has coupling_re's shape,
+% Rectangular coupling with omitted imaginary part: the default port_weights_im has port_weights_re's shape,
 % not n_elements x n_elements, so omitting it equals a matching-shape zero block.
 ant_a = ant;
-ant_a.coupling_re = [1; 1];        % 2 elements -> 1 port
-ant_a = rmfield(ant_a, 'coupling_im');
+ant_a.port_weights_re = [1; 1];        % 2 elements -> 1 port
+ant_a = rmfield(ant_a, 'port_weights_im');
 
 ant_b = ant_a;
-ant_b.coupling_im = [0; 0];        % explicit matching-shape zero imaginary part
+ant_b.port_weights_im = [0; 0];        % explicit matching-shape zero imaginary part
 
 [cra, cia, dla] = quadriga_lib.get_channels_planar( ant_a, ant_a, ...
     [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod, eod, aoa, eoa, path_gain, path_length, M, 0.0, 1);
@@ -71,18 +71,18 @@ assertElementsAlmostEqual( dla, dlb, 'absolute', 1e-14 );
 ant = rmfield(ant,'element_pos');
 [~] = quadriga_lib.get_channels_planar( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod, eod, aoa, eoa, path_gain, path_length, M, 2997924580.0, 1);
 
-ant = rmfield(ant,'coupling_re');
+ant = rmfield(ant,'port_weights_re');
 try
     [~] = quadriga_lib.get_channels_planar( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod, eod, aoa, eoa, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    expectedErrorMessage = 'Input ''tx_array'' is not valid: Imaginary part of port weights (phase component) defined without real part (absolute component)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-ant = rmfield(ant,'coupling_im');
+ant = rmfield(ant,'port_weights_im');
 [~] = quadriga_lib.get_channels_planar( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], aod, eod, aoa, eoa, path_gain, path_length, M, 2997924580.0, 1);
 
 % Mismatching n_path
@@ -109,7 +109,7 @@ end
 
 % 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
 C = 299792458.0;
-ant1 = quadriga_lib.arrayant_generate('omni');
+ant1 = quadriga_lib.generate_antenna('omni');
 e = zeros(0, 1);
 [cr, ci, dl, dop] = quadriga_lib.get_channels_planar(ant1, ant1, [0;0;0], [0;0;0], [10;0;0], [0;0;0], e, e, e, e, e, e, zeros(8,0), 1e9, true, true);
 assertEqual( [cr, ci, dop], [0, 0, 0] );
@@ -118,7 +118,7 @@ assertElementsAlmostEqual( dl, 10 / C, 'absolute', 1e-18 );
 assertEqual( dl, 0 );
 % Per antenna pair: the delays of a real LOS path (moved to slot 0) with the same geometry
 ant2 = ant1; ant2.e_theta_re(:,:,2) = 1; ant2.e_theta_im(:,:,2) = 0; ant2.e_phi_re(:,:,2) = 0; ant2.e_phi_im(:,:,2) = 0;
-ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.coupling_re = [1, 0.3; 0, 1]; ant2.coupling_im = [0, 0.2; 0, 0];
+ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.port_weights_re = [1, 0.3; 0, 1]; ant2.port_weights_im = [0, 0.2; 0, 0];
 tx = [1;2;3]; rx = [11;-3;5]; d = rx - tx;
 az = atan2(d(2), d(1)); el = atan2(d(3), hypot(d(1), d(2)));
 for abs_dl = [true, false]
@@ -138,7 +138,7 @@ assertTrue( isempty(dop) );
 
 
 % use_kernel (input 17) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 is rejected by C++
-tx = quadriga_lib.arrayant_generate('custom', 10, [], [90, 90]);
+tx = quadriga_lib.generate_antenna('custom', 10, [], [90, 90]);
 args = { tx, tx, [0;0;10], [0;0;0], [50;0;1.5], [0;0;0], [0.1, 0.5], [0, 0.2], [3, 2.5], ...
     [0, -0.2], [1, 0.5], [60, 70], [1, 1; 0, 0; 0, 0; 0, 0; 0, 0; 0, 0; -1, -1; 0, 0], 3e9, false, false };
 cr_d = quadriga_lib.get_channels_planar( args{:} );
@@ -153,7 +153,7 @@ catch ME
     end
 end
 % Batch mode: cell arrays of path data equal single calls per snapshot (shared and per-snapshot positions)
-ant = quadriga_lib.arrayant_generate('xpol');
+ant = quadriga_lib.generate_antenna('xpol');
 n_snap = 4;
 aod = cell(n_snap, 1); eod = aod; aoa = aod; eoa = aod; pg = aod; pl = aod; Mc = aod;
 for s = 1:n_snap

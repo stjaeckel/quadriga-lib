@@ -5,15 +5,15 @@
 #include "qd_helpers_python_types.hpp"
 
 /*!SECTION
-Array antenna functions
+Antennas, transducers and patterns
 SECTION!*/
 
 /*!MD
-# generate
-Generate an array antenna of a given type
+# generate_antenna
+Generate an antenna array of a given type
 
 - Tuples (`element`, `panel`, `spacing`, `pol`, `ports`, `steer`): entries left off at the end or set to NaN (0 in `panel`, `pol`, `ports`) take their default, e.g. `panel=[4, 8]` is one panel of 4 rows and 8 columns.
-- Panel arrays: elements are ordered polarization fastest, then row `m` (upwards along z), column `n` (along +y), panel row `mg`, panel column `ng`, centred on the origin; ports in the same order with `m_p`, `n_p`. The coupling matrix `[n_elements, n_ports]` holds the weights; `apply_weights` combines each port into one element at its sub-array centre.
+- Panel arrays: elements are ordered polarization fastest, then row `m` (upwards along z), column `n` (along +y), panel row `mg`, panel column `ng`, centred on the origin; ports in the same order with `m_p`, `n_p`. The port weights `[n_elements, n_ports]` hold the weights; `apply_weights` combines each port into one element at its sub-array centre.
 - Sub-array weights (`ula`, `3GPP`; TR 38.901 eq. 7.3-1, along y by analogy): a port feeds `K = M / M_P` × `L = N / N_P` elements; element `(k, l)` gets `exp(j 2π ((k - (K-1)/2) d_V sin(tilt) - (l - (L-1)/2) d_H sin(pan))) / sqrt(K L)`; a positive tilt points the beam down, a positive pan towards +y.
 - Polarization (TR 38.901 clause 7.3.2): `pol` 2 has the slants ζ = 0° and 90°, `pol` 3 ζ = +45° and -45° (element 0 first). Model-1 turns the element by ζ about its boresight (eq. 7.3-3); Model-2 sets F_θ = sqrt(A') cos ζ and F_φ = sqrt(A') sin ζ with A' = |F_θ|² + |F_φ|² of the element (eq. 7.3-4, 7.3-5).
 - `multibeam`: maximum-ratio-transmission weights for the directions in `beams` (exact for one beam, approximate for several; only the ratios of the beam weights matter); one port per polarization, with `separate_beams` one per polarization and beam.
@@ -22,19 +22,19 @@ Generate an array antenna of a given type
 ## Usage:
 ```
 # omni, xpol, dipole, half-wave-dipole
-ant = quadriga_lib.arrayant.generate( type, res, *, center_freq )
+ant = quadriga_lib.arrayant.generate_antenna( type, res, *, center_freq )
 
 # Custom-shape element
-ant = quadriga_lib.arrayant.generate( 'custom', res, *, center_freq, element )
+ant = quadriga_lib.arrayant.generate_antenna( 'custom', res, *, center_freq, element )
 
 # Uniform linear array (omni element) and TR 38.901 panel array
-ant = quadriga_lib.arrayant.generate( 'ula', res, *, center_freq, panel, spacing, pol, ports, steer, \
+ant = quadriga_lib.arrayant.generate_antenna( 'ula', res, *, center_freq, panel, spacing, pol, ports, steer, \
     pattern, apply_weights )
-ant = quadriga_lib.arrayant.generate( '3GPP', res, *, center_freq, element, panel, spacing, pol, ports, \
+ant = quadriga_lib.arrayant.generate_antenna( '3GPP', res, *, center_freq, element, panel, spacing, pol, ports, \
     steer, pattern, apply_weights )
 
 # Multi-beam panel array
-ant = quadriga_lib.arrayant.generate( 'multibeam', res, *, center_freq, element, panel, spacing, pol, \
+ant = quadriga_lib.arrayant.generate_antenna( 'multibeam', res, *, center_freq, element, panel, spacing, pol, \
     beams, separate_beams, apply_weights )
 ```
 
@@ -62,40 +62,40 @@ ant = quadriga_lib.arrayant.generate( 'multibeam', res, *, center_freq, element,
 - **`ports`** — `[M_P, N_P]`: ports per column and per row of a panel and polarization; int or `(n,)` of int; must divide `M` and `N`; default: `None` (`[M, N]`, one port per element)
 - **`steer`** — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt (positive down) and pan (positive towards +y); `(2,)` (a 1D input is one row) for all panels or `(Mg Ng, 2)` with one row per panel; one column: pan 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`; default: `None` (0)
 - **`beams`** — `(2, n_beams)` or `(3, n_beams)`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); a 1D input is one beam; default: `None` (`[[0], [0], [1]]`)
-- **`pattern`** — Element dict (keys as the output) to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; default: `None` (the element of the type)
+- **`pattern`** — Element dict (keys as the output) to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, port weights and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; default: `None` (the element of the type)
 - **`separate_beams`** — If `True`, one port per beam (weights ignored); default: `False`
 - **`apply_weights`** — If `True`, combine each port into one pattern at its sub-array centre; default: `False`
 
 ## Outputs:
 - **`ant`** — Dict with keys:<br><br>
-   | Key              | Description                                               | Shape                                  |
-   | ---------------- | --------------------------------------------------------- | -------------------------------------- |
-   | `e_theta_re`     | e-theta field component, real part                        | `(n_elevation, n_azimuth, n_elements)` |
-   | `e_theta_im`     | e-theta field component, imaginary part                   | `(n_elevation, n_azimuth, n_elements)` |
-   | `e_phi_re`       | e-phi field component, real part                          | `(n_elevation, n_azimuth, n_elements)` |
-   | `e_phi_im`       | e-phi field component, imaginary part                     | `(n_elevation, n_azimuth, n_elements)` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `(n_azimuth,)`                         |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `(n_elevation,)`                       |
-   | `element_pos`    | Element (x,y,z) positions in meters                       | `(3, n_elements)`                      |
-   | `coupling_re`    | Coupling matrix, real part                                | `(n_elements, n_ports)`                |
-   | `coupling_im`    | Coupling matrix, imaginary part                           | `(n_elements, n_ports)`                |
-   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`              | scalar                                 |
-   | `name`           | Name of the array antenna object                          | str                                    |
+   | Key               | Description                                               | Shape                                  |
+   | ----------------- | --------------------------------------------------------- | -------------------------------------- |
+   | `e_theta_re`      | e-theta field component, real part                        | `(n_elevation, n_azimuth, n_elements)` |
+   | `e_theta_im`      | e-theta field component, imaginary part                   | `(n_elevation, n_azimuth, n_elements)` |
+   | `e_phi_re`        | e-phi field component, real part                          | `(n_elevation, n_azimuth, n_elements)` |
+   | `e_phi_im`        | e-phi field component, imaginary part                     | `(n_elevation, n_azimuth, n_elements)` |
+   | `azimuth_grid`    | Azimuth angles in rad, -π to π, strictly increasing       | `(n_azimuth,)`                         |
+   | `elevation_grid`  | Elevation angles in rad, -π/2 to π/2, strictly increasing | `(n_elevation,)`                       |
+   | `element_pos`     | Element (x,y,z) positions in meters                       | `(3, n_elements)`                      |
+   | `port_weights_re` | Port weights, real part                                   | `(n_elements, n_ports)`                |
+   | `port_weights_im` | Port weights, imaginary part                              | `(n_elements, n_ports)`                |
+   | `center_freq`     | Center frequency in Hz; inputs accept `(1,)`              | scalar                                 |
+   | `name`            | Name of the antenna array object                          | str                                    |
 MD!*/
 
-py::dict arrayant_generate(const std::string &type,
-                           double res,
-                           double center_freq,
-                           const py::handle &element,
-                           const py::handle &panel,
-                           const py::handle &spacing,
-                           const py::handle &pol,
-                           const py::handle &ports,
-                           const py::handle &steer,
-                           const py::handle &beams,
-                           const py::handle &pattern,
-                           const py::handle &separate_beams,
-                           const py::handle &apply_weights)
+py::dict generate_antenna(const std::string &type,
+                          double res,
+                          double center_freq,
+                          const py::handle &element,
+                          const py::handle &panel,
+                          const py::handle &spacing,
+                          const py::handle &pol,
+                          const py::handle &ports,
+                          const py::handle &steer,
+                          const py::handle &beams,
+                          const py::handle &pattern,
+                          const py::handle &separate_beams,
+                          const py::handle &apply_weights)
 {
     // None is an empty container (not given); the C++ function fills the defaults per type
     const auto panel_a = qd_python_numpy2arma_Col<arma::uword>(panel, true, false, "panel");
@@ -126,7 +126,7 @@ py::dict arrayant_generate(const std::string &type,
     const bool separate_beams_b = qd_python_flag(separate_beams, false, "separate_beams");
     const bool apply_weights_b = qd_python_flag(apply_weights, false, "apply_weights");
 
-    const auto ant = quadriga_lib::arrayant_generate<double>(type, res, center_freq, element_a, panel_a, spacing_a, pol_a, ports_a,
+    const auto ant = quadriga_lib::generate_antenna<double>(type, res, center_freq, element_a, panel_a, spacing_a, pol_a, ports_a,
                                                              steer_a, beams_a, pattern_a, separate_beams_b, apply_weights_b);
     return qd_python_arrayant2dict(ant);
 }
@@ -138,7 +138,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Returns a multi-frequency arrayant dict; pattern fields are 4D arrays where the 4th dim is frequency; for a
   single frequency the dict is a single-frequency arrayant dict (3D pattern fields, scalar `center_freq`)
 - Directivity is stored as real-valued data in `e_theta_re`; dipole rear hemisphere is encoded with negative sign for 180° phase inversion
-- Multi-driver systems (e.g. two-way) are built by calling this per driver and combining via [[concat]];
+- Multi-driver systems (e.g. two-way) are built by calling this per driver and combining via [[join_arrays]];
   crossover behavior emerges from overlapping bandpass responses
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies
@@ -200,12 +200,12 @@ speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_
   - `azimuth_grid` — Azimuth angles in rad, -π to π, strictly increasing; `(n_azimuth,)`
   - `elevation_grid` — Elevation angles in rad, -π/2 to π/2, strictly increasing; `(n_elevation,)`
   - `element_pos` — Element (x,y,z) positions in meters; `(3, n_elements)`
-  - `coupling_re` — Coupling matrix, real part;
+  - `port_weights_re` — Port weights, real part;
     `(n_elements, n_ports)` or `(n_elements, n_ports, n_freq)` if it varies across frequencies
-  - `coupling_im` — Coupling matrix, imaginary part;
+  - `port_weights_im` — Port weights, imaginary part;
     `(n_elements, n_ports)` or `(n_elements, n_ports, n_freq)` if it varies across frequencies
   - `center_freq` — Frequency samples in Hz; `(n_freq,)`
-  - `name` — Name of the array antenna object; str
+  - `name` — Name of the antenna array object; str
 MD!*/
 
 py::dict generate_speaker(const std::string &driver_type,

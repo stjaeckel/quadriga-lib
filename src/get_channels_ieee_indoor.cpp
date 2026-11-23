@@ -62,8 +62,8 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 ```
 
 ## Inputs:
-- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [[arrayant]]
-- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [[arrayant]]
+- **`ap_array`** — Access point antenna array; `n_tx` = number of ports after port weights, see [[arrayant]]
+- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports after port weights, see [[arrayant]]
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`center_freq`** *(optional)* — Carrier frequency in Hz (finite, above 100 MHz)
 - **`tap_spacing`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
@@ -222,7 +222,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     const double Tb = 0.0, Tt = 0.0, Th = 0.0;
 
     // Get a cross-polarized probe antenna to compute the antenna-neutral power after complex-sum of the sub-paths
-    auto probe_antenna = quadriga_lib::arrayant_generate("xpol", 15.0);
+    auto probe_antenna = quadriga_lib::generate_antenna("xpol", 15.0);
     arma::uword n_probe = probe_antenna.n_elements();
 
     // Constants for Doppler calculation

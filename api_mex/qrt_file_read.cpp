@@ -73,7 +73,7 @@ Read ray-tracing CIR data from a QRT file
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ## See also:
-- [[arrayant_generate]] (for generating antenna arrays)
+- [[generate_antenna]] (for generating antenna arrays)
 - [[get_channels_planar]] (for embedding antennas using departure and arrival angles)
 - [[get_channels_spherical]] (for embedding antennas using FBS/LBS positions)
 - [[get_channels_multifreq]] (for multi-frequency antenna embedding)

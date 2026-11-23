@@ -2,7 +2,7 @@
 
 Antenna models that quadriga-lib may add after the TR 38.901 antenna work ([tr38901_antennas.md](tr38901_antennas.md)). Nothing here is decided or scheduled. New types follow the extension rules of tr38901_antennas.md, section 2.2, so they can be added after v1.0 without breaking calls.
 
-Sources: the MATLAB-only generators of QuaDRiGa (`qd_arrayant.generate`), and a survey of standards and implementations (Sionna, ns-3, MATLAB Phased Array Toolbox, ITU-R) on 2026-11-16. Parameter details marked "survey" were not checked against the standard.
+Sources: the MATLAB-only generators of QuaDRiGa (`qd_arrayant.generate_antenna`), and a survey of standards and implementations (Sionna, ns-3, MATLAB Phased Array Toolbox, ITU-R) on 2026-11-16. Parameter details marked "survey" were not checked against the standard.
 
 ## Next candidate: circular aperture
 

@@ -364,13 +364,13 @@ TEST_CASE("calc_angular_spread - outputs that alias inputs")
 TEST_CASE("calc_angular_spread - phi and theta are the local angles of the output orientation")
 {
     // An antenna with the output orientation points at the mean direction; the rotated angles equal the local angles
-    // that arrayant_interpolate returns for this orientation, with and without the bank angle. A mean direction 20
+    // that interpolate_pattern returns for this orientation, with and without the bank angle. A mean direction 20
     // degree above the horizon gives tilt -20 degree (a positive tilt points down).
     const double d = arma::datum::pi / 180.0;
     const std::vector<arma::vec> az = {arma::vec{28.0 * d, 32.0 * d, 30.0 * d, 35.0 * d}};
     const std::vector<arma::vec> el = {arma::vec{18.0 * d, 22.0 * d, 20.0 * d, 19.0 * d}};
     const std::vector<arma::vec> pw = {arma::vec{1.0, 1.0, 1.0, 2.0}};
-    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    const auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
     for (bool bank : {false, true})
     {
         arma::mat ori;
@@ -380,7 +380,7 @@ TEST_CASE("calc_angular_spread - phi and theta are the local angles of the outpu
         const arma::mat A = az[0].t(), E = el[0].t();
         const arma::cube O(ori.memptr(), 3, 1, 1);
         arma::mat Vr, Vi, Hr, Hi, az_loc, el_loc;
-        quadriga_lib::arrayant_interpolate(omni, A, E, Vr, Vi, Hr, Hi, {}, O, {}, (arma::mat *)nullptr, &az_loc, &el_loc);
+        quadriga_lib::interpolate_pattern(omni, A, E, Vr, Vi, Hr, Hi, {}, O, {}, (arma::mat *)nullptr, &az_loc, &el_loc);
         CHECK(arma::approx_equal(phi[0], arma::vec(az_loc.t()), "absdiff", 1e-6));
         CHECK(arma::approx_equal(theta[0], arma::vec(el_loc.t()), "absdiff", 1e-6));
     }

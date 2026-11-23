@@ -32,7 +32,7 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [MATLAB](.
   may differ between snapshots, `n_rx` and `n_tx` may not
 - Multi-frequency coefficients (e.g. from [channel.multifreq](channel-generation-functions.md#channel.multifreq)) and absolute carrier frequencies are handled by
   [baseband_freq_response_multi](#baseband_freq_response_multi); the two functions take different arguments, so they are two functions,
-  while [interpolate](array-antenna-functions.md#interpolate) serves both of its cases with one argument set
+  while [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern) serves both of its cases with one argument set
 - `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair
 - The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
   before sin / cos are evaluated in single precision; coefficients and sums are single precision, double inputs are
@@ -551,7 +551,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
-- [generate](array-antenna-functions.md#generate) (for generating antenna arrays)
+- [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna) (for generating antenna arrays)
 - [channel.planar](channel-generation-functions.md#channel.planar) (for embedding antennas using departure and arrival angles)
 - [channel.spherical](channel-generation-functions.md#channel.spherical) (for embedding antennas using FBS/LBS positions)
 - [channel.multifreq](channel-generation-functions.md#channel.multifreq) (for multi-frequency antenna embedding)

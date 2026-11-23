@@ -5,15 +5,15 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Array antenna functions
+Antennas, transducers and patterns
 SECTION!*/
 
 /*!MD
 # QDANT_WRITE
-Writes array antenna data to QDANT files
+Writes antenna array data to QDANT files
 
-- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
-- Multiple array antennas can be stored in the same file using distinct `id` values
+- The QuaDRiGa Array Antenna Exchange Format (QDANT) is an XML format for storing antenna pattern data
+- Multiple antenna arrays can be stored in the same file using distinct `id` values
 - If writing to an existing file without specifying an `id`, the data is appended at the end and
   the returned `id_in_file` identifies its location in the file
 - An optional `layout` can be provided to organize the data inside the file
@@ -22,7 +22,7 @@ Writes array antenna data to QDANT files
 - The file has single-precision-equivalent accuracy relative to the element peak: pattern
   magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
   amplitude of its element; samples far below the peak are less accurate relative to their own
-  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are
+  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and port weights are
   written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
   degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
@@ -35,7 +35,7 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 
 ## Inputs:
 - **`fn`** — Output QDANT filename; string; must not be empty
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[generate_antenna]];
   a struct array writes a frequency-dependent model and requires `id` and `layout` to be omitted
 - **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
   must be omitted for a multi-frequency model
@@ -47,7 +47,7 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 
 ## See also:
 - [[qdant_read]] (for reading QDANT data)
-- [[arrayant_generate]] (for the arrayant struct layout)
+- [[generate_antenna]] (for the arrayant struct layout)
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
@@ -80,7 +80,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant = qd_mex_struct2arrayant(prhs[1], true, false, "arrayant");
 
     if (is_multi)
-        CALL_QD(quadriga_lib::qdant_write_multi(fn, ant_multi));
+        CALL_QD(quadriga_lib::qdant_write(fn, ant_multi));
     else
         CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, layout));
 

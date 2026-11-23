@@ -40,8 +40,8 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 ```
 
 ### Inputs:
-- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling; see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling; see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
+- **`ap_array`** — Access point antenna array; `n_tx` = number of ports; see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
+- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports; see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
 - **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
@@ -103,10 +103,10 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
   channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` struct without `coupling_re` /
-  `coupling_im` throws, unlike in the other functions, where it stands for identity
+- The IRS port weights hold the IRS weights and must be given: an `irs_array` struct without `port_weights_re` /
+  `port_weights_im` throws, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
@@ -136,9 +136,9 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the coupling matrix holds the IRS weights,
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
+- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the port weights hold the IRS weights,
   one codebook entry per column, `[n_irs, n_codebook]`
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
@@ -158,12 +158,12 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 - **`path_length_2`** — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_2, 1]`
 - **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
-- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
+- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS port weights); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
-  only its patterns are used, its coupling and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
+  only its patterns are used, its port weights and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
 - **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`; default: `[]`
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
@@ -181,7 +181,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [Pyth
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-segment spherical-wave channel)
 - [get_channels_planar](#get_channels_planar) (single-segment planar-wave channel)
-- [arrayant_generate](array-antenna-functions.md#arrayant_generate) (antenna array generator)
+- [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna) (antenna array generator)
 
 ---
 <a id="get_channels_multifreq"></a>
@@ -203,7 +203,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
   FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.
-- Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
+- Port weights are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 1 holds the LOS path
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
@@ -229,8 +229,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 ```
 
 ### Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
+- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
+- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
@@ -249,7 +249,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0
+  unavailable); auto selects GENERIC in this version, see [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
@@ -258,7 +258,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)
-- [generate_speaker](array-antenna-functions.md#generate_speaker) (acoustic source construction)
+- [generate_speaker](antennas-transducers-and-patterns.md#generate_speaker) (acoustic source construction)
 
 ---
 <a id="get_channels_planar"></a>
@@ -305,8 +305,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
 - **`tx_pos`** — Transmitter position; `[3, 1]`, or `[3, n_snap]` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
   batch mode
@@ -325,7 +325,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0
+  unavailable); auto selects GENERIC in this version, see [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -336,7 +336,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (spherical wave variant accounting for per-element angle differences)
 - [get_channels_ieee_indoor](#get_channels_ieee_indoor) (for generating IEEE compliant channels using `get_channels_planar` internally)
-- [arrayant_generate](array-antenna-functions.md#arrayant_generate) (antenna array generator)
+- [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna) (antenna array generator)
 - [baseband_freq_response](channel-functions.md#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed grid)
 
@@ -390,8 +390,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
   `[3, n_snap]` in batch mode
@@ -411,7 +411,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
-  [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0
+  [interpolate_pattern](antennas-transducers-and-patterns.md#interpolate_pattern); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -425,6 +425,6 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 ### See also:
 - [get_channels_planar](#get_channels_planar) (planar wave variant)
 - [get_channels_irs](#get_channels_irs) (for IRS-assisted communication)
-- [arrayant_generate](array-antenna-functions.md#arrayant_generate) (antenna array generator)
+- [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna) (antenna array generator)
 - [baseband_freq_response](channel-functions.md#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed grid)

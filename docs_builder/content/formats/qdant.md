@@ -1,10 +1,10 @@
 +++
 title = "QuaDRiGa Array Antenna Exchange Format (QDANT)"
-summary = "XML file format for array antenna patterns: elements, positions, coupling and the layout of several antennas"
+summary = "XML file format for antenna array patterns: elements, positions, coupling and the layout of several antennas"
 order = 1
 +++
 
-QDANT is an XML grammar for exchanging array-antenna pattern data. Tag names are case-sensitive. A file contains a single `<qdant>` root element that may include an optional `<layout>` and one or more `<arrayant>` elements. A namespace is required on the root (with or without a prefix).
+QDANT is an XML grammar for exchanging antenna array pattern data. Tag names are case-sensitive. A file contains a single `<qdant>` root element that may include an optional `<layout>` and one or more `<arrayant>` elements. A namespace is required on the root (with or without a prefix).
 
 Coordinate convention (for interpreting pattern data):
 
@@ -38,7 +38,7 @@ Defines how multiple \<arrayant> objects are arranged into an object array (opti
 
 ## \<arrayant>
 
-Describes a single array antenna
+Describes a single antenna array
 
 ### Attributes
 
@@ -66,7 +66,7 @@ Describes a single array antenna
   List of azimuth samples (−180 … +180; 0 points east; anti-clockwise positive). Example: `-180 -90 0 90 180`
 
 - **`<CouplingAbs>`** (optional; only with `<NoElements>`)\
-  N×M absolute values of the coupling matrix. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. M is the number of antenna ports. Example (N=2): `1,0 0,1`
+  N×M absolute values of the coupling matrix (the port weights in the API). Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. M is the number of antenna ports. Example (N=2): `1,0 0,1`
 
 - **`<CouplingPhase>`** (optional; only with `<NoElements>` and `<CouplingAbs>`)\
   N×N phases (degrees) for the same matrix. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. Example (N=2): `0,0 0,0`

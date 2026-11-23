@@ -55,8 +55,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [[arrayant_generate]]
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [[arrayant_generate]]
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [[generate_antenna]]
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [[generate_antenna]]
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
   `[3, n_snap]` in batch mode
@@ -76,7 +76,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
-  [[arrayant_interpolate]]; default: 0
+  [[interpolate_pattern]]; default: 0
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -90,7 +90,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## See also:
 - [[get_channels_planar]] (planar wave variant)
 - [[get_channels_irs]] (for IRS-assisted communication)
-- [[arrayant_generate]] (antenna array generator)
+- [[generate_antenna]] (antenna array generator)
 - [[baseband_freq_response]] (for calculating the frequency response)
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/

@@ -24,8 +24,8 @@ static inline py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<doub
     output["azimuth_grid"] = qd_python_copy2numpy(&ant.azimuth_grid);
     output["elevation_grid"] = qd_python_copy2numpy(&ant.elevation_grid);
     output["element_pos"] = qd_python_copy2numpy(&ant.element_pos);
-    output["coupling_re"] = qd_python_copy2numpy(&ant.coupling_re);
-    output["coupling_im"] = qd_python_copy2numpy(&ant.coupling_im);
+    output["port_weights_re"] = qd_python_copy2numpy(&ant.port_weights_re);
+    output["port_weights_im"] = qd_python_copy2numpy(&ant.port_weights_im);
     output["center_freq"] = ant.center_freq;
     output["name"] = ant.name;
     return output;
@@ -70,61 +70,70 @@ static inline py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_
         center_freqs[f] = ant[f].center_freq;
     output["center_freq"] = qd_python_copy2numpy(&center_freqs);
 
-    // Coupling: check if all entries are identical
-    bool coupling_varies = false;
-    for (size_t f = 1; f < n_freq && !coupling_varies; ++f)
+    // Port weights: check if all entries are identical
+    bool port_weights_varies = false;
+    for (size_t f = 1; f < n_freq && !port_weights_varies; ++f)
     {
-        if (ant[f].coupling_re.n_elem != a0.coupling_re.n_elem ||
-            ant[f].coupling_im.n_elem != a0.coupling_im.n_elem)
-            coupling_varies = true;
+        if (ant[f].port_weights_re.n_elem != a0.port_weights_re.n_elem ||
+            ant[f].port_weights_im.n_elem != a0.port_weights_im.n_elem)
+            port_weights_varies = true;
         else
         {
-            if (a0.coupling_re.n_elem > 0 && !arma::approx_equal(ant[f].coupling_re, a0.coupling_re, "absdiff", 1e-15))
-                coupling_varies = true;
-            if (a0.coupling_im.n_elem > 0 && !arma::approx_equal(ant[f].coupling_im, a0.coupling_im, "absdiff", 1e-15))
-                coupling_varies = true;
+            if (a0.port_weights_re.n_elem > 0 && !arma::approx_equal(ant[f].port_weights_re, a0.port_weights_re, "absdiff", 1e-15))
+                port_weights_varies = true;
+            if (a0.port_weights_im.n_elem > 0 && !arma::approx_equal(ant[f].port_weights_im, a0.port_weights_im, "absdiff", 1e-15))
+                port_weights_varies = true;
         }
     }
 
-    if (coupling_varies)
+    if (port_weights_varies)
     {
         // Per-frequency: store as 3D (n_el × n_ports × n_freq)
-        if (a0.coupling_re.n_elem > 0)
+        if (a0.port_weights_re.n_elem > 0)
         {
-            arma::uword nr = a0.coupling_re.n_rows, nc = a0.coupling_re.n_cols;
-            arma::Cube<double> cpl_re(nr, nc, n_freq, arma::fill::none);
+            arma::uword nr = a0.port_weights_re.n_rows, nc = a0.port_weights_re.n_cols;
+            arma::Cube<double> pw_re(nr, nc, n_freq, arma::fill::none);
             for (size_t f = 0; f < n_freq; ++f)
-                cpl_re.slice(f) = ant[f].coupling_re;
-            output["coupling_re"] = qd_python_copy2numpy(&cpl_re);
+                pw_re.slice(f) = ant[f].port_weights_re;
+            output["port_weights_re"] = qd_python_copy2numpy(&pw_re);
         }
         else
-            output["coupling_re"] = qd_python_copy2numpy(&a0.coupling_re);
+            output["port_weights_re"] = qd_python_copy2numpy(&a0.port_weights_re);
 
-        if (a0.coupling_im.n_elem > 0)
+        if (a0.port_weights_im.n_elem > 0)
         {
-            arma::uword nr = a0.coupling_im.n_rows, nc = a0.coupling_im.n_cols;
-            arma::Cube<double> cpl_im(nr, nc, n_freq, arma::fill::none);
+            arma::uword nr = a0.port_weights_im.n_rows, nc = a0.port_weights_im.n_cols;
+            arma::Cube<double> pw_im(nr, nc, n_freq, arma::fill::none);
             for (size_t f = 0; f < n_freq; ++f)
-                cpl_im.slice(f) = ant[f].coupling_im;
-            output["coupling_im"] = qd_python_copy2numpy(&cpl_im);
+                pw_im.slice(f) = ant[f].port_weights_im;
+            output["port_weights_im"] = qd_python_copy2numpy(&pw_im);
         }
         else
-            output["coupling_im"] = qd_python_copy2numpy(&a0.coupling_im);
+            output["port_weights_im"] = qd_python_copy2numpy(&a0.port_weights_im);
     }
     else
     {
         // Shared: store as 2D
-        output["coupling_re"] = qd_python_copy2numpy(&a0.coupling_re);
-        output["coupling_im"] = qd_python_copy2numpy(&a0.coupling_im);
+        output["port_weights_re"] = qd_python_copy2numpy(&a0.port_weights_re);
+        output["port_weights_im"] = qd_python_copy2numpy(&a0.port_weights_im);
     }
 
     return output;
+}
+
+// The matrix of element-to-port weights was called coupling_re / coupling_im; ignoring the old keys would drop the weights
+static inline void qd_python_check_old_port_weights_keys(const py::dict &arrayant)
+{
+    for (const char *suffix : {"re", "im"})
+        if (arrayant.contains((std::string("coupling_") + suffix).c_str()))
+            throw std::invalid_argument(std::string("Key 'coupling_") + suffix + "' was renamed to 'port_weights_" + suffix + "'.");
 }
 
 static inline quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
                                                               bool view = false, bool strict = false,
                                                               bool validate = false)
 {
+    qd_python_check_old_port_weights_keys(arrayant);
     quadriga_lib::arrayant<double> ant;
 
     // A 4D pattern is multi-frequency data, which has its own converter
@@ -144,10 +153,10 @@ static inline quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::d
     // Optional fields; absent or empty ones get their defaults (zeros, identity)
     if (arrayant.contains("element_pos"))
         ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], view, strict);
-    if (arrayant.contains("coupling_re"))
-        ant.coupling_re = qd_python_numpy2arma_Mat<double>(arrayant["coupling_re"], view, strict);
-    if (arrayant.contains("coupling_im"))
-        ant.coupling_im = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
+    if (arrayant.contains("port_weights_re"))
+        ant.port_weights_re = qd_python_numpy2arma_Mat<double>(arrayant["port_weights_re"], view, strict);
+    if (arrayant.contains("port_weights_im"))
+        ant.port_weights_im = qd_python_numpy2arma_Mat<double>(arrayant["port_weights_im"], view, strict);
     qd_arrayant_fill_defaults(ant);
 
     if (arrayant.contains("center_freq")) // Scalar or array with exactly one element
@@ -179,6 +188,8 @@ static inline std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayan
                                                                                  bool validate = false,
                                                                                  bool require_center_freq = true)
 {
+    qd_python_check_old_port_weights_keys(arrayant);
+
     // Determine number of frequencies from e_theta_re shape
     py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
     int nd = (int)e_theta_re_arr.request().ndim;
@@ -232,49 +243,49 @@ static inline std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayan
     else
         throw std::invalid_argument("Input 'center_freq' is required for a multi-frequency arrayant (4D pattern fields).");
 
-    // Parse coupling: 2D (shared) or 3D (per-freq)
-    std::vector<arma::Mat<double>> coupling_re_vec(n_freq);
-    std::vector<arma::Mat<double>> coupling_im_vec(n_freq);
-    bool has_coupling_re = arrayant.contains("coupling_re");
-    bool has_coupling_im = arrayant.contains("coupling_im");
+    // Parse port weights: 2D (shared) or 3D (per-freq)
+    std::vector<arma::Mat<double>> port_weights_re_vec(n_freq);
+    std::vector<arma::Mat<double>> port_weights_im_vec(n_freq);
+    bool has_port_weights_re = arrayant.contains("port_weights_re");
+    bool has_port_weights_im = arrayant.contains("port_weights_im");
 
-    if (has_coupling_re)
+    if (has_port_weights_re)
     {
-        py::array cpl_arr = py::cast<py::array>(arrayant["coupling_re"]);
-        int cpl_nd = (int)cpl_arr.request().ndim;
-        if (cpl_nd <= 2) // Shared across all frequencies
+        py::array pw_arr = py::cast<py::array>(arrayant["port_weights_re"]);
+        int pw_nd = (int)pw_arr.request().ndim;
+        if (pw_nd <= 2) // Shared across all frequencies
         {
-            auto cpl = qd_python_numpy2arma_Mat<double>(arrayant["coupling_re"], view, strict);
+            auto cpl = qd_python_numpy2arma_Mat<double>(arrayant["port_weights_re"], view, strict);
             for (size_t f = 0; f < n_freq; ++f)
-                coupling_re_vec[f] = cpl;
+                port_weights_re_vec[f] = cpl;
         }
-        else // 3D: (n_el, n_ports, n_freq) — slices are per-frequency coupling matrices
+        else // 3D: (n_el, n_ports, n_freq) — slices are per-frequency port weights
         {
-            auto cpl_cube = qd_python_numpy2arma_Cube<double>(arrayant["coupling_re"], view, strict);
-            if (cpl_cube.n_slices != n_freq)
-                throw std::invalid_argument("'coupling_re' 3rd dimension must match number of frequency entries.");
+            auto pw_cube = qd_python_numpy2arma_Cube<double>(arrayant["port_weights_re"], view, strict);
+            if (pw_cube.n_slices != n_freq)
+                throw std::invalid_argument("'port_weights_re' 3rd dimension must match number of frequency entries.");
             for (size_t f = 0; f < n_freq; ++f)
-                coupling_re_vec[f] = cpl_cube.slice(f);
+                port_weights_re_vec[f] = pw_cube.slice(f);
         }
     }
 
-    if (has_coupling_im)
+    if (has_port_weights_im)
     {
-        py::array cpl_arr = py::cast<py::array>(arrayant["coupling_im"]);
-        int cpl_nd = (int)cpl_arr.request().ndim;
-        if (cpl_nd <= 2)
+        py::array pw_arr = py::cast<py::array>(arrayant["port_weights_im"]);
+        int pw_nd = (int)pw_arr.request().ndim;
+        if (pw_nd <= 2)
         {
-            auto cpl = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
+            auto cpl = qd_python_numpy2arma_Mat<double>(arrayant["port_weights_im"], view, strict);
             for (size_t f = 0; f < n_freq; ++f)
-                coupling_im_vec[f] = cpl;
+                port_weights_im_vec[f] = cpl;
         }
         else
         {
-            auto cpl_cube = qd_python_numpy2arma_Cube<double>(arrayant["coupling_im"], view, strict);
-            if (cpl_cube.n_slices != n_freq)
-                throw std::invalid_argument("'coupling_im' 3rd dimension must match number of frequency entries.");
+            auto pw_cube = qd_python_numpy2arma_Cube<double>(arrayant["port_weights_im"], view, strict);
+            if (pw_cube.n_slices != n_freq)
+                throw std::invalid_argument("'port_weights_im' 3rd dimension must match number of frequency entries.");
             for (size_t f = 0; f < n_freq; ++f)
-                coupling_im_vec[f] = cpl_cube.slice(f);
+                port_weights_im_vec[f] = pw_cube.slice(f);
         }
     }
 
@@ -291,16 +302,16 @@ static inline std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayan
         ant[f].element_pos = element_pos;
         ant[f].center_freq = center_freqs[f];
         ant[f].name = name;
-        if (has_coupling_re)
-            ant[f].coupling_re = std::move(coupling_re_vec[f]);
-        if (has_coupling_im)
-            ant[f].coupling_im = std::move(coupling_im_vec[f]);
+        if (has_port_weights_re)
+            ant[f].port_weights_re = std::move(port_weights_re_vec[f]);
+        if (has_port_weights_im)
+            ant[f].port_weights_im = std::move(port_weights_im_vec[f]);
         qd_arrayant_fill_defaults(ant[f]);
     }
 
     if (validate)
     {
-        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
+        auto error_msg = quadriga_lib::is_valid(ant);
         if (!error_msg.empty())
             throw std::invalid_argument(error_msg.c_str());
     }

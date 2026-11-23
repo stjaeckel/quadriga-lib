@@ -16,24 +16,24 @@ lang: en-US
 - Inputs with a stated default, or marked *(optional)*, can be omitted or passed as `[]`; all others are required. Output arguments are optional via `nargout`; a call without assignment returns the first output as `ans`, and outputs after the first are returned only when requested.
 - Invalid inputs (shape/domain) and problems with a file's access or content raise a MATLAB error with the identifier `quadriga_lib:CPPerror`.
 - Index conventions: 1-based unless the field is explicitly called 0-based.
-- The canonical arrayant struct is defined in [arrayant_generate](#arrayant_generate). Mandatory fields: `e_theta_re/im`, `e_phi_re/im`, `azimuth_grid`, `elevation_grid`. Optional field defaults: `element_pos = zeros(3, n_elements)`, identity coupling, `center_freq = 299792458`, empty `name`. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency. Each call builds a new arrayant from the struct, so its data is checked in full on every call.
+- The canonical arrayant struct is defined in [generate_antenna](#generate_antenna). Mandatory fields: `e_theta_re/im`, `e_phi_re/im`, `azimuth_grid`, `elevation_grid`. Optional field defaults: `element_pos = zeros(3, n_elements)`, identity port weights, `center_freq = 299792458`, empty `name`. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency. Each call builds a new arrayant from the struct, so its data is checked in full on every call.
 
 # Function Index
 
 | Function | Section | Summary |
 | --- | --- | --- |
-| [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) | Array antenna functions | Calculate the beamwidth and pointing angles of array antenna elements in degrees |
-| [arrayant_calc_directivity](#arrayant_calc_directivity) | Array antenna functions | Calculates the directivity in dBi of array antenna elements |
-| [arrayant_combine_pattern](#arrayant_combine_pattern) | Array antenna functions | Combine element patterns, positions, and coupling weights into effective radiation patterns |
-| [arrayant_concat](#arrayant_concat) | Array antenna functions | Concatenate two arrayant structs into a single one |
-| [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | Create copies of array antenna elements |
-| [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
-| [arrayant_generate](#arrayant_generate) | Array antenna functions | Generate an array antenna of a given type |
-| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
-| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns using Euler rotations |
-| [generate_speaker](#generate_speaker) | Array antenna functions | Generate a parametric frequency-dependent loudspeaker directivity model |
-| [qdant_read](#qdant_read) | Array antenna functions | Reads array antenna data from QDANT files |
-| [qdant_write](#qdant_write) | Array antenna functions | Writes array antenna data to QDANT files |
+| [apply_port_weights](#apply_port_weights) | Antennas, transducers and patterns | Apply the port weights of an antenna array: one pattern per port |
+| [calc_beamwidth](#calc_beamwidth) | Antennas, transducers and patterns | Calculate the beamwidth and pointing angles of antenna array elements in degrees |
+| [calc_directivity](#calc_directivity) | Antennas, transducers and patterns | Calculates the directivity in dBi of antenna array elements |
+| [copy_element](#copy_element) | Antennas, transducers and patterns | Create copies of antenna array elements |
+| [export_pattern_obj](#export_pattern_obj) | Antennas, transducers and patterns | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
+| [generate_antenna](#generate_antenna) | Antennas, transducers and patterns | Generate an antenna array of a given type |
+| [generate_speaker](#generate_speaker) | Antennas, transducers and patterns | Generate a parametric frequency-dependent loudspeaker directivity model |
+| [interpolate_pattern](#interpolate_pattern) | Antennas, transducers and patterns | Interpolate the polarimetric field pattern of an antenna array at given azimuth and elevation angles |
+| [join_arrays](#join_arrays) | Antennas, transducers and patterns | Concatenate two arrayant structs into a single one |
+| [qdant_read](#qdant_read) | Antennas, transducers and patterns | Reads antenna array data from QDANT files |
+| [qdant_write](#qdant_write) | Antennas, transducers and patterns | Writes antenna array data to QDANT files |
+| [rotate_pattern](#rotate_pattern) | Antennas, transducers and patterns | Rotate antenna radiation patterns using Euler rotations |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [channel_export_obj_file](#channel_export_obj_file) | Channel functions | Export propagation paths to a Wavefront OBJ file for 3D visualization |
@@ -115,15 +115,57 @@ lang: en-US
 
 ---
 
-<a id="sec-array-antenna-functions"></a>
-# Array antenna functions
+<a id="sec-antennas-transducers-and-patterns"></a>
+# Antennas, transducers and patterns
 
 ---
-<a id="arrayant_calc_beamwidth"></a>
-## arrayant_calc_beamwidth
-Calculate the beamwidth and pointing angles of array antenna elements in degrees
+<a id="apply_port_weights"></a>
+## apply_port_weights
+Apply the port weights of an antenna array: one pattern per port
 
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
+Also in: [C++](quadriga_lib_api_cpp.md#apply_port_weights) · [Python](quadriga_lib_api_python.md#apply_port_weights)
+
+- Evaluates the element patterns on the output grid, applies the phase shift of each element position (which
+  moves every pattern to the array origin) and sums the elements with the port weights
+- The result has one element per port, identity port weights and all element positions at the origin
+- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
+- The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
+  applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
+
+### Usage:
+```matlab
+arrayant_out = quadriga_lib.apply_port_weights( arrayant_in, freq_new, azimuth_grid_new, ...
+    elevation_grid_new, propagation_speed );
+```
+
+### Inputs:
+- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [generate_antenna](#generate_antenna);
+  a struct array may contain a frequency-dependent model
+- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is
+  recomputed (interpolated) at each requested frequency; default: `[]` (each input entry's `center_freq` unchanged)
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; default: `[]` (input grid)
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; default: `[]` (input grid)
+- **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
+  default: 299792458
+
+### Output:
+- **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
+  result); field layout as documented in [generate_antenna](#generate_antenna). Single struct when both input and
+  `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
+  `numel(arrayant_in)` when `freq_new` is omitted) otherwise.
+
+### See also:
+- [generate_antenna](#generate_antenna) (for field layout in the arrayant struct)
+- [rotate_pattern](#rotate_pattern) (for changing the orientation of elements before combining)
+- [calc_beamwidth](#calc_beamwidth) (calculates the beam width of antenna arrays)
+- [calc_directivity](#calc_directivity) (directivity in dBi of antenna array elements)
+
+---
+<a id="calc_beamwidth"></a>
+## calc_beamwidth
+Calculate the beamwidth and pointing angles of antenna array elements in degrees
+
+Also in: [C++](quadriga_lib_api_cpp.md#calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam
@@ -135,16 +177,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_beamwidth) · [Python](quad
   circle; 360° when the whole cut is above the threshold (e.g. a beam pointing to a pole)
 - Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles;
   at most 180°
-- Calculated per element, not per port; ignores element coupling
+- Calculated per element, not per port; ignores the port weights
 
 ### Usage:
 ```matlab
 [ beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg ] = ...
-    quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
+    quadriga_lib.calc_beamwidth( arrayant, i_element, threshold_dB );
 ```
 
 ### Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [generate_antenna](#generate_antenna);
   a struct array may contain a frequency-dependent model
 - **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`threshold_dB`** — Threshold in dB, positive and finite; default: 3 (equivalent to FWHM)
@@ -156,27 +198,27 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_beamwidth) · [Python](quad
 - **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
 
 ### See also:
-- [arrayant_combine_pattern](#arrayant_combine_pattern) (to apply element coupling before calculating the beamwidth)
-- [arrayant_calc_directivity](#arrayant_calc_directivity) (directivity in dBi of array antenna elements)
+- [apply_port_weights](#apply_port_weights) (to apply the port weights before calculating the beamwidth)
+- [calc_directivity](#calc_directivity) (directivity in dBi of antenna array elements)
 
 ---
-<a id="arrayant_calc_directivity"></a>
-## arrayant_calc_directivity
-Calculates the directivity in dBi of array antenna elements
+<a id="calc_directivity"></a>
+## calc_directivity
+Calculates the directivity in dBi of antenna array elements
 
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
+Also in: [C++](quadriga_lib_api_cpp.md#calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
 
 - Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Calculated per element, not per port; ignores element coupling
+- Calculated per element, not per port; ignores the port weights
 - Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
 
 ### Usage:
 ```matlab
-directivity_dBi = quadriga_lib.arrayant_calc_directivity( arrayant, i_element );
+directivity_dBi = quadriga_lib.calc_directivity( arrayant, i_element );
 ```
 
 ### Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [generate_antenna](#generate_antenna);
   a struct array may contain a frequency-dependent model
 - **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 
@@ -184,95 +226,19 @@ directivity_dBi = quadriga_lib.arrayant_calc_directivity( arrayant, i_element );
 - **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
 
 ### See also:
-- [arrayant_combine_pattern](#arrayant_combine_pattern) (to apply element coupling before calculating directivity)
-- [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) (calculates the beam width of array antennas)
+- [apply_port_weights](#apply_port_weights) (to apply the port weights before calculating directivity)
+- [calc_beamwidth](#calc_beamwidth) (calculates the beam width of antenna arrays)
 
 ---
-<a id="arrayant_combine_pattern"></a>
-## arrayant_combine_pattern
-Combine element patterns, positions, and coupling weights into effective radiation patterns
+<a id="copy_element"></a>
+## copy_element
+Create copies of antenna array elements
 
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_combine_pattern) · [Python](quadriga_lib_api_python.md#combine_pattern)
-
-- Integrates the element field patterns, element positions, and coupling weights into one effective
-  pattern per port (column of the coupling matrix)
-- The result behaves as a virtual array with one element per port, zeroed element positions, and an
-  identity coupling matrix
-- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
-- The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
-  applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
-
-### Usage:
-```matlab
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq_new, azimuth_grid_new, ...
-    elevation_grid_new, propagation_speed );
-```
-
-### Inputs:
-- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
-  a struct array may contain a frequency-dependent model
-- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is
-  recomputed (interpolated) at each requested frequency; default: `[]` (each input entry's `center_freq` unchanged)
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; default: `[]` (input grid)
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; default: `[]` (input grid)
-- **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
-  default: 299792458
-
-### Output:
-- **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
-  result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when both input and
-  `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
-  `numel(arrayant_in)` when `freq_new` is omitted) otherwise.
-
-### See also:
-- [arrayant_generate](#arrayant_generate) (for field layout in the arrayant struct)
-- [arrayant_rotate_pattern](#arrayant_rotate_pattern) (for changing the orientation of elements before combining)
-- [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) (calculates the beam width of array antennas)
-- [arrayant_calc_directivity](#arrayant_calc_directivity) (directivity in dBi of array antenna elements)
-
----
-<a id="arrayant_concat"></a>
-## arrayant_concat
-Concatenate two arrayant structs into a single one
-
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_concat) · [Python](quadriga_lib_api_python.md#concat)
-
-- Concatenates all elements from `arrayant_in2` onto `arrayant_in1` along the element dimension; 
-  `element_pos` matrices are joined horizontally
-- Both inputs must share identical azimuth and elevation sampling grids
-- Coupling is assembled block-diagonally: elements from `arrayant_in1` connect only to ports from 
-  `arrayant_in1`, elements from `arrayant_in2` only to ports from `arrayant_in2`
-- `center_freq` and `name` are inherited from `arrayant_in1`
-- Supports multi-frequency arrayant models: when both inputs are struct arrays, they must have the 
-  same number of entries and matching `center_freq` at each index; concatenation is performed per 
-  entry and a struct array of equal size is returned
-- Output struct shape matches the input shape (scalar struct -> scalar struct, struct array -> struct array)
-
-### Usage:
-```matlab
-arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
-```
-
-### Inputs:
-- **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
-  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
-- **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
-  `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
-
-### Output:
-- **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
-  a struct array of equal size is returned for multi-frequency input
-
----
-<a id="arrayant_copy_element"></a>
-## arrayant_copy_element
-Create copies of array antenna elements
-
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_copy_element) · [Python](quadriga_lib_api_python.md#copy_element)
+Also in: [C++](quadriga_lib_api_cpp.md#copy_element) · [Python](quadriga_lib_api_python.md#copy_element)
 
 - Copies a source element to one or more destination slots within an arrayant
 - Array is resized if any destination index exceeds the current number of elements
-- Coupling matrix entries for newly added elements are set to identity; existing coupling is preserved
+- Port weights of newly added elements are set to identity; existing port weights are preserved
 - Supports multi-frequency arrayant models: when `arrayant_in` is a struct array, the same copy is
   applied to every entry and a struct array of equal size is returned
 - If `i_source` is a vector, `i_target` must have the same length; copies are performed
@@ -280,12 +246,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_copy_element) · [Python](quadri
 
 ### Usage:
 ```matlab
-arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_target );
+arrayant_out = quadriga_lib.copy_element( arrayant_in, i_source, i_target );
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
-  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
+  [generate_antenna](#generate_antenna); a struct array may contain a frequency-dependent model
 - **`i_source`** — Index of the source element(s); 1-based; scalar or `[n_copy]`
 - **`i_target`** — Index of the destination element(s); 1-based; scalar or `[n_copy]`;
   if `i_source` is a vector, must have the same length
@@ -295,11 +261,11 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_targ
   `arrayant_in`; a struct array of equal size is returned for multi-frequency input
 
 ---
-<a id="arrayant_export_obj_file"></a>
-## arrayant_export_obj_file
+<a id="export_pattern_obj"></a>
+## export_pattern_obj
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_export_obj_file) · [Python](quadriga_lib_api_python.md#export_obj_file)
+Also in: [C++](quadriga_lib_api_cpp.md#export_pattern_obj) · [Python](quadriga_lib_api_python.md#export_pattern_obj)
 
 - Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives a finer mesh
 - Supports multi-frequency arrayant models: pass a struct array and select the entry to export
@@ -307,14 +273,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_export_obj_file) · [Python](qua
 
 ### Usage:
 ```matlab
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, ...
+quadriga_lib.export_pattern_obj( fn, arrayant, directivity_range_dB, colormap, object_radius, ...
     icosphere_n_div, i_element, i_freq );
 ```
 
 ### Inputs:
 - **`fn`** — Output OBJ filename; must not be empty; filename must end in `.obj`
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in
-  [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
+  [generate_antenna](#generate_antenna); a struct array may contain a frequency-dependent model
 - **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object; default: 1 m
@@ -327,14 +293,14 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, color
 - [icosphere](#icosphere) (icosphere primitive used internally)
 
 ---
-<a id="arrayant_generate"></a>
-## arrayant_generate
-Generate an array antenna of a given type
+<a id="generate_antenna"></a>
+## generate_antenna
+Generate an antenna array of a given type
 
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_generate) · [Python](quadriga_lib_api_python.md#generate)
+Also in: [C++](quadriga_lib_api_cpp.md#generate_antenna) · [Python](quadriga_lib_api_python.md#generate_antenna)
 
 - Tuples (`element`, `panel`, `spacing`, `pol`, `ports`, `steer`): entries left off at the end or set to NaN (0 in `panel`, `pol`, `ports`) take their default, e.g. `panel = [4, 8]` is one panel of 4 rows and 8 columns.
-- Panel arrays: elements are ordered polarization fastest, then row `m` (upwards along z), column `n` (along +y), panel row `mg`, panel column `ng`, centred on the origin; ports in the same order with `m_p`, `n_p`. The coupling matrix `[n_elements, n_ports]` holds the weights; `apply_weights` combines each port into one element at its sub-array centre.
+- Panel arrays: elements are ordered polarization fastest, then row `m` (upwards along z), column `n` (along +y), panel row `mg`, panel column `ng`, centred on the origin; ports in the same order with `m_p`, `n_p`. The port weights `[n_elements, n_ports]` hold the weights; `apply_weights` combines each port into one element at its sub-array centre.
 - Sub-array weights (`ula`, `3GPP`; TR 38.901 eq. 7.3-1, along y by analogy): a port feeds `K = M / M_P` × `L = N / N_P` elements; element `(k, l)` gets `exp(j 2π ((k - (K-1)/2) d_V sin(tilt) - (l - (L-1)/2) d_H sin(pan))) / sqrt(K L)`; a positive tilt points the beam down, a positive pan towards +y.
 - Polarization (TR 38.901 clause 7.3.2): `pol` 2 has the slants ζ = 0° and 90°, `pol` 3 ζ = +45° and -45° (element 0 first). Model-1 turns the element by ζ about its boresight (eq. 7.3-3); Model-2 sets F_θ = sqrt(A') cos ζ and F_φ = sqrt(A') sin ζ with A' = |F_θ|² + |F_φ|² of the element (eq. 7.3-4, 7.3-5).
 - `multibeam`: maximum-ratio-transmission weights for the directions in `beams` (exact for one beam, approximate for several; only the ratios of the beam weights matter); one port per polarization, with `separate_beams` one per polarization and beam.
@@ -343,19 +309,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_generate) · [Python](quadriga_l
 ### Usage:
 ```matlab
 % omni, xpol, dipole, half-wave-dipole
-ant = quadriga_lib.arrayant_generate( type, res, center_freq );
+ant = quadriga_lib.generate_antenna( type, res, center_freq );
 
 % Custom-shape element
-ant = quadriga_lib.arrayant_generate( 'custom', res, center_freq, element );
+ant = quadriga_lib.generate_antenna( 'custom', res, center_freq, element );
 
 % Uniform linear array (omni element) and TR 38.901 panel array
-ant = quadriga_lib.arrayant_generate( 'ula', res, center_freq, [], panel, spacing, pol, ports, steer, ...
+ant = quadriga_lib.generate_antenna( 'ula', res, center_freq, [], panel, spacing, pol, ports, steer, ...
     [], pattern, [], apply_weights );
-ant = quadriga_lib.arrayant_generate( '3GPP', res, center_freq, element, panel, spacing, pol, ports, steer, ...
+ant = quadriga_lib.generate_antenna( '3GPP', res, center_freq, element, panel, spacing, pol, ports, steer, ...
     [], pattern, [], apply_weights );
 
 % Multi-beam panel array
-ant = quadriga_lib.arrayant_generate( 'multibeam', res, center_freq, element, panel, spacing, pol, [], [], ...
+ant = quadriga_lib.generate_antenna( 'multibeam', res, center_freq, element, panel, spacing, pol, [], [], ...
     beams, [], separate_beams, apply_weights );
 ```
 
@@ -383,132 +349,27 @@ ant = quadriga_lib.arrayant_generate( 'multibeam', res, center_freq, element, pa
 - **`ports`** — `[M_P, N_P]`: ports per column and per row of a panel and polarization; must divide `M` and `N`; default: `[M, N]` (one port per element)
 - **`steer`** — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt (positive down) and pan (positive towards +y); `[1, 2]` for all panels or `[Mg Ng, 2]` with one row per panel; one column: pan 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`; default: 0
 - **`beams`** — `[2 or 3, n_beams]`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); default: `[0; 0; 1]`
-- **`pattern`** — Element struct to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; default: the element of the type
+- **`pattern`** — Element struct to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, port weights and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; default: the element of the type
 - **`separate_beams`** — If `true`, one port per beam (weights ignored); default: `false`
 - **`apply_weights`** — If `true`, combine each port into one pattern at its sub-array centre; default: `false`
 
 ### Outputs:
 - **`ant`** — Struct with fields:
-   | Field            | Description                                               | Size                                   |
-   | ---------------- | --------------------------------------------------------- | -------------------------------------- |
-   | `e_theta_re`     | e-theta field component, real part                        | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_theta_im`     | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_re`       | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_im`       | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[1, n_azimuth]`                       |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[1, n_elevation]`                     |
-   | `element_pos`    | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
-   | `coupling_re`    | Coupling matrix, real part                                | `[n_elements, n_ports]`                |
-   | `coupling_im`    | Coupling matrix, imaginary part                           | `[n_elements, n_ports]`                |
-   | `center_freq`    | Center frequency in Hz                                    | scalar                                 |
-   | `name`           | Name of the array antenna object                          | string                                 |
+   | Field             | Description                                               | Size                                   |
+   | ----------------- | --------------------------------------------------------- | -------------------------------------- |
+   | `e_theta_re`      | e-theta field component, real part                        | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_theta_im`      | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_re`        | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_im`        | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
+   | `azimuth_grid`    | Azimuth angles in rad, -π to π, strictly increasing       | `[1, n_azimuth]`                       |
+   | `elevation_grid`  | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[1, n_elevation]`                     |
+   | `element_pos`     | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
+   | `port_weights_re` | Port weights, real part                                   | `[n_elements, n_ports]`                |
+   | `port_weights_im` | Port weights, imaginary part                              | `[n_elements, n_ports]`                |
+   | `center_freq`     | Center frequency in Hz                                    | scalar                                 |
+   | `name`            | Name of the antenna array object                          | string                                 |
 
-   If `ant` is used as an input to other functions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are mandatory; remaining fields are optional (defaults: unit coupling, zero positions, 299792458 Hz).
-
----
-<a id="arrayant_interpolate"></a>
-## arrayant_interpolate
-Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
-
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadriga_lib_api_python.md#interpolate)
-
-- Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
-  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (a 1x1 struct and no `freq_new`): up to 8 outputs. Multi-frequency mode (a struct array with
-  more than one entry, or `freq_new` given): for each target frequency, the two entries whose center frequencies
-  bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
-- `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
-- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
-- On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so
-  that the local and the global theta unit vectors agree: the polarization is not rotated there
-- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the peak
-  field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
-  2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
-  elevation; auto selects GENERIC in this version, which may change in a later version
-
-### Usage:
-```matlab
-% Single-frequency mode
-[ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.arrayant_interpolate( ...
-    arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
-
-% Multi-frequency mode
-[ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    i_element, orientation, element_pos, freq_new, use_kernel );
-```
-
-### Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate); a struct
-  array may contain a frequency-dependent model
-- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
-  output)
-- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
-- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
-  `[3, n_out, n_ang]`; default: no rotation
-- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
-  positions of the arrayant
-- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
-  of the entries
-- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
-
-### Outputs:
-- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`; multi-frequency mode:
-  `[n_out, n_ang, n_freq]`
-- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
-- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
-  elements closer to the source; `[n_out, n_ang]`; single-frequency mode only
-- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;
-  single-frequency mode only
-- **`gamma`** — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`; single-frequency
-  mode only
-
-### See also:
-- [arrayant_generate](#arrayant_generate) (arrayant struct layout)
-- [qdant_read](#qdant_read) (load arrayant data)
-- [generate_speaker](#generate_speaker) (typical source of multi-frequency struct arrays)
-
----
-<a id="arrayant_rotate_pattern"></a>
-## arrayant_rotate_pattern
-Rotate antenna radiation patterns using Euler rotations
-
-Also in: [C++](quadriga_lib_api_cpp.md#arrayant_rotate_pattern) · [Python](quadriga_lib_api_python.md#rotate_pattern)
-
-- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
-  [arrayant_interpolate](#arrayant_interpolate) returns for the unrotated pattern with the same `orientation`
-- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
-- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
-- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
-  in `i_element` is an error when the grid must be adjusted
-- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid
-  spurious polarization effects
-
-### Usage:
-```matlab
-arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, orientation, usage, i_element);
-```
-
-### Inputs:
-- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
-  a struct array represents a frequency-dependent model
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3-element vector
-- **`usage`** — Rotation mode; default: 0
-   | Mode | Pattern | Polarization | Grid adj. |
-   | :--: | :-----: | :----------: | :-------: |
-   | 0    | Yes     | Yes          | Yes       |
-   | 1    | Yes     | No           | Yes       |
-   | 2    | No      | Yes          | No        |
-   | 3    | Yes     | Yes          | No        |
-   | 4    | Yes     | No           | No        |
-
-  Multi-frequency input never adjusts the grid (uniform-grid consistency across frequencies): 0 and 3
-  rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
-- **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
-
-### Output:
-- **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
-  field layout as documented in [arrayant_generate](#arrayant_generate)
+   If `ant` is used as an input to other functions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are mandatory; remaining fields are optional (defaults: identity port weights, zero positions, 299792458 Hz).
 
 ---
 <a id="generate_speaker"></a>
@@ -520,7 +381,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_speaker) · [Python](quadriga_li
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
   directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
-  results via [arrayant_concat](#arrayant_concat) and `element_pos`; crossover behavior emerges from overlapping bandpass
+  results via [join_arrays](#join_arrays) and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
@@ -570,56 +431,156 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 ### Output:
 - **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [arrayant_generate](#arrayant_generate) for struct fields; `[1, n_freq]`
+  see [generate_antenna](#generate_antenna) for struct fields; `[1, n_freq]`
+
+---
+<a id="interpolate_pattern"></a>
+## interpolate_pattern
+Interpolate the polarimetric field pattern of an antenna array at given azimuth and elevation angles
+
+Also in: [C++](quadriga_lib_api_cpp.md#interpolate_pattern) · [Python](quadriga_lib_api_python.md#interpolate_pattern)
+
+- Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
+  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
+- Single-frequency mode (a 1x1 struct and no `freq_new`): up to 8 outputs. Multi-frequency mode (a struct array with
+  more than one entry, or `freq_new` given): for each target frequency, the two entries whose center frequencies
+  bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
+- `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
+- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
+- On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so
+  that the local and the global theta unit vectors agree: the polarization is not rotated there
+- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the peak
+  field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
+  2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
+  elevation; auto selects GENERIC in this version, which may change in a later version
+
+### Usage:
+```matlab
+% Single-frequency mode
+[ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
+    arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
+
+% Multi-frequency mode
+[ V_re, V_im, H_re, H_im ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
+    i_element, orientation, element_pos, freq_new, use_kernel );
+```
+
+### Inputs:
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [generate_antenna](#generate_antenna); a struct
+  array may contain a frequency-dependent model
+- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
+  output)
+- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
+- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
+  `[3, n_out, n_ang]`; default: no rotation
+- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
+  positions of the arrayant
+- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
+  of the entries
+- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
+
+### Outputs:
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`; multi-frequency mode:
+  `[n_out, n_ang, n_freq]`
+- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
+- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
+  elements closer to the source; `[n_out, n_ang]`; single-frequency mode only
+- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;
+  single-frequency mode only
+- **`gamma`** — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`; single-frequency
+  mode only
+
+### See also:
+- [generate_antenna](#generate_antenna) (arrayant struct layout)
+- [qdant_read](#qdant_read) (load arrayant data)
+- [generate_speaker](#generate_speaker) (typical source of multi-frequency struct arrays)
+
+---
+<a id="join_arrays"></a>
+## join_arrays
+Concatenate two arrayant structs into a single one
+
+Also in: [C++](quadriga_lib_api_cpp.md#join_arrays) · [Python](quadriga_lib_api_python.md#join_arrays)
+
+- Concatenates all elements from `arrayant_in2` onto `arrayant_in1` along the element dimension; 
+  `element_pos` matrices are joined horizontally
+- Both inputs must share identical azimuth and elevation sampling grids
+- Port weights are assembled block-diagonally: elements from `arrayant_in1` connect only to ports from 
+  `arrayant_in1`, elements from `arrayant_in2` only to ports from `arrayant_in2`
+- `center_freq` and `name` are inherited from `arrayant_in1`
+- Supports multi-frequency arrayant models: when both inputs are struct arrays, they must have the 
+  same number of entries and matching `center_freq` at each index; concatenation is performed per 
+  entry and a struct array of equal size is returned
+- Output struct shape matches the input shape (scalar struct -> scalar struct, struct array -> struct array)
+
+### Usage:
+```matlab
+arrayant_out = quadriga_lib.join_arrays( arrayant_in1, arrayant_in2 );
+```
+
+### Inputs:
+- **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
+  [generate_antenna](#generate_antenna); a struct array may contain a frequency-dependent model
+- **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
+  `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
+
+### Output:
+- **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
+  a struct array of equal size is returned for multi-frequency input
 
 ---
 <a id="qdant_read"></a>
 ## qdant_read
-Reads array antenna data from QDANT files
+Reads antenna array data from QDANT files
 
 Also in: [C++](quadriga_lib_api_cpp.md#qdant_read) · [Python](quadriga_lib_api_python.md#qdant_read)
 
-- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
-- Without `id`, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) 
+- The QuaDRiGa Array Antenna Exchange Format (QDANT) is an XML format for storing antenna pattern data
+- Without `ids`, the entries listed in the layout are read (all entries if the file has no layout): returns a struct array when the file has multiple entries (frequency-dependent model) 
   or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
-  same azimuth and elevation grids, element positions and coupling size), otherwise
-  an error asks to pass `id`
-- With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
-- An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
+  same azimuth and elevation grids, element positions and port-weights size), otherwise
+  an error asks to pass `ids`
+- With a scalar `ids`, a single entry is read as a struct; useful for picking one frequency from a multi-frequency file
+- With a vector `ids`, the entries are read in the given order (duplicates allowed) and returned as a struct array
+- An ID that is 0 or not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
 - Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
   elements without pattern data read as zeros (at most 2^24 zero values per entry)
 
 ### Usage:
 ```matlab
-% Multi-frequency read (struct array, all entries)
+% Multi-frequency read (struct array, entries in the layout)
 [ ant, layout ] = quadriga_lib.qdant_read( fn );
 
 % Single-frequency read (struct output)
-[ ant, layout ] = quadriga_lib.qdant_read( fn, id );
+[ ant, layout ] = quadriga_lib.qdant_read( fn, ids );
+
+% Several entries (struct array)
+[ ant, layout ] = quadriga_lib.qdant_read( fn, [3,1,3] );
 ```
 
 ### Inputs:
 - **`fn`** — Path to the QDANT file; string; must not be empty
-- **`id`** — 1-based ID of the antenna entry to read; pass `[]` or omit to read every entry in the file
+- **`ids`** — 1-based ID of the antenna entry to read (scalar) or vector of IDs; pass `[]` or omit to read the entries in the layout
 
 ### Outputs:
-- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [arrayant_generate](#arrayant_generate)
+- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [generate_antenna](#generate_antenna)
 - **`layout`** — Matrix of element IDs describing how entries are arranged in the file; datatype: uint32
 
 ### See also:
 - [qdant_write](#qdant_write) (for writing QDANT data)
-- [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
+- [generate_antenna](#generate_antenna) (for the arrayant struct layout)
 - QuaDRiGa Array Antenna Exchange Format ([QDANT](formats/qdant.md))
 
 ---
 <a id="qdant_write"></a>
 ## qdant_write
-Writes array antenna data to QDANT files
+Writes antenna array data to QDANT files
 
 Also in: [C++](quadriga_lib_api_cpp.md#qdant_write) · [Python](quadriga_lib_api_python.md#qdant_write)
 
-- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
-- Multiple array antennas can be stored in the same file using distinct `id` values
+- The QuaDRiGa Array Antenna Exchange Format (QDANT) is an XML format for storing antenna pattern data
+- Multiple antenna arrays can be stored in the same file using distinct `id` values
 - If writing to an existing file without specifying an `id`, the data is appended at the end and
   the returned `id_in_file` identifies its location in the file
 - An optional `layout` can be provided to organize the data inside the file
@@ -628,7 +589,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_write) · [Python](quadriga_lib_api
 - The file has single-precision-equivalent accuracy relative to the element peak: pattern
   magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
   amplitude of its element; samples far below the peak are less accurate relative to their own
-  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are
+  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and port weights are
   written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
   degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
@@ -641,7 +602,7 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 
 ### Inputs:
 - **`fn`** — Output QDANT filename; string; must not be empty
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [generate_antenna](#generate_antenna);
   a struct array writes a frequency-dependent model and requires `id` and `layout` to be omitted
 - **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
   must be omitted for a multi-frequency model
@@ -653,8 +614,50 @@ id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 
 ### See also:
 - [qdant_read](#qdant_read) (for reading QDANT data)
-- [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
+- [generate_antenna](#generate_antenna) (for the arrayant struct layout)
 - QuaDRiGa Array Antenna Exchange Format ([QDANT](formats/qdant.md))
+
+---
+<a id="rotate_pattern"></a>
+## rotate_pattern
+Rotate antenna radiation patterns using Euler rotations
+
+Also in: [C++](quadriga_lib_api_cpp.md#rotate_pattern) · [Python](quadriga_lib_api_python.md#rotate_pattern)
+
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [interpolate_pattern](#interpolate_pattern) returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); port weights, `center_freq` and `name` are kept
+- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
+  in `i_element` is an error when the grid must be adjusted
+- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid
+  spurious polarization effects
+
+### Usage:
+```matlab
+arrayant_out = quadriga_lib.rotate_pattern(arrayant_in, orientation, usage, i_element);
+```
+
+### Inputs:
+- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [generate_antenna](#generate_antenna);
+  a struct array represents a frequency-dependent model
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3-element vector
+- **`usage`** — Rotation mode; default: 0
+   | Mode | Pattern | Polarization | Grid adj. |
+   | :--: | :-----: | :----------: | :-------: |
+   | 0    | Yes     | Yes          | Yes       |
+   | 1    | Yes     | No           | Yes       |
+   | 2    | No      | Yes          | No        |
+   | 3    | Yes     | Yes          | No        |
+   | 4    | Yes     | No           | No        |
+
+  Multi-frequency input never adjusts the grid (uniform-grid consistency across frequencies): 0 and 3
+  rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
+- **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
+
+### Output:
+- **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
+  field layout as documented in [generate_antenna](#generate_antenna)
 
 ---
 
@@ -677,7 +680,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [Python](quadr
   paths do not change the result)
 - Multi-frequency coefficients (e.g. from [get_channels_multifreq](#get_channels_multifreq)) and absolute carrier frequencies are handled by
   [baseband_freq_response_multi](#baseband_freq_response_multi); the two functions take different arguments, so they are two functions, while
-  [arrayant_interpolate](#arrayant_interpolate) serves both of its cases with one argument set
+  [interpolate_pattern](#interpolate_pattern) serves both of its cases with one argument set
 - `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
 - The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
   before sin / cos are evaluated in single precision; coefficients and sums are single precision; double inputs are
@@ -1200,7 +1203,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
-- [arrayant_generate](#arrayant_generate) (for generating antenna arrays)
+- [generate_antenna](#generate_antenna) (for generating antenna arrays)
 - [get_channels_planar](#get_channels_planar) (for embedding antennas using departure and arrival angles)
 - [get_channels_spherical](#get_channels_spherical) (for embedding antennas using FBS/LBS positions)
 - [get_channels_multifreq](#get_channels_multifreq) (for multi-frequency antenna embedding)
@@ -1296,8 +1299,8 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 ```
 
 ### Inputs:
-- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling; see [arrayant_generate](#arrayant_generate)
-- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling; see [arrayant_generate](#arrayant_generate)
+- **`ap_array`** — Access point antenna array; `n_tx` = number of ports; see [generate_antenna](#generate_antenna)
+- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports; see [generate_antenna](#generate_antenna)
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
 - **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
@@ -1359,10 +1362,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
   channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` struct without `coupling_re` /
-  `coupling_im` throws, unlike in the other functions, where it stands for identity
+- The IRS port weights hold the IRS weights and must be given: an `irs_array` struct without `port_weights_re` /
+  `port_weights_im` throws, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
@@ -1392,9 +1395,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the coupling matrix holds the IRS weights,
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [generate_antenna](#generate_antenna)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [generate_antenna](#generate_antenna)
+- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the port weights hold the IRS weights,
   one codebook entry per column, `[n_irs, n_codebook]`
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
@@ -1414,12 +1417,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 - **`path_length_2`** — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_2, 1]`
 - **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
-- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
+- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS port weights); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
-  only its patterns are used, its coupling and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
+  only its patterns are used, its port weights and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
 - **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`; default: `[]`
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
@@ -1437,7 +1440,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-segment spherical-wave channel)
 - [get_channels_planar](#get_channels_planar) (single-segment planar-wave channel)
-- [arrayant_generate](#arrayant_generate) (antenna array generator)
+- [generate_antenna](#generate_antenna) (antenna array generator)
 
 ---
 <a id="get_channels_multifreq"></a>
@@ -1459,7 +1462,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
   FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.
-- Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
+- Port weights are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 1 holds the LOS path
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
@@ -1485,8 +1488,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 ```
 
 ### Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [arrayant_generate](#arrayant_generate)
-- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [arrayant_generate](#arrayant_generate)
+- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [generate_antenna](#generate_antenna)
+- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [generate_antenna](#generate_antenna)
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
@@ -1505,7 +1508,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](#arrayant_interpolate); default: 0
+  unavailable); auto selects GENERIC in this version, see [interpolate_pattern](#interpolate_pattern); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
@@ -1561,8 +1564,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [generate_antenna](#generate_antenna)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [generate_antenna](#generate_antenna)
 - **`tx_pos`** — Transmitter position; `[3, 1]`, or `[3, n_snap]` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
   batch mode
@@ -1581,7 +1584,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](#arrayant_interpolate); default: 0
+  unavailable); auto selects GENERIC in this version, see [interpolate_pattern](#interpolate_pattern); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -1592,7 +1595,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (spherical wave variant accounting for per-element angle differences)
 - [get_channels_ieee_indoor](#get_channels_ieee_indoor) (for generating IEEE compliant channels using `get_channels_planar` internally)
-- [arrayant_generate](#arrayant_generate) (antenna array generator)
+- [generate_antenna](#generate_antenna) (antenna array generator)
 - [baseband_freq_response](#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed grid)
 
@@ -1646,8 +1649,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [generate_antenna](#generate_antenna)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [generate_antenna](#generate_antenna)
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
   `[3, n_snap]` in batch mode
@@ -1667,7 +1670,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
-  [arrayant_interpolate](#arrayant_interpolate); default: 0
+  [interpolate_pattern](#interpolate_pattern); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -1681,7 +1684,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 ### See also:
 - [get_channels_planar](#get_channels_planar) (planar wave variant)
 - [get_channels_irs](#get_channels_irs) (for IRS-assisted communication)
-- [arrayant_generate](#arrayant_generate) (antenna array generator)
+- [generate_antenna](#generate_antenna) (antenna array generator)
 - [baseband_freq_response](#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed grid)
 
@@ -2360,7 +2363,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 
 ### Inputs:
 - **`tx_array`**, **`rx_array`** — Structs containing the arrayant data with `n_tx` and `n_rx` ports; field layout
-  as documented in [arrayant_generate](#arrayant_generate)
+  as documented in [generate_antenna](#generate_antenna)
 - **`rays`** — Ray struct of the link, see [ssf_rays](#ssf_rays); `[1, 1]` struct
 - **`link_gain_dB`** — Link gain (see Terms) at `rays.center_freq(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** — `'phase'`, `'drift'` or `'auto'` (see Terms; `'auto'` is `'drift'` for `'quadriga'` rays, which then

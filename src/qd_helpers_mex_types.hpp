@@ -18,7 +18,7 @@ inline mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant
 {
     std::vector<std::string> fields = {"e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im",
                                        "azimuth_grid", "elevation_grid", "element_pos",
-                                       "coupling_re", "coupling_im", "center_freq", "name"};
+                                       "port_weights_re", "port_weights_im", "center_freq", "name"};
 
     mxArray *output = qd_mex_make_struct(fields);
     qd_mex_set_field(output, fields[0], qd_mex_copy2matlab(&ant.e_theta_re));
@@ -28,8 +28,8 @@ inline mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant
     qd_mex_set_field(output, fields[4], qd_mex_copy2matlab(&ant.azimuth_grid, true));
     qd_mex_set_field(output, fields[5], qd_mex_copy2matlab(&ant.elevation_grid, true));
     qd_mex_set_field(output, fields[6], qd_mex_copy2matlab(&ant.element_pos));
-    qd_mex_set_field(output, fields[7], qd_mex_copy2matlab(&ant.coupling_re));
-    qd_mex_set_field(output, fields[8], qd_mex_copy2matlab(&ant.coupling_im));
+    qd_mex_set_field(output, fields[7], qd_mex_copy2matlab(&ant.port_weights_re));
+    qd_mex_set_field(output, fields[8], qd_mex_copy2matlab(&ant.port_weights_im));
     qd_mex_set_field(output, fields[9], qd_mex_copy2matlab(&ant.center_freq));
     qd_mex_set_field(output, fields[10], mxCreateString(ant.name.c_str()));
     return output;
@@ -39,7 +39,7 @@ inline mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arr
 {
     std::vector<std::string> fields = {"e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im",
                                        "azimuth_grid", "elevation_grid", "element_pos",
-                                       "coupling_re", "coupling_im", "center_freq", "name"};
+                                       "port_weights_re", "port_weights_im", "center_freq", "name"};
 
     mxArray *output = qd_mex_make_struct(fields, ant.size());
     for (size_t n = 0; n < ant.size(); ++n)
@@ -51,8 +51,8 @@ inline mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arr
         qd_mex_set_field(output, fields[4], qd_mex_copy2matlab(&ant[n].azimuth_grid, true), n);
         qd_mex_set_field(output, fields[5], qd_mex_copy2matlab(&ant[n].elevation_grid, true), n);
         qd_mex_set_field(output, fields[6], qd_mex_copy2matlab(&ant[n].element_pos), n);
-        qd_mex_set_field(output, fields[7], qd_mex_copy2matlab(&ant[n].coupling_re), n);
-        qd_mex_set_field(output, fields[8], qd_mex_copy2matlab(&ant[n].coupling_im), n);
+        qd_mex_set_field(output, fields[7], qd_mex_copy2matlab(&ant[n].port_weights_re), n);
+        qd_mex_set_field(output, fields[8], qd_mex_copy2matlab(&ant[n].port_weights_im), n);
         qd_mex_set_field(output, fields[9], qd_mex_copy2matlab(&ant[n].center_freq), n);
         qd_mex_set_field(output, fields[10], mxCreateString(ant[n].name.c_str()), n);
     }
@@ -75,6 +75,14 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant_element(const mxArr
         return (a == nullptr || mxIsEmpty(a)) ? nullptr : a;
     };
 
+    // The matrix of element-to-port weights was called coupling_re / coupling_im; ignoring the old fields would drop the weights
+    for (const char *suffix : {"re", "im"})
+        if (mxGetField(input, (mwIndex)n, (std::string("coupling_") + suffix).c_str()) != nullptr)
+        {
+            const std::string msg = "Field '" + fld((std::string("coupling_") + suffix).c_str()) + "' was renamed to 'port_weights_" + suffix + "'.";
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+        }
+
     quadriga_lib::arrayant<double> ant;
     ant.e_theta_re = qd_mex_get_Cube<double>(get("e_theta_re"), copy, fld("e_theta_re"));
     ant.e_theta_im = qd_mex_get_Cube<double>(get("e_theta_im"), copy, fld("e_theta_im"));
@@ -84,10 +92,10 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant_element(const mxArr
     ant.elevation_grid = qd_mex_get_Col<double>(get("elevation_grid"), copy, fld("elevation_grid"));
     if (const mxArray *a = opt("element_pos"))
         ant.element_pos = qd_mex_get_Mat<double>(a, copy, fld("element_pos"));
-    if (const mxArray *a = opt("coupling_re"))
-        ant.coupling_re = qd_mex_get_Mat<double>(a, copy, fld("coupling_re"));
-    if (const mxArray *a = opt("coupling_im"))
-        ant.coupling_im = qd_mex_get_Mat<double>(a, copy, fld("coupling_im"));
+    if (const mxArray *a = opt("port_weights_re"))
+        ant.port_weights_re = qd_mex_get_Mat<double>(a, copy, fld("port_weights_re"));
+    if (const mxArray *a = opt("port_weights_im"))
+        ant.port_weights_im = qd_mex_get_Mat<double>(a, copy, fld("port_weights_im"));
     qd_arrayant_fill_defaults(ant);
 
     if (const mxArray *a = opt("center_freq"))
@@ -122,7 +130,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         ant.push_back(qd_mex_struct2arrayant_element(input, n, copy, var_name));
     if (validate)
     {
-        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
+        auto error_msg = quadriga_lib::is_valid(ant);
         if (!error_msg.empty())
             qd_mex_cpp_error(error_msg);
     }

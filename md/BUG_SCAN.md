@@ -47,7 +47,7 @@ Everything in the library is in scope unless the maintainer excluded it in phase
 
 | Area | Contents |
 | :--- | :------- |
-| A. Array antennas | `qd_arrayant*`, interpolation (generic and AVX2), generate, combine, rotate, qdant read/write, xio, speaker, beamwidth and directivity |
+| A. Antenna arrays | `qd_arrayant.cpp`, `interpolate_pattern*`, `generate_antenna`, `apply_port_weights`, `join_arrays`, `copy_element`, `pattern_transform`, `pattern_metrics`, `qdant`, `generate_speaker` |
 | B. Channel object and file I/O | `qd_channel*`, HDF5, QRT, `quantize_delays`, OBJ read/write, Mitsuba XML, PNG, conf files |
 | C. Channel generation and tools | `get_channels_*` (planar, spherical, multifreq, IRS, IEEE indoor), `baseband_freq_response` (generic and AVX2), `qd_tools_*`, acdf, diffraction gain and paths, `qd_path`, `coord2path`, `path_to_tube`, `polmat_update`, `combine_irs_coord` |
 | D. Stochastic channel model | `qd_scenpar`, `lsp_generate`, `ssf_clusters`, `qd_gbsm_phases`, `path_loss`, `los_probability`, `o2i_loss`, `qd_helpers_gbsm` |

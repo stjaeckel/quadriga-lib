@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
+#include "qd_helpers_mex_types.hpp"
+
+/*!SECTION
+Antennas, transducers and patterns
+SECTION!*/
+
+/*!MD
+# CALC_DIRECTIVITY
+Calculates the directivity in dBi of antenna array elements
+
+- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+- Calculated per element, not per port; ignores the port weights
+- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
+
+## Usage:
+```
+directivity_dBi = quadriga_lib.calc_directivity( arrayant, i_element );
+```
+
+## Inputs:
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[generate_antenna]];
+  a struct array may contain a frequency-dependent model
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
+
+## Output:
+- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
+
+## See also:
+- [[apply_port_weights]] (to apply the port weights before calculating directivity)
+- [[calc_beamwidth]] (calculates the beam width of antenna arrays)
+MD!*/
+
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+    if (nrhs < 1 || nrhs > 2)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+    if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be an arrayant struct or struct array.");
+
+    // Element indices: 1-based MATLAB -> 0-based C++ (empty = all elements)
+    const arma::uvec i_element = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_element");
+
+    // A single struct is a one-entry vector; the output is [n_out, n_freq] either way
+    const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant"); // Validated by the C++ function
+    arma::mat directivity_dBi;
+    CALL_QD(directivity_dBi = quadriga_lib::calc_directivity(ant_multi, i_element));
+    plhs[0] = qd_mex_copy2matlab(&directivity_dBi);
+}

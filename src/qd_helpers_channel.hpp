@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Helpers shared by the sources of the channel sections: matrix products of the channel generators, the
-// combination of antenna patterns into coefficients, the spherical-wave geometry, the element coupling, the batch
+// combination of antenna patterns into coefficients, the spherical-wave geometry, the port weights, the batch
 // ("_vec") checks and snapshot loop, and the type ID of values in std::any
 
 #ifndef qd_helpers_channel_hpp
@@ -208,7 +208,7 @@ static inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX 
 //   R = t * n_rx + r to aod, eod, aoa, eoa, len at i_out * n_links + R; each [n_links, n_out]
 // - NLOS path length between the phase centres: max(path_length, TX-FBS-LBS-RX polyline); the extra length goes into
 //   the FBS-LBS segment
-// - Element indices and local positions for qd_arrayant_interpolate_dispatch: i_tx, i_rx [n_links];
+// - Element indices and local positions for qd_interpolate_pattern_dispatch: i_tx, i_rx [n_links];
 //   tx_pos_interp, rx_pos_interp [3, n_links]
 // - dist_rx_tx: distance between the TX and RX phase centres
 // - Returns the output slot of the path whose length is closest to dist_rx_tx, within 0.1 mm (the true LOS path);
@@ -344,35 +344,35 @@ static inline arma::uword qd_channels_spherical_geometry(const arma::Mat<dtype> 
     return true_los_path;
 }
 
-// True if the coupling (coupling_re [n_el, n_ports] or empty = identity, coupling_im of the same size or empty =
+// True if the port weights (port_weights_re [n_el, n_ports] or empty = identity, port_weights_im of the same size or empty =
 // zero) is the identity within 1e-6 per entry, so that the channel generators can skip it
 template <typename dtype>
-static inline bool qd_coupling_is_identity(const arma::Mat<dtype> &coupling_re, const arma::Mat<dtype> &coupling_im)
+static inline bool qd_port_weights_is_identity(const arma::Mat<dtype> &port_weights_re, const arma::Mat<dtype> &port_weights_im)
 {
     constexpr dtype limit = (dtype)1.0e-6, one = (dtype)1.0;
-    const arma::uword n = coupling_re.n_rows;
-    if (coupling_re.n_elem != 0 && coupling_re.n_cols != n)
+    const arma::uword n = port_weights_re.n_rows;
+    if (port_weights_re.n_elem != 0 && port_weights_re.n_cols != n)
         return false;
-    const dtype *p = coupling_re.memptr();
-    for (arma::uword c = 0; c < coupling_re.n_cols; ++c)
+    const dtype *p = port_weights_re.memptr();
+    for (arma::uword c = 0; c < port_weights_re.n_cols; ++c)
         for (arma::uword r = 0; r < n; ++r)
             if (std::abs(p[c * n + r] - (r == c ? one : (dtype)0.0)) > limit)
                 return false;
-    for (const dtype v : coupling_im)
+    for (const dtype v : port_weights_im)
         if (std::abs(v) > limit)
             return false;
     return true;
 }
 
-// Applies the antenna coupling to one path of the channel generators: coefficients C_out = A_rx^T * C_in * A_tx
-// with the complex coupling matrices (rx_re/rx_im [n_rx, n_rx_ports], tx_re/tx_im [n_tx, n_tx_ports], nullptr =
-// identity / zero), delays D_out = P_rx^T * D_in * P_tx with the column-normalized coupling powers (rx_pwr, tx_pwr,
+// Applies the port weights to one path of the channel generators: coefficients C_out = A_rx^T * C_in * A_tx
+// with the complex port weights (rx_re/rx_im [n_rx, n_rx_ports], tx_re/tx_im [n_tx, n_tx_ports], nullptr =
+// identity / zero), delays D_out = P_rx^T * D_in * P_tx with the column-normalized port-weight powers (rx_pwr, tx_pwr,
 // see qd_power_mat)
 // - Inputs cr_in, ci_in, dl_in [n_rx, n_tx]; outputs cr_out, ci_out, dl_out [n_rx_ports, n_tx_ports]
 // - The outputs may be the inputs (in place, when the port counts equal the element counts); the result then goes
 //   through 'temp', which is resized as needed
 template <typename dtype>
-static inline void qd_coupling_apply_slot(const dtype *rx_re, const dtype *rx_im, const dtype *tx_re, const dtype *tx_im,
+static inline void qd_port_weights_apply_slot(const dtype *rx_re, const dtype *rx_im, const dtype *tx_re, const dtype *tx_im,
                                           const dtype *rx_pwr, const dtype *tx_pwr,
                                           size_t n_rx, size_t n_rx_ports, size_t n_tx, size_t n_tx_ports,
                                           const dtype *cr_in, const dtype *ci_in, const dtype *dl_in,
@@ -414,7 +414,7 @@ static inline bool qd_channels_vec_check(const quadriga_lib::arrayant<dtype> &tx
         if (m->n_cols != 1ULL && m->n_cols != n_snap)
             throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 1 or 'n_snap' columns.");
 
-    qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
+    qd_interpolate_pattern_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
     qd_arrayant_check_tx_rx(tx_array, rx_array);
 
     const arma::uword n_links = tx_array.e_theta_re.n_slices * rx_array.e_theta_re.n_slices;

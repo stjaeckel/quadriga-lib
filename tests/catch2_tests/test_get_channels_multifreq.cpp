@@ -30,7 +30,7 @@ static std::vector<quadriga_lib::arrayant<dtype>> wrap_single(const quadriga_lib
 
 TEST_CASE("Multifreq - Empty TX array throws")
 {
-    std::vector<quadriga_lib::arrayant<double>> tx, rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    std::vector<quadriga_lib::arrayant<double>> tx, rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     arma::mat pg(1, 1, arma::fill::ones);
     arma::vec pl = {1.0};
@@ -47,7 +47,7 @@ TEST_CASE("Multifreq - Empty TX array throws")
 TEST_CASE("Multifreq - fbs_pos with columns but no rows throws")
 {
     // [0, 4] has no elements but 4 columns; with all other path inputs empty it is missing data, not 0 paths
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0)), rx = tx;
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0)), rx = tx;
     arma::mat fbs(0, 4), lbs, pg;
     arma::vec pl;
     arma::cube M;
@@ -64,7 +64,7 @@ TEST_CASE("Multifreq - fbs_pos with columns but no rows throws")
 TEST_CASE("Multifreq - Empty RX array throws")
 {
     std::vector<quadriga_lib::arrayant<double>> rx;
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     arma::mat pg(1, 1, arma::fill::ones);
     arma::vec pl = {1.0};
@@ -80,8 +80,8 @@ TEST_CASE("Multifreq - Empty RX array throws")
 
 TEST_CASE("Multifreq - Empty freq throws")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     arma::mat pg(1, 1, arma::fill::ones);
     arma::vec pl = {1.0};
@@ -97,8 +97,8 @@ TEST_CASE("Multifreq - Empty freq throws")
 
 TEST_CASE("Multifreq - Empty freq_new throws")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     arma::mat pg(1, 1, arma::fill::ones);
     arma::vec pl = {1.0};
@@ -114,8 +114,8 @@ TEST_CASE("Multifreq - Empty freq_new throws")
 
 TEST_CASE("Multifreq - Mismatched path_gain size throws")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 2, arma::fill::zeros), lbs(3, 2, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     fbs(0, 1) = 10.0; lbs(0, 1) = 10.0;
@@ -133,8 +133,8 @@ TEST_CASE("Multifreq - Mismatched path_gain size throws")
 
 TEST_CASE("Multifreq - M with wrong row count throws")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -151,8 +151,8 @@ TEST_CASE("Multifreq - M with wrong row count throws")
 
 TEST_CASE("Multifreq - Non-positive propagation speed throws")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -170,7 +170,7 @@ TEST_CASE("Multifreq - Non-positive propagation speed throws")
 
 TEST_CASE("Multifreq - Non-finite TX or RX position or orientation throws")
 {
-    auto ant = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto ant = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs = arma::vec({5.0, 5.0, 0.0});
     arma::mat pg(1, 1, arma::fill::ones);
     arma::vec pl = {15.0};
@@ -210,8 +210,8 @@ TEST_CASE("Multifreq - Non-finite TX or RX position or orientation throws")
 
 TEST_CASE("Multifreq - Output vector and cube dimensions")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 3, arma::fill::zeros), lbs(3, 3, arma::fill::zeros);
     fbs(0, 0) = 10.0; fbs(0, 1) = 10.0; fbs(0, 2) = 10.0;
     lbs(0, 0) = 10.0; lbs(0, 1) = 10.0; lbs(0, 2) = 10.0;
@@ -240,8 +240,8 @@ TEST_CASE("Multifreq - Output vector and cube dimensions")
 
 TEST_CASE("Multifreq - Fake LOS adds extra path slice")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 5.0; fbs(1, 0) = 5.0; // NLOS path
     lbs(0, 0) = 5.0; lbs(1, 0) = 5.0;
@@ -264,8 +264,8 @@ TEST_CASE("Multifreq - Matches get_channels_spherical for single freq, single en
     double C = 299792458.0;
     double fc = 2997924580.0; // 10 * C (wavelength = 0.1 m)
 
-    auto ant_single = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-    quadriga_lib::arrayant_copy_element(ant_single, 0, {1});
+    auto ant_single = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    quadriga_lib::copy_element(ant_single, 0, {1});
     ant_single.element_pos(1, 0) = 1.0;
     ant_single.element_pos(1, 1) = -1.0;
     ant_single.e_theta_re.slice(1) *= 2;
@@ -315,8 +315,8 @@ TEST_CASE("Multifreq - Speed of sound produces correct acoustic delays")
 {
     double c_sound = 343.0; // m/s
 
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
 
     // LOS path: TX at origin, RX at (5, 0, 0)
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
@@ -351,8 +351,8 @@ TEST_CASE("Multifreq - Radio vs acoustic delays differ by speed ratio")
     double c_sound = 343.0;
     double dist = 10.0;
 
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = dist; lbs(0, 0) = dist;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -377,8 +377,8 @@ TEST_CASE("Multifreq - Radio vs acoustic delays differ by speed ratio")
 
 TEST_CASE("Multifreq - Scalar M (2 rows) produces same VV result as full M (8 rows)")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -412,8 +412,8 @@ TEST_CASE("Multifreq - Scalar M (2 rows) produces same VV result as full M (8 ro
 
 TEST_CASE("Multifreq - Path gain linearly interpolated across frequency")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::vec pl = {10.0};
@@ -440,8 +440,8 @@ TEST_CASE("Multifreq - Path gain linearly interpolated across frequency")
 TEST_CASE("Multifreq - M interpolated with SLERP (phase rotation)")
 {
     // M rotates from (1,0) to (0,1) across frequency → 90° phase shift
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::vec pl = {10.0};
@@ -466,8 +466,8 @@ TEST_CASE("Multifreq - M interpolated with SLERP (phase rotation)")
 
 TEST_CASE("Multifreq - Extrapolation clamps path gain and M")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::vec pl = {10.0};
@@ -499,8 +499,8 @@ TEST_CASE("Multifreq - Extrapolation clamps path gain and M")
 
 TEST_CASE("Multifreq - Multiple output frequencies produce correct count and finite values")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -530,13 +530,13 @@ TEST_CASE("Multifreq - GHz antenna with frequency-dependent pattern")
     std::vector<quadriga_lib::arrayant<double>> tx_vec;
     for (arma::uword i = 0; i < ghz_freqs.n_elem; ++i)
     {
-        auto ant = quadriga_lib::arrayant_generate<double>("custom", 1.0, NAN, {90.0, 90.0});
+        auto ant = quadriga_lib::generate_antenna<double>("custom", 1.0, NAN, {90.0, 90.0});
         double scale = 1.0 + 0.5 * (double)i;
         ant.e_theta_re *= scale;
         ant.center_freq = ghz_freqs[i];
         tx_vec.push_back(ant);
     }
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
 
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
@@ -569,10 +569,10 @@ TEST_CASE("Multifreq - Acoustic 2-way speaker with omni microphone (documentatio
     auto tx_tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
         0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
-    auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
+    auto tx = quadriga_lib::join_arrays(tx_woofer, tx_tweeter);
 
     // Omnidirectional microphone as RX (single entry, clamped for all frequencies)
-    std::vector<quadriga_lib::arrayant<double>> rx = {quadriga_lib::arrayant_generate<double>("omni", 1.0)};
+    std::vector<quadriga_lib::arrayant<double>> rx = {quadriga_lib::generate_antenna<double>("omni", 1.0)};
 
     // Simple LOS path setup
     arma::mat fbs = arma::mat({0.5, 0.0, 0.0}).t();
@@ -622,8 +622,8 @@ TEST_CASE("Multifreq - Acoustic woofer dominates at low freq, tweeter at high fr
     auto tx_tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
         0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
-    auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
-    std::vector<quadriga_lib::arrayant<double>> rx = {quadriga_lib::arrayant_generate<double>("omni", 1.0)};
+    auto tx = quadriga_lib::join_arrays(tx_woofer, tx_tweeter);
+    std::vector<quadriga_lib::arrayant<double>> rx = {quadriga_lib::generate_antenna<double>("omni", 1.0)};
 
     arma::mat fbs = arma::mat({2.0, 0.0, 0.0}).t();
     arma::mat lbs = arma::mat({2.0, 0.0, 0.0}).t();
@@ -655,8 +655,8 @@ TEST_CASE("Multifreq - Acoustic woofer dominates at low freq, tweeter at high fr
 TEST_CASE("Multifreq - Full polarimetric Jones with cross-pol coupling")
 {
     // Create a cross-pol probe as RX (has both V and H response)
-    auto probe = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
-    auto tx_ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    auto probe = quadriga_lib::generate_antenna<double>("xpol", 1.0);
+    auto tx_ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
     auto tx = wrap_single(tx_ant);
     auto rx = wrap_single(probe);
 
@@ -691,13 +691,13 @@ TEST_CASE("Multifreq - Full polarimetric Jones with cross-pol coupling")
 
 TEST_CASE("Multifreq - TX orientation rotates pattern")
 {
-    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-    quadriga_lib::arrayant_copy_element(ant, 0, {1});
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    quadriga_lib::copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 15.0;
     ant.element_pos(1, 1) = -15.0;
     ant.e_theta_re.slice(1) *= 2;
 
-    auto probe = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
+    auto probe = quadriga_lib::generate_antenna<double>("xpol", 1.0);
     auto tx = wrap_single(ant);
     auto rx = wrap_single(probe);
 
@@ -727,8 +727,8 @@ TEST_CASE("Multifreq - TX orientation rotates pattern")
 
 TEST_CASE("Multifreq - Different frequencies produce different phases")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -759,8 +759,8 @@ TEST_CASE("Multifreq - Different frequencies produce different phases")
 
 TEST_CASE("Multifreq - LOS and NLOS paths have different delays")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     double C = 299792458.0;
 
     // Path 0: LOS (FBS = LBS = RX position)
@@ -792,14 +792,14 @@ TEST_CASE("Multifreq - LOS and NLOS paths have different delays")
 
 TEST_CASE("Multifreq - 2x2 MIMO output dimensions and element scaling")
 {
-    auto tx_ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-    quadriga_lib::arrayant_copy_element(tx_ant, 0, {1});
+    auto tx_ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    quadriga_lib::copy_element(tx_ant, 0, {1});
     tx_ant.element_pos(1, 0) = 0.5;
     tx_ant.element_pos(1, 1) = -0.5;
     tx_ant.e_theta_re.slice(1) *= 2.0;
 
-    auto rx_ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-    quadriga_lib::arrayant_copy_element(rx_ant, 0, {1});
+    auto rx_ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    quadriga_lib::copy_element(rx_ant, 0, {1});
 
     auto tx = wrap_single(tx_ant);
     auto rx = wrap_single(rx_ant);
@@ -829,8 +829,8 @@ TEST_CASE("Multifreq - 2x2 MIMO output dimensions and element scaling")
 
 TEST_CASE("Multifreq - Float template compiles and runs")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<float>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<float>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<float>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<float>("omni", 1.0));
     arma::fmat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0f; lbs(0, 0) = 10.0f;
     arma::fmat pg(1, 1, arma::fill::ones);
@@ -850,8 +850,8 @@ TEST_CASE("Multifreq - Float template compiles and runs")
 
 TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -873,8 +873,8 @@ TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
 
 TEST_CASE("Multifreq - Multiple freq entries with varying path gain")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::vec pl = {10.0};
@@ -905,8 +905,8 @@ TEST_CASE("Multifreq - Absolute delay includes LOS, relative subtracts it")
     double C = 299792458.0;
     double dist = 20.0;
 
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = dist; lbs(0, 0) = dist;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -930,8 +930,8 @@ TEST_CASE("Multifreq - Absolute delay includes LOS, relative subtracts it")
 
 TEST_CASE("Multifreq - Sweep: amplitude stable, phase varies with frequency")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -956,8 +956,8 @@ TEST_CASE("Multifreq - Sweep: amplitude stable, phase varies with frequency")
 
 TEST_CASE("Multifreq - Pre-allocated output vectors are reused")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg(1, 1, arma::fill::ones);
@@ -990,8 +990,8 @@ TEST_CASE("Multifreq - Pre-allocated output vectors are reused")
 TEST_CASE("Multifreq - Acoustic single-bounce produces NLOS delay > LOS")
 {
     double c_sound = 343.0;
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
 
     // TX at origin, RX at (3, 0, 0), scatterer on wall at (1.5, 2, 0)
     arma::mat fbs(3, 2, arma::fill::zeros), lbs(3, 2, arma::fill::zeros);
@@ -1021,8 +1021,8 @@ TEST_CASE("Multifreq - Acoustic single-bounce produces NLOS delay > LOS")
 TEST_CASE("Multifreq - Air absorption increases with frequency (acoustic)")
 {
     double c_sound = 343.0;
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 5.0; lbs(0, 0) = 5.0;
     arma::vec pl = {5.0};
@@ -1055,8 +1055,8 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
     std::vector<quadriga_lib::arrayant<double>> tx_vec;
     for (int i = 0; i < 2; ++i)
     {
-        auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-        quadriga_lib::arrayant_copy_element(ant, 0, {1});
+        auto ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+        quadriga_lib::copy_element(ant, 0, {1});
         ant.center_freq = (i == 0) ? 1e9 : 2e9;
 
         // Coupling: mix elements differently at each frequency
@@ -1064,13 +1064,13 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
         // At 2 GHz: port 0 = elem0, port 1 = elem1 (identity)
         if (i == 0)
         {
-            ant.coupling_re = {{1.0, 0.5}, {0.5, 1.0}};
-            ant.coupling_im.zeros(2, 2);
+            ant.port_weights_re = {{1.0, 0.5}, {0.5, 1.0}};
+            ant.port_weights_im.zeros(2, 2);
         }
         // i==1: no coupling set → identity
         tx_vec.push_back(ant);
     }
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
 
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
@@ -1094,8 +1094,8 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
 
 TEST_CASE("Multifreq - Reversed freq_new order gives consistent results")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::mat pg = {{1.0, 4.0}};
@@ -1127,8 +1127,8 @@ TEST_CASE("Multifreq - Reversed freq_new order gives consistent results")
 // <= freq[0] to column 0 would collapse these bands onto the reference value.
 TEST_CASE("Multifreq - Unsorted freq is not clamped to first entry")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
-    auto rx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
 
     // Single path, omni patterns: coefficient magnitude reduces to sqrt(path_gain),
     // so a per-frequency gain maps directly to a per-frequency amplitude.
@@ -1183,7 +1183,7 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
     // Geometry: TX (0,0,0), RX (100,0,0), 3-bounce path via (30,40,0), (50,60,0), (70,40,0);
     // full length 156.5685 m, geometric TX-FBS-LBS-RX polyline 140 m
     const double C = 299792458.0;
-    auto va = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 10.0));
+    auto va = wrap_single(quadriga_lib::generate_antenna<double>("omni", 10.0));
     arma::u32_vec n_interact = {3};
     arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
     arma::vec len;
@@ -1231,7 +1231,7 @@ TEST_CASE("Multifreq - add_fake_los_path layout")
     // Always one extra output path; slot 0 holds the LOS path (zero power if none was found);
     // if a LOS path was present, its original slot holds a zero-power path.
     const double C = 299792458.0;
-    auto va = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 10.0));
+    auto va = wrap_single(quadriga_lib::generate_antenna<double>("omni", 10.0));
     arma::mat F(3, 3); // TX (0,0,0), RX (50,0,0)
     F.col(0) = arma::vec({20, 20, 0}), F.col(2) = arma::vec({30, -25, 0});
     arma::mat pg = arma::vec({0.5, 1.0, 0.25});
@@ -1270,13 +1270,13 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
     // The output holds exactly the zero-power LOS path for every output frequency; its delays per antenna pair equal
     // those of a real LOS path with the same geometry; without add_fake_los_path, the outputs are empty
     const double C = 299792458.0;
-    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    auto tx = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    quadriga_lib::copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     tx.center_freq = 3e9;
     auto rx = tx;
-    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
-    rx.coupling_im = arma::vec({0.0, 0.2});
+    rx.port_weights_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.port_weights_im = arma::vec({0.0, 0.2});
     std::vector<quadriga_lib::arrayant<double>> txv = {tx}, rxv = {rx};
 
     const double Tx = 1, Ty = 2, Tz = 3, Rx = 11, Ry = -3, Rz = 5;
@@ -1311,7 +1311,7 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
         }
     }
 
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
     std::vector<quadriga_lib::arrayant<double>> ov = {omni};
     std::vector<arma::cube> cr, ci, dl;
     quadriga_lib::get_channels_multifreq<double>(ov, ov, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
@@ -1328,12 +1328,12 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
 TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
 {
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0] for every output frequency
-    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    auto tx = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    quadriga_lib::copy_element(tx, 0, {1});
     tx.center_freq = 3e9;
     auto rx = tx;
-    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
-    rx.coupling_im = arma::vec({0.0, 0.2});
+    rx.port_weights_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.port_weights_im = arma::vec({0.0, 0.2});
     std::vector<quadriga_lib::arrayant<double>> txv = {tx}, rxv = {rx};
     arma::mat f0(3, 0), g0(0, 1), fx, gx;
     arma::cube M0(8, 0, 1), Mx;
@@ -1364,7 +1364,7 @@ TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
 
 TEST_CASE("Multifreq - outputs that alias inputs")
 {
-    auto tx = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 10.0));
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("omni", 10.0));
     arma::mat fbs = arma::mat({10.0, 5.0, 0.0}).t(), pg = {1.0};
     arma::vec pl = {0.0}, fi = {1e9}, fo = {1e9, 2e9};
     arma::cube M(8, 1, 1, arma::fill::zeros);
@@ -1401,8 +1401,8 @@ TEST_CASE("get_channels_multifreq - a positive tilt points down (3GPP TR 38.901)
     // The TX is 10 m above the RX and 10 m away: the RX is 45 degree below the TX. A beam along x reaches the other
     // end only when turned toward it: TX tilt +pi/4 (down); RX heading pi and tilt -pi/4 (up).
     const double q = arma::datum::pi / 4.0;
-    const auto beam = wrap_single(quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {40.0, 40.0}));
-    const auto omni = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 5.0));
+    const auto beam = wrap_single(quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {40.0, 40.0}));
+    const auto omni = wrap_single(quadriga_lib::generate_antenna<double>("omni", 5.0));
     const arma::mat pos(arma::vec{5.0, 0.0, 5.0}), gain(1, 1, arma::fill::ones); // A scatterer on the LOS
     const arma::vec length = {0.0}, freq = {299792458.0};
     arma::cube M(8, 1, 1, arma::fill::zeros);
@@ -1419,8 +1419,8 @@ TEST_CASE("get_channels_multifreq - a positive tilt points down (3GPP TR 38.901)
     CHECK(power(omni, beam, 0.0, -q) > 100.0 * power(omni, beam, 0.0, q));
 
     // Element positions turn with the array as in get_channels_spherical (two elements along y, tilted and banked)
-    auto pair = quadriga_lib::arrayant_generate<double>("omni", 5.0);
-    quadriga_lib::arrayant_copy_element(pair, 0, {1});
+    auto pair = quadriga_lib::generate_antenna<double>("omni", 5.0);
+    quadriga_lib::copy_element(pair, 0, {1});
     pair.element_pos = {{0.0, 0.0}, {1.0, -1.0}, {0.0, 0.0}};
     std::vector<arma::cube> cr, ci, dl;
     quadriga_lib::get_channels_multifreq(wrap_single(pair), wrap_single(pair), {0.0, 0.0, 10.0}, {-q, 0.5, 0.2}, {10.0, 0.0, 0.0},
@@ -1446,16 +1446,16 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
         std::vector<quadriga_lib::arrayant<dtype>> tx, rx;
         for (dtype f : {dtype(1.0e9), dtype(2.0e9)})
         {
-            auto a = quadriga_lib::arrayant_generate<dtype>("3GPP", 10, dtype(1.0e9), {}, {1, 2}, {}, {3});
+            auto a = quadriga_lib::generate_antenna<dtype>("3GPP", 10, dtype(1.0e9), {}, {1, 2}, {}, {3});
             a.center_freq = f;
             a.e_theta_re *= f / dtype(1.0e9);
             if (coupling == 1)
-                a.coupling_re = {{1.0, 0.5, 0.0, 0.2}, {0.5, 1.0, 0.1, 0.0}, {0.0, 0.3, 1.0, 0.5}, {0.2, 0.0, 0.5, 1.0}},
-                a.coupling_im.zeros(4, 4), a.coupling_im(1, 0) = f / dtype(4.0e9);
+                a.port_weights_re = {{1.0, 0.5, 0.0, 0.2}, {0.5, 1.0, 0.1, 0.0}, {0.0, 0.3, 1.0, 0.5}, {0.2, 0.0, 0.5, 1.0}},
+                a.port_weights_im.zeros(4, 4), a.port_weights_im(1, 0) = f / dtype(4.0e9);
             if (coupling == 2)
-                a.coupling_re = {{1.0, 0.0}, {0.5, 0.0}, {0.0, 1.0}, {0.0, -0.5}}, a.coupling_im.zeros(4, 2);
+                a.port_weights_re = {{1.0, 0.0}, {0.5, 0.0}, {0.0, 1.0}, {0.0, -0.5}}, a.port_weights_im.zeros(4, 2);
             tx.push_back(a);
-            rx.push_back(quadriga_lib::arrayant_generate<dtype>("3GPP", 10, dtype(1.0e9), {}, {1, 1}, {}, {3}));
+            rx.push_back(quadriga_lib::generate_antenna<dtype>("3GPP", 10, dtype(1.0e9), {}, {1, 1}, {}, {3}));
             rx.back().center_freq = f;
         }
         arma::Mat<dtype> fbs = {{20.0, 25.0, 30.0}, {20.0, 0.0, -25.0}, {0.0, 0.0, 5.0}}; // Path 1 is the LOS path
@@ -1494,7 +1494,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
     check(0.0, 0, true, true), check(0.0, 2, true, true);
 
     // A complex output that shares memory with an input throws
-    auto ant = wrap_single(quadriga_lib::arrayant_generate<double>("omni", 1.0));
+    auto ant = wrap_single(quadriga_lib::generate_antenna<double>("omni", 1.0));
     arma::mat fbs = arma::vec({10.0, 5.0, 0.0}), pg(1, 1, arma::fill::ones);
     arma::vec pl = {0.0}, fi = {1e9};
     arma::cube M(8, 1, 1, arma::fill::zeros);
@@ -1526,7 +1526,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
 TEST_CASE("Get Channels Multifreq - Position and orientation shapes")
 {
     // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
-    const std::vector<quadriga_lib::arrayant<double>> ant = {quadriga_lib::arrayant_generate<double>("omni", 1.0)};
+    const std::vector<quadriga_lib::arrayant<double>> ant = {quadriga_lib::generate_antenna<double>("omni", 1.0)};
     const arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), gain = {1.0};
     const arma::vec length = {0.0}, freq = {1.0e9};
     arma::cube M(8, 1, 1, arma::fill::zeros);
@@ -1564,9 +1564,9 @@ TEST_CASE("Get Channels Multifreq - Position and orientation shapes")
 TEST_CASE("Get Channels Multifreq - AVX2 interpolation agrees with GENERIC, auto is GENERIC")
 {
     // AVX2 antenna interpolation agrees with GENERIC; auto selects GENERIC (identical results); invalid values throw
-    auto tx = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {90.0, 90.0});
-    auto tx2 = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {70.0, 70.0});
-    const auto rx = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
+    auto tx = quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {90.0, 90.0});
+    auto tx2 = quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {70.0, 70.0});
+    const auto rx = quadriga_lib::generate_antenna<double>("xpol", 10.0);
     const std::vector<quadriga_lib::arrayant<double>> txv = {tx, tx2}, rxv = {rx, rx};
     const arma::uword n = 13;
     arma::mat fbs = arma::randu<arma::mat>(3, n) * 60.0 - 30.0;

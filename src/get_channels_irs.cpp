@@ -23,9 +23,9 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
   channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS coupling matrix holds the IRS weights and must be given: an empty coupling of `irs_array` throws, unlike
+- The IRS port weights holds the IRS weights and must be given: empty port weights of `irs_array` throws, unlike
   in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
@@ -109,7 +109,7 @@ void quadriga_lib::get_channels_irs(
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its coupling and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [[arrayant]]
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its port weights and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [[arrayant]]
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 - **`use_kernel`** *(optional)* — Kernel of both segments, passed to [[get_channels_spherical]]: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
@@ -168,11 +168,11 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
         throw std::invalid_argument(error_message.c_str());
     }
 
-    if (irs_array.coupling_re.n_cols == 0ULL)
-        throw std::invalid_argument("Input 'irs_array' must have a coupling matrix holding the IRS weights (phase shifts) of the elements.");
+    if (irs_array.port_weights_re.n_cols == 0ULL)
+        throw std::invalid_argument("Input 'irs_array' must have port weights holding the IRS weights (phase shifts) of the elements.");
 
-    if (i_irs >= irs_array.coupling_re.n_cols)
-        throw std::invalid_argument("Input 'i_irs' is out of range; the IRS coupling matrix has " + std::to_string(irs_array.coupling_re.n_cols) + " columns.");
+    if (i_irs >= irs_array.port_weights_re.n_cols)
+        throw std::invalid_argument("Input 'i_irs' is out of range; the IRS port weights have " + std::to_string(irs_array.port_weights_re.n_cols) + " columns.");
 
     bool calc_angles = aod != nullptr || eod != nullptr || aoa != nullptr || eoa != nullptr;
 
@@ -189,10 +189,10 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
 
         if (irs_array_2.e_theta_re.n_slices != n_elements_irs)
             throw std::invalid_argument("Input 'irs_array_2' must have the same number of elements as 'irs_array'.");
-        // Its coupling and element_pos are not used: the weights and element positions come from irs_array
+        // Its port weights and element_pos are not used: the weights and element positions come from irs_array
     }
 
-    // IRS arrays without coupling (one port per element), as read-only views of the pattern data of a valid array.
+    // IRS arrays without port weights (one port per element), as read-only views of the pattern data of a valid array.
     // Each segment gets its own object, since assigning to a view copies into the viewed data. An empty element_pos
     // has no data to view and is replaced by zeros.
     auto irs_view = [&](arrayant<dtype> &dst, const arrayant<dtype> &src)
@@ -244,8 +244,8 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
     const arma::uword n_irs = n_elements_irs;
 
     // IRS weights w of the codebook entry and their powers |w|^2, normalized to sum 1 (uniform if all are 0)
-    const dtype *w_re = irs_array.coupling_re.colptr(i_irs);
-    const dtype *w_im = irs_array.coupling_im.is_empty() ? nullptr : irs_array.coupling_im.colptr(i_irs);
+    const dtype *w_re = irs_array.port_weights_re.colptr(i_irs);
+    const dtype *w_im = irs_array.port_weights_im.is_empty() ? nullptr : irs_array.port_weights_im.colptr(i_irs);
     std::vector<dtype> w_pwr(n_irs);
     qd_power_mat(n_irs, 1, w_pwr.data(), true, w_re, w_im);
 

@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Channel coefficients from paths and array antennas: get_channels_spherical, get_channels_planar, their "_vec" batch
+// Channel coefficients from paths and antenna arrays: get_channels_spherical, get_channels_planar, their "_vec" batch
 // forms, get_channels_irs and get_channels_multifreq with generated or fuzzed arrayants, fuzzed positions, orientations and path data
 // (consistent or mismatched sizes), optional outputs, options and the available kernels
 
@@ -16,16 +16,16 @@ static quadriga_lib::arrayant<T> antenna(fz::input &in)
     switch (in.ConsumeIntegralInRange<int>(0, 5))
     {
     case 0:
-        return quadriga_lib::arrayant_generate<T>("omni", T(30));
+        return quadriga_lib::generate_antenna<T>("omni", T(30));
     case 1:
-        return quadriga_lib::arrayant_generate<T>("xpol", T(30));
+        return quadriga_lib::generate_antenna<T>("xpol", T(30));
     case 2:
-        fz::clean([&] { a = quadriga_lib::arrayant_generate<T>("ula", T(30), T(3.5e9), {}, {1, in.size(4)}, {in.value<T>()}); });
+        fz::clean([&] { a = quadriga_lib::generate_antenna<T>("ula", T(30), T(3.5e9), {}, {1, in.size(4)}, {in.value<T>()}); });
         break;
     case 3:
     {
         const arma::uword M = in.size(2), N = in.size(2), M_P = in.ConsumeBool() ? 1 : 0, pol = in.ConsumeIntegralInRange<unsigned>(1, 3);
-        fz::clean([&] { a = quadriga_lib::arrayant_generate<T>("3GPP", 30.0, 3.5e9, {}, {M, N}, {}, {pol}, {M_P}, {5.0}); });
+        fz::clean([&] { a = quadriga_lib::generate_antenna<T>("3GPP", 30.0, 3.5e9, {}, {M, N}, {}, {pol}, {M_P}, {5.0}); });
         break;
     }
     default:
@@ -36,7 +36,7 @@ static quadriga_lib::arrayant<T> antenna(fz::input &in)
     if (in.ConsumeBool() && a.n_elements() != 0)
     {
         arma::uword n_p = in.size(4);
-        a.coupling_re = in.mat<T>(a.n_elements(), n_p), a.coupling_im = in.mat<T>(a.n_elements(), n_p);
+        a.port_weights_re = in.mat<T>(a.n_elements(), n_p), a.port_weights_im = in.mat<T>(a.n_elements(), n_p);
     }
     return a;
 }

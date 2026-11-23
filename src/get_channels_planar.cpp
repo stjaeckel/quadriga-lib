@@ -88,7 +88,7 @@ void quadriga_lib::get_channels_planar(
   found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
-  [[arrayant_interpolate]]
+  [[interpolate_pattern]]
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -130,7 +130,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2];
 
     // Kernel of the antenna interpolation, checked before any early return
-    const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
+    const int kernel = qd_interpolate_pattern_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
 
     qd_check_alias(rx_Doppler, "rx_Doppler", &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &polmat);
     qd_check_alias_list({&coeff_re, &coeff_im, &delay}, {"coeff_re", "coeff_im", "delay"},
@@ -179,11 +179,11 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
 
     arma::uword n_path = aod.n_elem;                                // Number of paths
     arma::uword n_out = add_fake_los_path ? n_path + 1ULL : n_path; // Number of output paths
-    arma::uword n_tx = tx_array.e_theta_re.n_slices;                // Number of TX antenna elements before coupling
-    arma::uword n_rx = rx_array.e_theta_re.n_slices;                // Number of RX antenna elements before coupling
+    arma::uword n_tx = tx_array.e_theta_re.n_slices;                // Number of TX antenna elements before the port weights
+    arma::uword n_rx = rx_array.e_theta_re.n_slices;                // Number of RX antenna elements before the port weights
     arma::uword n_links = n_rx * n_tx;                              // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    arma::uword n_tx_ports = tx_array.n_ports();                    // Number of TX antenna elements after coupling
-    arma::uword n_rx_ports = rx_array.n_ports();                    // Number of RX antenna elements after coupling
+    arma::uword n_tx_ports = tx_array.n_ports();                    // Number of TX antenna elements after the port weights
+    arma::uword n_rx_ports = rx_array.n_ports();                    // Number of RX antenna elements after the port weights
 
     // Check if the number of paths is consistent in all inputs
     if (eod.n_elem != n_path || aoa.n_elem != n_path || eoa.n_elem != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
@@ -255,7 +255,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     if (tx_array.element_pos.n_elem != 0ULL)
         std::memcpy(element_pos_interp.memptr(), tx_array.element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
 
-    qd_arrayant_interpolate_dispatch<dtype>(tx_array, AOD, EOD, i_element, tx_ori, element_pos_interp,
+    qd_interpolate_pattern_dispatch<dtype>(tx_array, AOD, EOD, i_element, tx_ori, element_pos_interp,
                                             Vt_re, Vt_im, Ht_re, Ht_im, &Pt, nullptr, nullptr, nullptr, kernel);
 
     i_element = arma::regspace<arma::uvec>(0, n_rx - 1);
@@ -263,7 +263,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     if (rx_array.element_pos.n_elem != 0ULL)
         std::memcpy(element_pos_interp.memptr(), rx_array.element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
 
-    qd_arrayant_interpolate_dispatch<dtype>(rx_array, AOA, EOA, i_element, rx_ori, element_pos_interp,
+    qd_interpolate_pattern_dispatch<dtype>(rx_array, AOA, EOA, i_element, rx_ori, element_pos_interp,
                                             Vr_re, Vr_im, Hr_re, Hr_im, &Pr, rx_Doppler == nullptr ? nullptr : &AOA_loc,
                                             rx_Doppler == nullptr ? nullptr : &EOA_loc, nullptr, kernel);
 
@@ -351,21 +351,21 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
             std::swap(rx_Doppler->at(0), rx_Doppler->at(true_los_path));
     }
 
-    // Apply antenna element coupling; without different_output_size the data is in the outputs and the coupling runs
+    // Apply port weights; without different_output_size the data is in the outputs and the port weights run
     // in place
-    if (rx_array.coupling_re.n_elem != 0ULL || rx_array.coupling_im.n_elem != 0ULL ||
-        tx_array.coupling_re.n_elem != 0ULL || tx_array.coupling_im.n_elem != 0ULL)
+    if (rx_array.port_weights_re.n_elem != 0ULL || rx_array.port_weights_im.n_elem != 0ULL ||
+        tx_array.port_weights_re.n_elem != 0ULL || tx_array.port_weights_im.n_elem != 0ULL)
     {
-        // Coupling powers abs(cpl)^2, each column (port) normalized to sum 1
+        // Port-weight powers abs(cpl)^2, each column (port) normalized to sum 1
         std::vector<dtype> rx_cpl(n_rx * n_rx_ports), tx_cpl(n_tx * n_tx_ports), temp;
-        qd_power_mat(n_rx, n_rx_ports, rx_cpl.data(), true, rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr());
-        qd_power_mat(n_tx, n_tx_ports, tx_cpl.data(), true, tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr());
+        qd_power_mat(n_rx, n_rx_ports, rx_cpl.data(), true, rx_array.port_weights_re.memptr(), rx_array.port_weights_im.memptr());
+        qd_power_mat(n_tx, n_tx_ports, tx_cpl.data(), true, tx_array.port_weights_re.memptr(), tx_array.port_weights_im.memptr());
 
         for (arma::uword j = 0ULL; j < n_out; ++j)
         {
             const arma::uword o = j * n_links; // Slice offset
-            qd_coupling_apply_slot(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
-                                   tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
+            qd_port_weights_apply_slot(rx_array.port_weights_re.memptr(), rx_array.port_weights_im.memptr(),
+                                   tx_array.port_weights_re.memptr(), tx_array.port_weights_im.memptr(),
                                    rx_cpl.data(), tx_cpl.data(), n_rx, n_rx_ports, n_tx, n_tx_ports,
                                    &p_coeff_re[o], &p_coeff_im[o], &p_delays[o],
                                    different_output_size ? coeff_re.slice_memptr(j) : &p_coeff_re[o],

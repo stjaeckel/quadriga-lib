@@ -17,7 +17,7 @@ function test_qd_ieee_chan
 
 
 %% 1) Type A, single user, cross-polarised antenna
-ant = quadriga_lib.arrayant_generate('xpol');
+ant = quadriga_lib.generate_antenna('xpol');
 chan = quadriga_lib.get_channels_ieee_indoor(ant, ant, 'A');
 
 assertEqual(numel(chan), 1);
@@ -70,7 +70,7 @@ assertElementsAlmostEqual(p00, p11, 'absolute', 0);
 
 
 %% 2) Type A, two users, default TGac offset angles
-ant = quadriga_lib.arrayant_generate('omni', 30.0);
+ant = quadriga_lib.generate_antenna('omni', 30.0);
 chan = call_ieee(ant, ant, 'A', ...
     'center_freq', 2.4e9, ...
     'tap_spacing', 1e-8, ...
@@ -315,7 +315,7 @@ assertElementsAlmostEqual(f_peak, fD_expected, 'absolute', 5.0);
 % conjugation) of the downlink channel per path and snapshot, with
 % transposed delays: the reciprocal channel, with the same Doppler shift
 % for a moving station.
-ant = quadriga_lib.arrayant_generate('xpol');   % 2 elements at each end
+ant = quadriga_lib.generate_antenna('xpol');   % 2 elements at each end
 
 common = {'center_freq', 2.4e9, 'tap_spacing', 5e-9, ...
           'n_users', 2, 'doppler_effect', 40.0, 'seed', 1234, ...
@@ -359,7 +359,7 @@ end
 assertElementsAlmostEqual(max_err, 0, 'absolute', 1e-10);
 
 % Override rules: the model defaults passed explicitly match []; out-of-range values throw; errors name the argument
-ant = quadriga_lib.arrayant_generate('omni');
+ant = quadriga_lib.generate_antenna('omni');
 assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'kf', -1), 'quadriga_lib:CPPerror');
 assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'xpr_nlos', 0), 'quadriga_lib:CPPerror');
 c0 = call_ieee(ant, ant, 'B', 'dist', 8, 'seed', 4);

@@ -571,7 +571,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive pola
 
     // The same powers from get_channels_spherical with circular patterns, (V, H) = (1, +j)/sqrt(2) (LHCP) and
     // (1, -j)/sqrt(2) (RHCP), at the receive and transmit ends
-    auto L = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto L = quadriga_lib::generate_antenna<double>("omni", 10.0);
     L.e_theta_re *= std::sqrt(0.5);
     L.e_phi_im = L.e_theta_re;
     L.e_phi_re.zeros();

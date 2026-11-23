@@ -977,7 +977,7 @@ TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with abs
     // get_channels_* carry the phase of the absolute path length. Reproduction geometry: LOS + one single-bounce path,
     // TX (0,0,2), RX (30,0,1.5), freq 2-3 GHz in 100 MHz steps, freq_new in 1 MHz steps; the truth is
     // get_channels_multifreq evaluated directly at freq_new.
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 5.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 5.0);
     std::vector<quadriga_lib::arrayant<double>> va = {omni};
     arma::mat fbs(3, 2);
     fbs.col(0) = arma::vec({15.0, 0.0, 1.75}), fbs.col(1) = arma::vec({10.0, 12.0, 2.0});

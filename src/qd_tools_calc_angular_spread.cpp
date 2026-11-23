@@ -142,7 +142,7 @@ void quadriga_lib::calc_angular_spread(
 - **`orientation`** *(optional)* — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
   direction (a positive tilt points down); `[3, n_cir]`
 - **`phi`** *(optional)* — Rotated azimuth angles, the path azimuths in the local frame of that antenna (as
-  [[arrayant_interpolate]] returns them); `[n_cir]` vector, each element of length `n_path`
+  [[interpolate_pattern]] returns them); `[n_cir]` vector, each element of length `n_path`
 - **`theta`** *(optional)* — Rotated elevation angles; same structure as `phi`
 MD!*/
 

@@ -31,9 +31,9 @@ POSITIONAL_OPTIONAL = {
     "RTtools.ray_triangle_intersect": ("sub_mesh_ind", "aabb"),
     "RTtools.subdivide_triangles": ("mtl_ind",),
     "RTtools.triangle_mesh_aabb": ("sub_mesh_ind",),
-    "arrayant.generate": ("res",),
+    "arrayant.generate_antenna": ("res",),
     "arrayant.generate_speaker": ("driver_type",),
-    "arrayant.qdant_read": ("id",),
+    "arrayant.qdant_read": ("ids",),
     "arrayant.qdant_write": ("id",),
     "channel.hdf5_create_file": ("nx", "ny", "nz", "nw"),
     "channel.hdf5_read_channel": ("ix", "iy", "iz", "iw"),
@@ -132,7 +132,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.tools.calc_angular_spread([[0.1]], [[0.0]], [[1.0]], True)
         with self.assertRaises(TypeError):
-            quadriga_lib.arrayant.calc_directivity(quadriga_lib.arrayant.generate("omni"), [0])
+            quadriga_lib.arrayant.calc_directivity(quadriga_lib.arrayant.generate_antenna("omni"), [0])
 
 
 if __name__ == "__main__":

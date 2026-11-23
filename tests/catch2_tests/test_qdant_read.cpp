@@ -4,9 +4,10 @@
 
 // qdant_read: hand-written QDANT files (magnitudes in dB, phases and grids in degrees) give the expected linear
 // fields, radians, coupling and center frequency; also XML namespaces, the ID lookup and the errors for missing IDs,
-// malformed counts and empty grids. Writing and multi-entry files are covered by test_qdant_write and test_qdant_multi.
+// malformed counts and empty grids. Writing and multi-entry files are covered by test_qdant_write.
 
 #include <catch2/catch_test_macros.hpp>
+#include <sstream>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
@@ -29,7 +30,7 @@ TEST_CASE("Arrayant reading from QDANT file - Minimal test")
     f.close();
 
     float pi = arma::datum::pi;
-    auto x = quadriga_lib::qdant_read<float>("test.qdant");
+    auto x = quadriga_lib::qdant_read<float>("test.qdant", {1})[0];
 
     arma::fmat A = 20 * log10(x.e_theta_re.slice(0));
     arma::fmat B = arma::reshape(arma::linspace<arma::fvec>(1, 15, 15), 3, 5).t();
@@ -50,10 +51,10 @@ TEST_CASE("Arrayant reading from QDANT file - Minimal test")
     CHECK(arma::approx_equal(x.element_pos, B.t(), "absdiff", 1e-6));
 
     B = {1.0f};
-    CHECK(arma::approx_equal(x.coupling_re, B, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(x.port_weights_re, B, "absdiff", 1e-6));
 
     B = {0.0f};
-    CHECK(arma::approx_equal(x.coupling_im, B, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(x.port_weights_im, B, "absdiff", 1e-6));
     CHECK(std::abs(x.center_freq - 299792447.0f) < 0.1f);
 
     std::remove("test.qdant");
@@ -82,7 +83,7 @@ TEST_CASE("Arrayant reading from QDANT file - Multi-Element Array")
     f.close();
 
     double pi = arma::datum::pi;
-    auto x = quadriga_lib::qdant_read<double>("test2.qdant");
+    auto x = quadriga_lib::qdant_read<double>("test2.qdant", {1})[0];
 
     arma::mat A = 20 * log10(sqrt(x.e_theta_re.slice(0) % x.e_theta_re.slice(0) + x.e_theta_im.slice(0) % x.e_theta_im.slice(0)));
     arma::mat B = arma::reshape(arma::linspace<arma::vec>(1, 15, 15), 3, 5).t();
@@ -116,11 +117,11 @@ TEST_CASE("Arrayant reading from QDANT file - Multi-Element Array")
     B.fill(4.0 * pi / 180.0);
     CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
 
-    A = sqrt(x.coupling_re % x.coupling_re + x.coupling_im % x.coupling_im);
+    A = sqrt(x.port_weights_re % x.port_weights_re + x.port_weights_im % x.port_weights_im);
     B = arma::reshape(arma::linspace<arma::vec>(1, 6, 6), 2, 3);
     CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
 
-    A = arma::atan2(x.coupling_im, x.coupling_re) * 180.0 / pi;
+    A = arma::atan2(x.port_weights_im, x.port_weights_re) * 180.0 / pi;
     B = arma::reshape(arma::linspace<arma::vec>(5, 30, 6), 2, 3);
     CHECK(arma::approx_equal(A, B, "absdiff", 1e-12));
 
@@ -150,7 +151,7 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
     double pi = arma::datum::pi;
 
     arma::Mat<unsigned> layout;
-    auto x = quadriga_lib::qdant_read<double>("test.qdant", 1, &layout);
+    auto x = quadriga_lib::qdant_read<double>("test.qdant", {1}, &layout)[0];
 
     arma::mat B = {-pi / 2.0, -pi / 4.0, 0.0, pi / 4.0, pi / 2.0};
     CHECK(arma::approx_equal(x.azimuth_grid, B.t(), "absdiff", 1e-13));
@@ -172,8 +173,8 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
     CHECK(arma::approx_equal(x.element_pos, B.t(), "absdiff", 1e-13));
 
     B = {1.0 / std::sqrt(2.0)};
-    CHECK(arma::approx_equal(x.coupling_re, B, "absdiff", 1e-13));
-    CHECK(arma::approx_equal(x.coupling_im, B, "absdiff", 1e-13));
+    CHECK(arma::approx_equal(x.port_weights_re, B, "absdiff", 1e-13));
+    CHECK(arma::approx_equal(x.port_weights_im, B, "absdiff", 1e-13));
 
     CHECK(std::abs(x.center_freq - 3.0e9) < 0.1f);
     CHECK(x.name == "unknown");
@@ -187,20 +188,20 @@ TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
     const std::string fn = "test_qdant_missing_id.qdant";
     std::remove(fn.c_str());
 
-    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto a = quadriga_lib::generate_antenna<double>("omni", 10.0);
     a.name = "two";
     quadriga_lib::qdant_write(fn, a, 2);
     a.name = "three";
     quadriga_lib::qdant_write(fn, a, 3);
 
-    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::qdant_read<float>(fn, 4), std::invalid_argument);
-    CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "two");
-    CHECK(quadriga_lib::qdant_read<double>(fn, 3).name == "three");
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {1}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<float>(fn, {4}), std::invalid_argument);
+    CHECK(quadriga_lib::qdant_read<double>(fn, {2})[0].name == "two");
+    CHECK(quadriga_lib::qdant_read<double>(fn, {3})[0].name == "three");
 
-    // qdant_read_multi takes the IDs from the layout and is not affected
+    // Without ids, qdant_read takes the IDs from the layout and is not affected
     arma::u32_mat layout;
-    auto v = quadriga_lib::qdant_read_multi<double>(fn, &layout);
+    auto v = quadriga_lib::qdant_read<double>(fn, {}, &layout);
     REQUIRE(v.size() == 2);
     CHECK(v[0].name == "two");
     CHECK(v[1].name == "three");
@@ -210,18 +211,62 @@ TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
     f << "<qdant><arrayant><name>no-id</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant>"
       << "<arrayant id=\"2\"><name>id-2</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant></qdant>\n";
     f.close();
-    CHECK(quadriga_lib::qdant_read<double>(fn, 1).name == "no-id");
-    CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "id-2");
+    CHECK(quadriga_lib::qdant_read<double>(fn, {1})[0].name == "no-id");
+    CHECK(quadriga_lib::qdant_read<double>(fn, {2})[0].name == "id-2");
 
     f.open(fn);
     f << "<qdant><arrayant id=\"2\"><name>id-2</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant>"
       << "<arrayant><name>no-id</name><ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid></arrayant></qdant>\n";
     f.close();
-    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {1}), std::invalid_argument);
 
     // A missing file is a file problem, a missing ID an argument error
     std::remove(fn.c_str());
-    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::runtime_error);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {1}), std::runtime_error);
+}
+
+// A list of IDs is returned in the given order, duplicates included; an ID of 0 or one not in the file throws
+TEST_CASE("Arrayant reading from QDANT file - List of IDs")
+{
+    const std::string fn = "test_qdant_id_list.qdant";
+    std::remove(fn.c_str());
+
+    std::vector<quadriga_lib::arrayant<double>> v;
+    const char *names[3] = {"one", "two", "three"};
+    for (int i = 0; i < 3; ++i)
+    {
+        v.push_back(quadriga_lib::generate_antenna<double>("omni", 10.0 + 5.0 * i));
+        v.back().name = names[i];
+        v.back().center_freq = 1.0e9 * (i + 1);
+    }
+    quadriga_lib::qdant_write(fn, v);
+
+    arma::u32_mat layout;
+    auto a = quadriga_lib::qdant_read<double>(fn, {3, 1, 3}, &layout);
+    REQUIRE(a.size() == 3);
+    CHECK(a[0].name == "three");
+    CHECK(a[1].name == "one");
+    CHECK(a[2].name == "three");
+    CHECK(a[0].center_freq == 3.0e9);
+    CHECK(a[1].center_freq == 1.0e9);
+    CHECK(a[0].azimuth_grid.n_elem == a[2].azimuth_grid.n_elem);
+    CHECK(arma::approx_equal(a[0].e_theta_re, a[2].e_theta_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(arma::conv_to<arma::vec>::from(arma::vectorise(layout)), arma::vec{1.0, 2.0, 3.0}, "absdiff", 0.0));
+
+    // No IDs: all entries; the same as listing them
+    auto all = quadriga_lib::qdant_read<float>(fn);
+    auto lst = quadriga_lib::qdant_read<float>(fn, arma::uvec{1, 2, 3});
+    REQUIRE(all.size() == 3);
+    REQUIRE(lst.size() == 3);
+    for (size_t i = 0; i < 3; ++i)
+        CHECK(all[i].name == lst[i].name);
+
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {0}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {4}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {1, 2, 4}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {1, 0}), std::invalid_argument);
+
+    std::remove(fn.c_str());
 }
 
 // Writes the given text to a file and returns the exception type of qdant_read (or "none")
@@ -232,8 +277,8 @@ static std::string qdant_read_exception(const std::string &fn, const std::string
     f.close();
     try
     {
-        quadriga_lib::qdant_read<double>(fn, id);
-        quadriga_lib::qdant_read_multi<float>(fn);
+        quadriga_lib::qdant_read<double>(fn, {id});
+        quadriga_lib::qdant_read<float>(fn);
     }
     catch (const std::invalid_argument &)
     {
@@ -324,7 +369,7 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_err
                  "<ElevationGrid>-90 0 90</ElevationGrid><AzimuthGrid>-90 0 90</AzimuthGrid>"
                  "<EthetaMag el=\"1\">0 0 0 0 0 0 0 0 0</EthetaMag>");
         f.close();
-        auto a = quadriga_lib::qdant_read<double>(fn);
+        auto a = quadriga_lib::qdant_read<double>(fn, {1})[0];
         CHECK(a.n_elements() == 2);
         CHECK(arma::all(arma::vectorise(a.e_theta_re.slice(0)) == 1.0));
         CHECK(arma::all(arma::vectorise(a.e_theta_re.slice(1)) == 0.0));
@@ -337,7 +382,7 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_err
         f << ant("<NoElements>2</NoElements><ElevationGrid>0</ElevationGrid><AzimuthGrid>-90 90</AzimuthGrid>"
                  "<EthetaMag el=\"1\">0 0</EthetaMag><EphiMag el=\"2\">0 -inf</EphiMag>");
         f.close();
-        auto a = quadriga_lib::qdant_read<double>(fn);
+        auto a = quadriga_lib::qdant_read<double>(fn, {1})[0];
         CHECK(a.n_elements() == 2);
         CHECK(a.e_phi_re(0, 0, 1) == 1.0);
         CHECK(a.e_phi_re(0, 1, 1) == 0.0);
@@ -360,8 +405,68 @@ TEST_CASE("Arrayant reading from QDANT file - Empty grid throws")
           << "</arrayant>\n</qdant>\n";
         f.close();
         const std::string grid = empty_az ? "AzimuthGrid" : "ElevationGrid";
-        CHECK_THROWS_WITH(quadriga_lib::qdant_read<double>(fn, 1), Catch::Matchers::ContainsSubstring(grid));
-        CHECK_THROWS_WITH(quadriga_lib::qdant_read<float>(fn, 1), Catch::Matchers::ContainsSubstring(grid));
+        CHECK_THROWS_WITH(quadriga_lib::qdant_read<double>(fn, {1}), Catch::Matchers::ContainsSubstring(grid));
+        CHECK_THROWS_WITH(quadriga_lib::qdant_read<float>(fn, {1}), Catch::Matchers::ContainsSubstring(grid));
     }
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("Arrayant reading from QDANT file - All entries follow the layout")
+{
+    const std::string fn = "test_qdant_layout_order.qdant";
+    std::remove(fn.c_str());
+    for (unsigned i = 1; i <= 3; ++i)
+    {
+        auto ant = quadriga_lib::generate_antenna<double>("omni", 30.0);
+        ant.center_freq = 1.0e9 * i;
+        quadriga_lib::qdant_write(fn, ant, i);
+    }
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 30.0);
+    ant.center_freq = 2.0e9;
+    quadriga_lib::qdant_write(fn, ant, 2, arma::u32_mat({{2, 1}, {2, 3}})); // Column-major: 2, 2, 1, 3
+
+    auto all = quadriga_lib::qdant_read<double>(fn);
+    REQUIRE(all.size() == 3);
+    CHECK(all[0].center_freq == 2.0e9);
+    CHECK(all[1].center_freq == 1.0e9);
+    CHECK(all[2].center_freq == 3.0e9);
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("Arrayant reading from QDANT file - Malformed layout values")
+{
+    const std::string fn = "test_qdant_bad_layout.qdant";
+    std::remove(fn.c_str());
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 30.0);
+    quadriga_lib::qdant_write(fn, ant, 1);
+    quadriga_lib::qdant_write(fn, ant, 2);
+
+    std::ifstream in(fn);
+    std::stringstream buffer;
+    buffer << in.rdbuf();
+    in.close();
+    const std::string text = buffer.str();
+    const size_t first = text.find("<layout>") + 8, last = text.find("</layout>");
+    REQUIRE(last != std::string::npos);
+    const auto with_layout = [&](const std::string &layout)
+    {
+        std::ofstream out(fn, std::ios::trunc);
+        out << text.substr(0, first) << layout << text.substr(last);
+    };
+
+    for (const char *bad : {"1.5", "-1", "abc", "99999999999", "1 x", "1e0"})
+    {
+        with_layout(bad);
+        CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, {1}), std::runtime_error);
+    }
+
+    with_layout("0 2"); // Zeros stay allowed and are skipped
+    CHECK(quadriga_lib::qdant_read<double>(fn).size() == 1);
+    with_layout("1,2 2,1"); // Two columns
+    arma::u32_mat layout;
+    CHECK(quadriga_lib::qdant_read<double>(fn, {}, &layout).size() == 2);
+    CHECK(layout.n_rows == 2);
+    CHECK(layout.n_cols == 2);
     std::remove(fn.c_str());
 }

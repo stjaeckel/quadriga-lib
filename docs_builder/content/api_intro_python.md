@@ -1,6 +1,6 @@
 +++
 title = "Python API"
-description = "%%GAP: Python API reference for Quadriga-Lib: array antennas, channel generation, statistics, the 3GPP stochastic model and site-specific simulation tools.%%"
+description = "%%GAP: Python API reference for Quadriga-Lib: antenna arrays, channel generation, statistics, the 3GPP stochastic model and site-specific simulation tools.%%"
 lead = "%%GAP: Reference for the Python package `quadriga_lib`, version {{ version }}.%%"
 +++
 
@@ -10,7 +10,7 @@ lead = "%%GAP: Reference for the Python package `quadriga_lib`, version {{ versi
 - Array shapes follow in backticks as numpy shapes, e.g. `(n_rx, n_tx, n_path)`; `(n,)` is a 1D array.
 - Array inputs take numpy arrays in any memory order; lists, scalars and other numeric dtypes are converted (copied). Index and count arrays accept integer values of any numeric dtype (`1.0` is accepted); a negative, fractional or non-finite entry raises `ValueError`. A scalar count takes a Python `int`; other values raise `TypeError`. Outputs are numpy arrays: float64 for real values, complex128 for complex values; integer outputs have the dtype stated at the output.
 - Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays; `polmat` keeps the real interleaved `(8, n)` form of C++; complex outputs are always complex arrays (`x.real` and `x.imag` give the parts without a copy). Each function states its form.
-- Data structures (array antennas, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
+- Data structures (antenna arrays, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
 - Arguments have the names and defaults of the C++ function. Optional arguments follow a `*` in the Usage line and are passed by keyword, e.g. `stack=True`; a few optional inputs that a call almost always needs, such as the slot indices of the HDF5 functions, come before the `*` and can also be passed by position. The Usage line shows the order of the positional arguments.
 - Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Flags (bool options) take a `bool` or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`. File names take a `str`, `bytes` or path-like object (e.g. `pathlib.Path`). Several outputs are returned as a tuple in the order of the Usage line.
 - Errors: invalid inputs (shape/domain, an index outside the layout of a file) raise `ValueError`, a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) `RuntimeError`, an index out of range of an input array `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.

@@ -11,6 +11,7 @@
 #include "quadriga_lib.hpp"
 
 #include <cmath>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -36,18 +37,18 @@ static void calls_with_literals()
     std::vector<uint8_t> u8;
 
     // quadriga_arrayant.hpp
-    quadriga_lib::arrayant_calc_beamwidth(a, ui, 3);
-    quadriga_lib::arrayant_combine_pattern(a, col, col, 343);
-    quadriga_lib::arrayant_export_obj_file("a.obj", a, 30.0, "jet", 1.0);
-    quadriga_lib::arrayant_calc_beamwidth_multi(av, ui, 3);
-    quadriga_lib::arrayant_combine_pattern_multi(av, col, col, col, 343);
-    a = quadriga_lib::arrayant_generate<T>("omni", 10);
-    a = quadriga_lib::arrayant_generate<T>("custom", 10, NAN, {90, 90.0});
-    a = quadriga_lib::arrayant_generate("ula", 10, 3.5e9, {}, {1, 4}, {0.5}, {}, {}, {}, {}, a);
-    a = quadriga_lib::arrayant_generate<T>("multibeam", 10, 3.5e9, {120, 120}, {2, 2}, {0.5}, {1});
-    a = quadriga_lib::arrayant_generate<T>("3GPP", 10, 3.5e9, {}, {2, 2}, {0.5}, {3, 2}, {1}, {6, 0});
+    quadriga_lib::calc_beamwidth(a, ui, 3);
+    quadriga_lib::apply_port_weights(a, col, col, 343);
+    quadriga_lib::export_pattern_obj("a.obj", a, 30.0, "jet", 1.0);
+    quadriga_lib::calc_beamwidth(av, ui, 3);
+    quadriga_lib::apply_port_weights(av, col, col, col, 343);
+    a = quadriga_lib::generate_antenna<T>("omni", 10);
+    a = quadriga_lib::generate_antenna<T>("custom", 10, NAN, {90, 90.0});
+    a = quadriga_lib::generate_antenna("ula", 10, 3.5e9, {}, {1, 4}, {0.5}, {}, {}, {}, {}, a);
+    a = quadriga_lib::generate_antenna<T>("multibeam", 10, 3.5e9, {120, 120}, {2, 2}, {0.5}, {1});
+    a = quadriga_lib::generate_antenna<T>("3GPP", 10, 3.5e9, {}, {2, 2}, {0.5}, {3, 2}, {1}, {6, 0});
     av = quadriga_lib::generate_speaker<T>("piston", 0.05, 80, 12000, 12, 12, 85, "hemisphere", 90, 60, 1000, 0.15, 0.25, col, 5);
-    quadriga_lib::arrayant<double> ad = quadriga_lib::arrayant_generate("omni", 10); // dtype defaults to double
+    quadriga_lib::arrayant<double> ad = quadriga_lib::generate_antenna("omni", 10); // dtype defaults to double
 
     // quadriga_channel.hpp
     quadriga_lib::channel_export_obj_file("a.obj", c, 0, -60, -140, "jet", ui, 0.05, 0.01);
@@ -87,30 +88,71 @@ static void calls_with_literals()
     (void)ad;
 }
 
+// The single and the vector forms of the antenna array functions share one name. Calls as users write them, with
+// braced optional inputs and nullptr outputs (which need the template argument), select the intended form; compiled
+// and linked only
+static void calls_of_overloads()
+{
+    quadriga_lib::arrayant<double> a;
+    std::vector<quadriga_lib::arrayant<double>> av;
+    arma::vec bw;
+    arma::mat bw_m, az, el, V_re, V_im, H_re, H_im;
+    arma::cube Vf_re, Vf_im, Hf_re, Hf_im;
+
+    bw = quadriga_lib::calc_directivity(a);
+    bw_m = quadriga_lib::calc_directivity(av, {0, 1});
+    quadriga_lib::calc_beamwidth(a, {}, 3.0, &bw);
+    quadriga_lib::calc_beamwidth(av, {}, 3.0, &bw_m);
+    quadriga_lib::calc_beamwidth<double>(a, {}, 3.0, nullptr, &bw);
+    quadriga_lib::calc_beamwidth<double>(av, {}, 3.0, nullptr, &bw_m);
+    a = quadriga_lib::apply_port_weights(a);
+    av = quadriga_lib::apply_port_weights(av, {}, {}, {1.0e9}, 343.0);
+    a = quadriga_lib::join_arrays(a, a);
+    av = quadriga_lib::join_arrays(av, av);
+    quadriga_lib::copy_element(a, 0, {1, 2});
+    quadriga_lib::copy_element(av, 0, {1});
+    quadriga_lib::set_element_pos(av, arma::mat(3, 2), {0, 1});
+    quadriga_lib::rotate_pattern(a, {0.0, 0.1, 0.0});
+    quadriga_lib::rotate_pattern(av, {0.0, 0.1, 0.0}, 1, {0});
+    quadriga_lib::interpolate_pattern(a, az, el, V_re, V_im, H_re, H_im, {0});
+    quadriga_lib::interpolate_pattern(av, az, el, Vf_re, Vf_im, Hf_re, Hf_im, {1.0e9}, {0});
+    quadriga_lib::interpolate_pattern<double>(a, az, el, V_re, V_im, H_re, H_im, {}, {}, {}, nullptr, nullptr, nullptr,
+                                              nullptr, nullptr, nullptr, 1);
+    quadriga_lib::interpolate_pattern<double>(av, az, el, Vf_re, Vf_im, Hf_re, Hf_im, {}, {}, {}, {}, nullptr, nullptr, 1);
+    std::string err = quadriga_lib::is_valid(av);
+    unsigned id = quadriga_lib::qdant_write("a.qdant", a, 0, {});
+    quadriga_lib::qdant_write("a.qdant", av);
+    (void)err;
+    (void)id;
+}
+
 TEST_CASE("Scalar argument types - literals of any type with float data")
 {
     volatile bool never = false;
     if (never)
+    {
         calls_with_literals();
+        calls_of_overloads();
+    }
 
     // The converted values arrive: int and double literals give the same result as float ones
-    quadriga_lib::arrayant<T> a = quadriga_lib::arrayant_generate<T>("custom", 10, NAN, {60, 30.0});
-    quadriga_lib::arrayant<T> b = quadriga_lib::arrayant_generate<T>("custom", 10.0f, NAN, {60.0f, 30.0f});
+    quadriga_lib::arrayant<T> a = quadriga_lib::generate_antenna<T>("custom", 10, NAN, {60, 30.0});
+    quadriga_lib::arrayant<T> b = quadriga_lib::generate_antenna<T>("custom", 10.0f, NAN, {60.0f, 30.0f});
     CHECK(a.azimuth_grid.n_elem == 37);
     CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0));
 
     arma::Col<T> bw_int, bw_float, bw_3dB;
-    quadriga_lib::arrayant_calc_beamwidth(a, arma::uvec(), 10, &bw_int);
-    quadriga_lib::arrayant_calc_beamwidth(a, arma::uvec(), 10.0f, &bw_float);
+    quadriga_lib::calc_beamwidth(a, arma::uvec(), 10, &bw_int);
+    quadriga_lib::calc_beamwidth(a, arma::uvec(), 10.0f, &bw_float);
     CHECK(arma::approx_equal(bw_int, bw_float, "absdiff", 0.0));
 
     // The values are used: the 3 dB width is the requested 60 degree (within the interpolation error of the
     // 10 degree grid), and the 10 dB threshold gives a wider beam than the default of 3 dB
-    quadriga_lib::arrayant_calc_beamwidth(a, arma::uvec(), 3, &bw_3dB);
+    quadriga_lib::calc_beamwidth(a, arma::uvec(), 3, &bw_3dB);
     CHECK(std::abs(bw_3dB(0) - T(60)) < T(1));
     CHECK(bw_int(0) > T(1.5) * bw_3dB(0));
 
     // dtype defaults to double for the generators
-    quadriga_lib::arrayant<double> d = quadriga_lib::arrayant_generate("omni", 10);
+    quadriga_lib::arrayant<double> d = quadriga_lib::generate_antenna("omni", 10);
     CHECK(d.azimuth_grid.n_elem == 37);
 }

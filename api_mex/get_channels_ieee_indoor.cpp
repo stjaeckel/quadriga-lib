@@ -35,8 +35,8 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 ```
 
 ## Inputs:
-- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling; see [[arrayant_generate]]
-- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling; see [[arrayant_generate]]
+- **`ap_array`** — Access point antenna array; `n_tx` = number of ports; see [[generate_antenna]]
+- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports; see [[generate_antenna]]
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
 - **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9

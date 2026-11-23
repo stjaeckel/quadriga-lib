@@ -481,7 +481,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 
 ### Inputs:
 - **`tx_array`**, **`rx_array`** — Structs containing the arrayant data with `n_tx` and `n_rx` ports; field layout
-  as documented in [arrayant_generate](array-antenna-functions.md#arrayant_generate)
+  as documented in [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna)
 - **`rays`** — Ray struct of the link, see [ssf_rays](#ssf_rays); `[1, 1]` struct
 - **`link_gain_dB`** — Link gain (see Terms) at `rays.center_freq(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** — `'phase'`, `'drift'` or `'auto'` (see Terms; `'auto'` is `'drift'` for `'quadriga'` rays, which then

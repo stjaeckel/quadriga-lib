@@ -64,7 +64,7 @@ The corpus is what makes long fuzzing pay off: each run starts from the inputs t
 - **Header:** the commit (with a note if tracked files had uncommitted changes), start and end, the number of processes, the load before and after, the limits per input and the counts of new and known findings.
 - **Targets:** per target the fuzzing time, the processes, the inputs run, the runs per second, the coverage (code edges reached; it compares runs of one target, not targets with each other), the corpus size at the start and at the end, and the number of failing inputs that were new, known or did not fail again.
 - **Problems of the run:** a target whose seeds could not be written, whose fuzzer did not end normally or ran no input, or one where most fuzzing jobs ended at a failing input. Each failure ends a job, so such a target hardly explores past the failure; fixing the defect, or listing it in `known.txt` when it is undefined behaviour, lets it go further.
-- **New findings:** one section per cause. Many failing inputs usually share one cause; they are grouped by their signature, which is the kind of failure, the first library function in the stack trace and its file (for example `heap-buffer-overflow in quadriga_lib::qdant_read (src/qd_arrayant_qdant.cpp)`). Each section gives the message of the sanitizer or of libFuzzer, how many inputs hit it, the smallest input after minimizing, the command that reproduces it, the stack frames in the source tree, the input as text if it is printable, and a command that recreates the input file, ready to paste into an issue.
+- **New findings:** one section per cause. Many failing inputs usually share one cause; they are grouped by their signature, which is the kind of failure, the first library function in the stack trace and its file (for example `heap-buffer-overflow in quadriga_lib::qdant_read (src/qdant.cpp)`). Each section gives the message of the sanitizer or of libFuzzer, how many inputs hit it, the smallest input after minimizing, the command that reproduces it, the stack frames in the source tree, the input as text if it is printable, and a command that recreates the input file, ready to paste into an issue.
 - **Known findings:** causes listed in `known.txt`, counted only.
 - **Inputs not replayed:** per target the failing inputs beyond `--max-replays`, which stay in `artifacts/` unexamined. The counts of inputs per finding are those of the replayed inputs.
 - **Inputs that did not fail again:** inputs that failed while fuzzing but passed when run alone, most often a timeout under heavy load.
@@ -106,17 +106,17 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 
 | Target | Input | Calls |
 | :----- | :---- | :---- |
-| `fz_qdant` | QDANT file | `qdant_read` (with layout, a second ID), `qdant_read_multi` |
+| `fz_qdant` | QDANT file | `qdant_read` (all entries, a single ID with layout, a list with a duplicate, an ID not in the file) |
 | `fz_obj` | OBJ file | `obj_file_read` with all outputs |
 | `fz_mtl` | MTL file | `obj_file_read` of a fixed OBJ file that uses the fuzzed MTL file |
 | `fz_material_csv` | Material table (CSV) | `obj_file_read` of a fixed OBJ file with the fuzzed table, lenient and strict; `medium_gain`, `interface_gain`, `refractive_index` of each material it reads, EM and scalar mode |
 | `fz_conf` | Scenario parameter file | `conf_file_read` with all outputs, with and without the value checks |
 | `fz_qrt` | QRT file | `qrt_file_parse`, `qrt_read_cache_init`, `qrt_file_read` for several origins and CIR lists (single CIRs, past the end, two CIRs with a cache, all CIRs of small files) in both directions, `qrt_file_read_raw` |
 | `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel` (also with `i_snap`), `hdf5_read_channel_vec`, `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
-| `fz_arrayant_generate` | Parameters | `arrayant_generate` (each type with its inputs; all types with tuples of fuzzed lengths and values) and `generate_speaker` |
-| `fz_arrayant_interpolate` | Array antenna, angles | `arrayant_interpolate`, `arrayant_interpolate_multi` |
-| `fz_arrayant_edit` | Array antenna | The `arrayant` functions and members in a fuzzed order, the `arrayant_*_multi` functions, `qdant_write` and `qdant_read` |
-| `fz_get_channels` | Array antennas, paths | `get_channels_spherical`, `get_channels_planar` (also `_vec`), `get_channels_irs`, `get_channels_multifreq` |
+| `fz_generate_antenna` | Parameters | `generate_antenna` (each type with its inputs; all types with tuples of fuzzed lengths and values) and `generate_speaker` |
+| `fz_interpolate_pattern` | Antenna array, angles | `interpolate_pattern` (single and vector form) |
+| `fz_arrayant_edit` | Antenna array | The `arrayant` functions and members in a fuzzed order, the vector overloads of the arrayant functions, `qdant_write` and `qdant_read` |
+| `fz_get_channels` | Antenna arrays, paths | `get_channels_spherical`, `get_channels_planar` (also `_vec`), `get_channels_irs`, `get_channels_multifreq` |
 | `fz_channel_tools` | Coefficients, delays | `quantize_delays`, the `baseband_freq_response` functions |
 | `fz_hdf5_write` | Channel object | `channel` member functions, the HDF5 writers, then the HDF5 readers on the written file |
 | `fz_sos` | Frequencies, phases, ACF tables | The `sos_*` functions |
@@ -150,7 +150,7 @@ void fuzz_one(const uint8_t *data, size_t size)
 }
 ```
 
-Seeds can also be written by the library's own writers through `s.path(<name>)`, for example `qdant_write`. A target for API functions takes its arguments from the input with `fz::input`, which extends libFuzzer's `FuzzedDataProvider` by `size(max)`, `index(n)` (a valid index, one or two past the end, or the largest value), `value<T>()` (mostly moderate numbers, sometimes zero, NaN, infinity or extreme values), `col`, `mat` and `cube`; `fz::arrayant<T>(in)` builds an array antenna from it. The API targets run each input in `float` or `double`:
+Seeds can also be written by the library's own writers through `s.path(<name>)`, for example `qdant_write`. A target for API functions takes its arguments from the input with `fz::input`, which extends libFuzzer's `FuzzedDataProvider` by `size(max)`, `index(n)` (a valid index, one or two past the end, or the largest value), `value<T>()` (mostly moderate numbers, sometimes zero, NaN, infinity or extreme values), `col`, `mat` and `cube`; `fz::arrayant<T>(in)` builds an antenna array from it. The API targets run each input in `float` or `double`:
 
 ```cpp
 #include "fuzz_target.hpp"

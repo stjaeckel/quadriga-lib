@@ -27,18 +27,18 @@ MANDATORY_KEYS = ("e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im", "azimuth_g
 
 def irs_two_ports():
     # Two IRS elements, two codebook entries with different weights
-    ant = quadriga_lib.arrayant.generate("omni")
+    ant = quadriga_lib.arrayant.generate_antenna("omni")
     out = {k: (np.repeat(v, 2, axis=2) if k.startswith("e_") else v) for k, v in ant.items()}
     out["element_pos"] = np.array([[0.0, 0.0], [0.0, 0.1], [0.0, 0.0]])
-    out["coupling_re"] = np.array([[1.0, 0.3], [0.0, 0.4]])
-    out["coupling_im"] = np.zeros((2, 2))
+    out["port_weights_re"] = np.array([[1.0, 0.3], [0.0, 0.4]])
+    out["port_weights_im"] = np.zeros((2, 2))
     return out
 
 
 def distinct_args():
     # Different antennas, orientations, FBS / LBS, path lengths and polarization per segment, so that a swapped
     # argument changes the result
-    tx, rx = quadriga_lib.arrayant.generate("dipole"), quadriga_lib.arrayant.generate("xpol")
+    tx, rx = quadriga_lib.arrayant.generate_antenna("dipole"), quadriga_lib.arrayant.generate_antenna("xpol")
     geo = [np.array([0.0, 0.0, 1.0]), np.array([0.1, 0.2, 0.3]), np.array([40.0, 0.0, 1.5]),
            np.array([-0.2, 0.1, 2.0]), np.array([20.0, 1.0, 3.0]), np.array([0.3, -0.1, 1.2])]
     M1, M2 = np.zeros((8, 2)), np.zeros((8, 2))
@@ -55,7 +55,7 @@ class test_case(unittest.TestCase):
 
     def setUp(self):
         # TX -> IRS -> RX on the x-axis at 1 m height; segment 1: LOS + one path, segment 2: LOS + one path
-        self.omni = quadriga_lib.arrayant.generate("omni")
+        self.omni = quadriga_lib.arrayant.generate_antenna("omni")
         self.irs = irs_two_ports()
         z = np.zeros(3)
         self.geo = [np.array([0.0, 0.0, 1.0]), z, np.array([40.0, 0.0, 1.0]), z, np.array([20.0, 0.0, 1.0]), z]
@@ -99,7 +99,7 @@ class test_case(unittest.TestCase):
         tx, rx, irs = args[:3]
         tp, to, rp, ro, ip, io = args[3:9]
         seg1, seg2 = args[9:14], args[14:19]
-        irs_1 = dict(irs, coupling_re=irs["coupling_re"][:, :1], coupling_im=irs["coupling_im"][:, :1])
+        irs_1 = dict(irs, port_weights_re=irs["port_weights_re"][:, :1], port_weights_im=irs["port_weights_im"][:, :1])
         c1, d1, aod, eod, _, _ = quadriga_lib.channel.spherical(tx, irs_1, tp, to, ip, io, *seg1, 3.5e9,
                                                                 use_absolute_delays=True, angles=True)
         c2, d2, _, _, aoa, eoa = quadriga_lib.channel.spherical(irs_1, rx, ip, io, rp, ro, *seg2, 3.5e9,
@@ -135,7 +135,7 @@ class test_case(unittest.TestCase):
                 npt.assert_array_equal(a, b)
 
         # i_irs selects the codebook column: entry 1 equals entry 0 of the array with swapped columns
-        swapped = dict(self.irs, coupling_re=self.irs["coupling_re"][:, ::-1], coupling_im=self.irs["coupling_im"][:, ::-1])
+        swapped = dict(self.irs, port_weights_re=self.irs["port_weights_re"][:, ::-1], port_weights_im=self.irs["port_weights_im"][:, ::-1])
         out = self.call(i_irs=1)[0]
         npt.assert_allclose(out, quadriga_lib.channel.irs(*self.args(irs=swapped))[0], atol=1e-14, rtol=0)
         self.assertGreater(np.abs(out - ref[0]).max(), 1e-3)
@@ -222,14 +222,14 @@ class test_case(unittest.TestCase):
         self.assertIn("active_path", str(ctx.exception))
         # The IRS weights come from irs_array: a dict without coupling is rejected; the coupling and element_pos of
         # irs_array_2 are ignored
-        no_coupling = {k: v for k, v in self.irs.items() if not k.startswith("coupling")}
+        no_coupling = {k: v for k, v in self.irs.items() if not k.startswith("port_weights")}
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.channel.irs(*self.args(irs=no_coupling))
-        self.assertIn("Input 'irs_array' must have a coupling matrix", str(ctx.exception))
+        self.assertIn("Input 'irs_array' must have port weights", str(ctx.exception))
         npt.assert_array_equal(self.call(irs_array_2=no_coupling)[0], self.call()[0])
         patterns_only = {k: self.irs[k] for k in MANDATORY_KEYS}
         npt.assert_array_equal(self.call(irs_array_2=patterns_only, i_irs=1)[0], self.call(i_irs=1)[0])
-        other = dict(self.irs, coupling_re=2.0 * self.irs["coupling_re"], element_pos=np.ones((3, 2)))
+        other = dict(self.irs, port_weights_re=2.0 * self.irs["port_weights_re"], element_pos=np.ones((3, 2)))
         npt.assert_array_equal(self.call(irs_array_2=other)[0], self.call()[0])
         # From the wrapper and the input conversion
         with self.assertRaises(TypeError) as ctx:

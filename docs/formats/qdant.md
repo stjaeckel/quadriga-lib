@@ -7,7 +7,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/formats.html#qdant
 | [\<layout>](#layout) | [Content](#content-2) · [Examples](#examples) |
 | [\<arrayant>](#arrayant) | [Attributes](#attributes) · [Child elements](#child-elements) · [Validation & Formatting Rules (at a glance)](#validation-formatting-rules-at-a-glance) · [Quick Reference](#quick-reference) · [Example](#example) |
 
-QDANT is an XML grammar for exchanging array-antenna pattern data. Tag names are case-sensitive. A file contains a single `<qdant>` root element that may include an optional `<layout>` and one or more `<arrayant>` elements. A namespace is required on the root (with or without a prefix).
+QDANT is an XML grammar for exchanging antenna array pattern data. Tag names are case-sensitive. A file contains a single `<qdant>` root element that may include an optional `<layout>` and one or more `<arrayant>` elements. A namespace is required on the root (with or without a prefix).
 
 Coordinate convention (for interpreting pattern data):
 
@@ -18,12 +18,12 @@ Coordinate convention (for interpreting pattern data):
 
 See related read / write functions in the API documentation for details on how to use this format:
 
-- C++ QDANT read function ([qdant_read](../api/cpp/array-antenna-functions.md#qdant_read))
-- C++ QDANT write function ([qdant_write](../api/cpp/array-antenna-functions.md#qdant_write))
-- MATLAB / Octave QDANT read function ([qdant_read](../api/mex/array-antenna-functions.md#qdant_read))
-- MATLAB / Octave QDANT write function ([qdant_write](../api/mex/array-antenna-functions.md#qdant_write))
-- Python QDANT read function ([qdant_read](../api/python/array-antenna-functions.md#qdant_read))
-- Python QDANT write function ([qdant_write](../api/python/array-antenna-functions.md#qdant_write))
+- C++ QDANT read function ([qdant_read](../api/cpp/antennas-transducers-and-patterns.md#qdant_read))
+- C++ QDANT write function ([qdant_write](../api/cpp/antennas-transducers-and-patterns.md#qdant_write))
+- MATLAB / Octave QDANT read function ([qdant_read](../api/mex/antennas-transducers-and-patterns.md#qdant_read))
+- MATLAB / Octave QDANT write function ([qdant_write](../api/mex/antennas-transducers-and-patterns.md#qdant_write))
+- Python QDANT read function ([qdant_read](../api/python/antennas-transducers-and-patterns.md#qdant_read))
+- Python QDANT write function ([qdant_write](../api/python/antennas-transducers-and-patterns.md#qdant_write))
 
 <a id="layout"></a>
 ## \<layout>
@@ -45,7 +45,7 @@ Defines how multiple \<arrayant> objects are arranged into an object array (opti
 <a id="arrayant"></a>
 ## \<arrayant>
 
-Describes a single array antenna
+Describes a single antenna array
 
 <a id="attributes"></a>
 ### Attributes
@@ -75,7 +75,7 @@ Describes a single array antenna
   List of azimuth samples (−180 … +180; 0 points east; anti-clockwise positive). Example: `-180 -90 0 90 180`
 
 - **`<CouplingAbs>`** (optional; only with `<NoElements>`)\
-  N×M absolute values of the coupling matrix. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. M is the number of antenna ports. Example (N=2): `1,0 0,1`
+  N×M absolute values of the coupling matrix (the port weights in the API). Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. M is the number of antenna ports. Example (N=2): `1,0 0,1`
 
 - **`<CouplingPhase>`** (optional; only with `<NoElements>` and `<CouplingAbs>`)\
   N×N phases (degrees) for the same matrix. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. Example (N=2): `0,0 0,0`

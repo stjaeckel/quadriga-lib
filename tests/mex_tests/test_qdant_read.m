@@ -19,7 +19,7 @@ fclose(f);
 [ant, layout] = quadriga_lib.qdant_read('test.qdant');
 e_theta_re = ant.e_theta_re; e_theta_im = ant.e_theta_im; e_phi_re = ant.e_phi_re; e_phi_im = ant.e_phi_im;
 azimuth_grid = ant.azimuth_grid; elevation_grid = ant.elevation_grid; element_pos = ant.element_pos;
-coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_freq = ant.center_freq; name = ant.name;
+port_weights_re = ant.port_weights_re; port_weights_im = ant.port_weights_im; center_freq = ant.center_freq; name = ant.name;
 
 assertTrue( isa(e_theta_re,'double') );
 assertTrue( isa(e_theta_im,'double') );
@@ -28,8 +28,8 @@ assertTrue( isa(e_phi_im,'double') );
 assertTrue( isa(azimuth_grid,'double') );
 assertTrue( isa(elevation_grid,'double') );
 assertTrue( isa(element_pos,'double') );
-assertTrue( isa(coupling_re,'double') );
-assertTrue( isa(coupling_im,'double') );
+assertTrue( isa(port_weights_re,'double') );
+assertTrue( isa(port_weights_im,'double') );
 assertTrue( isa(center_freq,'double') );
 assertTrue( isa(layout,'uint32') );
 
@@ -40,8 +40,8 @@ assertElementsAlmostEqual( e_phi_im, zeros(5,3), 'absolute', 1e-14 );
 assertElementsAlmostEqual( azimuth_grid, [-pi,0,pi/2], 'absolute', 1e-13 );
 assertElementsAlmostEqual( elevation_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute', 1e-13 );
 assertElementsAlmostEqual( element_pos, [0;0;0], 'absolute', 1e-13 );
-assertElementsAlmostEqual( coupling_re, 1, 'absolute', 1e-13 );
-assertElementsAlmostEqual( coupling_im, 0, 'absolute', 1e-13 );
+assertElementsAlmostEqual( port_weights_re, 1, 'absolute', 1e-13 );
+assertElementsAlmostEqual( port_weights_im, 0, 'absolute', 1e-13 );
 assertElementsAlmostEqual( center_freq, 299792458, 'absolute', 1e-13 );
 assertTrue( strcmp(name,'bla') );
 assertEqual( layout, uint32(1) );
@@ -71,7 +71,7 @@ fclose(f);
 [ant, layout] = quadriga_lib.qdant_read('test.qdant',1);
 e_theta_re = ant.e_theta_re; e_theta_im = ant.e_theta_im; e_phi_re = ant.e_phi_re; e_phi_im = ant.e_phi_im;
 azimuth_grid = ant.azimuth_grid; elevation_grid = ant.elevation_grid; element_pos = ant.element_pos;
-coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_freq = ant.center_freq; name = ant.name;
+port_weights_re = ant.port_weights_re; port_weights_im = ant.port_weights_im; center_freq = ant.center_freq; name = ant.name;
 
 assertElementsAlmostEqual( azimuth_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute', 1e-12 );
 assertElementsAlmostEqual( elevation_grid, [-pi/2,0,pi/2], 'absolute', 1e-12 );
@@ -80,8 +80,8 @@ assertElementsAlmostEqual( e_theta_im, -sqrt(10^(0.3)*ones(3,5)), 'absolute', 1e
 assertElementsAlmostEqual( e_phi_re, zeros(3,5), 'absolute', 1e-12 );
 assertElementsAlmostEqual( e_phi_im, ones(3,5), 'absolute', 1e-12 );
 assertElementsAlmostEqual( element_pos, [1;2;3], 'absolute', 1e-12 );
-assertElementsAlmostEqual( coupling_re, 1/sqrt(2), 'absolute', 1e-12 );
-assertElementsAlmostEqual( coupling_im, 1/sqrt(2), 'absolute', 1e-12 );
+assertElementsAlmostEqual( port_weights_re, 1/sqrt(2), 'absolute', 1e-12 );
+assertElementsAlmostEqual( port_weights_im, 1/sqrt(2), 'absolute', 1e-12 );
 assertElementsAlmostEqual( center_freq, 3e9, 'absolute', 1e-12 );
 assertTrue( strcmp(name,'unknown') );
 assertEqual( layout, ones(2,3,'uint32') );
@@ -94,13 +94,13 @@ assertElementsAlmostEqual( data.e_phi_im, e_phi_im, 'absolute', 1e-14)
 assertElementsAlmostEqual( data.azimuth_grid, azimuth_grid, 'absolute', 1e-14)
 assertElementsAlmostEqual( data.elevation_grid, elevation_grid, 'absolute', 1e-14)
 assertElementsAlmostEqual( data.element_pos, element_pos, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.coupling_re, coupling_re, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.coupling_im, coupling_im, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.port_weights_re, port_weights_re, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.port_weights_im, port_weights_im, 'absolute', 1e-14)
 assertElementsAlmostEqual( data.center_freq, center_freq, 'absolute', 1e-14)
 assertTrue( strcmp(data.name,'unknown') );
 assertEqual( layout, ones(2,3,'uint32') );
 
-%% Two array antennas with uncommon formats
+%% Two antenna arrays with uncommon formats
 f = fopen( 'test.qdant','w' );
 fprintf(f,'<qdant><arrayant id="1">\n');
 fprintf(f,'<ElevationGrid> -45 45</ElevationGrid>\n');
@@ -129,8 +129,8 @@ data = quadriga_lib.qdant_read('test.qdant',3);
 assertElementsAlmostEqual( data.e_theta_re, zeros(2,3,2), 'absolute', 1e-13 );
 assertElementsAlmostEqual( data.e_phi_re, zeros(2,3,2), 'absolute', 1e-13 );
 assertElementsAlmostEqual( data.e_phi_im(:,:,2), [1;-1].*sqrt(10.^([1 2 3 ; -1 -2 -3]/10)), 'absolute', 1e-13 );
-assertElementsAlmostEqual( data.coupling_re, [1/sqrt(2);0], 'absolute', 1e-13 );
-assertElementsAlmostEqual( data.coupling_im, [1/sqrt(2);-2], 'absolute', 1e-13 );
+assertElementsAlmostEqual( data.port_weights_re, [1/sqrt(2);0], 'absolute', 1e-13 );
+assertElementsAlmostEqual( data.port_weights_im, [1/sqrt(2);-2], 'absolute', 1e-13 );
 assertTrue( strcmp(data.name,'xxx') );
 
 % Read all entries (no id): the two entries differ in the number of elements, so they are no frequency set
@@ -177,7 +177,7 @@ try
     [~] = quadriga_lib.qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Array antenna object must have an ''AzimuthGrid''.';
+    expectedErrorMessage = 'Antenna array object must have an ''AzimuthGrid''.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -299,9 +299,9 @@ end
 
 delete('test.qdant');
 
-% Without 'id', all entries are read; they must form a frequency set (same element count and grids)
+% Without 'ids', all entries are read; they must form a frequency set (same element count and grids)
 fn = [tempname, '.qdant'];
-a1 = quadriga_lib.arrayant_generate('omni');
+a1 = quadriga_lib.generate_antenna('omni');
 a2 = a1; a2.center_freq = 2e9; a2.e_theta_re = 0.5 * a2.e_theta_re;
 quadriga_lib.qdant_write(fn, a1, 1);
 quadriga_lib.qdant_write(fn, a2, 2);
@@ -310,24 +310,24 @@ assertEqual( size(r), [1 2] );
 assertEqual( [r.center_freq], [a1.center_freq, 2e9] );
 delete(fn);
 
-quadriga_lib.qdant_write(fn, quadriga_lib.arrayant_generate('omni'), 1);   % 1 element
-quadriga_lib.qdant_write(fn, quadriga_lib.arrayant_generate('xpol'), 2);   % 2 elements
+quadriga_lib.qdant_write(fn, quadriga_lib.generate_antenna('omni'), 1);   % 1 element
+quadriga_lib.qdant_write(fn, quadriga_lib.generate_antenna('xpol'), 2);   % 2 elements
 failed = false;
 try
     [~] = quadriga_lib.qdant_read(fn);
 catch ME
     failed = ~isempty(strfind(ME.message, fn)) && ~isempty(strfind(ME.message, 'frequency set')) && ...
-        ~isempty(strfind(ME.message, '''id'''));
+        ~isempty(strfind(ME.message, '''ids'''));
 end
 assertTrue( failed );
-r1 = quadriga_lib.qdant_read(fn, 1);   % single entries can still be read by 'id'
+r1 = quadriga_lib.qdant_read(fn, 1);   % single entries can still be read by ID
 r2 = quadriga_lib.qdant_read(fn, 2);
 assertEqual( size(r1.e_theta_re, 3), 1 );
 assertEqual( size(r2.e_theta_re, 3), 2 );
 delete(fn);
 
-quadriga_lib.qdant_write(fn, quadriga_lib.arrayant_generate('omni'), 1);      % 10 deg grid
-quadriga_lib.qdant_write(fn, quadriga_lib.arrayant_generate('omni', 5), 2);   % 5 deg grid
+quadriga_lib.qdant_write(fn, quadriga_lib.generate_antenna('omni'), 1);      % 10 deg grid
+quadriga_lib.qdant_write(fn, quadriga_lib.generate_antenna('omni', 5), 2);   % 5 deg grid
 failed = false;
 try
     [~] = quadriga_lib.qdant_read(fn);
@@ -338,9 +338,33 @@ assertTrue( failed );
 delete(fn);
 
 
+% A vector of IDs gives a struct array in the given order, duplicates included; an ID that is 0 or not in the file is an error
+fn = [tempname, '.qdant'];
+for n = 1:3
+    a = quadriga_lib.generate_antenna('omni');
+    a.center_freq = n * 1e9;
+    quadriga_lib.qdant_write(fn, a, n);
+end
+r = quadriga_lib.qdant_read(fn, [3 1 3]);
+assertEqual( size(r), [1 3] );
+assertEqual( [r.center_freq], [3e9, 1e9, 3e9] );
+r = quadriga_lib.qdant_read(fn, 2);
+assertEqual( r.center_freq, 2e9 );
+for bad_id = {0, 4, [1 4], [1 0]}
+    failed = false;
+    try
+        [~] = quadriga_lib.qdant_read(fn, bad_id{1});
+    catch ME
+        failed = ~isempty(regexpi(ME.message, '\<ids?\>', 'once'));
+    end
+    assertTrue( failed );
+end
+assertEqual( numel(quadriga_lib.qdant_read(fn, [])), numel(quadriga_lib.qdant_read(fn)) );
+delete(fn);
+
 % 0 to 2 outputs work, 0 behaves as 1; more outputs are an error
 fn = [tempname, '.qdant'];
-a1 = quadriga_lib.arrayant_generate('xpol');
+a1 = quadriga_lib.generate_antenna('xpol');
 quadriga_lib.qdant_write(fn, a1, 1);
 ref = quadriga_lib.qdant_read(fn, 1);
 quadriga_lib.qdant_read(fn, 1);
@@ -349,7 +373,7 @@ assertEqual( ans, ref );
 assertEqual( out1, ref );
 assertEqual( out2, uint32(1) );
 
-% Multi-entry file without 'id': 0 outputs behave as 1
+% Multi-entry file without 'ids': 0 outputs behave as 1
 a2 = a1; a2.center_freq = 2e9;
 quadriga_lib.qdant_write(fn, a2, 2);
 r = quadriga_lib.qdant_read(fn);

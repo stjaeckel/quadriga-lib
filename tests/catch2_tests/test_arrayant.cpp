@@ -2,8 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Array antenna structure and operations: is_valid, the block-diagonal coupling of arrayant_concat, arrayant_remove_zeros,
-// arrayant_copy_element and the output checks of arrayant_calc_beamwidth. Oracles are hand-written grids and coupling
+// Antenna array structure and operations: is_valid, the block-diagonal coupling of join_arrays, trim_pattern,
+// copy_element and the output checks of calc_beamwidth. Oracles are hand-written grids and coupling
 // matrices; the short-dipole directivity is 1.76 dBi (10 log10(1.5)).
 
 #include <catch2/catch_template_test_macros.hpp>
@@ -21,17 +21,17 @@
 
 TEST_CASE("Arrayant append")
 {
-    auto ant1 = quadriga_lib::arrayant_generate<float>("dipole");
-    auto ant2 = quadriga_lib::arrayant_generate<float>("custom", 1.0, NAN, {10.0, 10.0});
+    auto ant1 = quadriga_lib::generate_antenna<float>("dipole");
+    auto ant2 = quadriga_lib::generate_antenna<float>("custom", 1.0, NAN, {10.0, 10.0});
 
-    ant1.coupling_re.at(0) = 2.0;
-    ant2.coupling_re.at(0) = 3.0;
+    ant1.port_weights_re.at(0) = 2.0;
+    ant2.port_weights_re.at(0) = 3.0;
 
-    auto ant = quadriga_lib::arrayant_concat(ant1, ant2);
+    auto ant = quadriga_lib::join_arrays(ant1, ant2);
 
     arma::fmat T;
     T = {{2.0, 0.0}, {0.0, 3.0}};
-    CHECK(arma::approx_equal(ant.coupling_re, T, "absdiff", 1.0e-6f));
+    CHECK(arma::approx_equal(ant.port_weights_re, T, "absdiff", 1.0e-6f));
 
     float g0 = qd_directivity(ant, 0);
     float g1 = qd_directivity(ant, 1);
@@ -43,7 +43,7 @@ TEST_CASE("Arrayant append")
 // is_valid always checks the data: a value changed in place is found although the data pointers are unchanged
 TEST_CASE("Arrayant is_valid - Checks the data")
 {
-    auto a = quadriga_lib::arrayant_generate<double>("omni", 30.0);
+    auto a = quadriga_lib::generate_antenna<double>("omni", 30.0);
     a.azimuth_grid.memptr()[1] = 4.0; // Out of range, written in place
     CHECK(a.is_valid() == "Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).");
 
@@ -66,84 +66,84 @@ TEST_CASE("Arrayant is_valid - Checks the data")
     CHECK(c.is_valid() == "Values of 'elevation_grid' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
 }
 
-// Append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
-// of ports differs from the number of elements, and treat an empty coupling_im as zeros.
+// Append must build the block-diagonal coupling [C1 0; 0 C2] (as join_arrays), also when the number
+// of ports differs from the number of elements, and treat an empty port_weights_im as zeros.
 TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than elements")
 {
-    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    quadriga_lib::arrayant_copy_element(a, 0, {1});
-    a.coupling_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
-    a.coupling_im = arma::mat(arma::colvec{0.5, -0.5});
+    auto a = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    quadriga_lib::copy_element(a, 0, {1});
+    a.port_weights_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
+    a.port_weights_im = arma::mat(arma::colvec{0.5, -0.5});
 
-    auto b = quadriga_lib::arrayant_generate<double>("xpol", 10.0); // 2 elements, 2 ports (identity)
-    b.coupling_re = {{2.0, 0.0}, {0.0, 3.0}};
-    b.coupling_im = {{0.0, 0.25}, {0.0, 0.0}};
+    auto b = quadriga_lib::generate_antenna<double>("xpol", 10.0); // 2 elements, 2 ports (identity)
+    b.port_weights_re = {{2.0, 0.0}, {0.0, 3.0}};
+    b.port_weights_im = {{0.0, 0.25}, {0.0, 0.0}};
 
-    auto c = quadriga_lib::arrayant_concat(a, a);
+    auto c = quadriga_lib::join_arrays(a, a);
     arma::mat T = {{1.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {0.0, 1.0}};
-    CHECK(arma::approx_equal(c.coupling_re, T, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(c.port_weights_re, T, "absdiff", 1e-14));
     T = {{0.5, 0.0}, {-0.5, 0.0}, {0.0, 0.5}, {0.0, -0.5}};
-    CHECK(arma::approx_equal(c.coupling_im, T, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(c.port_weights_im, T, "absdiff", 1e-14));
     CHECK(c.n_ports() == 2);
 
-    auto cm = quadriga_lib::arrayant_concat_multi(std::vector<quadriga_lib::arrayant<double>>{a},
+    auto cm = quadriga_lib::join_arrays(std::vector<quadriga_lib::arrayant<double>>{a},
                                                   std::vector<quadriga_lib::arrayant<double>>{a});
-    CHECK(arma::approx_equal(c.coupling_re, cm[0].coupling_re, "absdiff", 1e-14));
-    CHECK(arma::approx_equal(c.coupling_im, cm[0].coupling_im, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(c.port_weights_re, cm[0].port_weights_re, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(c.port_weights_im, cm[0].port_weights_im, "absdiff", 1e-14));
 
     // Different port counts: 2x1 block followed by a 2x2 block
-    auto d = quadriga_lib::arrayant_concat(a, b);
+    auto d = quadriga_lib::join_arrays(a, b);
     T = {{1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}};
-    CHECK(arma::approx_equal(d.coupling_re, T, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(d.port_weights_re, T, "absdiff", 1e-14));
     T = {{0.5, 0.0, 0.0}, {-0.5, 0.0, 0.0}, {0.0, 0.0, 0.25}, {0.0, 0.0, 0.0}};
-    CHECK(arma::approx_equal(d.coupling_im, T, "absdiff", 1e-14));
-    auto dm = quadriga_lib::arrayant_concat_multi(std::vector<quadriga_lib::arrayant<double>>{a},
+    CHECK(arma::approx_equal(d.port_weights_im, T, "absdiff", 1e-14));
+    auto dm = quadriga_lib::join_arrays(std::vector<quadriga_lib::arrayant<double>>{a},
                                                   std::vector<quadriga_lib::arrayant<double>>{b});
-    CHECK(arma::approx_equal(d.coupling_re, dm[0].coupling_re, "absdiff", 1e-14));
-    CHECK(arma::approx_equal(d.coupling_im, dm[0].coupling_im, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(d.port_weights_re, dm[0].port_weights_re, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(d.port_weights_im, dm[0].port_weights_im, "absdiff", 1e-14));
     CHECK(d.is_valid().empty());
 }
 
-TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
+TEST_CASE("Arrayant append - Empty port_weights_im is treated as zeros")
 {
-    auto b = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    b.coupling_re = arma::mat(1, 1, arma::fill::value(2.0));
-    b.coupling_im.reset();
+    auto b = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    b.port_weights_re = arma::mat(1, 1, arma::fill::value(2.0));
+    b.port_weights_im.reset();
     REQUIRE(b.is_valid().empty());
 
     quadriga_lib::arrayant<double> d;
-    REQUIRE_NOTHROW(d = quadriga_lib::arrayant_concat(b, b));
+    REQUIRE_NOTHROW(d = quadriga_lib::join_arrays(b, b));
     arma::mat T = {{2.0, 0.0}, {0.0, 2.0}};
-    CHECK(arma::approx_equal(d.coupling_re, T, "absdiff", 1e-14));
-    CHECK(d.coupling_im.n_rows == 2);
-    CHECK(d.coupling_im.n_cols == 2);
-    CHECK(arma::all(arma::vectorise(d.coupling_im) == 0.0));
+    CHECK(arma::approx_equal(d.port_weights_re, T, "absdiff", 1e-14));
+    CHECK(d.port_weights_im.n_rows == 2);
+    CHECK(d.port_weights_im.n_cols == 2);
+    CHECK(arma::all(arma::vectorise(d.port_weights_im) == 0.0));
 
     // Both couplings empty (allowed by is_valid): identity blocks
-    auto e = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
-    e.coupling_re.reset(), e.coupling_im.reset();
+    auto e = quadriga_lib::generate_antenna<double>("xpol", 10.0);
+    e.port_weights_re.reset(), e.port_weights_im.reset();
     REQUIRE(e.is_valid().empty());
-    auto f = quadriga_lib::arrayant_concat(e, b);
+    auto f = quadriga_lib::join_arrays(e, b);
     T = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 2.0}};
-    CHECK(arma::approx_equal(f.coupling_re, T, "absdiff", 1e-14));
-    CHECK(arma::all(arma::vectorise(f.coupling_im) == 0.0));
+    CHECK(arma::approx_equal(f.port_weights_re, T, "absdiff", 1e-14));
+    CHECK(arma::all(arma::vectorise(f.port_weights_im) == 0.0));
 
-    // arrayant_concat_multi with empty couplings
+    // join_arrays with empty couplings
     std::vector<quadriga_lib::arrayant<double>> fm;
-    REQUIRE_NOTHROW(fm = quadriga_lib::arrayant_concat_multi(std::vector<quadriga_lib::arrayant<double>>{e},
+    REQUIRE_NOTHROW(fm = quadriga_lib::join_arrays(std::vector<quadriga_lib::arrayant<double>>{e},
                                                              std::vector<quadriga_lib::arrayant<double>>{b}));
-    CHECK(arma::approx_equal(fm[0].coupling_re, T, "absdiff", 1e-14));
-    CHECK(arma::all(arma::vectorise(fm[0].coupling_im) == 0.0));
+    CHECK(arma::approx_equal(fm[0].port_weights_re, T, "absdiff", 1e-14));
+    CHECK(arma::all(arma::vectorise(fm[0].port_weights_im) == 0.0));
 }
 
-// Remove_zeros and arrayant_calc_directivity must not depend on the absolute scale of the pattern; an all-zero
+// Remove_zeros and calc_directivity must not depend on the absolute scale of the pattern; an all-zero
 // pattern is left unchanged.
 TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
 {
-    auto a = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {90.0, 90.0}); // 37 x 73
+    auto a = quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {90.0, 90.0}); // 37 x 73
     const double d_ref = qd_directivity(a, 0);
     quadriga_lib::arrayant<double> o_ref;
-    o_ref = a, quadriga_lib::arrayant_remove_zeros(o_ref);
+    o_ref = a, quadriga_lib::trim_pattern(o_ref);
 
     for (double s : {1e-6, 1e-8, 1e-12, 1e-30, 1e160, 1e300}) // power above the double range at 1e160
     {
@@ -151,35 +151,35 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
         b.e_theta_re *= s;
         CHECK(std::abs(qd_directivity(b, 0) - d_ref) < 1e-9);
         quadriga_lib::arrayant<double> o;
-        o = b, quadriga_lib::arrayant_remove_zeros(o);
+        o = b, quadriga_lib::trim_pattern(o);
         CHECK(o.n_elevation() == o_ref.n_elevation());
         CHECK(o.n_azimuth() == o_ref.n_azimuth());
         CHECK(arma::approx_equal(o.e_theta_re, o_ref.e_theta_re * s, "reldiff", 1e-12));
     }
 
     // Float pattern scaled by 1e-8 (power 1e-16)
-    auto af = quadriga_lib::arrayant_generate<float>("custom", 5.0f, NAN, {90.0f, 90.0f});
+    auto af = quadriga_lib::generate_antenna<float>("custom", 5.0f, NAN, {90.0f, 90.0f});
     const float df_ref = qd_directivity(af, 0);
     quadriga_lib::arrayant<float> of_ref;
-    of_ref = af, quadriga_lib::arrayant_remove_zeros(of_ref);
+    of_ref = af, quadriga_lib::trim_pattern(of_ref);
     af.e_theta_re *= 1e-8f;
     CHECK(std::abs(qd_directivity(af, 0) - df_ref) < 1e-4f);
     quadriga_lib::arrayant<float> of;
-    of = af, quadriga_lib::arrayant_remove_zeros(of);
+    of = af, quadriga_lib::trim_pattern(of);
     CHECK(of.n_elevation() == of_ref.n_elevation());
     CHECK(of.n_azimuth() == of_ref.n_azimuth());
 
     // All-zero pattern: unchanged (in place and into an output), directivity 0
-    auto z = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto z = quadriga_lib::generate_antenna<double>("omni", 10.0);
     z.e_theta_re.zeros();
     CHECK(qd_directivity(z, 0) == 0.0);
     quadriga_lib::arrayant<double> oz;
-    oz = z, quadriga_lib::arrayant_remove_zeros(oz);
+    oz = z, quadriga_lib::trim_pattern(oz);
     CHECK(oz.n_elevation() == z.n_elevation());
     CHECK(oz.n_azimuth() == z.n_azimuth());
     CHECK(arma::approx_equal(oz.azimuth_grid, z.azimuth_grid, "absdiff", 0.0));
     CHECK(oz.is_valid().empty());
-    quadriga_lib::arrayant_remove_zeros(z);
+    quadriga_lib::trim_pattern(z);
     CHECK(z.n_elevation() == 19);
     CHECK(z.n_azimuth() == 37);
     CHECK(z.is_valid().empty());
@@ -199,12 +199,12 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     a.e_theta_re.zeros(3, 7, 1);
     a.e_theta_re.slice(0).col(0).fill(1.0);
     a.e_theta_im.zeros(3, 7, 1), a.e_phi_re.zeros(3, 7, 1), a.e_phi_im.zeros(3, 7, 1);
-    a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
+    a.element_pos.zeros(3, 1), a.port_weights_re.ones(1, 1), a.port_weights_im.zeros(1, 1);
     a.center_freq = 1.0e9;
     REQUIRE(a.is_valid().empty());
 
     quadriga_lib::arrayant<double> o = a;
-    quadriga_lib::arrayant_remove_zeros(o);
+    quadriga_lib::trim_pattern(o);
     CHECK(o.name == "sector");
     CHECK(arma::approx_equal(o.azimuth_grid, arma::vec({-30.0, -20.0}) * d2r, "absdiff", 1e-14));
     CHECK(o.n_elevation() == 3);
@@ -213,11 +213,11 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     // Power only at 30 deg: the previous neighbour (20 deg) is kept, the next one across the gap (-30 deg) is not
     a.e_theta_re.zeros();
     a.e_theta_re.slice(0).col(6).fill(1.0);
-    o = a, quadriga_lib::arrayant_remove_zeros(o);
+    o = a, quadriga_lib::trim_pattern(o);
     CHECK(arma::approx_equal(o.azimuth_grid, arma::vec({20.0, 30.0}) * d2r, "absdiff", 1e-14));
 
     // In place: the name is kept
-    quadriga_lib::arrayant_remove_zeros(a);
+    quadriga_lib::trim_pattern(a);
     CHECK(a.name == "sector");
     CHECK(a.n_azimuth() == 2);
 }
@@ -225,11 +225,11 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
 // Copy_element must reject an empty destination with a clear message.
 TEST_CASE("Arrayant copy_element - Empty destination")
 {
-    auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto a = quadriga_lib::generate_antenna<double>("omni", 10.0);
 
     try
     {
-        quadriga_lib::arrayant_copy_element(a, 0, arma::uvec());
+        quadriga_lib::copy_element(a, 0, arma::uvec());
         FAIL("no exception for an empty destination");
     }
     catch (const std::invalid_argument &e)
@@ -238,19 +238,19 @@ TEST_CASE("Arrayant copy_element - Empty destination")
     }
     CHECK(a.n_elements() == 1);
 
-    REQUIRE_NOTHROW(quadriga_lib::arrayant_copy_element(a, 0, {2}));
+    REQUIRE_NOTHROW(quadriga_lib::copy_element(a, 0, {2}));
     CHECK(a.n_elements() == 3);
 
     // The largest index cannot be reached by resizing (index + 1 wraps to 0); it must throw, not write
     const arma::uword idx_max = std::numeric_limits<arma::uword>::max();
-    CHECK_THROWS_AS(quadriga_lib::arrayant_copy_element(a, 0, {idx_max}), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_copy_element(a, 0, arma::uvec{1, idx_max}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::copy_element(a, 0, {idx_max}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::copy_element(a, 0, arma::uvec{1, idx_max}), std::invalid_argument);
     CHECK(a.n_elements() == 3);
 }
 
 // The grids must be finite, in range and strictly increasing. A NaN or two equal neighbours must be rejected by the
 // full check and by interpolate, which otherwise returns zero or NaN patterns without an error.
-// The same holds for the output grids of combine_pattern and arrayant_combine_pattern_multi.
+// The same holds for the output grids of combine_pattern and apply_port_weights.
 TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values", "", float, double)
 {
     using T = TestType;
@@ -261,24 +261,24 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
     a.e_theta_re.ones(3, 4, 1), a.e_theta_im.zeros(3, 4, 1), a.e_phi_re.zeros(3, 4, 1), a.e_phi_im.zeros(3, 4, 1);
     a.azimuth_grid = {T(-3.0), T(-1.0), T(1.0), T(3.0)};
     a.elevation_grid = {T(-1.0), T(0.0), T(1.0)};
-    a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
+    a.element_pos.zeros(3, 1), a.port_weights_re.ones(1, 1), a.port_weights_im.zeros(1, 1);
     REQUIRE(a.is_valid().empty());
 
     arma::Mat<T> az = {T(0.1)}, el = {T(0.2)}, vr, vi, hr, hi;
 
-    // Rejected by both entry points; arrayant_interpolate runs on a copy that was never validated
+    // Rejected by both entry points; interpolate_pattern runs on a copy that was never validated
     auto rejected = [&](const quadriga_lib::arrayant<T> &b)
     {
         quadriga_lib::arrayant<T> c = b, d = b;
         CHECK(!c.is_valid().empty());
-        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate(d, az, el, vr, vi, hr, hi), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::interpolate_pattern(d, az, el, vr, vi, hr, hi), std::invalid_argument);
     };
 
     SECTION("Controls: valid grids pass")
     {
         quadriga_lib::arrayant<T> b = a;
         CHECK(b.is_valid().empty());
-        quadriga_lib::arrayant_interpolate(b, az, el, vr, vi, hr, hi);
+        quadriga_lib::interpolate_pattern(b, az, el, vr, vi, hr, hi);
         CHECK(std::abs(vr(0) - T(1.0)) < T(1e-5));
 
         // A single grid point in both directions
@@ -334,16 +334,16 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
     {
         const std::vector<quadriga_lib::arrayant<T>> v = {a};
         arma::Col<T> az_ok = {T(-1.0), T(0.0), T(1.0)}, el_ok = {T(0.0)};
-        CHECK_NOTHROW(quadriga_lib::arrayant_combine_pattern(a, az_ok, el_ok));
+        CHECK_NOTHROW(quadriga_lib::apply_port_weights(a, az_ok, el_ok));
 
         arma::Col<T> az_nan = {T(-1.0), nan, T(1.0)}, el_nan = {nan};
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, az_nan, el_ok), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, az_ok, el_nan), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, az_nan, el_ok), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, az_ok, el_nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::apply_port_weights(a, az_nan, el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::apply_port_weights(a, az_ok, el_nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::apply_port_weights(v, az_nan, el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::apply_port_weights(v, az_ok, el_nan), std::invalid_argument);
 
         arma::Col<T> az_rep = {T(-1.0), T(-1.0), T(1.0)};
-        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern(a, az_rep, el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::apply_port_weights(a, az_rep, el_ok), std::invalid_argument);
     }
 }
 
@@ -352,24 +352,24 @@ TEST_CASE("Arrayant remove_zeros - non-finite field values")
     // A NaN in every azimuth column would remove all columns; an Inf would keep the pattern unchanged
     for (double v : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})
     {
-        auto a = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+        auto a = quadriga_lib::generate_antenna<double>("omni", 10.0);
         a.e_theta_re.slice(0).row(3).fill(v);
-        CHECK_THROWS_AS(quadriga_lib::arrayant_remove_zeros(a), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::trim_pattern(a), std::invalid_argument);
         CHECK(a.n_azimuth() == 37);
     }
 }
 
 TEST_CASE("Arrayant calc_beamwidth - outputs that are the same variable")
 {
-    auto a = quadriga_lib::arrayant_generate<double>("custom", 10.0, NAN, {90.0, 60.0});
+    auto a = quadriga_lib::generate_antenna<double>("custom", 10.0, NAN, {90.0, 60.0});
     arma::vec bw_az, bw_el, p_az, p_el, d;
-    CHECK_NOTHROW(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_el, &p_az, &p_el));
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &bw_az, &bw_az), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth<double>(a, {}, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, {}, 3.0, &a.azimuth_grid), std::invalid_argument);
+    CHECK_NOTHROW(quadriga_lib::calc_beamwidth(a, {}, 3.0, &bw_az, &bw_el, &p_az, &p_el));
+    CHECK_THROWS_AS(quadriga_lib::calc_beamwidth(a, {}, 3.0, &bw_az, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_beamwidth<double>(a, {}, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_beamwidth(a, {}, 3.0, &a.azimuth_grid), std::invalid_argument);
 
     std::vector<quadriga_lib::arrayant<double>> v = {a, a};
     arma::mat m1, m2;
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v, {}, 3.0, &m1, &m1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi<double>(v, {}, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_beamwidth(v, {}, 3.0, &m1, &m1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_beamwidth<double>(v, {}, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
 }

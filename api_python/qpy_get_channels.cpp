@@ -97,14 +97,14 @@ static inline arma::Mat<double> qd_python_get_xyz(const py::handle &h, const cha
                  : arma::Mat<double>(qd_python_numpy2arma_Col<double>(h.cast<py::array_t<double>>(), false, false, name, 3));
 }
 
-// IRS arrayant dict: the coupling matrix holds the IRS weights; without one, C++ raises instead of using identity
+// IRS arrayant dict: the port weights hold the IRS weights; without one, C++ raises instead of using identity
 static inline quadriga_lib::arrayant<double> qd_irs_dict2arrayant(const py::dict &irs)
 {
     auto ant = qd_python_dict2arrayant(irs, true);
     auto given = [&](const char *key)
     { return irs.contains(key) && !irs[key].is_none() && py::array::ensure(irs[key]).size() != 0; };
-    if (!given("coupling_re") && !given("coupling_im"))
-        ant.coupling_re.reset(), ant.coupling_im.reset();
+    if (!given("port_weights_re") && !given("port_weights_im"))
+        ant.port_weights_re.reset(), ant.port_weights_im.reset();
     return ant;
 }
 
@@ -160,7 +160,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate_antenna]]; a 4D dict raises
   `ValueError` (use [[channel.multifreq]])
 - **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_snap)` in batch mode
@@ -180,7 +180,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
-  unavailable); auto selects GENERIC in this version, see [[interpolate]]; `int`; default: 0
+  unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]]; `int`; default: 0
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
 
@@ -192,7 +192,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
 ## See also:
 - [[channel.spherical]] (spherical wave variant)
 - [[channel.ieee_indoor]] (IEEE compliant channels using `channel.planar` internally)
-- [[generate]] (antenna array generator)
+- [[generate_antenna]] (antenna array generator)
 MD!*/
 
 py::tuple get_channels_planar(const py::dict &tx_array,
@@ -344,7 +344,7 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate_antenna]]; a 4D dict raises
   `ValueError` (use [[channel.multifreq]])
 - **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
@@ -363,9 +363,9 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
-  coupling, the time to convert them to the ports; default: `False`
+  port weights, the time to convert them to the ports; default: `False`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
-  2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [[interpolate]];
+  2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]];
   `int`; default: 0
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
@@ -494,7 +494,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
-- Coupling matrices are interpolated across frequencies (SLERP for complex pairs); pass 3D coupling `(n_elem, n_ports, n_freq)` for per-frequency coupling
+- Port weights are interpolated across frequencies (SLERP for complex pairs); pass 3D port weights `(n_elem, n_ports, n_freq)` for per-frequency port weights
 - Extrapolation clamps to the nearest frequency entry on all four grids
 - `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
@@ -529,7 +529,7 @@ coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
 ```
 
 ## Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [[generate]];
+- **`tx_array`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [[generate_antenna]];
   4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
 - **`rx_array`** — RX arrayant dict; same format as `tx_array`
 - **`tx_pos`** — Transmitter position, finite; `(3,)`
@@ -550,7 +550,7 @@ coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
-  unavailable); auto selects GENERIC in this version, see [[interpolate]]; `int`; default: 0
+  unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]]; `int`; default: 0
 
 ## Outputs:
 - **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
@@ -624,10 +624,10 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
   channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` dict without `coupling_re` /
-  `coupling_im` raises, unlike in the other functions, where it stands for identity
+- The IRS port weights hold the IRS weights and must be given: an `irs_array` dict without `port_weights_re` /
+  `port_weights_im` raises, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
@@ -656,10 +656,10 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit arrayant dict; `n_tx` = number of ports after element coupling; see [[generate]]
-- **`rx_array`** — Receive arrayant dict; `n_rx` = number of ports after element coupling; see [[generate]]
-- **`irs_array`** — IRS arrayant dict (TX-facing side) with `n_irs` elements; the coupling matrix holds the IRS
-  weights, one codebook entry per column, `(n_irs, n_codebook)`; see [[generate]]
+- **`tx_array`** — Transmit arrayant dict; `n_tx` = number of ports; see [[generate_antenna]]
+- **`rx_array`** — Receive arrayant dict; `n_rx` = number of ports; see [[generate_antenna]]
+- **`irs_array`** — IRS arrayant dict (TX-facing side) with `n_irs` elements; the port weights hold the IRS
+  weights, one codebook entry per column, `(n_irs, n_codebook)`; see [[generate_antenna]]
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
@@ -679,12 +679,12 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
   the polyline length; `(n_path_2,)`
 - **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
 - **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
-- **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
+- **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS port weights); default: `0`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
 - **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
-  elements as `irs_array`; only its patterns are used, its coupling and `element_pos` are ignored; default: `None`
+  elements as `irs_array`; only its patterns are used, its port weights and `element_pos` are ignored; default: `None`
   (`irs_array` for both sides)
 - **`active_path`** — Mask selecting active path pairs, bool or numeric (nonzero = active); overrides `threshold_dB`
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
@@ -704,7 +704,7 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 ## See also:
 - [[channel.spherical]] (single-segment spherical-wave channel)
 - [[channel.planar]] (single-segment planar-wave channel)
-- [[generate]] (antenna array generator)
+- [[generate_antenna]] (antenna array generator)
 MD!*/
 
 py::tuple get_channels_irs(const py::dict &tx_array,
@@ -835,8 +835,8 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, channel_type, cent
 ```
 
 ## Inputs:
-- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see arrayant-[[generate]]
-- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see arrayant-[[generate]]
+- **`ap_array`** — Access point antenna array; `n_tx` = number of ports, see [[generate_antenna]]
+- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports, see [[generate_antenna]]
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
 - **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9

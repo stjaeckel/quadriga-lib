@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
+#include "qd_helpers_mex_types.hpp"
+
+/*!SECTION
+Antennas, transducers and patterns
+SECTION!*/
+
+/*!MD
+# JOIN_ARRAYS
+Concatenate two arrayant structs into a single one
+
+- Concatenates all elements from `arrayant_in2` onto `arrayant_in1` along the element dimension; 
+  `element_pos` matrices are joined horizontally
+- Both inputs must share identical azimuth and elevation sampling grids
+- Port weights are assembled block-diagonally: elements from `arrayant_in1` connect only to ports from 
+  `arrayant_in1`, elements from `arrayant_in2` only to ports from `arrayant_in2`
+- `center_freq` and `name` are inherited from `arrayant_in1`
+- Supports multi-frequency arrayant models: when both inputs are struct arrays, they must have the 
+  same number of entries and matching `center_freq` at each index; concatenation is performed per 
+  entry and a struct array of equal size is returned
+- Output struct shape matches the input shape (scalar struct -> scalar struct, struct array -> struct array)
+
+## Usage:
+```
+arrayant_out = quadriga_lib.join_arrays( arrayant_in1, arrayant_in2 );
+```
+
+## Inputs:
+- **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
+  [[generate_antenna]]; a struct array may contain a frequency-dependent model
+- **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
+  `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
+
+## Output:
+- **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
+  a struct array of equal size is returned for multi-frequency input
+MD!*/
+
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+    if (nrhs != 2)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+
+    qd_mex_check_struct(prhs[0], "arrayant_in1");
+    qd_mex_check_struct(prhs[1], "arrayant_in2");
+
+    size_t n_freq1 = (size_t)mxGetNumberOfElements(prhs[0]);
+    size_t n_freq2 = (size_t)mxGetNumberOfElements(prhs[1]);
+
+    if (n_freq1 == 0 || n_freq2 == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'arrayant_in1' and 'arrayant_in2' cannot be empty.");
+
+    if (n_freq1 != n_freq2)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'arrayant_in1' and 'arrayant_in2' must have the same number of frequency entries.");
+
+    auto ant1 = quadriga_lib::arrayant<double>();
+    auto ant2 = quadriga_lib::arrayant<double>();
+    auto ant1_multi = std::vector<quadriga_lib::arrayant<double>>();
+    auto ant2_multi = std::vector<quadriga_lib::arrayant<double>>();
+
+    if (n_freq1 > 1)
+    {
+        ant1_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant_in1");
+        ant2_multi = qd_mex_struct2arrayant_multi(prhs[1], false, false, "arrayant_in2");
+    }
+    else
+    {
+        ant1 = qd_mex_struct2arrayant(prhs[0], false, false, "arrayant_in1");
+        ant2 = qd_mex_struct2arrayant(prhs[1], false, false, "arrayant_in2");
+    }
+
+    auto ant_out = quadriga_lib::arrayant<double>();
+    auto ant_out_multi = std::vector<quadriga_lib::arrayant<double>>();
+
+    if (n_freq1 > 1)
+        CALL_QD(ant_out_multi = quadriga_lib::join_arrays<double>(ant1_multi, ant2_multi));
+    else
+        CALL_QD(ant_out = quadriga_lib::join_arrays(ant1, ant2));
+
+    plhs[0] = (n_freq1 > 1) ? qd_mex_arrayant2struct_multi(ant_out_multi) : qd_mex_arrayant2struct(ant_out);
+}

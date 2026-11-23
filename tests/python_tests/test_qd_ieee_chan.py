@@ -67,7 +67,7 @@ class test_case(unittest.TestCase):
 
     # ---- 1) Type A, single user, cross-polarised antenna ----
     def test_ieee_chan_a_1user_xpol(self):
-        ant = arrayant.generate("xpol", 30.0)
+        ant = arrayant.generate_antenna("xpol", 30.0)
         chan = channel.ieee_indoor(ant, ant, "A")
 
         self.assertEqual(len(chan), 1)
@@ -119,7 +119,7 @@ class test_case(unittest.TestCase):
 
     # ---- 2) Type A, two users, default TGac offset angles ----
     def test_ieee_chan_a_2user_default_offsets(self):
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
         chan = channel.ieee_indoor(ant, ant, "A",
                                    center_freq=2.4e9,
                                    tap_spacing=1e-8,
@@ -153,7 +153,7 @@ class test_case(unittest.TestCase):
 
     # ---- 3) Type A, two users, manual offset angles ----
     def test_ieee_chan_a_2user_manual_offset(self):
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
         offset_angles = np.full((4, 2), 100.0)
 
         chan = channel.ieee_indoor(ant, ant, "A",
@@ -182,7 +182,7 @@ class test_case(unittest.TestCase):
 
     # ---- 4) Type B, three users, mixed distances and floors ----
     def test_ieee_chan_b_3user_floors_distances(self):
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
         chan = channel.ieee_indoor(ant, ant, "B",
                                    center_freq=2.4e9,
                                    tap_spacing=10e-9,
@@ -242,7 +242,7 @@ class test_case(unittest.TestCase):
 
     # ---- 5) Seed consistency: same seed → identical channel ----
     def test_ieee_chan_seed_consistency(self):
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
 
         kw = dict(center_freq=2.4e9,
                   tap_spacing=10e-9,
@@ -263,7 +263,7 @@ class test_case(unittest.TestCase):
         frequency), adding walls neither changes the path structure nor the SF
         realisation, so the total path power in dB must differ from the
         reference by exactly -n_walls * wall_loss_dB for every user."""
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
         seed = 42
 
         common = dict(center_freq=5.25e9,
@@ -335,7 +335,7 @@ class test_case(unittest.TestCase):
         both have n_floors > 0 ensures both lose the LOS path, so the path
         structure and SF realisation are identical at a fixed seed; the total
         power ratio is then determined purely by the floor-loss term."""
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
         seed = 7
 
         def FL(n):
@@ -369,7 +369,7 @@ class test_case(unittest.TestCase):
         observation_time_s = 10.0
         speed_station_kmh = 50.0
 
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
 
         chan = channel.ieee_indoor(ant, ant, "A",
                                    center_freq=fGHz * 1e9,
@@ -404,7 +404,7 @@ class test_case(unittest.TestCase):
         conjugation) of the downlink channel per path and snapshot, with
         transposed delays: the reciprocal channel, with the same Doppler shift
         for a moving station."""
-        ant = arrayant.generate("xpol", 30.0)  # 2 elements at each end
+        ant = arrayant.generate_antenna("xpol", 30.0)  # 2 elements at each end
 
         common = dict(center_freq=2.4e9,
                       tap_spacing=5e-9,
@@ -453,7 +453,7 @@ class test_case(unittest.TestCase):
         """stack=True must return the same data as stack=False, reshaped into
         a single array with the snapshot as the trailing axis. Tested on a
         time-evolving channel so n_snap > 1."""
-        ant = arrayant.generate("xpol", 30.0)  # 2x2
+        ant = arrayant.generate_antenna("xpol", 30.0)  # 2x2
         common = dict(center_freq=2.4e9, tap_spacing=10e-9,
                       observation_time=0.1, update_interval=1e-3,
                       speed_station_kmh=30.0, seed=2024)
@@ -518,7 +518,7 @@ class test_case(unittest.TestCase):
         """stack mode keeps chan as a list of length n_users; each user's data
         is stacked independently. Static channel here, so n_snap = 1 and the
         trailing axis has length 1."""
-        ant = arrayant.generate("omni", 30.0)
+        ant = arrayant.generate_antenna("omni", 30.0)
         common = dict(center_freq=2.4e9, tap_spacing=10e-9,
                       n_users=3,
                       dist=np.array([3.0, 5.0, 7.0]),
@@ -554,7 +554,7 @@ class test_case(unittest.TestCase):
 
     def test_output_keys_and_center_frequency_shape(self):
         """center_freq is an array of shape (1,); initial_position is returned."""
-        ant = arrayant.generate('omni')
+        ant = arrayant.generate_antenna('omni')
         c = channel.ieee_indoor(ant, ant, 'B', seed=1)[0]
         self.assertIsInstance(c['center_freq'], np.ndarray)
         self.assertEqual(c['center_freq'].shape, (1,))
@@ -565,7 +565,7 @@ class test_case(unittest.TestCase):
 
     def test_argument_passing(self):
         """Antennas and channel_type are mandatory; flags take a bool or None; containers None or arrays."""
-        ant = arrayant.generate('omni')
+        ant = arrayant.generate_antenna('omni')
         with self.assertRaises(TypeError):
             channel.ieee_indoor(channel_type='B')
         with self.assertRaises(TypeError):
@@ -584,7 +584,7 @@ class test_case(unittest.TestCase):
 
     def test_override_default_rules(self):
         """NaN selects the default; kf and the SF spreads must be >= 0, xpr_nlos and dist_breakpoint > 0."""
-        ant = arrayant.generate('omni')
+        ant = arrayant.generate_antenna('omni')
         for name in ('kf', 'sf_std_los_dB', 'sf_std_nlos_dB', 'xpr_nlos', 'dist_breakpoint'):
             for v in (-1.0, np.inf):
                 with self.assertRaisesRegex(ValueError, name):

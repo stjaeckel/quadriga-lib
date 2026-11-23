@@ -1,6 +1,6 @@
 +++
 title = "C++ API"
-description = "%%GAP: C++ API reference for Quadriga-Lib: array antennas, channel generation, statistics, the 3GPP stochastic model and site-specific simulation tools.%%"
+description = "%%GAP: C++ API reference for Quadriga-Lib: antenna arrays, channel generation, statistics, the 3GPP stochastic model and site-specific simulation tools.%%"
 lead = "%%GAP: Reference for the C++17 library, version {{ version }}. All functions live in the `quadriga_lib` namespace.%%"
 +++
 
@@ -57,7 +57,15 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 - `polmat`: polarization transfer matrix, the 2×2 polarization matrix of TR 38.901 per path or ray, rows rx, columns tx, stored column-major; `[8, n]` real interleaved: rows 0–1 (rx V, tx V), 2–3 (rx H, tx V), 4–5 (rx V, tx H), 6–7 (rx H, tx H). In scalar (acoustic) mode `[2, n]` holds the real and imaginary part of the complex scalar coefficient. Labels such as `ReHV` name the rx polarization first. The HDF5 file stores it as `path_polarization`.
 
-**Array antenna generators (TR 38.901 tuples)**
+**Antenna arrays: elements, ports and port weights**
+
+- Array: the whole `arrayant` object, an array of antenna or acoustic elements (an antenna array, a loudspeaker or a microphone array), with the radiation pattern (antennas) or directivity pattern (loudspeakers, microphones) of each element, the element positions and the port weights.
+- Element: one radiator or sensor (antenna element, loudspeaker driver, microphone capsule), with a pattern, a position and one row of the port weights.
+- Pattern: the direction-dependent field of an element, or of a port after `apply_port_weights`, sampled on an azimuth and elevation grid (`e_theta_re/im`, `e_phi_re/im`).
+- Port: one column of the port weights; `apply_port_weights` turns ports into elements. `n_ports()` is the number of ports.
+- Port weights: the fixed complex feed network that maps the elements to the ports, `[n_elements, n_ports]` (`port_weights_re`, `port_weights_im`); empty means identity (one port per element). It is not the mutual coupling between elements.
+
+**Antenna array generators (TR 38.901 tuples)**
 
 - Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `arma::uvec` for counts and codes, `arma::vec` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
 - `panel`: `[M, N, Mg, Ng]`: elements per column (along z), columns per panel (along y), panels per column, panels per row; default 1.

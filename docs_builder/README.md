@@ -236,7 +236,7 @@ A block starts with a line that is exactly `/*!SECTION`, `/*!SECTION_DESC` or `/
 
 ```
 /*!SECTION
-Array antenna functions
+Antennas, transducers and patterns
 SECTION!*/
 
 /*!SECTION_DESC
@@ -294,30 +294,30 @@ The Markdown files keep every item as written; only the website splits it into n
 
 ### Links
 
-- `[[name]]` links to the function `name` on the same API page, by the name exactly as in its name line (`[[arrayant_generate]]`, `[[sos.val]]`), without a `quadriga_lib.` prefix; `.[[name]]` links to the member function `.name` (C++). MATLAB names are compared in lower case. Nothing else is tried: a name that matches no function on that page stops the build (`E-link`). To link a function on another API page, write the site-root link, for example `[arrayant_generate](cpp_api.html#arrayant_generate)` or `<a href="python_api.html#arrayant.generate">...</a>`; such links work from doc blocks and content pages and are checked like every other link.
+- `[[name]]` links to the function `name` on the same API page, by the name exactly as in its name line (`[[generate_antenna]]`, `[[sos.val]]`), without a `quadriga_lib.` prefix; `.[[name]]` links to the member function `.name` (C++). MATLAB names are compared in lower case. Nothing else is tried: a name that matches no function on that page stops the build (`E-link`). To link a function on another API page, write the site-root link, for example `[generate_antenna](cpp_api.html#generate_antenna)` or `<a href="python_api.html#arrayant.generate_antenna">...</a>`; such links work from doc blocks and content pages and are checked like every other link.
 - Links to other pages and files are written relative to the site root, as on the website: `formats.html#qdant`, `faq.html#cite`, `publications/x.pdf`. Absolute links to `http://quadriga-lib.org/...` (with or without `www.`, http or https) are treated the same; links below `download/` and `releases/` stay absolute. Every such link and its anchor is checked: a wrong anchor stops the build.
 - A raw `<a href="U">text</a>` in a doc block works like `[text](U)`; `target` and `rel` are dropped. A `<br>` at the end of a line becomes a line break when the next line continues the paragraph, and is dropped at the end of a paragraph.
 - Inside code spans and fences nothing is rewritten.
 
 ### Anchors
 
-The id of a function is its name on the page, exactly: `arrayant_interpolate_multi`, `.is_valid`, `arrayant_generate` (MATLAB, lower case), `sos.acf_2d`. A section's id is `sec-<slug>`, the slug of its title: "Miscellaneous / Tools" gives `sec-miscellaneous-tools` and the file `api/<lang>/miscellaneous-tools.md`. Headings on content pages get the slug of their text unless `{#id}` sets another one (see [File format](#file-format)); there are no other ids. Renaming a section or a function changes its ids and breaks links to it from outside. Two equal ids on one page stop the build (`E-anchor`).
+The id of a function is its name on the page, exactly: `interpolate_pattern`, `.is_valid`, `generate_antenna` (MATLAB, lower case), `sos.acf_2d`. A section's id is `sec-<slug>`, the slug of its title: "Miscellaneous / Tools" gives `sec-miscellaneous-tools` and the file `api/<lang>/miscellaneous-tools.md`. Headings on content pages get the slug of their text unless `{#id}` sets another one (see [File format](#file-format)); there are no other ids. Renaming a section or a function changes its ids and breaks links to it from outside. Two equal ids on one page stop the build (`E-anchor`).
 
 ### Cross-language buttons
 
 Each function entry shows buttons "C++", "MATLAB", "Python" (on the website) and the line "Also in: ... · Not in: ..." (in the Markdown files). The counterparts are found like this:
 
-1. A MATLAB and a Python function form a family when their names match, compared in lower case with `.` read as `_` (`gbsm.draw` matches `gbsm_draw`). `[python_names]` in `docs_builder/content/api_matching.toml` gives the MATLAB name of the Python functions whose names differ (`"channel.planar" = "get_channels_planar"`, `generate = "arrayant_generate"`).
+1. A MATLAB and a Python function form a family when their names match, compared in lower case with `.` read as `_` (`gbsm.draw` matches `gbsm_draw`). `[python_names]` in `docs_builder/content/api_matching.toml` gives the MATLAB name of the Python functions whose names differ (`"channel.planar" = "get_channels_planar"`).
 2. The family's C++ counterpart is the C++ function with the same name, compared in lower case with `.` read as `_` (`sos.acf_2d` matches `sos_acf_2d`).
 3. `docs_builder/content/api_matching.toml` lists the C++ functions of families whose names do not match, and replaces rule 2 for the families it lists:
 
 ```toml
 [families]
-arrayant_combine_pattern = ["arrayant_combine_pattern", "arrayant_combine_pattern_multi"]
+get_channels_planar = ["get_channels_planar", "get_channels_planar_vec"]
 interp = ["interp_2D"]
 ```
 
-Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-frequency function before the `_multi` variant. All listed C++ functions link back to the family. An unknown family, an unknown C++ name, an unknown Python name in `[python_names]` or a C++ function in two families stops the build.
+Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-item function before its differently named vector variant. All listed C++ functions link back to the family. An unknown family, an unknown C++ name, an unknown Python name in `[python_names]` or a C++ function in two families stops the build. Overloads that share one name (for example the vector form of a function on a `std::vector` of arrayants) are one C++ function and need no entry.
 
 ### Formulas
 
@@ -412,7 +412,7 @@ Every page of the website that has a Markdown version (a twin) links to it in th
 
 - Each twin starts with `# title`, then `Quadriga-Lib <version> · Web page: <URL>`, then an index table of its `##` headings when it has at least two (with a column of `###` links on content pages), then the lead and the body.
 - The text is copied line by line. Only these change: sub-block headings move one level down; `{...}` after headings is removed; fences without info string get the page language; `[[name]]`, raw `<a href>` links and trailing `<br>` become Markdown; link URLs are rewritten for the twin's location; gap markers are removed. Formulas, tables, note boxes and parameter items stay as written.
-- Anchors: every function, section and heading gets an explicit `<a id="..."></a>` line before it, with the same ids as the HTML page (for a section `<a id="sec-<slug>"></a>`). So `#arrayant_generate`, `#sec-channel-functions` and `faq.md#cite` work in both formats, and links between twins use these ids. When you change how anchors are written, check on GitHub that a function link with a `.` (such as `#.is_valid`) still resolves.
+- Anchors: every function, section and heading gets an explicit `<a id="..."></a>` line before it, with the same ids as the HTML page (for a section `<a id="sec-<slug>"></a>`). So `#generate_antenna`, `#sec-channel-functions` and `faq.md#cite` work in both formats, and links between twins use these ids. When you change how anchors are written, check on GitHub that a function link with a `.` (such as `#.is_valid`) still resolves.
 - Every function has the line "Also in: [C++](...) · [Python](...)" or "Not in: C++, Python" with the same information as the buttons on the website. "Not in" names a language without a counterpart; the line is never left out.
 - `quadriga_lib_api_<lang>.md` has YAML front matter (title with the version, author, language), the general usage notes, a "Function Index" table (Function, Section, Summary) and then every section and function. Agents should read the index and then fetch only the section file `api/<lang>/<slug>.md`.
 - Links to website pages without a twin (the landing page, the Impressum) and to site files outside `docs/` (publications, the skill, the material model, the tutorials) are absolute `http://quadriga-lib.org/...` links in `docs/`.

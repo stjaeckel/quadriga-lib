@@ -25,8 +25,8 @@ rr = quadriga_lib.gbsm_draw( sp, 'ray', quadriga_lib.gbsm_init_phases( sp, 'ray'
 rays = quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rr, 'quadriga', ...
     [], [], [], gre, gim );
 rays = quadriga_lib.ssf_scatterers( rays );
-tx = quadriga_lib.arrayant_generate( 'omni' );
-rx = quadriga_lib.arrayant_generate( 'xpol' );
+tx = quadriga_lib.generate_antenna( 'omni' );
+rx = quadriga_lib.generate_antenna( 'xpol' );
 taps = unique( rays.tap );
 n_tap = numel( taps );
 n_path = sum( any( rays.power > 0, 2 ) | rays.path_type < 2 );

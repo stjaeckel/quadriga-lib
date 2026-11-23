@@ -4,14 +4,14 @@
 
 #include "qd_helpers_mex_types.hpp"
 
-// IRS array struct: the coupling matrix holds the IRS weights; without one, C++ throws instead of using identity
+// IRS array struct: the port weights hold the IRS weights; without one, C++ throws instead of using identity
 static inline quadriga_lib::arrayant<double> qd_irs_struct2arrayant(const mxArray *input, const std::string &var_name)
 {
     auto ant = qd_mex_struct2arrayant(input, false, false, var_name);
     auto given = [&](const char *name)
     { return qd_mex_has_field(input, name) && !mxIsEmpty(qd_mex_get_field(input, name)); };
-    if (!given("coupling_re") && !given("coupling_im"))
-        ant.coupling_re.reset(), ant.coupling_im.reset();
+    if (!given("port_weights_re") && !given("port_weights_im"))
+        ant.port_weights_re.reset(), ant.port_weights_im.reset();
     return ant;
 }
 
@@ -25,10 +25,10 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS coupling matrix (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
+  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
   channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` struct without `coupling_re` /
-  `coupling_im` throws, unlike in the other functions, where it stands for identity
+- The IRS port weights hold the IRS weights and must be given: an `irs_array` struct without `port_weights_re` /
+  `port_weights_im` throws, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
@@ -58,9 +58,9 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [[arrayant_generate]]
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [[arrayant_generate]]
-- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the coupling matrix holds the IRS weights,
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [[generate_antenna]]
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [[generate_antenna]]
+- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; the port weights hold the IRS weights,
   one codebook entry per column, `[n_irs, n_codebook]`
 - **`tx_pos`** — Transmitter position; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
@@ -80,12 +80,12 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`path_length_2`** — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_2, 1]`
 - **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
-- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
+- **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS port weights); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements as `irs_array`;
-  only its patterns are used, its coupling and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
+  only its patterns are used, its port weights and `element_pos` are ignored; default: `[]` (`irs_array` on both sides)
 - **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`; default: `[]`
 - **`use_kernel`** — Kernel of both segments, as in [[get_channels_spherical]]: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
@@ -103,7 +103,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 ## See also:
 - [[get_channels_spherical]] (single-segment spherical-wave channel)
 - [[get_channels_planar]] (single-segment planar-wave channel)
-- [[arrayant_generate]] (antenna array generator)
+- [[generate_antenna]] (antenna array generator)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

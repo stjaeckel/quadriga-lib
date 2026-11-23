@@ -18,20 +18,20 @@ e_theta_im      = -reshape(1:12,3,[])*0.002;
 e_phi_re        = -reshape(1:12,3,[]);
 e_phi_im        = -reshape(1:12,3,[])*0.001;
 element_pos     = [1;2;4];
-coupling_re     = 1;
-coupling_im     = 0.1;
+port_weights_re     = 1;
+port_weights_im     = 0.1;
 center_freq     = 2e9;
 name            = 'name';
 
 id_file = quadriga_lib.qdant_write( 'testm.qdant', mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name ) );
+    azimuth_grid, elevation_grid, element_pos, port_weights_re, port_weights_im, center_freq, name ) );
 
 assert( id_file == 1 );
 
 [antI, layout] = quadriga_lib.qdant_read('testm.qdant');
 e_theta_reI = antI.e_theta_re; e_theta_imI = antI.e_theta_im; e_phi_reI = antI.e_phi_re; e_phi_imI = antI.e_phi_im;
 azimuth_gridI = antI.azimuth_grid; elevation_gridI = antI.elevation_grid; element_posI = antI.element_pos;
-coupling_reI = antI.coupling_re; coupling_imI = antI.coupling_im; center_frequencyI = antI.center_freq; nameI = antI.name;
+port_weights_reI = antI.port_weights_re; port_weights_imI = antI.port_weights_im; center_frequencyI = antI.center_freq; nameI = antI.name;
 
 assertElementsAlmostEqual( azimuth_grid, azimuth_gridI, 'absolute', 1e-6 );
 assertElementsAlmostEqual( elevation_grid, elevation_gridI, 'absolute', 1e-6 );
@@ -40,8 +40,8 @@ assertElementsAlmostEqual( e_theta_imI, e_theta_im, 'absolute', 1e-4 );
 assertElementsAlmostEqual( e_phi_reI, e_phi_re, 'absolute', 1e-4 );
 assertElementsAlmostEqual( e_phi_imI, e_phi_im, 'absolute', 1e-4 );
 assertElementsAlmostEqual( element_posI, element_pos, 'absolute', 1e-4 );
-assertElementsAlmostEqual( coupling_reI, coupling_re, 'absolute', 1e-4 );
-assertElementsAlmostEqual( coupling_imI, coupling_im, 'absolute', 1e-4 );
+assertElementsAlmostEqual( port_weights_reI, port_weights_re, 'absolute', 1e-4 );
+assertElementsAlmostEqual( port_weights_imI, port_weights_im, 'absolute', 1e-4 );
 assertElementsAlmostEqual( center_frequencyI, center_freq, 'absolute', 1e-4 );
 assertTrue( strcmp(nameI,name) );
 assertEqual( layout, uint32(1) );
@@ -67,8 +67,8 @@ ant.e_theta_im      = -reshape(1:12,3,[])*0.002;
 ant.e_phi_re        = -reshape(1:12,3,[]);
 ant.e_phi_im        = -reshape(1:12,3,[])*0.001;
 ant.element_pos     = [1;2;4];
-ant.coupling_re     = 1;
-ant.coupling_im     = 0.1;
+ant.port_weights_re     = 1;
+ant.port_weights_im     = 0.1;
 ant.center_freq     = 2e9;
 ant.name            = 'name';
 
@@ -78,7 +78,7 @@ assertEqual( id_file, uint32(2) );
 
 [r, layout] = quadriga_lib.qdant_read('testm.qdant',2);
 A = r.e_theta_re; B = r.e_theta_im; C = r.e_phi_re; D = r.e_phi_im; E = r.azimuth_grid; F = r.elevation_grid;
-G = r.element_pos; H = r.coupling_re; I = r.coupling_im; J = r.center_freq; nameI = r.name;
+G = r.element_pos; H = r.port_weights_re; I = r.port_weights_im; J = r.center_freq; nameI = r.name;
 
 assertElementsAlmostEqual( A, ant.e_theta_re, 'absolute', 1e-4 );
 assertElementsAlmostEqual( B, ant.e_theta_im, 'absolute', 1e-4 );
@@ -87,8 +87,8 @@ assertElementsAlmostEqual( D, ant.e_phi_im, 'absolute', 1e-4 );
 assertElementsAlmostEqual( E, ant.azimuth_grid, 'absolute', 1e-6 );
 assertElementsAlmostEqual( F, ant.elevation_grid, 'absolute', 1e-6 );
 assertElementsAlmostEqual( G, ant.element_pos, 'absolute', 1e-4 );
-assertElementsAlmostEqual( H, ant.coupling_re, 'absolute', 1e-4 );
-assertElementsAlmostEqual( I, ant.coupling_im, 'absolute', 1e-4 );
+assertElementsAlmostEqual( H, ant.port_weights_re, 'absolute', 1e-4 );
+assertElementsAlmostEqual( I, ant.port_weights_im, 'absolute', 1e-4 );
 assertElementsAlmostEqual( J, ant.center_freq, 'absolute', 1e-4 );
 assertTrue( strcmp(nameI,ant.name) );
 assertEqual(layout, uint32([1,2]));
@@ -222,8 +222,8 @@ base.e_theta_im     = -reshape(1:12,3,[])*0.002;
 base.e_phi_re       = -reshape(1:12,3,[]);
 base.e_phi_im       = -reshape(1:12,3,[])*0.001;
 base.element_pos    = [1;2;4];
-base.coupling_re    = 1;
-base.coupling_im    = 0.1;
+base.port_weights_re    = 1;
+base.port_weights_im    = 0.1;
 base.center_freq    = 0;      % placeholder, overwritten per entry
 base.name           = '';     % placeholder, overwritten per entry
 
@@ -238,7 +238,7 @@ quadriga_lib.qdant_write('testm.qdant', ant3);   % void call, no id requested
 % Read back as struct array, no id
 [ant_read, layout] = quadriga_lib.qdant_read('testm.qdant');
 assertEqual(numel(ant_read), 3);
-assertEqual(layout, uint32([1;2;3]));            % [n_entries, 1] per qdant_write_multi
+assertEqual(layout, uint32([1;2;3]));            % [n_entries, 1] per the vector form of qdant_write
 
 for k = 1:3
     assertTrue(strcmp(ant_read(k).name, ant3(k).name));
@@ -277,13 +277,13 @@ end
 delete('testm.qdant');
 
 %% Errors name the entry of a struct array 1-based (C++ counts from 0)
-a = quadriga_lib.arrayant_generate('omni');
+a = quadriga_lib.generate_antenna('omni');
 b = a; b.e_theta_re = b.e_theta_re(1:end-1, :); % third entry is invalid
 assert_throws( @() quadriga_lib.qdant_write('testm.qdant', [a, a, b]), 'Entry 3: ' );
-assert_throws( @() quadriga_lib.arrayant_interpolate([a, a, b], 0, 0), ': Entry 3: ' ); % inside a C++ exception message
+assert_throws( @() quadriga_lib.interpolate_pattern([a, a, b], 0, 0), ': Entry 3: ' ); % inside a C++ exception message
 
 %% An empty center_freq field writes the default 299792458
-ant = quadriga_lib.arrayant_generate('omni');
+ant = quadriga_lib.generate_antenna('omni');
 quadriga_lib.qdant_write('testm.qdant', mk_ant( ant.e_theta_re, ant.e_theta_im, ant.e_phi_re, ant.e_phi_im, ...
     ant.azimuth_grid, ant.elevation_grid, [], [], [], [], 'x') );
 a2 = quadriga_lib.qdant_read('testm.qdant', 1);
@@ -308,7 +308,7 @@ end
 function ant = mk_ant(e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, varargin)
 ant = struct('e_theta_re', e_theta_re, 'e_theta_im', e_theta_im, 'e_phi_re', e_phi_re, 'e_phi_im', e_phi_im, ...
     'azimuth_grid', azimuth_grid, 'elevation_grid', elevation_grid);
-names = {'element_pos', 'coupling_re', 'coupling_im', 'center_freq', 'name'};
+names = {'element_pos', 'port_weights_re', 'port_weights_im', 'center_freq', 'name'};
 for k = 1:numel(varargin)
     ant.(names{k}) = varargin{k};
 end

@@ -627,7 +627,7 @@ TEST_CASE("ssf_paths - phase and drift agree for millimetre displacements")
     // get_channels_spherical at the moved positions. LOS and NLOS (no fallback ray in this fixture): equal within
     // the second-order bound; GR: drift = phase × sqrt(g(t) / g(0))·R_par(t) / R_par(0) (vertical polarisation),
     // the change of the GR coefficient at the moved ends
-    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    const auto omni = quadriga_lib::generate_antenna<double>("omni", 1.0);
     for (const char *method : {"38.901", "quadriga"})
     {
         const rays_t r = make_rays(21, true, true, 6, 2, method, true);

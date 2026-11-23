@@ -132,11 +132,11 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz, // Freque
                  const size_t n_pos,                                   // Number of positions
                  double *val);                                         // Output: Values, Size [n_pos, n_gen], uninitialized
 
-// Interpolation of array antenna patterns (arrayant_interpolate), AVX2 kernel; computes in single precision for
-// float and double. Arguments and preconditions as qd_arrayant_interpolate_GENERIC, and the pattern of all elements
-// has at most INT_MAX samples (int32 gather offsets); checked by qd_arrayant_interpolate_dispatch, not by the kernel.
+// Interpolation of antenna array patterns (interpolate_pattern), AVX2 kernel; computes in single precision for
+// float and double. Arguments and preconditions as qd_interpolate_pattern_GENERIC, and the pattern of all elements
+// has at most INT_MAX samples (int32 gather offsets); checked by qd_interpolate_pattern_dispatch, not by the kernel.
 template <typename dtype>
-void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_im,       // e-theta field, real / imaginary part, [n_elevation, n_azimuth, n_elements]
+void qd_interpolate_pattern_AVX2(const dtype *e_theta_re, const dtype *e_theta_im,       // e-theta field, real / imaginary part, [n_elevation, n_azimuth, n_elements]
                                   const dtype *e_phi_re, const dtype *e_phi_im,           // e-phi field, real / imaginary part, [n_elevation, n_azimuth, n_elements]
                                   const size_t n_elevation, const size_t n_azimuth,       // Number of elevation and azimuth samples, both >= 1
                                   const dtype *azimuth_grid,                              // Azimuth sample angles in rad, strictly increasing, [n_azimuth]

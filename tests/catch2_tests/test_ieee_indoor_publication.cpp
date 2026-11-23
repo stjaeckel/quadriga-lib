@@ -121,7 +121,7 @@ namespace
 
 TEST_CASE("IEEE indoor publication - Sec. 2.2.3 and 3.8: API, tap spacing and snapshots")
 {
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
 
     // N_snap = 1 + floor(T_obs / dt)
     CHECK(quadriga_lib::get_channels_ieee_indoor(omni, omni, "A", 2.4e9, 10e-9, 1, 0.0, 1e-3)[0].n_snap() == 1);
@@ -279,7 +279,7 @@ TEST_CASE("IEEE indoor publication - Sec. 3.4, Table 3-3: MU-MIMO offset angles"
     code_map.row(2) = lcg(s3, 3).t();
     code_map.row(3) = lcg(s4, 3).t();
 
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
     auto run = [&](const arma::mat &off)
     {
         return quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", 2.4e9, 10e-9, 3, 0.0, 1e-3, 0.0, 1.2, {3.0}, {0}, false,
@@ -372,7 +372,7 @@ TEST_CASE("IEEE indoor publication - Sec. 3.7 and 4.1, Table 4-1: normalisation 
     // alpha^2 = X / (1 + X) = 2/3 of its path gain and the LOS tap all of it. This (and not the interpolation) is
     // why the "TGn" and "TGac" rows of Table 4-1 differ from the reference rows. Models B, C, F are deterministic;
     // D and E vary with the fluorescent modulation, which is also applied to a static channel.
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 30.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 30.0);
     auto run = [&](const char *m, double ts, arma::sword seed)
     {
         return quadriga_lib::get_channels_ieee_indoor(omni, omni, m, 2.4e9, ts, 1, 0.0, 1e-3, 0.0, 1.2, {4.99}, {0}, false, {}, 20,
@@ -442,7 +442,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.2, Table 4-2: 4x4 MIMO NLOS capacity
     // 100 realisations per model (report: 2000). Per-realisation std measured over 2000 (A..F, IID):
     // 1.03, 0.81, 0.87, 0.83, 0.90, 0.86, 0.70 b/s/Hz. Tolerance: printed rounding (0.05) + 3 std of the difference
     // of the two means, std * sqrt(1/100 + 1/2000).
-    auto ula = quadriga_lib::arrayant_generate<double>("ula", 30.0, 2.4e9, {}, {1, 4}, {0.5});
+    auto ula = quadriga_lib::generate_antenna<double>("ula", 30.0, 2.4e9, {}, {1, 4}, {0.5});
     arma::vec pilot = {0.0};
     const char *models[6] = {"A", "B", "C", "D", "E", "F"};
     const double published[7] = {9.0, 9.4, 9.1, 10.2, 9.6, 10.4, 11.0};
@@ -496,7 +496,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.3, Figure 4.2: bell-shaped environme
     // Bell spectrum S(f) = 1 / (1 + 9 (f / f_d)^2): fraction of power within |f| <= f_d = (2 / pi) atan(3) = 0.795.
     // 16 realisations; measured over 1000: ensemble fraction 0.806 (rectangular window), std over batches of 16:
     // 0.022; asymmetry std 0.066. The draws are truncated at 5 f_d (13.3 Hz).
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 30.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 30.0);
     const double fd = 1.2 / 3.6 / (c0 / 2.4e9), dt = 0.02;
     double in = 0.0, tot = 0.0, pos = 0.0, neg = 0.0, beyond = 0.0, tot_h = 0.0;
     for (int n = 1; n <= 16; ++n)
@@ -527,7 +527,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.3, Figure 4.3: Jakes Doppler of a mo
     // most power at positive Doppler (report: peak at +10.6 Hz on its axis, i.e. the bin at +10.89 Hz).
     // 8 realisations; measured over 1000: fraction at f > 0 = 0.897, std over batches of 8: 0.0095.
     // The report's script (IFFT over time) shows this spectrum mirrored, see the header.
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 30.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 30.0);
     const double fmax = 5.0 / 3.6 / (c0 / 2.4e9), dt = 0.02;
     arma::vec S_sum(101, arma::fill::zeros), Sh_sum(101, arma::fill::zeros);
     for (int n = 1; n <= 8; ++n)
@@ -556,7 +556,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.3, Figure 4.4: Doppler spike of a mo
     // 12 realisations; measured over 1000: energy centroid of the spike 88.96 Hz, std over batches of 12: 0.24 Hz.
     // The report states that the spike is 3.3 dB below the same tap at 0 Hz (its figure shows 4.3 dB between the
     // peak bins); the energy ratio is not a stable statistic (ensemble 1.7 dB, batch std 1.8 dB), not checked.
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 30.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 30.0);
     const double fs = 40.0 / 3.6 / (c0 / 2.4e9), dt = 0.004;
     double hi = 0.0, fw = 0.0, mirror = 0.0, edge = 0.0;
     for (int n = 1; n <= 12; ++n)
@@ -589,7 +589,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.3, Figure 4.5: fluorescent lights")
     // 12 realisations, Hann window, +-20 Hz around each line; measured over 1000: line energy / total = 4.85e-4,
     // std over batches of 12: 1.58e-4. Line power ratios are not checked: the per-realisation normalisation of I/C
     // makes them biased and heavy-tailed (ensemble -11.6 / -15.9 dB instead of -15 / -20 dB).
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 30.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 30.0);
     const double dt = 0.0008;
     double L[3] = {0.0, 0.0, 0.0}, Lp = 0.0, Ln = 0.0, tot = 0.0;
     for (int n = 1; n <= 12; ++n)
@@ -619,8 +619,8 @@ TEST_CASE("IEEE indoor publication - Sec. 3.9: uplink")
     // The report states H_UL = H_DL^H. The code returns H_UL = H_DL^T (reciprocal channel in the baseband
     // convention of the library; the conjugate would reverse the Doppler shift of a moving station). Delays are
     // transposed, positions and orientations swapped, path gains equal.
-    auto ap = quadriga_lib::arrayant_generate<double>("ula", 1.0, 2.4e9, {}, {1, 3}, {0.5});
-    auto sta = quadriga_lib::arrayant_generate<double>("ula", 1.0, 2.4e9, {}, {1, 2}, {0.5});
+    auto ap = quadriga_lib::generate_antenna<double>("ula", 1.0, 2.4e9, {}, {1, 3}, {0.5});
+    auto sta = quadriga_lib::generate_antenna<double>("ula", 1.0, 2.4e9, {}, {1, 2}, {0.5});
     auto dl = quadriga_lib::get_channels_ieee_indoor(ap, sta, "D", 2.4e9, 10e-9, 1, 0.003, 1e-3, 3.0, 1.2, {6.0}, {0}, false, {}, 20, 50.0, 8)[0];
     auto ul = quadriga_lib::get_channels_ieee_indoor(ap, sta, "D", 2.4e9, 10e-9, 1, 0.003, 1e-3, 3.0, 1.2, {6.0}, {0}, true, {}, 20, 50.0, 8)[0];
     REQUIRE(dl.n_snap() == 4);

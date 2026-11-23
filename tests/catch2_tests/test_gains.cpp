@@ -253,8 +253,8 @@ TEST_CASE("Gains - Phase matches get_channels_spherical, EM mode")
             mtl_map_w[names[c]] = std::vector<double>{vals[c]};
     }
 
-    auto tx_ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-    auto rx_ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    auto tx_ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    auto rx_ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
 
     struct Case
     {
@@ -377,8 +377,8 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
 
         for (double freq : {125.0, 4000.0})
         {
-            std::vector<quadriga_lib::arrayant<double>> tx_v{quadriga_lib::arrayant_generate<double>("omni", 1.0)};
-            std::vector<quadriga_lib::arrayant<double>> rx_v{quadriga_lib::arrayant_generate<double>("omni", 1.0)};
+            std::vector<quadriga_lib::arrayant<double>> tx_v{quadriga_lib::generate_antenna<double>("omni", 1.0)};
+            std::vector<quadriga_lib::arrayant<double>> rx_v{quadriga_lib::generate_antenna<double>("omni", 1.0)};
             tx_v[0].center_freq = freq;
             rx_v[0].center_freq = freq;
 

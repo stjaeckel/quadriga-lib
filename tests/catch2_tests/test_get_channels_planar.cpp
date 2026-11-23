@@ -19,8 +19,8 @@ TEST_CASE("Get Channels Planar - Minimal test")
 
     float pi = 3.141592653589793f, pid180 = 0.017453292519943f;
 
-    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
-    quadriga_lib::arrayant_copy_element(ant, 0, {1});
+    auto ant = quadriga_lib::generate_antenna<float>("omni", 1.0);
+    quadriga_lib::copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 1) = -1.0;
     ant.e_theta_re.slice(1) *= 2;
@@ -102,7 +102,7 @@ TEST_CASE("Get Channels Planar - Fake LOS")
 {
 
     float pi = 3.141592653589793f, pid180 = 0.017453292519943f;
-    auto ant = quadriga_lib::arrayant_generate<float>("omni", 1.0);
+    auto ant = quadriga_lib::generate_antenna<float>("omni", 1.0);
 
     // The LOS path is the second input path
 
@@ -161,8 +161,8 @@ TEST_CASE("Get Channels Planar - Coupling")
 {
     float pi = 3.141592653589793f;
 
-    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
-    quadriga_lib::arrayant_copy_element(ant, 0, {2});
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    quadriga_lib::copy_element(ant, 0, {2});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 2) = -1.0;
 
@@ -209,9 +209,9 @@ TEST_CASE("Get Channels Planar - Coupling")
     arma::mat dd = delay.slice(0) - T;
 
     // Case 2: n_ports == n_elements
-    ant.coupling_re.zeros();
-    ant.coupling_re.col(0).ones();
-    ant.coupling_im.reset();
+    ant.port_weights_re.zeros();
+    ant.port_weights_re.col(0).ones();
+    ant.port_weights_im.reset();
 
     quadriga_lib::get_channels_planar<double>(ant, ant,
                                               {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
@@ -235,8 +235,8 @@ TEST_CASE("Get Channels Planar - Coupling")
 
     // Case 3: n_ports != n_elements
     delay.zeros();
-    ant.coupling_re.ones(3, 1);
-    ant.coupling_re *= 2.0;
+    ant.port_weights_re.ones(3, 1);
+    ant.port_weights_re *= 2.0;
 
     quadriga_lib::get_channels_planar<double>(ant, ant,
                                               {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
@@ -261,7 +261,7 @@ TEST_CASE("Get Channels Planar - add_fake_los_path layout")
     // Always one extra output path; slot 0 holds the LOS path (zero power if none was found);
     // if a LOS path was present, its original slot holds a zero-power path.
     const double C = 299792458.0;
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
     arma::vec aod = {0.5, 0.0, -0.4}, eod = {0.0, 0.0, 0.1}, aoa = {2.5, arma::datum::pi, -2.7}, eoa = {0.0, 0.0, 0.1};
     arma::vec G = {0.5, 1.0, 0.25};
     arma::mat M(8, 3, arma::fill::zeros);
@@ -300,12 +300,12 @@ TEST_CASE("Get Channels Planar - 0 paths with add_fake_los_path")
     // The output holds exactly the zero-power LOS path; its delays per antenna pair equal those of a real LOS path
     // with the same geometry (which is moved to slot 0); without add_fake_los_path, the outputs are empty
     const double C = 299792458.0;
-    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    auto tx = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    quadriga_lib::copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     auto rx = tx;
-    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
-    rx.coupling_im = arma::vec({0.0, 0.2});
+    rx.port_weights_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.port_weights_im = arma::vec({0.0, 0.2});
 
     const double Tx = 1, Ty = 2, Tz = 3, Rx = 11, Ry = -3, Rz = 5;
     const double dx = Rx - Tx, dy = Ry - Ty, dz = Rz - Tz, dist = std::sqrt(dx * dx + dy * dy + dz * dz);
@@ -338,7 +338,7 @@ TEST_CASE("Get Channels Planar - 0 paths with add_fake_los_path")
     }
 
     // Single-element antennas: delay = TX-RX distance / c, or 0 for relative delays
-    auto omni = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
     arma::cube cr, ci, dl;
     quadriga_lib::get_channels_planar<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
                                               e, e, e, e, e, e, M0, cr, ci, dl, 1e9, true, true);
@@ -357,11 +357,11 @@ TEST_CASE("Get Channels Planar - 0 paths with add_fake_los_path")
 TEST_CASE("Get Channels Planar - 0 paths without add_fake_los_path")
 {
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0], also into outputs that held data before
-    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    auto tx = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    quadriga_lib::copy_element(tx, 0, {1});
     auto rx = tx;
-    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
-    rx.coupling_im = arma::vec({0.0, 0.2});
+    rx.port_weights_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.port_weights_im = arma::vec({0.0, 0.2});
     arma::vec e, dop(3, arma::fill::ones);
     arma::mat M0(8, 0), Mx; // M may also be 0x0
     arma::cube cr(2, 2, 5, arma::fill::ones), ci, dl;
@@ -386,7 +386,7 @@ TEST_CASE("Get Channels Planar - 0 paths without add_fake_los_path")
 
 TEST_CASE("Get Channels Planar - outputs that alias inputs")
 {
-    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 10.0);
     arma::vec aod = {0.0}, eod = {0.0}, aoa = {arma::datum::pi}, eoa = {0.0}, gain = {1.0}, length = {20.0};
     arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
     arma::cube cr, ci, dl;
@@ -420,8 +420,8 @@ TEST_CASE("get_channels_planar - a positive tilt points down (3GPP TR 38.901)")
     // The path leaves the TX 45 degree downward and arrives at the RX from 45 degree above, from the -x side. A beam
     // along x catches it only when turned toward it: TX tilt +pi/4 (down); RX heading pi and tilt -pi/4 (up).
     const double q = arma::datum::pi / 4.0;
-    const auto beam = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {40.0, 40.0});
-    const auto omni = quadriga_lib::arrayant_generate<double>("omni", 5.0);
+    const auto beam = quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {40.0, 40.0});
+    const auto omni = quadriga_lib::generate_antenna<double>("omni", 5.0);
     const arma::vec aod = {0.0}, eod = {-q}, aoa = {arma::datum::pi}, eoa = {q}, gain = {1.0}, length = {20.0};
     arma::mat M(8, 1, arma::fill::zeros);
     M(0, 0) = 1.0, M(6, 0) = -1.0;
@@ -439,7 +439,7 @@ TEST_CASE("get_channels_planar - a positive tilt points down (3GPP TR 38.901)")
 TEST_CASE("Get Channels Planar - Position and orientation shapes")
 {
     // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
-    auto ant = quadriga_lib::arrayant_generate<double>("omni", 1.0);
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
     const arma::vec aod = {0.0}, eod = {0.0}, aoa = {arma::datum::pi}, eoa = {0.0}, gain = {1.0}, length = {30.0};
     const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
     const arma::mat col[4] = {arma::vec{0.0, 0.0, 1.0}, arma::vec{0.1, 0.2, 0.3}, arma::vec{20.0, 0.0, 1.0}, arma::vec{0.0, -0.1, 0.5}};
@@ -470,10 +470,10 @@ TEST_CASE("Get Channels Planar - Position and orientation shapes")
 
 TEST_CASE("Get Channels Planar - AVX2 interpolation agrees with GENERIC, auto is GENERIC")
 {
-    auto tx = quadriga_lib::arrayant_generate<double>("custom", 5.0, NAN, {90.0, 90.0});
-    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    auto tx = quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {90.0, 90.0});
+    quadriga_lib::copy_element(tx, 0, {1});
     tx.element_pos(1, 1) = 0.1;
-    const auto rx = quadriga_lib::arrayant_generate<double>("xpol", 10.0);
+    const auto rx = quadriga_lib::generate_antenna<double>("xpol", 10.0);
     const arma::uword n = 19;
     const arma::vec aod = arma::randu<arma::vec>(n) * 6.0 - 3.0, eod = arma::randu<arma::vec>(n) * 2.0 - 1.0;
     const arma::vec aoa = arma::randu<arma::vec>(n) * 6.0 - 3.0, eoa = arma::randu<arma::vec>(n) * 2.0 - 1.0;
@@ -515,13 +515,13 @@ TEST_CASE("Get Channels Planar - AVX2 interpolation agrees with GENERIC, auto is
 TEST_CASE("Get Channels Planar - vec form equals single calls")
 {
     // 40 snapshots (enough for the parallel region), shared or per-snapshot positions, snapshots without paths
-    auto tx = quadriga_lib::arrayant_generate<double>("omni", 10.0);
-    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    auto tx = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    quadriga_lib::copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     tx.e_phi_re.slice(1) += 0.5;
     auto rx = tx;
-    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
-    rx.coupling_im = arma::vec({0.0, 0.2});
+    rx.port_weights_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.port_weights_im = arma::vec({0.0, 0.2});
 
     const arma::uword n_snap = 40;
     arma::arma_rng::set_seed(11);
@@ -575,7 +575,7 @@ TEST_CASE("Get Channels Planar - vec form equals single calls")
         }
 
     // Float; output entries of the right size are written in place
-    auto txf = quadriga_lib::arrayant_generate<float>("omni", 10.0);
+    auto txf = quadriga_lib::generate_antenna<float>("omni", 10.0);
     std::vector<arma::fvec> a1 = {arma::fvec({0.0f})}, g1 = {arma::fvec({1.0f})}, l1 = {arma::fvec({20.0f})};
     std::vector<arma::fmat> M1 = {arma::fmat({1, 0, 0, 0, 0, 0, -1, 0}).t()};
     std::vector<arma::fcube> cr(1, arma::fcube(1, 1, 1)), ci, dl;
@@ -602,7 +602,7 @@ TEST_CASE("Get Channels Planar - vec form equals single calls")
 TEST_CASE("Get Channels Planar - vec form errors")
 {
     using Catch::Matchers::ContainsSubstring;
-    auto ant = quadriga_lib::arrayant_generate<double>("omni", 10.0);
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 10.0);
     std::vector<arma::vec> a(3, arma::vec({0.0})), g(3, arma::vec({1.0})), l(3, arma::vec({20.0}));
     std::vector<arma::mat> M(3, arma::mat(8, 1, arma::fill::ones));
     const arma::mat p1(3, 1, arma::fill::zeros), p2(3, 2, arma::fill::zeros), r1 = arma::mat({10.0, 0.0, 0.0}).t();

@@ -46,8 +46,8 @@ class test_case(unittest.TestCase):
 
     def setUp(self):
         self.rays = make_rays()
-        self.tx = quadriga_lib.arrayant.generate("omni")
-        self.rx = quadriga_lib.arrayant.generate("xpol")
+        self.tx = quadriga_lib.arrayant.generate_antenna("omni")
+        self.rx = quadriga_lib.arrayant.generate_antenna("xpol")
         self.taps = np.unique(self.rays["tap"])
         self.n_path = int(np.sum(np.any(self.rays["power"] > 0, 1) | (self.rays["path_type"] < 2)))
         self.out = gbsm.single_link_channel(self.tx, self.rx, self.rays, np.array([-90.0]))

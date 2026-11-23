@@ -130,7 +130,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ## See also:
-- [[generate]] (for generating antenna arrays)
+- [[generate_antenna]] (for generating antenna arrays)
 - [[channel.planar]] (for embedding antennas using departure and arrival angles)
 - [[channel.spherical]] (for embedding antennas using FBS/LBS positions)
 - [[channel.multifreq]] (for multi-frequency antenna embedding)

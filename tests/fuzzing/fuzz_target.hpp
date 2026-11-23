@@ -9,7 +9,7 @@
 //     void fuzz_seeds(const fz::seeds &s);             // writes the starting inputs of the corpus
 //     void fuzz_one(const uint8_t *data, size_t size); // runs the library on one input
 //
-// fz::input turns the fuzz input into sizes, indices and values for API calls; fz::arrayant builds an array antenna
+// fz::input turns the fuzz input into sizes, indices and values for API calls; fz::arrayant builds an antenna array
 // from it.
 //
 // fuzz_one passes every exception of type std::exception to fz::clean, which counts it as the correct answer to
@@ -234,14 +234,14 @@ namespace fz
         switch (in.ConsumeIntegralInRange<int>(0, 3))
         {
         case 1:
-            a.coupling_re = in.mat<T>(n_e, n_p), a.coupling_im = in.mat<T>(n_e, n_p);
+            a.port_weights_re = in.mat<T>(n_e, n_p), a.port_weights_im = in.mat<T>(n_e, n_p);
             break;
         case 2:
-            a.coupling_re = in.mat<T>(n_e, n_p);
+            a.port_weights_re = in.mat<T>(n_e, n_p);
             break;
         case 3:
-            a.coupling_re = in.mat<T>(in.size(n_e + 1), in.size(n_p + 1));
-            a.coupling_im = in.mat<T>(in.size(n_e + 1), in.size(n_p + 1));
+            a.port_weights_re = in.mat<T>(in.size(n_e + 1), in.size(n_p + 1));
+            a.port_weights_im = in.mat<T>(in.size(n_e + 1), in.size(n_p + 1));
             break;
         }
         a.center_freq = in.value<T>();

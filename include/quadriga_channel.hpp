@@ -555,7 +555,7 @@ namespace quadriga_lib
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
     // - Interpolates the receive antenna pattern (including orientation and polarization)
-    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including antenna element coupling)
+    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including the port weights)
     // - LOS-Path identification: path-length must equal the TX-RX 3D-distance within 0.1 mm (use double precision for satellite links!)
     // - For the LOS-Path, FBS and LBS must be on the direct line between Tx and Rx (i.e. FBS-Pos = TX-Pos, LBS-Pos = RX-Pos)
     // - LOS-Path delays and amplitudes are calculated including the individual element positions
@@ -569,8 +569,8 @@ namespace quadriga_lib
     //   found in the input leaves a zero-power path in its original slot
     template <typename dtype>
     void get_channels_spherical(
-        const arrayant<dtype> &tx_array,        // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<dtype> &rx_array,        // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+        const arrayant<dtype> &tx_array,        // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
+        const arrayant<dtype> &rx_array,        // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arma::Mat<dtype> &tx_pos,         // Transmitter position in Cartesian coordinates [m], [3, 1] or [1, 3]
         const arma::Mat<dtype> &tx_orientation, // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
         const arma::Mat<dtype> &rx_pos,         // Receiver position in Cartesian coordinates [m], [3, 1] or [1, 3]
@@ -599,8 +599,8 @@ namespace quadriga_lib
     // - The optional complex output is computed one snapshot per thread at a time (no split copy of all snapshots)
     template <typename dtype>
     void get_channels_spherical_vec(
-        const arrayant<dtype> &tx_array,                               // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<dtype> &rx_array,                               // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+        const arrayant<dtype> &tx_array,                               // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
+        const arrayant<dtype> &rx_array,                               // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arma::Mat<dtype> &tx_pos,                                // Transmitter positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
         const arma::Mat<dtype> &tx_orientation,                        // Transmitter orientations (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]
         const arma::Mat<dtype> &rx_pos,                                // Receiver positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
@@ -659,19 +659,19 @@ namespace quadriga_lib
         int use_kernel = 0);                                           // Kernel of the antenna interpolation: 0 = auto (GENERIC), 1 = GENERIC, 2 = AVX2
 
     // Calculate channels for Intelligent Reflective Surfaces (IRS)
-    // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements
+    // - IRS is provided as a 3rd antenna array model comprised of 'n_irs' elements
     // - Requires 2 channel segments: (1) TX -> IRS and (2) IRS -> RX
     // - Assumes a low-rank channel where the IRS creates additional multipath components
-    // - The IRS weights (phase shifts) are provided as Coupling matrix of the IRS array (column vectors); it must not be empty
-    // - Multiple columns in the Coupling matrix can be seen as multiple IRS codebook entries. Only one entry can be selected
+    // - The IRS weights (phase shifts) are provided as Port weights of the IRS array (column vectors); it must not be empty
+    // - Multiple columns in the Port weights can be seen as multiple IRS codebook entries. Only one entry can be selected
     // - Generates n_path_irs output paths where n_path_irs <= n_path_1 * n_path_2
     // - By default the 'irs_array' for both, the receive (TX-IRS) and receive (IRS-RX) direction.
     // - If different IRS patterns are required for the receive (IRS-RX) direction, a second IRS array can be supplied as optional input
     // - The optional output 'active_path_out' flags which of the n_path_1 * n_path_2 paths are in the output
     template <typename dtype> // Supported types: float or double
     void get_channels_irs(
-        const arrayant<dtype> &tx_array,                            // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<dtype> &rx_array,                            // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+        const arrayant<dtype> &tx_array,                            // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
+        const arrayant<dtype> &rx_array,                            // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arrayant<dtype> &irs_array,                           // IRS array with 'n_irs' elements (only one port can be selected for channel generation)
         const arma::Mat<dtype> &tx_pos,                             // Transmitter position in Cartesian coordinates [m], [3, 1] or [1, 3]
         const arma::Mat<dtype> &tx_orientation,                     // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
@@ -708,7 +708,7 @@ namespace quadriga_lib
     // Calculate channel coefficients for planar waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
     // - Interpolates the receive antenna pattern (including orientation and polarization)
-    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including antenna element coupling)
+    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including the port weights)
     // - LOS-Path identification: path-length must equal the TX-RX 3D-distance within 0.1 mm
     // - Angles are ignored for LOS path identification
     // - Polarization transfer matrix: 2x2 Jones matrix (rows = RX pol. V/H, columns = TX pol. V/H), column-major, Re/Im
@@ -719,8 +719,8 @@ namespace quadriga_lib
     // - Option to calculate the Doppler weights from orientation (+1 Moves towards path, -1 moves away from path)
     template <typename dtype>
     void get_channels_planar(
-        const arrayant<dtype> &tx_array,        // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<dtype> &rx_array,        // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+        const arrayant<dtype> &tx_array,        // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
+        const arrayant<dtype> &rx_array,        // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arma::Mat<dtype> &tx_pos,         // Transmitter position in Cartesian coordinates [m], [3, 1] or [1, 3]
         const arma::Mat<dtype> &tx_orientation, // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
         const arma::Mat<dtype> &rx_pos,         // Receiver position in Cartesian coordinates [m], [3, 1] or [1, 3]
@@ -748,8 +748,8 @@ namespace quadriga_lib
     // - The optional complex output is computed one snapshot per thread at a time (no split copy of all snapshots)
     template <typename dtype>
     void get_channels_planar_vec(
-        const arrayant<dtype> &tx_array,                               // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<dtype> &rx_array,                               // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+        const arrayant<dtype> &tx_array,                               // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
+        const arrayant<dtype> &rx_array,                               // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arma::Mat<dtype> &tx_pos,                                // Transmitter positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
         const arma::Mat<dtype> &tx_orientation,                        // Transmitter orientations (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]
         const arma::Mat<dtype> &rx_pos,                                // Receiver positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
@@ -776,8 +776,8 @@ namespace quadriga_lib
     // - Depends on arrayant and channel classes
     // - 2D model, no elevation angles
     std::vector<channel<double>> get_channels_ieee_indoor(
-        const arrayant<double> &ap_array,                 // Access point array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<double> &sta_array,                // Mobile station array antenna with 'n_rx' elements (= ports after element coupling)
+        const arrayant<double> &ap_array,                 // Access point antenna array with 'n_tx' elements (= ports after the port weights)
+        const arrayant<double> &sta_array,                // Mobile station antenna array with 'n_rx' elements (= ports after the port weights)
         const std::string &channel_type,                  // Channel Model Type (A, B, C, D, E, F) as defined by TGn
         double center_freq = 5.25e9,                      // Carrier frequency in Hz
         double tap_spacing = 10.0e-9,                     // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9

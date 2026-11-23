@@ -7,15 +7,15 @@ function test_get_channels_multifreq
 % Physics validation lives in the Catch2 suite (test_get_channels_multifreq.cpp).
 
 %% Setup: 2-element omni antenna (geometry of test_get_channels_spherical)
-ant = quadriga_lib.arrayant_generate('omni');
+ant = quadriga_lib.generate_antenna('omni');
 ant.e_theta_re(:,:,2) = 2;
 ant.e_theta_im(:,:,2) = 0;
 ant.e_phi_re(:,:,2) = 0;
 ant.e_phi_im(:,:,2) = 0;
 ant.element_pos = [0,0; 1,-1; 0,0];
-ant.coupling_re = eye(2);
-ant.coupling_im = zeros(2);
-ant.center_freq = 2997924580.0;     % required by arrayant_is_valid_multi
+ant.port_weights_re = eye(2);
+ant.port_weights_im = zeros(2);
+ant.center_freq = 2997924580.0;     % required by is_valid
 
 fbs_pos     = [10,0 ; 0,10 ; 1 11]; % 3 x n_path
 path_length = [0,0];
@@ -61,7 +61,7 @@ assertElementsAlmostEqual( dl3(:,:,:,2), dl3(:,:,:,3), 'absolute', 1e-14 );
 
 %% path_gain is interpolated linearly across input frequencies
 % pg = [1, 4] at fi = [1, 2] GHz → at 1.5 GHz gain = 2.5, amp = sqrt(2.5)
-ant_o = quadriga_lib.arrayant_generate('omni');
+ant_o = quadriga_lib.generate_antenna('omni');
 ant_o.center_freq = 1e9;
 fbs1 = [10;0;0];
 pg2  = [1.0, 4.0];                                  % [n_path=1, n_freq=2]
@@ -177,7 +177,7 @@ end
 
 % 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
 C = 299792458.0;
-a1 = quadriga_lib.arrayant_generate('omni'); a1.center_freq = fc;
+a1 = quadriga_lib.generate_antenna('omni'); a1.center_freq = fc;
 [cr, ci, dl] = quadriga_lib.get_channels_multifreq(a1, a1, [0;0;0], [0,0,0], [10;0;0], [0,0,0], zeros(3,0), ...
     zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), fc, [fc, 2*fc], true, true);
 assertEqual( size(dl), [1, 1, 1, 2] );
@@ -207,7 +207,7 @@ end
 
 
 % use_kernel (input 17) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 is rejected by C++
-tx = quadriga_lib.arrayant_generate('custom', 10, [], [90, 90]);
+tx = quadriga_lib.generate_antenna('custom', 10, [], [90, 90]);
 args = { tx, tx, [0;0;10], [0;0;0], [50;0;1.5], [0;0;0], [20; 5; 3], [20; 5; 3], [1, 1], 0, repmat([1;0;0;0;0;0;-1;0], [1, 1, 2]), ...
     [3e9; 3.6e9], [3e9; 3.3e9], false, false, 299792458.0 };
 cr_d = quadriga_lib.get_channels_multifreq( args{:} );

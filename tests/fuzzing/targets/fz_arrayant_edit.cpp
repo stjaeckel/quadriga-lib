@@ -2,12 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Array antenna member functions in a fuzzed order on a fuzzed arrayant: is_valid, copy and move, validate, append,
-// combine_pattern, copy_element, export_obj_file, qdant_write / qdant_read, remove_zeros, set_size, reset;
-// arrayant_calc_beamwidth, arrayant_calc_directivity, arrayant_rotate_pattern; and the multi-frequency functions
-// arrayant_is_valid_multi, arrayant_calc_beamwidth_multi, arrayant_calc_directivity_multi, arrayant_concat_multi,
-// arrayant_copy_element_multi, arrayant_rotate_pattern_multi, arrayant_set_element_pos_multi,
-// arrayant_combine_pattern_multi, qdant_write_multi / qdant_read_multi
+// Antenna array functions in a fuzzed order on a fuzzed arrayant: the members is_valid, validate, set_size, reset, copy
+// and move; apply_port_weights, calc_beamwidth, calc_directivity, copy_element, export_pattern_obj, join_arrays,
+// qdant_write / qdant_read, rotate_pattern, trim_pattern; and the vector forms of is_valid, calc_beamwidth,
+// calc_directivity, join_arrays, copy_element, rotate_pattern, set_element_pos, apply_port_weights and qdant_write
 
 #include "fuzz_target.hpp"
 
@@ -49,7 +47,7 @@ static void run(fz::input &in)
         {
             quadriga_lib::arrayant<T> b = in.ConsumeBool() ? a : fz::arrayant<T>(in);
             if (n_e <= 16) // keeps repeated appends small
-                fz::clean([&] { a = quadriga_lib::arrayant_concat(a, b); });
+                fz::clean([&] { a = quadriga_lib::join_arrays(a, b); });
             break;
         }
         case 3:
@@ -62,14 +60,14 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
             {
                 arma::Col<T> bw_az, bw_el, p_az, p_el;
-                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth(a, i_el, threshold, &bw_az, all ? &bw_el : nullptr,
+                fz::clean([&] { quadriga_lib::calc_beamwidth(a, i_el, threshold, &bw_az, all ? &bw_el : nullptr,
                                                                       all ? &p_az : nullptr, &p_el); });
             }
             else
             {
                 auto vec = fuzzed_vector<T>(in, a);
                 arma::Mat<T> bw_az, bw_el, p_az, p_el;
-                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth_multi(vec, i_el, threshold, &bw_az, all ? &bw_el : nullptr,
+                fz::clean([&] { quadriga_lib::calc_beamwidth(vec, i_el, threshold, &bw_az, all ? &bw_el : nullptr,
                                                                             all ? &p_az : nullptr, &p_el); });
             }
             break;
@@ -82,13 +80,13 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
             {
                 arma::Col<T> d;
-                fz::clean([&] { d = quadriga_lib::arrayant_calc_directivity(a, i_el); });
+                fz::clean([&] { d = quadriga_lib::calc_directivity(a, i_el); });
             }
             else
             {
                 auto vec = fuzzed_vector<T>(in, a);
                 arma::Mat<T> d;
-                fz::clean([&] { d = quadriga_lib::arrayant_calc_directivity_multi(vec, i_el); });
+                fz::clean([&] { d = quadriga_lib::calc_directivity(vec, i_el); });
             }
             break;
         }
@@ -99,13 +97,13 @@ static void run(fz::input &in)
                 az = arma::sort(az), el = arma::sort(el);
             const int mode = in.ConsumeIntegralInRange<int>(0, 3);
             T speed = in.ConsumeBool() ? T(299792458.0) : in.value<T>();
-            fz::clean([&] { a = quadriga_lib::arrayant_combine_pattern(a, fz::opt(mode & 1, az), fz::opt(mode & 2, el), speed); });
+            fz::clean([&] { a = quadriga_lib::apply_port_weights(a, fz::opt(mode & 1, az), fz::opt(mode & 2, el), speed); });
             break;
         }
         case 6:
         {
             arma::uword src = in.index(n_e), dst = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_copy_element(a, src, {dst}); });
+            fz::clean([&] { quadriga_lib::copy_element(a, src, {dst}); });
             break;
         }
         case 7:
@@ -114,7 +112,7 @@ static void run(fz::input &in)
             arma::uvec dst(in.size(4));
             for (auto &d : dst)
                 d = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_copy_element(a, src, dst); });
+            fz::clean([&] { quadriga_lib::copy_element(a, src, dst); });
             break;
         }
         case 8:
@@ -126,7 +124,7 @@ static void run(fz::input &in)
                 i = in.index(n_e);
             const char *maps[] = {"jet", "parula", "winter", "hot", "turbo", "copper", "spring", "cool", "gray", "autumn", "summer", ""};
             std::string cmap = in.ConsumeBool() ? maps[in.ConsumeIntegralInRange<int>(0, 11)] : in.ConsumeRandomLengthString(12);
-            fz::clean([&] { quadriga_lib::arrayant_export_obj_file(obj, a, range, cmap, radius, n_div, i_el); });
+            fz::clean([&] { quadriga_lib::export_pattern_obj(obj, a, range, cmap, radius, n_div, i_el); });
             break;
         }
         case 9:
@@ -138,14 +136,14 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
                 std::filesystem::remove(qdant);
             fz::clean([&] { quadriga_lib::qdant_write(qdant, a, id, layout); });
-            fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read<T>(qdant, in.ConsumeIntegralInRange<unsigned>(0, 4), &lay); });
+            fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read<T>(qdant, {in.ConsumeIntegralInRange<unsigned>(0, 4)}, &lay); });
             break;
         }
         case 10:
             if (in.ConsumeBool())
-                fz::clean([&] { quadriga_lib::arrayant_remove_zeros(a); });
+                fz::clean([&] { quadriga_lib::trim_pattern(a); });
             else
-                fz::clean([&] { quadriga_lib::arrayant<T> out = a; quadriga_lib::arrayant_remove_zeros(out); a = out; });
+                fz::clean([&] { quadriga_lib::arrayant<T> out = a; quadriga_lib::trim_pattern(out); a = out; });
             break;
         case 11:
         {
@@ -154,7 +152,7 @@ static void run(fz::input &in)
             arma::uvec i_el(in.size(3));
             for (auto &i : i_el)
                 i = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern(a, orientation, usage, i_el); });
+            fz::clean([&] { quadriga_lib::rotate_pattern(a, orientation, usage, i_el); });
             break;
         }
         case 12:
@@ -177,9 +175,9 @@ static void run(fz::input &in)
         case 14:
         {
             auto vec = fuzzed_vector<T>(in, a);
-            fz::clean([&] { quadriga_lib::arrayant_is_valid_multi(vec); });
+            fz::clean([&] { quadriga_lib::is_valid(vec); });
             auto vec2 = in.ConsumeBool() ? vec : fuzzed_vector<T>(in, a);
-            fz::clean([&] { quadriga_lib::arrayant_concat_multi(vec, vec2); });
+            fz::clean([&] { quadriga_lib::join_arrays(vec, vec2); });
             break;
         }
         case 15:
@@ -189,8 +187,8 @@ static void run(fz::input &in)
             arma::uvec dst(in.size(4));
             for (auto &d : dst)
                 d = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_copy_element_multi(vec, src, dst); });
-            fz::clean([&] { quadriga_lib::arrayant_copy_element_multi(vec, in.index(n_e), arma::uvec{in.index(n_e)}); });
+            fz::clean([&] { quadriga_lib::copy_element(vec, src, dst); });
+            fz::clean([&] { quadriga_lib::copy_element(vec, in.index(n_e), arma::uvec{in.index(n_e)}); });
             break;
         }
         case 16:
@@ -201,7 +199,7 @@ static void run(fz::input &in)
             arma::uvec i_el(in.size(3));
             for (auto &i : i_el)
                 i = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern_multi(vec, orientation, usage, i_el); });
+            fz::clean([&] { quadriga_lib::rotate_pattern(vec, orientation, usage, i_el); });
             break;
         }
         case 17:
@@ -212,7 +210,7 @@ static void run(fz::input &in)
                 i = in.index(n_e);
             arma::Mat<T> pos = in.ConsumeBool() ? in.mat<T>(3, i_el.is_empty() ? n_e : i_el.n_elem)
                                                 : in.mat<T>(in.size(4), in.size(7));
-            fz::clean([&] { quadriga_lib::arrayant_set_element_pos_multi(vec, pos, i_el); });
+            fz::clean([&] { quadriga_lib::set_element_pos(vec, pos, i_el); });
             break;
         }
         case 18:
@@ -221,7 +219,7 @@ static void run(fz::input &in)
             arma::Col<T> az = in.col<T>(in.size(16)), el = in.col<T>(in.size(16)), fr = in.col<T>(in.size(4));
             const int mode = in.ConsumeIntegralInRange<int>(0, 7);
             T speed = in.ConsumeBool() ? T(343.0) : in.value<T>();
-            fz::clean([&] { quadriga_lib::arrayant_combine_pattern_multi(vec, fz::opt(mode & 1, az), fz::opt(mode & 2, el),
+            fz::clean([&] { quadriga_lib::apply_port_weights(vec, fz::opt(mode & 1, az), fz::opt(mode & 2, el),
                                                                          fz::opt(mode & 4, fr), speed); });
             break;
         }
@@ -229,8 +227,8 @@ static void run(fz::input &in)
         {
             auto vec = fuzzed_vector<T>(in, a);
             std::filesystem::remove(qdant);
-            fz::clean([&] { quadriga_lib::qdant_write_multi(qdant, vec); });
-            fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read_multi<T>(qdant, &lay); });
+            fz::clean([&] { quadriga_lib::qdant_write(qdant, vec); });
+            fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read<T>(qdant, {}, &lay); });
         }
         }
     }

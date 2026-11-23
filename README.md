@@ -7,7 +7,7 @@
 
 C++ library with MATLAB, Octave and Python interfaces for radio channel modelling and simulation.
 
-Quadriga-Lib generates channel impulse responses for system-level studies of mobile radio networks. It also provides tools for array antennas, channel data storage and processing, and site-specific (ray-tracing) simulations. Documentation and API reference: **[quadriga-lib.org](http://quadriga-lib.org)**.
+Quadriga-Lib generates channel impulse responses for system-level studies of mobile radio networks. It also provides tools for antenna arrays, channel data storage and processing, and site-specific (ray-tracing) simulations. Documentation and API reference: **[quadriga-lib.org](http://quadriga-lib.org)**.
 
 ## Relation to QuaDRiGa
 
@@ -20,7 +20,7 @@ Quadriga-Lib generates channel impulse responses for system-level studies of mob
 - **Stochastic channel model (GBSM)**: large-scale and small-scale fading parameters, path loss, LOS probability, O2I loss, and scenario parameters for 3GPP TR 38.901 (configuration files in `data/config/`, installed to `share/quadriga-lib/config/`)
 - **IEEE 802.11 (Wi-Fi) indoor channel models**: TGn channel types A to F with the TGac, TGax and TGah extensions (MU-MIMO, floor penetration loss, time-evolving channels)
 - **Spatially consistent random fields**: sum-of-sinusoids generators for correlated random variables
-- **Array antennas**: predefined models (omni, dipole, ULA, 3GPP panels, multibeam), pattern interpolation, rotation, coupling, directivity and beamwidth, QDANT file format
+- **Antenna arrays**: predefined models (omni, dipole, ULA, 3GPP panels, multibeam), pattern interpolation, rotation, port weights, directivity and beamwidth, QDANT file format
 - **Channel coefficients**: antenna patterns applied to path data (spherical and planar wave, multi-frequency, IRS), baseband frequency response, delay quantization, delay and angular spread, K-factor, XPR
 - **Channel data storage**: HDF5 channel files for large datasets (read, write, reshape)
 - **Site-specific simulation**: ray–triangle and ray–point intersection, mesh tools, OBJ and Mitsuba XML export, reading of QRT ray-tracing results
@@ -58,7 +58,7 @@ All three examples create a 2 × 2 3GPP antenna array at 3.7 GHz and print the d
 ```python
 import quadriga_lib as qd
 
-ant = qd.arrayant.generate('3gpp', panel=[2, 2], center_freq=3.7e9)
+ant = qd.arrayant.generate_antenna('3gpp', panel=[2, 2], center_freq=3.7e9)
 print(qd.version())
 print(qd.arrayant.calc_directivity(ant, i_element=0))
 ```
@@ -66,9 +66,9 @@ print(qd.arrayant.calc_directivity(ant, i_element=0))
 **MATLAB / Octave**
 
 ```matlab
-ant = quadriga_lib.arrayant_generate('3GPP', 1, 3.7e9, [], [2, 2]);
+ant = quadriga_lib.generate_antenna('3GPP', 1, 3.7e9, [], [2, 2]);
 disp(quadriga_lib.version())
-disp(quadriga_lib.arrayant_calc_directivity(ant, 1))
+disp(quadriga_lib.calc_directivity(ant, 1))
 ```
 
 **C++**
@@ -79,9 +79,9 @@ disp(quadriga_lib.arrayant_calc_directivity(ant, 1))
 
 int main()
 {
-    auto ant = quadriga_lib::arrayant_generate<double>("3GPP", 1.0, 3.7e9, {}, {2, 2});
+    auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.7e9, {}, {2, 2});
     std::cout << quadriga_lib::quadriga_lib_version() << "\n";
-    arma::vec directivity_dBi = quadriga_lib::arrayant_calc_directivity(ant);
+    arma::vec directivity_dBi = quadriga_lib::calc_directivity(ant);
     std::cout << directivity_dBi(0) << " dBi\n";
 }
 ```

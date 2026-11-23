@@ -335,8 +335,8 @@ namespace quadriga_lib
     // - Validity: see ssf_paths; the channel's 'par' reports the largest displacement relative to the limit
     //   ("phase": sqrt(lambda * b_eff / 8); "drift": 0.2 * b_med)
     channel<double> gbsm_single_link_channel(
-        const arrayant<double> &tx_array,              // Tx array antenna, n_tx ports
-        const arrayant<double> &rx_array,              // Rx array antenna, n_rx ports
+        const arrayant<double> &tx_array,              // Tx antenna array, n_tx ports
+        const arrayant<double> &rx_array,              // Rx antenna array, n_rx ports
         const gbsm_rays &rays,                         // Ray data of the link
         const arma::vec &link_gain_dB,                 // Link gain -PL - O2I + 10·lg(SF) at rays.center_freq(i_freq) in [dB], [n_snap] or [1]
         const std::string &mobility = "auto",          // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)

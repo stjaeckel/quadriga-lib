@@ -30,11 +30,11 @@ PI = math.pi
 
 
 def omni():
-    return arrayant.generate('omni')
+    return arrayant.generate_antenna('omni')
 
 
 def xpol():
-    return arrayant.generate('xpol')
+    return arrayant.generate_antenna('xpol')
 
 
 def make_M(n_path, vv=1.0, hh=-1.0):
@@ -60,8 +60,8 @@ class TestGetChannelsSpherical(unittest.TestCase):
         ant['e_phi_re'][:, :, 1] = 0.0
         ant['e_phi_im'][:, :, 1] = 0.0
         ant['element_pos'] = np.array([[0, 0], [1, -1], [0, 0]], order='F')
-        ant['coupling_re'] = np.eye(2, order='F')
-        ant['coupling_im'] = np.zeros((2, 2), order='F')
+        ant['port_weights_re'] = np.eye(2, order='F')
+        ant['port_weights_im'] = np.zeros((2, 2), order='F')
 
         fbs_pos = np.array([[10, 0], [0, 10], [1, 11]], order='F')
         path_gain = np.array([1.0, 0.25])
@@ -188,8 +188,8 @@ class TestGetChannelsSpherical(unittest.TestCase):
         ant = arrayant.copy_element(ant, 0, 1)
         ant['e_theta_re'][:, :, 1] = 2.0
         ant['element_pos'] = np.array([[0, 0], [15, -15], [0, 0]], order='F')
-        ant['coupling_re'] = np.eye(2, order='F')
-        ant['coupling_im'] = np.zeros((2, 2), order='F')
+        ant['port_weights_re'] = np.eye(2, order='F')
+        ant['port_weights_im'] = np.zeros((2, 2), order='F')
         probe = xpol()
 
         fbs_pos = np.array([[10.0], [0.0], [1.0]], order='F')
@@ -298,13 +298,13 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
     # ---- Coupling ----
 
-    def test_coupling_identity(self):
+    def test_port_weights_identity(self):
         ant = omni()
         ant = arrayant.copy_element(ant, 0, 1)
         ant = arrayant.copy_element(ant, 0, 2)
         ant['element_pos'] = np.array([[0, 0, 0], [1, 0, -1], [0, 0, 0]], order='F')
-        ant['coupling_re'] = np.eye(3, order='F')
-        ant['coupling_im'] = np.zeros((3, 3), order='F')
+        ant['port_weights_re'] = np.eye(3, order='F')
+        ant['port_weights_im'] = np.zeros((3, 3), order='F')
 
         fbs_pos = np.array([[10.0], [0.0], [1.0]], order='F')
         path_gain = np.array([1.0])
@@ -326,14 +326,14 @@ class TestGetChannelsSpherical(unittest.TestCase):
         expected[2, 0] = 1.0; expected[2, 2] = 1.0
         npt.assert_almost_equal(cr[:, :, 0], np.ones((3, 3)), decimal=5)
 
-    def test_coupling_beamforming(self):
+    def test_port_weights_beamforming(self):
         ant = omni()
         ant = arrayant.copy_element(ant, 0, 1)
         ant = arrayant.copy_element(ant, 0, 2)
         ant['element_pos'] = np.array([[0, 0, 0], [1, 0, -1], [0, 0, 0]], order='F')
         # All elements summed into one port
-        ant['coupling_re'] = np.ones((3, 1), order='F') * 2.0
-        ant['coupling_im'] = np.zeros((3, 1), order='F')
+        ant['port_weights_re'] = np.ones((3, 1), order='F') * 2.0
+        ant['port_weights_im'] = np.zeros((3, 1), order='F')
 
         fbs_pos = np.array([[10.0], [0.0], [1.0]], order='F')
         path_gain = np.array([1.0])
@@ -661,14 +661,14 @@ class TestGetChannelsSpherical(unittest.TestCase):
         tx = arrayant.copy_element(tx, 0, 1)
         tx = arrayant.copy_element(tx, 0, 2)
         tx['element_pos'] = np.array([[0, 0, 0], [0.5, 0.0, -0.5], [0, 0, 0]], order='F')
-        tx['coupling_re'] = np.eye(3, order='F')
-        tx['coupling_im'] = np.zeros((3, 3), order='F')
+        tx['port_weights_re'] = np.eye(3, order='F')
+        tx['port_weights_im'] = np.zeros((3, 3), order='F')
 
         rx = omni()
         rx = arrayant.copy_element(rx, 0, 1)
         rx['element_pos'] = np.array([[0, 0], [0.5, -0.5], [0, 0]], order='F')
-        rx['coupling_re'] = np.eye(2, order='F')
-        rx['coupling_im'] = np.zeros((2, 2), order='F')
+        rx['port_weights_re'] = np.eye(2, order='F')
+        rx['port_weights_im'] = np.zeros((2, 2), order='F')
 
         n_path = 4
         fbs_pos = np.zeros((3, n_path), order='F')
@@ -697,8 +697,8 @@ class TestGetChannelsSpherical(unittest.TestCase):
         tx = omni()
         tx = arrayant.copy_element(tx, 0, 1)
         tx['element_pos'] = np.array([[0, 0], [0.5, -0.5], [0, 0]], order='F')
-        tx['coupling_re'] = np.eye(2, order='F')
-        tx['coupling_im'] = np.zeros((2, 2), order='F')
+        tx['port_weights_re'] = np.eye(2, order='F')
+        tx['port_weights_im'] = np.zeros((2, 2), order='F')
         rx = omni()
 
         fbs_pos = np.array([[50.0], [0.0], [0.0]], order='F')
@@ -810,7 +810,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
     # ---- Kernel selection: use_kernel (after freq) ----
 
     def test_use_kernel(self):
-        ant = arrayant.generate('3gpp', 10.0, panel=[1, 2], pol=3)
+        ant = arrayant.generate_antenna('3gpp', 10.0, panel=[1, 2], pol=3)
         rng = np.random.default_rng(0)
         fbs_pos = np.asfortranarray(rng.uniform(-30, 30, (3, 5)))
         args = (ant, xpol(), [0, 0, 10], [0.1, 0.2, 0.3], [40, 5, 1.5], [0, 0, 0], fbs_pos, fbs_pos, np.ones(5),
@@ -882,11 +882,11 @@ class TestGetChannelsSpherical(unittest.TestCase):
                 ant, ant, [0, 0, 1, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], fbs_pos, fbs_pos, path_gain, path_length,
                 M)
 
-    def test_error_coupling_im_without_re(self):
+    def test_error_port_weights_im_without_re(self):
         ant = omni()
         ant = arrayant.copy_element(ant, 0, 1)
-        ant['coupling_im'] = np.zeros((2, 2), order='F')
-        ant.pop('coupling_re', None)
+        ant['port_weights_im'] = np.zeros((2, 2), order='F')
+        ant.pop('port_weights_re', None)
 
         fbs_pos = np.zeros((3, 2), order='F'); fbs_pos[0, :] = [10, 0]; fbs_pos[1, 1] = 10
         path_gain = np.array([1.0, 0.25])
@@ -897,13 +897,13 @@ class TestGetChannelsSpherical(unittest.TestCase):
             channel.spherical(
                 ant, ant, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], fbs_pos, fbs_pos, path_gain, path_length, M,
                 2997924580.0, use_absolute_delays=True)
-        self.assertIn("Imaginary part of coupling matrix", str(ctx.exception))
+        self.assertIn("Imaginary part of port weights", str(ctx.exception))
 
-    def test_no_coupling_keys_accepted(self):
+    def test_no_port_weights_keys_accepted(self):
         ant = omni()
         ant = arrayant.copy_element(ant, 0, 1)
-        ant.pop('coupling_re', None)
-        ant.pop('coupling_im', None)
+        ant.pop('port_weights_re', None)
+        ant.pop('port_weights_im', None)
         ant.pop('element_pos', None)
 
         fbs_pos = np.zeros((3, 2), order='F'); fbs_pos[0, :] = [10, 0]; fbs_pos[1, 1] = 10
@@ -922,7 +922,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
     def test_input_memory_layouts_give_equal_results(self):
         rng = np.random.default_rng(7)
-        ant = arrayant.generate('3gpp', 10.0, panel=[2, 1], pol=2)
+        ant = arrayant.generate_antenna('3gpp', 10.0, panel=[2, 1], pol=2)
         n_out, n_freq = 4, 2
         cf = np.array([2.0e9, 3.5e9])
         def u(lo, hi, shape):  # float32-exact values, so that the float32 variant converts losslessly
@@ -1013,7 +1013,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and MATLAB)
     def test(self):
-        ant = arrayant.generate('omni')
+        ant = arrayant.generate_antenna('omni')
         e = np.zeros(0)
         cr, ci, dl = re_im(channel.spherical(ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)),
                                        np.zeros((3, 0)), e, e, np.zeros((8, 0)), 1e9, use_absolute_delays=True,
@@ -1028,7 +1028,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0), as in C++ and MATLAB
     def test_without_fake_los(self):
-        ant = arrayant.generate('xpol')
+        ant = arrayant.generate_antenna('xpol')
         e = np.zeros(0)
         out = re_im(channel.spherical(ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)),
                                 np.zeros((3, 0)), e, e, np.zeros((8, 0)), 1e9, use_absolute_delays=True,
@@ -1039,7 +1039,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
     # Batch mode: a snapshot without paths gets the zero-power LOS path with add_fake_los_path, as in single mode
     def test_batch_zero_path_snapshot(self):
-        ant = arrayant.generate('omni')
+        ant = arrayant.generate_antenna('omni')
         C = 299792458.0
         fbs = [np.array([[5.0], [5.0], [0.0]]), np.zeros((3, 0))]
         gain = [np.array([0.5]), np.zeros(0)]

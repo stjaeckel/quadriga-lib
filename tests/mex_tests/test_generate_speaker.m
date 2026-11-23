@@ -4,7 +4,7 @@
 
 function test_generate_speaker
 % MEX interface test for quadriga_lib.generate_speaker.
-% Physics validation lives in the Catch2 suite (test_speaker_generate.cpp).
+% Physics validation lives in the Catch2 suite (test_generate_speaker.cpp).
 
 %% Output structure and types
 
@@ -17,7 +17,7 @@ assertEqual( ans, data );
 
 required_fields = {'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im', ...
                    'azimuth_grid', 'elevation_grid', 'element_pos', ...
-                   'coupling_re', 'coupling_im', 'center_freq', 'name'};
+                   'port_weights_re', 'port_weights_im', 'center_freq', 'name'};
 for i = 1:numel(required_fields)
     assertTrue(isfield(data, required_fields{i}));
 end
@@ -303,13 +303,13 @@ data = quadriga_lib.generate_speaker('piston', [], [], [], [], [], [], 'monopole
 assertElementsAlmostEqual(data(1).e_theta_im, zeros(size(data(1).e_theta_im)), ...
                           'absolute', 1e-14);
 
-%% Coupling matrix
+%% Port weights
 
 % Single driver -> 1x1 identity coupling
 data = quadriga_lib.generate_speaker([], [], [], [], [], [], [], [], ...
                                       [], [], [], [], [], 1000.0);
-assertElementsAlmostEqual(data(1).coupling_re, 1.0, 'absolute', 1e-14);
-assertElementsAlmostEqual(data(1).coupling_im, 0.0, 'absolute', 1e-14);
+assertElementsAlmostEqual(data(1).port_weights_re, 1.0, 'absolute', 1e-14);
+assertElementsAlmostEqual(data(1).port_weights_im, 0.0, 'absolute', 1e-14);
 
 %% Name
 

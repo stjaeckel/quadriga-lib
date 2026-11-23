@@ -77,7 +77,7 @@ TEST_CASE("Channel - Effective Path Gain")
 
     // Coefficients from get_channels_planar: the same gain without polmat and path_length
     arma::Cube<double> coeff_re, coeff_im, delay;
-    auto ant = quadriga_lib::arrayant_generate<double>("xpol", 1.0);
+    auto ant = quadriga_lib::generate_antenna<double>("xpol", 1.0);
 
     l = {0.0}; // Angles
     quadriga_lib::get_channels_planar(ant, ant,

@@ -5,7 +5,7 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Array antenna functions
+Antennas, transducers and patterns
 SECTION!*/
 
 /*!MD
@@ -15,7 +15,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
   directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
-  results via [[arrayant_concat]] and `element_pos`; crossover behavior emerges from overlapping bandpass
+  results via [[join_arrays]] and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
@@ -65,7 +65,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 ## Output:
 - **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [[arrayant_generate]] for struct fields; `[1, n_freq]`
+  see [[generate_antenna]] for struct fields; `[1, n_freq]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

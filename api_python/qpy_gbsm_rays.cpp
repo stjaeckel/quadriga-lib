@@ -141,7 +141,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 
 ## Inputs:
 - **`tx_array`**, **`rx_array`** — Dicts containing the arrayant data with `n_tx` and `n_rx` ports; layout as
-  documented in [[generate]]
+  documented in [[generate_antenna]]
 - **`rays`** — Ray dict of the link, see [[ssf_rays]]
 - **`link_gain_dB`** — Link gain (see Terms) at frequency `i_freq` of `rays` in dB; float, `(1,)` or `(n_snap,)`
 - **`mobility`** — `"phase"`, `"drift"` or `"auto"` (see Terms; `"auto"` is `"drift"` for `"quadriga"` rays, which then

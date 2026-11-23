@@ -2,8 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Helpers shared by the array antenna sources and the channel generators that use arrayants: value ranges, validity
-// checks and their cache, the interpolation dispatch, qdant file I/O and coupling
+// Helpers shared by the antenna array sources and the channel generators that use arrayants: value ranges, validity
+// checks and their cache, the interpolation dispatch and the field scaling of the pattern metrics
 
 #ifndef qd_helpers_arrayant_hpp
 #define qd_helpers_arrayant_hpp
@@ -57,84 +57,26 @@ static inline dtype qd_arrayant_grid_resolution(dtype res, dtype res_default, co
     return (std::isnan(res) || res <= (dtype)0.0) ? res_default : res;
 }
 
-// Returns empty string if there was no error or an error message otherwise; 'input_error' is set to true when the
-// error is in the arguments (no entry with the given ID), false when it is in the file
-template <typename dtype> // float or double
-std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
-                                   std::string *name,
-                                   arma::Cube<dtype> *e_theta_re,
-                                   arma::Cube<dtype> *e_theta_im,
-                                   arma::Cube<dtype> *e_phi_re,
-                                   arma::Cube<dtype> *e_phi_im,
-                                   arma::Col<dtype> *azimuth_grid,
-                                   arma::Col<dtype> *elevation_grid,
-                                   arma::Mat<dtype> *element_pos,
-                                   arma::Mat<dtype> *coupling_re,
-                                   arma::Mat<dtype> *coupling_im,
-                                   dtype *center_freq,
-                                   arma::Mat<unsigned> *layout,
-                                   bool *input_error = nullptr);
-
-// Returns empty string if there was no error or an error message otherwise; 'input_error' is set to true when the
-// error is in the arguments (layout refers to an ID that is not in the file), false when it is in the file
-template <typename dtype> // float or double
-std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
-                                    const std::string *name,
-                                    const arma::Cube<dtype> *e_theta_re,
-                                    const arma::Cube<dtype> *e_theta_im,
-                                    const arma::Cube<dtype> *e_phi_re,
-                                    const arma::Cube<dtype> *e_phi_im,
-                                    const arma::Col<dtype> *azimuth_grid,
-                                    const arma::Col<dtype> *elevation_grid,
-                                    const arma::Mat<dtype> *element_pos,
-                                    const arma::Mat<dtype> *coupling_re,
-                                    const arma::Mat<dtype> *coupling_im,
-                                    const dtype *center_freq,
-                                    const arma::Mat<unsigned> *layout,
-                                    unsigned *id_in_file,
-                                    bool *input_error = nullptr);
-
-// Block-diagonal coupling [C1 0; 0 C2] of two arrays with n_el1 and n_el2 elements (arrayant::append and
-// arrayant_concat_multi). An empty coupling_re is an identity block (one port per element); an empty coupling_im is
-// zero. Outputs are set to [n_el1 + n_el2, n_ports1 + n_ports2]; they must not alias the inputs.
+// Inverse of the largest absolute field value of n samples (calc_directivity, export_pattern_obj, trim_pattern);
+// scaling by it keeps the power of double patterns with amplitudes above about 1e154 inside the double range (only
+// called when the unscaled power overflowed)
 template <typename dtype>
-static inline void qd_arrayant_coupling_block_diag(const arma::Mat<dtype> &coupling_re1, const arma::Mat<dtype> &coupling_im1,
-                                            arma::uword n_el1,
-                                            const arma::Mat<dtype> &coupling_re2, const arma::Mat<dtype> &coupling_im2,
-                                            arma::uword n_el2,
-                                            arma::Mat<dtype> &coupling_re, arma::Mat<dtype> &coupling_im)
+static inline double qd_inverse_max_field(const dtype *a, const dtype *b, const dtype *c, const dtype *d, size_t n)
 {
-    const arma::uword n_ports1 = coupling_re1.is_empty() ? n_el1 : coupling_re1.n_cols;
-    const arma::uword n_ports2 = coupling_re2.is_empty() ? n_el2 : coupling_re2.n_cols;
-    coupling_re.zeros(n_el1 + n_el2, n_ports1 + n_ports2);
-    coupling_im.zeros(n_el1 + n_el2, n_ports1 + n_ports2);
-
-    if (n_el1 != 0 && n_ports1 != 0)
+    double m = 0.0;
+    for (size_t i = 0; i < n; ++i)
     {
-        if (coupling_re1.is_empty())
-            coupling_re.submat(0, 0, n_el1 - 1, n_ports1 - 1).eye();
-        else
-            coupling_re.submat(0, 0, n_el1 - 1, n_ports1 - 1) = coupling_re1;
-        if (!coupling_im1.is_empty())
-            coupling_im.submat(0, 0, n_el1 - 1, n_ports1 - 1) = coupling_im1;
+        double x = std::max(std::max(std::abs((double)a[i]), std::abs((double)b[i])), std::max(std::abs((double)c[i]), std::abs((double)d[i])));
+        m = x > m ? x : m;
     }
-    if (n_el2 != 0 && n_ports2 != 0)
-    {
-        const arma::uword r1 = n_el1 + n_el2 - 1, c1 = n_ports1 + n_ports2 - 1;
-        if (coupling_re2.is_empty())
-            coupling_re.submat(n_el1, n_ports1, r1, c1).eye();
-        else
-            coupling_re.submat(n_el1, n_ports1, r1, c1) = coupling_re2;
-        if (!coupling_im2.is_empty())
-            coupling_im.submat(n_el1, n_ports1, r1, c1) = coupling_im2;
-    }
+    return 1.0 / m;
 }
 
 // Resolves the kernel selector 'use_kernel' of the arrayant interpolation functions to the kernel that runs: 1
 // (GENERIC) for 0 (auto) and 1, 2 (AVX2) for 2. Throws std::invalid_argument for other values, and for 2 when the
 // AVX2 kernel is not available (BUILD_WITH_AVX2 and the CPU check) or when a pattern cube has more than INT_MAX
 // values (int32 gather offsets of the AVX2 kernel); n_pattern_values: number of values of the largest pattern cube
-static inline int qd_arrayant_interpolate_kernel(int use_kernel, unsigned long long n_pattern_values)
+static inline int qd_interpolate_pattern_kernel(int use_kernel, unsigned long long n_pattern_values)
 {
     const int kernel = qd_kernel_auto_avx2(use_kernel == 0 ? 1 : use_kernel); // Auto selects GENERIC
     if (kernel == 2 && n_pattern_values > (unsigned long long)INT_MAX)
@@ -142,15 +84,15 @@ static inline int qd_arrayant_interpolate_kernel(int use_kernel, unsigned long l
     return kernel;
 }
 
-// Interpolates the pattern of 'ant' (arrayant_interpolate without its argument handling), for library functions that
+// Interpolates the pattern of 'ant' (interpolate_pattern without its argument handling), for library functions that
 // have validated the arrayant themselves (e.g. with is_valid) and own the outputs
 // - Preconditions, not checked: 'ant' is valid; no output aliases an input, a data member of 'ant' or another output
 // - Checks, before a kernel runs: i_element not empty and its entries < n_elements; the sizes of the angles, the
-//   orientation, the positions and the outputs; n_ang <= INT_MAX; kernel 1 or 2, for 2 as qd_arrayant_interpolate_kernel;
+//   orientation, the positions and the outputs; n_ang <= INT_MAX; kernel 1 or 2, for 2 as qd_interpolate_pattern_kernel;
 //   throws std::invalid_argument on a violation. With n_ang = 0 it returns after the checks.
 // - All outputs are pre-sized by the caller and completely written; optional outputs may be nullptr
 template <typename dtype>
-void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant, // Valid array antenna with n_elements elements
+void qd_interpolate_pattern_dispatch(const quadriga_lib::arrayant<dtype> &ant, // Valid antenna array with n_elements elements
                                       const arma::Mat<dtype> &azimuth,          // Azimuth angles in GCS in rad; [1, n_ang] or [n_out, n_ang]
                                       const arma::Mat<dtype> &elevation,        // Elevation angles in GCS in rad; same size as azimuth
                                       const arma::uvec &i_element,              // Element indices, 0-based; [n_out], n_out >= 1
@@ -180,7 +122,7 @@ namespace quadriga_lib
 
 // Validity cache of an arrayant (member check_ptr): the data pointers of the members at the last passed check.
 // The cache matches when all pointers are unchanged and the member sizes still fit together (Armadillo can keep a
-// data pointer when a member is resized); empty element_pos (zeros) and coupling (identity) fit.
+// data pointer when a member is resized); empty element_pos (zeros) and port weights (identity) fit.
 // A matching cache does not prove that the values are unchanged.
 template <typename dtype>
 static inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
@@ -195,13 +137,13 @@ static inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype>
            ant.azimuth_grid.n_elem == ant.e_theta_re.n_cols &&
            ant.elevation_grid.n_elem == ant.e_theta_re.n_rows &&
            (ant.element_pos.is_empty() || (ant.element_pos.n_rows == 3 && ant.element_pos.n_cols == ant.e_theta_re.n_slices)) &&
-           (ant.coupling_re.is_empty() ? ant.coupling_im.is_empty() : ant.coupling_re.n_rows == ant.e_theta_re.n_slices) &&
-           (ant.coupling_im.is_empty() || arma::size(ant.coupling_im) == arma::size(ant.coupling_re)) &&
+           (ant.port_weights_re.is_empty() ? ant.port_weights_im.is_empty() : ant.port_weights_re.n_rows == ant.e_theta_re.n_slices) &&
+           (ant.port_weights_im.is_empty() || arma::size(ant.port_weights_im) == arma::size(ant.port_weights_re)) &&
            p[0] != nullptr && p[1] != nullptr && p[2] != nullptr && p[3] != nullptr && p[4] != nullptr && p[5] != nullptr &&
            p[0] == ant.e_theta_re.memptr() && p[1] == ant.e_theta_im.memptr() &&
            p[2] == ant.e_phi_re.memptr() && p[3] == ant.e_phi_im.memptr() &&
            p[4] == ant.azimuth_grid.memptr() && p[5] == ant.elevation_grid.memptr() &&
-           p[6] == ant.element_pos.memptr() && p[7] == ant.coupling_re.memptr() && p[8] == ant.coupling_im.memptr();
+           p[6] == ant.element_pos.memptr() && p[7] == ant.port_weights_re.memptr() && p[8] == ant.port_weights_im.memptr();
 }
 
 // Marks an arrayant as validated: sets the cache to the current data pointers (relaxed atomic stores, so threads that
@@ -211,7 +153,7 @@ static inline void qd_arrayant_mark_valid(const quadriga_lib::arrayant<dtype> &a
 {
     const dtype *p[9] = {ant.e_theta_re.memptr(), ant.e_theta_im.memptr(), ant.e_phi_re.memptr(), ant.e_phi_im.memptr(),
                          ant.azimuth_grid.memptr(), ant.elevation_grid.memptr(), ant.element_pos.memptr(),
-                         ant.coupling_re.memptr(), ant.coupling_im.memptr()};
+                         ant.port_weights_re.memptr(), ant.port_weights_im.memptr()};
     for (int i = 0; i < 9; ++i)
         quadriga_lib::qd_arrayant_access::check_ptr(ant)[i].store(p[i], std::memory_order_relaxed);
 }
@@ -259,34 +201,15 @@ static inline void qd_check_alias_arrayant(const T *const (&out)[N], const char 
 {
     for (std::size_t i = 0; i < N; ++i)
         qd_check_alias(out[i], name[i], &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im, &ant.azimuth_grid,
-                       &ant.elevation_grid, &ant.element_pos, &ant.coupling_re, &ant.coupling_im);
+                       &ant.elevation_grid, &ant.element_pos, &ant.port_weights_re, &ant.port_weights_im);
 }
 
-// Element indices of the calc functions: empty = all elements, duplicates allowed, out of range throws
-static inline arma::uvec qd_arrayant_calc_element_list(const arma::uvec &i_element, arma::uword n_elements)
-{
-    if (i_element.n_elem == 0) // A valid arrayant has at least one element
-        return arma::regspace<arma::uvec>(0, n_elements - 1);
-    if (arma::any(i_element >= n_elements))
-        throw std::invalid_argument("Input 'i_element' contains an index that is out of range.");
-    return i_element;
-}
+// is_valid of a vector with the per-entry check of qd_arrayant_is_valid_quick (read only)
+template <typename dtype>
+std::string qd_arrayant_vec_is_valid_quick(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 
-// Per-element kernels of arrayant_calc_beamwidth / arrayant_calc_directivity (src/qd_arrayant_ops.cpp); no checks:
-// valid arrayant, element index in range; beamwidth outputs in degree, computed only when not nullptr
+// is_valid of a vector with the per-entry full check qd_arrayant_check (read only)
 template <typename dtype>
-void qd_arrayant_calc_beamwidth_element(const quadriga_lib::arrayant<dtype> &ant, arma::uword i_element,
-                                        dtype threshold_dB, dtype *beamwidth_az, dtype *beamwidth_el,
-                                        dtype *az_point_ang, dtype *el_point_ang);
-template <typename dtype>
-dtype qd_arrayant_calc_directivity_element(const quadriga_lib::arrayant<dtype> &ant, arma::uword i_element);
-
-// arrayant_is_valid_multi with the per-entry check of qd_arrayant_is_valid_quick (read only)
-template <typename dtype>
-std::string qd_arrayant_is_valid_multi_quick(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
-
-// arrayant_is_valid_multi with the per-entry full check qd_arrayant_check (read only)
-template <typename dtype>
-std::string qd_arrayant_check_multi(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
+std::string qd_arrayant_vec_check(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 
 #endif

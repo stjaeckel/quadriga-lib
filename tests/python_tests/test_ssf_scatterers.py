@@ -71,7 +71,7 @@ class test_case(unittest.TestCase):
 
     def test_validity_scales(self):
         r, b_med, b_eff = self.out
-        ant = quadriga_lib.arrayant.generate("omni")
+        ant = quadriga_lib.arrayant.generate_antenna("omni")
         for k in range(2):
             par = gbsm.single_link_channel(ant, ant, r, np.array([0.0]), mobility="drift", output="taps", i_freq=k)[1]
             npt.assert_array_equal(b_med[:, k], par["b_med"])

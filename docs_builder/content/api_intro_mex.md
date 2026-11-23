@@ -1,6 +1,6 @@
 +++
 title = "MATLAB / Octave API"
-description = "%%GAP: MATLAB / Octave API reference for Quadriga-Lib: array antennas, channel generation, statistics, the 3GPP stochastic model and site-specific simulation tools.%%"
+description = "%%GAP: MATLAB / Octave API reference for Quadriga-Lib: antenna arrays, channel generation, statistics, the 3GPP stochastic model and site-specific simulation tools.%%"
 lead = "%%GAP: Reference for the MATLAB / Octave interface, version {{ version }}. All functions live in the `+quadriga_lib` package.%%"
 +++
 
@@ -13,4 +13,4 @@ lead = "%%GAP: Reference for the MATLAB / Octave interface, version {{ version }
 - Inputs with a stated default, or marked *(optional)*, can be omitted or passed as `[]`; all others are required. Output arguments are optional via `nargout`; a call without assignment returns the first output as `ans`, and outputs after the first are returned only when requested.
 - Invalid inputs (shape/domain) and problems with a file's access or content raise a MATLAB error with the identifier `quadriga_lib:CPPerror`.
 - Index conventions: 1-based unless the field is explicitly called 0-based.
-- The canonical arrayant struct is defined in [[arrayant_generate]]. Mandatory fields: `e_theta_re/im`, `e_phi_re/im`, `azimuth_grid`, `elevation_grid`. Optional field defaults: `element_pos = zeros(3, n_elements)`, identity coupling, `center_freq = 299792458`, empty `name`. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency. Each call builds a new arrayant from the struct, so its data is checked in full on every call.
+- The canonical arrayant struct is defined in [[generate_antenna]]. Mandatory fields: `e_theta_re/im`, `e_phi_re/im`, `azimuth_grid`, `elevation_grid`. Optional field defaults: `element_pos = zeros(3, n_elements)`, identity port weights, `center_freq = 299792458`, empty `name`. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency. Each call builds a new arrayant from the struct, so its data is checked in full on every call.

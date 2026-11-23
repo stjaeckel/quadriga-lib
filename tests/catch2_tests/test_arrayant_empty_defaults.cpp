@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// An empty element_pos stands for zeros, an empty coupling_re for identity and an empty coupling_im for zeros. Every
+// An empty element_pos stands for zeros, an empty port_weights_re for identity and an empty port_weights_im for zeros. Every
 // function that takes an arrayant must give the same result for the empty members as for the explicit values.
 
 #include <catch2/catch_test_macros.hpp>
@@ -16,8 +16,8 @@
 #include <string>
 #include <vector>
 
-// Three-element arrayant on a 30 degree grid with distinct, deterministic patterns; element_pos, coupling_re and
-// coupling_im filled with zeros, identity and zeros
+// Three-element arrayant on a 30 degree grid with distinct, deterministic patterns; element_pos, port_weights_re and
+// port_weights_im filled with zeros, identity and zeros
 static quadriga_lib::arrayant<double> filled_arrayant(double center_freq = 3.0e9)
 {
     const double d2r = arma::datum::pi / 180.0;
@@ -39,15 +39,15 @@ static quadriga_lib::arrayant<double> filled_arrayant(double center_freq = 3.0e9
                 a.e_phi_im(i, j, s) = 0.1 * std::cos(k * el);
             }
     a.element_pos.zeros(3, n);
-    a.coupling_re.eye(n, n);
-    a.coupling_im.zeros(n, n);
+    a.port_weights_re.eye(n, n);
+    a.port_weights_im.zeros(n, n);
     a.center_freq = center_freq;
     return a;
 }
 
 static quadriga_lib::arrayant<double> emptied(quadriga_lib::arrayant<double> a)
 {
-    a.element_pos.reset(), a.coupling_re.reset(), a.coupling_im.reset();
+    a.element_pos.reset(), a.port_weights_re.reset(), a.port_weights_im.reset();
     return a;
 }
 
@@ -58,11 +58,11 @@ static arma::mat pos_of(const quadriga_lib::arrayant<double> &a)
 }
 static arma::mat cpl_re_of(const quadriga_lib::arrayant<double> &a)
 {
-    return a.coupling_re.empty() ? arma::mat(a.n_elements(), a.n_elements(), arma::fill::eye) : a.coupling_re;
+    return a.port_weights_re.empty() ? arma::mat(a.n_elements(), a.n_elements(), arma::fill::eye) : a.port_weights_re;
 }
 static arma::mat cpl_im_of(const quadriga_lib::arrayant<double> &a)
 {
-    return a.coupling_im.empty() ? arma::mat(a.n_elements(), a.n_ports(), arma::fill::zeros) : a.coupling_im;
+    return a.port_weights_im.empty() ? arma::mat(a.n_elements(), a.n_ports(), arma::fill::zeros) : a.port_weights_im;
 }
 
 static void check_same(const quadriga_lib::arrayant<double> &a, const quadriga_lib::arrayant<double> &b)
@@ -95,13 +95,13 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
     const auto E = emptied(F);
     REQUIRE(E.is_valid().empty());
 
-    SECTION("arrayant_interpolate")
+    SECTION("interpolate_pattern")
     {
         const arma::mat az = {{0.3, -1.2, 2.5}}, el = {{0.1, -0.4, 0.7}};
         const arma::cube ori(3, 1, 1, arma::fill::value(0.2));
         arma::mat vr[2], vi[2], hr[2], hi[2], d[2];
-        quadriga_lib::arrayant_interpolate<double>(F, az, el, vr[0], vi[0], hr[0], hi[0], {}, ori, {}, &d[0]);
-        quadriga_lib::arrayant_interpolate<double>(E, az, el, vr[1], vi[1], hr[1], hi[1], {}, ori, {}, &d[1]);
+        quadriga_lib::interpolate_pattern<double>(F, az, el, vr[0], vi[0], hr[0], hi[0], {}, ori, {}, &d[0]);
+        quadriga_lib::interpolate_pattern<double>(E, az, el, vr[1], vi[1], hr[1], hi[1], {}, ori, {}, &d[1]);
         CHECK(arma::approx_equal(vr[0], vr[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(vi[0], vi[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(hr[0], hr[1], "absdiff", 0.0));
@@ -109,53 +109,53 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         CHECK(arma::approx_equal(d[0], d[1], "absdiff", 0.0));
     }
 
-    SECTION("arrayant_combine_pattern")
+    SECTION("apply_port_weights")
     {
-        check_same(quadriga_lib::arrayant_combine_pattern(F), quadriga_lib::arrayant_combine_pattern(E));
+        check_same(quadriga_lib::apply_port_weights(F), quadriga_lib::apply_port_weights(E));
     }
 
-    SECTION("arrayant_concat")
+    SECTION("join_arrays")
     {
-        check_same(quadriga_lib::arrayant_concat(F, F), quadriga_lib::arrayant_concat(E, E));
-        check_same(quadriga_lib::arrayant_concat(F, F), quadriga_lib::arrayant_concat(F, E));
-        check_same(quadriga_lib::arrayant_concat(F, F), quadriga_lib::arrayant_concat(E, F));
+        check_same(quadriga_lib::join_arrays(F, F), quadriga_lib::join_arrays(E, E));
+        check_same(quadriga_lib::join_arrays(F, F), quadriga_lib::join_arrays(F, E));
+        check_same(quadriga_lib::join_arrays(F, F), quadriga_lib::join_arrays(E, F));
     }
 
-    SECTION("arrayant_copy_element")
+    SECTION("copy_element")
     {
         // Growing: empty members are written out, so that the new elements can be edited
         auto f = F, e = E;
-        quadriga_lib::arrayant_copy_element(f, 1, {0, 4});
-        quadriga_lib::arrayant_copy_element(e, 1, {0, 4});
+        quadriga_lib::copy_element(f, 1, {0, 4});
+        quadriga_lib::copy_element(e, 1, {0, 4});
         check_same(f, e);
         CHECK(arma::size(e.element_pos) == arma::size(3, 5));
-        CHECK(arma::size(e.coupling_re) == arma::size(5, 5));
-        CHECK(arma::size(e.coupling_im) == arma::size(5, 5));
+        CHECK(arma::size(e.port_weights_re) == arma::size(5, 5));
+        CHECK(arma::size(e.port_weights_im) == arma::size(5, 5));
         CHECK(e.n_ports() == 5);
-        e.element_pos(1, 4) = 0.5, e.coupling_re(4, 4) = 0.7; // Editing a new element works
+        e.element_pos(1, 4) = 0.5, e.port_weights_re(4, 4) = 0.7; // Editing a new element works
 
-        // Coupling given, coupling_im empty: the new elements get their own port
-        f = F, e = F, e.coupling_im.reset();
-        quadriga_lib::arrayant_copy_element(f, 2, {3});
-        quadriga_lib::arrayant_copy_element(e, 2, {3});
+        // Coupling given, port_weights_im empty: the new elements get their own port
+        f = F, e = F, e.port_weights_im.reset();
+        quadriga_lib::copy_element(f, 2, {3});
+        quadriga_lib::copy_element(e, 2, {3});
         check_same(f, e);
 
         // Not growing: empty members stay empty
         f = F, e = E;
-        quadriga_lib::arrayant_copy_element(f, 0, {1, 2});
-        quadriga_lib::arrayant_copy_element(e, 0, {1, 2});
+        quadriga_lib::copy_element(f, 0, {1, 2});
+        quadriga_lib::copy_element(e, 0, {1, 2});
         check_same(f, e);
         CHECK(e.element_pos.empty());
-        CHECK(e.coupling_re.empty());
+        CHECK(e.port_weights_re.empty());
     }
 
-    SECTION("arrayant_remove_zeros")
+    SECTION("trim_pattern")
     {
         auto f = F, e = E;
         f.e_theta_re.cols(0, 3).zeros(), f.e_theta_im.cols(0, 3).zeros(), f.e_phi_re.cols(0, 3).zeros(), f.e_phi_im.cols(0, 3).zeros();
         e.e_theta_re = f.e_theta_re, e.e_theta_im = f.e_theta_im, e.e_phi_re = f.e_phi_re, e.e_phi_im = f.e_phi_im;
-        quadriga_lib::arrayant_remove_zeros(f);
-        quadriga_lib::arrayant_remove_zeros(e);
+        quadriga_lib::trim_pattern(f);
+        quadriga_lib::trim_pattern(e);
         CHECK(f.n_azimuth() < F.n_azimuth());
         check_same(f, e);
         CHECK(e.element_pos.empty());
@@ -167,21 +167,21 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         std::remove(fn_f.c_str()), std::remove(fn_e.c_str());
         quadriga_lib::qdant_write(fn_f, F);
         quadriga_lib::qdant_write(fn_e, E);
-        check_same(quadriga_lib::qdant_read<double>(fn_f), quadriga_lib::qdant_read<double>(fn_e));
+        check_same(quadriga_lib::qdant_read<double>(fn_f, {1})[0], quadriga_lib::qdant_read<double>(fn_e, {1})[0]);
         std::remove(fn_f.c_str()), std::remove(fn_e.c_str());
     }
 
-    SECTION("arrayant_export_obj_file")
+    SECTION("export_pattern_obj")
     {
         const std::string fn = "test_empty_defaults.obj";
-        quadriga_lib::arrayant_export_obj_file(fn, F, 30.0, "jet", 1.0, 1);
+        quadriga_lib::export_pattern_obj(fn, F, 30.0, "jet", 1.0, 1);
         const std::string text_f = file_text(fn);
-        quadriga_lib::arrayant_export_obj_file(fn, E, 30.0, "jet", 1.0, 1);
+        quadriga_lib::export_pattern_obj(fn, E, 30.0, "jet", 1.0, 1);
         CHECK(text_f == file_text(fn));
         std::remove(fn.c_str()), std::remove("test_empty_defaults.mtl");
     }
 
-    SECTION("arrayant_rotate_pattern")
+    SECTION("rotate_pattern")
     {
         for (unsigned usage : {0U, 1U, 2U, 3U})
         {
@@ -207,7 +207,7 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         check_same(f, e);
     }
 
-    SECTION("arrayant_calc_beamwidth and arrayant_calc_directivity")
+    SECTION("calc_beamwidth and calc_directivity")
     {
         double bf = 0.0, be = 0.0;
         qd_beamwidth(F, 1, 3.0, &bf);
@@ -221,7 +221,7 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
 {
     const std::vector<quadriga_lib::arrayant<double>> F = {filled_arrayant(1.0e9), filled_arrayant(2.0e9)};
     const std::vector<quadriga_lib::arrayant<double>> E = {emptied(F[0]), emptied(F[1])};
-    REQUIRE(quadriga_lib::arrayant_is_valid_multi(E).empty());
+    REQUIRE(quadriga_lib::is_valid(E).empty());
 
     auto check_same_multi = [](const std::vector<quadriga_lib::arrayant<double>> &a, const std::vector<quadriga_lib::arrayant<double>> &b)
     {
@@ -230,25 +230,25 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
             check_same(a[i], b[i]);
     };
 
-    SECTION("arrayant_combine_pattern_multi")
+    SECTION("apply_port_weights (vector)")
     {
-        check_same_multi(quadriga_lib::arrayant_combine_pattern_multi(F), quadriga_lib::arrayant_combine_pattern_multi(E));
+        check_same_multi(quadriga_lib::apply_port_weights(F), quadriga_lib::apply_port_weights(E));
     }
 
-    SECTION("arrayant_concat_multi")
+    SECTION("join_arrays (vector)")
     {
-        check_same_multi(quadriga_lib::arrayant_concat_multi(F, F), quadriga_lib::arrayant_concat_multi(E, F));
+        check_same_multi(quadriga_lib::join_arrays(F, F), quadriga_lib::join_arrays(E, F));
     }
 
-    SECTION("arrayant_copy_element_multi")
+    SECTION("copy_element (vector)")
     {
         auto f = F, e = E;
-        quadriga_lib::arrayant_copy_element_multi(f, 0, {3});
-        quadriga_lib::arrayant_copy_element_multi(e, 0, {3});
+        quadriga_lib::copy_element(f, 0, {3});
+        quadriga_lib::copy_element(e, 0, {3});
         check_same_multi(f, e);
     }
 
-    SECTION("arrayant_rotate_pattern_multi")
+    SECTION("rotate_pattern (vector)")
     {
         auto f = F, e = E;
         qd_rotate_multi(f, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0);
@@ -256,35 +256,35 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
         check_same_multi(f, e);
     }
 
-    SECTION("arrayant_set_element_pos_multi")
+    SECTION("set_element_pos")
     {
         auto f = F, e = E;
         const arma::mat p = arma::vec{0.1, 0.2, 0.3};
         const arma::uvec i_el = {1};
-        quadriga_lib::arrayant_set_element_pos_multi(f, p, i_el);
-        quadriga_lib::arrayant_set_element_pos_multi(e, p, i_el);
+        quadriga_lib::set_element_pos(f, p, i_el);
+        quadriga_lib::set_element_pos(e, p, i_el);
         check_same_multi(f, e);
     }
 
-    SECTION("arrayant_interpolate_multi")
+    SECTION("interpolate_pattern (vector)")
     {
         const arma::mat az = {{0.3, -1.2}}, el = {{0.1, -0.4}};
         const arma::vec freq = {1.5e9};
         arma::cube vr[2], vi[2], hr[2], hi[2];
-        quadriga_lib::arrayant_interpolate_multi(F, az, el, vr[0], vi[0], hr[0], hi[0], freq);
-        quadriga_lib::arrayant_interpolate_multi(E, az, el, vr[1], vi[1], hr[1], hi[1], freq);
+        quadriga_lib::interpolate_pattern(F, az, el, vr[0], vi[0], hr[0], hi[0], freq);
+        quadriga_lib::interpolate_pattern(E, az, el, vr[1], vi[1], hr[1], hi[1], freq);
         CHECK(arma::approx_equal(vr[0], vr[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(vi[0], vi[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(hr[0], hr[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(hi[0], hi[1], "absdiff", 0.0));
     }
 
-    SECTION("qdant_write_multi and qdant_read_multi")
+    SECTION("qdant_write and qdant_read of all entries")
     {
         const std::string fn_f = "test_empty_defaults_mf.qdant", fn_e = "test_empty_defaults_me.qdant";
-        quadriga_lib::qdant_write_multi(fn_f, F);
-        quadriga_lib::qdant_write_multi(fn_e, E);
-        check_same_multi(quadriga_lib::qdant_read_multi<double>(fn_f), quadriga_lib::qdant_read_multi<double>(fn_e));
+        quadriga_lib::qdant_write(fn_f, F);
+        quadriga_lib::qdant_write(fn_e, E);
+        check_same_multi(quadriga_lib::qdant_read<double>(fn_f), quadriga_lib::qdant_read<double>(fn_e));
         std::remove(fn_f.c_str()), std::remove(fn_e.c_str());
     }
 }
@@ -295,16 +295,16 @@ TEST_CASE("Channel functions - Empty element_pos and coupling equal zeros and id
     auto F = filled_arrayant();
     F.element_pos = {{0.0, 0.05, -0.05}, {0.1, -0.1, 0.0}, {0.0, 0.02, 0.0}}; // Positions stay given
     auto E = F;
-    E.coupling_re.reset(), E.coupling_im.reset();
+    E.port_weights_re.reset(), E.port_weights_im.reset();
 
     // Array with two ports: element 0 and the phased sum of elements 1 and 2
     auto C = F;
-    C.coupling_re = {{1.0, 0.0}, {0.0, 0.6}, {0.0, 0.5}};
-    C.coupling_im = {{0.0, 0.0}, {0.0, 0.3}, {0.0, -0.2}};
+    C.port_weights_re = {{1.0, 0.0}, {0.0, 0.6}, {0.0, 0.5}};
+    C.port_weights_im = {{0.0, 0.0}, {0.0, 0.3}, {0.0, -0.2}};
 
     // Positions only: empty vs zeros
     auto P0 = filled_arrayant(), PE = emptied(filled_arrayant());
-    PE.coupling_re = P0.coupling_re, PE.coupling_im = P0.coupling_im;
+    PE.port_weights_re = P0.port_weights_re, PE.port_weights_im = P0.port_weights_im;
 
     const arma::mat fbs = {{10.0, 5.0}, {0.0, 8.0}, {1.0, 2.0}};
     const arma::vec gain = {1.0, 0.25}, len = {20.0, 22.0};

@@ -1,0 +1,1292 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
+// No Armadillo and no standard containers in this file: template functions used here would be emitted with AVX
+// instructions as weak symbols, which the linker may then pick for callers in other objects
+
+#include "quadriga_lib_avx2_functions.hpp"
+
+#include <immintrin.h>
+#include <cfloat>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include "fastmath_avx2.h"
+
+namespace
+{
+    // Helpers for the computation stages shared by the three code paths (element-vectorized, angle-vectorized,
+    // general). The paths differ only in how they load inputs (broadcast vs. SoA gather) and store outputs
+    // (contiguous vs. strided).
+
+    // 3×3 rotation matrix, 8 SIMD lanes per entry: R^T in column-major order (= R in row-major order), r[0..2] is
+    // row 0 of R. Forward rotation d = R * v uses r[0],r[3],r[6] / r[1],r[4],r[7] / r[2],r[5],r[8], back-rotation
+    // d = R^T * v uses r[0],r[1],r[2] / r[3],r[4],r[5] / r[6],r[7],r[8].
+    struct RMatrix8
+    {
+        __m256 r[9];
+    };
+
+    // Precomputed azimuth grid search parameters (cyclic wrapping)
+    struct AzGridParams
+    {
+        const float *grid_f;   // Float grid values, length [n + 1] with grid_f[n] = +inf sentinel
+        const float *step_inv; // Reciprocal grid spacings [n], step_inv[i] = 1/(grid[i] - grid[i-1])
+        size_t n;              // Number of azimuth grid points (n_azimuth)
+        bool uniform;          // True if grid is uniformly spaced
+        float fmin;            // Grid minimum: grid_f[0]
+        float fmax;            // Grid maximum: grid_f[n-1]
+        float step_rinv;       // 1 / uniform_step (only valid if uniform == true)
+        int bsearch_iters;     // Binary search iterations: ceil(log2(n + 1))
+        float eps_cubed;       // Tiny guard for weight computation (eps^3)
+    };
+
+    // Precomputed elevation grid search parameters (clamped, no wrapping)
+    struct ElGridParams
+    {
+        const float *grid_f;   // Float grid values, length [n + 1] with grid_f[n] = +inf sentinel
+        const float *step_inv; // Reciprocal grid spacings [n]
+        size_t n;              // Number of elevation grid points (n_elevation)
+        bool uniform;          // True if grid is uniformly spaced
+        float fmin;            // Grid minimum: grid_f[0]
+        float step_rinv;       // 1 / uniform_step (only valid if uniform == true)
+        int bsearch_iters;     // Binary search iterations: ceil(log2(n + 1))
+        float eps_cubed;       // Tiny guard for weight computation (eps^3)
+    };
+
+    // Azimuth grid lookup for 8 query values, cyclic: values below the first or above the last grid point interpolate
+    // between the last and the first one. n == 1: no interpolation; uniform grid: O(1) index; else binary search.
+    static inline void avx2_grid_search_azimuth(
+        __m256 az8,                                // Query azimuth in rad
+        const AzGridParams &p,                     // Grid parameters
+        __m256i *iUp8, __m256i *iUn8, __m256 *up8) // Output: lower / upper bracket index in [0, n-1], weight of the lower one
+    {
+        const __m256 ones_8 = _mm256_set1_ps(1.0f);
+        const __m256 zeros_8 = _mm256_setzero_ps();
+        const __m256 eps0_8 = _mm256_set1_ps(p.eps_cubed);
+
+        // Trivial case: single grid point
+        if (p.n == 1)
+        {
+            *iUp8 = _mm256_setzero_si256();
+            *iUn8 = _mm256_setzero_si256();
+            *up8 = ones_8;
+            return;
+        }
+
+        // Compute normal-range indices and weight
+        __m256i iUp_norm, iUn_norm;
+        __m256 up_norm;
+        __m256 mask_below, mask_above;
+
+        if (p.uniform)
+        {
+            // O(1) index computation for uniform grids
+            const __m256 az_min_v = _mm256_set1_ps(p.fmin);
+            const __m256 az_max_v = _mm256_set1_ps(p.fmax);
+            const __m256 az_rinv_v = _mm256_set1_ps(p.step_rinv);
+            const __m256i az_max_idx = _mm256_set1_epi32((int)(p.n - 2));
+
+            __m256 fidx = _mm256_mul_ps(_mm256_sub_ps(az8, az_min_v), az_rinv_v);
+
+            // Branchless floor: truncate, then adjust if negative fractional part
+            __m256i i_trunc = _mm256_cvttps_epi32(fidx);
+            __m256 f_trunc = _mm256_cvtepi32_ps(i_trunc);
+            __m256 neg_adj = _mm256_cmp_ps(fidx, f_trunc, _CMP_LT_OQ);
+            __m256i i_floor = _mm256_add_epi32(i_trunc, _mm256_castps_si256(neg_adj));
+
+            iUp_norm = _mm256_max_epi32(_mm256_setzero_si256(), _mm256_min_epi32(i_floor, az_max_idx));
+            iUn_norm = _mm256_add_epi32(iUp_norm, _mm256_set1_epi32(1));
+
+            __m256 grid_un = _mm256_i32gather_ps(p.grid_f, iUn_norm, 4);
+            __m256 un_norm = _mm256_mul_ps(_mm256_sub_ps(grid_un, az8), az_rinv_v);
+            un_norm = _mm256_max_ps(zeros_8, _mm256_min_ps(ones_8, un_norm));
+            up_norm = _mm256_sub_ps(ones_8, un_norm);
+
+            mask_below = _mm256_cmp_ps(az8, az_min_v, _CMP_LT_OQ);
+            mask_above = _mm256_cmp_ps(az8, az_max_v, _CMP_GE_OQ);
+        }
+        else
+        {
+            // Vectorized binary search for non-uniform grids
+            __m256i bs_lo = _mm256_setzero_si256();
+            __m256i bs_hi = _mm256_set1_epi32((int)p.n);
+            for (int iter = 0; iter < p.bsearch_iters; ++iter)
+            {
+                __m256i mid = _mm256_srli_epi32(_mm256_add_epi32(bs_lo, bs_hi), 1);
+                __m256 val = _mm256_i32gather_ps(p.grid_f, mid, 4);
+                __m256 cmp = _mm256_cmp_ps(val, az8, _CMP_LE_OQ);
+                __m256i cmp_i = _mm256_castps_si256(cmp);
+                bs_lo = _mm256_blendv_epi8(bs_lo, _mm256_add_epi32(mid, _mm256_set1_epi32(1)), cmp_i);
+                bs_hi = _mm256_blendv_epi8(mid, bs_hi, cmp_i);
+            }
+
+            __m256i ub8_az = bs_lo;
+            iUp_norm = _mm256_sub_epi32(ub8_az, _mm256_set1_epi32(1));
+            iUn_norm = ub8_az;
+
+            __m256i iUn_safe = _mm256_max_epi32(_mm256_setzero_si256(), _mm256_min_epi32(iUn_norm, _mm256_set1_epi32((int)(p.n - 1))));
+            __m256 grid_un = _mm256_i32gather_ps(p.grid_f, iUn_safe, 4);
+            __m256 diff_un = _mm256_i32gather_ps(p.step_inv, iUn_safe, 4);
+            __m256 un_norm = _mm256_mul_ps(_mm256_sub_ps(grid_un, az8), diff_un);
+            un_norm = _mm256_min_ps(ones_8, un_norm);
+            up_norm = _mm256_sub_ps(ones_8, un_norm);
+
+            mask_below = _mm256_castsi256_ps(_mm256_cmpeq_epi32(ub8_az, _mm256_setzero_si256()));
+            mask_above = _mm256_castsi256_ps(_mm256_cmpeq_epi32(ub8_az, _mm256_set1_epi32((int)p.n)));
+        }
+
+        // Cyclic wrap handling (shared between uniform and non-uniform)
+        __m256 wrap_mask = _mm256_or_ps(mask_below, mask_above);
+        __m256i az_last_i = _mm256_set1_epi32((int)(p.n - 1));
+        __m256 az_wrap_rinv_v = _mm256_set1_ps(p.step_inv[0]);
+        __m256 az_min_v = _mm256_set1_ps(p.fmin);
+        __m256 az_max_v = _mm256_set1_ps(p.fmax);
+
+        __m256 wrap_un_below = _mm256_mul_ps(_mm256_add_ps(_mm256_sub_ps(az_min_v, az8), eps0_8), az_wrap_rinv_v);
+        __m256 wrap_up_below = _mm256_sub_ps(ones_8, _mm256_min_ps(ones_8, wrap_un_below));
+        __m256 wrap_up_above = _mm256_min_ps(ones_8, _mm256_mul_ps(_mm256_add_ps(_mm256_sub_ps(az8, az_max_v), eps0_8), az_wrap_rinv_v));
+        __m256 wrap_up = _mm256_blendv_ps(wrap_up_above, wrap_up_below, mask_below);
+        wrap_up = _mm256_max_ps(zeros_8, _mm256_min_ps(ones_8, wrap_up));
+
+        // Select between normal-range and wrap results
+        *iUp8 = _mm256_castps_si256(_mm256_blendv_ps(
+            _mm256_castsi256_ps(iUp_norm), _mm256_castsi256_ps(az_last_i), wrap_mask));
+        *iUn8 = _mm256_castps_si256(_mm256_blendv_ps(
+            _mm256_castsi256_ps(iUn_norm), _mm256_setzero_ps(), wrap_mask));
+        *up8 = _mm256_blendv_ps(up_norm, wrap_up, wrap_mask);
+    }
+
+    // Elevation grid lookup for 8 query values, clamped: values below the first grid point snap to index 0 with weight
+    // 1, values above the last to the last index. n <= 1: no interpolation; uniform grid: O(1) index; else binary search.
+    static inline void avx2_grid_search_elevation(
+        __m256 el8,                                // Query elevation in rad
+        const ElGridParams &p,                     // Grid parameters
+        __m256i *iVp8, __m256i *iVn8, __m256 *vp8) // Output: lower / upper bracket index in [0, n-1], weight of the lower one
+    {
+        const __m256 ones_8 = _mm256_set1_ps(1.0f);
+        const __m256 zeros_8 = _mm256_setzero_ps();
+        const __m256 eps0_8 = _mm256_set1_ps(p.eps_cubed);
+
+        // Trivial case: single grid point
+        if (p.n <= 1)
+        {
+            *iVp8 = _mm256_setzero_si256();
+            *iVn8 = _mm256_setzero_si256();
+            *vp8 = ones_8;
+            return;
+        }
+
+        if (p.uniform)
+        {
+            // O(1) index computation for uniform grids
+            const __m256 el_min_v = _mm256_set1_ps(p.fmin);
+            const __m256 el_rinv_v = _mm256_set1_ps(p.step_rinv);
+            const int el_max_idx = (int)(p.n - 2);
+
+            __m256 fidx = _mm256_mul_ps(_mm256_sub_ps(el8, el_min_v), el_rinv_v);
+
+            __m256i i_trunc = _mm256_cvttps_epi32(fidx);
+            __m256 f_trunc = _mm256_cvtepi32_ps(i_trunc);
+            __m256 neg_adj = _mm256_cmp_ps(fidx, f_trunc, _CMP_LT_OQ);
+            __m256i i_floor = _mm256_add_epi32(i_trunc, _mm256_castps_si256(neg_adj));
+
+            __m256i iVp_c = _mm256_max_epi32(_mm256_setzero_si256(), _mm256_min_epi32(i_floor, _mm256_set1_epi32(el_max_idx)));
+            __m256i iVn_c = _mm256_add_epi32(iVp_c, _mm256_set1_epi32(1));
+
+            __m256 grid_vn = _mm256_i32gather_ps(p.grid_f, iVn_c, 4);
+            __m256 vn_c = _mm256_mul_ps(_mm256_add_ps(_mm256_sub_ps(grid_vn, el8), eps0_8), el_rinv_v);
+            vn_c = _mm256_max_ps(zeros_8, _mm256_min_ps(ones_8, vn_c));
+            __m256 vp_c = _mm256_sub_ps(ones_8, vn_c);
+
+            // Clamp below: if el < grid_min, force weight = 1 (snap to first point)
+            __m256 mask_below = _mm256_cmp_ps(el8, el_min_v, _CMP_LT_OQ);
+            vp_c = _mm256_blendv_ps(vp_c, ones_8, mask_below);
+            iVn_c = _mm256_castps_si256(_mm256_blendv_ps(
+                _mm256_castsi256_ps(iVn_c), _mm256_setzero_ps(), mask_below));
+
+            *iVp8 = iVp_c;
+            *iVn8 = iVn_c;
+            *vp8 = vp_c;
+        }
+        else
+        {
+            // Vectorized binary search for non-uniform grids (no wrapping for elevation)
+            __m256i bs_lo = _mm256_setzero_si256();
+            __m256i bs_hi = _mm256_set1_epi32((int)p.n);
+            for (int iter = 0; iter < p.bsearch_iters; ++iter)
+            {
+                __m256i mid = _mm256_srli_epi32(_mm256_add_epi32(bs_lo, bs_hi), 1);
+                __m256 val = _mm256_i32gather_ps(p.grid_f, mid, 4);
+                __m256 cmp = _mm256_cmp_ps(val, el8, _CMP_LE_OQ);
+                __m256i cmp_i = _mm256_castps_si256(cmp);
+                bs_lo = _mm256_blendv_epi8(bs_lo, _mm256_add_epi32(mid, _mm256_set1_epi32(1)), cmp_i);
+                bs_hi = _mm256_blendv_epi8(mid, bs_hi, cmp_i);
+            }
+            __m256i ub8_el = bs_lo;
+
+            __m256 mask_past = _mm256_castsi256_ps(
+                _mm256_cmpeq_epi32(ub8_el, _mm256_set1_epi32((int)p.n)));
+            __m256 mask_before = _mm256_castsi256_ps(
+                _mm256_cmpeq_epi32(ub8_el, _mm256_setzero_si256()));
+            __m256 clamp_mask = _mm256_or_ps(mask_past, mask_before);
+
+            __m256i iVp_norm = _mm256_sub_epi32(ub8_el, _mm256_set1_epi32(1));
+            __m256i iVn_norm = ub8_el;
+
+            __m256i iVn_safe = _mm256_min_epi32(iVn_norm, _mm256_set1_epi32((int)(p.n - 1)));
+            __m256 grid_vn = _mm256_i32gather_ps(p.grid_f, iVn_safe, 4);
+            __m256 diff_vn = _mm256_i32gather_ps(p.step_inv, iVn_safe, 4);
+            __m256 vn_norm = _mm256_mul_ps(_mm256_add_ps(_mm256_sub_ps(grid_vn, el8), eps0_8), diff_vn);
+            vn_norm = _mm256_min_ps(ones_8, vn_norm);
+            __m256 vp_norm = _mm256_sub_ps(ones_8, vn_norm);
+
+            __m256i el_last_i = _mm256_set1_epi32((int)(p.n - 1));
+            __m256i iVp_past = el_last_i;
+            __m256i iVn_past = el_last_i;
+
+            iVp_norm = _mm256_max_epi32(iVp_norm, _mm256_setzero_si256());
+            *iVp8 = _mm256_castps_si256(_mm256_blendv_ps(
+                _mm256_castsi256_ps(iVp_norm),
+                _mm256_blendv_ps(_mm256_castsi256_ps(iVp_past), _mm256_setzero_ps(), mask_before),
+                clamp_mask));
+            *iVn8 = _mm256_castps_si256(_mm256_blendv_ps(
+                _mm256_castsi256_ps(iVn_safe),
+                _mm256_blendv_ps(_mm256_castsi256_ps(iVn_past), _mm256_setzero_ps(), mask_before),
+                clamp_mask));
+            *vp8 = _mm256_blendv_ps(vp_norm, ones_8, clamp_mask);
+        }
+    }
+
+    // Rotation of the query direction by R, local angles (cart2geo) and the polarization rotation angle gamma. The sin /
+    // cos of the local angles follow from the Cartesian components (no extra sincos). gamma follows from the dot
+    // products of the input basis vectors eTHi, ePHi (global angles) with the output basis vector eTHo (local angles),
+    // back-rotated by R^T to the global frame.
+    static inline void avx2_rotate_and_polarize(
+        const RMatrix8 &R,                                      // Rotation matrix, see RMatrix8
+        __m256 sAZi8, __m256 cAZi8, __m256 sELi8, __m256 cELi8, // sin / cos of the global azimuth and elevation
+        __m256 *dx8, __m256 *dy8, __m256 *dz8,                  // Output: rotated direction, for the distance
+        __m256 *az8, __m256 *el8,                               // Output: local azimuth and elevation in rad
+        __m256 *cos_gamma8, __m256 *sin_gamma8)                 // Output: cos / sin of the polarization rotation angle
+    {
+        // Input direction in Cartesian: [cEL*cAZ, cEL*sAZ, sEL]
+        __m256 Cx8 = _mm256_mul_ps(cELi8, cAZi8);
+        __m256 Cy8 = _mm256_mul_ps(cELi8, sAZi8);
+
+        // Forward rotation: d = R * [Cx, Cy, sEL]
+        *dx8 = _mm256_fmadd_ps(R.r[0], Cx8, _mm256_fmadd_ps(R.r[3], Cy8, _mm256_mul_ps(R.r[6], sELi8)));
+        *dy8 = _mm256_fmadd_ps(R.r[1], Cx8, _mm256_fmadd_ps(R.r[4], Cy8, _mm256_mul_ps(R.r[7], sELi8)));
+        *dz8 = _mm256_fmadd_ps(R.r[2], Cx8, _mm256_fmadd_ps(R.r[5], Cy8, _mm256_mul_ps(R.r[8], sELi8)));
+
+        // cart2geo: local az = atan2(dy, dx), local el = asin(clamp(dz))
+        __m256 len;
+        _fm256_cart2geo_ps(*dx8, *dy8, *dz8, az8, el8, &len);
+
+        // Derive sin/cos of output angles from dx/dy/dz directly (avoids extra sincos). The pattern lookup (az8) and the
+        // polarization basis (cAZo8, sAZo8) must use the same azimuth with a unit-length basis, also next to the local
+        // pole. On the pole itself (dx, dy rounding residues: dx^2 + dy^2 < (8 eps)^2) the azimuth is undefined; it is
+        // taken from the theta unit vector of the query in the local frame (R * eTHi), so that the polarization is not
+        // rotated there.
+        __m256 eTHi_x8 = _mm256_mul_ps(sELi8, cAZi8); // Input basis vectors: eTHi = [sEL*cAZ, sEL*sAZ, -cEL]
+        __m256 eTHi_y8 = _mm256_mul_ps(sELi8, sAZi8);
+        __m256 eTHi_z8 = _mm256_xor_ps(cELi8, _mm256_set1_ps(-0.0f)); // -cELi
+        __m256 ePHi_x8 = _mm256_xor_ps(sAZi8, _mm256_set1_ps(-0.0f)); // ePHi = [-sAZ, cAZ, 0]
+        __m256 ePHi_y8 = cAZi8;
+
+        const __m256 tiny8 = _mm256_set1_ps(64.0f * FLT_EPSILON * FLT_EPSILON);
+        __m256 hyp_sq8 = _mm256_fmadd_ps(*dx8, *dx8, _mm256_mul_ps(*dy8, *dy8));
+        __m256 pole8 = _mm256_cmp_ps(hyp_sq8, tiny8, _CMP_LT_OQ);
+        __m256 ax8 = *dx8, ay8 = *dy8, hyp_a8 = hyp_sq8;
+        if (_mm256_movemask_ps(pole8))
+        {
+            __m256 tx8 = _mm256_fmadd_ps(R.r[0], eTHi_x8, _mm256_fmadd_ps(R.r[3], eTHi_y8, _mm256_mul_ps(R.r[6], eTHi_z8)));
+            __m256 ty8 = _mm256_fmadd_ps(R.r[1], eTHi_x8, _mm256_fmadd_ps(R.r[4], eTHi_y8, _mm256_mul_ps(R.r[7], eTHi_z8)));
+            ax8 = _mm256_blendv_ps(ax8, _mm256_mul_ps(*dz8, tx8), pole8);
+            ay8 = _mm256_blendv_ps(ay8, _mm256_mul_ps(*dz8, ty8), pole8);
+            *az8 = _mm256_blendv_ps(*az8, _fm256_atan2256_ps(ay8, ax8), pole8);
+            hyp_a8 = _mm256_fmadd_ps(ax8, ax8, _mm256_mul_ps(ay8, ay8));
+        }
+        __m256 inv_hypot8 = _fm256_rsqrt_nr_ps(_mm256_max_ps(hyp_a8, tiny8));
+        __m256 cAZo8 = _mm256_mul_ps(ax8, inv_hypot8);
+        __m256 sAZo8 = _mm256_mul_ps(ay8, inv_hypot8);
+        __m256 cELo8 = _mm256_mul_ps(hyp_sq8, inv_hypot8); // About 0 on the pole
+
+        // Output basis vector: eTHo = [dz*cAZo, dz*sAZo, -cELo]
+        __m256 eTHo_x8 = _mm256_mul_ps(*dz8, cAZo8);
+        __m256 eTHo_y8 = _mm256_mul_ps(*dz8, sAZo8);
+        __m256 eTHo_z8 = _mm256_xor_ps(cELo8, _mm256_set1_ps(-0.0f)); // -cELo
+
+        // Back-rotate eTHo into global frame: eTHor = R^T * eTHo
+        __m256 eTHor_x8 = _mm256_fmadd_ps(R.r[0], eTHo_x8, _mm256_fmadd_ps(R.r[1], eTHo_y8, _mm256_mul_ps(R.r[2], eTHo_z8)));
+        __m256 eTHor_y8 = _mm256_fmadd_ps(R.r[3], eTHo_x8, _mm256_fmadd_ps(R.r[4], eTHo_y8, _mm256_mul_ps(R.r[5], eTHo_z8)));
+        __m256 eTHor_z8 = _mm256_fmadd_ps(R.r[6], eTHo_x8, _mm256_fmadd_ps(R.r[7], eTHo_y8, _mm256_mul_ps(R.r[8], eTHo_z8)));
+
+        // Gamma from dot products: cos_gamma = dot(eTHi, eTHor), sin_gamma = dot(ePHi, eTHor)
+        *cos_gamma8 = _mm256_fmadd_ps(eTHi_x8, eTHor_x8, _mm256_fmadd_ps(eTHi_y8, eTHor_y8, _mm256_mul_ps(eTHi_z8, eTHor_z8)));
+        *sin_gamma8 = _mm256_fmadd_ps(ePHi_x8, eTHor_x8, _mm256_mul_ps(ePHi_y8, eTHor_y8));
+    }
+
+    // Signed projection of the element position onto the direction, negated (convention of the channel model)
+    static inline __m256 avx2_compute_distance(
+        __m256 dx8, __m256 dy8, __m256 dz8,  // Rotated direction from avx2_rotate_and_polarize
+        __m256 px8, __m256 py8, __m256 pz8)  // Element position in m
+    {
+        __m256 dot8 = _mm256_fmadd_ps(dx8, px8, _mm256_fmadd_ps(dy8, py8, _mm256_mul_ps(dz8, pz8)));
+        __m256 dx2_8 = _mm256_mul_ps(dx8, dx8);
+        __m256 dy2_8 = _mm256_mul_ps(dy8, dy8);
+        __m256 dz2_8 = _mm256_mul_ps(dz8, dz8);
+        __m256 sgn8 = _fm256_signum_ps(_mm256_fmadd_ps(dot8, dx2_8, _mm256_fmadd_ps(dot8, dy2_8, _mm256_mul_ps(dot8, dz2_8))));
+        __m256 dot2_8 = _mm256_mul_ps(dot8, dot8);
+        return _mm256_xor_ps(
+            _mm256_mul_ps(sgn8, _mm256_sqrt_ps(_mm256_fmadd_ps(dot2_8, dx2_8, _mm256_fmadd_ps(dot2_8, dy2_8, _mm256_mul_ps(dot2_8, dz2_8))))),
+            _mm256_set1_ps(-0.0f)); // negate
+    }
+
+    // Gather 8 doubles by index and convert them to 8 floats; AVX2 gathers only 4 doubles at a time, so the indices are
+    // split into lanes 0-3 (idx_lo) and lanes 4-7 (idx_hi)
+    static inline __m256 gather_d2f(const double *base, __m128i idx_lo, __m128i idx_hi)
+    {
+        return _mm256_set_m128(
+            _mm256_cvtpd_ps(_mm256_i32gather_pd(base, idx_hi, 8)),
+            _mm256_cvtpd_ps(_mm256_i32gather_pd(base, idx_lo, 8)));
+    }
+
+    // Gather the pattern samples at the four bilinear corners (A = Up/Vp, B = Un/Vp, C = Up/Vn, D = Un/Vn; double
+    // patterns are gathered 4 + 4 and converted to float), interpolate them by 6 SLERPs, and rotate the polarization by
+    // gamma from local antenna coordinates to global coordinates
+    template <typename dtype>
+    static inline void avx2_gather_slerp_polrot(
+        __m256i iUp8, __m256i iUn8, __m256i iVp8, __m256i iVn8,     // Azimuth / elevation bracket indices from the grid search
+        __m256 up8, __m256 vp8,                                     // Weights of the lower brackets
+        __m256i offset8, size_t n_elevation,                        // i_element * n_pattern_samples; column stride of the pattern
+        const dtype *p_theta_re, const dtype *p_theta_im,           // e-theta pattern, real / imaginary part
+        const dtype *p_phi_re, const dtype *p_phi_im,               // e-phi pattern, real / imaginary part
+        __m256 cos_gamma8, __m256 sin_gamma8,                       // cos / sin of the polarization rotation angle
+        bool compute_gamma,                                         // Compute gamma8 = atan2(sin_gamma, cos_gamma)
+        __m256 *v_re8, __m256 *v_im8, __m256 *h_re8, __m256 *h_im8, // Output: rotated e-theta (V) and e-phi (H) field
+        __m256 *gamma8)                                             // Output: gamma in rad, only if compute_gamma
+    {
+        // Build gather indices for the 4 bilinear corners
+        const __m256i n_el_i = _mm256_set1_epi32((int)n_elevation);
+
+        __m256i row_up = _mm256_add_epi32(_mm256_mullo_epi32(iUp8, n_el_i), offset8);
+        __m256i row_un = _mm256_add_epi32(_mm256_mullo_epi32(iUn8, n_el_i), offset8);
+        __m256i iA8 = _mm256_add_epi32(row_up, iVp8); // corner A: (az_lower, el_lower)
+        __m256i iB8 = _mm256_add_epi32(row_un, iVp8); // corner B: (az_upper, el_lower)
+        __m256i iC8 = _mm256_add_epi32(row_up, iVn8); // corner C: (az_lower, el_upper)
+        __m256i iD8 = _mm256_add_epi32(row_un, iVn8); // corner D: (az_upper, el_upper)
+
+        // Gather pattern data at all 4 corners, both polarizations
+        __m256 VfAr8, VfAi8, VfBr8, VfBi8, VfCr8, VfCi8, VfDr8, VfDi8;
+        __m256 HfAr8, HfAi8, HfBr8, HfBi8, HfCr8, HfCi8, HfDr8, HfDi8;
+
+        if constexpr (sizeof(dtype) == sizeof(float))
+        {
+            const float *pTHr = (const float *)p_theta_re, *pTHi = (const float *)p_theta_im;
+            const float *pPHr = (const float *)p_phi_re, *pPHi = (const float *)p_phi_im;
+
+            VfAr8 = _mm256_i32gather_ps(pTHr, iA8, 4);
+            VfAi8 = _mm256_i32gather_ps(pTHi, iA8, 4);
+            VfBr8 = _mm256_i32gather_ps(pTHr, iB8, 4);
+            VfBi8 = _mm256_i32gather_ps(pTHi, iB8, 4);
+            VfCr8 = _mm256_i32gather_ps(pTHr, iC8, 4);
+            VfCi8 = _mm256_i32gather_ps(pTHi, iC8, 4);
+            VfDr8 = _mm256_i32gather_ps(pTHr, iD8, 4);
+            VfDi8 = _mm256_i32gather_ps(pTHi, iD8, 4);
+
+            HfAr8 = _mm256_i32gather_ps(pPHr, iA8, 4);
+            HfAi8 = _mm256_i32gather_ps(pPHi, iA8, 4);
+            HfBr8 = _mm256_i32gather_ps(pPHr, iB8, 4);
+            HfBi8 = _mm256_i32gather_ps(pPHi, iB8, 4);
+            HfCr8 = _mm256_i32gather_ps(pPHr, iC8, 4);
+            HfCi8 = _mm256_i32gather_ps(pPHi, iC8, 4);
+            HfDr8 = _mm256_i32gather_ps(pPHr, iD8, 4);
+            HfDi8 = _mm256_i32gather_ps(pPHi, iD8, 4);
+        }
+        else
+        {
+            const double *dTHr = (const double *)p_theta_re, *dTHi = (const double *)p_theta_im;
+            const double *dPHr = (const double *)p_phi_re, *dPHi = (const double *)p_phi_im;
+
+            __m128i iA_lo = _mm256_castsi256_si128(iA8), iA_hi = _mm256_extracti128_si256(iA8, 1);
+            __m128i iB_lo = _mm256_castsi256_si128(iB8), iB_hi = _mm256_extracti128_si256(iB8, 1);
+            __m128i iC_lo = _mm256_castsi256_si128(iC8), iC_hi = _mm256_extracti128_si256(iC8, 1);
+            __m128i iD_lo = _mm256_castsi256_si128(iD8), iD_hi = _mm256_extracti128_si256(iD8, 1);
+
+            VfAr8 = gather_d2f(dTHr, iA_lo, iA_hi);
+            VfAi8 = gather_d2f(dTHi, iA_lo, iA_hi);
+            VfBr8 = gather_d2f(dTHr, iB_lo, iB_hi);
+            VfBi8 = gather_d2f(dTHi, iB_lo, iB_hi);
+            VfCr8 = gather_d2f(dTHr, iC_lo, iC_hi);
+            VfCi8 = gather_d2f(dTHi, iC_lo, iC_hi);
+            VfDr8 = gather_d2f(dTHr, iD_lo, iD_hi);
+            VfDi8 = gather_d2f(dTHi, iD_lo, iD_hi);
+
+            HfAr8 = gather_d2f(dPHr, iA_lo, iA_hi);
+            HfAi8 = gather_d2f(dPHi, iA_lo, iA_hi);
+            HfBr8 = gather_d2f(dPHr, iB_lo, iB_hi);
+            HfBi8 = gather_d2f(dPHi, iB_lo, iB_hi);
+            HfCr8 = gather_d2f(dPHr, iC_lo, iC_hi);
+            HfCi8 = gather_d2f(dPHi, iC_lo, iC_hi);
+            HfDr8 = gather_d2f(dPHr, iD_lo, iD_hi);
+            HfDi8 = gather_d2f(dPHi, iD_lo, iD_hi);
+        }
+
+        // 6× SLERP: bilinear spherical interpolation
+        // Interpolate along azimuth (A↔B, C↔D), then along elevation (E↔F)
+        // zero_if_both_tiny = false: linear interpolation where both amplitudes are tiny, as the generic kernel
+        __m256 VEr8, VEi8, VFr8, VFi8, Vr8, Vi8;
+        _fm256_slerp_complex_ps(VfAr8, VfAi8, VfBr8, VfBi8, up8, &VEr8, &VEi8, false);
+        _fm256_slerp_complex_ps(VfCr8, VfCi8, VfDr8, VfDi8, up8, &VFr8, &VFi8, false);
+        _fm256_slerp_complex_ps(VEr8, VEi8, VFr8, VFi8, vp8, &Vr8, &Vi8, false);
+
+        __m256 HEr8, HEi8, HFr8, HFi8, Hr8, Hi8;
+        _fm256_slerp_complex_ps(HfAr8, HfAi8, HfBr8, HfBi8, up8, &HEr8, &HEi8, false);
+        _fm256_slerp_complex_ps(HfCr8, HfCi8, HfDr8, HfDi8, up8, &HFr8, &HFi8, false);
+        _fm256_slerp_complex_ps(HEr8, HEi8, HFr8, HFi8, vp8, &Hr8, &Hi8, false);
+
+        // Polarization rotation (Jones matrix rotation by gamma)
+        *v_re8 = _mm256_fmsub_ps(cos_gamma8, Vr8, _mm256_mul_ps(sin_gamma8, Hr8));
+        *v_im8 = _mm256_fmsub_ps(cos_gamma8, Vi8, _mm256_mul_ps(sin_gamma8, Hi8));
+        *h_re8 = _mm256_fmadd_ps(sin_gamma8, Vr8, _mm256_mul_ps(cos_gamma8, Hr8));
+        *h_im8 = _mm256_fmadd_ps(sin_gamma8, Vi8, _mm256_mul_ps(cos_gamma8, Hi8));
+
+        // Gamma angle (only if requested by caller)
+        *gamma8 = _mm256_setzero_ps();
+        if (compute_gamma)
+            *gamma8 = _fm256_atan2256_ps(sin_gamma8, cos_gamma8);
+    }
+
+    // Stores the first n (1 to 8) lanes of the complex values re8 + i im8: split (step 1: re[j], im[j]) or interleaved
+    // (step 2: re[2 j], re[2 j + 1], im = re + 1); mask holds the first n lanes (used by the split float stores with n < 8)
+    template <typename dtype>
+    static inline void avx2_store_field(dtype *re, dtype *im, size_t step, size_t n, __m256i mask, __m256 re8, __m256 im8)
+    {
+        if (step == 1)
+        {
+            if constexpr (sizeof(dtype) == sizeof(float))
+            {
+                if (n == 8)
+                    _mm256_storeu_ps((float *)re, re8), _mm256_storeu_ps((float *)im, im8);
+                else
+                    _mm256_maskstore_ps((float *)re, mask, re8), _mm256_maskstore_ps((float *)im, mask, im8);
+            }
+            else if (n == 8)
+            {
+                _mm256_storeu_pd((double *)re, _mm256_cvtps_pd(_mm256_castps256_ps128(re8)));
+                _mm256_storeu_pd((double *)re + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(re8, 1)));
+                _mm256_storeu_pd((double *)im, _mm256_cvtps_pd(_mm256_castps256_ps128(im8)));
+                _mm256_storeu_pd((double *)im + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(im8, 1)));
+            }
+            else
+            {
+                alignas(32) float tmp_re[8], tmp_im[8];
+                _mm256_store_ps(tmp_re, re8), _mm256_store_ps(tmp_im, im8);
+                for (size_t j = 0; j < n; ++j)
+                    re[j] = (dtype)tmp_re[j], im[j] = (dtype)tmp_im[j];
+            }
+            return;
+        }
+
+        // Interleave: lo = (r0 i0 r1 i1 r2 i2 r3 i3), hi = (r4 i4 r5 i5 r6 i6 r7 i7)
+        const __m256 a = _mm256_unpacklo_ps(re8, im8), b = _mm256_unpackhi_ps(re8, im8);
+        const __m256 lo = _mm256_permute2f128_ps(a, b, 0x20), hi = _mm256_permute2f128_ps(a, b, 0x31);
+        if (n == 8)
+        {
+            if constexpr (sizeof(dtype) == sizeof(float))
+                _mm256_storeu_ps((float *)re, lo), _mm256_storeu_ps((float *)re + 8, hi);
+            else
+            {
+                _mm256_storeu_pd((double *)re, _mm256_cvtps_pd(_mm256_castps256_ps128(lo)));
+                _mm256_storeu_pd((double *)re + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(lo, 1)));
+                _mm256_storeu_pd((double *)re + 8, _mm256_cvtps_pd(_mm256_castps256_ps128(hi)));
+                _mm256_storeu_pd((double *)re + 12, _mm256_cvtps_pd(_mm256_extractf128_ps(hi, 1)));
+            }
+        }
+        else
+        {
+            alignas(32) float tmp[16];
+            _mm256_store_ps(tmp, lo), _mm256_store_ps(tmp + 8, hi);
+            for (size_t j = 0; j < 2 * n; ++j)
+                re[j] = (dtype)tmp[j];
+        }
+    }
+
+    // Runs body(i) for i = 0 .. n - 1, as an OpenMP loop only if 'parallel' is true; entering an OpenMP region costs
+    // about 0.5 us even when its if-clause makes it run serially, which dominates calls with few outputs and angles
+    template <typename Body>
+    static inline void avx2_for(long long n, bool parallel, bool dynamic, const Body &body)
+    {
+        if (parallel && dynamic)
+        {
+#pragma omp parallel for schedule(dynamic, 1)
+            for (long long i = 0; i < n; ++i)
+                body(i);
+        }
+        else if (parallel)
+        {
+#pragma omp parallel for schedule(static)
+            for (long long i = 0; i < n; ++i)
+                body(i);
+        }
+        else
+            for (long long i = 0; i < n; ++i)
+                body(i);
+    }
+} // namespace
+
+// Main interpolation function; preconditions in quadriga_lib_avx2_functions.hpp
+
+template <typename dtype>
+void qd_interpolate_pattern_AVX2(const dtype *e_theta_re, const dtype *e_theta_im, const dtype *e_phi_re, const dtype *e_phi_im,
+                                  const size_t n_elevation, const size_t n_azimuth,
+                                  const dtype *azimuth_grid, const dtype *elevation_grid,
+                                  const dtype *azimuth, const dtype *elevation, const size_t n_angle_rows, const size_t n_ang,
+                                  const dtype *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
+                                  const dtype *element_pos, const unsigned long long *i_element, const size_t n_out,
+                                  dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im, const size_t V_step, const size_t H_step,
+                                  dtype *dist, dtype *azimuth_loc, dtype *elevation_loc, dtype *gamma)
+{
+    const size_t n_pattern_samples = n_azimuth * n_elevation; // Number of samples per element
+    const bool per_element_angles = n_angle_rows > 1;
+    const bool per_element_rotation = n_rotation_cols > 1;
+    const bool per_angle_rotation = n_rotation_slices > 1;
+
+    // Pointers for direct memory access
+    const dtype *p_theta_re = e_theta_re, *p_theta_im = e_theta_im;
+    const dtype *p_phi_re = e_phi_re, *p_phi_im = e_phi_im;
+    const dtype *p_az_global = azimuth, *p_el_global = elevation;
+    const dtype *p_azimuth_grid = azimuth_grid, *p_elevation_grid = elevation_grid;
+    const dtype *p_element_pos = element_pos;
+    const unsigned long long *p_i_element = i_element;
+    dtype *p_v_re = V_re, *p_v_im = V_im, *p_h_re = H_re, *p_h_im = H_im;
+    dtype *p_dist = dist, *p_azimuth_loc = azimuth_loc, *p_elevation_loc = elevation_loc, *p_gamma = gamma;
+
+    // All computation is in float, double inputs are converted during the precomputation. The constants are float too,
+    // so that no double epsilon vanishes below float precision.
+    const float two_pi = (float)dtype(6.28318530717958647692528676655900576);
+    const float eps_cubed = FLT_EPSILON * FLT_EPSILON * FLT_EPSILON; // tiny guard for weight computation
+    constexpr float one = 1.0f;
+
+    // Reciprocal grid spacings: 1/(grid[i] - grid[i-1]), used as interpolation weight multipliers
+    qd_avx2_buffer az_step_inv_buf(n_azimuth, sizeof(float)), el_step_inv_buf(n_elevation, sizeof(float));
+    float *az_step_inv = (float *)az_step_inv_buf.ptr, *el_step_inv = (float *)el_step_inv_buf.ptr;
+    *az_step_inv = two_pi - (float)p_azimuth_grid[n_azimuth - 1] + (float)*p_azimuth_grid;
+    *az_step_inv = one / *az_step_inv;
+    *el_step_inv = one;
+    for (size_t a = 1; a < n_azimuth; ++a)
+        az_step_inv[a] = one / ((float)(p_azimuth_grid[a] - p_azimuth_grid[a - 1]));
+    for (size_t a = 1; a < n_elevation; ++a)
+        el_step_inv[a] = one / ((float)(p_elevation_grid[a] - p_elevation_grid[a - 1]));
+
+    // Uniform-grid detection: the step is fitted over the whole grid in double precision, and the grid counts as
+    // uniform when every value lies within 1e-6 rad of the fitted grid; the O(1) index of the grid search is then off
+    // by at most that much (a step from two neighbouring values would carry their rounding into every index). Other
+    // grids use the binary search. Returns 1 / step, or 0 for a grid that is not uniform.
+    auto uniform_step_rinv = [](const dtype *g, size_t n) -> float
+    {
+        const double step = ((double)g[n - 1] - (double)g[0]) / (double)(n - 1);
+        if (!(step > 0.0))
+            return 0.0f;
+        for (size_t i = 1; i + 1 < n; ++i)
+        {
+            const double dev = (double)g[i] - (double)g[0] - (double)i * step;
+            if (dev > 1e-6 || dev < -1e-6)
+                return 0.0f;
+        }
+        return (float)(1.0 / step);
+    };
+    auto bsearch_iters = [](size_t n)
+    {
+        int iters = 0;
+        while ((size_t(1) << iters) < n + 1)
+            ++iters;
+        return iters;
+    };
+    const float az_fmin = (float)p_azimuth_grid[0], az_fmax = (float)p_azimuth_grid[n_azimuth - 1];
+    const float el_fmin = (float)p_elevation_grid[0];
+    const float az_step_rinv = n_azimuth > 1 ? uniform_step_rinv(p_azimuth_grid, n_azimuth) : 0.0f;
+    const float el_step_rinv = n_elevation > 1 ? uniform_step_rinv(p_elevation_grid, n_elevation) : 0.0f;
+    const bool az_uniform = az_step_rinv > 0.0f, el_uniform = el_step_rinv > 0.0f;
+    const int az_bsearch_iters = bsearch_iters(n_azimuth), el_bsearch_iters = bsearch_iters(n_elevation);
+
+    // grid_f is assigned below, once the grid arrays exist
+    AzGridParams az_gp = {nullptr, az_step_inv, n_azimuth, az_uniform,
+                          az_fmin, az_fmax, az_step_rinv, az_bsearch_iters, eps_cubed};
+    ElGridParams el_gp = {nullptr, el_step_inv, n_elevation, el_uniform,
+                          el_fmin, el_step_rinv, el_bsearch_iters, eps_cubed};
+
+    qd_avx2_buffer az_grid_f_buf(n_azimuth + 1, sizeof(float)), el_grid_f_buf(n_elevation + 1, sizeof(float));
+    float *az_grid_f = (float *)az_grid_f_buf.ptr;
+    float *el_grid_f = (float *)el_grid_f_buf.ptr;
+
+    for (size_t a = 0; a < n_azimuth; ++a)
+        az_grid_f[a] = (float)p_azimuth_grid[a];
+    az_grid_f[n_azimuth] = INFINITY;
+    for (size_t a = 0; a < n_elevation; ++a)
+        el_grid_f[a] = (float)p_elevation_grid[a];
+    el_grid_f[n_elevation] = INFINITY;
+
+    az_gp.grid_f = az_grid_f;
+    el_gp.grid_f = el_grid_f;
+
+    // Per-element precompute buffers (O(n_out), fits in L1)
+    const size_t n_out_padded = ((n_out + 7) / 8) * 8;
+    const size_t n_out_vec = n_out_padded / 8;
+
+    // SoA layout: R_elem[9 * n_out_padded], pos_elem[3 * n_out_padded]
+    const size_t elem_floats = 9 * n_out_padded + 3 * n_out_padded;
+    qd_avx2_buffer elem_buf_ptr(elem_floats, sizeof(float));
+    float *elem_buf = (float *)elem_buf_ptr.ptr;
+    float *R_elem = elem_buf;
+    float *pos_elem = elem_buf + 9 * n_out_padded;
+
+    // Precomputed i_element * n_pattern_samples offsets (0-based index, int32)
+    qd_avx2_buffer offset_elem_ptr(n_out_padded, sizeof(int));
+    int *offset_elem = (int *)offset_elem_ptr.ptr;
+
+    // Fill per-element buffers (for the non-per_angle_rotation case, R is constant across angles)
+    for (size_t o = 0; o < n_out; ++o)
+    {
+        const dtype *Rp = &rotation[9 * (per_element_rotation ? o : 0)];
+        for (size_t k = 0; k < 9; ++k)
+            R_elem[k * n_out_padded + o] = (float)Rp[k];
+
+        pos_elem[0 * n_out_padded + o] = (float)p_element_pos[3 * o + 0];
+        pos_elem[1 * n_out_padded + o] = (float)p_element_pos[3 * o + 1];
+        pos_elem[2 * n_out_padded + o] = (float)p_element_pos[3 * o + 2];
+
+        offset_elem[o] = (int)p_i_element[o] * (int)n_pattern_samples;
+    }
+    // Pad [n_out..n_out_padded) with last valid entry
+    for (size_t o = n_out; o < n_out_padded; ++o)
+    {
+        for (size_t k = 0; k < 9; ++k)
+            R_elem[k * n_out_padded + o] = R_elem[k * n_out_padded + n_out - 1];
+        pos_elem[0 * n_out_padded + o] = pos_elem[0 * n_out_padded + n_out - 1];
+        pos_elem[1 * n_out_padded + o] = pos_elem[1 * n_out_padded + n_out - 1];
+        pos_elem[2 * n_out_padded + o] = pos_elem[2 * n_out_padded + n_out - 1];
+        offset_elem[o] = offset_elem[n_out - 1];
+    }
+
+    // Tail mask for masked stores (based on n_out % 8)
+    const int tail = (int)(n_out % 8);
+    __m256i tail_mask;
+    if (tail == 0)
+        tail_mask = _mm256_set1_epi32(-1); // all lanes active
+    else
+    {
+        alignas(32) int32_t tm[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        for (int j = 0; j < tail; ++j)
+            tm[j] = -1;
+        tail_mask = _mm256_load_si256((__m256i *)tm);
+    }
+    const size_t n_valid_tail = (tail == 0) ? 8 : (size_t)tail;
+
+    // Element-vectorized path: n_out >= 8, no per-angle rotation, no per-element angles
+    // Two-level loop: outer over angles (OMP), inner over elements (AVX2, 8 elements/vector)
+    if (!per_angle_rotation && !per_element_angles && n_out >= 8)
+    {
+        avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
+        {
+            // Output base pointers for this angle's column (column-major: column a starts at offset a*n_out)
+            dtype *out_vr = p_v_re + a * n_out * V_step;
+            dtype *out_vi = p_v_im + a * n_out * V_step;
+            dtype *out_hr = p_h_re + a * n_out * H_step;
+            dtype *out_hi = p_h_im + a * n_out * H_step;
+            dtype *out_dist = p_dist ? p_dist + a * n_out : nullptr;
+            dtype *out_az = p_azimuth_loc ? p_azimuth_loc + a * n_out : nullptr;
+            dtype *out_el = p_elevation_loc ? p_elevation_loc + a * n_out : nullptr;
+            dtype *out_gam = p_gamma ? p_gamma + a * n_out : nullptr;
+
+            // Angle-dependent data (computed once per angle, broadcast)
+            float az_a = (float)p_az_global[a];
+            float el_a = (float)p_el_global[a];
+
+            float sAZi_s = std::sin(az_a), cAZi_s = std::cos(az_a);
+            float sELi_s = std::sin(el_a), cELi_s = std::cos(el_a);
+
+            __m256 sAZi8 = _mm256_set1_ps(sAZi_s);
+            __m256 cAZi8 = _mm256_set1_ps(cAZi_s);
+            __m256 sELi8 = _mm256_set1_ps(sELi_s);
+            __m256 cELi8 = _mm256_set1_ps(cELi_s);
+
+            // Inner element loop (AVX2)
+            for (size_t ov = 0; ov < n_out_vec; ++ov)
+            {
+                const size_t o_base = ov * 8;
+                const bool is_tail_iter = (ov == n_out_vec - 1) && (tail != 0);
+                const size_t n_valid = is_tail_iter ? n_valid_tail : 8;
+
+                // Load rotation matrix from per-element SoA buffer
+                RMatrix8 R;
+                for (int k = 0; k < 9; ++k)
+                    R.r[k] = _mm256_loadu_ps(&R_elem[k * n_out_padded + o_base]);
+
+                // Rotation, local angles, polarization angle gamma
+                __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
+                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
+                                         &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
+
+                // Projected distance
+                __m256 dist8 = _mm256_setzero_ps();
+                if (p_dist != nullptr)
+                {
+                    __m256 px8 = _mm256_loadu_ps(&pos_elem[0 * n_out_padded + o_base]);
+                    __m256 py8 = _mm256_loadu_ps(&pos_elem[1 * n_out_padded + o_base]);
+                    __m256 pz8 = _mm256_loadu_ps(&pos_elem[2 * n_out_padded + o_base]);
+                    dist8 = avx2_compute_distance(dx8, dy8, dz8, px8, py8, pz8);
+                }
+
+                // Grid search
+                __m256i iUp8, iUn8, iVp8, iVn8;
+                __m256 up8, vp8;
+                avx2_grid_search_azimuth(az8, az_gp, &iUp8, &iUn8, &up8);
+                avx2_grid_search_elevation(el8, el_gp, &iVp8, &iVn8, &vp8);
+
+                // Gather, SLERP, polarization rotation
+                __m256i offset8 = _mm256_loadu_si256((const __m256i *)&offset_elem[o_base]);
+                __m256 v_re8, v_im8, h_re8, h_im8, gamma8;
+                avx2_gather_slerp_polrot<dtype>(
+                    iUp8, iUn8, iVp8, iVn8, up8, vp8, offset8, n_elevation,
+                    p_theta_re, p_theta_im, p_phi_re, p_phi_im,
+                    cos_gamma8, sin_gamma8, p_gamma != nullptr,
+                    &v_re8, &v_im8, &h_re8, &h_im8, &gamma8);
+
+                // Stores (dtype-dependent)
+                avx2_store_field(out_vr + o_base * V_step, out_vi + o_base * V_step, V_step, n_valid, tail_mask, v_re8, v_im8);
+                avx2_store_field(out_hr + o_base * H_step, out_hi + o_base * H_step, H_step, n_valid, tail_mask, h_re8, h_im8);
+                if constexpr (sizeof(dtype) == sizeof(float))
+                {
+                    if (is_tail_iter)
+                    {
+                        if (out_dist)
+                            _mm256_maskstore_ps((float *)out_dist + o_base, tail_mask, dist8);
+                        if (out_az)
+                            _mm256_maskstore_ps((float *)out_az + o_base, tail_mask, az8);
+                        if (out_el)
+                            _mm256_maskstore_ps((float *)out_el + o_base, tail_mask, el8);
+                        if (out_gam)
+                            _mm256_maskstore_ps((float *)out_gam + o_base, tail_mask, gamma8);
+                    }
+                    else
+                    {
+                        if (out_dist)
+                            _mm256_storeu_ps((float *)out_dist + o_base, dist8);
+                        if (out_az)
+                            _mm256_storeu_ps((float *)out_az + o_base, az8);
+                        if (out_el)
+                            _mm256_storeu_ps((float *)out_el + o_base, el8);
+                        if (out_gam)
+                            _mm256_storeu_ps((float *)out_gam + o_base, gamma8);
+                    }
+                }
+                else
+                {
+                    // Double stores: convert float→double, store as __m256d pairs
+#define STORE_F2D(dst, src, base)                                                                       \
+    do                                                                                                  \
+    {                                                                                                   \
+        _mm256_storeu_pd((double *)(dst) + (base), _mm256_cvtps_pd(_mm256_castps256_ps128(src)));       \
+        _mm256_storeu_pd((double *)(dst) + (base) + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(src, 1))); \
+    } while (0)
+
+                    if (is_tail_iter)
+                    {
+                        alignas(32) float tmp_dist[8], tmp_az[8], tmp_el[8], tmp_gam[8];
+                        if (out_dist)
+                            _mm256_store_ps(tmp_dist, dist8);
+                        _mm256_store_ps(tmp_az, az8);
+                        _mm256_store_ps(tmp_el, el8);
+                        if (out_gam)
+                            _mm256_store_ps(tmp_gam, gamma8);
+
+                        for (size_t j = 0; j < n_valid; ++j)
+                        {
+                            if (out_dist)
+                                out_dist[o_base + j] = (dtype)tmp_dist[j];
+                            if (out_az)
+                                out_az[o_base + j] = (dtype)tmp_az[j];
+                            if (out_el)
+                                out_el[o_base + j] = (dtype)tmp_el[j];
+                            if (out_gam)
+                                out_gam[o_base + j] = (dtype)tmp_gam[j];
+                        }
+                    }
+                    else
+                    {
+                        if (out_dist)
+                            STORE_F2D(out_dist, dist8, o_base);
+                        if (out_az)
+                            STORE_F2D(out_az, az8, o_base);
+                        if (out_el)
+                            STORE_F2D(out_el, el8, o_base);
+                        if (out_gam)
+                            STORE_F2D(out_gam, gamma8, o_base);
+                    }
+
+#undef STORE_F2D
+                }
+            } // end inner element loop
+        }); // end outer angle loop
+    }
+    // Angle-vectorized path: n_out < 8, no per-angle rotation, no per-element angles
+    // One loop over all pairs of element (1–7) and chunk of 8 angles (AVX2, 8 angles/vector)
+    // R, position, offset are broadcast (constant for one element across all angles).
+    // sincos is vectorized across the 8 angles of a chunk.
+    else if (!per_angle_rotation && !per_element_angles)
+    {
+        const size_t n_ang_padded = ((n_ang + 7) / 8) * 8;
+        const long long n_ang_vec = (long long)(n_ang_padded / 8);
+        const int ang_tail = (int)(n_ang % 8);
+        __m256i ang_tail_mask;
+        if (ang_tail == 0)
+            ang_tail_mask = _mm256_set1_epi32(-1);
+        else
+        {
+            alignas(32) int32_t atm[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+            for (int j = 0; j < ang_tail; ++j)
+                atm[j] = -1;
+            ang_tail_mask = _mm256_load_si256((__m256i *)atm);
+        }
+        const size_t n_valid_ang_tail = (ang_tail == 0) ? 8 : (size_t)ang_tail;
+
+        // One parallel region for all elements and angle chunks
+        const long long n_items = (long long)n_out * n_ang_vec;
+        avx2_for(n_items, n_ang_vec >= 16, false, [&](long long item)
+        {
+            const size_t o = (size_t)(item / n_ang_vec);
+            const long long av = item % n_ang_vec;
+
+            // Broadcast per-element data across 8 angle lanes
+            RMatrix8 R;
+            for (int k = 0; k < 9; ++k)
+                R.r[k] = _mm256_set1_ps(R_elem[k * n_out_padded + o]);
+
+            __m256 px_bc = _mm256_set1_ps(pos_elem[0 * n_out_padded + o]);
+            __m256 py_bc = _mm256_set1_ps(pos_elem[1 * n_out_padded + o]);
+            __m256 pz_bc = _mm256_set1_ps(pos_elem[2 * n_out_padded + o]);
+
+            __m256i offset_bc = _mm256_set1_epi32(offset_elem[o]);
+
+            // Chunk of 8 angles (AVX2)
+            {
+                const size_t a_base = (size_t)av * 8;
+                const bool is_ang_tail_iter = (av == n_ang_vec - 1) && (ang_tail != 0);
+                const size_t n_valid = is_ang_tail_iter ? n_valid_ang_tail : 8;
+
+                // Load 8 input angles (contiguous in [1, n_ang] layout)
+                __m256 az_in8, el_in8;
+                if constexpr (sizeof(dtype) == sizeof(float))
+                {
+                    if (is_ang_tail_iter)
+                    {
+                        az_in8 = _mm256_maskload_ps((const float *)p_az_global + a_base, ang_tail_mask);
+                        el_in8 = _mm256_maskload_ps((const float *)p_el_global + a_base, ang_tail_mask);
+                    }
+                    else
+                    {
+                        az_in8 = _mm256_loadu_ps((const float *)p_az_global + a_base);
+                        el_in8 = _mm256_loadu_ps((const float *)p_el_global + a_base);
+                    }
+                }
+                else
+                {
+                    if (is_ang_tail_iter)
+                    {
+                        alignas(32) float az_tmp[8] = {0}, el_tmp[8] = {0};
+                        for (size_t j = 0; j < n_valid; ++j)
+                        {
+                            az_tmp[j] = (float)p_az_global[a_base + j];
+                            el_tmp[j] = (float)p_el_global[a_base + j];
+                        }
+                        az_in8 = _mm256_load_ps(az_tmp);
+                        el_in8 = _mm256_load_ps(el_tmp);
+                    }
+                    else
+                    {
+                        __m256d az_lo = _mm256_loadu_pd((const double *)p_az_global + a_base);
+                        __m256d az_hi = _mm256_loadu_pd((const double *)p_az_global + a_base + 4);
+                        __m256d el_lo = _mm256_loadu_pd((const double *)p_el_global + a_base);
+                        __m256d el_hi = _mm256_loadu_pd((const double *)p_el_global + a_base + 4);
+                        az_in8 = _mm256_set_m128(_mm256_cvtpd_ps(az_hi), _mm256_cvtpd_ps(az_lo));
+                        el_in8 = _mm256_set_m128(_mm256_cvtpd_ps(el_hi), _mm256_cvtpd_ps(el_lo));
+                    }
+                }
+
+                __m256 sAZi8, cAZi8, sELi8, cELi8; // <false>: and / or selection, faster in this kernel
+                _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
+                _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
+
+                // Rotation, local angles, polarization angle gamma
+                __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
+                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
+                                         &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
+
+                // Projected distance
+                __m256 dist8 = _mm256_setzero_ps();
+                if (p_dist != nullptr)
+                    dist8 = avx2_compute_distance(dx8, dy8, dz8, px_bc, py_bc, pz_bc);
+
+                // Grid search
+                __m256i iUp8, iUn8, iVp8, iVn8;
+                __m256 up8, vp8;
+                avx2_grid_search_azimuth(az8, az_gp, &iUp8, &iUn8, &up8);
+                avx2_grid_search_elevation(el8, el_gp, &iVp8, &iVn8, &vp8);
+
+                // Gather, SLERP, polarization rotation
+                __m256 v_re8, v_im8, h_re8, h_im8, gamma8;
+                avx2_gather_slerp_polrot<dtype>(
+                    iUp8, iUn8, iVp8, iVn8, up8, vp8, offset_bc, n_elevation,
+                    p_theta_re, p_theta_im, p_phi_re, p_phi_im,
+                    cos_gamma8, sin_gamma8, p_gamma != nullptr,
+                    &v_re8, &v_im8, &h_re8, &h_im8, &gamma8);
+
+                // Stores: angle-vectorized, strided by n_out
+                // Output layout [n_out, n_ang] col-major: element o, angle a → index o + a * n_out
+                // For n_out == 1: contiguous → vector store
+                // For n_out > 1: extract to temp, scalar scatter
+
+                alignas(32) float tmp_vr[8], tmp_vi[8], tmp_hr[8], tmp_hi[8];
+                alignas(32) float tmp_d[8], tmp_a[8], tmp_e[8], tmp_g[8];
+
+                _mm256_store_ps(tmp_vr, v_re8);
+                _mm256_store_ps(tmp_vi, v_im8);
+                _mm256_store_ps(tmp_hr, h_re8);
+                _mm256_store_ps(tmp_hi, h_im8);
+                if (p_dist)
+                    _mm256_store_ps(tmp_d, dist8);
+                _mm256_store_ps(tmp_a, az8);
+                _mm256_store_ps(tmp_e, el8);
+                if (p_gamma)
+                    _mm256_store_ps(tmp_g, gamma8);
+
+                if (n_out == 1)
+                {
+                    avx2_store_field(p_v_re + a_base * V_step, p_v_im + a_base * V_step, V_step, n_valid, ang_tail_mask, v_re8, v_im8);
+                    avx2_store_field(p_h_re + a_base * H_step, p_h_im + a_base * H_step, H_step, n_valid, ang_tail_mask, h_re8, h_im8);
+                    // Contiguous stores (stride == 1)
+                    if constexpr (sizeof(dtype) == sizeof(float))
+                    {
+                        if (is_ang_tail_iter)
+                        {
+                            if (p_dist)
+                                _mm256_maskstore_ps((float *)p_dist + a_base, ang_tail_mask, dist8);
+                            if (p_azimuth_loc)
+                                _mm256_maskstore_ps((float *)p_azimuth_loc + a_base, ang_tail_mask, az8);
+                            if (p_elevation_loc)
+                                _mm256_maskstore_ps((float *)p_elevation_loc + a_base, ang_tail_mask, el8);
+                            if (p_gamma)
+                                _mm256_maskstore_ps((float *)p_gamma + a_base, ang_tail_mask, gamma8);
+                        }
+                        else
+                        {
+                            if (p_dist)
+                                _mm256_storeu_ps((float *)p_dist + a_base, dist8);
+                            if (p_azimuth_loc)
+                                _mm256_storeu_ps((float *)p_azimuth_loc + a_base, az8);
+                            if (p_elevation_loc)
+                                _mm256_storeu_ps((float *)p_elevation_loc + a_base, el8);
+                            if (p_gamma)
+                                _mm256_storeu_ps((float *)p_gamma + a_base, gamma8);
+                        }
+                    }
+                    else
+                    {
+                        // double, n_out==1: contiguous, convert+store
+#define STORE_F2D_AV(dst, src, base)                                                                    \
+    do                                                                                                  \
+    {                                                                                                   \
+        _mm256_storeu_pd((double *)(dst) + (base), _mm256_cvtps_pd(_mm256_castps256_ps128(src)));       \
+        _mm256_storeu_pd((double *)(dst) + (base) + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(src, 1))); \
+    } while (0)
+
+                        if (is_ang_tail_iter)
+                        {
+                            for (size_t j = 0; j < n_valid; ++j)
+                            {
+                                if (p_dist)
+                                    p_dist[a_base + j] = (dtype)tmp_d[j];
+                                if (p_azimuth_loc)
+                                    p_azimuth_loc[a_base + j] = (dtype)tmp_a[j];
+                                if (p_elevation_loc)
+                                    p_elevation_loc[a_base + j] = (dtype)tmp_e[j];
+                                if (p_gamma)
+                                    p_gamma[a_base + j] = (dtype)tmp_g[j];
+                            }
+                        }
+                        else
+                        {
+                            if (p_dist)
+                                STORE_F2D_AV(p_dist, dist8, a_base);
+                            if (p_azimuth_loc)
+                                STORE_F2D_AV(p_azimuth_loc, az8, a_base);
+                            if (p_elevation_loc)
+                                STORE_F2D_AV(p_elevation_loc, el8, a_base);
+                            if (p_gamma)
+                                STORE_F2D_AV(p_gamma, gamma8, a_base);
+                        }
+
+#undef STORE_F2D_AV
+                    }
+                }
+                else
+                {
+                    // Strided stores (n_out = 2..7): scalar extraction
+                    const size_t n_store = is_ang_tail_iter ? n_valid : 8;
+                    for (size_t j = 0; j < n_store; ++j)
+                    {
+                        const size_t idx = o + (a_base + j) * n_out;
+                        p_v_re[idx * V_step] = (dtype)tmp_vr[j];
+                        p_v_im[idx * V_step] = (dtype)tmp_vi[j];
+                        p_h_re[idx * H_step] = (dtype)tmp_hr[j];
+                        p_h_im[idx * H_step] = (dtype)tmp_hi[j];
+                        if (p_dist)
+                            p_dist[idx] = (dtype)tmp_d[j];
+                        if (p_azimuth_loc)
+                            p_azimuth_loc[idx] = (dtype)tmp_a[j];
+                        if (p_elevation_loc)
+                            p_elevation_loc[idx] = (dtype)tmp_e[j];
+                        if (p_gamma)
+                            p_gamma[idx] = (dtype)tmp_g[j];
+                    }
+                }
+            } // end angle chunk
+        }); // end loop over elements and angle chunks
+    }
+    // General path: per-angle rotation or per-element angles
+    // Two-level loop without angle hoisting (sincos computed per vector iteration)
+    else
+    {
+        avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
+        {
+            // Output base pointers for this angle's column
+            dtype *out_vr = p_v_re + a * n_out * V_step;
+            dtype *out_vi = p_v_im + a * n_out * V_step;
+            dtype *out_hr = p_h_re + a * n_out * H_step;
+            dtype *out_hi = p_h_im + a * n_out * H_step;
+            dtype *out_dist = p_dist ? p_dist + a * n_out : nullptr;
+            dtype *out_az = p_azimuth_loc ? p_azimuth_loc + a * n_out : nullptr;
+            dtype *out_el = p_elevation_loc ? p_elevation_loc + a * n_out : nullptr;
+            dtype *out_gam = p_gamma ? p_gamma + a * n_out : nullptr;
+
+            // Per-angle rotation needs a per-thread R buffer: on the stack for n_out <= 64, else on the heap
+            float *R_this = R_elem;
+            float R_local[9 * 64];
+            qd_avx2_buffer R_heap(n_out_padded > 64 && per_angle_rotation ? 9 * n_out_padded : 0, sizeof(float));
+            float *R_work;
+            if (n_out_padded <= 64)
+                R_work = R_local;
+            else if (per_angle_rotation)
+                R_work = (float *)R_heap.ptr;
+            else
+                R_work = nullptr; // unused
+
+            if (per_angle_rotation)
+            {
+                // Rebuild R buffer for this angle
+                for (size_t o = 0; o < n_out; ++o)
+                {
+                    size_t Rp_o = per_element_rotation ? o : 0;
+                    const dtype *Rp = &rotation[9 * ((size_t)a * n_rotation_cols + Rp_o)];
+                    for (size_t k = 0; k < 9; ++k)
+                        R_work[k * n_out_padded + o] = (float)Rp[k];
+                }
+                for (size_t o = n_out; o < n_out_padded; ++o)
+                    for (size_t k = 0; k < 9; ++k)
+                        R_work[k * n_out_padded + o] = R_work[k * n_out_padded + n_out - 1];
+                R_this = R_work;
+            }
+
+            // Inner element loop (AVX2)
+            for (size_t ov = 0; ov < n_out_vec; ++ov)
+            {
+                const size_t o_base = ov * 8;
+                const bool is_tail_iter = (ov == n_out_vec - 1) && (tail != 0);
+                const size_t n_valid = is_tail_iter ? n_valid_tail : 8;
+
+                // Input angles and their sin / cos
+                __m256 az_in8, el_in8;
+                if (per_element_angles)
+                {
+                    // Load per-element angles for this angle index
+                    // azimuth layout: [n_out, n_ang], column a at offset a*n_out
+                    // In the last, partial block only n_valid values may be read (end of the matrix)
+                    const dtype *az_col = p_az_global + (size_t)a * n_out;
+                    const dtype *el_col = p_el_global + (size_t)a * n_out;
+                    if constexpr (sizeof(dtype) == sizeof(float))
+                    {
+                        if (is_tail_iter)
+                        {
+                            az_in8 = _mm256_maskload_ps((const float *)az_col + o_base, tail_mask);
+                            el_in8 = _mm256_maskload_ps((const float *)el_col + o_base, tail_mask);
+                        }
+                        else
+                        {
+                            az_in8 = _mm256_loadu_ps((const float *)az_col + o_base);
+                            el_in8 = _mm256_loadu_ps((const float *)el_col + o_base);
+                        }
+                    }
+                    else if (is_tail_iter)
+                    {
+                        alignas(32) float az_tmp[8] = {0}, el_tmp[8] = {0};
+                        for (size_t j = 0; j < n_valid; ++j)
+                        {
+                            az_tmp[j] = (float)az_col[o_base + j];
+                            el_tmp[j] = (float)el_col[o_base + j];
+                        }
+                        az_in8 = _mm256_load_ps(az_tmp);
+                        el_in8 = _mm256_load_ps(el_tmp);
+                    }
+                    else
+                    {
+                        // double→float conversion for 8 elements
+                        __m256d az_lo = _mm256_loadu_pd((const double *)az_col + o_base);
+                        __m256d az_hi = _mm256_loadu_pd((const double *)az_col + o_base + 4);
+                        __m256d el_lo = _mm256_loadu_pd((const double *)el_col + o_base);
+                        __m256d el_hi = _mm256_loadu_pd((const double *)el_col + o_base + 4);
+                        az_in8 = _mm256_set_m128(_mm256_cvtpd_ps(az_hi), _mm256_cvtpd_ps(az_lo));
+                        el_in8 = _mm256_set_m128(_mm256_cvtpd_ps(el_hi), _mm256_cvtpd_ps(el_lo));
+                    }
+                }
+                else
+                {
+                    az_in8 = _mm256_set1_ps((float)p_az_global[a]);
+                    el_in8 = _mm256_set1_ps((float)p_el_global[a]);
+                }
+
+                __m256 sAZi8, cAZi8, sELi8, cELi8; // <false>: and / or selection, faster in this kernel
+                _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
+                _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
+
+                // Load rotation matrix from SoA buffer
+                RMatrix8 R;
+                for (int k = 0; k < 9; ++k)
+                    R.r[k] = _mm256_loadu_ps(&R_this[k * n_out_padded + o_base]);
+
+                // Rotation, local angles, polarization angle gamma
+                __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
+                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
+                                         &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
+
+                // Projected distance
+                __m256 dist8 = _mm256_setzero_ps();
+                if (p_dist != nullptr)
+                {
+                    __m256 px8 = _mm256_loadu_ps(&pos_elem[0 * n_out_padded + o_base]);
+                    __m256 py8 = _mm256_loadu_ps(&pos_elem[1 * n_out_padded + o_base]);
+                    __m256 pz8 = _mm256_loadu_ps(&pos_elem[2 * n_out_padded + o_base]);
+                    dist8 = avx2_compute_distance(dx8, dy8, dz8, px8, py8, pz8);
+                }
+
+                // Grid search
+                __m256i iUp8, iUn8, iVp8, iVn8;
+                __m256 up8, vp8;
+                avx2_grid_search_azimuth(az8, az_gp, &iUp8, &iUn8, &up8);
+                avx2_grid_search_elevation(el8, el_gp, &iVp8, &iVn8, &vp8);
+
+                // Gather, SLERP, polarization rotation
+                __m256i offset8 = _mm256_loadu_si256((const __m256i *)&offset_elem[o_base]);
+                __m256 v_re8, v_im8, h_re8, h_im8, gamma8;
+                avx2_gather_slerp_polrot<dtype>(
+                    iUp8, iUn8, iVp8, iVn8, up8, vp8, offset8, n_elevation,
+                    p_theta_re, p_theta_im, p_phi_re, p_phi_im,
+                    cos_gamma8, sin_gamma8, p_gamma != nullptr,
+                    &v_re8, &v_im8, &h_re8, &h_im8, &gamma8);
+
+                // Stores (dtype-dependent)
+                avx2_store_field(out_vr + o_base * V_step, out_vi + o_base * V_step, V_step, n_valid, tail_mask, v_re8, v_im8);
+                avx2_store_field(out_hr + o_base * H_step, out_hi + o_base * H_step, H_step, n_valid, tail_mask, h_re8, h_im8);
+                if constexpr (sizeof(dtype) == sizeof(float))
+                {
+                    if (is_tail_iter)
+                    {
+                        if (out_dist)
+                            _mm256_maskstore_ps((float *)out_dist + o_base, tail_mask, dist8);
+                        if (out_az)
+                            _mm256_maskstore_ps((float *)out_az + o_base, tail_mask, az8);
+                        if (out_el)
+                            _mm256_maskstore_ps((float *)out_el + o_base, tail_mask, el8);
+                        if (out_gam)
+                            _mm256_maskstore_ps((float *)out_gam + o_base, tail_mask, gamma8);
+                    }
+                    else
+                    {
+                        if (out_dist)
+                            _mm256_storeu_ps((float *)out_dist + o_base, dist8);
+                        if (out_az)
+                            _mm256_storeu_ps((float *)out_az + o_base, az8);
+                        if (out_el)
+                            _mm256_storeu_ps((float *)out_el + o_base, el8);
+                        if (out_gam)
+                            _mm256_storeu_ps((float *)out_gam + o_base, gamma8);
+                    }
+                }
+                else
+                {
+#define STORE_F2D(dst, src, base)                                                                       \
+    do                                                                                                  \
+    {                                                                                                   \
+        _mm256_storeu_pd((double *)(dst) + (base), _mm256_cvtps_pd(_mm256_castps256_ps128(src)));       \
+        _mm256_storeu_pd((double *)(dst) + (base) + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(src, 1))); \
+    } while (0)
+
+                    if (is_tail_iter)
+                    {
+                        alignas(32) float tmp_dist[8], tmp_az[8], tmp_el[8], tmp_gam[8];
+                        if (out_dist)
+                            _mm256_store_ps(tmp_dist, dist8);
+                        _mm256_store_ps(tmp_az, az8);
+                        _mm256_store_ps(tmp_el, el8);
+                        if (out_gam)
+                            _mm256_store_ps(tmp_gam, gamma8);
+
+                        for (size_t j = 0; j < n_valid; ++j)
+                        {
+                            if (out_dist)
+                                out_dist[o_base + j] = (dtype)tmp_dist[j];
+                            if (out_az)
+                                out_az[o_base + j] = (dtype)tmp_az[j];
+                            if (out_el)
+                                out_el[o_base + j] = (dtype)tmp_el[j];
+                            if (out_gam)
+                                out_gam[o_base + j] = (dtype)tmp_gam[j];
+                        }
+                    }
+                    else
+                    {
+                        if (out_dist)
+                            STORE_F2D(out_dist, dist8, o_base);
+                        if (out_az)
+                            STORE_F2D(out_az, az8, o_base);
+                        if (out_el)
+                            STORE_F2D(out_el, el8, o_base);
+                        if (out_gam)
+                            STORE_F2D(out_gam, gamma8, o_base);
+                    }
+
+#undef STORE_F2D
+                }
+            } // end inner element loop
+        }); // end outer angle loop (general path)
+    }
+}
+
+template void qd_interpolate_pattern_AVX2(const float *e_theta_re, const float *e_theta_im, const float *e_phi_re, const float *e_phi_im,
+                                           const size_t n_elevation, const size_t n_azimuth,
+                                           const float *azimuth_grid, const float *elevation_grid,
+                                           const float *azimuth, const float *elevation, const size_t n_angle_rows, const size_t n_ang,
+                                           const float *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
+                                           const float *element_pos, const unsigned long long *i_element, const size_t n_out,
+                                           float *V_re, float *V_im, float *H_re, float *H_im, const size_t V_step, const size_t H_step,
+                                           float *dist, float *azimuth_loc, float *elevation_loc, float *gamma);
+
+template void qd_interpolate_pattern_AVX2(const double *e_theta_re, const double *e_theta_im, const double *e_phi_re, const double *e_phi_im,
+                                           const size_t n_elevation, const size_t n_azimuth,
+                                           const double *azimuth_grid, const double *elevation_grid,
+                                           const double *azimuth, const double *elevation, const size_t n_angle_rows, const size_t n_ang,
+                                           const double *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
+                                           const double *element_pos, const unsigned long long *i_element, const size_t n_out,
+                                           double *V_re, double *V_im, double *H_re, double *H_im, const size_t V_step, const size_t H_step,
+                                           double *dist, double *azimuth_loc, double *elevation_loc, double *gamma);
