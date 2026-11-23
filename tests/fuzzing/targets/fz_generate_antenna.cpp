@@ -78,7 +78,7 @@ static void run(fz::input &in)
     const T res = resolution<T>(in);
     const bool c = coarse(res);
 
-    switch (in.ConsumeIntegralInRange<int>(0, 9))
+    switch (in.ConsumeIntegralInRange<int>(0, 10))
     {
     case 0:
         fz::clean([&] { quadriga_lib::generate_antenna<T>("omni", res); });
@@ -104,7 +104,7 @@ static void run(fz::input &in)
         double fc = in.value<double>(), spacing = in.value<double>();
         bool use;
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_antenna<T>("ula", res, fc, {}, {1, N}, {spacing}, {}, {}, {}, {}, fz::opt(use, p)); });
+        fz::clean([&] { quadriga_lib::generate_antenna<T>("ula", res, fc, {}, {1, N}, {spacing}, {}, {}, {}, {}, {}, {}, fz::opt(use, p)); });
         break;
     }
     case 6:
@@ -115,7 +115,7 @@ static void run(fz::input &in)
         double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool use, apply = in.ConsumeBool();
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_antenna<T>("3GPP", res, fc, element, panel, spacing, pol, ports, steer, {}, fz::opt(use, p), false, apply); });
+        fz::clean([&] { quadriga_lib::generate_antenna<T>("3GPP", res, fc, element, panel, spacing, pol, ports, steer, {}, {}, {}, fz::opt(use, p), false, apply); });
         break;
     }
     case 7:
@@ -125,20 +125,32 @@ static void run(fz::input &in)
         arma::mat beams = in.mat<double>(in.size(4), in.size(4));
         double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool separate = in.ConsumeBool(), apply = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::generate_antenna<T>("multibeam", res, fc, element, panel, spacing, pol, {}, {}, beams, {}, separate, apply); });
+        fz::clean([&] { quadriga_lib::generate_antenna<T>("multibeam", res, fc, element, panel, spacing, pol, {}, {}, beams, {}, {}, {}, separate, apply); });
         break;
     }
     case 8:
     {
-        const char *types[] = {"omni", "xpol", "dipole", "short-dipole", "half-wave-dipole", "custom", "ula", "3GPP", "3gpp", "multibeam"};
-        std::string type = in.ConsumeIntegralInRange<int>(0, 15) != 0 ? types[in.ConsumeIntegralInRange<int>(0, 9)] : in.ConsumeRandomLengthString(12);
+        const char *types[] = {"omni", "xpol", "dipole", "short-dipole", "half-wave-dipole", "custom", "ula", "3GPP", "3gpp", "multibeam", "3GPP-UT", "3GPP-CPE"};
+        std::string type = in.ConsumeIntegralInRange<int>(0, 15) != 0 ? types[in.ConsumeIntegralInRange<int>(0, 11)] : in.ConsumeRandomLengthString(12);
         arma::uvec panel = utuple(in, 4, c ? 3 : 1), ports = utuple(in, 2, 3), pol = utuple(in, 2, 7);
         arma::vec spacing = vtuple(in, 4), element = vtuple(in, 5);
         arma::mat steer = in.mat<double>(in.size(3), in.size(3)), beams = in.mat<double>(in.size(4), in.size(4));
         double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
         bool use, separate = in.ConsumeBool(), apply = in.ConsumeBool();
         quadriga_lib::arrayant<T> p = pattern<T>(in, use);
-        fz::clean([&] { quadriga_lib::generate_antenna<T>(type, res, fc, element, panel, spacing, pol, ports, steer, beams, fz::opt(use, p), separate, apply); });
+        fz::clean([&] { quadriga_lib::generate_antenna<T>(type, res, fc, element, panel, spacing, pol, ports, steer, beams, {}, {}, fz::opt(use, p), separate, apply); });
+        break;
+    }
+    case 9:
+    {
+        const char *types[] = {"3GPP-UT", "3gpp-ut", "3GPP-CPE", "3gpp-cpe"};
+        arma::uvec pol = utuple(in, 2, 7), locations = utuple(in, c ? 10 : 2, 10);
+        arma::vec element = vtuple(in, 5), device_size = vtuple(in, 3);
+        double fc = in.ConsumeBool() ? 3.5e9 : in.value<double>();
+        bool use;
+        quadriga_lib::arrayant<T> p = pattern<T>(in, use);
+        const char *type = types[in.ConsumeIntegralInRange<int>(0, 3)];
+        fz::clean([&] { quadriga_lib::generate_antenna<T>(type, res, fc, element, {}, {}, pol, {}, {}, {}, device_size, locations, fz::opt(use, p)); });
         break;
     }
     default:

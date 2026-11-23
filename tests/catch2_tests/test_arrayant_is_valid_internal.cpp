@@ -236,7 +236,7 @@ TEST_CASE("Arrayant quick check - Generated antennas are marked")
         for (arma::uword M : {1ULL, 2ULL, 4ULL})
             for (bool sep : {false, true})
             {
-                auto a = quadriga_lib::generate_antenna<double>("multibeam", 10.0, 3.0e9, {}, {M, 2}, {}, {pol}, {}, {}, beams, {}, sep);
+                auto a = quadriga_lib::generate_antenna<double>("multibeam", 10.0, 3.0e9, {}, {M, 2}, {}, {pol}, {}, {}, beams, {}, {}, {}, sep);
                 CHECK(qd_arrayant_cache_matches(a));
             }
     CHECK(qd_arrayant_cache_matches(quadriga_lib::generate_antenna<double>("omni", 10.0)));

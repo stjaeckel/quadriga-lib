@@ -320,13 +320,13 @@ TEST_CASE("generate_antenna 3GPP - Model-2 follows eq. 7.3-4 and 7.3-5")
     // with pol = 1 uses it as given
     auto p = quadriga_lib::generate_antenna<double>("omni", 10.0);
     p.e_theta_re.fill(0.36), p.e_theta_im.fill(0.48), p.e_phi_im.fill(0.8);
-    const auto m2 = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {3, 2}, {}, {}, {}, p);
+    const auto m2 = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {3, 2}, {}, {}, {}, {}, {}, p);
     REQUIRE(m2.n_elements() == 2);
     CHECK(arma::abs(m2.e_theta_re - s).max() < 1e-12);
     CHECK(arma::abs(m2.e_phi_re.slice(0) - s).max() < 1e-12);
     CHECK(arma::abs(m2.e_phi_re.slice(1) + s).max() < 1e-12);
     CHECK(arma::abs(m2.e_theta_im).max() + arma::abs(m2.e_phi_im).max() == 0.0);
-    const auto m1 = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 1}, {}, {}, {}, p);
+    const auto m1 = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 1}, {}, {}, {}, {}, {}, p);
     p.center_freq = 3.5e9;
     CHECK(max_diff(m1, p) == 0.0);
 }
@@ -400,7 +400,7 @@ TEST_CASE("generate_antenna 3GPP - kept elements with coupling equal the combine
     const arma::mat steer = {{10.0, 20.0}, {-5.0, -30.0}};
     const double fc = 3.5e9, k = 2.0 * arma::datum::pi * fc / 299792458.0;
     const auto kept = quadriga_lib::generate_antenna<double>("3GPP", 10.0, fc, {}, panel, spacing, pol, ports, steer);
-    const auto comb = quadriga_lib::generate_antenna<double>("3GPP", 10.0, fc, {}, panel, spacing, pol, ports, steer, {}, {}, false, true);
+    const auto comb = quadriga_lib::generate_antenna<double>("3GPP", 10.0, fc, {}, panel, spacing, pol, ports, steer, {}, {}, {}, {}, false, true);
     REQUIRE(kept.n_elements() == 64);
     REQUIRE(kept.n_ports() == 16);
     REQUIRE(comb.n_elements() == 16);
@@ -437,7 +437,7 @@ TEST_CASE("generate_antenna 3GPP - a positive electrical tilt points the beam do
 {
     // A positive electrical tilt is a downtilt (TR 38.901): 8 vertical elements combined into one port with tilt 10
     // degree, the main beam at elevation -10 degree
-    const auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {8}, {}, {}, {1}, {10.0}, {}, {}, false, true);
+    const auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {8}, {}, {}, {1}, {10.0}, {}, {}, {}, {}, false, true);
     REQUIRE(ant.n_elements() == 1);
     double el, az;
     peak_direction(ant, 0, el, az);
@@ -448,7 +448,7 @@ TEST_CASE("generate_antenna 3GPP - a positive pan turns the beam towards +y")
 {
     // 8 columns of omni elements combined into one port (N_P = 1) with pan 20 degree: the main beam at azimuth +20 degree
     const auto omni = quadriga_lib::generate_antenna<double>("omni", 1.0);
-    const auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {1, 8}, {}, {}, {0, 1}, {0.0, 20.0}, {}, omni, false, true);
+    const auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {1, 8}, {}, {}, {0, 1}, {0.0, 20.0}, {}, {}, {}, omni, false, true);
     REQUIRE(ant.n_elements() == 1);
     double el, az;
     peak_direction(ant, 0, el, az);
@@ -462,9 +462,9 @@ TEST_CASE("generate_antenna 3GPP - each panel has its own steering row")
     // beams point to elevation -10 and +20 degree from the same position
     const auto omni = quadriga_lib::generate_antenna<double>("omni", 1.0), omni_10 = quadriga_lib::generate_antenna<double>("omni", 10.0);
     const arma::mat steer = {{10.0, 0.0}, {-20.0, 0.0}};
-    const auto kept = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {8, 1, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {}, {1}, steer, {}, omni_10);
+    const auto kept = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {8, 1, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {}, {1}, steer, {}, {}, {}, omni_10);
     CHECK(arma::approx_equal(kept.element_pos.cols(0, 7), kept.element_pos.cols(8, 15), "absdiff", 0.0));
-    const auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {8, 1, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {}, {1}, steer, {}, omni, false, true);
+    const auto ant = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {8, 1, 1, 2}, {0.5, 0.5, 0.0, 0.0}, {}, {1}, steer, {}, {}, {}, omni, false, true);
     REQUIRE(ant.n_elements() == 2);
     CHECK(arma::abs(ant.element_pos).max() < 1e-12 * 0.3);
     double el, az;
@@ -540,7 +540,7 @@ TEST_CASE("generate_antenna ula - ULA and 3GPP ignore positions and coupling of 
     p.center_freq = 1e9;
 
     const double lambda = 299792458.0 / 3e9;
-    auto u = quadriga_lib::generate_antenna<double>("ula", 1.0, 3e9, {}, {1, 2}, {0.5}, {}, {}, {}, {}, p);
+    auto u = quadriga_lib::generate_antenna<double>("ula", 1.0, 3e9, {}, {1, 2}, {0.5}, {}, {}, {}, {}, {}, {}, p);
     CHECK(u.n_elements() == 4);
     CHECK(u.n_ports() == 4);
     CHECK(arma::approx_equal(u.port_weights_re, arma::mat(4, 4, arma::fill::eye), "absdiff", 0.0));
@@ -551,14 +551,14 @@ TEST_CASE("generate_antenna ula - ULA and 3GPP ignore positions and coupling of 
     CHECK(arma::approx_equal(u.element_pos.row(1), y, "absdiff", 1e-12));
     CHECK(u.center_freq == 3e9);
 
-    auto g = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3e9, {}, {}, {}, {}, {}, {}, {}, p);
+    auto g = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, p);
     CHECK(g.n_elements() == 2);
     CHECK(g.n_ports() == 2);
     CHECK(arma::approx_equal(g.port_weights_re, arma::mat(2, 2, arma::fill::eye), "absdiff", 0.0));
     CHECK(arma::all(arma::vectorise(g.element_pos) == 0.0));
 
     // Vertical stacking: z positions come from the array geometry only
-    auto g2 = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3e9, {}, {2}, {}, {}, {}, {}, {}, p);
+    auto g2 = quadriga_lib::generate_antenna<double>("3GPP", 1.0, 3e9, {}, {2}, {}, {}, {}, {}, {}, {}, {}, p);
     CHECK(g2.n_elements() == 4);
     CHECK(g2.n_ports() == 4);
     CHECK(arma::all(g2.element_pos.row(0) == 0.0));
@@ -652,13 +652,13 @@ TEST_CASE("generate_antenna 3GPP - input validation")
     SECTION("pattern")
     {
         auto p = quadriga_lib::generate_antenna<double>("omni", 10.0);
-        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 3.5e9, {65.0}, {}, {}, {}, {}, {}, {}, p), "Inputs 'element' and 'pattern' cannot be given together.");
+        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 3.5e9, {65.0}, {}, {}, {}, {}, {}, {}, {}, {}, p), "Inputs 'element' and 'pattern' cannot be given together.");
         quadriga_lib::copy_element(p, 0, {1});
-        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {2}, {}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
-        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 2}, {}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
-        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 1e-300, {}, {2}, {}, {}, {}, {}, {}, p), "Inputs 'spacing' and 'center_freq' give non-finite element positions.");
+        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {2}, {}, {}, {}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
+        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {1, 2}, {}, {}, {}, {}, {}, p), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
+        CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 1.0, 1e-300, {}, {2}, {}, {}, {}, {}, {}, {}, {}, p), "Inputs 'spacing' and 'center_freq' give non-finite element positions.");
         p.azimuth_grid.resize(3);
-        CHECK_THROWS_AS(generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {}, {}, {}, {}, p), std::invalid_argument);
+        CHECK_THROWS_AS(generate_antenna<double>("3GPP", 1.0, 3.5e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, p), std::invalid_argument);
     }
 }
 
@@ -724,7 +724,7 @@ TEST_CASE("generate_antenna - aliases, default resolution and center frequency")
     const arma::mat beams = {{10.0, -20.0}, {0.0, 5.0}};
     for (const std::string type : {"omni", "xpol", "dipole", "half-wave-dipole", "custom", "ula", "3GPP"})
         CHECK(generate_antenna<double>(type, 10.0, fc).center_freq == fc);
-    CHECK(generate_antenna<double>("multibeam", 10.0, fc, {}, {2, 2}, {}, {2}, {}, {}, beams, {}, true).center_freq == fc);
+    CHECK(generate_antenna<double>("multibeam", 10.0, fc, {}, {2, 2}, {}, {2}, {}, {}, beams, {}, {}, {}, true).center_freq == fc);
     CHECK(generate_antenna<float>("omni").center_freq == 299792458.0f);
 }
 
@@ -733,7 +733,7 @@ TEST_CASE("generate_antenna - input validation")
     using quadriga_lib::generate_antenna;
     const auto p = quadriga_lib::generate_antenna<double>("omni", 10.0);
     const arma::mat beams = column({0.0, 0.0});
-    REQUIRE_NOTHROW(generate_antenna<double>("3GPP", 30.0, 3.5e9, {}, {2}, {0.5}, {3}, {1}, {5.0}, {}, p, false, true));
+    REQUIRE_NOTHROW(generate_antenna<double>("3GPP", 30.0, 3.5e9, {}, {2}, {0.5}, {3}, {1}, {5.0}, {}, {}, {}, p, false, true));
 
     SECTION("type")
     {
@@ -748,10 +748,10 @@ TEST_CASE("generate_antenna - input validation")
         CHECK_THROWS_WITH(generate_antenna<double>("custom", 10.0, 3e9, {}, {}, {}, {1}), "Input 'pol' is not used by type 'custom'.");
         CHECK_THROWS_WITH(generate_antenna<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {5.0}), "Input 'steer' is not used by type 'multibeam'.");
         CHECK_THROWS_WITH(generate_antenna<double>("ula", 10.0, 3e9, {65.0}), "Input 'element' is not used by type 'ula'.");
-        CHECK_THROWS_WITH(generate_antenna<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, p), "Input 'pattern' is not used by type 'multibeam'.");
+        CHECK_THROWS_WITH(generate_antenna<double>("multibeam", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, p), "Input 'pattern' is not used by type 'multibeam'.");
         CHECK_THROWS_WITH(generate_antenna<double>("3GPP", 10.0, 3e9, {}, {}, {}, {}, {}, {}, beams), "Input 'beams' is not used by type '3GPP'.");
-        CHECK_THROWS_WITH(generate_antenna<double>("ula", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, true), "Input 'separate_beams' is not used by type 'ula'.");
-        CHECK_THROWS_WITH(generate_antenna<double>("half-wave-dipole", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, false, true),
+        CHECK_THROWS_WITH(generate_antenna<double>("ula", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, true), "Input 'separate_beams' is not used by type 'ula'.");
+        CHECK_THROWS_WITH(generate_antenna<double>("half-wave-dipole", 10.0, 3e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, false, true),
                           "Input 'apply_weights' is not used by type 'half-wave-dipole'.");
     }
     SECTION("center_freq")
@@ -820,14 +820,14 @@ TEST_CASE("generate_antenna multibeam - beams, weights, ports and polarization")
     CHECK(max_diff(a3, quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3w)) == 0.0);
     CHECK(max_diff(quadriga_lib::generate_antenna<double>("multibeam", 1.0, fc, {}, {2, 2}), quadriga_lib::generate_antenna<double>("multibeam", 1.0, fc, {}, {2, 2}, {}, {}, {}, {}, column({0.0, 0.0, 1.0}))) == 0.0);
 
-    const auto s = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3, {}, true);
+    const auto s = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3, {}, {}, {}, true);
     CHECK(s.n_elements() == 36);
     CHECK(s.n_ports() == 3);
 
     for (bool sep : {false, true})
     {
-        const auto v = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {3, 2}, {}, {}, {}, {}, b3, {}, sep);
-        const auto x = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {3, 2}, {}, {3, 2}, {}, {}, b3, {}, sep);
+        const auto v = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {3, 2}, {}, {}, {}, {}, b3, {}, {}, {}, sep);
+        const auto x = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {3, 2}, {}, {3, 2}, {}, {}, b3, {}, {}, {}, sep);
         REQUIRE(x.n_elements() == 12);
         REQUIRE(x.n_ports() == 2 * v.n_ports());
         for (arma::uword e = 0; e < 6; ++e)
@@ -842,7 +842,7 @@ TEST_CASE("generate_antenna multibeam - beams, weights, ports and polarization")
     }
 
     // apply_weights: one pattern per port
-    const auto c = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3, {}, false, true);
+    const auto c = quadriga_lib::generate_antenna<double>("multibeam", 15.0, fc, {}, {6, 6}, {0.4}, {}, {}, {}, b3, {}, {}, {}, false, true);
     CHECK(c.n_elements() == 1);
     CHECK(max_diff(c, quadriga_lib::apply_port_weights(a3)) < 1e-12 * arma::abs(c.e_theta_re).max());
 
@@ -873,7 +873,7 @@ TEST_CASE("generate_antenna multibeam - beams towards the poles")
         }
 
     // Separate beams, one of them towards the zenith
-    auto b = quadriga_lib::generate_antenna<double>("multibeam", 10.0, 3e9, {}, {2, 2}, {}, {2}, {}, {}, arma::mat{{0.0, 30.0}, {90.0, 0.0}}, {}, true);
+    auto b = quadriga_lib::generate_antenna<double>("multibeam", 10.0, 3e9, {}, {2, 2}, {}, {2}, {}, {}, arma::mat{{0.0, 30.0}, {90.0, 0.0}}, {}, {}, {}, true);
     CHECK(b.n_elements() == 8);
     CHECK(b.n_ports() == 4);
     CHECK(b.is_valid().empty());
@@ -916,4 +916,247 @@ TEST_CASE("generate_antenna half-wave-dipole - pattern equals cos(pi/2 sin(el)) 
         CHECK(std::abs(d.e_theta_re(i, 7, 0)) < 1e-12); // Limit 0 at the poles
         CHECK(std::abs(f.e_theta_re(i, 7, 0)) < 1e-6f);
     }
+}
+
+// Handheld UT field of TR 38.901 eq. 7.3-6 to 7.3-8 (beta = 0) with the Table 7.3-2 element at (theta, phi) in rad, for
+// bearing alpha and roll gamma; 'second' is the phi'' field pattern; false on the z'' axis, where psi is undefined
+static bool ut_field(double theta, double phi, double alpha, double gamma, bool second, double &F_theta, double &F_phi)
+{
+    const double rad2deg = 180.0 / arma::datum::pi, cg = std::cos(gamma), sg = std::sin(gamma), dp = phi - alpha;
+    const double x = std::sin(theta) * std::cos(dp), y = std::sin(theta) * std::sin(dp), z = std::cos(theta);
+    const double y2 = cg * y + sg * z, z2 = std::min(1.0, std::max(-1.0, cg * z - sg * y)); // eq. 7.1-7, 7.1-8
+    const double den = std::sqrt(1.0 - z2 * z2);
+    if (den < 1e-6)
+        return false;
+    const double cos_psi = (cg * std::sin(theta) + sg * std::sin(dp) * z) / den, sin_psi = sg * std::cos(dp) / den;
+    const double A_V = std::min(12.0 * std::pow((std::acos(z2) * rad2deg - 90.0) / 125.0, 2.0), 22.5);
+    const double A_H = std::min(12.0 * std::pow(std::atan2(y2, x) * rad2deg / 125.0, 2.0), 22.5);
+    const double F = std::pow(10.0, (5.3 - std::min(A_V + A_H, 22.5)) / 20.0);
+    F_theta = second ? -sin_psi * F : cos_psi * F, F_phi = second ? cos_psi * F : sin_psi * F;
+    return true;
+}
+
+// Largest field error of element e against ut_field over the grid; sign = -1 compares with the negated field
+static double ut_field_error(const quadriga_lib::arrayant<double> &ant, arma::uword e, double alpha, double gamma, bool second, double sign = 1.0)
+{
+    double d = 0.0;
+    for (arma::uword j = 0; j < ant.n_azimuth(); ++j)
+        for (arma::uword i = 0; i < ant.n_elevation(); ++i)
+        {
+            double F_t, F_p;
+            if (ut_field(0.5 * arma::datum::pi - ant.elevation_grid(i), ant.azimuth_grid(j), alpha, gamma, second, F_t, F_p))
+                d = std::max(d, std::hypot(ant.e_theta_re(i, j, e) - sign * F_t, ant.e_phi_re(i, j, e) - sign * F_p));
+        }
+    return d;
+}
+
+TEST_CASE("generate_antenna 3GPP-UT - positions and fields of Tables A.6-1 and A.6-2")
+{
+    const double x_cm[8] = {-7.5, 0.0, 7.5, 7.5, 7.5, 0.0, -7.5, -7.5}, y_cm[8] = {-3.5, -3.5, -3.5, 0.0, 3.5, 3.5, 3.5, 0.0};
+    const double bearing[8] = {-155.0, -90.0, -25.0, 0.0, 25.0, 90.0, 155.0, 180.0}, deg2rad = arma::datum::pi / 180.0;
+    for (arma::uword P : {1, 2})
+    {
+        const auto ant = quadriga_lib::generate_antenna<double>("3GPP-UT", 5.0, 7.0e9, {}, {}, {}, {P});
+        REQUIRE(ant.n_elements() == 8 * P);
+        CHECK(ant.name == "3gpp-ut");
+        CHECK(arma::abs(ant.port_weights_re - arma::eye(8 * P, 8 * P)).max() == 0.0);
+        double d_field = 0.0;
+        for (arma::uword e = 0; e < 8 * P; ++e)
+        {
+            const arma::uword u = e / P;
+            CHECK(std::abs(ant.element_pos(0, e) - 0.01 * x_cm[u]) < 1e-12);
+            CHECK(std::abs(ant.element_pos(1, e) - 0.01 * y_cm[u]) < 1e-12);
+            CHECK(ant.element_pos(2, e) == 0.0);
+            const double alpha = std::atan2(y_cm[u], x_cm[u]); // Within 0.05 degree of the rounded table value
+            CHECK(std::abs(alpha / deg2rad - bearing[u]) < 0.05);
+            d_field = std::max(d_field, ut_field_error(ant, e, alpha, (P == 1 ? 90.0 : 45.0) * deg2rad, e % P == 1));
+        }
+        INFO("P = " << P);
+        CHECK(d_field < 0.01); // Interpolation of the rotation on the 5 degree grid; the peak is 1.84
+    }
+}
+
+TEST_CASE("generate_antenna 3GPP-UT - published calibration values")
+{
+    // F_theta' and F_phi' of the antennas 1 to 8 in the UT LCS, Table 7.8-2A metric 5, Config D: results of InterDigital
+    // in 3GPP R1-2506406 (Calibration_UTant); [theta, phi] in degree
+    const double ref[8][4] = {
+        {45, 15, 0.0458130303, -0.3668065343},
+        {50, 55, 0.1443569292, -0.3207327858},
+        {55, 95, 0.2687239569, -0.2706762346},
+        {60, 135, 0.1258446118, -0.2516892236},
+        {65, 175, 0.0535240607, -0.2192127212},
+        {70, 215, 0.0940772519, -0.1926015243},
+        {75, 255, 0.2522915276, -0.1721763073},
+        {80, 295, 0.0505436807, -0.1357279167},};
+    const auto ant = quadriga_lib::generate_antenna<double>("3GPP-UT", 1.0, 7.0e9);
+    for (arma::uword u = 0; u < 8; ++u)
+    {
+        const arma::uword i = arma::uword(90.0 - ref[u][0] + 90.0), j = (arma::uword(ref[u][1]) + 180) % 360;
+        INFO("antenna " << u + 1);
+        CHECK(std::abs(ant.e_theta_re(i, j, u) - ref[u][2]) < 1e-4);
+        CHECK(std::abs(ant.e_phi_re(i, j, u) - ref[u][3]) < 1e-4);
+    }
+}
+
+TEST_CASE("generate_antenna 3GPP-UT - locations, device size, polarization and fill rules")
+{
+    const double n = qd_nan;
+    const auto all = quadriga_lib::generate_antenna<double>("3GPP-UT", 10.0, 7.0e9);
+    const auto call = [](const arma::vec &element, const arma::uvec &pol, const arma::vec &size, const arma::uvec &loc)
+    { return quadriga_lib::generate_antenna<double>("3GPP-UT", 10.0, 7.0e9, element, {}, {}, pol, {}, {}, {}, size, loc); };
+
+    SECTION("Locations keep the caller's order, repeats are separate antennas")
+    {
+        const arma::uvec loc = {1, 7, 3, 5, 7};
+        const auto a = call({}, {}, {}, loc);
+        REQUIRE(a.n_elements() == 5);
+        for (arma::uword l = 0; l < 5; ++l)
+        {
+            CHECK(arma::abs(a.e_theta_re.slice(l) - all.e_theta_re.slice(loc[l] - 1)).max() == 0.0);
+            CHECK(arma::abs(a.element_pos.col(l) - all.element_pos.col(loc[l] - 1)).max() == 0.0);
+        }
+        CHECK(arma::abs(a.port_weights_re - arma::eye(5, 5)).max() == 0.0);
+    }
+    SECTION("Omitted, default-coded and explicit inputs agree exactly")
+    {
+        for (const auto &a : {call({n, n, n, n}, {0, 0}, {n, n, n}, {}), call({125.0, 125.0, 22.5, 22.5, 5.3}, {1, 1}, {0.15, 0.07, 0.0}, {1, 2, 3, 4, 5, 6, 7, 8})})
+            CHECK(max_diff(a, all) == 0.0);
+    }
+    SECTION("The device size sets positions and bearings")
+    {
+        const auto a = call({}, {}, {0.2, 0.1}, {5});
+        CHECK(std::abs(a.element_pos(0, 0) - 0.1) < 1e-12);
+        CHECK(std::abs(a.element_pos(1, 0) - 0.05) < 1e-12);
+        CHECK(ut_field_error(a, 0, std::atan2(0.05, 0.1), 0.5 * arma::datum::pi, false) < 0.015); // Interpolation on the 10 degree grid
+    }
+    SECTION("Model-1 and Model-2 agree for one field pattern, Model-1 keeps a custom field")
+    {
+        CHECK(max_diff(call({}, {1, 2}, {}, {}), all) < 1e-12);
+        auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
+        omni.e_theta_im = omni.e_theta_re;
+        const auto call_p = [&](const arma::uvec &pol)
+        { return quadriga_lib::generate_antenna<double>("3GPP-UT", 10.0, 7.0e9, {}, {}, {}, pol, {}, {}, {}, {}, {4}, omni); };
+        CHECK(arma::abs(call_p({1, 2}).e_theta_im).max() == 0.0);
+        CHECK(arma::abs(call_p({1, 1}).e_theta_im).max() > 0.5);
+        CHECK(max_diff(call_p({}), call_p({1, 1})) == 0.0); // The default keeps the given fields
+    }
+    SECTION("The roll follows the polarization and the model default")
+    {
+        CHECK(max_diff(call({}, {3}, {}, {4}), call({}, {3, 2}, {}, {4})) == 0.0);
+        for (arma::uword p : {2, 3})
+        {
+            auto ref = quadriga_lib::generate_antenna<double>("3GPP", 10.0, 7.0e9, {125.0, 125.0, 22.5, 22.5, 5.3}, {}, {}, {p, 1});
+            quadriga_lib::rotate_pattern(ref, arma::vec{(p == 2 ? 0.25 : 0.5) * arma::datum::pi, 0.0, 0.0}, 3);
+            const auto a = call({}, {p, 1}, {}, {4});
+            CHECK(arma::abs(a.e_theta_re - ref.e_theta_re).max() < 1e-12);
+            CHECK(arma::abs(a.e_phi_re - ref.e_phi_re).max() < 1e-12);
+        }
+    }
+    SECTION("A pattern on an irregular grid is resampled before it is turned")
+    {
+        const double d2r = arma::datum::pi / 180.0;
+        quadriga_lib::arrayant<double> p; // 40 degree beam
+        p.azimuth_grid = arma::vec{-180, -120, -60, -30, -20, -10, 0, 10, 20, 30, 60, 120, 180} * d2r;
+        p.elevation_grid = arma::vec{-90, -45, -20, -10, 0, 10, 20, 45, 90} * d2r;
+        p.e_theta_re.set_size(9, 13, 1);
+        for (arma::uword j = 0; j < 13; ++j)
+            for (arma::uword i = 0; i < 9; ++i)
+                p.e_theta_re(i, j, 0) = std::pow(10.0, -0.6 * (std::pow(p.azimuth_grid(j) / d2r / 40.0, 2.0) + std::pow(p.elevation_grid(i) / d2r / 40.0, 2.0)) / 1.0);
+        p.e_theta_im.zeros(9, 13, 1), p.e_phi_re.zeros(9, 13, 1), p.e_phi_im.zeros(9, 13, 1);
+        const auto a = quadriga_lib::generate_antenna<double>("3GPP-UT", 10.0, 7.0e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, p);
+        REQUIRE(a.n_elements() == 8);
+        const arma::uword i0 = arma::index_min(arma::abs(a.elevation_grid));
+        for (arma::uword e = 0; e < 8; ++e)
+        {
+            const double bearing = std::atan2(a.element_pos(1, e), a.element_pos(0, e));
+            const arma::uword j0 = arma::index_min(arma::abs(a.azimuth_grid - bearing));
+            INFO("antenna " << e + 1);
+            CHECK(std::hypot(a.e_theta_re(i0, j0, e), a.e_phi_re(i0, j0, e)) > std::pow(10.0, -1.0 / 20.0)); // Within 1 dB of the peak
+        }
+
+        quadriga_lib::arrayant<double> one; // A single sample is the isotropic element
+        one.azimuth_grid = arma::vec{0.0}, one.elevation_grid = arma::vec{0.0};
+        one.e_theta_re.ones(1, 1, 1), one.e_theta_im.zeros(1, 1, 1), one.e_phi_re.zeros(1, 1, 1), one.e_phi_im.zeros(1, 1, 1);
+        const auto b = quadriga_lib::generate_antenna<double>("3GPP-UT", 10.0, 7.0e9, {}, {}, {}, {}, {}, {}, {}, {}, {6}, one);
+        const arma::uword ib = arma::index_min(arma::abs(b.elevation_grid)), jb = arma::index_min(arma::abs(b.azimuth_grid - 0.5 * arma::datum::pi));
+        CHECK(std::abs(b.e_theta_re(ib, jb, 0)) < 1e-6);
+        CHECK(std::abs(std::abs(b.e_phi_re(ib, jb, 0)) - 1.0) < 1e-6);
+    }
+    SECTION("A two-element pattern is the TR pair of field patterns")
+    {
+        const auto pair = quadriga_lib::generate_antenna<double>("3GPP", 10.0, 7.0e9, {125.0, 125.0, 22.5, 22.5, 5.3}, {}, {}, {2, 2});
+        const auto a = quadriga_lib::generate_antenna<double>("3GPP-UT", 10.0, 7.0e9, {}, {}, {}, {}, {}, {}, {}, {}, {}, pair);
+        CHECK(max_diff(a, call({}, {2, 2}, {}, {})) < 1e-12);
+    }
+    SECTION("Slants at roll 90 degrees have the two TR polarizations at boresight, in swapped order")
+    {
+        const auto tr = call({}, {2, 2}, {}, {4}), slant = call({}, {3, 2}, {}, {4});
+        REQUIRE(slant.n_elements() == 2);
+        const arma::uword i = 9, j = 18; // Boresight of location 4: azimuth 0, elevation 0
+        for (arma::uword e = 0; e < 2; ++e)
+        {
+            CHECK(std::abs(slant.e_theta_re(i, j, e) - tr.e_theta_re(i, j, 1 - e)) < 1e-6);
+            CHECK(std::abs(slant.e_phi_re(i, j, e) - tr.e_phi_re(i, j, 1 - e)) < 1e-6);
+        }
+    }
+    SECTION("Float equals double")
+    {
+        const auto f = quadriga_lib::generate_antenna<float>("3GPP-UT", 10.0, 7.0e9);
+        double d = 0.0;
+        for (arma::uword e = 0; e < 8; ++e)
+            for (arma::uword k = 0; k < all.e_theta_re.n_elem / 8; ++k)
+                d = std::max(d, std::abs(double(f.e_theta_re.slice_memptr(e)[k]) - all.e_theta_re.slice_memptr(e)[k]) +
+                                    std::abs(double(f.e_phi_re.slice_memptr(e)[k]) - all.e_phi_re.slice_memptr(e)[k]));
+        CHECK(d < 1e-5);
+    }
+}
+
+TEST_CASE("generate_antenna 3GPP-CPE - locations of Fig. 7.3-6 and the element")
+{
+    const auto ant = quadriga_lib::generate_antenna<double>("3GPP-CPE", 10.0, 3.5e9);
+    REQUIRE(ant.n_elements() == 9);
+    CHECK(ant.name == "3gpp-cpe");
+    const double y[9] = {-0.1, -0.1, -0.1, 0.0, 0.1, 0.1, 0.1, 0.0, 0.0}, z[9] = {0.1, 0.0, -0.1, -0.1, -0.1, 0.0, 0.1, 0.1, 0.0};
+    const auto element = quadriga_lib::generate_antenna<double>("3GPP", 10.0, 3.5e9, {90.0, 90.0, 25.0, 25.0, 5.0});
+    for (arma::uword e = 0; e < 9; ++e)
+    {
+        CHECK(ant.element_pos(0, e) == 0.0);
+        CHECK(std::abs(ant.element_pos(1, e) - y[e]) < 1e-12);
+        CHECK(std::abs(ant.element_pos(2, e) - z[e]) < 1e-12);
+        CHECK(arma::abs(ant.e_theta_re.slice(e) - element.e_theta_re.slice(0)).max() == 0.0);
+    }
+    const auto iso = quadriga_lib::generate_antenna<double>("3GPP-CPE", 10.0, 3.5e9, {qd_inf, qd_inf, qd_nan, qd_nan, 0.0});
+    CHECK(arma::abs(iso.e_theta_re - 1.0).max() < 1e-12);
+    const auto x = quadriga_lib::generate_antenna<double>("3gpp-cpe", 10.0, 28e9, {}, {}, {}, {3, 2}, {}, {}, {}, {qd_nan, 0.4, 0.0}, {9, 7, 7});
+    REQUIRE(x.n_elements() == 6);
+    CHECK(std::abs(x.element_pos(1, 2) - 0.2) < 1e-12);
+    CHECK(x.element_pos(2, 2) == 0.0);
+}
+
+TEST_CASE("generate_antenna 3GPP-UT and 3GPP-CPE - input validation")
+{
+    const auto dev = [](const std::string &type, const arma::vec &size, const arma::uvec &loc)
+    { quadriga_lib::generate_antenna<double>(type, 30.0, 3.5e9, {}, {}, {}, {}, {}, {}, {}, size, loc); };
+    const std::string hh = "Input 'device_size' of a handheld UT must have X > 0, Y > 0 and Z = 0.";
+    REQUIRE_THROWS_WITH(dev("3GPP-UT", {0.0, 0.07}, {}), hh);
+    REQUIRE_THROWS_WITH(dev("3GPP-UT", {0.15, 0.0}, {}), hh);
+    REQUIRE_THROWS_WITH(dev("3GPP-UT", {0.15, 0.07, 0.01}, {}), hh);
+    REQUIRE_THROWS_WITH(dev("3GPP-CPE", {0.01}, {}), "Input 'device_size' of a CPE must have X = 0.");
+    REQUIRE_THROWS_WITH(dev("3GPP-CPE", {0.0, -0.1}, {}), "Input 'device_size' must be finite and >= 0.");
+    REQUIRE_THROWS_WITH(dev("3GPP-CPE", {0.0, qd_inf}, {}), "Input 'device_size' must be finite and >= 0.");
+    REQUIRE_THROWS_WITH(dev("3GPP-UT", {0.1, 0.1, 0.0, 0.0}, {}), "Input 'device_size' must have at most 3 entries.");
+    REQUIRE_THROWS_WITH(dev("3GPP-UT", {}, {0}), "Input 'locations' must have labels from 1 to 8.");
+    REQUIRE_THROWS_WITH(dev("3GPP-UT", {}, {9}), "Input 'locations' must have labels from 1 to 8.");
+    REQUIRE_THROWS_WITH(dev("3GPP-CPE", {}, {10}), "Input 'locations' must have labels from 1 to 9.");
+    REQUIRE_NOTHROW(dev("3GPP-CPE", {0.0, 0.0, 0.0}, {9, 9}));
+    REQUIRE_THROWS_WITH(quadriga_lib::generate_antenna<double>("3GPP-UT", 30.0, NAN, {}, {2}), "Input 'panel' is not used by type '3GPP-UT'.");
+    REQUIRE_THROWS_WITH(quadriga_lib::generate_antenna<double>("3GPP-CPE", 30.0, NAN, {}, {}, {0.5}), "Input 'spacing' is not used by type '3GPP-CPE'.");
+    REQUIRE_THROWS_WITH(dev("3GPP", {0.1}, {}), "Input 'device_size' is not used by type '3GPP'.");
+    REQUIRE_THROWS_WITH(dev("omni", {}, {1}), "Input 'locations' is not used by type 'omni'.");
+    REQUIRE_THROWS_WITH(quadriga_lib::generate_antenna<double>("3GPP-UT", 30.0, NAN, {}, {}, {}, {4}), "Input 'pol' (polarization) values 4 to 6 are reserved; elements are combined through 'ports'.");
+    const auto two = quadriga_lib::generate_antenna<double>("xpol", 30.0);
+    REQUIRE_THROWS_WITH(quadriga_lib::generate_antenna<double>("3GPP-UT", 30.0, NAN, {}, {}, {}, {2}, {}, {}, {}, {}, {}, two), "Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
+    REQUIRE(quadriga_lib::generate_antenna<double>("3GPP-UT", 30.0, NAN, {}, {}, {}, {}, {}, {}, {}, {}, {}, two).n_elements() == 16);
+    REQUIRE_THROWS_WITH(quadriga_lib::generate_antenna<float>("3GPP-CPE", 30.0, NAN, {}, {}, {}, {}, {}, {}, {}, {0.0, 1e300, 1e300}), "Input 'device_size' must be finite and >= 0.");
 }

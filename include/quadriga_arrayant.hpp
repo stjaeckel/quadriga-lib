@@ -275,21 +275,24 @@ namespace quadriga_lib
     // ---- Antenna array generators ----
 
     // Generate an antenna array of a given type, panel arrays with the TR 38.901 tuples
-    // - Types: 'omni', 'xpol', 'dipole' (or 'short-dipole'), 'half-wave-dipole', 'custom', 'ula', '3GPP' (or '3gpp'), 'multibeam'
+    // - Types: 'omni', 'xpol', 'dipole' (or 'short-dipole'), 'half-wave-dipole', 'custom', 'ula', '3GPP' (or '3gpp'), 'multibeam',
+    //   '3GPP-UT' (or '3gpp-ut', handheld), '3GPP-CPE' (or '3gpp-cpe')
     // - An input a type does not use throws; the result has the given center_freq
     template <typename dtype = double>
     arrayant<dtype> generate_antenna(
         const std::string &type,                            // Antenna type
         double res = NAN,                                   // Grid resolution in degree, 0.1 to 90; NaN or <= 0 = 10 (omni, xpol) or 1
         double center_freq = 299792458.0,                   // Center frequency in Hz, positive, finite; NaN = 299792458
-        const arma::vec &element = {},                      // Element parameters per type (custom, 3GPP, multibeam)
+        const arma::vec &element = {},                      // Element parameters per type (custom, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
         const arma::uvec &panel = {},                       // [M, N, Mg, Ng] (ula, 3GPP, multibeam)
         const arma::vec &spacing = {},                      // [d_V, d_H, d_gV, d_gH] in wavelengths (ula, 3GPP, multibeam)
-        const arma::uvec &pol = {},                         // [polarization, model] (ula, 3GPP, multibeam)
+        const arma::uvec &pol = {},                         // [polarization, model] (ula, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
         const arma::uvec &ports = {},                       // [M_P, N_P] (ula, 3GPP)
         const arma::mat &steer = {},                        // [tilt, pan] in degree, one row or one per panel (ula, 3GPP)
         const arma::mat &beams = {},                        // [2 or 3, n_beams] in degree; weights (multibeam)
-        const arrayant<dtype> &pattern = arrayant<dtype>(), // Element pattern (ula, 3GPP)
+        const arma::vec &device_size = {},                  // [X, Y, Z] in m (3GPP-UT, 3GPP-CPE)
+        const arma::uvec &locations = {},                   // TR location labels, 1-based (3GPP-UT 1 to 8, 3GPP-CPE 1 to 9)
+        const arrayant<dtype> &pattern = arrayant<dtype>(), // Element pattern (ula, 3GPP, 3GPP-UT, 3GPP-CPE)
         bool separate_beams = false,                        // One port per beam (multibeam)
         bool apply_weights = false);                        // Apply the port weights, one pattern per port (ula, 3GPP, multibeam)
 

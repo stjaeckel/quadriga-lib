@@ -38,7 +38,7 @@ The inventory is useful only while it matches the code, so a change that adds, r
 
 The large-scale model, the cluster and ray steps of clause 7.5, path loss, LOS probability and O2I loss, and most of the clause 7.6 components that act on a single link are implemented. The scenario files hold the v19.5.0 table values: no number in Tables 7.5-6 and 7.5-7 to 7.5-12 differs from the TR, and the path-loss, correlation-distance, absolute-TOA, cluster-count and polarisation-variability values match as well.
 
-Not implemented: the link-level CDL and TDL models (7.7, only building blocks), blockage models A and B (7.6.4), mobility procedures A and B (7.6.3.2), the NLOS part of the near-field model (7.6.13), spatial non-stationarity (7.6.14), the 7.6.2.2 large-bandwidth ray model for the TR methods, mobile scatterers (7.6.10), the handheld UT antenna and polarisation models (7.3, CR 0032, Annex A.6), polarised antenna Model-2, the ISAC model (7.9), and the stochastic part of the map-based hybrid model (clause 8 steps 4–12). The deterministic part of clause 8 is covered by the library's ray tracer. No 3GPP calibration (7.8) has been reproduced with the library.
+Not implemented: the link-level CDL and TDL models (7.7, only building blocks), blockage models A and B (7.6.4), mobility procedures A and B (7.6.3.2), the NLOS part of the near-field model (7.6.13), spatial non-stationarity (7.6.14), the 7.6.2.2 large-bandwidth ray model for the TR methods, mobile scatterers (7.6.10), the ISAC model (7.9), and the stochastic part of the map-based hybrid model (clause 8 steps 4–12). The deterministic part of clause 8 is covered by the library's ray tracer. Apart from sample directions of the handheld UT patterns (Table 7.8-2A, metric 5), no 3GPP calibration (7.8) has been reproduced with the library.
 
 Main drifts in implemented features (details in the rows):
 
@@ -55,7 +55,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 |---|---|---|---|---|---|
 | 7.1 Coordinate system (3.1) | 6 | 6 | 0 | 0 | 0 |
 | 7.2 Scenarios (3.2) | 5 | 0 | 5 | 0 | 0 |
-| 7.3 Antenna modelling (3.3) | 8 | 5 | 0 | 3 | 0 |
+| 7.3 Antenna modelling (3.3) | 8 | 8 | 0 | 0 | 0 |
 | 7.4 Path loss, LOS probability, penetration (3.4) | 20 | 17 | 3 | 0 | 0 |
 | 7.5 Fast fading model incl. parameter tables (3.5) | 46 | 43 | 2 | 1 | 0 |
 | 7.6 Additional modelling components (3.6) | 36 | 17 | 4 | 14 | 1 |
@@ -63,7 +63,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 | 7.8 Calibration (3.8) | 14 | 0 | 10 | 4 | 0 |
 | 7.9 ISAC (3.9) | 23 | 0 | 8 | 15 | 0 |
 | 8 Map-based hybrid model (4) | 23 | 9 | 5 | 8 | 1 |
-| Annex A (5) | 6 | 0 | 4 | 2 | 0 |
+| Annex A (5) | 6 | 1 | 4 | 1 | 0 |
 
 ## 3. Inventory: clause 7, channel models for 0.5–100 GHz
 
@@ -92,14 +92,14 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| BS panel array (Mg, Ng, M, N, P) | 7.3.0, Fig. 7.3-1 | Yes | `generate_antenna` type `3GPP` (`src/generate_antenna.cpp:759`; tuples filled in `qd_panel_fill` `:43`, positions and port weights in `qd_arrayant_panel` `:347`) | Tuples `panel = [M, N, Mg, Ng]`, `spacing = [d_V, d_H, d_gV, d_gH]` in λ (d_H = d_V, panel spacing M·d_V and N·d_H by default; 0 allowed for co-located elements). Element order: polarisation, then m (upwards along z), n (along +y), Mg, Ng, as Fig. 7.3-1; positions centred. Tested against the configurations of Tables 7.8-2 (configs 1, 2), 7.8-2A (configs 3, 4), 7.8-6A (configs 1, 2) and 7.8-6C: counts, positions and weights in closed form ("TR 38.901 calibration configurations"). |
+| BS panel array (Mg, Ng, M, N, P) | 7.3.0, Fig. 7.3-1 | Yes | `generate_antenna` type `3GPP` (`src/generate_antenna.cpp:846`; tuples filled in `qd_panel_fill` `:43`, positions and port weights in `qd_arrayant_panel` `:378`) | Tuples `panel = [M, N, Mg, Ng]`, `spacing = [d_V, d_H, d_gV, d_gH]` in λ (d_H = d_V, panel spacing M·d_V and N·d_H by default; 0 allowed for co-located elements). Element order: polarisation, then m (upwards along z), n (along +y), Mg, Ng, as Fig. 7.3-1; positions centred. Tested against the configurations of Tables 7.8-2 (configs 1, 2), 7.8-2A (configs 3, 4), 7.8-6A (configs 1, 2) and 7.8-6C: counts, positions and weights in closed form ("TR 38.901 calibration configurations"). |
 | BS element pattern | 7.3.0, Table 7.3-1 | Yes | `qd_tr38901_element` (`src/generate_antenna.cpp:281`), `element = [φ_3dB, θ_3dB, SLA_V, A_max, G_max]` | Default 65°, 65°, 30 dB, 30 dB, 8 dBi; G_max NaN normalises to the directivity (9.83 dBi for the default). Shape tested within 1e-10 dB for the Table 7.3-1 and the Table 7.3-2 constants, G_max NaN against the directivity within 0.01 dB. |
-| UT antenna model (handheld, CPE: positions, device size, Ω_UT) | 7.3.0, Fig. 7.3-2 to 7.3-6 | No | – | No generator. Building blocks: `element_pos`, per-element `rotate_pattern` (`src/pattern_transform.cpp`), Rx orientation. |
-| Handheld UT element pattern | 7.3.0, Table 7.3-2 | No | – | No preset for 125° beamwidths, 22.5 dB, 5.3 dBi. The `custom` type of `generate_antenna` uses a different pattern shape. The antenna-imbalance note is not implemented. |
-| Port mapping (TXRU sub-arrays with electrical tilt and pan) | 7.3.1, eq. 7.3-1 | Yes | `generate_antenna` type `3GPP`, `ports = [M_P, N_P]`, `steer = [tilt, pan]` per panel, `apply_weights` (`qd_arrayant_panel`, `src/generate_antenna.cpp:347`) | Eq. 7.3-1 per sub-array of M/M_P elements (1/√K, phase reference at the sub-array centre, equal to 7.3-1 up to a constant phase per port); horizontal weights for `pan` by analogy along y with d_H (a reading, not TR text). `tilt` is the electrical downtilt (θ_etilt = 90° + tilt). Weights in the coupling matrix by default; `apply_weights` combines each port into one pattern at the sub-array centre (equal within 1e-12). Tilt and pan signs pinned by tests ("a positive electrical tilt points the beam down", "a positive pan turns the beam towards +y"). |
+| UT antenna model (handheld, CPE: positions, device size, Ω_UT) | 7.3.0, Fig. 7.3-2 to 7.3-6 | Yes | `generate_antenna` types `3GPP-UT`, `3GPP-CPE` (`qd_generate_device_array`, `src/generate_antenna.cpp:474`), `device_size`, `locations` | Handheld: 8 locations on a 15 × 7 cm rectangle, in any order, repeats allowed; positions and bearings from the geometry (25.02° against 25° in A.6; the company results in R1-2506406 use both, the fields differ by at most 0.0016 at a peak of 1.84). CPE: 9 locations on a 20 × 20 cm square in the y-z plane, elements facing +x, Fig. 7.3-6 read as seen from the front (our reading). The TR gives no CPE element; the default is the UE element of TR 38.803 Table 5.2.3.3-1 (90°, 25 dB, 5 dBi). Ω_UT is the receiver orientation of the channel functions, not a generator input. |
+| Handheld UT element pattern | 7.3.0, Table 7.3-2 | Yes | `generate_antenna` type `3GPP-UT`, `element` default `[125, 125, 22.5, 22.5, 5.3]` (`qd_tr38901_element`, `src/generate_antenna.cpp:281`) | Shape tested within 1e-10 dB. The antenna-imbalance note is not implemented (a per-port random loss, a channel-side draw). |
+| Port mapping (TXRU sub-arrays with electrical tilt and pan) | 7.3.1, eq. 7.3-1 | Yes | `generate_antenna` type `3GPP`, `ports = [M_P, N_P]`, `steer = [tilt, pan]` per panel, `apply_weights` (`qd_arrayant_panel`, `src/generate_antenna.cpp:382`) | Eq. 7.3-1 per sub-array of M/M_P elements (1/√K, phase reference at the sub-array centre, equal to 7.3-1 up to a constant phase per port); horizontal weights for `pan` by analogy along y with d_H (a reading, not TR text). `tilt` is the electrical downtilt (θ_etilt = 90° + tilt). Weights in the coupling matrix by default; `apply_weights` combines each port into one pattern at the sub-array centre (equal within 1e-12). Tilt and pan signs pinned by tests ("a positive electrical tilt points the beam down", "a positive pan turns the beam towards +y"). |
 | Polarised antenna Model-1 | 7.3.2, eq. 7.3-2 to 7.3-3b | Yes | `qd_apply_polarization` (`src/generate_antenna.cpp:310`), `pol = [2 or 3, 1]`; `rotate_pattern` usage 3 (`src/pattern_transform.cpp`) | The element is turned by ζ about its boresight, pattern and polarisation together, so F″ is evaluated at (θ″, φ″) as in eq. 7.3-3; also applied to a one-element custom `pattern`. Tested against eq. 7.3-3 with A″(θ″, φ″) on and off the rotation axis; on the axis the polarisation is not rotated (8551c68). |
 | Polarised antenna Model-2 | 7.3.2, eq. 7.3-4, 7.3-5 | Yes | `qd_apply_polarization` (`src/generate_antenna.cpp:310`), `pol = [2 or 3, 2]` | F_θ = √A′ cos ζ, F_φ = √A′ sin ζ with A′ = \|F_θ\|² + \|F_φ\|² of the element; also for a one-element custom `pattern` (e.g. the isotropic element of the panel UT configs). Tested against eq. 7.3-4/7.3-5 within 1e-12. |
-| Handheld UT polarised model (CR 0032) | 7.3.2, eq. 7.3-6 to 7.3-8, Fig. 7.3-7 to 7.3-10 | No | – | No per-antenna (α_u, β_u, γ_u) construction and no dual-pattern rule. |
+| Handheld UT polarised model (CR 0032) | 7.3.2, eq. 7.3-6 to 7.3-8, Fig. 7.3-7 to 7.3-10 | Yes | `generate_antenna` type `3GPP-UT`, `pol` `[1, 2]` and `[2, 2]`; `rotate_pattern` usage 3 | Each antenna is the reference element rotated by (γ_u, 0, α_u). Tested against eq. 7.3-6 to 7.3-8 for all 8 antennas with one and two field patterns (0.01 on a 5° grid, peak 1.84) and against 8 sample directions of the InterDigital results in R1-2506406, Table 7.8-2A metric 5 (1e-4 on a 1° grid). The other z'' direction of Fig. 7.3-7 is the same antenna with a negated port weight; other `pol` values are extensions. |
 
 ### 3.4 Pathloss, LOS probability and penetration modelling (7.4)
 
@@ -476,7 +476,7 @@ The deterministic part of clause 8 maps onto the library's ray tracer: `obj_file
 | Cluster angular spread incl. LOS | A.3, eq. A-3 | Partial | `calc_angular_spread` | The caller passes cluster angles plus the LOS path; A.1 drift applies. |
 | Cluster mean angle incl. LOS | A.4, eq. A-4 | Partial | as A.2 | |
 | CDL AS scaling factor | A.5, eq. A-5, A-6 | No | – | |
-| Handheld UT antenna positions and orientations | A.6, Tables A.6-1/-2 | No | – | Part of CR 0032; see 7.3. |
+| Handheld UT antenna positions and orientations | A.6, Tables A.6-1/-2 | Yes | `generate_antenna` type `3GPP-UT` | Positions tested within 1e-12 m, bearings within 0.05° of the tables (computed from the geometry for every device size). |
 
 ## 6. Proposed runs to confirm drifts and check open points
 

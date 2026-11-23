@@ -340,6 +340,41 @@ static void qd_apply_polarization(quadriga_lib::arrayant<dtype> &ant, unsigned p
     ant.e_phi_im.zeros();
 }
 
+// The polarization set of an array type: the TR element of 'par' ('tr_element') or the omni element on the grid of
+// 'res', or the field patterns of 'pattern' ('regular_grid': resampled to a regular grid); a one-element set gets the
+// polarizations of 'pol' and 'model'
+template <typename dtype>
+static quadriga_lib::arrayant<dtype> qd_polarized_element(bool tr_element, const double *par, bool element_given,
+                                                          const quadriga_lib::arrayant<dtype> &pattern, unsigned pol, unsigned model, double res,
+                                                          bool regular_grid = false)
+{
+    quadriga_lib::arrayant<dtype> elem;
+    if (pattern.n_elements() == 0)
+    {
+        res = qd_arrayant_grid_resolution(res, 1.0, "res");
+        elem = tr_element ? qd_tr38901_element<dtype>(par, res) : qd_generate_arrayant_omni<dtype>(res);
+    }
+    else
+    {
+        if (element_given)
+            throw std::invalid_argument("Inputs 'element' and 'pattern' cannot be given together.");
+        elem = pattern;
+        const std::string error_message = elem.is_valid(); // Deep check
+        if (!error_message.empty())
+            throw std::invalid_argument("Input 'pattern' is not valid: " + error_message);
+        if (elem.n_elements() > 1 && (pol != 1 || model != 1))
+            throw std::invalid_argument("Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
+        if (regular_grid) // Turning an element on its own grid needs samples in all directions
+            quadriga_lib::rotate_pattern(elem, arma::Col<dtype>(3, arma::fill::zeros), 0);
+    }
+    if (elem.n_elements() == 1) // Only the field patterns are used
+    {
+        elem.element_pos.zeros(3, 1), elem.port_weights_re.ones(1, 1), elem.port_weights_im.zeros(1, 1);
+        qd_apply_polarization(elem, pol, model);
+    }
+    return elem;
+}
+
 // Panel array of TR 38.901 clause 7.3 from the polarization set 'elem' (P elements, valid; only its radiation pattern
 // is used): positions and sub-array weights follow from the indices (p, m, n, mg, ng), see generate_antenna;
 // 'apply_weights' combines each port at its sub-array centre, from one combined sub-array per panel
@@ -427,30 +462,70 @@ static quadriga_lib::arrayant<dtype> qd_generate_panel_array(bool tr_element, co
     const qd_panel_par q = qd_panel_fill(panel, spacing, ports, pol, steer);
     double par[5];
     qd_tr38901_element_fill(element, 65.0, 30.0, 8.0, par);
-
-    quadriga_lib::arrayant<dtype> elem;
-    if (pattern.n_elements() == 0)
-    {
-        res = qd_arrayant_grid_resolution(res, 1.0, "res");
-        elem = tr_element ? qd_tr38901_element<dtype>(par, res) : qd_generate_arrayant_omni<dtype>(res);
-    }
-    else
-    {
-        if (element.n_elem != 0)
-            throw std::invalid_argument("Inputs 'element' and 'pattern' cannot be given together.");
-        elem = pattern;
-        const std::string error_message = elem.is_valid(); // Deep check
-        if (!error_message.empty())
-            throw std::invalid_argument("Input 'pattern' is not valid: " + error_message);
-        if (elem.n_elements() > 1 && (q.pol != 1 || q.model != 1))
-            throw std::invalid_argument("Input 'pol' must be [1, 1] for a 'pattern' with more than one element.");
-    }
-    if (elem.n_elements() == 1) // Only the field patterns are used
-    {
-        elem.element_pos.zeros(3, 1), elem.port_weights_re.ones(1, 1), elem.port_weights_im.zeros(1, 1);
-        qd_apply_polarization(elem, q.pol, q.model);
-    }
+    const auto elem = qd_polarized_element<dtype>(tr_element, par, element.n_elem != 0, pattern, q.pol, q.model, res);
     return qd_arrayant_panel(elem, center_freq, q, apply_weights);
+}
+
+// Handheld UT and CPE of TR 38.901 clause 7.3.0: 'P' elements per entry of 'locations', at the TR location labels.
+// Handheld (Fig. 7.3-2, Table A.6-1/-2): each element is rolled about its boresight and turned to the bearing of its
+// location, which is eq. 7.3-6 to 7.3-8 with the pole of the local frame defined. CPE (Fig. 7.3-6 seen from the front):
+// the elements keep their orientation and face +x.
+template <typename dtype>
+static quadriga_lib::arrayant<dtype> qd_generate_device_array(bool handheld, const arma::vec &element, const arma::uvec &pol,
+                                                              const quadriga_lib::arrayant<dtype> &pattern, const arma::vec &device_size,
+                                                              const arma::uvec &locations, double res)
+{
+    qd_panel_par q = qd_panel_fill(arma::uvec(), arma::vec(), arma::uvec(), pol, arma::mat());
+    if (handheld && q.pol > 1 && (pol.n_elem < 2 || pol[1] == 0)) // Two field patterns of the handheld model are those of Model-2
+        q.model = 2;
+    double par[5];
+    if (handheld)
+        qd_tr38901_element_fill(element, 125.0, 22.5, 5.3, par); // TR 38.901 Table 7.3-2
+    else
+        qd_tr38901_element_fill(element, 90.0, 25.0, 5.0, par); // TR 38.803 Table 5.2.3.3-1
+    const auto elem = qd_polarized_element<dtype>(true, par, element.n_elem != 0, pattern, q.pol, q.model, res, handheld);
+
+    if (device_size.n_elem > 3)
+        throw std::invalid_argument("Input 'device_size' must have at most 3 entries.");
+    double size[3] = {handheld ? 0.15 : 0.0, handheld ? 0.07 : 0.2, handheld ? 0.0 : 0.2};
+    for (arma::uword i = 0; i < device_size.n_elem; ++i)
+        if (!std::isnan(device_size[i]))
+            size[i] = device_size[i];
+    for (const double s : size)
+        if (!(s >= 0.0 && s <= double(std::numeric_limits<dtype>::max())))
+            throw std::invalid_argument("Input 'device_size' must be finite and >= 0.");
+    if (handheld && (size[0] == 0.0 || size[1] == 0.0 || size[2] != 0.0))
+        throw std::invalid_argument("Input 'device_size' of a handheld UT must have X > 0, Y > 0 and Z = 0.");
+    if (!handheld && size[0] != 0.0)
+        throw std::invalid_argument("Input 'device_size' of a CPE must have X = 0.");
+
+    const arma::uword n_labels = handheld ? 8 : 9;
+    const arma::uvec labels = locations.is_empty() ? arma::uvec(arma::regspace<arma::uvec>(1, n_labels)) : locations;
+    if (labels.min() < 1 || labels.max() > n_labels)
+        throw std::invalid_argument(std::string("Input 'locations' must have labels from 1 to ") + (handheld ? "8." : "9."));
+
+    const arma::uword P = elem.n_elements();
+    q.M = labels.n_elem, q.MP = labels.n_elem; // One column of elements, placed below
+    quadriga_lib::arrayant<dtype> ant = qd_arrayant_panel(elem, 299792458.0, q, false);
+    ant.name = handheld ? "3gpp-ut" : "3gpp-cpe";
+
+    // Signs of the coordinates per label: x and y of the handheld, y and z = -x of the CPE
+    static const int sign_x[9] = {-1, 0, 1, 1, 1, 0, -1, -1, 0}, sign_y[9] = {-1, -1, -1, 0, 1, 1, 1, 0, 0};
+    const double roll = (P == 2 && q.pol != 3 ? 0.25 : 0.5) * arma::datum::pi; // TR 38.901 Table A.6-2 for two field patterns, else A.6-1
+    for (arma::uword l = 0; l < labels.n_elem; ++l)
+    {
+        const arma::uword u = labels[l] - 1;
+        const double sx = double(sign_x[u]), sy = double(sign_y[u]);
+        const double x = 0.5 * sx * size[0] + 0.0, y = 0.5 * sy * size[1] + 0.0, z = 0.0 - 0.5 * sx * size[2]; // Handheld Z and CPE X are 0, never -0
+        if (handheld)
+        {
+            const arma::Col<dtype> orientation = {dtype(roll), dtype(0.0), dtype(std::atan2(y, x))};
+            quadriga_lib::rotate_pattern(ant, orientation, 3, arma::regspace<arma::uvec>(P * l, P * l + P - 1));
+        }
+        ant.element_pos.cols(P * l, P * l + P - 1).each_col() = arma::Col<dtype>{dtype(x), dtype(y), dtype(z)};
+    }
+    qd_arrayant_mark_valid(ant);
+    return ant;
 }
 
 // Fill rule of the custom-shape element tuple [az_3dB, el_3dB, floor_dB]: omitted or NaN beamwidths take bw_default,
@@ -468,10 +543,9 @@ static void qd_custom_element_fill(const arma::vec &element, double bw_default, 
         throw std::invalid_argument("Input 'element' (el_3dB) must be > 0 degrees (Inf: no taper).");
     const double floor_dB = (element.n_elem > 2 && !std::isnan(element[2])) ? element[2] : std::numeric_limits<double>::infinity();
     rear_gain_lin = std::pow(10.0, -0.1 * floor_dB); // Inf: 0
-    if (!(floor_dB > 0.0) || rear_gain_lin >= 1.0)    // also floor_dB below the double resolution of 1 - 10^(-x/10)
+    if (!(floor_dB > 0.0) || rear_gain_lin >= 1.0)   // also floor_dB below the double resolution of 1 - 10^(-x/10)
         throw std::invalid_argument("Input 'element' (floor_dB) must be > 0, the attenuation of the floor in dB below the peak (Inf: no floor).");
 }
-
 
 // Multibeam panel array: custom-shape element and maximum-ratio-transmission weights for the directions in beams
 template <typename dtype>
@@ -689,6 +763,8 @@ Generate an antenna array of a given type
 - Sub-array weights (`ula`, `3GPP`; TR 38.901 eq. 7.3-1, along y by analogy): a port feeds `K = M / M_P` × `L = N / N_P` elements; element `(k, l)` gets `exp(j 2π ((k - (K-1)/2) d_V sin(tilt) - (l - (L-1)/2) d_H sin(pan))) / sqrt(K L)`; a positive tilt points the beam down, a positive pan towards +y.
 - Polarization (TR 38.901 clause 7.3.2): `pol` 2 has the slants ζ = 0° and 90°, `pol` 3 ζ = +45° and -45° (element 0 first). Model-1 turns the element by ζ about its boresight (eq. 7.3-3); Model-2 sets F_θ = sqrt(A') cos ζ and F_φ = sqrt(A') sin ζ with A' = |F_θ|² + |F_φ|² of the element (eq. 7.3-4, 7.3-5).
 - `multibeam`: maximum-ratio-transmission weights for the directions in `beams` (exact for one beam, approximate for several; only the ratios of the beam weights matter); one port per polarization, with `separate_beams` one per polarization and beam.
+- Handheld UT (`3GPP-UT`, TR 38.901 clause 7.3): `P` elements at each entry of `locations` (Fig. 7.3-2), polarization fastest; each element is rolled about its boresight by 90° (45° for two field patterns: `pol` 2 or a two-element `pattern`) and turned to the bearing `atan2(y, x)` of its location (Tables A.6-1, A.6-2); a `pattern` on an irregular grid is first resampled to a regular one. `pol` 1 and 2 with their default model are the TR model (eq. 7.3-6 to 7.3-8), other values are extensions. For an element symmetric under a 180° roll (every `element` tuple), the other z'' direction of Fig. 7.3-7 is the same antenna with a negated port weight.
+- CPE (`3GPP-CPE`): `P` elements at each entry of `locations` (Fig. 7.3-6 seen from the front, in the y-z plane), facing +x. TR 38.901 defines no CPE element; the default is the UE element of TR 38.803 Table 5.2.3.3-1.
 - An input that the type does not take throws.
 
 ## Declaration:
@@ -704,6 +780,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
     const arma::uvec &ports = {},
     const arma::mat &steer = {},
     const arma::mat &beams = {},
+    const arma::vec &device_size = {},
+    const arma::uvec &locations = {},
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(),
     bool separate_beams = false,
     bool apply_weights = false);
@@ -721,18 +799,23 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
    | `ula`                        | Uniform linear array of omni elements                                      | `panel`, `spacing`, `pol`, `ports`, `steer`, `pattern`, `apply_weights`            |
    | `3GPP` (or `3gpp`)           | Panel array of 3GPP TR 38.901 clause 7.3                                   | `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `pattern`, `apply_weights` |
    | `multibeam`                  | Panel array with beams towards given directions                            | `element`, `panel`, `spacing`, `pol`, `beams`, `separate_beams`, `apply_weights`   |
+   | `3GPP-UT` (or `3gpp-ut`)     | Handheld UT of 3GPP TR 38.901 clause 7.3                                   | `element`, `pol`, `pattern`, `device_size`, `locations`                            |
+   | `3GPP-CPE` (or `3gpp-cpe`)   | CPE of 3GPP TR 38.901 clause 7.3                                           | `element`, `pol`, `pattern`, `device_size`, `locations`                            |
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: 10° for `omni` and `xpol`, 1° otherwise; ignored if `pattern` is given
 - **`center_freq`** *(optional)* — Center frequency in Hz; positive and finite; NaN: 299792458 (wavelength 1 m)
 - **`element`** *(optional)* — Element parameters per type:
   - `custom` `[az_3dB, el_3dB, floor_dB]`: 3 dB beamwidths in degrees (> 0, Inf: no taper); floor of the power pattern as a positive attenuation in dB below the peak (10: 10 dB below the peak; Inf: no floor); default `[90, 90, Inf]`
   - `multibeam`: the same, default `[120, 120, Inf]`
   - `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` of TR 38.901 Table 7.3-1: beamwidths in degrees (> 0, Inf: no taper); SLA_V and A_max as positive attenuations in dB below the peak, as in the TR (>= 0, Inf: no limit); G_max in dBi (finite or NaN); default `[65, 65, 30, 30, 8]`; entries left off at the end or set to NaN take their default, where `theta_3dB` defaults to `phi_3dB` and `A_max` to `SLA_V` (e.g. `[90]` gives `[90, 90, 30, 30, 8]`); `G_max` left off is 8 dBi, NaN sets the peak gain to the directivity; not together with `pattern`
+  - `3GPP-UT`: the same tuple, default `[125, 125, 22.5, 22.5, 5.3]` (Table 7.3-2); `3GPP-CPE`: default `[90, 90, 25, 25, 5]`; `[Inf, Inf, NaN, NaN, 0]` is isotropic
 - **`panel`** *(optional)* — `[M, N, Mg, Ng]`: elements per column, columns per panel, panels per column, panels per row; default 1; at most 1e7 elements per polarization (`ula`: `panel = 8` is a vertical column, `[1, 8]` a horizontal row)
 - **`spacing`** *(optional)* — `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing; finite and >= 0 (0 places elements or panels at the same position); default `[0.5, d_V, M d_V, N d_H]`
-- **`pol`** *(optional)* — `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°); model 1 (Model-1) or 2 (Model-2); default `[1, 1]`
+- **`pol`** *(optional)* — `[polarization, model]`. Polarization: 1 = one element (ζ = 0°, vertical), 2 = two elements (ζ = 0° and 90°), 3 = two elements (ζ = +45° and -45°). Model of TR 38.901 clause 7.3.2: 1 = the element pattern is turned by ζ about its boresight (Model-1, eq. 7.3-3), 2 = the power pattern is kept and the field is split by ζ (Model-2, eq. 7.3-4, 7.3-5). Default `[1, 1]`; for `3GPP-UT` with polarization 2 or 3 the default model is 2, which gives the reference fields of the handheld model (eq. 7.3-6).
 - **`ports`** *(optional)* — `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; must divide `M` and `N`; default `[M, N]` (one port per element)
 - **`steer`** *(optional)* — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt and pan of the sub-array weights; `[1, 2]` for all panels or `[Mg Ng, 2]` with one row per panel (panel order `mg`, `ng`); one column: pan 0; default 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`
 - **`beams`** *(optional)* — `[2, n_beams]` or `[3, n_beams]`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); finite; default `[0; 0; 1]`
+- **`device_size`** *(optional)* — `[X, Y, Z]` in m (depth, width, height); NaN or left off: the default; `3GPP-UT` `[0.15, 0.07, 0]` with X, Y > 0 and Z = 0, `3GPP-CPE` `[0, 0.2, 0.2]` with X = 0 and Y, Z >= 0
+- **`locations`** *(optional)* — TR location labels (`3GPP-UT` 1 to 8, `3GPP-CPE` 1 to 9), not 0-based indices; any order, repeats allowed; default all
 - **`pattern`** *(optional)* — Element to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; empty (no elements): the element of the type
 - **`separate_beams`** *(optional)* — If `true`, one port per beam (weights ignored)
 - **`apply_weights`** *(optional)* — If `true`, combine each port into one pattern at its sub-array centre
@@ -749,6 +832,9 @@ auto beam = quadriga_lib::generate_antenna("custom", 1.0, NAN, {30.0, 20.0});
 // Table 7.8-2, BS config 1: two 4 x 4 panels 2.5 wavelengths apart, +/-45 deg Model-2, one port per polarization
 // and panel, 12 degree electrical downtilt
 auto bs = quadriga_lib::generate_antenna("3GPP", 1.0, 6.0e9, {}, {4, 4, 1, 2}, {0.5, 0.5, 2.5, 2.5}, {3, 2}, {1, 1}, {12.0, 0.0});
+
+// Handheld UT at the locations (1, 7, 3, 5) of Table 7.8-2A, Config B
+auto ut = quadriga_lib::generate_antenna("3GPP-UT", 1.0, 7.0e9, {}, {}, {}, {}, {}, {}, {}, {}, {1, 7, 3, 5});
 ```
 
 ## See also:
@@ -758,16 +844,19 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
-                                                              const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
-                                                              const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
-                                                              const arma::mat &beams, const arrayant<dtype> &pattern,
-                                                              bool separate_beams, bool apply_weights)
+                                                             const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
+                                                             const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
+                                                             const arma::mat &beams, const arma::vec &device_size, const arma::uvec &locations, const arrayant<dtype> &pattern,
+                                                             bool separate_beams, bool apply_weights)
 {
     // Inputs per type, as bit masks over the optional inputs below
-    const char *name[10] = {"panel", "spacing", "ports", "pol", "steer", "element", "pattern", "beams", "separate_beams", "apply_weights"};
-    const bool given[10] = {!panel.is_empty(), !spacing.is_empty(), !ports.is_empty(), !pol.is_empty(), !steer.is_empty(),
-                            !element.is_empty(), pattern.n_elements() != 0, !beams.is_empty(), separate_beams, apply_weights};
-    const unsigned ula = 0x5F, tgpp = 0x7F | 0x200, multibeam = 0x3AB;
+    const char *name[12] = {"panel", "spacing", "ports", "pol", "steer", "element", "pattern", "beams", "separate_beams", "apply_weights",
+                            "device_size", "locations"};
+    const bool given[12] = {!panel.is_empty(), !spacing.is_empty(), !ports.is_empty(), !pol.is_empty(), !steer.is_empty(),
+                            !element.is_empty(), pattern.n_elements() != 0, !beams.is_empty(), separate_beams, apply_weights,
+                            !device_size.is_empty(), !locations.is_empty()};
+    const unsigned ula = 0x5F, tgpp = 0x7F | 0x200, multibeam = 0x3AB, device = 0x8 | 0x20 | 0x40 | 0x400 | 0x800;
+    const bool handheld = type == "3GPP-UT" || type == "3gpp-ut", cpe = type == "3GPP-CPE" || type == "3gpp-cpe";
     unsigned uses;
     if (type == "omni" || type == "xpol" || type == "dipole" || type == "short-dipole" || type == "half-wave-dipole")
         uses = 0;
@@ -779,9 +868,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(const std::string &
         uses = tgpp;
     else if (type == "multibeam")
         uses = multibeam;
+    else if (handheld || cpe)
+        uses = device;
     else
         throw std::invalid_argument("Input 'type' has an unsupported value '" + type + "'.");
-    for (unsigned i = 0; i < 10; ++i)
+    for (unsigned i = 0; i < 12; ++i)
         if (given[i] && !(uses & (1u << i)))
             throw std::invalid_argument(std::string("Input '") + name[i] + "' is not used by type '" + type + "'.");
 
@@ -813,6 +904,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(const std::string &
     }
     else if (type == "multibeam")
         ant = qd_generate_arrayant_multibeam<dtype>(panel, center_freq, spacing, pol, element, beams, res, separate_beams, apply_weights);
+    else if (handheld || cpe)
+        ant = qd_generate_device_array<dtype>(handheld, element, pol, pattern, device_size, locations, res);
     else
         ant = qd_generate_panel_array<dtype>(true, panel, center_freq, spacing, ports, pol, steer, element, pattern, res, apply_weights);
 
@@ -821,12 +914,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(const std::string &
 }
 
 template quadriga_lib::arrayant<float> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
+                                                                      const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
+                                                                      const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
+                                                                      const arma::mat &beams, const arma::vec &device_size, const arma::uvec &locations, const arrayant<float> &pattern,
+                                                                      bool separate_beams, bool apply_weights);
+
+template quadriga_lib::arrayant<double> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
                                                                        const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
                                                                        const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
-                                                                       const arma::mat &beams, const arrayant<float> &pattern,
+                                                                       const arma::mat &beams, const arma::vec &device_size, const arma::uvec &locations, const arrayant<double> &pattern,
                                                                        bool separate_beams, bool apply_weights);
-template quadriga_lib::arrayant<double> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
-                                                                        const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
-                                                                        const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
-                                                                        const arma::mat &beams, const arrayant<double> &pattern,
-                                                                        bool separate_beams, bool apply_weights);

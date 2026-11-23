@@ -65,6 +65,8 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("ports") = py::none(),
           py::arg("steer") = py::none(),
           py::arg("beams") = py::none(),
+          py::arg("device_size") = py::none(),
+          py::arg("locations") = py::none(),
           py::arg("pattern") = py::none(),
           py::arg("separate_beams") = false,
           py::arg("apply_weights") = false);

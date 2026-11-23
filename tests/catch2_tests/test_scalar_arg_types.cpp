@@ -44,7 +44,7 @@ static void calls_with_literals()
     quadriga_lib::apply_port_weights(av, col, col, col, 343);
     a = quadriga_lib::generate_antenna<T>("omni", 10);
     a = quadriga_lib::generate_antenna<T>("custom", 10, NAN, {90, 90.0});
-    a = quadriga_lib::generate_antenna("ula", 10, 3.5e9, {}, {1, 4}, {0.5}, {}, {}, {}, {}, a);
+    a = quadriga_lib::generate_antenna("ula", 10, 3.5e9, {}, {1, 4}, {0.5}, {}, {}, {}, {}, {}, {}, a);
     a = quadriga_lib::generate_antenna<T>("multibeam", 10, 3.5e9, {120, 120}, {2, 2}, {0.5}, {1});
     a = quadriga_lib::generate_antenna<T>("3GPP", 10, 3.5e9, {}, {2, 2}, {0.5}, {3, 2}, {1}, {6, 0});
     av = quadriga_lib::generate_speaker<T>("piston", 0.05, 80, 12000, 12, 12, 85, "hemisphere", 90, 60, 1000, 0.15, 0.25, col, 5);

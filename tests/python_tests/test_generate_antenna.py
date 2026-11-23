@@ -20,8 +20,8 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
-OPTIONAL = ("center_freq", "element", "panel", "spacing", "pol", "ports", "steer", "beams", "pattern",
-            "separate_beams", "apply_weights")
+OPTIONAL = ("center_freq", "element", "panel", "spacing", "pol", "ports", "steer", "beams", "device_size",
+            "locations", "pattern", "separate_beams", "apply_weights")
 
 
 class test_case(unittest.TestCase):
@@ -176,6 +176,20 @@ class test_case(unittest.TestCase):
             f()
         with self.assertRaises(TypeError):
             f("omni", None)
+
+    def test_device_size_and_locations(self):
+        f = quadriga_lib.arrayant.generate_antenna
+        a = f("3GPP-UT", 30, device_size=[0.2, 0.1], locations=[5, 1])  # labels stay 1-based
+        self.assertEqual(a["e_theta_re"].shape, (7, 13, 2))
+        npt.assert_allclose(a["element_pos"], [[0.1, -0.1], [0.05, -0.05], [0, 0]], atol=1e-12, rtol=0)
+        a = f("3GPP-CPE", 30, locations=np.array([7], dtype=np.int32))
+        npt.assert_allclose(a["element_pos"], [[0], [0.1], [0.1]], atol=1e-12, rtol=0)
+        with self.assertRaises(ValueError) as ctx:
+            f("3GPP-UT", 30, locations=1.5)
+        self.assertIn("Input 'locations' must contain integers from 0 to", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:  # C++
+            f("3GPP-UT", 30, locations=[9])
+        self.assertIn("Input 'locations' must have labels from 1 to 8.", str(ctx.exception))
 
 
 if __name__ == "__main__":

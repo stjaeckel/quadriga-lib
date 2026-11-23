@@ -71,10 +71,12 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `panel`: `[M, N, Mg, Ng]`: elements per column (along z), columns per panel (along y), panels per column, panels per row; default 1.
 - `spacing`: `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); defaults 0.5, `d_V`, `M d_V`, `N d_H`.
 - `ports`: `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; they divide `M` and `N`; default `[M, N]` (one port per element).
-- `pol`: `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°), 4 to 6 reserved; model 1 or 2 (TR 38.901 Model-1, Model-2); default `[1, 1]`.
+- `pol`: `[polarization, model]`: polarization 1 (vertical), 2 (H/V) or 3 (±45°), 4 to 6 reserved; model 1 or 2 (Model-1 or Model-2 of TR 38.901 clause 7.3.2); default `[1, 1]`.
 - `steer`: `[tilt, pan]` in degrees: electrical downtilt (positive down) and pan (positive towards +y) of the sub-array weights; one row for all panels or one row per panel; default 0.
 - `element`: the element parameters of a generator type, unit per entry in its documentation, e.g. `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` in degrees, degrees, dB, dB and dBi for the TR element. Attenuations (`SLA_V`, `A_max`, `floor_dB`) are positive dB values below the peak, as in TR 38.901 (30 dB), and Inf removes the limit; an infinite beamwidth gives a flat cut.
 - `beams`: `[2 or 3, n_beams]`: azimuth and elevation in degrees, weight (linear).
+- `device_size`: `[X, Y, Z]` in m: depth, width and height of a UT device (TR 38.901 clause 7.3.0); the default depends on the device type.
+- `locations`: candidate antenna locations of a UT device as the labels of the TR figures, 1-based in all APIs because they are names, not indices; default all.
 
 **Kernel selection**
 
