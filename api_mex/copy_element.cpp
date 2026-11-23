@@ -10,15 +10,12 @@ SECTION!*/
 
 /*!MD
 # COPY_ELEMENT
-Create copies of antenna array elements
+Copy a single element of an antenna array to one or more destination slots
 
-- Copies a source element to one or more destination slots within an arrayant
-- Array is resized if any destination index exceeds the current number of elements
-- Port weights of newly added elements are set to identity; existing port weights are preserved
-- Supports multi-frequency arrayant models: when `arrayant_in` is a struct array, the same copy is
-  applied to every entry and a struct array of equal size is returned
-- If `i_source` is a vector, `i_target` must have the same length; copies are performed
-  pairwise as `i_source(i)` to `i_target(i)`
+- Copies the pattern and the position of an element, e.g. to build an array from a single element; the port weights of
+  existing elements do not change
+- A destination beyond the last element enlarges the array. Each added element gets its own new port with weight 1;
+  added elements that are not a destination have a zero pattern and position
 
 ## Usage:
 ```
@@ -26,15 +23,20 @@ arrayant_out = quadriga_lib.copy_element( arrayant_in, i_source, i_target );
 ```
 
 ## Inputs:
-- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
-  [[generate_antenna]]; a struct array may contain a frequency-dependent model
-- **`i_source`** — Index of the source element(s); 1-based; scalar or `[n_copy]`
-- **`i_target`** — Index of the destination element(s); 1-based; scalar or `[n_copy]`;
-  if `i_source` is a vector, must have the same length
+- **`arrayant_in`** — Arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency array; the same
+  copy is made in every entry
+- **`i_source`** — Index of the element to copy, 1-based, at most `n_elements`; scalar, or `[n_copy]` for pairwise
+  copies from `i_source(k)` to `i_target(k)`
+- **`i_target`** — Destination indices, 1-based, not empty; a scalar `i_source` is copied to each of them, a vector
+  `i_source` needs the same length; `[n_copy]`
 
 ## Output:
-- **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
-  `arrayant_in`; a struct array of equal size is returned for multi-frequency input
+- **`arrayant_out`** — Arrayant with the copies, in the form of `arrayant_in`
+
+## See also:
+- [[join_arrays]] (joins two arrays)
+- [[generate_antenna]] (creates the element to copy)
+- [[rotate_pattern]] (turns single copies, through `i_element`)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

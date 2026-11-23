@@ -13,20 +13,10 @@ SECTION!*/
 Interpolate the polarimetric field pattern of an antenna array at given azimuth and elevation angles
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
-  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (3D pattern arrays and no `freq_new`): outputs `(n_out, n_ang)`; `dist` and `local_angles` add
-  outputs, returned only on request since computing them costs extra time and memory. Multi-frequency mode (4D pattern
-  arrays, or `freq_new` given): for each target frequency, the two entries whose center frequencies bracket it are
-  interpolated and blended; frequencies outside the entries take the nearest entry; outputs `(n_out, n_ang, n_freq)`;
-  a 3D pattern is the same at every frequency
-- `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
-- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
-- On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so
-  that the local and the global theta unit vectors agree: the polarization is not rotated there
-- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the peak
-  field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
-  2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
-  elevation; auto selects GENERIC in this version, which may change in a later version
+  global coordinate system (GCS), with the orientation of the array and the resulting polarization rotation applied
+- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation)
+- Multi-frequency mode (4D pattern arrays, or target frequencies given): the two entries whose center frequencies
+  bracket each target frequency are interpolated and blended
 
 ## Usage:
 ```
@@ -43,40 +33,64 @@ V, H = quadriga_lib.arrayant.interpolate_pattern( arrayant, azimuth, elevation, 
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict containing the arrayant data; layout as documented in [[generate_antenna]]; 4D pattern arrays contain
-  a frequency-dependent model
-- **`azimuth`** — Azimuth angles in GCS; `(1, n_ang)` (same angles for all outputs) or `(n_out, n_ang)` (one angle
-  per output)
-- **`elevation`** — Elevation angles in GCS; same shape as `azimuth`
-- **`i_element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
-- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `(3, 1)`, `(3, n_out)`, `(3, 1, n_ang)` or
-  `(3, n_out, n_ang)`; default: `None` (no rotation)
-- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`
-  (the positions of the arrayant)
-- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
-  `center_freq` of the entries)
-- **`dist`** — Also return the projected distance; single-frequency mode only; default: `False`
-- **`local_angles`** — Also return the local angles and the polarization rotation angle; single-frequency mode only;
-  default: `False`
-- **`fast_access`** — Require the pattern arrays to be float64 and Fortran-contiguous, so that they are read without
-  a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
-  default: `False`
-- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array; entries need
+  not be sorted by frequency
+- **`azimuth`** — Azimuth angles in GCS in rad; one row: the same angles for all outputs (planar wave), `n_out` rows:
+  one angle per output (spherical wave); `(1, n_ang)` or `(n_out, n_ang)`
+- **`elevation`** — Elevation angles in GCS in rad; same shape as `azimuth`
+- **`i_element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements in order,
+  `n_out = n_elements`)
+- **`orientation`** — Euler angles (bank, tilt, heading) of the array, for all outputs and angles, per output, per
+  angle, or both, applied at all frequencies; `(3, 1)`, `(3, n_out)`, `(3, 1, n_ang)` or `(3, n_out, n_ang)`; default:
+  `None` (no rotation)
+- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; multi-frequency mode: checked for
+  its shape only, since no output depends on the positions; `(3, n_out)`; default: `None` (the positions of the selected
+  elements)
+- **`freq_new`** — Target frequencies in Hz, finite; selects the multi-frequency mode, in which a 3D pattern is the same
+  at every frequency; ascending or descending order is fastest; `(n_freq,)`; default: `None` (the `center_freq` of the
+  entries in order)
+- **`dist`** — Also return the projected distance, at extra time and memory; single-frequency mode only; default:
+  `False`
+- **`local_angles`** — Also return the local angles and the polarization rotation angle, at extra time and memory;
+  single-frequency mode only; default: `False`
+- **`fast_access`** — Require the pattern arrays to be float64 and Fortran-contiguous, so that they are read without a
+  copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied; default:
+  `False`
+- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable or if the pattern has more than
+  $2^{31} - 1$ samples); other values raise; `int`; default: 0
 
 ## Outputs:
-- **`V`** — e-theta (vertical) field, complex; `(n_out, n_ang)`; multi-frequency mode: `(n_out, n_ang, n_freq)`
+- **`V`** — e-theta (vertical) field, complex; `(n_out, n_ang)`, multi-frequency mode `(n_out, n_ang, n_freq)`
 - **`H`** — e-phi (horizontal) field, complex; same shape as `V`
-- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
-  elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
-- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;
-  returned when `local_angles` is `True`
+- **`dist`** — Distance of each element from the wavefront plane through the origin of the array; negative for elements
+  closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
+- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`; returned
+  when `local_angles` is `True`
 - **`gamma`** — Polarization rotation angle from the global to the local frame; `(n_out, n_ang)`; returned when
   `local_angles` is `True`
 
+## Notes:
+- **Interpolation**: linear where neighboring samples have nearly opposite phases; the azimuth grid wraps around,
+  elevations outside the grid take the values of the first or last grid row
+- **Frequency interpolation** (multi-frequency mode): spherical interpolation of the complex values over frequency,
+  linear where the two values have nearly opposite phases or one of them is zero. Target frequencies outside the range
+  of the center frequencies take the nearest entry (no extrapolation). Consecutive target frequencies with the same
+  bracketing entries reuse the spatial results
+- **Angles**: not range-checked; values outside $[-\pi, \pi]$ and $[-\pi/2, \pi/2]$ denote the same direction; an
+  elevation beyond $\pm\pi/2$ crosses the pole, so e-theta and e-phi have the opposite sign of the same direction given
+  in range. NaN or infinite angles give NaN in all outputs of that angle and output, without an error. `azimuth` of
+  shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
+- **Poles**: on a pole of the local frame (a direction along the z-axis of the oriented array) the local azimuth is
+  chosen so that the local and the global theta unit vectors agree: the polarization is not rotated there
+- **Kernels**: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the
+  peak field value and 2e-6 rad in the angles, and near a pole of the local frame up to about 2e-7 / d rad at a distance
+  d (in rad). Auto currently selects GENERIC
+
 ## See also:
-- [[generate_antenna]] (arrayant dict layout)
-- [[qdant_read]] (load arrayant data)
-- [[generate_speaker]] (typical source of multi-frequency arrayants)
+- [[apply_port_weights]] (patterns per port instead of per element)
+- [[rotate_pattern]] (applies an orientation to the stored patterns)
+- [[join_arrays]], [[generate_speaker]] (build multi-element, multi-frequency arrays)
+- [[channel.spherical]] (channel coefficients from the interpolated patterns)
 MD!*/
 
 py::tuple interpolate_pattern(const py::dict &arrayant,

@@ -97,6 +97,7 @@ Describes a single antenna array
 - Zeros and levels: a magnitude of `-inf` dB is an exact zero; there is no lower limit for other values. quadriga-lib writes every non-zero sample, and an element that is zero in both components as an all-`-inf` `e_theta_mag` node.
 - Precision written by quadriga-lib (single-precision equivalent relative to the element peak): magnitudes (dB) and phases (degree) get the fewest decimals (0 to 6) that keep the error of each complex sample at or below 6e-8 times the peak amplitude of its element (over both components); magnitudes get 6 decimals within 20 dB of the peak and one fewer per 20 dB below it. Samples far below the peak are therefore less accurate relative to their own value (about 6e-4 at -80 dB, 6e-2 at -120 dB). Positions and port weights as the shortest text that reads back as the same float (at most 9 significant digits), grids rounded to 0.001 degree. A phase tag is omitted if all phases round to 0.
 - `n_elements` must be backed by data: `element_pos`, `port_weights_abs`, or pattern tags with `el="N"`.
+- Reader limits of quadriga-lib, over all entries read (a repeated ID counts once): elements without pattern tags read as zeros, and these zero patterns are limited to the larger of 2^24 values and 1 value per file byte; the identity port weights of a file without `port_weights_abs` (at most 4096 elements) are limited to the larger of 2^24 values and 128 values per file byte.
 
 ### Quick Reference
 

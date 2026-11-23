@@ -8,23 +8,61 @@
 Antennas, transducers and patterns
 SECTION!*/
 
+/*!SECTION_DESC
+The functions of this section create, inspect, transform and store antenna and acoustic arrays. They share one data
+structure, the arrayant dict (keys in [[generate_antenna]]): complex polarimetric patterns of the elements on an azimuth
+and elevation grid, the element positions and the port weights. The channel functions take it as transmit and receive
+antenna.<br><br>
+
+**Terms** (full list in the [Glossary](cpp_api.html#glossary)):
+
+- **Element**: one radiator or sensor (antenna element, loudspeaker driver, microphone capsule) with a pattern, a
+  position and one row of the port weights
+- **Grid**: azimuth $\phi$ in $[-\pi, \pi]$, measured from +x toward +y, and elevation $\theta$ in $[-\pi/2, \pi/2]$,
+  measured from the x-y plane (TR 38.901 uses the zenith angle $90° - \theta$), both in rad and strictly increasing.
+  Boresight is +x
+- **Pattern**: the direction-dependent far field of an element: $F_\theta$ (`e_theta_re/im`) along
+  $\hat\theta = (\sin\theta\cos\phi, \sin\theta\sin\phi, -\cos\theta)$, the zenith-angle unit vector of TR 38.901, which
+  points toward decreasing elevation, and $F_\phi$ (`e_phi_re/im`) along $\hat\phi = (-\sin\phi, \cos\phi, 0)$. For an
+  antenna, $\lvert F_\theta \rvert^2 + \lvert F_\phi \rvert^2$ is the linear gain over an isotropic radiator
+- **Port**: one signal of the array, one column of the port weights
+- **Port weights**: the fixed complex feed network $w_{i,p}$ from element $i$ to port $p$, `(n_elements, n_ports)`. It
+  is not the mutual coupling between elements. Empty means identity (one port per element)
+- **Element position**: local Cartesian coordinates in m, `(3, n_elements)`; empty means all at the origin
+- **Multi-frequency array**: a dict whose pattern arrays have the frequency as fourth axis,
+  `(n_elevation, n_azimuth, n_elements, n_freq)`, with `center_freq` `(n_freq,)`, one grid and one set of element
+  positions, and port weights `(n_elements, n_ports)` or, if they differ between frequencies,
+  `(n_elements, n_ports, n_freq)`. [[interpolate_pattern]] and [[apply_port_weights]] interpolate over frequency between
+  the entries
+
+The field of port $p$ in a direction is the weighted sum of the element fields, each with the phase of its position,
+
+$$F_p = \sum_i w_{i,p} \, F_i \, e^{-j 2\pi f d_i / c}$$
+
+where $d_i = -\hat{r} \cdot x_i$ is the distance of element $i$ at position $x_i$ from the wavefront plane through the
+origin, negative for elements closer to the source, $\hat{r}$ the unit vector toward the source, $f$ the frequency and
+$c$ the propagation speed.<br><br>
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Create | [[generate_antenna]], [[generate_speaker]], [[qdant_read]] |
+| Evaluate | [[interpolate_pattern]], [[calc_directivity]], [[calc_beamwidth]] |
+| Transform | [[apply_port_weights]], [[rotate_pattern]] |
+| Edit and combine | [[join_arrays]], [[copy_element]] |
+| Store, show | [[qdant_write]], [[export_pattern_obj]] |
+
+Arrays are stored in the [QDANT file format](formats.html#qdant).
+SECTION_DESC!*/
+
 /*!MD
 # calc_beamwidth
-Calculate the beamwidth and pointing angles of antenna array elements in degrees
+Calculate the beamwidth and pointing angles of the elements of an antenna array in degrees
 
-- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
-- Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern
-  (≈100x finer grid in each direction than the antenna sampling grid)
-- The width is that of the main lobe, searched outwards from the maximum; side lobes above the threshold
-  are not included
-- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full
-  circle; 360° when the whole cut is above the threshold (e.g. a beam pointing to a pole)
-- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles;
-  at most 180°
-- Calculated per element, not per port; ignores the port weights
-- Accepts both single-frequency (3D pattern fields) and multi-frequency (4D pattern fields)
-  arrayant dicts; output dimensionality follows the input
+- Measures the width of the main lobe of each element in azimuth and elevation at a threshold below its peak, and the
+  direction of the peak
+- Calculated per element, not per port: the port weights are ignored
 
 ## Usage:
 ```
@@ -33,22 +71,31 @@ beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg = \
 ```
 
 ## Inputs:
-- **`arrayant`** — Arrayant dict; single-frequency or multi-frequency (4th pattern dim is frequency);
-  only `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are used;
-  see [[generate_antenna]] for the field layout
-- **`i_element`** — Element indices, 0-based, duplicates allowed; empty: all elements; `(n_out,)`; default: None (all elements)
-- **`threshold_dB`** — Threshold in dB, positive and finite (3 = FWHM); default: 3.0
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array; only the
+  pattern arrays and the grids are needed
+- **`i_element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
+- **`threshold_dB`** — Threshold below the peak in dB, positive and finite; 3 dB is the half-power beamwidth;
+  loudspeakers state the coverage angle between the -6 dB points, use 6; default: 3.0
 
 ## Outputs:
-- **`beamwidth_az_deg`** — Azimuth beamwidth in degrees; `(n_out,)` for single-frequency input,
-  `(n_out, n_freq)` for multi-frequency input; `n_out = n_elements` when `i_element` is None
-- **`beamwidth_el_deg`** — Elevation beamwidth in degrees; same shape as `beamwidth_az_deg`
-- **`az_point_ang_deg`** — Azimuth pointing angle of the main beam in degrees; same shape as `beamwidth_az_deg`
-- **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degrees; same shape as `beamwidth_az_deg`
+- **`beamwidth_az_deg`** — Azimuth beamwidth in degrees; `(n_out,)`, 4D input `(n_out, n_freq)`
+- **`beamwidth_el_deg`** — Elevation beamwidth in degrees; same shape
+- **`az_point_ang_deg`** — Azimuth pointing angle of the main beam in degrees; same shape
+- **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degrees; same shape
+
+## Notes:
+- **Main lobe**: starting at the maximum, the search goes outward until the power drops below the threshold; side lobes
+  above the threshold are not included
+- **Resolution**: the cuts are interpolated as in [[interpolate_pattern]], about 100 times finer than the sampling grid
+- **Azimuth cut**: at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360°
+  when the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
+- **Elevation cut**: along the great circle through the maximum, so a lobe can extend across the poles (requires samples
+  at ±90°); the result is at most 180°
 
 ## See also:
-- [[apply_port_weights]] (apply the port weights before calculating beamwidth)
-- [[calc_directivity]] (directivity in dBi of antenna array elements)
+- [[calc_directivity]] (directivity in dBi of the elements)
+- [[apply_port_weights]] (combines the elements into ports, to measure the beams of the ports)
+- [[generate_antenna]] (creates elements with a given beamwidth)
 MD!*/
 
 py::tuple calc_beamwidth(const py::dict &arrayant,
@@ -76,13 +123,11 @@ py::tuple calc_beamwidth(const py::dict &arrayant,
 
 /*!MD
 # calc_directivity
-Calculates the directivity in dBi of antenna array elements
+Calculate the directivity in dBi of the elements of an antenna array
 
-- Directivity = 10·log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Calculated per element, not per port; ignores the port weights
-- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
-- Accepts both single-frequency (3D pattern fields) and multi-frequency (4D pattern fields)
-  arrayant dicts; output dimensionality follows the input
+- Measures how strongly an element concentrates its power: $D = 10 \log_{10}(P_\mathrm{max} / \bar{P})$ with the peak
+  radiation intensity $P_\mathrm{max}$ and its mean $\bar{P}$ over the sphere; an isotropic radiator has 0 dBi
+- Calculated per element, not per port: the port weights are ignored
 
 ## Usage:
 ```
@@ -90,18 +135,20 @@ directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, *, i_element
 ```
 
 ## Inputs:
-- **`arrayant`** — Arrayant dict; single-frequency or multi-frequency (4th pattern dim is frequency);
-  only `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are used;
-  see [[generate_antenna]] for the field layout
-- **`i_element`** — Element indices, 0-based, duplicates allowed; empty: all elements; `(n_out,)`; default: None (all elements)
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array; only the
+  pattern arrays and the grids are needed
+- **`i_element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
 
 ## Output:
-- **`directivity_dBi`** — Directivity in dBi; `(n_out,)` for a single-frequency input,
-  `(n_out, n_freq)` for a multi-frequency input; `n_out = n_elements` when `i_element` is None
+- **`directivity_dBi`** — Directivity in dBi; `(n_out,)`, 4D input `(n_out, n_freq)`
+
+## Notes:
+- **Scale**: the result does not depend on the scale of the pattern; an element whose pattern is zero everywhere gives 0
+  dBi
 
 ## See also:
-- [[apply_port_weights]] (apply the port weights before calculating directivity)
-- [[calc_beamwidth]] (calculates the beam width of antenna arrays)
+- [[calc_beamwidth]] (beamwidth and pointing angles of the elements)
+- [[apply_port_weights]] (combines the elements into ports, to measure the directivity of the ports)
 MD!*/
 
 py::array_t<double> calc_directivity(const py::dict &arrayant,
@@ -126,14 +173,10 @@ py::array_t<double> calc_directivity(const py::dict &arrayant,
 # apply_port_weights
 Apply the port weights of an antenna array: one pattern per port
 
-- Evaluates the element patterns on the output grid, applies the phase shift of each element position (which
-  moves every pattern to the array origin) and sums the elements with the port weights
+- Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
+- Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
+  and including the phase of each element position
 - The result has one element per port, identity port weights and all element positions at the origin
-- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
-- Accepts a frequency-dependent antenna (4D pattern fields); the pattern is then combined per frequency
-- `freq_new` may recompute (interpolate) the combined pattern at one or more requested frequencies
-- The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
-  applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 
 ## Usage:
 ```
@@ -151,26 +194,30 @@ arrayant_out = quadriga_lib.arrayant.apply_port_weights( arrayant, propagation_s
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict with the antenna array data; keys as documented in [[generate_antenna]]; 4D pattern fields
-  require `center_freq` with one value per frequency entry `(n_freq,)`
-- **`freq_new`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
-  recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
-  is treated as not given; default: `None`
-- **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; strictly increasing; `(n_azimuth_out,)`;
-  if `None`, the input grid is used; default: `None`
-- **`elevation_grid`** — Alternative output elevation grid in rad; -pi/2 to pi/2; strictly increasing;
-  `(n_elevation_out,)`; if `None`, the input grid is used; default: `None`
-- **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for
-  acoustics; default: `299792458.0`
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array
+- **`freq_new`** — Output frequencies in Hz, positive and finite; a scalar <= 0 counts as not given; a 3D input has one
+  pattern, so that only the phase of the element positions follows `freq_new`; scalar or `(n_freq_new,)`; default:
+  `None` (the `center_freq` of the entries, one output per entry)
+- **`azimuth_grid`** — Output azimuth grid in rad; `(n_azimuth_out,)`; default: `None` (the input grid)
+- **`elevation_grid`** — Output elevation grid in rad; `(n_elevation_out,)`; default: `None` (the input grid)
+- **`propagation_speed`** — Wave propagation speed $c$ in m/s, positive and finite; the default is the speed of light
+  for radio waves, use about 343 for acoustic arrays (e.g. from [[generate_speaker]]); default: 299792458.0
 
 ## Output:
-- **`arrayant_out`** — Dict with the combined antenna array data; keys as in [[generate_antenna]]
+- **`arrayant_out`** — Arrayant dict with `n_ports` elements, each holding the pattern of that port; `name` is kept,
+  `center_freq` is the output frequency; 3D pattern arrays for one output frequency, otherwise 4D with one entry per
+  output frequency
+
+## Notes:
+- **Frequency interpolation** (4D input or several output frequencies): the fields are interpolated over frequency as in
+  [[interpolate_pattern]], the port weights spherically between the two entries that bracket the output frequency.
+  Output frequencies outside the entries take the nearest entry. The position phase uses the output frequency
 
 ## See also:
-- [[generate_antenna]] (for field layout in the arrayant struct)
-- [[rotate_pattern]] (for changing the orientation of elements before combining)
-- [[calc_beamwidth]] (calculates the beam width of antenna arrays)
-- [[calc_directivity]] (directivity in dBi of antenna array elements)
+- [[generate_antenna]] (creates arrays with port weights)
+- [[interpolate_pattern]] (evaluates the element patterns without the port weights)
+- [[calc_directivity]], [[calc_beamwidth]] (work per element, so they measure the port patterns of the result)
+- [[rotate_pattern]] (turns the combined pattern)
 MD!*/
 
 py::dict apply_port_weights(const py::dict &arrayant,
@@ -207,18 +254,15 @@ py::dict apply_port_weights(const py::dict &arrayant,
 
 /*!MD
 # join_arrays
-Concatenate two antenna arrays into a single one
+Join the elements of two antenna arrays into a new array
 
-- Appends all elements of `arrayant2` onto `arrayant1` along the element dimension; the `element_pos`
-  matrices are joined horizontally
-- Both inputs must share identical azimuth and elevation sampling grids
-- Port weights are assembled block-diagonally: `arrayant1`'s elements connect only to its own ports,
-  `arrayant2`'s elements only to its own ports
-- `center_freq` and `name` are taken from `arrayant1`
-- Frequency-dependent input (4D pattern fields): both inputs must have the same number of
-  frequency entries with matching `center_freq` at each index; concatenation is done per entry
-- Output format matches the input: single-frequency dict for 3D input, frequency-dependent dict
-  for 4D input
+- Combines two arrays with identical sampling grids, e.g. the drivers of a loudspeaker; `name` and `center_freq` are
+  taken from the first array
+- The ports stay separate: elements of the first array connect only to its ports, and likewise for the second:<br><br>
+   | Element \ Port        | P1…Pp1 (first) | Pp1+1…Pp1+p2 (second) |
+   | --------------------- | :------------: | :-------------------: |
+   | E1…En1 (first)        |    W1 block    |           0           |
+   | En1+1…En1+n2 (second) |       0        |       W2 block        |
 
 ## Usage:
 ```
@@ -226,14 +270,19 @@ arrayant_out = quadriga_lib.arrayant.join_arrays( arrayant1, arrayant2 )
 ```
 
 ## Inputs:
-- **`arrayant1`** — Dict with the first antenna array; keys as in [[generate_antenna]]; pattern fields
-  may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`arrayant2`** — Dict with the second antenna array; must use the same azimuth and elevation
-  grids as `arrayant1`, and for 4D input the same number of frequency entries with matching `center_freq`
+- **`arrayant1`** — First array; arrayant dict ([[generate_antenna]]), 3D or 4D (multi-frequency) pattern arrays; its
+  elements come first in the output
+- **`arrayant2`** — Second array with the same sampling grids; 4D input needs as many frequency entries as the first and
+  matching `center_freq` values at each index
 
 ## Output:
-- **`arrayant_out`** — Dict with the concatenated antenna array; same keys and layout as the
-  inputs; single-frequency dict for 3D input, frequency-dependent dict for 4D input
+- **`arrayant_out`** — New arrayant dict with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports, in the form
+  of the inputs (3D or 4D)
+
+## See also:
+- [[copy_element]] (duplicates an element within one array)
+- [[generate_speaker]] (creates the driver models to join)
+- [[qdant_write]] (stores the joined model)
 MD!*/
 
 py::dict join_arrays(const py::dict &arrayant1,
@@ -261,16 +310,12 @@ py::dict join_arrays(const py::dict &arrayant1,
 
 /*!MD
 # copy_element
-Create copies of antenna array elements
+Copy a single element of an antenna array to one or more destination slots
 
-- Copies a source element to one or more destination slots within an arrayant
-- The antenna is resized when a destination index exceeds the current number of elements
-- Port weights of newly added elements are set to identity; existing port weights are kept
-- Works on single-frequency dicts (3D pattern fields) and frequency-dependent dicts (4D pattern
-  fields); the same copy is applied to every frequency and a matching dict is returned
-- If `i_source` has one entry, that element is copied to every index in `i_target`
-- If `i_source` has several entries, `i_target` must have the same length and copies
-  are performed pairwise as `i_source[i]` to `i_target[i]`
+- Copies the pattern and the position of an element, e.g. to build an array from a single element; the port weights of
+  existing elements do not change
+- A destination beyond the last element enlarges the array. Each added element gets its own new port with weight 1;
+  added elements that are not a destination have a zero pattern and position
 
 ## Usage:
 ```
@@ -285,15 +330,20 @@ arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, [0, 1], [2, 3] )
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict with the antenna array data; keys as in [[generate_antenna]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`i_source`** — Index of the source element(s); scalar int or 1D list or array of int; `(n_copy,)`
-- **`i_target`** — Index of the destination element(s); scalar int or 1D list or array of int; `(n_copy,)`;
-  must have the same length as `i_source` unless `i_source` is a single index
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array; the same copy
+  is made at every frequency
+- **`i_source`** — Index of the element to copy, 0-based, below `n_elements`; int, or list or array `(n_copy,)` for
+  pairwise copies from `i_source[k]` to `i_target[k]`
+- **`i_target`** — Destination indices, 0-based, not empty; int, or list or array `(n_copy,)`; a single `i_source` is
+  copied to each of them, several need the same length
 
 ## Output:
-- **`arrayant_out`** — Dict with the modified antenna array data; same keys and layout as
-  `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input
+- **`arrayant_out`** — Arrayant dict with the copies, in the form of `arrayant` (3D or 4D)
+
+## See also:
+- [[join_arrays]] (joins two arrays)
+- [[generate_antenna]] (creates the element to copy)
+- [[rotate_pattern]] (turns single copies, through `i_element`)
 MD!*/
 
 py::dict copy_element(const py::dict &arrayant,
@@ -324,17 +374,12 @@ py::dict copy_element(const py::dict &arrayant,
 
 /*!MD
 # rotate_pattern
-Rotate antenna radiation patterns using Euler rotations
+Rotate the patterns of an antenna array using Euler rotations
 
-- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
-  [[interpolate_pattern]] returns for the unrotated pattern with the same `orientation`
-- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
-- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); port weights, `center_freq` and `name` are kept
-- Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled
-  antennas; this needs all elements, so a subset in `i_element` raises an error when the grid must be adjusted
-- Frequency-dependent input (4D pattern fields): the rotation is applied to every entry and the grid is never adjusted,
-  since all entries must share one grid
-- For scalar acoustic fields (pressure stored in `e_theta_re` only) use `usage = 1` to avoid spurious polarization effects
+- Turns the patterns, the polarization and the element positions of an array, e.g. for a mechanical downtilt. The
+  rotated pattern equals, at the grid points, what [[interpolate_pattern]] returns for the unrotated pattern with the
+  same `orientation`
+- Port weights, `center_freq` and `name` are kept
 
 ## Usage:
 ```
@@ -342,25 +387,31 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, orientation, *, u
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict with the antenna array data; keys as in [[generate_antenna]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3 elements
-- **`usage`** — Rotation mode; default: 0<br><br>
-   | Mode | Pattern | Polarization | Grid adj. |
-   | :--: | :-----: | :----------: | :-------: |
-   | 0    | Yes     | Yes          | Yes       |
-   | 1    | Yes     | No           | Yes       |
-   | 2    | No      | Yes          | No        |
-   | 3    | Yes     | Yes          | No        |
-   | 4    | Yes     | No           | No        |
-
-   for 4D input the grid is never adjusted, so `0`/`3` and `1`/`4` are equivalent
-- **`i_element`** — Element indices to rotate, 0-based, no duplicates; `None` or empty rotates all elements;
-  default: `None`
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; a positive tilt turns the main beam down, as in
+  3GPP TR 38.901; 3 elements
+- **`usage`** — Rotation mode; default: 0. Modes 0 and 1 adjust the sampling grid of non-uniformly sampled patterns,
+  which needs all elements: for such a pattern, a subset in `i_element` raises an error. 4D input never adjusts the
+  grid, so that all entries keep the same grid: there 0 equals 3, and 1 equals 4. Element positions turn in all modes
+  except 2. For scalar acoustic fields (pressure in `e_theta_re` only), use 1 to avoid spurious polarization
+  effects:<br><br>
+   | Mode | Pattern | Polarization | Grid adjustment |
+   | ---- | ------- | ------------ | --------------- |
+   | 0    | Yes     | Yes          | Yes             |
+   | 1    | Yes     | No           | Yes             |
+   | 2    | No      | Yes          | No              |
+   | 3    | Yes     | Yes          | No              |
+   | 4    | Yes     | No           | No              |
+- **`i_element`** — Element indices to rotate, 0-based, no duplicates; default: `None` (all elements)
 
 ## Output:
-- **`arrayant_out`** — Dict with the rotated antenna array data; same keys and layout as
-  `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input
+- **`arrayant_out`** — Rotated arrayant dict, in the form of `arrayant` (3D or 4D)
+
+## See also:
+- [[interpolate_pattern]] (evaluates a pattern for an orientation without changing it)
+- [[calc_rotation_matrix]] (rotation matrix of the orientation)
+- [[generate_antenna]] (electrical tilt through the port weights)
+- [[join_arrays]] (joins arrays that are then rotated together)
 MD!*/
 
 py::dict rotate_pattern(const py::dict &arrayant,

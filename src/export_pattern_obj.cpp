@@ -21,8 +21,10 @@ SECTION!*/
 # export_pattern_obj
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
-- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives finer mesh
-- Each element is placed at its position in `element_pos` (empty: at the origin)
+- Writes the power pattern of each element as a colored 3D surface, one object per element, placed at its position in
+  `element_pos`
+- The distance of the surface from the element is linear in the level in dB: `object_radius` at the peak over all
+  exported elements, 0 at `directivity_range_dB` below it. The color shows the same level
 
 ## Declaration:
 ```
@@ -37,18 +39,21 @@ void quadriga_lib::export_pattern_obj(
 ```
 
 ## Inputs:
-- **`fn`** — Output OBJ filename; must end in .obj; the colormap is written to a .mtl file of the same name
-- **`ant`** — Valid arrayant
-- **`directivity_range_dB`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
-- **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
-- **`object_radius`** *(optional)* — Radius of the exported object
-- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [[icosphere]]
-- **`i_element`** *(optional)* — 0-based element indices to export; empty exports all elements
+- **`fn`** — Output OBJ file name, must end in `.obj`; the colormap is written to a `.mtl` file of the same name;
+  existing files are overwritten
+- **`ant`** — Valid arrayant; the exported elements must have finite field values and must not be zero in all directions
+- **`directivity_range_dB`** *(optional)* — Range of the plot below the peak in dB, finite and not 0; the sign is
+  ignored
+- **`colormap`** *(optional)* — Colormap name; see [[colormap]] for the supported maps
+- **`object_radius`** *(optional)* — Radius of the surface at the peak in m, positive and finite
+- **`icosphere_n_div`** *(optional)* — Subdivisions of the [[icosphere]] that carries the surface; higher = finer mesh
+  with $20 n^2$ faces
+- **`i_element`** *(optional)* — Element indices to export, 0-based; empty: all elements
 
 ## See also:
-- [[colormap]] (Used for setting the colormap)
-- [[icosphere]] (Used internally to generate icosphere primitive)
-- [[channel_export_obj_file]] (exports propagation paths to OBJ 3D visualization)
+- [[calc_directivity]], [[calc_beamwidth]] (the same pattern as numbers)
+- [[colormap]] (the available color scales)
+- [[channel_export_obj_file]] (exports propagation paths to an OBJ file)
 MD!*/
 
 template <typename dtype>

@@ -268,19 +268,9 @@ SECTION!*/
 # calc_beamwidth
 Calculate the beamwidth and pointing angles of the elements of an antenna array in degrees
 
-- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
-- Loudspeakers state the coverage angle between the -6 dB points: use `threshold_dB = 6`
-- Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
-- The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the
-  threshold; side lobes above the threshold are not included
-- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when
-  the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
-- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples
-  at ±90°); the result is at most 180°
-- Calculated per element, not per port; ignores the port weights
-- Vector form: the same computation on every entry of a multi-frequency vector; column `i_freq` of each output holds
-  the results of `arrayant_vec[i_freq]`
+- Measures the width of the main lobe of each element in azimuth and elevation at a threshold below its peak, and the
+  direction of the peak
+- Calculated per element, not per port: the port weights are ignored
 
 ## Declarations:
 ```
@@ -305,28 +295,40 @@ void quadriga_lib::calc_beamwidth(
 
 ## Inputs:
 - **`ant`** — Valid arrayant
-- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [[is_valid]]
+- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [[is_valid]]; column
+  `i_freq` of each output holds the results of `arrayant_vec[i_freq]`
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
-- **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
+- **`threshold_dB`** *(optional)* — Threshold below the peak in dB, positive and finite; 3 dB is the half-power
+  beamwidth; loudspeakers state the coverage angle between the -6 dB points, use 6
 
 ## Outputs:
-- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degree; `[n_out]`, vector form `[n_out, n_freq]`
-- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degree; `[n_out]`, vector form `[n_out, n_freq]`
-- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out]`, vector form
+- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degrees; `[n_out]`, vector form `[n_out, n_freq]`
+- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degrees; `[n_out]`, vector form `[n_out, n_freq]`
+- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degrees; `[n_out]`, vector form
   `[n_out, n_freq]`
-- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degree; `[n_out]`, vector form
+- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degrees; `[n_out]`, vector form
   `[n_out, n_freq]`
 
 ## Example:
 ```
 auto ant = quadriga_lib::generate_antenna<double>("custom", 1.0, NAN, {30.0, 20.0});
 arma::vec bw_az, bw_el;
-quadriga_lib::calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
+quadriga_lib::calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // about 30 and 20 degrees
 ```
+
+## Notes:
+- **Main lobe**: starting at the maximum, the search goes outward until the power drops below the threshold; side lobes
+  above the threshold are not included
+- **Resolution**: the cuts are interpolated as in [[interpolate_pattern]], about 100 times finer than the sampling grid
+- **Azimuth cut**: at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360°
+  when the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
+- **Elevation cut**: along the great circle through the maximum, so a lobe can extend across the poles (requires samples
+  at ±90°); the result is at most 180°
 
 ## See also:
 - [[calc_directivity]] (directivity in dBi of the elements)
-- [[apply_port_weights]] (apply the port weights before calculating the beamwidth)
+- [[apply_port_weights]] (combines the elements into ports, to measure the beams of the ports)
+- [[generate_antenna]] (creates elements with a given beamwidth)
 MD!*/
 
 template <typename dtype>
@@ -410,11 +412,9 @@ template void quadriga_lib::calc_beamwidth(const std::vector<arrayant<double>> &
 # calc_directivity
 Calculate the directivity in dBi of the elements of an antenna array
 
-- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
-- Calculated per element, not per port; ignores the port weights
-- Vector form: the same computation on every entry of a multi-frequency vector; column `i_freq` of the output holds
-  the results of `arrayant_vec[i_freq]`
+- Measures how strongly an element concentrates its power: $D = 10 \log_{10}(P_\mathrm{max} / \bar{P})$ with the peak
+  radiation intensity $P_\mathrm{max}$ and its mean $\bar{P}$ over the sphere; an isotropic radiator has 0 dBi
+- Calculated per element, not per port: the port weights are ignored
 
 ## Declarations:
 ```
@@ -429,7 +429,8 @@ arma::Mat<dtype> quadriga_lib::calc_directivity(
 
 ## Inputs:
 - **`ant`** — Valid arrayant
-- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [[is_valid]]
+- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [[is_valid]]; column
+  `i_freq` of the output holds the results of `arrayant_vec[i_freq]`
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ## Returns:
@@ -441,9 +442,13 @@ auto ant = quadriga_lib::generate_antenna<double>("dipole");
 arma::vec directivity_dBi = quadriga_lib::calc_directivity(ant); // about 1.76 dBi
 ```
 
+## Notes:
+- **Scale**: the result does not depend on the scale of the pattern; an element whose pattern is zero everywhere gives 0
+  dBi
+
 ## See also:
 - [[calc_beamwidth]] (beamwidth and pointing angles of the elements)
-- [[apply_port_weights]] (apply the port weights before calculating the directivity)
+- [[apply_port_weights]] (combines the elements into ports, to measure the directivity of the ports)
 MD!*/
 
 template <typename dtype>

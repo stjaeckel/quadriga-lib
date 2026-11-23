@@ -4,12 +4,12 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-geomet
 
 | Function | Summary |
 | --- | --- |
+| [gbsm_rays](#gbsm_rays) | Class for the ray data of one link (geometry-based stochastic model) |
 | [conf_file_list](#conf_file_list) | List the scenarios defined by the conf files in a set of directories |
 | [conf_file_read](#conf_file_read) | Read and validate a QuaDRiGa scenario configuration file |
 | [conf_file_write](#conf_file_write) | Write a QuaDRiGa scenario configuration file |
 | [gbsm_draw](#gbsm_draw) | Spatially correlated normalized random values of one random set at a set of links |
 | [gbsm_init_phases](#gbsm_init_phases) | SOS phases of one random set of a BS site and scenario |
-| [gbsm_rays](#gbsm_rays) | Class for the ray data of one link (geometry-based stochastic model) |
 | [gbsm_rays_from_paths](#gbsm_rays_from_paths) | Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read |
 | [gbsm_single_link_channel](#gbsm_single_link_channel) | Channel coefficients of one link at one frequency over one segment |
 | [los_probability](#los_probability) | LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models |
@@ -118,6 +118,59 @@ conf-file keys): in rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, p
 38.901 except two deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm_init_phases](#gbsm_init_phases),
 [gbsm_draw](#gbsm_draw)) and `method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Units: frequencies
 in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees.
+
+---
+<a id="gbsm_rays"></a>
+## gbsm_rays
+Class for the ray data of one link (geometry-based stochastic model)
+
+Not in: MATLAB, Python
+
+- Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
+  positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
+  [ssf_scatterers](#ssf_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
+- Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
+- An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
+- Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
+  `is_valid()`) and one `method` for all rays. [ssf_scatterers](#ssf_scatterers) overwrites given scatterers, so solve rays without
+  scatterers in a separate object and concatenate the attributes
+- Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
+  non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
+
+### Attributes:
+| Attribute | Type, size | Meaning | Set by |
+| --- | --- | --- | --- |
+| `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
+| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
+| `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
+| `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
+| `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
+| `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
+| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | all |
+| `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
+| `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
+| `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [ssf_scatterers](#ssf_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [ssf_scatterers](#ssf_scatterers) |
+
+### Member functions:
+| Member | Returns |
+| --- | --- |
+| `n_ray()` | Number of rays, length of `delay` |
+| `n_freq()` | Number of frequencies, length of `center_freq` |
+| `empty()` | `true` if `n_ray() == 0` |
+| `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
+| `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
+| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
+
+- `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
+
+### See also:
+- [ssf_rays](#ssf_rays) (ray data of a set of links)
+- [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for the mobility `drift`)
+- [ssf_paths](#ssf_paths) (paths of one link at one position)
+- [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
 ---
 <a id="conf_file_list"></a>
@@ -423,59 +476,6 @@ arma::cube quadriga_lib::gbsm_init_phases(
 ### See also:
 - [gbsm_draw](#gbsm_draw) (evaluates the SOS phases at the links)
 - [sos_init_phases](sum-of-sinusoids-random-number-generator.md#sos_init_phases), [sos_val](sum-of-sinusoids-random-number-generator.md#sos_val) (SOS phases and evaluation of one generator), [sos_remove_bias](sum-of-sinusoids-random-number-generator.md#sos_remove_bias) (its bias removal)
-
----
-<a id="gbsm_rays"></a>
-## gbsm_rays
-Class for the ray data of one link (geometry-based stochastic model)
-
-Not in: MATLAB, Python
-
-- Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
-  positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
-  [ssf_scatterers](#ssf_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
-- Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
-- An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
-- Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
-  `is_valid()`) and one `method` for all rays. [ssf_scatterers](#ssf_scatterers) overwrites given scatterers, so solve rays without
-  scatterers in a separate object and concatenate the attributes
-- Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
-  non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
-
-### Attributes:
-| Attribute | Type, size | Meaning | Set by |
-| --- | --- | --- | --- |
-| `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
-| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
-| `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
-| `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
-| `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
-| `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
-| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | all |
-| `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
-| `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
-| `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [ssf_scatterers](#ssf_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [ssf_scatterers](#ssf_scatterers) |
-
-### Member functions:
-| Member | Returns |
-| --- | --- |
-| `n_ray()` | Number of rays, length of `delay` |
-| `n_freq()` | Number of frequencies, length of `center_freq` |
-| `empty()` | `true` if `n_ray() == 0` |
-| `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
-| `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
-| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
-
-- `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
-
-### See also:
-- [ssf_rays](#ssf_rays) (ray data of a set of links)
-- [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
-- [ssf_scatterers](#ssf_scatterers) (scatterers for the mobility `drift`)
-- [ssf_paths](#ssf_paths) (paths of one link at one position)
-- [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
 ---
 <a id="gbsm_rays_from_paths"></a>

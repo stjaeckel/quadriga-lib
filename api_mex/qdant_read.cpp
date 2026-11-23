@@ -10,18 +10,11 @@ SECTION!*/
 
 /*!MD
 # QDANT_READ
-Reads antenna array data from QDANT files
+Read arrayant objects from a QDANT file
 
-- The QuaDRiGa Array Antenna Exchange Format (QDANT) is an XML format for storing antenna pattern data
-- Without `ids`, the entries listed in the layout are read (all entries if the file has no layout): returns a struct array when the file has multiple entries (frequency-dependent model) 
-  or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
-  same azimuth and elevation grids, element positions and port-weights size), otherwise
-  an error asks to pass `ids`
-- With a scalar `ids`, a single entry is read as a struct; useful for picking one frequency from a multi-frequency file
-- With a vector `ids`, the entries are read in the given order (duplicates allowed) and returned as a struct array
-- An ID that is 0 or not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
-- Malformed files are an error, also when they declare more elements (`n_elements`) than the file has data for;
-  elements without pattern data read as zeros (at most the larger of 2^24 values and 1 value per file byte in one read)
+- Loads arrays from a file in the [QDANT format](formats.html#qdant). A file can hold several arrays, each with a
+  numeric ID, e.g. one per frequency of a frequency-dependent model, where `center_freq` of each entry identifies the
+  frequency
 
 ## Usage:
 ```
@@ -36,17 +29,25 @@ Reads antenna array data from QDANT files
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QDANT file; string; must not be empty
-- **`ids`** — 1-based ID of the antenna entry to read (scalar) or vector of IDs; pass `[]` or omit to read the entries in the layout
+- **`fn`** — Path to the QDANT file; must not be empty
+- **`ids`** — 1-based IDs of the entries to read, in this order, duplicates allowed; scalar or vector; default: the
+  entries listed in the layout, each once, in order of first appearance (column-major scan), or all entries if the file
+  has no layout; several entries must then form a multi-frequency array, otherwise an error asks to pass `ids`
 
 ## Outputs:
-- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [[generate_antenna]]
-- **`layout`** — Matrix of element IDs describing how entries are arranged in the file; datatype: uint32
+- **`ant`** — Arrayant struct ([[generate_antenna]]) for one entry, 1xN struct array for several
+- **`layout`** — The file's layout matrix of entry IDs (0 = empty slot); uint32
+
+## Notes:
+- **IDs**: the number used in the layout matrix and by [[qdant_write]]. A first entry without an `id` attribute (files
+  from other tools) counts as ID 1
+- **Errors**: an ID that is 0 or not in the file, and a missing, unreadable or malformed file, raise an error
+- **Elements without data**: elements without pattern nodes read as zeros. A file whose element count is not backed by
+  its data, or that exceeds the [reader limits](formats.html#qdant), raises an error
 
 ## See also:
-- [[qdant_write]] (for writing QDANT data)
-- [[generate_antenna]] (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
+- [[qdant_write]] (writes such files)
+- [[generate_antenna]], [[generate_speaker]] (create arrays without a file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

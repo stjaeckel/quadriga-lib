@@ -10,11 +10,11 @@ SECTION!*/
 
 /*!MD
 # CALC_DIRECTIVITY
-Calculates the directivity in dBi of antenna array elements
+Calculate the directivity in dBi of the elements of an antenna array
 
-- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Calculated per element, not per port; ignores the port weights
-- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
+- Measures how strongly an element concentrates its power: `D = 10 log10(P_max / P_mean)` with the peak radiation
+  intensity `P_max` and its mean `P_mean` over the sphere; an isotropic radiator has 0 dBi
+- Calculated per element, not per port: the port weights are ignored
 
 ## Usage:
 ```
@@ -22,16 +22,20 @@ directivity_dBi = quadriga_lib.calc_directivity( arrayant, i_element );
 ```
 
 ## Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[generate_antenna]];
-  a struct array may contain a frequency-dependent model
+- **`arrayant`** — Arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency array with `n_freq`
+  entries
 - **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 
 ## Output:
-- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
+- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
+
+## Notes:
+- **Scale**: the result does not depend on the scale of the pattern; an element whose pattern is zero everywhere gives 0
+  dBi
 
 ## See also:
-- [[apply_port_weights]] (to apply the port weights before calculating directivity)
-- [[calc_beamwidth]] (calculates the beam width of antenna arrays)
+- [[calc_beamwidth]] (beamwidth and pointing angles of the elements)
+- [[apply_port_weights]] (combines the elements into ports, to measure the directivity of the ports)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

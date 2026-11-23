@@ -22,15 +22,10 @@ SECTION!*/
 # rotate_pattern
 Rotate the patterns of an antenna array using Euler rotations, in place
 
-- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
-  [[interpolate_pattern]] returns for the unrotated pattern with the same `orientation`
-- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
-- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); port weights, `center_freq` and `name` are kept
-- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled patterns; this needs all elements, so a subset
-  in `i_element` throws when the grid must be adjusted
-- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
-- Vector form: rotates every entry of a multi-frequency vector with grid adjustment always disabled (required for
-  uniform-grid consistency across frequencies); usage 0 to 2
+- Turns the patterns, the polarization and the element positions of an array, e.g. for a mechanical downtilt. The
+  rotated pattern equals, at the grid points, what [[interpolate_pattern]] returns for the unrotated pattern with the
+  same `orientation`
+- Port weights, `center_freq` and `name` are kept
 
 ## Declarations:
 ```
@@ -49,9 +44,14 @@ void quadriga_lib::rotate_pattern(
 
 ## Inputs:
 - **`ant`** — Valid arrayant; updated in place
-- **`arrayant_vec`** — Vector form: non-empty vector of arrayant objects; updated in place
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]` or `[1, 3]`
-- **`usage`** *(optional)* — Rotation mode:<br><br>
+- **`arrayant_vec`** — Vector form: non-empty vector of arrayant objects; updated in place; the grid is never adjusted,
+  so that all entries keep the same grid
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; a positive tilt turns the main beam down, as in
+  3GPP TR 38.901; `[3, 1]` or `[1, 3]`
+- **`usage`** *(optional)* — Rotation mode; vector form: 0 to 2, where 0 and 1 act as 3 and 4. In the single form, modes
+  0 and 1 adjust the sampling grid of non-uniformly sampled patterns, which needs all elements: a subset in `i_element`
+  then throws. Element positions turn in all modes except 2. For scalar acoustic fields (pressure in `e_theta_re` only),
+  use 1 to avoid spurious polarization effects:<br><br>
    | Mode | Pattern | Polarization | Grid adjustment |
    | ---- | ------- | ------------ | --------------- |
    | 0    | Yes     | Yes          | Yes             |
@@ -69,9 +69,10 @@ quadriga_lib::rotate_pattern(ant, downtilt);
 ```
 
 ## See also:
-- [[interpolate_pattern]] (same orientation convention)
+- [[interpolate_pattern]] (evaluates a pattern for an orientation without changing it)
 - [[calc_rotation_matrix]] (rotation matrix of the orientation)
-- [[join_arrays]] (join arrays before rotating)
+- [[generate_antenna]] (electrical tilt through the port weights)
+- [[join_arrays]] (joins arrays that are then rotated together)
 MD!*/
 
 template <typename dtype>
@@ -397,12 +398,8 @@ template void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<do
 # trim_pattern
 Remove zero-valued entries from antenna pattern data, reducing its size
 
-- Works in place on the sampling grid and the pattern cubes; positions, port weights, name and frequency are unchanged
-- A column or row is removed if the total power summed over all field components and array elements does not exceed
-  1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
-  depend on the scale of the pattern; an all-zero pattern is left unchanged
-- Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-- To keep the original, call it on a copy (`auto b = ant;`)
+- Removes the azimuth columns and elevation rows without power from the sampling grid and the patterns, in place
+- Positions, port weights, name and frequency are unchanged
 
 ## Declaration:
 ```
@@ -410,7 +407,18 @@ void quadriga_lib::trim_pattern(arrayant<dtype> &ant);
 ```
 
 ## Input:
-- **`ant`** — Valid arrayant; updated in-place
+- **`ant`** — Valid arrayant; updated in place; to keep the original, call it on a copy (`auto b = ant;`)
+
+## Notes:
+- **Threshold**: a column or row is removed if its total power, summed over all field components and elements, does not
+  exceed $10^{-12}$ times the peak power of a single sample (summed over field components and elements). The result does
+  not depend on the scale of the pattern; an all-zero pattern is left unchanged
+- **Neighbors**: the immediate neighbors of retained entries are also kept, unless the local grid spacing is strongly
+  asymmetric (by a factor above 1.5)
+
+## See also:
+- [[rotate_pattern]] (trims the grid it adjusts)
+- [[qdant_write]] (stores the reduced pattern)
 MD!*/
 
 template <typename dtype>

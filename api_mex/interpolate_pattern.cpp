@@ -13,18 +13,10 @@ SECTION!*/
 Interpolate the polarimetric field pattern of an antenna array at given azimuth and elevation angles
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
-  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (a 1x1 struct and no `freq_new`): up to 8 outputs. Multi-frequency mode (a struct array with
-  more than one entry, or `freq_new` given): for each target frequency, the two entries whose center frequencies
-  bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
-- `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
-- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
-- On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so
-  that the local and the global theta unit vectors agree: the polarization is not rotated there
-- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the peak
-  field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
-  2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
-  elevation; auto selects GENERIC in this version, which may change in a later version
+  global coordinate system (GCS), with the orientation of the array and the resulting polarization rotation applied
+- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation)
+- Multi-frequency mode (a struct array, or target frequencies given): the two entries whose center frequencies bracket
+  each target frequency are interpolated and blended
 
 ## Usage:
 ```
@@ -38,35 +30,56 @@ Interpolate the polarimetric field pattern of an antenna array at given azimuth 
 ```
 
 ## Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[generate_antenna]]; a struct
-  array may contain a frequency-dependent model
-- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
-  output)
-- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
-- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
-  `[3, n_out, n_ang]`; default: no rotation
-- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
-  positions of the arrayant
-- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
-  of the entries
-- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
+- **`arrayant`** — Arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency array; entries need
+  not be sorted by frequency
+- **`azimuth`** — Azimuth angles in GCS in rad; one row: the same angles for all outputs (planar wave), `n_out` rows:
+  one angle per output (spherical wave); `[1, n_ang]` or `[n_out, n_ang]`
+- **`elevation`** — Elevation angles in GCS in rad; same size as `azimuth`
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements in order
+  (`n_out = n_elements`)
+- **`orientation`** — Euler angles (bank, tilt, heading) of the array, for all outputs and angles, per output, per
+  angle, or both, applied at all frequencies; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or `[3, n_out, n_ang]`; default:
+  no rotation
+- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; multi-frequency mode: checked for
+  its size only, since no output depends on the positions; `[3, n_out]`; default: the positions of the selected elements
+- **`freq_new`** — Target frequencies in Hz, finite; selects the multi-frequency mode; ascending or descending order is
+  fastest; `[n_freq]`; default: the center frequencies of the entries in order
+- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable or if the pattern has more than
+  2^31 - 1 samples); other values raise an error; default: 0
 
 ## Outputs:
-- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`; multi-frequency mode:
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`, multi-frequency mode
   `[n_out, n_ang, n_freq]`
 - **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
-- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
-  elements closer to the source; `[n_out, n_ang]`; single-frequency mode only
+- **`dist`** — Distance of each element from the wavefront plane through the origin of the array; negative for elements
+  closer to the source; `[n_out, n_ang]`; single-frequency mode only
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;
   single-frequency mode only
-- **`gamma`** — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`; single-frequency
-  mode only
+- **`gamma`** — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`; single-frequency mode
+  only
+
+## Notes:
+- **Interpolation**: linear where neighboring samples have nearly opposite phases; the azimuth grid wraps around,
+  elevations outside the grid take the values of the first or last grid row
+- **Frequency interpolation** (multi-frequency mode): spherical interpolation of the complex values over frequency,
+  linear where the two values have nearly opposite phases or one of them is zero. Target frequencies outside the range
+  of the center frequencies take the nearest entry (no extrapolation). Consecutive target frequencies with the same
+  bracketing entries reuse the spatial results
+- **Angles**: not range-checked; values outside [-π, π] and [-π/2, π/2] denote the same direction; an elevation beyond
+  ±π/2 crosses the pole, so e-theta and e-phi have the opposite sign of the same direction given in range. NaN or
+  infinite angles give NaN in all outputs of that angle and output, without an error. `azimuth` of size `[1, 0]` or
+  `[n_out, 0]` gives empty outputs; `[]` raises an error
+- **Poles**: on a pole of the local frame (a direction along the z-axis of the oriented array) the local azimuth is
+  chosen so that the local and the global theta unit vectors agree: the polarization is not rotated there
+- **Kernels**: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the
+  peak field value and 2e-6 rad in the angles, and near a pole of the local frame up to about 2e-7 / d rad at a distance
+  d (in rad). Auto currently selects GENERIC
 
 ## See also:
-- [[generate_antenna]] (arrayant struct layout)
-- [[qdant_read]] (load arrayant data)
-- [[generate_speaker]] (typical source of multi-frequency struct arrays)
+- [[apply_port_weights]] (patterns per port instead of per element)
+- [[rotate_pattern]] (applies an orientation to the stored patterns)
+- [[join_arrays]], [[generate_speaker]] (build multi-element, multi-frequency arrays)
+- [[get_channels_spherical]] (channel coefficients from the interpolated patterns)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

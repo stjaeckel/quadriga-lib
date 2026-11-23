@@ -12,30 +12,10 @@ SECTION!*/
 # GENERATE_SPEAKER
 Generate a parametric frequency-dependent loudspeaker directivity model
 
-- Returns one arrayant per frequency sample; each has a single element with the real-valued
-  directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
-- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
-  results via [[join_arrays]] and `element_pos`; crossover behavior emerges from overlapping bandpass
-  responses.
-- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
-  where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB - 85) / 20)`.
-- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band
-  below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz.
-- Speed of sound assumed to be 343 m/s.
-- Driver models (`driver_type`):
-  - `piston` - circular piston in baffle, `D(theta) = 2·J1(ka·sin theta)/(ka·sin theta)`,
-    rotationally symmetric, narrows with increasing `ka`
-  - `horn` - separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni
-    below `horn_control_freq`
-  - `omni` - frequency-independent omnidirectional pattern.
-- Enclosure models (`radiation_type`):
-  - `monopole` - no modification
-  - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
-  - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
-  - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
-  and `f_ctrl = c/(2pi·radius)`.
+- Creates one arrayant per frequency with a single element at the origin. Its real-valued pattern in `e_theta_re` is the
+  product of the driver directivity, the enclosure radiation and the bandpass frequency response
+- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining the results with
+  [[join_arrays]] and the field `element_pos`; the crossover follows from the overlapping bandpass responses
 
 ## Usage:
 ```
@@ -46,26 +26,62 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 ```
 
 ## Inputs:
-- **`driver_type`** — Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
-- **`radius`** — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn; default: 0.05
-- **`lower_cutoff`** — Lower -3 dB bandpass frequency in Hz, > 0; default: 80
-- **`upper_cutoff`** — Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`; default: 12000
-- **`lower_rolloff_slope_dB`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth); default: 12
-- **`upper_rolloff_slope_dB`** — High-frequency rolloff in dB/octave, > 0; default: 12
-- **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
-- **`radiation_type`** — Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`; default: `hemisphere`
-- **`hor_coverage_deg`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; default: NaN
-- **`ver_coverage_deg`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; default: NaN
-- **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
-- **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
-- **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
-- **`center_freq`** — Frequency sample points; `[n_freq]`; default: `[]` (auto-generated third-octave bands)
-- **`angular_resolution_deg`** — Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
+- **`driver_type`** — Driver directivity model: `piston` (circular piston in a baffle, narrows with increasing
+  frequency), `horn` (set coverage, toward omni at low frequencies) or `omni` (independent of frequency); default:
+  `piston`
+- **`radius`** — Effective radiating radius in m, > 0; cone or dome radius for `piston`, mouth radius for `horn`;
+  default: 0.05
+- **`lower_cutoff`** — Lower -3 dB frequency of the bandpass in Hz, > 0; default: 80
+- **`upper_cutoff`** — Upper -3 dB frequency of the bandpass in Hz, larger than `lower_cutoff`; default: 12000
+- **`lower_rolloff_slope_dB`** — Low-frequency rolloff in dB per octave, > 0; 12 is a second-order Butterworth filter;
+  default: 12
+- **`upper_rolloff_slope_dB`** — High-frequency rolloff in dB per octave, > 0; default: 12
+- **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude; default: 85
+- **`radiation_type`** — Enclosure radiation model: `monopole` (no change), `hemisphere` (sealed box with baffle-step
+  transition), `dipole` (figure-8, rear hemisphere inverted) or `cardioid`; default: `hemisphere`
+- **`hor_coverage_deg`** — `horn`: horizontal coverage in degrees, between the -6 dB points at full pattern
+  control; NaN or <= 0: 90°; default: NaN
+- **`ver_coverage_deg`** — `horn`: vertical coverage in degrees, as above; NaN or <= 0: 60°; default: NaN
+- **`horn_control_freq`** — `horn`: frequency in Hz above which the horn controls its pattern; NaN or <= 0: `c / (2π a)`
+  with the speed of sound c and a = `radius`; default: NaN
+- **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere`; default: 0.15
+- **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere`; default: 0.25
+- **`center_freq`** — Frequency samples in Hz, positive and finite; `[n_freq]`; default: third-octave bands
+  `1000 · 2^(n/3)` Hz, those enclosing the cutoffs plus one more on each side, limited to 20 to 20000 Hz
+- **`angular_resolution_deg`** — Resolution of the azimuth and elevation grid in degrees; 0.1 to 90; a value r gives
+  `floor(360 / r)` azimuth and `floor(180 / r)` elevation steps; default: 5
 
 ## Output:
-- **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
-  `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [[generate_antenna]] for struct fields; `[1, n_freq]`
+- **`arrayant`** — Struct array with one arrayant per frequency, with `center_freq` set to that frequency; fields as in
+  [[generate_antenna]]; `[1, n_freq]`
+
+## Notes:
+- **Frequency response**: a Butterworth-style bandpass, -3 dB at the cutoffs, scaled by the sensitivity S =
+  `sensitivity_dB` relative to 85 dB SPL:
+
+  `H(f) = 10^((S - 85) / 20) / ( √(1 + (f_l / f)^(2 n_l)) · √(1 + (f / f_u)^(2 n_u)) )`
+
+  with f_l = `lower_cutoff`, f_u = `upper_cutoff` and n_l, n_u the rolloff slopes in dB per octave divided by 6
+- **Driver directivity** D, with the angle α from the forward axis +x (cos α = cos θ cos φ), the wavenumber k = 2π f /
+  c, the speed of sound c = 343 m/s and a = `radius`:
+  - `piston`: `D = 2 J1(x) / x` with `x = k a sin α`, rotationally symmetric about +x
+  - `horn`: `D = 1 - b + b cos^m_h(φ) cos^m_v(θ)` in the front half (φ between -90° and 90°) and `D = 1 - b` behind it,
+    with `b = f² / (f² + f_c²)` and f_c = `horn_control_freq`. The exponents follow from the coverage angle Θ by
+    `cos^m(Θ / 2) = 1/2`
+  - `omni`: D = 1
+- **Enclosure radiation** R:
+  - `monopole`: R = 1
+  - `hemisphere`: `R = 1 - b + b (1 + cos α) / 2` with `b = f² / (f² + f_b²)` and the baffle-step frequency
+    `f_b = c / (π √(W H))`, W = `baffle_width`, H = `baffle_height`; omnidirectional at low and cardioid-like at high
+    frequencies
+  - `dipole`: `R = abs(cos α)`; the pattern is negative in the rear hemisphere (180° phase inversion)
+  - `cardioid`: `R = (1 + cos α) / 2`
+
+## See also:
+- [[join_arrays]] (builds multi-driver systems)
+- [[interpolate_pattern]] (evaluates the model at any direction and frequency)
+- [[calc_beamwidth]] (measures the coverage angle, with `threshold_dB = 6`)
+- [[qdant_write]] (stores the model in a file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

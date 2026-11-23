@@ -4,6 +4,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 
 | Function | Summary |
 | --- | --- |
+| [path](#path) | Class for storing and managing a single propagation path with a compact fixed-size header |
 | [any_type_id](#any_type_id) | Get the type ID and the shape of the value in a `std::any` object |
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
@@ -21,7 +22,6 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [hdf5_write_channel](#hdf5_write_channel) | Write a channel object to an HDF5 file at a specified 4D index |
 | [hdf5_write_channel_vec](#hdf5_write_channel_vec) | Write several channel objects to slots of an HDF5 file |
 | [hdf5_write_dset](#hdf5_write_dset) | Write a single unstructured dataset to an HDF5 file at a specified 4D index |
-| [path](#path) | Class for storing and managing a single propagation path with a compact fixed-size header |
 | [qrt_file_append](#qrt_file_append) | Append one transmitter's path data to an existing QRT file |
 | [qrt_file_init](#qrt_file_init) | Create a new QRT file and write its metadata header |
 | [qrt_file_parse](#qrt_file_parse) | Read metadata from a QRT file |
@@ -30,6 +30,129 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) | Path objects of one CIR from spherical path data, for qrt_file_append |
 | [qrt_read_cache_init](#qrt_read_cache_init) | Initialize a QRT read cache for fast repeated access |
 | [quantize_delays](#quantize_delays) | Map path delays to a fixed tap grid using two-tap power-weighted interpolation |
+
+---
+<a id="path"></a>
+## path
+Class for storing and managing a single propagation path with a compact fixed-size header
+
+Not in: MATLAB, Python
+
+- Represents one ray from origin to destination through a sequence of `nSEG` interaction points
+- A 56-byte header holds metadata, the first 2 interaction type codes, and the frequency-0
+  transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
+  frequency coefficients, and the overflow interaction codes
+- Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
+  SCALAR carries a single complex pressure coefficient per frequency
+- Copyable and movable; the moved-from object is left in the valid empty state (`nSEG == 0`, `nFRQ == 1`, EM)
+
+### Attributes:
+| Attribute            | Size   | Description                                                       |
+| -------------------- | ------ | ----------------------------------------------------------------- |
+| `unsigned i_cir`     | scalar | CIR index: the CIR to which the path belongs                      |
+| `uint8_t n_ref`      | scalar | Number of reflections (interaction type codes 128-255 except 193) |
+| `uint8_t n_tra`      | scalar | Number of transmissions / refractions (type codes 1-127)          |
+| `uint8_t n_sub`      | scalar | Number of subdivisions                                            |
+| `uint8_t n_sct`      | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
+| `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
+
+### Data buffer layout (EM mode):
+| Block         | Size (floats)     | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
+| Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
+
+### Data buffer layout (SCALAR mode):
+| Block         | Size (floats)     | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
+| Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
+
+### Simple member functions:
+| Method            | Description                                                                     |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `.n_freq()`       | Returns the number of frequencies (1-127)                                       |
+| `.n_seg()`        | Returns the number of segments                                                  |
+| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                                    |
+| `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
+| `.free()`         | Releases the data buffer and resets to the valid empty state                    |
+| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
+| `.polmat()`       | Returns a pointer to a frequency's transfer coefficients                        |
+| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
+| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
+| `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
+
+### Function 'calc_length':
+Calculates the total length of the path
+
+- The stored member `length` spans origin through the last interaction; it never includes the leg to the destination
+- The read-only overload adds only the final last-to-D leg to the stored member; the origin overloads recompute every leg and overwrite the member with the origin-to-last total
+- Returns the full length including the leg to `D`; on an empty path (`nSEG == 0`) the read-only form returns NaN while the origin form returns the straight origin-to-destination distance
+```cpp
+float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
+float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length, update member
+float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
+```
+- **`Dx`, `Dy`, `Dz`, `*D`** — Destination coordinates
+- **`Ox`, `Oy`, `Oz`, `*O`** — Origin coordinates (optional); if provided, accumulated path length is updated
+
+### Function 'calc_gain':
+Calculates the path gain (linear power) from the transfer coefficients at one frequency
+
+- EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
+- A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
+- With `freq > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` with `lambda = c / freq` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
+- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
+  read-only `calc_length` before the member is updated
+```cpp
+float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
+```
+- **`freq`** — Frequency in Hz; `> 0` applies path loss, `<= 0` returns polarization power only. In SCALAR mode any
+  positive value applies spherical spreading; the value itself is not used, so no speed of sound is needed
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
+
+### Function 'polmat_update':
+Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
+
+- Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
+- `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
+- The return value uses the same gain definition as `calc_gain`
+- Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
+```cpp
+float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
+```
+- **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
+- **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
+- **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
+
+### Function 'duplicate':
+Copies the path into an existing target object and returns its length
+
+- Performs a deep copy: the target receives an independent data buffer and all metadata
+- The target's previous contents are released; the source is left unchanged
+```cpp
+float duplicate(path &target) const;
+```
+- **`target`** — Destination path, overwritten with a deep copy of the source
+
+### Function 'extend':
+Copies the path into a target and appends one new segment, returning the new total length
+
+- The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
+- The interaction `type` is recorded for the new segment, counters n_ref, n_tra, n_sub, n_sct are not updated (left to the caller)
+- The target receives an independent buffer sized for the extra segment; the source is left unchanged
+- Throws if the source already holds the maximum of 255 segments
+```cpp
+float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
+```
+- **`target`** — Destination path, overwritten with the extended copy
+- **`x`, `y`, `z`** — Coordinates of the appended interaction point
+- **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
 
 ---
 <a id="any_type_id"></a>
@@ -739,129 +862,6 @@ void quadriga_lib::hdf5_write_dset(
 - [hdf5_read_dset](#hdf5_read_dset) (read an unstructured dataset by name)
 - [hdf5_read_dset_names](#hdf5_read_dset_names) (list available dataset names at a slot)
 - [any_type_id](#any_type_id) (inspect the type held in a `std::any`)
-
----
-<a id="path"></a>
-## path
-Class for storing and managing a single propagation path with a compact fixed-size header
-
-Not in: MATLAB, Python
-
-- Represents one ray from origin to destination through a sequence of `nSEG` interaction points
-- A 56-byte header holds metadata, the first 2 interaction type codes, and the frequency-0
-  transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
-  frequency coefficients, and the overflow interaction codes
-- Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
-  SCALAR carries a single complex pressure coefficient per frequency
-- Copyable and movable; the moved-from object is left in the valid empty state (`nSEG == 0`, `nFRQ == 1`, EM)
-
-### Attributes:
-| Attribute            | Size   | Description                                                       |
-| -------------------- | ------ | ----------------------------------------------------------------- |
-| `unsigned i_cir`     | scalar | CIR index: the CIR to which the path belongs                      |
-| `uint8_t n_ref`      | scalar | Number of reflections (interaction type codes 128-255 except 193) |
-| `uint8_t n_tra`      | scalar | Number of transmissions / refractions (type codes 1-127)          |
-| `uint8_t n_sub`      | scalar | Number of subdivisions                                            |
-| `uint8_t n_sct`      | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
-| `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
-
-### Data buffer layout (EM mode):
-| Block         | Size (floats)     | Description                                             |
-| ------------- | ----------------- | ------------------------------------------------------- |
-| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
-| Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
-| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
-
-### Data buffer layout (SCALAR mode):
-| Block         | Size (floats)     | Description                                             |
-| ------------- | ----------------- | ------------------------------------------------------- |
-| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
-| Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
-| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
-
-### Simple member functions:
-| Method            | Description                                                                     |
-| ----------------- | ------------------------------------------------------------------------------- |
-| `.n_freq()`       | Returns the number of frequencies (1-127)                                       |
-| `.n_seg()`        | Returns the number of segments                                                  |
-| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                                    |
-| `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
-| `.free()`         | Releases the data buffer and resets to the valid empty state                    |
-| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
-| `.polmat()`       | Returns a pointer to a frequency's transfer coefficients                        |
-| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
-| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
-| `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
-
-### Function 'calc_length':
-Calculates the total length of the path
-
-- The stored member `length` spans origin through the last interaction; it never includes the leg to the destination
-- The read-only overload adds only the final last-to-D leg to the stored member; the origin overloads recompute every leg and overwrite the member with the origin-to-last total
-- Returns the full length including the leg to `D`; on an empty path (`nSEG == 0`) the read-only form returns NaN while the origin form returns the straight origin-to-destination distance
-```cpp
-float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
-float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length, update member
-float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
-```
-- **`Dx`, `Dy`, `Dz`, `*D`** — Destination coordinates
-- **`Ox`, `Oy`, `Oz`, `*O`** — Origin coordinates (optional); if provided, accumulated path length is updated
-
-### Function 'calc_gain':
-Calculates the path gain (linear power) from the transfer coefficients at one frequency
-
-- EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
-- A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
-- With `freq > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` with `lambda = c / freq` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
-- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
-  read-only `calc_length` before the member is updated
-```cpp
-float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
-```
-- **`freq`** — Frequency in Hz; `> 0` applies path loss, `<= 0` returns polarization power only. In SCALAR mode any
-  positive value applies spherical spreading; the value itself is not used, so no speed of sound is needed
-- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
-- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
-
-### Function 'polmat_update':
-Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
-
-- Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
-- `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
-- The return value uses the same gain definition as `calc_gain`
-- Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
-```cpp
-float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
-```
-- **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
-- **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
-- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
-- **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
-- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
-
-### Function 'duplicate':
-Copies the path into an existing target object and returns its length
-
-- Performs a deep copy: the target receives an independent data buffer and all metadata
-- The target's previous contents are released; the source is left unchanged
-```cpp
-float duplicate(path &target) const;
-```
-- **`target`** — Destination path, overwritten with a deep copy of the source
-
-### Function 'extend':
-Copies the path into a target and appends one new segment, returning the new total length
-
-- The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
-- The interaction `type` is recorded for the new segment, counters n_ref, n_tra, n_sub, n_sct are not updated (left to the caller)
-- The target receives an independent buffer sized for the extra segment; the source is left unchanged
-- Throws if the source already holds the maximum of 255 segments
-```cpp
-float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
-```
-- **`target`** — Destination path, overwritten with the extended copy
-- **`x`, `y`, `z`** — Coordinates of the appended interaction point
-- **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
 
 ---
 <a id="qrt_file_append"></a>

@@ -56,17 +56,13 @@ SECTION!*/
 # join_arrays
 Join the elements of two antenna arrays into a new array
 
-- Both arrays must share identical sampling grids; throws otherwise
-- The port weights are block-diagonal: elements of the first array connect only to its ports, and likewise for the
-  second; name and `center_freq` are taken from the first array:<br><br>
+- Combines two arrays with identical sampling grids, e.g. the drivers of a loudspeaker; `name` and `center_freq` are
+  taken from the first array
+- The ports stay separate: elements of the first array connect only to its ports, and likewise for the second:<br><br>
    | Element \ Port        | P1…Pp1 (first) | Pp1+1…Pp1+p2 (second) |
    | --------------------- | :------------: | :-------------------: |
    | E1…En1 (first)        |    W1 block    |           0           |
    | En1+1…En1+n2 (second) |       0        |       W2 block        |
-- An empty `element_pos` counts as zeros, an empty `port_weights_re` as identity (one port per element), an empty
-  `port_weights_im` as zeros
-- Vector form: joins the entries of two multi-frequency vectors pairwise; both must pass [[is_valid]], have equal entry
-  counts, identical angular grids and matching `center_freq` values at each index; each output entry is validated
 
 ## Declarations:
 ```
@@ -80,18 +76,20 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::join_arrays(
 ```
 
 ## Inputs:
-- **`ant_1`** / **`arrayant_vec1`** — First arrayant (vector form: vector); its elements come first in the output
-- **`ant_2`** / **`arrayant_vec2`** — Second arrayant (vector form: vector); sampling grids (and center frequencies)
-  must match the first
+- **`ant_1`** / **`arrayant_vec1`** — First array; its elements come first in the output; vector form: must pass
+  [[is_valid]]
+- **`ant_2`** / **`arrayant_vec2`** — Second array with the same sampling grids; vector form: must pass [[is_valid]],
+  with as many entries as the first and matching `center_freq` values at each index
 
 ## Returns:
 - New `arrayant` with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports; vector form: one such entry per
   frequency
 
 ## See also:
-- [[set_element_pos]] (position drivers before joining)
-- [[rotate_pattern]] (rotate elements after joining)
-- [[qdant_write]] (persist the joined model)
+- [[set_element_pos]] (positions the drivers of a multi-frequency array)
+- [[copy_element]] (duplicates an element within one array)
+- [[generate_speaker]] (creates the driver models to join)
+- [[qdant_write]] (stores the joined model)
 MD!*/
 
 template <typename dtype>

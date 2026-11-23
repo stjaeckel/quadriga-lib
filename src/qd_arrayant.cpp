@@ -16,33 +16,72 @@
 Antennas, transducers and patterns
 SECTION!*/
 
+/*!SECTION_DESC
+The functions of this section create, inspect, transform and store antenna and acoustic arrays. They share one data
+structure, [[arrayant]]: complex polarimetric patterns of the elements on an azimuth and elevation grid, the element
+positions and the port weights. The channel functions take it as transmit and receive antenna.<br><br>
+
+**Terms** (full list in the [Glossary](cpp_api.html#glossary)):
+
+- **Element**: one radiator or sensor (antenna element, loudspeaker driver, microphone capsule) with a pattern, a
+  position and one row of the port weights
+- **Grid**: azimuth $\phi$ in $[-\pi, \pi]$, measured from +x toward +y, and elevation $\theta$ in $[-\pi/2, \pi/2]$,
+  measured from the x-y plane (TR 38.901 uses the zenith angle $90° - \theta$), both in rad and strictly increasing.
+  Boresight is +x
+- **Pattern**: the direction-dependent far field of an element: $F_\theta$ (`e_theta_re/im`) along
+  $\hat\theta = (\sin\theta\cos\phi, \sin\theta\sin\phi, -\cos\theta)$, the zenith-angle unit vector of TR 38.901, which
+  points toward decreasing elevation, and $F_\phi$ (`e_phi_re/im`) along $\hat\phi = (-\sin\phi, \cos\phi, 0)$. For an
+  antenna, $\lvert F_\theta \rvert^2 + \lvert F_\phi \rvert^2$ is the linear gain over an isotropic radiator
+- **Port**: one signal of the array, one column of the port weights
+- **Port weights**: the fixed complex feed network $w_{i,p}$ from element $i$ to port $p$, `[n_elements, n_ports]`. It
+  is not the mutual coupling between elements. Empty means identity (one port per element)
+- **Element position**: local Cartesian coordinates in m, `[3, n_elements]`; empty means all at the origin
+- **Multi-frequency array**: a `std::vector` of arrayants, one entry per `center_freq`, with equal grids, element
+  positions and port weight sizes ([[is_valid]]). [[interpolate_pattern]] and [[apply_port_weights]] interpolate over
+  frequency between the entries
+
+The field of port $p$ in a direction is the weighted sum of the element fields, each with the phase of its position,
+
+$$F_p = \sum_i w_{i,p} \, F_i \, e^{-j 2\pi f d_i / c}$$
+
+where $d_i = -\hat{r} \cdot x_i$ is the distance of element $i$ at position $x_i$ from the wavefront plane through the
+origin, negative for elements closer to the source, $\hat{r}$ the unit vector toward the source, $f$ the frequency and
+$c$ the propagation speed.<br><br>
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Create | [[generate_antenna]], [[generate_speaker]], [[qdant_read]] |
+| Evaluate | [[interpolate_pattern]], [[calc_directivity]], [[calc_beamwidth]] |
+| Transform | [[apply_port_weights]], [[rotate_pattern]], [[trim_pattern]] |
+| Edit and combine | [[join_arrays]], [[copy_element]], [[set_element_pos]] |
+| Check, store, show | [[is_valid]], [[qdant_write]], [[export_pattern_obj]] |
+
+Arrays are stored in the [QDANT file format](formats.html#qdant).
+SECTION_DESC!*/
+
 /*!MD
 # arrayant<++>
 Class for storing and manipulating an array of antenna or acoustic elements
 
-- Each element (antenna element, loudspeaker driver, microphone capsule) has a pattern and a position relative to the array phase-center
-- The port weights map the elements to the ports: complex, `[n_elements, n_ports]`
-- Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
-- `element_pos` is optional (empty = all elements at origin); `port_weights_re/im` are optional (empty = identity); all
-  functions give the same results for empty members as for zeros / identity, except the IRS array of
-  [[get_channels_irs]], whose port weights hold the IRS weights and must be given. In a multi-frequency vector all
-  entries use the same form (see [[is_valid]])
-- Field values and port weights must be finite with magnitudes below about 1e18; larger values overflow in the
-  interpolation and in the channel functions and give NaN results
+- All functions give the same results for an empty `element_pos` and empty port weights as for zeros and identity,
+  except the IRS array of [[get_channels_irs]], whose port weights hold the IRS weights and must be given
+- In a multi-frequency vector all entries use the same form, either empty or given (see [[is_valid]])
 
 ## Attributes:<br>
 | Attribute                         | Size                                   | Description                                                    |
 | --------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
-| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part                            |
-| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part                       |
-| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part                            |
-| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part                       |
+| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | e-theta (vertical) field, real part                            |
+| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | e-theta (vertical) field, imaginary part                       |
+| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | e-phi (horizontal) field, real part                            |
+| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | e-phi (horizontal) field, imaginary part                       |
 | `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], strictly increasing       |
 | `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], strictly increasing |
-| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
+| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions relative to the phase center, in m           |
 | `arma::Mat<dtype> port_weights_re`    | `[n_elements, n_ports]` or empty       | Port weights, real part                                     |
 | `arma::Mat<dtype> port_weights_im`    | `[n_elements, n_ports]` or empty       | Port weights, imaginary part                                |
-| `dtype center_freq`          | scalar                                 | Center frequency                                               |
+| `dtype center_freq`          | scalar                                 | Center frequency in Hz; default 299792458                      |
 | `std::string name`                | string                                 | Name of the antenna array object                               |
 
 ## Member functions:<br>
@@ -52,17 +91,24 @@ Class for storing and manipulating an array of antenna or acoustic elements
 | `.n_azimuth()`                                            | Number of azimuth angles                                                                                                                                            |
 | `.n_elements()`                                           | Number of antenna elements                                                                                                                                          |
 | `.n_ports()`                                              | Number of ports (columns of port weights)                                                                                                                        |
-| `.reset()`                                                | Clears all data, resetting size to zero                                                                                                                             |
+| `.reset()`                                                | Empties all data; `center_freq` returns to its default, `name` is kept                                                                                              |
 | `.set_size(n_elevation, n_azimuth, n_elements, n_ports)` | Resizes all members (`arma::uword` sizes); no-op if they match; after a resize `element_pos` is zero, `port_weights_re` identity, `port_weights_im` zero, field data undefined |
 | `.is_valid()`                                             | `std::string`: empty if the object is valid, else an error message                                                                                                  |
 
-- `is_valid()` always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and port weights; empty `element_pos` and port weights are allowed
-- A passing check marks the object as validated: the library functions then skip the full check as long as no data member was reallocated or resized; values changed in place after the check are not seen by them
-- The mark is updated atomically, so `is_valid()` may be called while other threads read the object; a copy is marked if its source passes the full check, a moved-to object takes over the mark of its source
-- The free functions of this section compute on an arrayant and read and write it (e.g. [[calc_beamwidth]], [[calc_directivity]], [[join_arrays]], [[apply_port_weights]], [[copy_element]], [[rotate_pattern]], [[qdant_write]]); [[generate_antenna]] creates one
+## Notes:
+- **Value range**: field values and port weights must be finite with magnitudes below about 1e18; larger values overflow
+  in the interpolation and in the channel functions and give NaN results
+- **Validation**: `is_valid()` always checks the data: sizes of all members, ranges and order of the angle grids, sizes
+  of element positions and port weights. A passing check marks the object as validated: the library functions then skip
+  the full check as long as no data member was reallocated or resized; values changed in place after the check are not
+  seen by them
+- **Threads and copies**: the mark is updated atomically, so `is_valid()` may be called while other threads read the
+  object; a copy is marked if its source passes the full check, a moved-to object takes over the mark of its source
 
 ## See also:
-- [[is_valid]] (multi-frequency counterpart of `is_valid()`)
+- [[is_valid]] (checks a multi-frequency vector)
+- [[generate_antenna]], [[generate_speaker]] (create arrays)
+- [[qdant_read]], [[qdant_write]] (load and store arrays)
 MD!*/
 
 template <typename dtype>
@@ -303,12 +349,13 @@ template class quadriga_lib::arrayant<double>;
 # is_valid
 Validate a vector of arrayant objects for multi-frequency consistency
 
-- Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
-- Cross-entry checks (all vs. the first entry): azimuth/elevation grid sizes and values, number of elements, element positions, port_weights_re shape, and port_weights_im presence and size.
-- Pattern data, `center_freq`, and port weights values are not compared (expected to vary).
-- All entries must use the same form for `element_pos`, `port_weights_re` and `port_weights_im`: all empty or all given; a
-  mix of empty members and explicit zeros / identity is rejected.
-- Stops at first error and returns a message identifying the failing entry and property.
+- Checks that the entries can be used together as one multi-frequency array and stops at the first error
+- Each entry gets the full check of its `is_valid` member, which marks a passing entry as validated. It is then compared
+  with the first entry: size and values of the angle grids, number of elements, element positions, size of the port
+  weights
+- All entries must use the same form for `element_pos`, `port_weights_re` and `port_weights_im`: all empty or all given;
+  a mix of empty members and explicit zeros or identity is rejected
+- Pattern data, `center_freq` and port weight values are not compared, since they vary with frequency
 
 ## Declaration:
 ```
@@ -317,13 +364,15 @@ std::string quadriga_lib::is_valid(
 ```
 
 ## Input:
-- **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
+- **`arrayant_vec`** — Vector of arrayant objects to validate; an empty vector is reported as invalid
 
 ## Returns:
-- Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match the first entry."`
+- Empty string if valid; otherwise a message that names the failing entry and property, such as
+  `"Entry 3: Azimuth grid values do not match the first entry."`
 
 ## See also:
-- [[arrayant]] (`is_valid()`, the per-entry validation called internally)
+- [[arrayant]] (its `is_valid()` member checks a single object)
+- [[set_element_pos]] (keeps the positions of all entries equal)
 - [[generate_speaker]] (typical source of multi-frequency arrayant vectors)
 MD!*/
 

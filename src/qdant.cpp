@@ -1076,15 +1076,9 @@ SECTION!*/
 # qdant_read
 Read arrayant objects from a QDANT file
 
-- Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the entries with the given IDs. The ID is the number used in the layout matrix and by [[qdant_write]].
-- Without `ids`, the entries listed in the layout are returned, each once, in order of first appearance (column-major scan); all entries if the file has no layout. This is the way to load frequency-dependent models, where `center_freq` of each entry identifies the frequency.
-- Throws `std::invalid_argument` if an ID is 0 or the file has no entry with it. The first entry of a file is ID 1 only
-  if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
-- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`n_elements`) must be
-  backed by data in the file (element positions, port weights, or pattern nodes of the last element). Elements without
-  pattern nodes read as zeros. Over all entries read, their zero patterns are limited to the larger of 2^24 values and
-  1 value per file byte, and the identity port weights of a file without `port_weights_abs` (at most 4096 elements) to
-  the larger of 2^24 values and 128 values per file byte; a repeated ID counts once.
+- Loads arrays from a file in the [QDANT format](formats.html#qdant). A file can hold several arrays, each with a
+  numeric ID, e.g. one per frequency of a frequency-dependent model, where `center_freq` of each entry identifies the
+  frequency
 
 ## Declaration:
 ```
@@ -1096,15 +1090,26 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
 
 ## Inputs:
 - **`fn`** — Path to the QDANT file; must not be empty
-- **`ids`** *(optional)* — 1-based IDs of the entries to read, duplicates allowed; empty reads the entries in the layout
-- **`layout`** *(optional)* — Output pointer filled with the file's layout matrix of entry IDs (0 = empty slot)
+- **`ids`** *(optional)* — 1-based IDs of the entries to read, duplicates allowed; empty: the entries listed in the
+  layout, each once, in order of first appearance (column-major scan), or all entries if the file has no layout
+
+## Output:
+- **`layout`** *(optional)* — The file's layout matrix of entry IDs (0 = empty slot)
 
 ## Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One validated arrayant per requested ID, in the order of `ids`
 
+## Notes:
+- **IDs**: the number used in the layout matrix and by [[qdant_write]]. A first entry without an `id` attribute (files
+  from other tools) counts as ID 1
+- **Exceptions**: `std::invalid_argument` if an ID is 0 or the file has no entry with it; `std::runtime_error` for a
+  missing, unreadable or malformed file
+- **Elements without data**: elements without pattern nodes read as zeros. A file whose element count is not backed by
+  its data, or that exceeds the [reader limits](formats.html#qdant), throws
+
 ## See also:
-- [[qdant_write]] (write a single arrayant, or a vector with sequential IDs)
-- [[generate_speaker]] (typical source of frequency-dependent arrayant vectors)
+- [[qdant_write]] (writes such files)
+- [[generate_antenna]], [[generate_speaker]] (create arrays without a file)
 MD!*/
 
 // Read antenna array objects and layout from QDANT file; the file is parsed once
@@ -1193,25 +1198,9 @@ template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::qdant_read(co
 # qdant_write
 Write arrayant data to a QDANT (XML) file
 
-- Multiple antennas can be stored in the same file using distinct `id` values
-- If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
-  in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
-- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
-  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
-  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
-  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
-  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
-  a low level is quantized relative to its own peak. Element positions and port weights (magnitude, phase) are written
-  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
-  to 0.001 degree
-- An empty `element_pos` or empty port weights are not written; [[qdant_read]] returns zeros and identity for them.
-  Above 4096 elements the identity port weights are written, because the reader requires them in the file
-- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
-  zero in both field components is written as an all `-inf` `e_theta_mag` node.
-- Vector form: writes each entry with sequential 1-based IDs and a `[n_entries, 1]` layout `1, 2, ..., n_entries`; the
-  file must not exist yet (an existing file throws `std::runtime_error` and is left unchanged); for frequency-dependent
-  models where each entry holds the pattern at its `center_freq`; read back with [[qdant_read]]
+- Stores an array in a file in the [QDANT format](formats.html#qdant). A file can hold several arrays with distinct IDs
+  and a layout matrix that arranges them
+- Vector form: stores a frequency-dependent model in a new file, each entry holding the pattern at its `center_freq`
 
 ## Declarations:
 ```
@@ -1227,17 +1216,37 @@ void quadriga_lib::qdant_write(
 ```
 
 ## Inputs:
-- **`fn`** — Output QDANT filename; must not be empty; vector form: must not exist
+- **`fn`** — Output QDANT file name, must not be empty; an existing file is updated; vector form: must not exist (throws
+  `std::runtime_error` and leaves the file unchanged)
 - **`ant`** — Valid arrayant
-- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects to store
-- **`id`** *(optional)* — Target ID in file; `0` appends with auto-assigned ID
-- **`layout`** *(optional)* — Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
+- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects, written with the sequential IDs
+  `1, 2, ..., n_entries` and a `[n_entries, 1]` layout of these IDs
+- **`id`** *(optional)* — Target ID in the file; an entry with this ID is replaced; `0` appends with
+  `max_existing_id + 1`, or 1 in a new file
+- **`layout`** *(optional)* — Matrix of entry IDs that arranges the file; every value must be an ID in the file (0 is
+  not accepted); empty: the layout in the file is replaced by a `[1, n]` row of all IDs in file order, so a custom
+  layout must be passed again with every write that should keep it
 
 ## Returns:
 - ID assigned to the written antenna within the file (single form)
 
+## Notes:
+- **Pattern accuracy**: the file has single-precision-equivalent accuracy relative to the element peak, also for
+  double-precision data. Pattern magnitudes (in dB) and phases (in degrees) get the fewest decimals (0 to 6) that keep
+  the error of each complex sample at or below 6e-8 times the peak amplitude of its element (over `e_theta` and
+  `e_phi`). Samples near the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per
+  20 dB below the peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak.
+  An element at a low level is quantized relative to its own peak
+- **Other values**: element positions and port weights (magnitude, phase) are written as the shortest text that reads
+  back as the same float (at most 9 significant digits); sampling grids are rounded to 0.001 degree
+- **Empty members**: an empty `element_pos` or empty port weights are not written; [[qdant_read]] returns zeros and
+  identity for them. Above 4096 elements the identity port weights are written, because the reader requires them in the
+  file
+- **Zeros**: all non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element
+  that is zero in both field components is written as an all `-inf` `e_theta_mag` node
+
 ## See also:
-- [[qdant_read]] (read back QDANT files)
+- [[qdant_read]] (reads the file back)
 - [[generate_speaker]] (typical source of frequency-dependent arrayant vectors)
 MD!*/
 

@@ -123,30 +123,9 @@ Interpolate the polarimetric field pattern of an antenna array at given azimuth 
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the array and the resulting polarization rotation applied
-- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation),
-  with linear interpolation where neighbouring samples have nearly opposite phases; the azimuth grid wraps around,
-  elevations outside the grid take the values of the first or last grid row
-- `azimuth` with one row gives the same angles for all outputs (planar wave), `n_out` rows one angle per output
-  (spherical wave); `n_ang = 0` gives outputs of size `[n_out, 0]` (vector form `[n_out, 0, n_freq]`)
-- Angles are not range-checked; values outside [-pi, pi] and [-pi/2, pi/2] denote the corresponding direction. NaN or
-  infinite angles give NaN in all outputs of that angle and output, without an exception
-- Outputs are resized only when their size differs, so pre-allocated outputs are written in place
-- On a pole of the local frame (a direction along the z-axis of the oriented array) the local azimuth is chosen so
-  that the local and the global theta unit vectors agree: the polarization is not rotated there
-- Kernels: GENERIC computes in the precision of `dtype`; AVX2 computes in single precision also for `double`, with
-  errors of up to about 2e-6 of the peak field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole
-  of the local frame up to about 2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most
-  4e-4 rad) in the local elevation; auto selects GENERIC in this version, which may change in a later version
-- Throws `std::invalid_argument` for an invalid `ant`, sizes that do not match, element indices `>= n_elements`, an
-  unknown or unavailable kernel, and outputs that are an input, a data member of `ant` or another output, or share
-  memory with one
-- Vector form (multi-frequency array, one entry per center frequency): for each target frequency, interpolates the two
-  entries whose center frequencies bracket it and blends their fields: spherical interpolation of the complex values
-  over frequency, linear where the two values have nearly opposite phases or one of them is zero. Target frequencies
-  outside the range of the center frequencies take the nearest entry (no extrapolation). Consecutive target
-  frequencies with the same bracketing entries reuse the spatial results; ascending or descending order is fastest.
-  The entries must pass [[is_valid]]; it also throws for an empty `arrayant_vec` and target frequencies that are not
-  finite
+- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation)
+- Vector form: for a multi-frequency array, the two entries whose center frequencies bracket each target frequency are
+  interpolated and blended
 
 ## Declarations:
 ```
@@ -187,35 +166,36 @@ void quadriga_lib::interpolate_pattern(
 ```
 
 ## Inputs:
-- **`ant`** — Antenna array with `n_elements` elements; see [[arrayant]]
-- **`arrayant_vec`** — Vector form: multi-frequency array, one entry per center frequency; entries need not be sorted
-  by frequency
-- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
-- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`freq_new`** *(optional)* — Vector form: target frequencies in Hz; empty: the center frequencies of the entries
-  in vector order; `[n_freq]`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in
-  order (`n_out = n_elements`); `[n_out]`
-- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the array, for all outputs and angles,
-  per output, per angle, or both, applied at all frequencies; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`,
+- **`ant`** — Antenna array with `n_elements` elements
+- **`arrayant_vec`** — Vector form: multi-frequency array that passes [[is_valid]], not empty; entries need not be
+  sorted by frequency
+- **`azimuth`** — Azimuth angles in GCS in rad; one row: the same angles for all outputs (planar wave), `n_out` rows:
+  one angle per output (spherical wave); `[1, n_ang]` or `[n_out, n_ang]`
+- **`elevation`** — Elevation angles in GCS in rad; same size as `azimuth`
+- **`freq_new`** *(optional)* — Vector form: target frequencies in Hz, finite; empty: the center frequencies of the
+  entries in vector order; ascending or descending order is fastest; `[n_freq]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in order
+  (`n_out = n_elements`); `[n_out]`
+- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the array, for all outputs and angles, per
+  output, per angle, or both, applied at all frequencies; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`,
   `[3, 1, n_ang]` or `[3, n_out, n_ang]`
-- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the
-  columns `i_element` of `ant.element_pos`, zeros if that is empty; vector form: checked for its size only, since no
-  output depends on the positions; `[3, n_out]`
-- **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern
-  has more than `INT_MAX` samples); other values throw
+- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the columns
+  `i_element` of `ant.element_pos`, zeros if that is empty; vector form: checked for its size only, since no output
+  depends on the positions; `[3, n_out]`
+- **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern has
+  more than `INT_MAX` samples); other values throw
 
 ## Outputs:
 - **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`, vector form
   `[n_out, n_ang, n_freq]`
 - **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; `[n_out, n_ang]`, vector form
   `[n_out, n_ang, n_freq]`
-- **`dist`** *(optional)* — Distance of each element from the wavefront plane through the origin of the array;
-  negative for elements closer to the source; `[n_out, n_ang]` (single form only)
+- **`dist`** *(optional)* — Distance of each element from the wavefront plane through the origin of the array; negative
+  for elements closer to the source; `[n_out, n_ang]` (single form only)
 - **`azimuth_loc`** / **`elevation_loc`** *(optional)* — Azimuth and elevation in the local antenna frame;
   `[n_out, n_ang]` (single form only)
-- **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`
-  (single form only)
+- **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]` (single
+  form only)
 - **`V`** / **`H`** *(optional)* — e-theta / e-phi field as complex values, replacing `V_re`, `V_im` / `H_re`, `H_im`
   (then left empty); `[n_out, n_ang]`, vector form `[n_out, n_ang, n_freq]`
 
@@ -233,10 +213,32 @@ arma::cube Vf_re, Vf_im, Hf_re, Hf_im;
 quadriga_lib::interpolate_pattern(speaker, azimuth, elevation, Vf_re, Vf_im, Hf_re, Hf_im, freq);
 ```
 
+## Notes:
+- **Interpolation**: linear where neighboring samples have nearly opposite phases; the azimuth grid wraps around,
+  elevations outside the grid take the values of the first or last grid row
+- **Frequency interpolation** (vector form): spherical interpolation of the complex values over frequency, linear where
+  the two values have nearly opposite phases or one of them is zero. Target frequencies outside the range of the center
+  frequencies take the nearest entry (no extrapolation). Consecutive target frequencies with the same bracketing entries
+  reuse the spatial results
+- **Angles**: not range-checked; values outside $[-\pi, \pi]$ and $[-\pi/2, \pi/2]$ denote the same direction; an
+  elevation beyond $\pm\pi/2$ crosses the pole, so e-theta and e-phi have the opposite sign of the same direction given
+  in range. NaN or infinite angles give NaN in all outputs of that angle and output, without an exception. `n_ang = 0`
+  gives outputs of size `[n_out, 0]` (vector form `[n_out, 0, n_freq]`)
+- **Poles**: on a pole of the local frame (a direction along the z-axis of the oriented array) the local azimuth is
+  chosen so that the local and the global theta unit vectors agree: the polarization is not rotated there
+- **Outputs** are resized only when their size differs, so pre-allocated outputs are written in place
+- **Kernels**: GENERIC computes in the precision of `dtype`; AVX2 in single precision also for `double`, with errors of
+  up to about 2e-6 of the peak field value and 2e-6 rad in the angles, and near a pole of the local frame up to about
+  2e-7 / d rad at a distance d (in rad). Auto currently selects GENERIC
+- **Exceptions**: `std::invalid_argument` for an invalid `ant`, sizes that do not match, element indices
+  `>= n_elements`, an unknown or unavailable kernel, and outputs that are an input, a data member of `ant` or another
+  output, or share memory with one; vector form also for an empty `arrayant_vec` and target frequencies that are not
+  finite
+
 ## See also:
-- [[arrayant]] (antenna array class)
-- [[join_arrays]] (build multi-element, multi-frequency models)
-- [[generate_speaker]] (typical source of multi-frequency arrays)
+- [[apply_port_weights]] (patterns per port instead of per element)
+- [[rotate_pattern]] (applies an orientation to the stored patterns)
+- [[join_arrays]], [[generate_speaker]] (build multi-element, multi-frequency arrays)
 - [[get_channels_spherical]] (channel coefficients from the interpolated patterns)
 MD!*/
 

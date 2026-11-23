@@ -12,9 +12,10 @@ SECTION!*/
 # EXPORT_PATTERN_OBJ
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
-- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives a finer mesh
-- Supports multi-frequency arrayant models: pass a struct array and select the entry to export
-  via the `i_freq` argument
+- Writes the power pattern of each element as a colored 3D surface, one object per element, placed at its position in
+  `element_pos`
+- The distance of the surface from the element is linear in the level in dB: `object_radius` at the peak over all
+  exported elements, 0 at `directivity_range_dB` below it. The color shows the same level
 
 ## Usage:
 ```
@@ -23,19 +24,23 @@ quadriga_lib.export_pattern_obj( fn, arrayant, directivity_range_dB, colormap, o
 ```
 
 ## Inputs:
-- **`fn`** — Output OBJ filename; must not be empty; filename must end in `.obj`
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in
-  [[generate_antenna]]; a struct array may contain a frequency-dependent model
-- **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
-- **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-- **`object_radius`** — Radius of the exported object; default: 1 m
-- **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
-- **`i_element`** — Element indices to export; 1-based; default: `[]` (all elements)
-- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based;
-  default: 1; must satisfy `1 <= i_freq <= n_freq`
+- **`fn`** — Output OBJ file name, must end in `.obj`; the colormap is written to a `.mtl` file of the same name;
+  existing files are overwritten
+- **`arrayant`** — Arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency array; the exported
+  elements must have finite field values and must not be zero in all directions
+- **`directivity_range_dB`** — Range of the plot below the peak in dB, finite and not 0; the sign is ignored; default:
+  30
+- **`colormap`** — Colormap name: `jet`, `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`,
+  `autumn` or `summer`; default: `jet`
+- **`object_radius`** — Radius of the surface at the peak in m, positive and finite; default: 1
+- **`icosphere_n_div`** — Subdivisions n of the [[icosphere]] that carries the surface; higher = finer mesh with 20 n²
+  faces; default: 4
+- **`i_element`** — Element indices to export, 1-based; default: all elements
+- **`i_freq`** — Entry of a multi-frequency array to export, 1-based, at most `numel(arrayant)`; default: 1
 
 ## See also:
-- [[icosphere]] (icosphere primitive used internally)
+- [[calc_directivity]], [[calc_beamwidth]] (the same pattern as numbers)
+- [[channel_export_obj_file]] (exports propagation paths to an OBJ file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -21,17 +21,10 @@ SECTION!*/
 # apply_port_weights
 Apply the port weights of an antenna array: one pattern per port
 
-- Evaluates the element patterns on the output grid, applies the phase shift of each element position (which moves
-  every pattern to the array origin) and sums the elements with the port weights
-- The position phase is `-2 pi f d / propagation_speed` with `f = center_freq` and `d` the distance of the element
-  from the wavefront plane through the origin; the default speed of light applies to radio waves, use about 343 m/s
-  for acoustic arrays (e.g. from [[generate_speaker]])
+- Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
+- Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
+  and including the phase of each element position
 - The result has one element per port, identity port weights and all element positions at the origin
-- Empty `element_pos` counts as zeros, empty port weights as identity
-- Useful for beamforming and MIMO channel computation speedup
-- Vector form: one output entry per output frequency (`freq_new`, or one per input entry); the fields are interpolated
-  over frequency as in [[interpolate_pattern]], the port weights spherically between the bracketing input entries;
-  output frequencies outside the entries take the nearest entry; the position phase uses each output frequency
 
 ## Declarations:
 ```
@@ -52,21 +45,27 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
 ## Inputs:
 - **`ant`** — Valid arrayant
 - **`arrayant_vec`** — Vector form: non-empty vector of arrayant objects that passes [[is_valid]]
-- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults
-  to the input grid (of the first entry)
-- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing;
-  defaults to the input grid (of the first entry)
-- **`freq_new`** *(optional)* — Vector form: output frequencies in Hz, positive and finite; defaults to the
-  `center_freq` of the entries; `[n_freq_new]`
-- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
+- **`azimuth_grid_new`** *(optional)* — Output azimuth grid in rad; empty: the input grid (of the first entry)
+- **`elevation_grid_new`** *(optional)* — Output elevation grid in rad; empty: the input grid (of the first entry)
+- **`freq_new`** *(optional)* — Vector form: output frequencies in Hz, positive and finite; empty: the `center_freq` of
+  the entries, one output per input entry; `[n_freq_new]`
+- **`propagation_speed`** *(optional)* — Wave propagation speed $c$ in m/s, positive and finite; the default is the
+  speed of light for radio waves, use about 343 for acoustic arrays (e.g. from [[generate_speaker]])
 
 ## Returns:
-- New `arrayant` with `n_ports` elements (= number of columns in `port_weights_re/im`), each holding the pattern of
-  that port; vector form: `n_freq_new` such entries
+- New `arrayant` with `n_ports` elements, each holding the pattern of that port; `name` is kept, and so is `center_freq`
+  in the single form; vector form: `n_freq_new` such entries, each with its output frequency as `center_freq`
+
+## Notes:
+- **Frequency interpolation** (vector form): the fields are interpolated over frequency as in [[interpolate_pattern]],
+  the port weights spherically between the two entries that bracket the output frequency. Output frequencies outside the
+  entries take the nearest entry. The position phase uses the output frequency
 
 ## See also:
-- [[interpolate_pattern]] (used internally to evaluate the element patterns)
-- [[rotate_pattern]] (useful for orienting antenna array patterns)
+- [[generate_antenna]] (creates arrays with port weights)
+- [[interpolate_pattern]] (evaluates the element patterns without the port weights)
+- [[calc_directivity]], [[calc_beamwidth]] (work per element, so they measure the port patterns of the result)
+- [[rotate_pattern]] (turns the combined pattern)
 MD!*/
 
 template <typename dtype>

@@ -20,13 +20,10 @@ SECTION!*/
 # copy_element
 Copy a single element of an antenna array to one or more destination slots
 
-- Works in place; the array is enlarged if any destination index exceeds the current number of elements
-- Added elements get their own port with identity port weights; positions of added elements that are not copied are zero
-- When the array grows, an empty `element_pos` and empty port weights are written out first (zeros, identity), so
-  that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for an empty `i_target`, a source index out of bound, or a destination index
-  equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
-- Vector form: the same copy on every entry of a multi-frequency vector
+- Copies the pattern and the position of one element in place, e.g. to build an array from a single element; the port
+  weights of existing elements do not change
+- A destination beyond the last element enlarges the array. Each added element gets its own new port with weight 1;
+  added elements that are not a destination have a zero pattern and position
 
 ## Declarations:
 ```
@@ -42,10 +39,12 @@ void quadriga_lib::copy_element(
 ```
 
 ## Inputs:
-- **`ant`** — Valid arrayant; updated in-place
-- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects; updated in-place
-- **`i_source`** — Index of the element to copy, 0-based
-- **`i_target`** — Target indices, 0-based; a single index is passed as `{i}`
+- **`ant`** — Valid arrayant; updated in place
+- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects; the same copy is made in every entry;
+  updated in place
+- **`i_source`** — Index of the element to copy, 0-based; must be below `n_elements`
+- **`i_target`** — Destination indices, 0-based, not empty; a single index is passed as `{i}`; the largest `arma::uword`
+  (e.g. `-1` cast to unsigned) throws
 
 ## Example:
 ```
@@ -54,9 +53,13 @@ quadriga_lib::copy_element(ant, 0, {1, 2, 3}); // 4 identical elements
 ant.element_pos.row(1) = arma::rowvec({-0.75, -0.25, 0.25, 0.75});
 ```
 
+## Notes:
+- **Empty members**: when the array grows, an empty `element_pos` and empty port weights are first written out as zeros
+  and identity, so that all elements can be edited afterward; otherwise they stay empty
+
 ## See also:
-- [[set_element_pos]] (set element positions of all entries of a vector after copying)
-- [[join_arrays]] (join two arrays)
+- [[set_element_pos]] (sets the positions of the copies in all entries of a vector)
+- [[join_arrays]] (joins two arrays)
 MD!*/
 
 template <typename dtype>
@@ -155,10 +158,7 @@ template void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<doub
 # set_element_pos
 Set element positions for all entries in a multi-frequency arrayant vector
 
-- Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
-- All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
+- Writes the same positions to every entry in place, since [[is_valid]] requires equal positions in all entries
 
 ## Declaration:
 ```
@@ -169,12 +169,15 @@ void quadriga_lib::set_element_pos(
 ```
 
 ## Inputs:
-- **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
-- **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; empty: all elements are replaced
+- **`arrayant_vec`** — Non-empty vector of arrayant objects with equal element counts; updated in place; an empty
+  `element_pos` of an entry is filled with zeros first
+- **`element_pos`** — New (x, y, z) positions in m; `[3, n_update]` with `n_update` the length of `i_element`, or
+  `n_elements` if `i_element` is empty
+- **`i_element`** *(optional)* — Indices of the elements to update, 0-based; empty: all elements
 
 ## See also:
-- [[copy_element]] (replicate elements before setting positions)
+- [[copy_element]] (adds elements before their positions are set)
+- [[join_arrays]] (joins arrays, e.g. the drivers of a loudspeaker)
 - [[generate_speaker]] (typical source of multi-frequency arrayant vectors)
 MD!*/
 

@@ -256,7 +256,7 @@ MD!*/
 
 - `/*!SECTION`: exactly one per file that has blocks; it holds one non-empty line, the section title. Files with the same title form one section. Sections are sorted by title on the page; a new title makes a new section.
 - `/*!SECTION_DESC`: optional, any number per section; on the page they follow each other in file-name order below the section heading.
-- `/*!MD`: one function. Line 1 is the name line, `# name` with nothing else: the name matches `\.?[A-Za-z_][A-Za-z0-9_.]*`, a leading `.` marks a member function (`# .is_valid`), a trailing `<++>` is accepted and ignored. Line 2 is the one-line summary (the brief): it appears in the function tables of the Markdown files and below the function heading. The description follows up to the first sub-block heading. Functions are sorted by name within a section, member functions after the free functions.
+- `/*!MD`: one function. Line 1 is the name line, `# name` with nothing else: the name matches `\.?[A-Za-z_][A-Za-z0-9_.]*`, a leading `.` marks a member function (`# .is_valid`), a trailing `<++>` is accepted and ignored. Line 2 is the one-line summary (the brief): it appears in the function tables of the Markdown files and below the function heading. The description follows up to the first sub-block heading. Within a section, class blocks come first, then the functions by name, member functions last.
 
 ### Sub-blocks
 

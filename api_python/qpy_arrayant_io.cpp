@@ -11,22 +11,11 @@ SECTION!*/
 
 /*!MD
 # qdant_read
-Reads antenna array data from QDANT files
+Read arrayant objects from a QDANT file
 
-- QDANT is the QuaDRiGa Array Antenna Exchange Format, an XML format for storing antenna patterns
-- A QDANT file may hold one or several entries (e.g. a frequency-dependent antenna model)
-- `ids` as an integer reads a single entry by its 1-based ID; the result is a dict with 3D pattern fields
-- `ids` as a list or array reads those entries in the given order (duplicates allowed); the result is a list of dicts
-  with 3D pattern fields
-- Without `ids` (or with `ids = None`), the entries listed in the layout are read (all entries if the file has no layout): a frequency-dependent dict with 4D pattern fields
-  when the file holds multiple entries, or a plain single-entry dict (3D fields) when it holds exactly one;
-  multiple entries must form a frequency set (same number of elements, same azimuth and elevation grids, element
-  positions and port-weights size), otherwise an error asks to pass `ids`
-- Reading all entries is the inverse of `qdant_write` with a 4D-pattern dict
-- An ID that is not in the file raises an error; the first entry counts as ID 1 only if it has no
-  `id` attribute
-- Malformed files raise an error, also when they declare more elements (`n_elements`) than the file
-  has data for; elements without pattern data read as zeros (at most the larger of 2^24 values and 1 value per file byte in one read)
+- Loads arrays from a file in the [QDANT format](formats.html#qdant). A file can hold several arrays, each with a
+  numeric ID, e.g. one per frequency of a frequency-dependent model, where `center_freq` of each entry identifies the
+  frequency
 
 ## Usage:
 ```
@@ -41,24 +30,27 @@ ant_list, layout = quadriga_lib.arrayant.qdant_read( fn, [3, 1, 3] )
 ```
 
 ## Inputs:
-- **`fn`** — path to the QDANT file; must not be empty
-- **`ids`** — 1-based ID of the entry to read (integer), or a list or array of IDs, all >= 1 (an empty list returns an empty list);
-  `None` reads the entries in the layout (see above); default: None
+- **`fn`** — Path to the QDANT file; must not be empty
+- **`ids`** — 1-based ID of the entry to read (int), or a list or array of IDs, read in this order, duplicates allowed;
+  an empty list returns an empty list; default: `None` (the entries listed in the layout, each once, in order of first
+  appearance (column-major scan), or all entries if the file has no layout; several entries must then form a
+  multi-frequency array, otherwise an error asks to pass `ids`)
 
 ## Outputs:
-- **`ant`** — Dict with the antenna array data (a list of such dicts for a list of `ids`); keys as in [[generate_antenna]], with these specifics:
-  - `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` — Pattern fields;
-    `(n_elevation, n_azimuth, n_elements)` for a single entry, or
-    `(n_elevation, n_azimuth, n_elements, n_freq)` when multiple entries are read
-  - `center_freq` — Center frequency in Hz; scalar for a single entry, `(n_freq,)` when reading multiple entries
-  - `port_weights_re`, `port_weights_im` — Port weights; `(n_elements, n_ports)`, or
-    `(n_elements, n_ports, n_freq)` when reading multiple entries with per-entry port weights
-- **`layout`** — Matrix of element IDs describing how the entries are arranged in the file; int64
+- **`ant`** — Arrayant dict ([[generate_antenna]]) with 3D pattern arrays for an int; a list of such dicts for a list or
+  array; with `ids=None`, a 3D dict for one entry and a 4D multi-frequency dict for several
+- **`layout`** — The file's layout matrix of entry IDs (0 = empty slot); int64
+
+## Notes:
+- **IDs**: the number used in the layout matrix and by [[qdant_write]]. A first entry without an `id` attribute (files
+  from other tools) counts as ID 1
+- **Errors**: an ID that is 0 or not in the file, and a missing, unreadable or malformed file, raise an error
+- **Elements without data**: elements without pattern nodes read as zeros. A file whose element count is not backed by
+  its data, or that exceeds the [reader limits](formats.html#qdant), raises an error
 
 ## See also:
-- [[qdant_write]] (for writing QDANT data)
-- [[generate_antenna]] (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
+- [[qdant_write]] (writes such files; reading all entries is the inverse of writing a 4D dict)
+- [[generate_antenna]], [[generate_speaker]] (create arrays without a file)
 MD!*/
 
 py::tuple qdant_read(const py::handle &fn,
@@ -120,22 +112,11 @@ py::tuple qdant_read(const py::handle &fn,
 
 /*!MD
 # qdant_write
-Writes antenna array data to QDANT files
+Write arrayant data to a QDANT (XML) file
 
-- QDANT is the QuaDRiGa Array Antenna Exchange Format, an XML format for storing antenna patterns
-- Single-frequency input (3D pattern fields) writes one entry; `id` places it in the file, and
-  several antennas can share one file via distinct IDs
-- Frequency-dependent input (4D pattern fields) writes every frequency entry with sequential
-  1-based IDs; `id` and `layout` do not apply, and the file must not already exist
-- Returns the ID assigned to the written entry (`0` for a frequency-dependent write)
-- Without `layout`, the layout in the file is replaced by a row of all IDs in the file in file order;
-  a custom layout written before is lost (pass it again with every write that should keep it)
-- The file has single-precision-equivalent accuracy relative to the element peak: pattern
-  magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
-  amplitude of its element; samples far below the peak are less accurate relative to their own
-  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and port weights are
-  written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
-  degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
+- Stores an array in a file in the [QDANT format](formats.html#qdant). A file can hold several arrays with distinct IDs
+  and a layout matrix that arranges them
+- 4D pattern arrays store a frequency-dependent model in a new file, each entry holding the pattern at its `center_freq`
 
 ## Usage:
 ```
@@ -148,23 +129,34 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ```
 
 ## Inputs:
-- **`fn`** — Output QDANT filename; must not be empty
-- **`arrayant`** — Dict with the antenna array data; keys as in [[generate_antenna]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`; 4D input
-  requires `center_freq` with one value per frequency entry `(n_freq,)`
-- **`id`** — Target 1-based ID of the entry inside the file; `0` appends after the highest
-  existing ID (or 1 if the file does not exist); ignored for 4D input; default: 0
-- **`layout`** — uint32 matrix organizing multiple antenna IDs within the file; must reference
-  only IDs present in the file; ignored for 4D input; default: `None` (a row of all IDs in the file,
-  which replaces a layout written before)
+- **`fn`** — Output QDANT file name, must not be empty; an existing file is updated; 4D input: the file must not exist
+  (raises `RuntimeError` and leaves the file unchanged)
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array, written with
+  the sequential IDs `1, 2, ..., n_freq` and an `(n_freq, 1)` layout of these IDs
+- **`id`** — Target ID in the file; an entry with this ID is replaced; 0 appends with `max_existing_id + 1`, or 1 in a
+  new file; ignored for 4D input; default: 0
+- **`layout`** — Integer matrix of entry IDs that arranges the file; every value must be an ID in the file (0 is not
+  accepted); ignored for 4D input; default: `None`, which replaces the layout in the file by a `(1, n)` row of all IDs
+  in file order, so a custom layout must be passed again with every write that should keep it
 
 ## Output:
-- **`id_in_file`** — ID assigned to the entry in the file after writing; `0` for a frequency-dependent (4D) write
+- **`id_in_file`** — ID assigned to the written antenna within the file; 0 for 4D input
+
+## Notes:
+- **Pattern accuracy**: the file has single-precision-equivalent accuracy relative to the element peak. Pattern
+  magnitudes (in dB) and phases (in degrees) get the fewest decimals (0 to 6) that keep the error of each complex sample
+  at or below 6e-8 times the peak amplitude of its element (over `e_theta` and `e_phi`). Samples near the peak are
+  accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the peak (about 6e-4 at
+  -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at a low level is
+  quantized relative to its own peak
+- **Other values**: element positions and port weights (magnitude, phase) are written as the shortest text that reads
+  back as the same float (at most 9 significant digits); sampling grids are rounded to 0.001 degree
+- **Zeros**: all non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element
+  that is zero in both field components is written as an all `-inf` `e_theta_mag` node
 
 ## See also:
-- [[qdant_read]] (for reading QDANT data)
-- [[generate_antenna]] (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
+- [[qdant_read]] (reads the file back)
+- [[generate_speaker]] (typical source of frequency-dependent arrays)
 MD!*/
 
 py::ssize_t qdant_write(const py::handle &fn,
@@ -195,10 +187,10 @@ py::ssize_t qdant_write(const py::handle &fn,
 # export_pattern_obj
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
-- The pattern is mapped onto an icosphere; a higher `icosphere_n_div` gives a finer mesh
-- The OBJ file is written to `fn`; the function returns nothing
-- Accepts a frequency-dependent antenna (4D pattern fields); `i_freq` selects which frequency
-  entry is exported
+- Writes the power pattern of each element as a colored 3D surface, one object per element, placed at its position in
+  `element_pos`
+- The distance of the surface from the element is linear in the level in dB: `object_radius` at the peak over all
+  exported elements, 0 at `directivity_range_dB` below it. The color shows the same level
 
 ## Usage:
 ```
@@ -207,14 +199,23 @@ quadriga_lib.arrayant.export_pattern_obj( fn, arrayant, *, directivity_range_dB,
 ```
 
 ## Inputs:
-- **`fn`** — Output OBJ filename; must not be empty and must end in `.obj`
-- **`arrayant`** — Dict with the antenna array data; keys as in [[generate_antenna]]; pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
-- **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-- **`object_radius`** — Radius of the exported object in meters; default: 1.0
-- **`icosphere_n_div`** — Icosphere subdivision count; higher gives a finer mesh; see [[icosphere]]; default: 4
-- **`i_element`** — Element indices to export; 1D list or array of int; `None` or empty exports all elements; default: `None`
-- **`i_freq`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= i_freq < n_freq`; default: 0
+- **`fn`** — Output OBJ file name, must end in `.obj`; the colormap is written to a `.mtl` file of the same name;
+  existing files are overwritten
+- **`arrayant`** — Arrayant dict ([[generate_antenna]]); 4D pattern arrays hold a multi-frequency array; the exported
+  elements must have finite field values and must not be zero in all directions
+- **`directivity_range_dB`** — Range of the plot below the peak in dB, finite and not 0; the sign is ignored; default:
+  30.0
+- **`colormap`** — Colormap name: `jet`, `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`,
+  `autumn` or `summer`; default: `jet`
+- **`object_radius`** — Radius of the surface at the peak in m, positive and finite; default: 1.0
+- **`icosphere_n_div`** — Subdivisions of the [[icosphere]] that carries the surface; higher = finer mesh with $20 n^2$
+  faces; default: 4
+- **`i_element`** — Element indices to export, 0-based; list or array of int; default: `None` (all elements)
+- **`i_freq`** — Frequency entry of a 4D input to export, 0-based, below `n_freq`; default: 0
+
+## See also:
+- [[calc_directivity]], [[calc_beamwidth]] (the same pattern as numbers)
+- [[channel.export_obj_file]] (exports propagation paths to an OBJ file)
 MD!*/
 
 void export_pattern_obj(const py::handle &fn,

@@ -8,16 +8,58 @@
 Antennas, transducers and patterns
 SECTION!*/
 
+/*!SECTION_DESC
+The functions of this section create, inspect, transform and store antenna and acoustic arrays. They share one data
+structure, the arrayant struct (fields in [[generate_antenna]]): complex polarimetric patterns of the elements on an
+azimuth and elevation grid, the element positions and the port weights. The channel functions take it as transmit and
+receive antenna.<br><br>
+
+**Terms** (full list in the [Glossary](cpp_api.html#glossary)):
+
+- **Element**: one radiator or sensor (antenna element, loudspeaker driver, microphone capsule) with a pattern, a
+  position and one row of the port weights
+- **Grid**: azimuth φ in [-π, π], measured from +x toward +y, and elevation θ in [-π/2, π/2], measured from the x-y
+  plane (TR 38.901 uses the zenith angle 90° - θ), both in rad and strictly increasing. Boresight is +x
+- **Pattern**: the direction-dependent far field of an element: F_θ (`e_theta_re/im`) along
+  `(sin θ cos φ, sin θ sin φ, -cos θ)`, the zenith-angle unit vector of TR 38.901, which points toward decreasing
+  elevation, and F_φ (`e_phi_re/im`) along `(-sin φ, cos φ, 0)`. For an antenna, `|F_θ|² + |F_φ|²` is the linear gain
+  over an isotropic radiator
+- **Port**: one signal of the array, one column of the port weights
+- **Port weights**: the fixed complex feed network `w(i,p)` from element i to port p, `[n_elements, n_ports]`. It is not
+  the mutual coupling between elements. Empty means identity (one port per element)
+- **Element position**: local Cartesian coordinates in m, `[3, n_elements]`; empty means all at the origin
+- **Multi-frequency array**: a 1xN struct array, one entry per `center_freq`, with equal grids, element positions and
+  port weight sizes. [[interpolate_pattern]] and [[apply_port_weights]] interpolate over frequency between the entries
+
+The field of port p in a direction is the weighted sum of the element fields, each with the phase of its position,
+
+`F_p = Σ_i w(i,p) · F_i · exp(-j 2π f d_i / c)`
+
+where `d_i = -r · x_i` is the distance of element i at position x_i from the wavefront plane through the origin,
+negative for elements closer to the source, r the unit vector toward the source, f the frequency and c the propagation
+speed.<br><br>
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Create | [[generate_antenna]], [[generate_speaker]], [[qdant_read]] |
+| Evaluate | [[interpolate_pattern]], [[calc_directivity]], [[calc_beamwidth]] |
+| Transform | [[apply_port_weights]], [[rotate_pattern]] |
+| Edit and combine | [[join_arrays]], [[copy_element]] |
+| Store, show | [[qdant_write]], [[export_pattern_obj]] |
+
+Arrays are stored in the [QDANT file format](formats.html#qdant).
+SECTION_DESC!*/
+
 /*!MD
 # APPLY_PORT_WEIGHTS
 Apply the port weights of an antenna array: one pattern per port
 
-- Evaluates the element patterns on the output grid, applies the phase shift of each element position (which
-  moves every pattern to the array origin) and sums the elements with the port weights
+- Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
+- Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
+  and including the phase of each element position
 - The result has one element per port, identity port weights and all element positions at the origin
-- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
-- The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
-  applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 
 ## Usage:
 ```
@@ -26,26 +68,30 @@ arrayant_out = quadriga_lib.apply_port_weights( arrayant_in, freq_new, azimuth_g
 ```
 
 ## Inputs:
-- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [[generate_antenna]];
-  a struct array may contain a frequency-dependent model
-- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is
-  recomputed (interpolated) at each requested frequency; default: `[]` (each input entry's `center_freq` unchanged)
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; default: `[]` (input grid)
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; default: `[]` (input grid)
-- **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
-  default: 299792458
+- **`arrayant_in`** — Arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency array
+- **`freq_new`** — Output frequencies in Hz, positive and finite; a 1x1 struct has one pattern, so that only the phase
+  of the element positions follows `freq_new`; `[n_freq_new]`; default: the `center_freq` of the entries, one output per
+  entry
+- **`azimuth_grid_new`** — Output azimuth grid in rad; default: the input grid (of the first entry)
+- **`elevation_grid_new`** — Output elevation grid in rad; default: the input grid (of the first entry)
+- **`propagation_speed`** — Wave propagation speed in m/s, positive and finite; 299792458 is the speed of light for
+  radio waves, use about 343 for acoustic arrays (e.g. from [[generate_speaker]]); default: 299792458
 
 ## Output:
-- **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
-  result); field layout as documented in [[generate_antenna]]. Single struct when both input and
-  `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
-  `numel(arrayant_in)` when `freq_new` is omitted) otherwise.
+- **`arrayant_out`** — Arrayant struct with `n_ports` elements, each holding the pattern of that port; `name` is kept,
+  `center_freq` is the output frequency; a 1x1 struct for one output frequency, otherwise a 1xN struct array with one
+  entry per output frequency
+
+## Notes:
+- **Frequency interpolation** (struct array): the fields are interpolated over frequency as in [[interpolate_pattern]],
+  the port weights spherically between the two entries that bracket the output frequency. Output frequencies outside the
+  entries take the nearest entry. The position phase uses the output frequency
 
 ## See also:
-- [[generate_antenna]] (for field layout in the arrayant struct)
-- [[rotate_pattern]] (for changing the orientation of elements before combining)
-- [[calc_beamwidth]] (calculates the beam width of antenna arrays)
-- [[calc_directivity]] (directivity in dBi of antenna array elements)
+- [[generate_antenna]] (creates arrays with port weights)
+- [[interpolate_pattern]] (evaluates the element patterns without the port weights)
+- [[calc_directivity]], [[calc_beamwidth]] (work per element, so they measure the port patterns of the result)
+- [[rotate_pattern]] (turns the combined pattern)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -10,18 +10,15 @@ SECTION!*/
 
 /*!MD
 # JOIN_ARRAYS
-Concatenate two arrayant structs into a single one
+Join the elements of two antenna arrays into a new array
 
-- Concatenates all elements from `arrayant_in2` onto `arrayant_in1` along the element dimension; 
-  `element_pos` matrices are joined horizontally
-- Both inputs must share identical azimuth and elevation sampling grids
-- Port weights are assembled block-diagonally: elements from `arrayant_in1` connect only to ports from 
-  `arrayant_in1`, elements from `arrayant_in2` only to ports from `arrayant_in2`
-- `center_freq` and `name` are inherited from `arrayant_in1`
-- Supports multi-frequency arrayant models: when both inputs are struct arrays, they must have the 
-  same number of entries and matching `center_freq` at each index; concatenation is performed per 
-  entry and a struct array of equal size is returned
-- Output struct shape matches the input shape (scalar struct -> scalar struct, struct array -> struct array)
+- Combines two arrays with identical sampling grids, e.g. the drivers of a loudspeaker; `name` and `center_freq` are
+  taken from the first array
+- The ports stay separate: elements of the first array connect only to its ports, and likewise for the second:<br><br>
+   | Element \ Port        | P1…Pp1 (first) | Pp1+1…Pp1+p2 (second) |
+   | --------------------- | :------------: | :-------------------: |
+   | E1…En1 (first)        |    W1 block    |           0           |
+   | En1+1…En1+n2 (second) |       0        |       W2 block        |
 
 ## Usage:
 ```
@@ -29,14 +26,19 @@ arrayant_out = quadriga_lib.join_arrays( arrayant_in1, arrayant_in2 );
 ```
 
 ## Inputs:
-- **`arrayant_in1`** — Struct containing the first arrayant data; field layout as documented in 
-  [[generate_antenna]]; a struct array may contain a frequency-dependent model
-- **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
-  `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
+- **`arrayant_in1`** — First array; arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency
+  array; its elements come first in the output
+- **`arrayant_in2`** — Second array with the same sampling grids; a struct array needs as many entries as the first and
+  matching `center_freq` values at each index
 
 ## Output:
-- **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
-  a struct array of equal size is returned for multi-frequency input
+- **`arrayant_out`** — New arrayant with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports, in the form of
+  the inputs
+
+## See also:
+- [[copy_element]] (duplicates an element within one array)
+- [[generate_speaker]] (creates the driver models to join)
+- [[qdant_write]] (stores the joined model)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -91,8 +91,8 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 | Function | Section | Summary |
 | --- | --- | --- |
-| [apply_port_weights](#apply_port_weights) | Antennas, transducers and patterns | Apply the port weights of an antenna array: one pattern per port |
 | [arrayant](#arrayant) | Antennas, transducers and patterns | Class for storing and manipulating an array of antenna or acoustic elements |
+| [apply_port_weights](#apply_port_weights) | Antennas, transducers and patterns | Apply the port weights of an antenna array: one pattern per port |
 | [calc_beamwidth](#calc_beamwidth) | Antennas, transducers and patterns | Calculate the beamwidth and pointing angles of the elements of an antenna array in degrees |
 | [calc_directivity](#calc_directivity) | Antennas, transducers and patterns | Calculate the directivity in dBi of the elements of an antenna array |
 | [copy_element](#copy_element) | Antennas, transducers and patterns | Copy a single element of an antenna array to one or more destination slots |
@@ -109,6 +109,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [trim_pattern](#trim_pattern) | Antennas, transducers and patterns | Remove zero-valued entries from antenna pattern data, reducing its size |
 | [channel](#channel) | Channel class | Class for storing and managing MIMO channel data and metadata across multiple snapshots |
 | [.add_paths](#.add_paths) | Channel class | Append new propagation paths to an existing channel snapshot |
+| [path](#path) | Channel functions | Class for storing and managing a single propagation path with a compact fixed-size header |
 | [any_type_id](#any_type_id) | Channel functions | Get the type ID and the shape of the value in a `std::any` object |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
@@ -126,7 +127,6 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [hdf5_write_channel](#hdf5_write_channel) | Channel functions | Write a channel object to an HDF5 file at a specified 4D index |
 | [hdf5_write_channel_vec](#hdf5_write_channel_vec) | Channel functions | Write several channel objects to slots of an HDF5 file |
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | Write a single unstructured dataset to an HDF5 file at a specified 4D index |
-| [path](#path) | Channel functions | Class for storing and managing a single propagation path with a compact fixed-size header |
 | [qrt_file_append](#qrt_file_append) | Channel functions | Append one transmitter's path data to an existing QRT file |
 | [qrt_file_init](#qrt_file_init) | Channel functions | Create a new QRT file and write its metadata header |
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | Read metadata from a QRT file |
@@ -147,12 +147,12 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
 | [calc_delay_spread](#calc_delay_spread) | Channel statistics | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | Calculate the Rician K-Factor from channel impulse response data |
+| [gbsm_rays](#gbsm_rays) | Geometry-based stochastic model | Class for the ray data of one link (geometry-based stochastic model) |
 | [conf_file_list](#conf_file_list) | Geometry-based stochastic model | List the scenarios defined by the conf files in a set of directories |
 | [conf_file_read](#conf_file_read) | Geometry-based stochastic model | Read and validate a QuaDRiGa scenario configuration file |
 | [conf_file_write](#conf_file_write) | Geometry-based stochastic model | Write a QuaDRiGa scenario configuration file |
 | [gbsm_draw](#gbsm_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of one random set at a set of links |
 | [gbsm_init_phases](#gbsm_init_phases) | Geometry-based stochastic model | SOS phases of one random set of a BS site and scenario |
-| [gbsm_rays](#gbsm_rays) | Geometry-based stochastic model | Class for the ray data of one link (geometry-based stochastic model) |
 | [gbsm_rays_from_paths](#gbsm_rays_from_paths) | Geometry-based stochastic model | Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read |
 | [gbsm_single_link_channel](#gbsm_single_link_channel) | Geometry-based stochastic model | Channel coefficients of one link at one frequency over one segment |
 | [los_probability](#los_probability) | Geometry-based stochastic model | LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models |
@@ -231,6 +231,101 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 <a id="sec-antennas-transducers-and-patterns"></a>
 # Antennas, transducers and patterns
 
+The functions of this section create, inspect, transform and store antenna and acoustic arrays. They share one data
+structure, [arrayant](#arrayant): complex polarimetric patterns of the elements on an azimuth and elevation grid, the element
+positions and the port weights. The channel functions take it as transmit and receive antenna.
+
+**Terms** (full list in the [Glossary](#glossary)):
+
+- **Element**: one radiator or sensor (antenna element, loudspeaker driver, microphone capsule) with a pattern, a
+  position and one row of the port weights
+- **Grid**: azimuth $\phi$ in $[-\pi, \pi]$, measured from +x toward +y, and elevation $\theta$ in $[-\pi/2, \pi/2]$,
+  measured from the x-y plane (TR 38.901 uses the zenith angle $90° - \theta$), both in rad and strictly increasing.
+  Boresight is +x
+- **Pattern**: the direction-dependent far field of an element: $F_\theta$ (`e_theta_re/im`) along
+  $\hat\theta = (\sin\theta\cos\phi, \sin\theta\sin\phi, -\cos\theta)$, the zenith-angle unit vector of TR 38.901, which
+  points toward decreasing elevation, and $F_\phi$ (`e_phi_re/im`) along $\hat\phi = (-\sin\phi, \cos\phi, 0)$. For an
+  antenna, $\lvert F_\theta \rvert^2 + \lvert F_\phi \rvert^2$ is the linear gain over an isotropic radiator
+- **Port**: one signal of the array, one column of the port weights
+- **Port weights**: the fixed complex feed network $w_{i,p}$ from element $i$ to port $p$, `[n_elements, n_ports]`. It
+  is not the mutual coupling between elements. Empty means identity (one port per element)
+- **Element position**: local Cartesian coordinates in m, `[3, n_elements]`; empty means all at the origin
+- **Multi-frequency array**: a `std::vector` of arrayants, one entry per `center_freq`, with equal grids, element
+  positions and port weight sizes ([is_valid](#is_valid)). [interpolate_pattern](#interpolate_pattern) and [apply_port_weights](#apply_port_weights) interpolate over
+  frequency between the entries
+
+The field of port $p$ in a direction is the weighted sum of the element fields, each with the phase of its position,
+
+$$F_p = \sum_i w_{i,p} \, F_i \, e^{-j 2\pi f d_i / c}$$
+
+where $d_i = -\hat{r} \cdot x_i$ is the distance of element $i$ at position $x_i$ from the wavefront plane through the
+origin, negative for elements closer to the source, $\hat{r}$ the unit vector toward the source, $f$ the frequency and
+$c$ the propagation speed.
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Create | [generate_antenna](#generate_antenna), [generate_speaker](#generate_speaker), [qdant_read](#qdant_read) |
+| Evaluate | [interpolate_pattern](#interpolate_pattern), [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) |
+| Transform | [apply_port_weights](#apply_port_weights), [rotate_pattern](#rotate_pattern), [trim_pattern](#trim_pattern) |
+| Edit and combine | [join_arrays](#join_arrays), [copy_element](#copy_element), [set_element_pos](#set_element_pos) |
+| Check, store, show | [is_valid](#is_valid), [qdant_write](#qdant_write), [export_pattern_obj](#export_pattern_obj) |
+
+Arrays are stored in the [QDANT file format](formats/qdant.md).
+
+---
+<a id="arrayant"></a>
+## arrayant
+Class for storing and manipulating an array of antenna or acoustic elements
+
+Not in: MATLAB, Python
+
+- All functions give the same results for an empty `element_pos` and empty port weights as for zeros and identity,
+  except the IRS array of [get_channels_irs](#get_channels_irs), whose port weights hold the IRS weights and must be given
+- In a multi-frequency vector all entries use the same form, either empty or given (see [is_valid](#is_valid))
+
+### Attributes:
+| Attribute                         | Size                                   | Description                                                    |
+| --------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | e-theta (vertical) field, real part                            |
+| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | e-theta (vertical) field, imaginary part                       |
+| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | e-phi (horizontal) field, real part                            |
+| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | e-phi (horizontal) field, imaginary part                       |
+| `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], strictly increasing       |
+| `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], strictly increasing |
+| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions relative to the phase center, in m           |
+| `arma::Mat<dtype> port_weights_re`    | `[n_elements, n_ports]` or empty       | Port weights, real part                                     |
+| `arma::Mat<dtype> port_weights_im`    | `[n_elements, n_ports]` or empty       | Port weights, imaginary part                                |
+| `dtype center_freq`          | scalar                                 | Center frequency in Hz; default 299792458                      |
+| `std::string name`                | string                                 | Name of the antenna array object                               |
+
+### Member functions:
+| Function                                                  | Description                                                                                                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.n_elevation()`                                          | Number of elevation angles                                                                                                                                          |
+| `.n_azimuth()`                                            | Number of azimuth angles                                                                                                                                            |
+| `.n_elements()`                                           | Number of antenna elements                                                                                                                                          |
+| `.n_ports()`                                              | Number of ports (columns of port weights)                                                                                                                        |
+| `.reset()`                                                | Empties all data; `center_freq` returns to its default, `name` is kept                                                                                              |
+| `.set_size(n_elevation, n_azimuth, n_elements, n_ports)` | Resizes all members (`arma::uword` sizes); no-op if they match; after a resize `element_pos` is zero, `port_weights_re` identity, `port_weights_im` zero, field data undefined |
+| `.is_valid()`                                             | `std::string`: empty if the object is valid, else an error message                                                                                                  |
+
+### Notes:
+- **Value range**: field values and port weights must be finite with magnitudes below about 1e18; larger values overflow
+  in the interpolation and in the channel functions and give NaN results
+- **Validation**: `is_valid()` always checks the data: sizes of all members, ranges and order of the angle grids, sizes
+  of element positions and port weights. A passing check marks the object as validated: the library functions then skip
+  the full check as long as no data member was reallocated or resized; values changed in place after the check are not
+  seen by them
+- **Threads and copies**: the mark is updated atomically, so `is_valid()` may be called while other threads read the
+  object; a copy is marked if its source passes the full check, a moved-to object takes over the mark of its source
+
+### See also:
+- [is_valid](#is_valid) (checks a multi-frequency vector)
+- [generate_antenna](#generate_antenna), [generate_speaker](#generate_speaker) (create arrays)
+- [qdant_read](#qdant_read), [qdant_write](#qdant_write) (load and store arrays)
+
 ---
 <a id="apply_port_weights"></a>
 ## apply_port_weights
@@ -238,17 +333,10 @@ Apply the port weights of an antenna array: one pattern per port
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#apply_port_weights) · [Python](quadriga_lib_api_python.md#apply_port_weights)
 
-- Evaluates the element patterns on the output grid, applies the phase shift of each element position (which moves
-  every pattern to the array origin) and sums the elements with the port weights
-- The position phase is `-2 pi f d / propagation_speed` with `f = center_freq` and `d` the distance of the element
-  from the wavefront plane through the origin; the default speed of light applies to radio waves, use about 343 m/s
-  for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
+- Combines the elements of an array into one pattern per port, for beamforming and to speed up MIMO channel computation
+- Each port pattern is the weighted sum of the element fields from the section overview, evaluated on the output grid
+  and including the phase of each element position
 - The result has one element per port, identity port weights and all element positions at the origin
-- Empty `element_pos` counts as zeros, empty port weights as identity
-- Useful for beamforming and MIMO channel computation speedup
-- Vector form: one output entry per output frequency (`freq_new`, or one per input entry); the fields are interpolated
-  over frequency as in [interpolate_pattern](#interpolate_pattern), the port weights spherically between the bracketing input entries;
-  output frequencies outside the entries take the nearest entry; the position phase uses each output frequency
 
 ### Declarations:
 ```cpp
@@ -269,72 +357,27 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
 ### Inputs:
 - **`ant`** — Valid arrayant
 - **`arrayant_vec`** — Vector form: non-empty vector of arrayant objects that passes [is_valid](#is_valid)
-- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults
-  to the input grid (of the first entry)
-- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing;
-  defaults to the input grid (of the first entry)
-- **`freq_new`** *(optional)* — Vector form: output frequencies in Hz, positive and finite; defaults to the
-  `center_freq` of the entries; `[n_freq_new]`
-- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
+- **`azimuth_grid_new`** *(optional)* — Output azimuth grid in rad; empty: the input grid (of the first entry)
+- **`elevation_grid_new`** *(optional)* — Output elevation grid in rad; empty: the input grid (of the first entry)
+- **`freq_new`** *(optional)* — Vector form: output frequencies in Hz, positive and finite; empty: the `center_freq` of
+  the entries, one output per input entry; `[n_freq_new]`
+- **`propagation_speed`** *(optional)* — Wave propagation speed $c$ in m/s, positive and finite; the default is the
+  speed of light for radio waves, use about 343 for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
 
 ### Returns:
-- New `arrayant` with `n_ports` elements (= number of columns in `port_weights_re/im`), each holding the pattern of
-  that port; vector form: `n_freq_new` such entries
+- New `arrayant` with `n_ports` elements, each holding the pattern of that port; `name` is kept, and so is `center_freq`
+  in the single form; vector form: `n_freq_new` such entries, each with its output frequency as `center_freq`
+
+### Notes:
+- **Frequency interpolation** (vector form): the fields are interpolated over frequency as in [interpolate_pattern](#interpolate_pattern),
+  the port weights spherically between the two entries that bracket the output frequency. Output frequencies outside the
+  entries take the nearest entry. The position phase uses the output frequency
 
 ### See also:
-- [interpolate_pattern](#interpolate_pattern) (used internally to evaluate the element patterns)
-- [rotate_pattern](#rotate_pattern) (useful for orienting antenna array patterns)
-
----
-<a id="arrayant"></a>
-## arrayant
-Class for storing and manipulating an array of antenna or acoustic elements
-
-Not in: MATLAB, Python
-
-- Each element (antenna element, loudspeaker driver, microphone capsule) has a pattern and a position relative to the array phase-center
-- The port weights map the elements to the ports: complex, `[n_elements, n_ports]`
-- Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
-- `element_pos` is optional (empty = all elements at origin); `port_weights_re/im` are optional (empty = identity); all
-  functions give the same results for empty members as for zeros / identity, except the IRS array of
-  [get_channels_irs](#get_channels_irs), whose port weights hold the IRS weights and must be given. In a multi-frequency vector all
-  entries use the same form (see [is_valid](#is_valid))
-- Field values and port weights must be finite with magnitudes below about 1e18; larger values overflow in the
-  interpolation and in the channel functions and give NaN results
-
-### Attributes:
-| Attribute                         | Size                                   | Description                                                    |
-| --------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
-| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part                            |
-| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part                       |
-| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part                            |
-| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part                       |
-| `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], strictly increasing       |
-| `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], strictly increasing |
-| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
-| `arma::Mat<dtype> port_weights_re`    | `[n_elements, n_ports]` or empty       | Port weights, real part                                     |
-| `arma::Mat<dtype> port_weights_im`    | `[n_elements, n_ports]` or empty       | Port weights, imaginary part                                |
-| `dtype center_freq`          | scalar                                 | Center frequency                                               |
-| `std::string name`                | string                                 | Name of the antenna array object                               |
-
-### Member functions:
-| Function                                                  | Description                                                                                                                                                         |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.n_elevation()`                                          | Number of elevation angles                                                                                                                                          |
-| `.n_azimuth()`                                            | Number of azimuth angles                                                                                                                                            |
-| `.n_elements()`                                           | Number of antenna elements                                                                                                                                          |
-| `.n_ports()`                                              | Number of ports (columns of port weights)                                                                                                                        |
-| `.reset()`                                                | Clears all data, resetting size to zero                                                                                                                             |
-| `.set_size(n_elevation, n_azimuth, n_elements, n_ports)` | Resizes all members (`arma::uword` sizes); no-op if they match; after a resize `element_pos` is zero, `port_weights_re` identity, `port_weights_im` zero, field data undefined |
-| `.is_valid()`                                             | `std::string`: empty if the object is valid, else an error message                                                                                                  |
-
-- `is_valid()` always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and port weights; empty `element_pos` and port weights are allowed
-- A passing check marks the object as validated: the library functions then skip the full check as long as no data member was reallocated or resized; values changed in place after the check are not seen by them
-- The mark is updated atomically, so `is_valid()` may be called while other threads read the object; a copy is marked if its source passes the full check, a moved-to object takes over the mark of its source
-- The free functions of this section compute on an arrayant and read and write it (e.g. [calc_beamwidth](#calc_beamwidth), [calc_directivity](#calc_directivity), [join_arrays](#join_arrays), [apply_port_weights](#apply_port_weights), [copy_element](#copy_element), [rotate_pattern](#rotate_pattern), [qdant_write](#qdant_write)); [generate_antenna](#generate_antenna) creates one
-
-### See also:
-- [is_valid](#is_valid) (multi-frequency counterpart of `is_valid()`)
+- [generate_antenna](#generate_antenna) (creates arrays with port weights)
+- [interpolate_pattern](#interpolate_pattern) (evaluates the element patterns without the port weights)
+- [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (work per element, so they measure the port patterns of the result)
+- [rotate_pattern](#rotate_pattern) (turns the combined pattern)
 
 ---
 <a id="calc_beamwidth"></a>
@@ -343,19 +386,9 @@ Calculate the beamwidth and pointing angles of the elements of an antenna array 
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
 
-- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
-- Loudspeakers state the coverage angle between the -6 dB points: use `threshold_dB = 6`
-- Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
-- The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the
-  threshold; side lobes above the threshold are not included
-- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when
-  the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
-- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples
-  at ±90°); the result is at most 180°
-- Calculated per element, not per port; ignores the port weights
-- Vector form: the same computation on every entry of a multi-frequency vector; column `i_freq` of each output holds
-  the results of `arrayant_vec[i_freq]`
+- Measures the width of the main lobe of each element in azimuth and elevation at a threshold below its peak, and the
+  direction of the peak
+- Calculated per element, not per port: the port weights are ignored
 
 ### Declarations:
 ```cpp
@@ -380,28 +413,40 @@ void quadriga_lib::calc_beamwidth(
 
 ### Inputs:
 - **`ant`** — Valid arrayant
-- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [is_valid](#is_valid)
+- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [is_valid](#is_valid); column
+  `i_freq` of each output holds the results of `arrayant_vec[i_freq]`
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
-- **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
+- **`threshold_dB`** *(optional)* — Threshold below the peak in dB, positive and finite; 3 dB is the half-power
+  beamwidth; loudspeakers state the coverage angle between the -6 dB points, use 6
 
 ### Outputs:
-- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degree; `[n_out]`, vector form `[n_out, n_freq]`
-- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degree; `[n_out]`, vector form `[n_out, n_freq]`
-- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out]`, vector form
+- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degrees; `[n_out]`, vector form `[n_out, n_freq]`
+- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degrees; `[n_out]`, vector form `[n_out, n_freq]`
+- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degrees; `[n_out]`, vector form
   `[n_out, n_freq]`
-- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degree; `[n_out]`, vector form
+- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degrees; `[n_out]`, vector form
   `[n_out, n_freq]`
 
 ### Example:
 ```cpp
 auto ant = quadriga_lib::generate_antenna<double>("custom", 1.0, NAN, {30.0, 20.0});
 arma::vec bw_az, bw_el;
-quadriga_lib::calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
+quadriga_lib::calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // about 30 and 20 degrees
 ```
+
+### Notes:
+- **Main lobe**: starting at the maximum, the search goes outward until the power drops below the threshold; side lobes
+  above the threshold are not included
+- **Resolution**: the cuts are interpolated as in [interpolate_pattern](#interpolate_pattern), about 100 times finer than the sampling grid
+- **Azimuth cut**: at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360°
+  when the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
+- **Elevation cut**: along the great circle through the maximum, so a lobe can extend across the poles (requires samples
+  at ±90°); the result is at most 180°
 
 ### See also:
 - [calc_directivity](#calc_directivity) (directivity in dBi of the elements)
-- [apply_port_weights](#apply_port_weights) (apply the port weights before calculating the beamwidth)
+- [apply_port_weights](#apply_port_weights) (combines the elements into ports, to measure the beams of the ports)
+- [generate_antenna](#generate_antenna) (creates elements with a given beamwidth)
 
 ---
 <a id="calc_directivity"></a>
@@ -410,11 +455,9 @@ Calculate the directivity in dBi of the elements of an antenna array
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
 
-- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
-- Calculated per element, not per port; ignores the port weights
-- Vector form: the same computation on every entry of a multi-frequency vector; column `i_freq` of the output holds
-  the results of `arrayant_vec[i_freq]`
+- Measures how strongly an element concentrates its power: $D = 10 \log_{10}(P_\mathrm{max} / \bar{P})$ with the peak
+  radiation intensity $P_\mathrm{max}$ and its mean $\bar{P}$ over the sphere; an isotropic radiator has 0 dBi
+- Calculated per element, not per port: the port weights are ignored
 
 ### Declarations:
 ```cpp
@@ -429,7 +472,8 @@ arma::Mat<dtype> quadriga_lib::calc_directivity(
 
 ### Inputs:
 - **`ant`** — Valid arrayant
-- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [is_valid](#is_valid)
+- **`arrayant_vec`** — Vector form: non-empty vector of `n_freq` arrayant objects that passes [is_valid](#is_valid); column
+  `i_freq` of the output holds the results of `arrayant_vec[i_freq]`
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements; `[n_out]`
 
 ### Returns:
@@ -441,9 +485,13 @@ auto ant = quadriga_lib::generate_antenna<double>("dipole");
 arma::vec directivity_dBi = quadriga_lib::calc_directivity(ant); // about 1.76 dBi
 ```
 
+### Notes:
+- **Scale**: the result does not depend on the scale of the pattern; an element whose pattern is zero everywhere gives 0
+  dBi
+
 ### See also:
 - [calc_beamwidth](#calc_beamwidth) (beamwidth and pointing angles of the elements)
-- [apply_port_weights](#apply_port_weights) (apply the port weights before calculating the directivity)
+- [apply_port_weights](#apply_port_weights) (combines the elements into ports, to measure the directivity of the ports)
 
 ---
 <a id="copy_element"></a>
@@ -452,13 +500,10 @@ Copy a single element of an antenna array to one or more destination slots
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#copy_element) · [Python](quadriga_lib_api_python.md#copy_element)
 
-- Works in place; the array is enlarged if any destination index exceeds the current number of elements
-- Added elements get their own port with identity port weights; positions of added elements that are not copied are zero
-- When the array grows, an empty `element_pos` and empty port weights are written out first (zeros, identity), so
-  that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for an empty `i_target`, a source index out of bound, or a destination index
-  equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
-- Vector form: the same copy on every entry of a multi-frequency vector
+- Copies the pattern and the position of one element in place, e.g. to build an array from a single element; the port
+  weights of existing elements do not change
+- A destination beyond the last element enlarges the array. Each added element gets its own new port with weight 1;
+  added elements that are not a destination have a zero pattern and position
 
 ### Declarations:
 ```cpp
@@ -474,10 +519,12 @@ void quadriga_lib::copy_element(
 ```
 
 ### Inputs:
-- **`ant`** — Valid arrayant; updated in-place
-- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects; updated in-place
-- **`i_source`** — Index of the element to copy, 0-based
-- **`i_target`** — Target indices, 0-based; a single index is passed as `{i}`
+- **`ant`** — Valid arrayant; updated in place
+- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects; the same copy is made in every entry;
+  updated in place
+- **`i_source`** — Index of the element to copy, 0-based; must be below `n_elements`
+- **`i_target`** — Destination indices, 0-based, not empty; a single index is passed as `{i}`; the largest `arma::uword`
+  (e.g. `-1` cast to unsigned) throws
 
 ### Example:
 ```cpp
@@ -486,9 +533,13 @@ quadriga_lib::copy_element(ant, 0, {1, 2, 3}); // 4 identical elements
 ant.element_pos.row(1) = arma::rowvec({-0.75, -0.25, 0.25, 0.75});
 ```
 
+### Notes:
+- **Empty members**: when the array grows, an empty `element_pos` and empty port weights are first written out as zeros
+  and identity, so that all elements can be edited afterward; otherwise they stay empty
+
 ### See also:
-- [set_element_pos](#set_element_pos) (set element positions of all entries of a vector after copying)
-- [join_arrays](#join_arrays) (join two arrays)
+- [set_element_pos](#set_element_pos) (sets the positions of the copies in all entries of a vector)
+- [join_arrays](#join_arrays) (joins two arrays)
 
 ---
 <a id="export_pattern_obj"></a>
@@ -497,8 +548,10 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#export_pattern_obj) · [Python](quadriga_lib_api_python.md#export_pattern_obj)
 
-- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives finer mesh
-- Each element is placed at its position in `element_pos` (empty: at the origin)
+- Writes the power pattern of each element as a colored 3D surface, one object per element, placed at its position in
+  `element_pos`
+- The distance of the surface from the element is linear in the level in dB: `object_radius` at the peak over all
+  exported elements, 0 at `directivity_range_dB` below it. The color shows the same level
 
 ### Declaration:
 ```cpp
@@ -513,18 +566,21 @@ void quadriga_lib::export_pattern_obj(
 ```
 
 ### Inputs:
-- **`fn`** — Output OBJ filename; must end in .obj; the colormap is written to a .mtl file of the same name
-- **`ant`** — Valid arrayant
-- **`directivity_range_dB`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
-- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
-- **`object_radius`** *(optional)* — Radius of the exported object
-- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
-- **`i_element`** *(optional)* — 0-based element indices to export; empty exports all elements
+- **`fn`** — Output OBJ file name, must end in `.obj`; the colormap is written to a `.mtl` file of the same name;
+  existing files are overwritten
+- **`ant`** — Valid arrayant; the exported elements must have finite field values and must not be zero in all directions
+- **`directivity_range_dB`** *(optional)* — Range of the plot below the peak in dB, finite and not 0; the sign is
+  ignored
+- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for the supported maps
+- **`object_radius`** *(optional)* — Radius of the surface at the peak in m, positive and finite
+- **`icosphere_n_div`** *(optional)* — Subdivisions of the [icosphere](#icosphere) that carries the surface; higher = finer mesh
+  with $20 n^2$ faces
+- **`i_element`** *(optional)* — Element indices to export, 0-based; empty: all elements
 
 ### See also:
-- [colormap](#colormap) (Used for setting the colormap)
-- [icosphere](#icosphere) (Used internally to generate icosphere primitive)
-- [channel_export_obj_file](#channel_export_obj_file) (exports propagation paths to OBJ 3D visualization)
+- [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (the same pattern as numbers)
+- [colormap](#colormap) (the available color scales)
+- [channel_export_obj_file](#channel_export_obj_file) (exports propagation paths to an OBJ file)
 
 ---
 <a id="generate_antenna"></a>
@@ -533,14 +589,15 @@ Generate an antenna array of a given type
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#generate_antenna) · [Python](quadriga_lib_api_python.md#generate_antenna)
 
-- Tuples (`element`, `panel`, `spacing`, `pol`, `ports`, `steer`): entries left off at the end or set to NaN (0 in `panel`, `pol`, `ports`) take their default, e.g. `panel = {4, 8}` is one panel of 4 rows and 8 columns.
-- Panel arrays: elements are ordered polarization fastest, then row `m` (upwards along z), column `n` (along +y), panel row `mg`, panel column `ng`, centred on the origin; ports in the same order with `m_p`, `n_p`. The port weights `[n_elements, n_ports]` holds the weights; `apply_weights` combines each port into one element at its sub-array centre.
-- Sub-array weights (`ula`, `3GPP`; TR 38.901 eq. 7.3-1, along y by analogy): a port feeds `K = M / M_P` × `L = N / N_P` elements; element `(k, l)` gets `exp(j 2π ((k - (K-1)/2) d_V sin(tilt) - (l - (L-1)/2) d_H sin(pan))) / sqrt(K L)`; a positive tilt points the beam down, a positive pan towards +y.
-- Polarization (TR 38.901 clause 7.3.2): `pol` 2 has the slants ζ = 0° and 90°, `pol` 3 ζ = +45° and -45° (element 0 first). Model-1 turns the element by ζ about its boresight (eq. 7.3-3); Model-2 sets F_θ = sqrt(A') cos ζ and F_φ = sqrt(A') sin ζ with A' = |F_θ|² + |F_φ|² of the element (eq. 7.3-4, 7.3-5).
-- `multibeam`: maximum-ratio-transmission weights for the directions in `beams` (exact for one beam, approximate for several; only the ratios of the beam weights matter); one port per polarization, with `separate_beams` one per polarization and beam.
-- Handheld UT (`3GPP-UT`, TR 38.901 clause 7.3): `P` elements at each entry of `locations` (Fig. 7.3-2), polarization fastest; each element is rolled about its boresight by 90° (45° for two field patterns: `pol` 2 or a two-element `pattern`) and turned to the bearing `atan2(y, x)` of its location (Tables A.6-1, A.6-2); a `pattern` on an irregular grid is first resampled to a regular one. `pol` 1 and 2 with their default model are the TR model (eq. 7.3-6 to 7.3-8), other values are extensions. For an element symmetric under a 180° roll (every `element` tuple), the other z'' direction of Fig. 7.3-7 is the same antenna with a negated port weight.
-- CPE (`3GPP-CPE`): `P` elements at each entry of `locations` (Fig. 7.3-6 seen from the front, in the y-z plane), facing +x. TR 38.901 defines no CPE element; the default is the UE element of TR 38.803 Table 5.2.3.3-1.
-- An input that the type does not take throws.
+- Creates every built-in antenna: single elements, uniform linear arrays, 3GPP TR 38.901 panel arrays, multibeam
+  arrays, and the handheld UT and CPE devices. `type` selects the antenna; the other inputs set its parameters
+- The result is an [arrayant](#arrayant) with one pattern per element, the element positions and the port weights. Ports stay
+  separate from the elements unless `apply_weights` is set; [apply_port_weights](#apply_port_weights) combines them later
+- Panel inputs use the TR notation: `P` polarizations, `M` rows, `N` columns, `Mg` and `Ng` panels, and `M_P`, `N_P`
+  ports per panel and polarization
+- Tuple inputs may be partial: entries left off at the end or set to NaN (0 in `panel`, `pol`, `ports`) take their
+  default, e.g. `panel = {4, 8}` is one panel of 4 rows and 8 columns
+- An input that the selected type does not take throws
 
 ### Declaration:
 ```cpp
@@ -573,30 +630,55 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
    | `custom`                     | One element with given 3 dB beamwidths, peak gain equal to its directivity | `element`                                                                          |
    | `ula`                        | Uniform linear array of omni elements                                      | `panel`, `spacing`, `pol`, `ports`, `steer`, `pattern`, `apply_weights`            |
    | `3GPP` (or `3gpp`)           | Panel array of 3GPP TR 38.901 clause 7.3                                   | `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `pattern`, `apply_weights` |
-   | `multibeam`                  | Panel array with beams towards given directions                            | `element`, `panel`, `spacing`, `pol`, `beams`, `separate_beams`, `apply_weights`   |
+   | `multibeam`                  | Panel array with beams toward given directions                             | `element`, `panel`, `spacing`, `pol`, `beams`, `separate_beams`, `apply_weights`   |
    | `3GPP-UT` (or `3gpp-ut`)     | Handheld UT of 3GPP TR 38.901 clause 7.3                                   | `element`, `pol`, `pattern`, `device_size`, `locations`                            |
    | `3GPP-CPE` (or `3gpp-cpe`)   | CPE of 3GPP TR 38.901 clause 7.3                                           | `element`, `pol`, `pattern`, `device_size`, `locations`                            |
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; NaN or <= 0: 10° for `omni` and `xpol`, 1° otherwise; ignored if `pattern` is given
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90; the grid has
+  `floor(360 / res)` azimuth and `floor(180 / res)` elevation steps; NaN or <= 0: 10° for `omni` and `xpol`, 1°
+  otherwise; ignored if `pattern` is given
 - **`center_freq`** *(optional)* — Center frequency in Hz; positive and finite; NaN: 299792458 (wavelength 1 m)
 - **`element`** *(optional)* — Element parameters per type:
-  - `custom` `[az_3dB, el_3dB, floor_dB]`: 3 dB beamwidths in degrees (> 0, Inf: no taper); floor of the power pattern as a positive attenuation in dB below the peak (10: 10 dB below the peak; Inf: no floor); default `[90, 90, Inf]`
+  - `custom` `[az_3dB, el_3dB, floor_dB]`: 3 dB beamwidths in degrees (> 0, Inf: no taper); floor of the power pattern
+    as a positive attenuation in dB below the peak (10: 10 dB below the peak; Inf: no floor); default `[90, 90, Inf]`
   - `multibeam`: the same, default `[120, 120, Inf]`
-  - `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` of TR 38.901 Table 7.3-1: beamwidths in degrees (> 0, Inf: no taper); SLA_V and A_max as positive attenuations in dB below the peak, as in the TR (>= 0, Inf: no limit); G_max in dBi (finite or NaN); default `[65, 65, 30, 30, 8]`; entries left off at the end or set to NaN take their default, where `theta_3dB` defaults to `phi_3dB` and `A_max` to `SLA_V` (e.g. `[90]` gives `[90, 90, 30, 30, 8]`); `G_max` left off is 8 dBi, NaN sets the peak gain to the directivity; not together with `pattern`
-  - `3GPP-UT`: the same tuple, default `[125, 125, 22.5, 22.5, 5.3]` (Table 7.3-2); `3GPP-CPE`: default `[90, 90, 25, 25, 5]`; `[Inf, Inf, NaN, NaN, 0]` is isotropic
-- **`panel`** *(optional)* — `[M, N, Mg, Ng]`: elements per column, columns per panel, panels per column, panels per row; default 1; at most 1e7 elements per polarization (`ula`: `panel = 8` is a vertical column, `[1, 8]` a horizontal row)
-- **`spacing`** *(optional)* — `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing; finite and >= 0 (0 places elements or panels at the same position); default `[0.5, d_V, M d_V, N d_H]`
-- **`pol`** *(optional)* — `[polarization, model]`. Polarization: 1 = one element (ζ = 0°, vertical), 2 = two elements (ζ = 0° and 90°), 3 = two elements (ζ = +45° and -45°). Model of TR 38.901 clause 7.3.2: 1 = the element pattern is turned by ζ about its boresight (Model-1, eq. 7.3-3), 2 = the power pattern is kept and the field is split by ζ (Model-2, eq. 7.3-4, 7.3-5). Default `[1, 1]`; for `3GPP-UT` with polarization 2 or 3 the default model is 2, which gives the reference fields of the handheld model (eq. 7.3-6).
-- **`ports`** *(optional)* — `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; must divide `M` and `N`; default `[M, N]` (one port per element)
-- **`steer`** *(optional)* — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt and pan of the sub-array weights; `[1, 2]` for all panels or `[Mg Ng, 2]` with one row per panel (panel order `mg`, `ng`); one column: pan 0; default 0; a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`
-- **`beams`** *(optional)* — `[2, n_beams]` or `[3, n_beams]`: azimuth in degrees; elevation in degrees; weight (linear; 2 rows: 1); finite; default `[0; 0; 1]`
-- **`device_size`** *(optional)* — `[X, Y, Z]` in m (depth, width, height); NaN or left off: the default; `3GPP-UT` `[0.15, 0.07, 0]` with X, Y > 0 and Z = 0, `3GPP-CPE` `[0, 0.2, 0.2]` with X = 0 and Y, Z >= 0
-- **`locations`** *(optional)* — TR location labels (`3GPP-UT` 1 to 8, `3GPP-CPE` 1 to 9), not 0-based indices; any order, repeats allowed; default all
-- **`pattern`** *(optional)* — Element to use instead of the default element: its field patterns (`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, `coupling` and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; empty (no elements): the element of the type
+  - `3GPP` `[phi_3dB, theta_3dB, SLA_V, A_max, G_max]` of TR 38.901 Table 7.3-1: beamwidths in degrees (> 0, Inf: no
+    taper); SLA_V and A_max as positive attenuations in dB below the peak, as in the TR (>= 0, Inf: no limit); G_max in
+    dBi (finite or NaN); default `[65, 65, 30, 30, 8]`; not together with `pattern`
+  - `3GPP-UT`: the same tuple, default `[125, 125, 22.5, 22.5, 5.3]` (Table 7.3-2); `3GPP-CPE`: default
+    `[90, 90, 25, 25, 5]`; `[Inf, Inf, NaN, NaN, 0]` is isotropic
+- **`panel`** *(optional)* — `[M, N, Mg, Ng]`: elements per column, columns per panel, panels per column, panels per
+  row; default 1; at most 1e7 elements per polarization (`ula`: `panel = 8` is a vertical column, `[1, 8]` a horizontal
+  row)
+- **`spacing`** *(optional)* — `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing,
+  vertical and horizontal panel spacing; finite and >= 0 (0 places elements or panels at the same position); default
+  `[0.5, d_V, M·d_V, N·d_H]`
+- **`pol`** *(optional)* — `[polarization, model]`. Polarization: 1 = one element (ζ = 0°, vertical), 2 = two elements
+  (ζ = 0° and 90°), 3 = two elements (ζ = +45° and -45°). Model of TR 38.901 clause 7.3.2: 1 = the element pattern is
+  turned by ζ about its boresight (Model-1, eq. 7.3-3), 2 = the power pattern is kept and the field is split by ζ
+  (Model-2, eq. 7.3-4, 7.3-5). Default `[1, 1]`; for `3GPP-UT` with polarization 2 or 3 the default model is 2, which
+  gives the reference fields of the handheld model (eq. 7.3-6).
+- **`ports`** *(optional)* — `[M_P, N_P]`: ports (transceiver units, TXRUs) per column and per row of a panel and
+  polarization; must divide `M` and `N`; default `[M, N]` (one port per element)
+- **`steer`** *(optional)* — `[tilt, pan]` in degrees, -90 to 90: electrical downtilt and pan of the sub-array weights;
+  `[1, 2]` for all panels or `[Mg·Ng, 2]` with one row per panel (panel order `mg`, `ng`); one column: pan 0; default 0;
+  a non-zero tilt needs `M_P < M`, a non-zero pan `N_P < N`
+- **`beams`** *(optional)* — `[2, n_beams]` or `[3, n_beams]`: azimuth in degrees; elevation in degrees; weight (linear;
+  2 rows: 1); finite; default `[0; 0; 1]`
+- **`device_size`** *(optional)* — `[X, Y, Z]` in m (depth, width, height); NaN or left off: the default; `3GPP-UT`
+  `[0.15, 0.07, 0]` with X, Y > 0 and Z = 0, `3GPP-CPE` `[0, 0.2, 0.2]` with X = 0 and Y, Z >= 0
+- **`locations`** *(optional)* — TR location labels (`3GPP-UT` 1 to 8, `3GPP-CPE` 1 to 9), not 0-based indices; any
+  order, repeats allowed; default all
+- **`pattern`** *(optional)* — Element to use instead of the default element: its field patterns (`e_theta_re`,
+  `e_theta_im`, `e_phi_re`, `e_phi_im` with their grids) are copied to every element position; its `element_pos`, port
+  weights and `center_freq` are not used, the generator sets them; a one-element pattern gets the polarizations of
+  `pol`, one with several elements is a polarization set used as given and needs `pol` [1, 1]; empty (no elements): the
+  element of the type; for `3GPP-UT`, a `pattern` on an irregular grid is first resampled to a regular one
 - **`separate_beams`** *(optional)* — If `true`, one port per beam (weights ignored)
-- **`apply_weights`** *(optional)* — If `true`, combine each port into one pattern at its sub-array centre
+- **`apply_weights`** *(optional)* — If `true`, combine each port into one pattern at its sub-array center
 
 ### Returns:
-- `quadriga_lib::arrayant<dtype>` — Antenna array object; panel arrays have `P M N Mg Ng` elements and `P M_P N_P Mg Ng` ports (`ula`, `3GPP`); with `apply_weights`, one element per port
+- `quadriga_lib::arrayant<dtype>` — Antenna array object; panel arrays have `P·M·N·Mg·Ng` elements and `P·M_P·N_P·Mg·Ng`
+  ports (`ula`, `3GPP`); with `apply_weights`, one element per port
 
 ### Example:
 ```cpp
@@ -612,9 +694,40 @@ auto bs = quadriga_lib::generate_antenna("3GPP", 1.0, 6.0e9, {}, {4, 4, 1, 2}, {
 auto ut = quadriga_lib::generate_antenna("3GPP-UT", 1.0, 7.0e9, {}, {}, {}, {}, {}, {}, {}, {}, {1, 7, 3, 5});
 ```
 
+### Notes:
+- **Element tuple** (`3GPP`, `3GPP-UT`, `3GPP-CPE`): entries left off at the end or set to NaN take their default, where
+  `theta_3dB` defaults to `phi_3dB` and `A_max` to `SLA_V` (e.g. `3GPP` with `[90]` gives `[90, 90, 30, 30, 8]`);
+  `G_max` left off takes the default of the type, NaN sets the peak gain to the directivity
+- **Element and port order** (panel arrays): polarization fastest, then row `m` (upward along z), column `n` (along
+  +y), panel row `mg`, panel column `ng`, centered on the origin; ports in the same order with `m_p`, `n_p`
+- **Sub-array weights** (`ula`, `3GPP`; TR 38.901 eq. 7.3-1, along y by analogy): a port feeds $K = M / M_P$ by
+  $L = N / N_P$ elements. With tilt $\theta_t$ and pan $\varphi_p$, element $(k, l)$ gets
+
+  $$w_{k,l} = \frac{1}{\sqrt{K L}} \exp\left( j 2\pi \left[ \left(k - \tfrac{K-1}{2}\right) d_V \sin\theta_t - \left(l - \tfrac{L-1}{2}\right) d_H \sin\varphi_p \right] \right)$$
+
+  A positive tilt points the beam down, a positive pan toward +y
+- **Polarization** (TR 38.901 clause 7.3.2): `pol` 2 has the slants $\zeta = 0°$ and $90°$, `pol` 3 $\zeta = +45°$ and
+  $-45°$, element 0 first. Model-1 turns the element by $\zeta$ about its boresight (eq. 7.3-3). Model-2 keeps the power
+  pattern $A' = \lvert F_\theta \rvert^2 + \lvert F_\phi \rvert^2$ and sets $F_\theta = \sqrt{A'} \cos\zeta$,
+  $F_\phi = \sqrt{A'} \sin\zeta$ (eq. 7.3-4, 7.3-5)
+- **`multibeam`**: maximum-ratio-transmission weights for the directions in `beams`, exact for one beam and approximate
+  for several; only the ratios of the beam weights matter. One port per polarization, with `separate_beams` one per
+  polarization and beam
+- **`3GPP-UT`** (TR 38.901 clause 7.3): `P` elements at each entry of `locations` (Fig. 7.3-2), polarization fastest.
+  Each element is rolled about its boresight by 90° (45° for two field patterns: `pol` 2 or a two-element `pattern`)
+  and turned to the bearing $\operatorname{atan2}(y, x)$ of its location (Tables A.6-1, A.6-2). `pol` 1 and 2 with
+  their default model are the TR model (eq. 7.3-6 to 7.3-8), other values are extensions. For an element symmetric
+  under a 180° roll (every `element` tuple), the other z'' direction of Fig. 7.3-7 is the same antenna with a negated
+  port weight
+- **`3GPP-CPE`**: `P` elements at each entry of `locations` (Fig. 7.3-6 seen from the front, in the y-z plane), facing
+  +x. TR 38.901 defines no CPE element; the default is the UE element of TR 38.803 Table 5.2.3.3-1
+
 ### See also:
+- [arrayant](#arrayant) (the returned data structure)
 - [apply_port_weights](#apply_port_weights) (combines the ports into patterns)
 - [rotate_pattern](#rotate_pattern) (turns an antenna)
+- [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (check the generated patterns)
+- [qdant_write](#qdant_write) (stores the antenna in a file)
 
 ---
 <a id="generate_speaker"></a>
@@ -623,27 +736,10 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga_lib_api_python.md#generate_speaker)
 
-- Returns one [arrayant](#arrayant) object per frequency sample; each has a single element with the real-valued 
-  directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
-- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results 
-  via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
-- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
-  where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
-- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
-  `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
-- Speed of sound assumed to be 343 m/s.
-- **Driver models** (`driver_type`):
-  - `piston` — circular piston in baffle, `D(θ) = 2·J1(ka·sinθ)/(ka·sinθ)`, rotationally symmetric, narrows with increasing `ka`
-  - `horn` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`
-  - `omni` — frequency-independent omnidirectional pattern.
-- **Enclosure models** (`radiation_type`):
-  - `monopole` — no modification
-  - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
-  - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
-  - `cardioid` — `R = 0.5·(1+cos(θ_off))`
-- For `"horn"`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
-  60° and `f_ctrl = c/(2π·radius)`.
+- Creates one [arrayant](#arrayant) per frequency with a single element at the origin. Its real-valued pattern in `e_theta_re` is
+  the product of the driver directivity, the enclosure radiation and the bandpass frequency response
+- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining the results with
+  [join_arrays](#join_arrays) and [set_element_pos](#set_element_pos); the crossover follows from the overlapping bandpass responses
 
 ### Declaration:
 ```cpp
@@ -666,24 +762,31 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 ```
 
 ### Inputs:
-- **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
-- **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn
-- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz, > 0
-- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz, larger than `lower_cutoff`
-- **`lower_rolloff_slope_dB`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
-- **`upper_rolloff_slope_dB`** *(optional)* — High-frequency rolloff in dB/octave, > 0
-- **`sensitivity_dB`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
-- **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
-- **`hor_coverage_deg`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
-- **`ver_coverage_deg`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
-- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
-- **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
-- **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
-- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; empty: third-octave bands
-- **`angular_resolution_deg`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
+- **`driver_type`** *(optional)* — Driver directivity model: `"piston"` (circular piston in a baffle, narrows with
+  increasing frequency), `"horn"` (set coverage, toward omni at low frequencies) or `"omni"` (independent of frequency)
+- **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone or dome radius for `"piston"`, mouth radius for
+  `"horn"`
+- **`lower_cutoff`** *(optional)* — Lower -3 dB frequency of the bandpass in Hz, > 0
+- **`upper_cutoff`** *(optional)* — Upper -3 dB frequency of the bandpass in Hz, larger than `lower_cutoff`
+- **`lower_rolloff_slope_dB`** *(optional)* — Low-frequency rolloff in dB per octave, > 0; 12 is a second-order
+  Butterworth filter
+- **`upper_rolloff_slope_dB`** *(optional)* — High-frequency rolloff in dB per octave, > 0
+- **`sensitivity_dB`** *(optional)* — On-axis sensitivity in dB SPL at 1 W and 1 m, finite; 85 dB gives unity amplitude
+- **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"` (no change), `"hemisphere"` (sealed box
+  with baffle-step transition), `"dipole"` (figure-8, rear hemisphere inverted) or `"cardioid"`
+- **`hor_coverage_deg`** *(optional)* — `"horn"`: horizontal coverage in degrees, between the -6 dB points at
+  full pattern control; NaN or <= 0: 90°
+- **`ver_coverage_deg`** *(optional)* — `"horn"`: vertical coverage in degrees, as above; NaN or <= 0: 60°
+- **`horn_control_freq`** *(optional)* — `"horn"`: frequency in Hz above which the horn controls its pattern; NaN or <=
+  0: $c / (2\pi a)$ with the speed of sound $c$ and $a$ = `radius`
+- **`baffle_width`, `baffle_height`** *(optional)* — Baffle size in m, > 0; used by `"hemisphere"`
+- **`center_freq`** *(optional)* — Frequency samples in Hz, positive and finite; `[n_freq]`; empty: third-octave bands
+  `1000 · 2^(n/3)` Hz, those enclosing the cutoffs plus one more on each side, limited to 20 to 20000 Hz
+- **`angular_resolution_deg`** *(optional)* — Resolution of the azimuth and elevation grid in degrees; 0.1 to 90; a
+  value r gives `floor(360 / r)` azimuth and `floor(180 / r)` elevation steps
 
 ### Returns:
-- `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
+- `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency, with `center_freq` set to that frequency
 
 ### Example:
 ```cpp
@@ -696,6 +799,34 @@ auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
 ```
 
+### Notes:
+- **Frequency response**: a Butterworth-style bandpass, -3 dB at the cutoffs, scaled by the sensitivity $S$ =
+  `sensitivity_dB` relative to 85 dB SPL:
+
+  $$H(f) = \frac{10^{(S - 85) / 20}}{\sqrt{1 + (f_l / f)^{2 n_l}} \, \sqrt{1 + (f / f_u)^{2 n_u}}}$$
+
+  with $f_l$ = `lower_cutoff`, $f_u$ = `upper_cutoff` and $n_l$, $n_u$ the rolloff slopes in dB per octave divided by 6
+- **Driver directivity** $D$, with the angle $\alpha$ from the forward axis +x ($\cos\alpha = \cos\theta \cos\phi$), the
+  wavenumber $k = 2\pi f / c$, the speed of sound $c$ = 343 m/s and $a$ = `radius`:
+  - `piston`: $D = 2 J_1(x) / x$ with $x = k a \sin\alpha$, rotationally symmetric about +x
+  - `horn`: $D = 1 - b + b \cos^{m_h}\phi \, \cos^{m_v}\theta$ in the front half ($\lvert\phi\rvert < 90°$) and
+    $D = 1 - b$ behind it, with $b = f^2 / (f^2 + f_c^2)$ and $f_c$ = `horn_control_freq`. The exponents follow from the
+    coverage angle $\Theta$ by $\cos^m(\Theta / 2) = 1/2$
+  - `omni`: $D = 1$
+- **Enclosure radiation** $R$:
+  - `monopole`: $R = 1$
+  - `hemisphere`: $R = 1 - b + b (1 + \cos\alpha) / 2$ with $b = f^2 / (f^2 + f_b^2)$ and the baffle-step frequency
+    $f_b = c / (\pi \sqrt{W H})$, $W$ = `baffle_width`, $H$ = `baffle_height`; omnidirectional at low and cardioid-like
+    at high frequencies
+  - `dipole`: $R = \lvert\cos\alpha\rvert$; the pattern is negative in the rear hemisphere (180° phase inversion)
+  - `cardioid`: $R = (1 + \cos\alpha) / 2$
+
+### See also:
+- [join_arrays](#join_arrays), [set_element_pos](#set_element_pos) (build multi-driver systems)
+- [interpolate_pattern](#interpolate_pattern) (evaluates the model at any direction and frequency)
+- [calc_beamwidth](#calc_beamwidth) (measures the coverage angle, with `threshold_dB = 6`)
+- [qdant_write](#qdant_write) (stores the model in a file)
+
 ---
 <a id="interpolate_pattern"></a>
 ## interpolate_pattern
@@ -705,30 +836,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#interpolate_pattern) · [Python](quadr
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the array and the resulting polarization rotation applied
-- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation),
-  with linear interpolation where neighbouring samples have nearly opposite phases; the azimuth grid wraps around,
-  elevations outside the grid take the values of the first or last grid row
-- `azimuth` with one row gives the same angles for all outputs (planar wave), `n_out` rows one angle per output
-  (spherical wave); `n_ang = 0` gives outputs of size `[n_out, 0]` (vector form `[n_out, 0, n_freq]`)
-- Angles are not range-checked; values outside [-pi, pi] and [-pi/2, pi/2] denote the corresponding direction. NaN or
-  infinite angles give NaN in all outputs of that angle and output, without an exception
-- Outputs are resized only when their size differs, so pre-allocated outputs are written in place
-- On a pole of the local frame (a direction along the z-axis of the oriented array) the local azimuth is chosen so
-  that the local and the global theta unit vectors agree: the polarization is not rotated there
-- Kernels: GENERIC computes in the precision of `dtype`; AVX2 computes in single precision also for `double`, with
-  errors of up to about 2e-6 of the peak field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole
-  of the local frame up to about 2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most
-  4e-4 rad) in the local elevation; auto selects GENERIC in this version, which may change in a later version
-- Throws `std::invalid_argument` for an invalid `ant`, sizes that do not match, element indices `>= n_elements`, an
-  unknown or unavailable kernel, and outputs that are an input, a data member of `ant` or another output, or share
-  memory with one
-- Vector form (multi-frequency array, one entry per center frequency): for each target frequency, interpolates the two
-  entries whose center frequencies bracket it and blends their fields: spherical interpolation of the complex values
-  over frequency, linear where the two values have nearly opposite phases or one of them is zero. Target frequencies
-  outside the range of the center frequencies take the nearest entry (no extrapolation). Consecutive target
-  frequencies with the same bracketing entries reuse the spatial results; ascending or descending order is fastest.
-  The entries must pass [is_valid](#is_valid); it also throws for an empty `arrayant_vec` and target frequencies that are not
-  finite
+- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation)
+- Vector form: for a multi-frequency array, the two entries whose center frequencies bracket each target frequency are
+  interpolated and blended
 
 ### Declarations:
 ```cpp
@@ -769,35 +879,36 @@ void quadriga_lib::interpolate_pattern(
 ```
 
 ### Inputs:
-- **`ant`** — Antenna array with `n_elements` elements; see [arrayant](#arrayant)
-- **`arrayant_vec`** — Vector form: multi-frequency array, one entry per center frequency; entries need not be sorted
-  by frequency
-- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
-- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`freq_new`** *(optional)* — Vector form: target frequencies in Hz; empty: the center frequencies of the entries
-  in vector order; `[n_freq]`
-- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in
-  order (`n_out = n_elements`); `[n_out]`
-- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the array, for all outputs and angles,
-  per output, per angle, or both, applied at all frequencies; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`,
+- **`ant`** — Antenna array with `n_elements` elements
+- **`arrayant_vec`** — Vector form: multi-frequency array that passes [is_valid](#is_valid), not empty; entries need not be
+  sorted by frequency
+- **`azimuth`** — Azimuth angles in GCS in rad; one row: the same angles for all outputs (planar wave), `n_out` rows:
+  one angle per output (spherical wave); `[1, n_ang]` or `[n_out, n_ang]`
+- **`elevation`** — Elevation angles in GCS in rad; same size as `azimuth`
+- **`freq_new`** *(optional)* — Vector form: target frequencies in Hz, finite; empty: the center frequencies of the
+  entries in vector order; ascending or descending order is fastest; `[n_freq]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; empty: all elements in order
+  (`n_out = n_elements`); `[n_out]`
+- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the array, for all outputs and angles, per
+  output, per angle, or both, applied at all frequencies; empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`,
   `[3, 1, n_ang]` or `[3, n_out, n_ang]`
-- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the
-  columns `i_element` of `ant.element_pos`, zeros if that is empty; vector form: checked for its size only, since no
-  output depends on the positions; `[3, n_out]`
-- **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern
-  has more than `INT_MAX` samples); other values throw
+- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; empty: the columns
+  `i_element` of `ant.element_pos`, zeros if that is empty; vector form: checked for its size only, since no output
+  depends on the positions; `[3, n_out]`
+- **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern has
+  more than `INT_MAX` samples); other values throw
 
 ### Outputs:
 - **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`, vector form
   `[n_out, n_ang, n_freq]`
 - **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; `[n_out, n_ang]`, vector form
   `[n_out, n_ang, n_freq]`
-- **`dist`** *(optional)* — Distance of each element from the wavefront plane through the origin of the array;
-  negative for elements closer to the source; `[n_out, n_ang]` (single form only)
+- **`dist`** *(optional)* — Distance of each element from the wavefront plane through the origin of the array; negative
+  for elements closer to the source; `[n_out, n_ang]` (single form only)
 - **`azimuth_loc`** / **`elevation_loc`** *(optional)* — Azimuth and elevation in the local antenna frame;
   `[n_out, n_ang]` (single form only)
-- **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`
-  (single form only)
+- **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]` (single
+  form only)
 - **`V`** / **`H`** *(optional)* — e-theta / e-phi field as complex values, replacing `V_re`, `V_im` / `H_re`, `H_im`
   (then left empty); `[n_out, n_ang]`, vector form `[n_out, n_ang, n_freq]`
 
@@ -815,10 +926,32 @@ arma::cube Vf_re, Vf_im, Hf_re, Hf_im;
 quadriga_lib::interpolate_pattern(speaker, azimuth, elevation, Vf_re, Vf_im, Hf_re, Hf_im, freq);
 ```
 
+### Notes:
+- **Interpolation**: linear where neighboring samples have nearly opposite phases; the azimuth grid wraps around,
+  elevations outside the grid take the values of the first or last grid row
+- **Frequency interpolation** (vector form): spherical interpolation of the complex values over frequency, linear where
+  the two values have nearly opposite phases or one of them is zero. Target frequencies outside the range of the center
+  frequencies take the nearest entry (no extrapolation). Consecutive target frequencies with the same bracketing entries
+  reuse the spatial results
+- **Angles**: not range-checked; values outside $[-\pi, \pi]$ and $[-\pi/2, \pi/2]$ denote the same direction; an
+  elevation beyond $\pm\pi/2$ crosses the pole, so e-theta and e-phi have the opposite sign of the same direction given
+  in range. NaN or infinite angles give NaN in all outputs of that angle and output, without an exception. `n_ang = 0`
+  gives outputs of size `[n_out, 0]` (vector form `[n_out, 0, n_freq]`)
+- **Poles**: on a pole of the local frame (a direction along the z-axis of the oriented array) the local azimuth is
+  chosen so that the local and the global theta unit vectors agree: the polarization is not rotated there
+- **Outputs** are resized only when their size differs, so pre-allocated outputs are written in place
+- **Kernels**: GENERIC computes in the precision of `dtype`; AVX2 in single precision also for `double`, with errors of
+  up to about 2e-6 of the peak field value and 2e-6 rad in the angles, and near a pole of the local frame up to about
+  2e-7 / d rad at a distance d (in rad). Auto currently selects GENERIC
+- **Exceptions**: `std::invalid_argument` for an invalid `ant`, sizes that do not match, element indices
+  `>= n_elements`, an unknown or unavailable kernel, and outputs that are an input, a data member of `ant` or another
+  output, or share memory with one; vector form also for an empty `arrayant_vec` and target frequencies that are not
+  finite
+
 ### See also:
-- [arrayant](#arrayant) (antenna array class)
-- [join_arrays](#join_arrays) (build multi-element, multi-frequency models)
-- [generate_speaker](#generate_speaker) (typical source of multi-frequency arrays)
+- [apply_port_weights](#apply_port_weights) (patterns per port instead of per element)
+- [rotate_pattern](#rotate_pattern) (applies an orientation to the stored patterns)
+- [join_arrays](#join_arrays), [generate_speaker](#generate_speaker) (build multi-element, multi-frequency arrays)
 - [get_channels_spherical](#get_channels_spherical) (channel coefficients from the interpolated patterns)
 
 ---
@@ -828,12 +961,13 @@ Validate a vector of arrayant objects for multi-frequency consistency
 
 Not in: MATLAB, Python
 
-- Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
-- Cross-entry checks (all vs. the first entry): azimuth/elevation grid sizes and values, number of elements, element positions, port_weights_re shape, and port_weights_im presence and size.
-- Pattern data, `center_freq`, and port weights values are not compared (expected to vary).
-- All entries must use the same form for `element_pos`, `port_weights_re` and `port_weights_im`: all empty or all given; a
-  mix of empty members and explicit zeros / identity is rejected.
-- Stops at first error and returns a message identifying the failing entry and property.
+- Checks that the entries can be used together as one multi-frequency array and stops at the first error
+- Each entry gets the full check of its `is_valid` member, which marks a passing entry as validated. It is then compared
+  with the first entry: size and values of the angle grids, number of elements, element positions, size of the port
+  weights
+- All entries must use the same form for `element_pos`, `port_weights_re` and `port_weights_im`: all empty or all given;
+  a mix of empty members and explicit zeros or identity is rejected
+- Pattern data, `center_freq` and port weight values are not compared, since they vary with frequency
 
 ### Declaration:
 ```cpp
@@ -842,13 +976,15 @@ std::string quadriga_lib::is_valid(
 ```
 
 ### Input:
-- **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
+- **`arrayant_vec`** — Vector of arrayant objects to validate; an empty vector is reported as invalid
 
 ### Returns:
-- Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match the first entry."`
+- Empty string if valid; otherwise a message that names the failing entry and property, such as
+  `"Entry 3: Azimuth grid values do not match the first entry."`
 
 ### See also:
-- [arrayant](#arrayant) (`is_valid()`, the per-entry validation called internally)
+- [arrayant](#arrayant) (its `is_valid()` member checks a single object)
+- [set_element_pos](#set_element_pos) (keeps the positions of all entries equal)
 - [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayant vectors)
 
 ---
@@ -858,17 +994,13 @@ Join the elements of two antenna arrays into a new array
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#join_arrays) · [Python](quadriga_lib_api_python.md#join_arrays)
 
-- Both arrays must share identical sampling grids; throws otherwise
-- The port weights are block-diagonal: elements of the first array connect only to its ports, and likewise for the
-  second; name and `center_freq` are taken from the first array:
+- Combines two arrays with identical sampling grids, e.g. the drivers of a loudspeaker; `name` and `center_freq` are
+  taken from the first array
+- The ports stay separate: elements of the first array connect only to its ports, and likewise for the second:
    | Element \ Port        | P1…Pp1 (first) | Pp1+1…Pp1+p2 (second) |
    | --------------------- | :------------: | :-------------------: |
    | E1…En1 (first)        |    W1 block    |           0           |
    | En1+1…En1+n2 (second) |       0        |       W2 block        |
-- An empty `element_pos` counts as zeros, an empty `port_weights_re` as identity (one port per element), an empty
-  `port_weights_im` as zeros
-- Vector form: joins the entries of two multi-frequency vectors pairwise; both must pass [is_valid](#is_valid), have equal entry
-  counts, identical angular grids and matching `center_freq` values at each index; each output entry is validated
 
 ### Declarations:
 ```cpp
@@ -882,18 +1014,20 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::join_arrays(
 ```
 
 ### Inputs:
-- **`ant_1`** / **`arrayant_vec1`** — First arrayant (vector form: vector); its elements come first in the output
-- **`ant_2`** / **`arrayant_vec2`** — Second arrayant (vector form: vector); sampling grids (and center frequencies)
-  must match the first
+- **`ant_1`** / **`arrayant_vec1`** — First array; its elements come first in the output; vector form: must pass
+  [is_valid](#is_valid)
+- **`ant_2`** / **`arrayant_vec2`** — Second array with the same sampling grids; vector form: must pass [is_valid](#is_valid),
+  with as many entries as the first and matching `center_freq` values at each index
 
 ### Returns:
 - New `arrayant` with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports; vector form: one such entry per
   frequency
 
 ### See also:
-- [set_element_pos](#set_element_pos) (position drivers before joining)
-- [rotate_pattern](#rotate_pattern) (rotate elements after joining)
-- [qdant_write](#qdant_write) (persist the joined model)
+- [set_element_pos](#set_element_pos) (positions the drivers of a multi-frequency array)
+- [copy_element](#copy_element) (duplicates an element within one array)
+- [generate_speaker](#generate_speaker) (creates the driver models to join)
+- [qdant_write](#qdant_write) (stores the joined model)
 
 ---
 <a id="qdant_read"></a>
@@ -902,15 +1036,9 @@ Read arrayant objects from a QDANT file
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_api_python.md#qdant_read)
 
-- Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the entries with the given IDs. The ID is the number used in the layout matrix and by [qdant_write](#qdant_write).
-- Without `ids`, the entries listed in the layout are returned, each once, in order of first appearance (column-major scan); all entries if the file has no layout. This is the way to load frequency-dependent models, where `center_freq` of each entry identifies the frequency.
-- Throws `std::invalid_argument` if an ID is 0 or the file has no entry with it. The first entry of a file is ID 1 only
-  if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
-- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`n_elements`) must be
-  backed by data in the file (element positions, port weights, or pattern nodes of the last element). Elements without
-  pattern nodes read as zeros. Over all entries read, their zero patterns are limited to the larger of 2^24 values and
-  1 value per file byte, and the identity port weights of a file without `port_weights_abs` (at most 4096 elements) to
-  the larger of 2^24 values and 128 values per file byte; a repeated ID counts once.
+- Loads arrays from a file in the [QDANT format](formats/qdant.md). A file can hold several arrays, each with a
+  numeric ID, e.g. one per frequency of a frequency-dependent model, where `center_freq` of each entry identifies the
+  frequency
 
 ### Declaration:
 ```cpp
@@ -922,15 +1050,26 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
 
 ### Inputs:
 - **`fn`** — Path to the QDANT file; must not be empty
-- **`ids`** *(optional)* — 1-based IDs of the entries to read, duplicates allowed; empty reads the entries in the layout
-- **`layout`** *(optional)* — Output pointer filled with the file's layout matrix of entry IDs (0 = empty slot)
+- **`ids`** *(optional)* — 1-based IDs of the entries to read, duplicates allowed; empty: the entries listed in the
+  layout, each once, in order of first appearance (column-major scan), or all entries if the file has no layout
+
+### Output:
+- **`layout`** *(optional)* — The file's layout matrix of entry IDs (0 = empty slot)
 
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One validated arrayant per requested ID, in the order of `ids`
 
+### Notes:
+- **IDs**: the number used in the layout matrix and by [qdant_write](#qdant_write). A first entry without an `id` attribute (files
+  from other tools) counts as ID 1
+- **Exceptions**: `std::invalid_argument` if an ID is 0 or the file has no entry with it; `std::runtime_error` for a
+  missing, unreadable or malformed file
+- **Elements without data**: elements without pattern nodes read as zeros. A file whose element count is not backed by
+  its data, or that exceeds the [reader limits](formats/qdant.md), throws
+
 ### See also:
-- [qdant_write](#qdant_write) (write a single arrayant, or a vector with sequential IDs)
-- [generate_speaker](#generate_speaker) (typical source of frequency-dependent arrayant vectors)
+- [qdant_write](#qdant_write) (writes such files)
+- [generate_antenna](#generate_antenna), [generate_speaker](#generate_speaker) (create arrays without a file)
 
 ---
 <a id="qdant_write"></a>
@@ -939,25 +1078,9 @@ Write arrayant data to a QDANT (XML) file
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_write) · [Python](quadriga_lib_api_python.md#qdant_write)
 
-- Multiple antennas can be stored in the same file using distinct `id` values
-- If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
-  in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
-- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
-  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
-  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
-  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
-  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
-  a low level is quantized relative to its own peak. Element positions and port weights (magnitude, phase) are written
-  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
-  to 0.001 degree
-- An empty `element_pos` or empty port weights are not written; [qdant_read](#qdant_read) returns zeros and identity for them.
-  Above 4096 elements the identity port weights are written, because the reader requires them in the file
-- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
-  zero in both field components is written as an all `-inf` `e_theta_mag` node.
-- Vector form: writes each entry with sequential 1-based IDs and a `[n_entries, 1]` layout `1, 2, ..., n_entries`; the
-  file must not exist yet (an existing file throws `std::runtime_error` and is left unchanged); for frequency-dependent
-  models where each entry holds the pattern at its `center_freq`; read back with [qdant_read](#qdant_read)
+- Stores an array in a file in the [QDANT format](formats/qdant.md). A file can hold several arrays with distinct IDs
+  and a layout matrix that arranges them
+- Vector form: stores a frequency-dependent model in a new file, each entry holding the pattern at its `center_freq`
 
 ### Declarations:
 ```cpp
@@ -973,17 +1096,37 @@ void quadriga_lib::qdant_write(
 ```
 
 ### Inputs:
-- **`fn`** — Output QDANT filename; must not be empty; vector form: must not exist
+- **`fn`** — Output QDANT file name, must not be empty; an existing file is updated; vector form: must not exist (throws
+  `std::runtime_error` and leaves the file unchanged)
 - **`ant`** — Valid arrayant
-- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects to store
-- **`id`** *(optional)* — Target ID in file; `0` appends with auto-assigned ID
-- **`layout`** *(optional)* — Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
+- **`arrayant_vec`** — Vector form: non-empty vector of valid arrayant objects, written with the sequential IDs
+  `1, 2, ..., n_entries` and a `[n_entries, 1]` layout of these IDs
+- **`id`** *(optional)* — Target ID in the file; an entry with this ID is replaced; `0` appends with
+  `max_existing_id + 1`, or 1 in a new file
+- **`layout`** *(optional)* — Matrix of entry IDs that arranges the file; every value must be an ID in the file (0 is
+  not accepted); empty: the layout in the file is replaced by a `[1, n]` row of all IDs in file order, so a custom
+  layout must be passed again with every write that should keep it
 
 ### Returns:
 - ID assigned to the written antenna within the file (single form)
 
+### Notes:
+- **Pattern accuracy**: the file has single-precision-equivalent accuracy relative to the element peak, also for
+  double-precision data. Pattern magnitudes (in dB) and phases (in degrees) get the fewest decimals (0 to 6) that keep
+  the error of each complex sample at or below 6e-8 times the peak amplitude of its element (over `e_theta` and
+  `e_phi`). Samples near the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per
+  20 dB below the peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak.
+  An element at a low level is quantized relative to its own peak
+- **Other values**: element positions and port weights (magnitude, phase) are written as the shortest text that reads
+  back as the same float (at most 9 significant digits); sampling grids are rounded to 0.001 degree
+- **Empty members**: an empty `element_pos` or empty port weights are not written; [qdant_read](#qdant_read) returns zeros and
+  identity for them. Above 4096 elements the identity port weights are written, because the reader requires them in the
+  file
+- **Zeros**: all non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element
+  that is zero in both field components is written as an all `-inf` `e_theta_mag` node
+
 ### See also:
-- [qdant_read](#qdant_read) (read back QDANT files)
+- [qdant_read](#qdant_read) (reads the file back)
 - [generate_speaker](#generate_speaker) (typical source of frequency-dependent arrayant vectors)
 
 ---
@@ -993,15 +1136,10 @@ Rotate the patterns of an antenna array using Euler rotations, in place
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#rotate_pattern) · [Python](quadriga_lib_api_python.md#rotate_pattern)
 
-- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
-  [interpolate_pattern](#interpolate_pattern) returns for the unrotated pattern with the same `orientation`
-- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
-- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); port weights, `center_freq` and `name` are kept
-- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled patterns; this needs all elements, so a subset
-  in `i_element` throws when the grid must be adjusted
-- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
-- Vector form: rotates every entry of a multi-frequency vector with grid adjustment always disabled (required for
-  uniform-grid consistency across frequencies); usage 0 to 2
+- Turns the patterns, the polarization and the element positions of an array, e.g. for a mechanical downtilt. The
+  rotated pattern equals, at the grid points, what [interpolate_pattern](#interpolate_pattern) returns for the unrotated pattern with the
+  same `orientation`
+- Port weights, `center_freq` and `name` are kept
 
 ### Declarations:
 ```cpp
@@ -1020,9 +1158,14 @@ void quadriga_lib::rotate_pattern(
 
 ### Inputs:
 - **`ant`** — Valid arrayant; updated in place
-- **`arrayant_vec`** — Vector form: non-empty vector of arrayant objects; updated in place
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]` or `[1, 3]`
-- **`usage`** *(optional)* — Rotation mode:
+- **`arrayant_vec`** — Vector form: non-empty vector of arrayant objects; updated in place; the grid is never adjusted,
+  so that all entries keep the same grid
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; a positive tilt turns the main beam down, as in
+  3GPP TR 38.901; `[3, 1]` or `[1, 3]`
+- **`usage`** *(optional)* — Rotation mode; vector form: 0 to 2, where 0 and 1 act as 3 and 4. In the single form, modes
+  0 and 1 adjust the sampling grid of non-uniformly sampled patterns, which needs all elements: a subset in `i_element`
+  then throws. Element positions turn in all modes except 2. For scalar acoustic fields (pressure in `e_theta_re` only),
+  use 1 to avoid spurious polarization effects:
    | Mode | Pattern | Polarization | Grid adjustment |
    | ---- | ------- | ------------ | --------------- |
    | 0    | Yes     | Yes          | Yes             |
@@ -1040,9 +1183,10 @@ quadriga_lib::rotate_pattern(ant, downtilt);
 ```
 
 ### See also:
-- [interpolate_pattern](#interpolate_pattern) (same orientation convention)
+- [interpolate_pattern](#interpolate_pattern) (evaluates a pattern for an orientation without changing it)
 - [calc_rotation_matrix](#calc_rotation_matrix) (rotation matrix of the orientation)
-- [join_arrays](#join_arrays) (join arrays before rotating)
+- [generate_antenna](#generate_antenna) (electrical tilt through the port weights)
+- [join_arrays](#join_arrays) (joins arrays that are then rotated together)
 
 ---
 <a id="set_element_pos"></a>
@@ -1051,10 +1195,7 @@ Set element positions for all entries in a multi-frequency arrayant vector
 
 Not in: MATLAB, Python
 
-- Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
-- All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
+- Writes the same positions to every entry in place, since [is_valid](#is_valid) requires equal positions in all entries
 
 ### Declaration:
 ```cpp
@@ -1065,12 +1206,15 @@ void quadriga_lib::set_element_pos(
 ```
 
 ### Inputs:
-- **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
-- **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; empty: all elements are replaced
+- **`arrayant_vec`** — Non-empty vector of arrayant objects with equal element counts; updated in place; an empty
+  `element_pos` of an entry is filled with zeros first
+- **`element_pos`** — New (x, y, z) positions in m; `[3, n_update]` with `n_update` the length of `i_element`, or
+  `n_elements` if `i_element` is empty
+- **`i_element`** *(optional)* — Indices of the elements to update, 0-based; empty: all elements
 
 ### See also:
-- [copy_element](#copy_element) (replicate elements before setting positions)
+- [copy_element](#copy_element) (adds elements before their positions are set)
+- [join_arrays](#join_arrays) (joins arrays, e.g. the drivers of a loudspeaker)
 - [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayant vectors)
 
 ---
@@ -1080,12 +1224,8 @@ Remove zero-valued entries from antenna pattern data, reducing its size
 
 Not in: MATLAB, Python
 
-- Works in place on the sampling grid and the pattern cubes; positions, port weights, name and frequency are unchanged
-- A column or row is removed if the total power summed over all field components and array elements does not exceed
-  1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
-  depend on the scale of the pattern; an all-zero pattern is left unchanged
-- Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-- To keep the original, call it on a copy (`auto b = ant;`)
+- Removes the azimuth columns and elevation rows without power from the sampling grid and the patterns, in place
+- Positions, port weights, name and frequency are unchanged
 
 ### Declaration:
 ```cpp
@@ -1093,7 +1233,18 @@ void quadriga_lib::trim_pattern(arrayant<dtype> &ant);
 ```
 
 ### Input:
-- **`ant`** — Valid arrayant; updated in-place
+- **`ant`** — Valid arrayant; updated in place; to keep the original, call it on a copy (`auto b = ant;`)
+
+### Notes:
+- **Threshold**: a column or row is removed if its total power, summed over all field components and elements, does not
+  exceed $10^{-12}$ times the peak power of a single sample (summed over field components and elements). The result does
+  not depend on the scale of the pattern; an all-zero pattern is left unchanged
+- **Neighbors**: the immediate neighbors of retained entries are also kept, unless the local grid spacing is strongly
+  asymmetric (by a factor above 1.5)
+
+### See also:
+- [rotate_pattern](#rotate_pattern) (trims the grid it adjusts)
+- [qdant_write](#qdant_write) (stores the reduced pattern)
 
 ---
 
@@ -1197,6 +1348,129 @@ void quadriga_lib::channel<dtype>::add_paths(
 
 <a id="sec-channel-functions"></a>
 # Channel functions
+
+---
+<a id="path"></a>
+## path
+Class for storing and managing a single propagation path with a compact fixed-size header
+
+Not in: MATLAB, Python
+
+- Represents one ray from origin to destination through a sequence of `nSEG` interaction points
+- A 56-byte header holds metadata, the first 2 interaction type codes, and the frequency-0
+  transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
+  frequency coefficients, and the overflow interaction codes
+- Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
+  SCALAR carries a single complex pressure coefficient per frequency
+- Copyable and movable; the moved-from object is left in the valid empty state (`nSEG == 0`, `nFRQ == 1`, EM)
+
+### Attributes:
+| Attribute            | Size   | Description                                                       |
+| -------------------- | ------ | ----------------------------------------------------------------- |
+| `unsigned i_cir`     | scalar | CIR index: the CIR to which the path belongs                      |
+| `uint8_t n_ref`      | scalar | Number of reflections (interaction type codes 128-255 except 193) |
+| `uint8_t n_tra`      | scalar | Number of transmissions / refractions (type codes 1-127)          |
+| `uint8_t n_sub`      | scalar | Number of subdivisions                                            |
+| `uint8_t n_sct`      | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
+| `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
+
+### Data buffer layout (EM mode):
+| Block         | Size (floats)     | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
+| Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
+
+### Data buffer layout (SCALAR mode):
+| Block         | Size (floats)     | Description                                             |
+| ------------- | ----------------- | ------------------------------------------------------- |
+| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
+| Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
+| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
+
+### Simple member functions:
+| Method            | Description                                                                     |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `.n_freq()`       | Returns the number of frequencies (1-127)                                       |
+| `.n_seg()`        | Returns the number of segments                                                  |
+| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                                    |
+| `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
+| `.free()`         | Releases the data buffer and resets to the valid empty state                    |
+| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
+| `.polmat()`       | Returns a pointer to a frequency's transfer coefficients                        |
+| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
+| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
+| `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
+
+### Function 'calc_length':
+Calculates the total length of the path
+
+- The stored member `length` spans origin through the last interaction; it never includes the leg to the destination
+- The read-only overload adds only the final last-to-D leg to the stored member; the origin overloads recompute every leg and overwrite the member with the origin-to-last total
+- Returns the full length including the leg to `D`; on an empty path (`nSEG == 0`) the read-only form returns NaN while the origin form returns the straight origin-to-destination distance
+```cpp
+float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
+float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length, update member
+float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
+```
+- **`Dx`, `Dy`, `Dz`, `*D`** — Destination coordinates
+- **`Ox`, `Oy`, `Oz`, `*O`** — Origin coordinates (optional); if provided, accumulated path length is updated
+
+### Function 'calc_gain':
+Calculates the path gain (linear power) from the transfer coefficients at one frequency
+
+- EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
+- A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
+- With `freq > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` with `lambda = c / freq` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
+- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
+  read-only `calc_length` before the member is updated
+```cpp
+float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
+```
+- **`freq`** — Frequency in Hz; `> 0` applies path loss, `<= 0` returns polarization power only. In SCALAR mode any
+  positive value applies spherical spreading; the value itself is not used, so no speed of sound is needed
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
+
+### Function 'polmat_update':
+Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
+
+- Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
+- `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
+- The return value uses the same gain definition as `calc_gain`
+- Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
+```cpp
+float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
+```
+- **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
+- **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
+- **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
+- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
+
+### Function 'duplicate':
+Copies the path into an existing target object and returns its length
+
+- Performs a deep copy: the target receives an independent data buffer and all metadata
+- The target's previous contents are released; the source is left unchanged
+```cpp
+float duplicate(path &target) const;
+```
+- **`target`** — Destination path, overwritten with a deep copy of the source
+
+### Function 'extend':
+Copies the path into a target and appends one new segment, returning the new total length
+
+- The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
+- The interaction `type` is recorded for the new segment, counters n_ref, n_tra, n_sub, n_sct are not updated (left to the caller)
+- The target receives an independent buffer sized for the extra segment; the source is left unchanged
+- Throws if the source already holds the maximum of 255 segments
+```cpp
+float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
+```
+- **`target`** — Destination path, overwritten with the extended copy
+- **`x`, `y`, `z`** — Coordinates of the appended interaction point
+- **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
 
 ---
 <a id="any_type_id"></a>
@@ -1906,129 +2180,6 @@ void quadriga_lib::hdf5_write_dset(
 - [hdf5_read_dset](#hdf5_read_dset) (read an unstructured dataset by name)
 - [hdf5_read_dset_names](#hdf5_read_dset_names) (list available dataset names at a slot)
 - [any_type_id](#any_type_id) (inspect the type held in a `std::any`)
-
----
-<a id="path"></a>
-## path
-Class for storing and managing a single propagation path with a compact fixed-size header
-
-Not in: MATLAB, Python
-
-- Represents one ray from origin to destination through a sequence of `nSEG` interaction points
-- A 56-byte header holds metadata, the first 2 interaction type codes, and the frequency-0
-  transfer coefficients; a variable-length heap buffer holds coordinates, the remaining
-  frequency coefficients, and the overflow interaction codes
-- Two layout modes selected at initialization: EM carries a full 2x2 Jones matrix per frequency;
-  SCALAR carries a single complex pressure coefficient per frequency
-- Copyable and movable; the moved-from object is left in the valid empty state (`nSEG == 0`, `nFRQ == 1`, EM)
-
-### Attributes:
-| Attribute            | Size   | Description                                                       |
-| -------------------- | ------ | ----------------------------------------------------------------- |
-| `unsigned i_cir`     | scalar | CIR index: the CIR to which the path belongs                      |
-| `uint8_t n_ref`      | scalar | Number of reflections (interaction type codes 128-255 except 193) |
-| `uint8_t n_tra`      | scalar | Number of transmissions / refractions (type codes 1-127)          |
-| `uint8_t n_sub`      | scalar | Number of subdivisions                                            |
-| `uint8_t n_sct`      | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
-| `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
-
-### Data buffer layout (EM mode):
-| Block         | Size (floats)     | Description                                             |
-| ------------- | ----------------- | ------------------------------------------------------- |
-| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
-| Jones         | `8 * (nFRQ - 1)`  | Transfer matrices for frequencies 1..nFRQ-1, col-major  |
-| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
-
-### Data buffer layout (SCALAR mode):
-| Block         | Size (floats)     | Description                                             |
-| ------------- | ----------------- | ------------------------------------------------------- |
-| Coordinates   | `3 * nSEG`        | Interaction points `[x, y, z]` per segment              |
-| Coeff         | `2 * (nFRQ - 4)`  | Pressure coefficients for frequencies 4..nFRQ-1         |
-| Interactions  | `(nSEG + 1) / 4`  | Overflow type codes past the first 2, packed 4 per float, present for `nSEG > 2` |
-
-### Simple member functions:
-| Method            | Description                                                                     |
-| ----------------- | ------------------------------------------------------------------------------- |
-| `.n_freq()`       | Returns the number of frequencies (1-127)                                       |
-| `.n_seg()`        | Returns the number of segments                                                  |
-| `.is_scalar()`    | Returns true for SCALAR layout, false for EM                                    |
-| `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
-| `.free()`         | Releases the data buffer and resets to the valid empty state                    |
-| `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
-| `.polmat()`       | Returns a pointer to a frequency's transfer coefficients                        |
-| `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
-| `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
-| `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
-
-### Function 'calc_length':
-Calculates the total length of the path
-
-- The stored member `length` spans origin through the last interaction; it never includes the leg to the destination
-- The read-only overload adds only the final last-to-D leg to the stored member; the origin overloads recompute every leg and overwrite the member with the origin-to-last total
-- Returns the full length including the leg to `D`; on an empty path (`nSEG == 0`) the read-only form returns NaN while the origin form returns the straight origin-to-destination distance
-```cpp
-float calc_length(float Dx, float Dy, float Dz) const;                         // member length + last to D distance
-float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length, update member
-float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
-```
-- **`Dx`, `Dy`, `Dz`, `*D`** — Destination coordinates
-- **`Ox`, `Oy`, `Oz`, `*O`** — Origin coordinates (optional); if provided, accumulated path length is updated
-
-### Function 'calc_gain':
-Calculates the path gain (linear power) from the transfer coefficients at one frequency
-
-- EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
-- A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
-- With `freq > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` with `lambda = c / freq` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
-- The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
-  read-only `calc_length` before the member is updated
-```cpp
-float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
-```
-- **`freq`** — Frequency in Hz; `> 0` applies path loss, `<= 0` returns polarization power only. In SCALAR mode any
-  positive value applies spherical spreading; the value itself is not used, so no speed of sound is needed
-- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
-- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
-
-### Function 'polmat_update':
-Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
-
-- Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
-- `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
-- The return value uses the same gain definition as `calc_gain`
-- Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
-```cpp
-float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
-```
-- **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
-- **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
-- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
-- **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
-- **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
-
-### Function 'duplicate':
-Copies the path into an existing target object and returns its length
-
-- Performs a deep copy: the target receives an independent data buffer and all metadata
-- The target's previous contents are released; the source is left unchanged
-```cpp
-float duplicate(path &target) const;
-```
-- **`target`** — Destination path, overwritten with a deep copy of the source
-
-### Function 'extend':
-Copies the path into a target and appends one new segment, returning the new total length
-
-- The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
-- The interaction `type` is recorded for the new segment, counters n_ref, n_tra, n_sub, n_sct are not updated (left to the caller)
-- The target receives an independent buffer sized for the extra segment; the source is left unchanged
-- Throws if the source already holds the maximum of 255 segments
-```cpp
-float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
-```
-- **`target`** — Destination path, overwritten with the extended copy
-- **`x`, `y`, `z`** — Coordinates of the appended interaction point
-- **`type`** — Interaction type code for the new segment; drives the reflection / transmission counters
 
 ---
 <a id="qrt_file_append"></a>
@@ -3487,6 +3638,59 @@ conf-file keys): in rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, p
 in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees.
 
 ---
+<a id="gbsm_rays"></a>
+## gbsm_rays
+Class for the ray data of one link (geometry-based stochastic model)
+
+Not in: MATLAB, Python
+
+- Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
+  positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
+  [ssf_scatterers](#ssf_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
+- Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
+- An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
+- Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
+  `is_valid()`) and one `method` for all rays. [ssf_scatterers](#ssf_scatterers) overwrites given scatterers, so solve rays without
+  scatterers in a separate object and concatenate the attributes
+- Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
+  non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
+
+### Attributes:
+| Attribute | Type, size | Meaning | Set by |
+| --- | --- | --- | --- |
+| `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
+| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
+| `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
+| `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
+| `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
+| `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
+| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | all |
+| `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
+| `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
+| `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [ssf_scatterers](#ssf_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [ssf_scatterers](#ssf_scatterers) |
+
+### Member functions:
+| Member | Returns |
+| --- | --- |
+| `n_ray()` | Number of rays, length of `delay` |
+| `n_freq()` | Number of frequencies, length of `center_freq` |
+| `empty()` | `true` if `n_ray() == 0` |
+| `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
+| `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
+| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
+
+- `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
+
+### See also:
+- [ssf_rays](#ssf_rays) (ray data of a set of links)
+- [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
+- [ssf_scatterers](#ssf_scatterers) (scatterers for the mobility `drift`)
+- [ssf_paths](#ssf_paths) (paths of one link at one position)
+- [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
+
+---
 <a id="conf_file_list"></a>
 ## conf_file_list
 List the scenarios defined by the conf files in a set of directories
@@ -3790,59 +3994,6 @@ arma::cube quadriga_lib::gbsm_init_phases(
 ### See also:
 - [gbsm_draw](#gbsm_draw) (evaluates the SOS phases at the links)
 - [sos_init_phases](#sos_init_phases), [sos_val](#sos_val) (SOS phases and evaluation of one generator), [sos_remove_bias](#sos_remove_bias) (its bias removal)
-
----
-<a id="gbsm_rays"></a>
-## gbsm_rays
-Class for the ray data of one link (geometry-based stochastic model)
-
-Not in: MATLAB, Python
-
-- Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
-  positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
-  [ssf_scatterers](#ssf_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
-- Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
-- An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
-- Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
-  `is_valid()`) and one `method` for all rays. [ssf_scatterers](#ssf_scatterers) overwrites given scatterers, so solve rays without
-  scatterers in a separate object and concatenate the attributes
-- Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
-  non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
-
-### Attributes:
-| Attribute | Type, size | Meaning | Set by |
-| --- | --- | --- | --- |
-| `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
-| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
-| `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
-| `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
-| `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
-| `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
-| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | all |
-| `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
-| `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
-| `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [ssf_scatterers](#ssf_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [ssf_scatterers](#ssf_scatterers) |
-
-### Member functions:
-| Member | Returns |
-| --- | --- |
-| `n_ray()` | Number of rays, length of `delay` |
-| `n_freq()` | Number of frequencies, length of `center_freq` |
-| `empty()` | `true` if `n_ray() == 0` |
-| `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
-| `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
-| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
-
-- `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
-
-### See also:
-- [ssf_rays](#ssf_rays) (ray data of a set of links)
-- [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
-- [ssf_scatterers](#ssf_scatterers) (scatterers for the mobility `drift`)
-- [ssf_paths](#ssf_paths) (paths of one link at one position)
-- [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
 ---
 <a id="gbsm_rays_from_paths"></a>

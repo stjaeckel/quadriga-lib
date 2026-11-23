@@ -398,5 +398,5 @@ def read_api(root, lang, intro, diag):
                     fn.section = title
                     sec.functions.append(fn)
     for sec in sections.values():
-        sec.functions.sort(key=lambda f: (f.name.startswith("."), f.name))
+        sec.functions.sort(key=lambda f: (f.name.startswith("."), not any(b.label == "Attributes" for b in f.subblocks), f.name))
     return ApiPage(lang, intro, [sections[t] for t in sorted(sections)])

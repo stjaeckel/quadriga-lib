@@ -10,19 +10,11 @@ SECTION!*/
 
 /*!MD
 # CALC_BEAMWIDTH
-Calculate the beamwidth and pointing angles of antenna array elements in degrees
+Calculate the beamwidth and pointing angles of the elements of an antenna array in degrees
 
-- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
-- Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in
-  each direction than the antenna sampling grid)
-- The width is that of the main lobe, searched outwards from the maximum; side lobes above the threshold
-  are not included
-- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full
-  circle; 360° when the whole cut is above the threshold (e.g. a beam pointing to a pole)
-- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles;
-  at most 180°
-- Calculated per element, not per port; ignores the port weights
+- Measures the width of the main lobe of each element in azimuth and elevation at a threshold below its peak, and the
+  direction of the peak
+- Calculated per element, not per port: the port weights are ignored
 
 ## Usage:
 ```
@@ -31,20 +23,31 @@ Calculate the beamwidth and pointing angles of antenna array elements in degrees
 ```
 
 ## Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[generate_antenna]];
-  a struct array may contain a frequency-dependent model
+- **`arrayant`** — Arrayant struct ([[generate_antenna]]), or 1xN struct array for a multi-frequency array with `n_freq`
+  entries
 - **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
-- **`threshold_dB`** — Threshold in dB, positive and finite; default: 3 (equivalent to FWHM)
+- **`threshold_dB`** — Threshold below the peak in dB, positive and finite; 3 dB is the half-power beamwidth;
+  loudspeakers state the coverage angle between the -6 dB points, use 6; default: 3
 
 ## Outputs:
-- **`beamwidth_az_deg`** — Azimuth beamwidth in degree; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
-- **`beamwidth_el_deg`** — Elevation beamwidth in degree; `[n_out, n_freq]`
-- **`az_point_ang_deg`** — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
-- **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`beamwidth_az_deg`** — Azimuth beamwidth in degrees; `[n_out, n_freq]`
+- **`beamwidth_el_deg`** — Elevation beamwidth in degrees; `[n_out, n_freq]`
+- **`az_point_ang_deg`** — Azimuth pointing angle of the main beam in degrees; `[n_out, n_freq]`
+- **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degrees; `[n_out, n_freq]`
+
+## Notes:
+- **Main lobe**: starting at the maximum, the search goes outward until the power drops below the threshold; side lobes
+  above the threshold are not included
+- **Resolution**: the cuts are interpolated as in [[interpolate_pattern]], about 100 times finer than the sampling grid
+- **Azimuth cut**: at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360°
+  when the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
+- **Elevation cut**: along the great circle through the maximum, so a lobe can extend across the poles (requires samples
+  at ±90°); the result is at most 180°
 
 ## See also:
-- [[apply_port_weights]] (to apply the port weights before calculating the beamwidth)
-- [[calc_directivity]] (directivity in dBi of antenna array elements)
+- [[calc_directivity]] (directivity in dBi of the elements)
+- [[apply_port_weights]] (combines the elements into ports, to measure the beams of the ports)
+- [[generate_antenna]] (creates elements with a given beamwidth)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
