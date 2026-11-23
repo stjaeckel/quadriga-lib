@@ -1,8 +1,19 @@
 # Antenna model candidates
 
-Antenna models that quadriga-lib may add after the TR 38.901 antenna work ([tr38901_antennas.md](tr38901_antennas.md)). Nothing here is decided or scheduled. New types follow the extension rules of tr38901_antennas.md, section 2.2, so they can be added after v1.0 without breaking calls.
+Antenna models that quadriga-lib may add after the TR 38.901 antenna work (`3GPP`, `3GPP-UT`, `3GPP-CPE`). Nothing here is decided or scheduled. New types follow the extension rules below, so they can be added after v1.0 without breaking calls.
 
 Sources: the MATLAB-only generators of QuaDRiGa (`qd_arrayant.generate_antenna`), and a survey of standards and implementations (Sionna, ns-3, MATLAB Phased Array Toolbox, ITU-R) on 2026-11-16. Parameter details marked "survey" were not checked against the standard.
+
+## Extension rules
+
+Decided 2026-11-16. After v1.0 the interface of `generate_antenna` stays stable:
+
+- Reserved codes: `pol` 4 to 6 throw in v1.0 and are reserved (e.g. for circular polarisation later); a code is never given a new meaning once it had one.
+- Type names: a type tied to one document carries its prefix (`3GPP`, `3GPP-UT`, `3GPP-CPE`, later e.g. `ITU-M2101`); a generic physical model has a plain name (`omni`, `dipole`, later e.g. `circular-aperture`).
+- Tuples grow only at the end: a new trailing entry has a default, so existing calls keep their meaning (e.g. `res` may later become `[step_deg, max_angle_deg]` for narrow-beam grids).
+- `element` is the per-type hook: a new type defines its own `element` entries instead of a new position; new positions, if needed, are appended with a default.
+- No new Python outputs later (a new Python output is a breaking change, SPEC_PYTHON_API): what a layout system later needs from the generator (e.g. the resolved parameter record that regenerates an antenna) becomes a member of the returned arrayant.
+- Regenerating antennas from stored generator parameters (planned for the layout system) needs the resolved parameters, not the omitted ones; the C++ dispatcher fills every default in one place, so it can report them. A custom `pattern` cannot be stored as numbers and needs a file reference.
 
 ## Next candidate: circular aperture
 
