@@ -391,6 +391,42 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_err
     std::remove(fn.c_str());
 }
 
+TEST_CASE("Arrayant reading from QDANT file - Values without data are limited per read")
+{
+    // Entry 1 has one value without data and entry 2 has 2^24, so every read stops before entry 2 allocates
+    const std::string fn = "test_qdant_read_limit.qdant";
+    const std::string small = "<elevation_grid>0</elevation_grid><azimuth_grid>0</azimuth_grid>";
+    const std::string weights = "<n_elements>4096</n_elements><e_theta_mag el=\"4096\">0</e_theta_mag>"; // No grid: throws after the limit
+    std::string patterns = "<n_elements>256</n_elements><element_pos>0,0,0", grid = "0";
+    for (int i = 1; i < 256; ++i)
+        patterns += " 0,0,0", grid += " 0";
+    patterns += "</element_pos><elevation_grid>" + grid + "</elevation_grid><azimuth_grid>" + grid + "</azimuth_grid>";
+
+    auto read_error = [&](const std::string &entry, const arma::uvec &ids = {}, const std::string &padding = "") -> std::string
+    {
+        {
+            std::ofstream f(fn, std::ios::binary);
+            f << "<qdant><!--" << padding << "--><layout>1 2</layout><arrayant id=\"1\">" << small << "</arrayant><arrayant id=\"2\">" << entry << "</arrayant></qdant>";
+        }
+        try
+        {
+            quadriga_lib::qdant_read<float>(fn, ids);
+        }
+        catch (const std::runtime_error &e)
+        {
+            return e.what();
+        }
+        return "";
+    };
+
+    CHECK_THAT(read_error(patterns), Catch::Matchers::ContainsSubstring("too many values without data"));
+    CHECK_THAT(read_error(weights), Catch::Matchers::ContainsSubstring("too many values without data"));
+    CHECK_THAT(read_error(weights, {2}), Catch::Matchers::ContainsSubstring("must have an 'elevation_grid'")); // One entry fits
+    CHECK_THAT(read_error(weights, {}, std::string(132000, ' ')), Catch::Matchers::ContainsSubstring("must have an 'elevation_grid'")); // 128 values per file byte
+
+    std::remove(fn.c_str());
+}
+
 TEST_CASE("Arrayant reading from QDANT file - Empty grid throws")
 {
     // An empty grid with pattern nodes present throws an error that names the grid

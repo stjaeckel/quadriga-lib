@@ -14,6 +14,7 @@
 #include <cstring>
 #include <filesystem>
 #include <limits>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -22,8 +23,23 @@
 #include "pugixml.hpp"
 
 // Largest number of values the reader creates without data in the file: zero patterns of elements that have no
-// pattern node, and the identity port weights of files without 'port_weights_abs' (2^24 values, 128 MB as double)
+// pattern node, and the identity port weights of files without 'port_weights_abs' (2^24 values, 128 MB as double).
+// Over all entries of one read, the larger of this value and a number of values per file byte applies to each kind
 #define QDANT_MAX_VALUES_WITHOUT_DATA 16777216ULL
+#define QDANT_ZERO_VALUES_PER_BYTE 1ULL
+
+// Identity port weights grow with the square of the element count and the file only with the count; files written by
+// the library have at least about 49 bytes per element, or up to 84 values per byte at 4096 elements
+#define QDANT_IDENTITY_VALUES_PER_BYTE 128ULL
+
+// Values created without data in the file during one read
+struct qd_qdant_values_without_data
+{
+    unsigned long long limit_patterns;
+    unsigned long long limit_port_weights;
+    unsigned long long n_patterns = 0ULL;
+    unsigned long long n_port_weights = 0ULL;
+};
 
 // Strict parse of a non-negative decimal integer: digits only, surrounding white space allowed, at most max_value
 static bool qd_qdant_parse_uint(const char *str, unsigned long long max_value, unsigned long long *value)
@@ -203,6 +219,7 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
                                        arma::Mat<dtype> *element_pos,
                                        arma::Mat<dtype> *port_weights_re, arma::Mat<dtype> *port_weights_im,
                                        dtype *center_freq,
+                                       qd_qdant_values_without_data *without_data,
                                        bool *input_error = nullptr)
 {
     if (input_error != nullptr)
@@ -303,6 +320,8 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
 
     if (!has_port_weights && n_elements > QDANT_MAX_VALUES_WITHOUT_DATA / n_elements)
         return "Antenna array objects with more than 4096 elements must define 'port_weights_abs'.";
+    if (!has_port_weights && (without_data->n_port_weights += n_elements * n_elements) > without_data->limit_port_weights)
+        return "The file has too many values without data (identity port weights) for its size.";
 
     // Read the elevation grid
     const dtype deg2rad = dtype(0.017453292519943);
@@ -361,8 +380,9 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
             }
         n_without_data += has_data ? 0ULL : 1ULL;
     }
-    if (n_ang != 0ULL && n_without_data > QDANT_MAX_VALUES_WITHOUT_DATA / n_ang)
-        return "Too many array elements without pattern data (" + std::to_string(n_without_data) + ") for the size of the sampling grid.";
+    if (n_without_data > (without_data->limit_patterns - without_data->n_patterns) / n_ang)
+        return "The file has too many values without data (zero patterns) for its size.";
+    without_data->n_patterns += n_without_data * n_ang;
 
     // Element positions
     if (has_element_pos)
@@ -1062,9 +1082,9 @@ Read arrayant objects from a QDANT file
   if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
 - A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`n_elements`) must be
   backed by data in the file (element positions, port weights, or pattern nodes of the last element). Elements without
-  pattern nodes read as zeros; their zero patterns, and the identity port weights of a file without `port_weights_abs`, are
-  limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without
-  port weights).
+  pattern nodes read as zeros. Over all entries read, their zero patterns are limited to the larger of 2^24 values and
+  1 value per file byte, and the identity port weights of a file without `port_weights_abs` (at most 4096 elements) to
+  the larger of 2^24 values and 128 values per file byte; a repeated ID counts once.
 
 ## Declaration:
 ```
@@ -1128,17 +1148,24 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(const std::s
         }
     }
 
+    std::error_code file_size_error;
+    const unsigned long long file_size = std::filesystem::file_size(fn, file_size_error) * !file_size_error;
+    qd_qdant_values_without_data without_data{std::max(QDANT_MAX_VALUES_WITHOUT_DATA, QDANT_ZERO_VALUES_PER_BYTE * file_size),
+                                              std::max(QDANT_MAX_VALUES_WITHOUT_DATA, QDANT_IDENTITY_VALUES_PER_BYTE * file_size)};
+    std::set<unsigned> ids_seen;
+
     std::vector<quadriga_lib::arrayant<dtype>> result;
     result.reserve(list.size());
     for (const unsigned id : list)
     {
         quadriga_lib::arrayant<dtype> ant;
         bool input_error = false;
+        qd_qdant_values_without_data repeated_id{without_data.limit_patterns, without_data.limit_port_weights}; // A repeated ID comes from the caller, not the file
         error_message = qd_qdant_read_entry(node_qdant, pfx, id, &ant.name,
                                             &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
                                             &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
                                             &ant.port_weights_re, &ant.port_weights_im, &ant.center_freq,
-                                            &input_error);
+                                            ids_seen.insert(id).second ? &without_data : &repeated_id, &input_error);
 
         // A requested ID that is not in the file is an error in the arguments; everything else is a problem with the file
         if (!error_message.empty() && input_error && !read_all)

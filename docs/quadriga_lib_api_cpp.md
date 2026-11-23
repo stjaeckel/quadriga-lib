@@ -894,9 +894,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_a
   if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
 - A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`n_elements`) must be
   backed by data in the file (element positions, port weights, or pattern nodes of the last element). Elements without
-  pattern nodes read as zeros; their zero patterns, and the identity port weights of a file without `port_weights_abs`, are
-  limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without
-  port weights).
+  pattern nodes read as zeros. Over all entries read, their zero patterns are limited to the larger of 2^24 values and
+  1 value per file byte, and the identity port weights of a file without `port_weights_abs` (at most 4096 elements) to
+  the larger of 2^24 values and 128 values per file byte; a repeated ID counts once.
 
 ### Declaration:
 ```cpp

@@ -26,7 +26,7 @@ Reads antenna array data from QDANT files
 - An ID that is not in the file raises an error; the first entry counts as ID 1 only if it has no
   `id` attribute
 - Malformed files raise an error, also when they declare more elements (`n_elements`) than the file
-  has data for; elements without pattern data read as zeros (at most 2^24 zero values per entry)
+  has data for; elements without pattern data read as zeros (at most the larger of 2^24 values and 1 value per file byte in one read)
 
 ## Usage:
 ```
