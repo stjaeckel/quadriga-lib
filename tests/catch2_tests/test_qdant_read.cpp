@@ -404,7 +404,7 @@ TEST_CASE("Arrayant reading from QDANT file - Empty grid throws")
           << "<EthetaMag el=\"1\"></EthetaMag>\n<EthetaPhase el=\"1\"></EthetaPhase>\n<EphiMag el=\"1\"></EphiMag>\n"
           << "</arrayant>\n</qdant>\n";
         f.close();
-        const std::string grid = empty_az ? "AzimuthGrid" : "ElevationGrid";
+        const std::string grid = empty_az ? "azimuth_grid" : "elevation_grid";
         CHECK_THROWS_WITH(quadriga_lib::qdant_read<double>(fn, {1}), Catch::Matchers::ContainsSubstring(grid));
         CHECK_THROWS_WITH(quadriga_lib::qdant_read<float>(fn, {1}), Catch::Matchers::ContainsSubstring(grid));
     }

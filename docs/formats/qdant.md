@@ -5,7 +5,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/formats.html#qdant
 | Section | Topics |
 | --- | --- |
 | [\<layout>](#layout) | [Content](#content-2) · [Examples](#examples) |
-| [\<arrayant>](#arrayant) | [Attributes](#attributes) · [Child elements](#child-elements) · [Validation & Formatting Rules (at a glance)](#validation-formatting-rules-at-a-glance) · [Quick Reference](#quick-reference) · [Example](#example) |
+| [\<arrayant>](#arrayant) | [Attributes](#attributes) · [Child elements](#child-elements) · [Validation & Formatting Rules (at a glance)](#validation-formatting-rules-at-a-glance) · [Quick Reference](#quick-reference) · [Tag names of earlier versions](#tag-names-of-earlier-versions) · [Example](#example) |
 
 QDANT is an XML grammar for exchanging antenna array pattern data. Tag names are case-sensitive. A file contains a single `<qdant>` root element that may include an optional `<layout>` and one or more `<arrayant>` elements. A namespace is required on the root (with or without a prefix).
 
@@ -59,37 +59,37 @@ Describes a single antenna array
 - **`<name>`** (string, optional)\
   Human-readable identifier.
 
-- **`<CenterFrequency>`** (Hz, integer or float, optional)\
+- **`<center_freq>`** (Hz, integer or float, optional)\
   Default 300 MHz if omitted. When omitted, element positions are interpreted in wavelength multiples (i.e., meters scaled by λ at 300 MHz).
 
-- **`<NoElements>`** (integer, required for multi-element arrays)\
+- **`<n_elements>`** (integer, required for multi-element arrays)\
   Number of elements in this array.
 
-- **`<ElementPosition>`** (optional)\
-  One or more position vectors \[x,y,z] in meters, relative to the phase center. Axis orientation: x = east, y = north, z = up. Formatting: Vectors separated by spaces; within each vector, components separated by commas. Requires `<NoElements>` to be defined and to match the number of vectors. Example: `0,0,0 0.05,0,0`
+- **`<element_pos>`** (optional)\
+  One or more position vectors \[x,y,z] in meters, relative to the phase center. Axis orientation: x = east, y = north, z = up. Formatting: Vectors separated by spaces; within each vector, components separated by commas. Requires `<n_elements>` to be defined and to match the number of vectors. Example: `0,0,0 0.05,0,0`
 
-- **`<ElevationGrid>`** (degrees, required)\
+- **`<elevation_grid>`** (degrees, required)\
   List of elevation samples (−90 … +90). Example: `-90 -45 0 45 90`
 
-- **`<AzimuthGrid>`** (degrees, required)\
+- **`<azimuth_grid>`** (degrees, required)\
   List of azimuth samples (−180 … +180; 0 points east; anti-clockwise positive). Example: `-180 -90 0 90 180`
 
-- **`<CouplingAbs>`** (optional; only with `<NoElements>`)\
-  N×M absolute values of the coupling matrix (the port weights in the API). Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. M is the number of antenna ports. Example (N=2): `1,0 0,1`
+- **`<port_weights_abs>`** (optional; only with `<n_elements>`)\
+  N×M absolute values of the port weights. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with n_elements = N. M is the number of antenna ports. Example (N=2): `1,0 0,1`
 
-- **`<CouplingPhase>`** (optional; only with `<NoElements>` and `<CouplingAbs>`)\
-  N×N phases (degrees) for the same matrix. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with NoElements = N. Example (N=2): `0,0 0,0`
+- **`<port_weights_phase>`** (optional; only with `<n_elements>` and `<port_weights_abs>`)\
+  N×M phases (degrees) of the port weights. Column vectors separated by spaces; entries within a column are separated by commas. Dimensions must be consistent with n_elements = N. Example (N=2): `0,0 0,0`
 
-- **`<EthetaMag>`** (optional)\
-  Magnitude in \[dB] of the electric field aligned with the ê − θ vector of the spherical coordinate system. One line contains all azimuth values for one elevation angle. The order is given by `AzimuthGrid` (columns) and `ElevationGrid` (rows). If `NoElements` is greater than 1, an additional attribute `<EthetaMag el="[no]">` must be provided. In the first example, the first line contains the values for the -90 degree elevation angle (down) and the last line contains the values for the 90 degree elevation (up). If there is no field in θ-direction, this XML-element can be omitted.
+- **`<e_theta_mag>`** (optional)\
+  Magnitude in \[dB] of the electric field aligned with the ê − θ vector of the spherical coordinate system. One line contains all azimuth values for one elevation angle. The order is given by `azimuth_grid` (columns) and `elevation_grid` (rows). If `n_elements` is greater than 1, an additional attribute `<e_theta_mag el="[no]">` must be provided. In the first example, the first line contains the values for the -90 degree elevation angle (down) and the last line contains the values for the 90 degree elevation (up). If there is no field in θ-direction, this XML-element can be omitted.
 
-- **`<EthetaPhase>`** (optional; only with `<EthetaMag>`)\
-  Phase in \[degree] of the electric field aligned with the ê − θ vector. One line contains all azimuth values for one elevation angle. The order is given by `AzimuthGrid` and `ElevationGrid`. If `NoElements` is greater than 1, an additional attribute `<EthetaPhase el="[no]">` must be provided. EthetaPhase cannot be defined without defining EthetaMag first. If all phases are 0, this XML-element can be omitted.
+- **`<e_theta_phase>`** (optional; only with `<e_theta_mag>`)\
+  Phase in \[degree] of the electric field aligned with the ê − θ vector. One line contains all azimuth values for one elevation angle. The order is given by `azimuth_grid` and `elevation_grid`. If `n_elements` is greater than 1, an additional attribute `<e_theta_phase el="[no]">` must be provided. e_theta_phase cannot be defined without defining e_theta_mag first. If all phases are 0, this XML-element can be omitted.
 
-- **`<EphiMag>`** (optional)\
+- **`<e_phi_mag>`** (optional)\
   Magnitude in \[dB] of the electric field aligned with the ê − φ vector of the spherical coordinate system.
 
-- **`<EphiPhase>`** (optional; only with `<EphiMag>`)\
+- **`<e_phi_phase>`** (optional; only with `<e_phi_mag>`)\
   Phase in \[degree] of the electric field aligned with the ê − φ vector.
 
 <a id="validation-formatting-rules-at-a-glance"></a>
@@ -98,36 +98,55 @@ Describes a single antenna array
 - Case-sensitive tag names.
 - `<qdant>` must be present; it may contain 0 or 1 `<layout>` and 1+ `<arrayant>`.
 - If `<layout>` is present, every integer in it must match an existing `<arrayant id="…">`
-- If `NoElements` is provided:\
-  (1) ElementPosition (if present) must provide exactly NoElements vectors.\
-  (2) CouplingAbs and CouplingPhase (if present) must be N×N with N = NoElements.\
-  (3) Pattern tags (Etheta*, Ephi*) must include el="1" … "N" for per-element data.
-- Pattern blocks: Number of lines = length of `ElevationGrid`. Numbers per line = length of `AzimuthGrid`. Magnitudes in dB; phases in degrees.
-- Omissions: If a component is everywhere zero, omit its *Mag (and its *Phase). If all phases are zero, *Phase may be omitted.
-- Zeros and levels: a magnitude of `-inf` dB is an exact zero; there is no lower limit for other values. quadriga-lib writes every non-zero sample, and an element that is zero in both components as an all-`-inf` `EthetaMag` node.
-- Precision written by quadriga-lib (single-precision equivalent relative to the element peak): magnitudes (dB) and phases (degree) get the fewest decimals (0 to 6) that keep the error of each complex sample at or below 6e-8 times the peak amplitude of its element (over both components); magnitudes get 6 decimals within 20 dB of the peak and one fewer per 20 dB below it. Samples far below the peak are therefore less accurate relative to their own value (about 6e-4 at -80 dB, 6e-2 at -120 dB). Positions and coupling as the shortest text that reads back as the same float (at most 9 significant digits), grids rounded to 0.001 degree. A phase tag is omitted if all phases round to 0.
-- `NoElements` must be backed by data: `ElementPosition`, `CouplingAbs`, or pattern tags with `el="N"`.
+- If `n_elements` is provided:\
+  (1) element_pos (if present) must provide exactly n_elements vectors.\
+  (2) port_weights_abs and port_weights_phase (if present) must be N×M with N = n_elements.\
+  (3) Pattern tags (e_theta_*, e_phi_*) must include el="1" … "N" for per-element data.
+- Pattern blocks: Number of lines = length of `elevation_grid`. Numbers per line = length of `azimuth_grid`. Magnitudes in dB; phases in degrees.
+- Omissions: If a component is everywhere zero, omit its *_mag (and its *_phase). If all phases are zero, *_phase may be omitted.
+- Zeros and levels: a magnitude of `-inf` dB is an exact zero; there is no lower limit for other values. quadriga-lib writes every non-zero sample, and an element that is zero in both components as an all-`-inf` `e_theta_mag` node.
+- Precision written by quadriga-lib (single-precision equivalent relative to the element peak): magnitudes (dB) and phases (degree) get the fewest decimals (0 to 6) that keep the error of each complex sample at or below 6e-8 times the peak amplitude of its element (over both components); magnitudes get 6 decimals within 20 dB of the peak and one fewer per 20 dB below it. Samples far below the peak are therefore less accurate relative to their own value (about 6e-4 at -80 dB, 6e-2 at -120 dB). Positions and port weights as the shortest text that reads back as the same float (at most 9 significant digits), grids rounded to 0.001 degree. A phase tag is omitted if all phases round to 0.
+- `n_elements` must be backed by data: `element_pos`, `port_weights_abs`, or pattern tags with `el="N"`.
 
 <a id="quick-reference"></a>
 ### Quick Reference
 
-| Element           | Required | Type / Units      | Notes                                                                |
-| ----------------- | -------: | ----------------- | -------------------------------------------------------------------- |
-| `qdant`           |      Yes | –                 | Root; carries namespace                                              |
-| `layout`          |       No | int matrix (text) | Columns separated by spaces; within a column, IDs comma-separated    |
-| `arrayant@id`     |    Cond. | int               | Unique; referenced by `layout`                                       |
-| `name`            |       No | string            | Free text                                                            |
-| `CenterFrequency` |       No | Hz                | Default 300 MHz if absent                                            |
-| `NoElements`      |    Cond. | int               | Required for multi-element arrays                                    |
-| `ElementPosition` |       No | meters            | Vectors `x,y,z`; vectors space-separated; components comma-separated |
-| `ElevationGrid`   |  **Yes** | degrees           | −90 … +90                                                            |
-| `AzimuthGrid`     |  **Yes** | degrees           | −180 … +180; 0° east; anti-clockwise positive                        |
-| `CouplingAbs`     |       No | matrix            | N×M; columns space-sep; entries comma-sep                            |
-| `CouplingPhase`   |       No | matrix (deg)      | Requires `CouplingAbs`; same shape                                   |
-| `EthetaMag`       |    Cond. | dB grid           | Rows = elevations; cols = azimuths; `el="n"` if N>1                  |
-| `EthetaPhase`     |    Cond. | deg grid          | Only with `EthetaMag`; omit if all zeros                             |
-| `EphiMag`         |    Cond. | dB grid           | Rows = elevations; cols = azimuths; `el="n"` if N>1                  |
-| `EphiPhase`       |    Cond. | deg grid          | Only with `EphiMag`; omit if all zeros                               |
+| Element              | Required | Type / Units      | Notes                                                                |
+| -------------------- | -------: | ----------------- | -------------------------------------------------------------------- |
+| `qdant`              |      Yes | –                 | Root; carries namespace                                              |
+| `layout`             |       No | int matrix (text) | Columns separated by spaces; within a column, IDs comma-separated    |
+| `arrayant@id`        |    Cond. | int               | Unique; referenced by `layout`                                       |
+| `name`               |       No | string            | Free text                                                            |
+| `center_freq`        |       No | Hz                | Default 300 MHz if absent                                            |
+| `n_elements`         |    Cond. | int               | Required for multi-element arrays                                    |
+| `element_pos`        |       No | meters            | Vectors `x,y,z`; vectors space-separated; components comma-separated |
+| `elevation_grid`     |  **Yes** | degrees           | −90 … +90                                                            |
+| `azimuth_grid`       |  **Yes** | degrees           | −180 … +180; 0° east; anti-clockwise positive                        |
+| `port_weights_abs`   |       No | matrix            | N×M; columns space-sep; entries comma-sep                            |
+| `port_weights_phase` |       No | matrix (deg)      | Requires `port_weights_abs`; same shape                              |
+| `e_theta_mag`        |    Cond. | dB grid           | Rows = elevations; cols = azimuths; `el="n"` if N>1                  |
+| `e_theta_phase`      |    Cond. | deg grid          | Only with `e_theta_mag`; omit if all zeros                           |
+| `e_phi_mag`          |    Cond. | dB grid           | Rows = elevations; cols = azimuths; `el="n"` if N>1                  |
+| `e_phi_phase`        |    Cond. | deg grid          | Only with `e_phi_mag`; omit if all zeros                             |
+
+<a id="tag-names-of-earlier-versions"></a>
+### Tag names of earlier versions
+
+Files written by earlier versions of quadriga-lib stay valid: the reader accepts the earlier tag names below, and the writer uses only the current names. Updating a file leaves its other entries unchanged, so one file can hold both. Versions that know only the earlier names cannot read files with the current names. An entry that contains both names of one tag is an error. The file stores grids and phases in degrees and magnitudes in dB, also where a tag has the same name as an `arrayant` member in radians or linear scale.
+
+| Earlier name      | Current name         |
+| ----------------- | -------------------- |
+| `CenterFrequency` | `center_freq`        |
+| `NoElements`      | `n_elements`         |
+| `ElementPosition` | `element_pos`        |
+| `ElevationGrid`   | `elevation_grid`     |
+| `AzimuthGrid`     | `azimuth_grid`       |
+| `CouplingAbs`     | `port_weights_abs`   |
+| `CouplingPhase`   | `port_weights_phase` |
+| `EthetaMag`       | `e_theta_mag`        |
+| `EthetaPhase`     | `e_theta_phase`      |
+| `EphiMag`         | `e_phi_mag`          |
+| `EphiPhase`       | `e_phi_phase`        |
 
 <a id="example"></a>
 ### Example
@@ -140,37 +159,37 @@ Describes a single antenna array
   <layout>1</layout>
   <arrayant id="1">
     <name>Simple XPOL</name>
-    <CenterFrequency>2600000000</CenterFrequency>
-    <NoElements>2</NoElements>
-    <ElementPosition>0,0,0 0,0,0</ElementPosition>
+    <center_freq>2600000000</center_freq>
+    <n_elements>2</n_elements>
+    <element_pos>0,0,0 0,0,0</element_pos>
 
-    <ElevationGrid>-90 0 90</ElevationGrid>
-    <AzimuthGrid>-180 -90 0 90 180</AzimuthGrid>
+    <elevation_grid>-90 0 90</elevation_grid>
+    <azimuth_grid>-180 -90 0 90 180</azimuth_grid>
 
-    <CouplingAbs>1,0 0,1</CouplingAbs>
-    <CouplingPhase>0,0 0,0</CouplingPhase>
+    <port_weights_abs>1,0 0,1</port_weights_abs>
+    <port_weights_phase>0,0 0,0</port_weights_phase>
 
-    <EthetaMag el="1">
+    <e_theta_mag el="1">
       0 0 0 0 0
       0 0 0 0 0
       0 0 0 0 0
-    </EthetaMag>
-    <EthetaPhase el="1">
+    </e_theta_mag>
+    <e_theta_phase el="1">
       0 0 0 0 0
       0 0 0 0 0
       0 0 0 0 0
-    </EthetaPhase>
+    </e_theta_phase>
 
-    <EphiMag el="2">
+    <e_phi_mag el="2">
       0 0 0 0 0
       0 0 0 0 0
       0 0 0 0 0
-    </EphiMag>
-    <EphiPhase el="2">
+    </e_phi_mag>
+    <e_phi_phase el="2">
       0 0 0 0 0
       0 0 0 0 0
       0 0 0 0 0
-    </EphiPhase>
+    </e_phi_phase>
   </arrayant>
 </qdant>
 ```

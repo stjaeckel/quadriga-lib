@@ -44,7 +44,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Frequencies**
 
-- `center_freq`: carrier frequency in Hz; scalar, or one value per snapshot or per frequency entry `[n_freq]`. Stored in HDF5 and QDANT files as `CenterFrequency`.
+- `center_freq`: carrier frequency in Hz; scalar, or one value per snapshot or per frequency entry `[n_freq]`. Stored in HDF5 files as `CenterFrequency` and in QDANT files as `center_freq`.
 - `freq`: short name for a frequency in Hz; a value that must stay in GHz is named `freq_GHz`. For a frequency grid, `freq` holds the sample frequencies and `freq_new` the target frequencies.
 - Acoustic frequency: in scalar (acoustic) mode every function takes the acoustic frequency in Hz. The ray-tracing core and the material model work with the EM-equivalent frequency `f · 299792458 / 343`, which has the same wavelength; the frequency columns of a material table (`fRef`, `resF`, `coiF`, `tfF`) are in EM-equivalent GHz (1 kHz = 0.87403 GHz).
 - `spatial_freq`: spatial frequencies of a sum-of-sinusoids generator in 1/m, `[n_coeff, n_dim]`; limits `spatial_freq_min`, `spatial_freq_max`.
@@ -892,9 +892,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_a
 - Without `ids`, the entries listed in the layout are returned, each once, in order of first appearance (column-major scan); all entries if the file has no layout. This is the way to load frequency-dependent models, where `center_freq` of each entry identifies the frequency.
 - Throws `std::invalid_argument` if an ID is 0 or the file has no entry with it. The first entry of a file is ID 1 only
   if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
-- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`NoElements`) must be
+- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`n_elements`) must be
   backed by data in the file (element positions, port weights, or pattern nodes of the last element). Elements without
-  pattern nodes read as zeros; their zero patterns, and the identity port weights of a file without `CouplingAbs`, are
+  pattern nodes read as zeros; their zero patterns, and the identity port weights of a file without `port_weights_abs`, are
   limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without
   port weights).
 
@@ -937,11 +937,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_write) · [Python](quadriga_lib_
   a low level is quantized relative to its own peak. Element positions and port weights (magnitude, phase) are written
   as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
   to 0.001 degree
-- The port weights are stored in the tags `CouplingAbs` and `CouplingPhase` of the file format
 - An empty `element_pos` or empty port weights are not written; [qdant_read](#qdant_read) returns zeros and identity for them.
   Above 4096 elements the identity port weights are written, because the reader requires them in the file
 - All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
-  zero in both field components is written as an all `-inf` `EthetaMag` node.
+  zero in both field components is written as an all `-inf` `e_theta_mag` node.
 - Vector form: writes each entry with sequential 1-based IDs and a `[n_entries, 1]` layout `1, 2, ..., n_entries`; the
   file must not exist yet (an existing file throws `std::runtime_error` and is left unchanged); for frequency-dependent
   models where each entry holds the pattern at its `center_freq`; read back with [qdant_read](#qdant_read)

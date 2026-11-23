@@ -25,7 +25,7 @@ Reads antenna array data from QDANT files
 - Reading all entries is the inverse of `qdant_write` with a 4D-pattern dict
 - An ID that is not in the file raises an error; the first entry counts as ID 1 only if it has no
   `id` attribute
-- Malformed files raise an error, also when they declare more elements (`NoElements`) than the file
+- Malformed files raise an error, also when they declare more elements (`n_elements`) than the file
   has data for; elements without pattern data read as zeros (at most 2^24 zero values per entry)
 
 ## Usage:

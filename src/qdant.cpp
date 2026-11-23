@@ -22,7 +22,7 @@
 #include "pugixml.hpp"
 
 // Largest number of values the reader creates without data in the file: zero patterns of elements that have no
-// pattern node, and the identity port weights of files without 'CouplingAbs' (2^24 values, 128 MB in double precision)
+// pattern node, and the identity port weights of files without 'port_weights_abs' (2^24 values, 128 MB as double)
 #define QDANT_MAX_VALUES_WITHOUT_DATA 16777216ULL
 
 // Strict parse of a non-negative decimal integer: digits only, surrounding white space allowed, at most max_value
@@ -161,6 +161,36 @@ static std::string qd_qdant_open(const std::string &fn, pugi::xml_document &doc,
     return "";
 }
 
+// Data tags of files written by earlier versions, which stay valid, and their current names
+static const char *const qd_qdant_old_tags[][2] = {{"CenterFrequency", "center_freq"},
+                                                   {"NoElements", "n_elements"},
+                                                   {"ElementPosition", "element_pos"},
+                                                   {"ElevationGrid", "elevation_grid"},
+                                                   {"AzimuthGrid", "azimuth_grid"},
+                                                   {"CouplingAbs", "port_weights_abs"},
+                                                   {"CouplingPhase", "port_weights_phase"},
+                                                   {"EthetaMag", "e_theta_mag"},
+                                                   {"EthetaPhase", "e_theta_phase"},
+                                                   {"EphiMag", "e_phi_mag"},
+                                                   {"EphiPhase", "e_phi_phase"}};
+
+// Gives the tags of one parsed entry their current names; returns an error message if an entry uses both names of a tag
+static std::string qd_qdant_update_tags(pugi::xml_node &node_arrayant, const std::string &pfx)
+{
+    for (const auto &tag : qd_qdant_old_tags)
+    {
+        const std::string name_old = pfx + tag[0], name_new = pfx + tag[1];
+        pugi::xml_node node = node_arrayant.child(name_old.c_str());
+        if (node.empty())
+            continue;
+        if (!node_arrayant.child(name_new.c_str()).empty())
+            return "Entry has both '" + std::string(tag[1]) + "' and its earlier name '" + tag[0] + "'.";
+        for (; !node.empty(); node = node.next_sibling(name_old.c_str()))
+            node.set_name(name_new.c_str());
+    }
+    return "";
+}
+
 // Reads one entry of a QDANT file from the opened root node. Returns empty string if there was no error or an error
 // message otherwise; 'input_error' is set to true when the error is in the arguments (no entry with the given ID),
 // false when it is in the file
@@ -199,26 +229,31 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
         return "The file has no arrayant with ID " + attr_value + ".";
     }
 
+    // Tags of earlier versions are read under their current names
+    const std::string tag_error = qd_qdant_update_tags(node_arrayant, pfx);
+    if (!tag_error.empty())
+        return tag_error;
+
     // Read name
     node_name = pfx + "name";
     node = node_arrayant.child(node_name.c_str());
     *name = node.empty() ? "unknown" : node.text().as_string();
 
     // Read center frequency
-    node_name = pfx + "CenterFrequency";
+    node_name = pfx + "center_freq";
     node = node_arrayant.child(node_name.c_str());
     *center_freq = node.empty() ? dtype(qd_speed_of_light) : dtype(node.text().as_double());
 
     // Read the number of elements
-    node_name = pfx + "NoElements";
+    node_name = pfx + "n_elements";
     node = node_arrayant.child(node_name.c_str());
     unsigned long long n_elements = 1ULL;
     if (!node.empty() && (!qd_qdant_parse_uint(node.text().as_string(), 4294967295ULL, &n_elements) || n_elements == 0ULL))
-        return "'NoElements' must be a positive integer.";
+        return "'n_elements' must be a positive integer.";
 
-    // Find the pattern nodes of each element: 0 = EthetaMag, 1 = EthetaPhase, 2 = EphiMag, 3 = EphiPhase
+    // Find the pattern nodes of each element: 0 = e_theta_mag, 1 = e_theta_phase, 2 = e_phi_mag, 3 = e_phi_phase
     // The first node with matching "el" attribute is used; a single element may also omit the attribute
-    const std::string pattern_node_names[4] = {pfx + "EthetaMag", pfx + "EthetaPhase", pfx + "EphiMag", pfx + "EphiPhase"};
+    const std::string pattern_node_names[4] = {pfx + "e_theta_mag", pfx + "e_theta_phase", pfx + "e_phi_mag", pfx + "e_phi_phase"};
     std::vector<std::pair<unsigned long long, pugi::xml_node>> pattern_nodes[4]; // (element, node) as found in the file
     unsigned long long max_el = 0ULL;
     for (pugi::xml_node node_pat : node_arrayant.children())
@@ -235,20 +270,20 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
             }
 
     // Read element position
-    node_name = pfx + "ElementPosition";
+    node_name = pfx + "element_pos";
     node = node_arrayant.child(node_name.c_str());
     const bool has_element_pos = !node.empty();
     arma::Col<dtype> element_pos_file;
     if (has_element_pos)
     {
         if (!qd_qdant_parse_list(node, &element_pos_file))
-            return "Malformed number list in 'ElementPosition'.";
+            return "Malformed number list in 'element_pos'.";
         if (element_pos_file.n_elem != 3ULL * n_elements)
-            return "Number of entries in 'ElementPosition' does not match the number of antenna elements.";
+            return "Number of entries in 'element_pos' does not match the number of antenna elements.";
     }
 
     // Read the absolute values of the port weights
-    node_name = pfx + "CouplingAbs";
+    node_name = pfx + "port_weights_abs";
     node = node_arrayant.child(node_name.c_str());
     const bool has_port_weights = !node.empty();
     arma::Col<dtype> port_weights_abs_file;
@@ -256,44 +291,44 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
     if (has_port_weights)
     {
         if (!qd_qdant_parse_list(node, &port_weights_abs_file))
-            return "Malformed number list in 'CouplingAbs'.";
+            return "Malformed number list in 'port_weights_abs'.";
         if (port_weights_abs_file.n_elem == 0ULL || port_weights_abs_file.n_elem % n_elements != 0ULL)
-            return "'CouplingAbs' must be a matrix with number of rows equal to number of elements.";
+            return "'port_weights_abs' must be a matrix with number of rows equal to number of elements.";
         n_ports = port_weights_abs_file.n_elem / n_elements;
     }
 
     // The number of elements must be backed by data in the file before it is used for any allocation
     if (n_elements > 1ULL && !has_element_pos && !has_port_weights && max_el < n_elements)
-        return "'NoElements' (" + std::to_string(n_elements) + ") is larger than the number of elements found in the file.";
+        return "'n_elements' (" + std::to_string(n_elements) + ") is larger than the number of elements found in the file.";
 
     if (!has_port_weights && n_elements > QDANT_MAX_VALUES_WITHOUT_DATA / n_elements)
-        return "Antenna array objects with more than 4096 elements must define 'CouplingAbs'.";
+        return "Antenna array objects with more than 4096 elements must define 'port_weights_abs'.";
 
     // Read the elevation grid
     const dtype deg2rad = dtype(0.017453292519943);
-    node_name = pfx + "ElevationGrid";
+    node_name = pfx + "elevation_grid";
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
-        return "Antenna array object must have an 'ElevationGrid'.";
+        return "Antenna array object must have an 'elevation_grid'.";
     arma::Col<dtype> grid_file;
     if (!qd_qdant_parse_list(node, &grid_file))
-        return "Malformed number list in 'ElevationGrid'.";
+        return "Malformed number list in 'elevation_grid'.";
     *elevation_grid = grid_file * deg2rad;
     unsigned long long n_elevation = elevation_grid->n_elem;
     if (n_elevation == 0)
-        return "'ElevationGrid' must not be empty.";
+        return "'elevation_grid' must not be empty.";
 
     // Read the azimuth grid
-    node_name = pfx + "AzimuthGrid";
+    node_name = pfx + "azimuth_grid";
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
-        return "Antenna array object must have an 'AzimuthGrid'.";
+        return "Antenna array object must have an 'azimuth_grid'.";
     if (!qd_qdant_parse_list(node, &grid_file))
-        return "Malformed number list in 'AzimuthGrid'.";
+        return "Malformed number list in 'azimuth_grid'.";
     *azimuth_grid = grid_file * deg2rad;
     unsigned long long n_azimuth = azimuth_grid->n_elem;
     if (n_azimuth == 0)
-        return "'AzimuthGrid' must not be empty.";
+        return "'azimuth_grid' must not be empty.";
 
     // Pattern nodes of each element (first one wins), the node without "el" attribute for a single element
     std::vector<pugi::xml_node> pattern_node(4ULL * n_elements); // Index 4 * element + component
@@ -313,7 +348,7 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
     for (unsigned long long el = 0ULL; el < n_elements; ++el)
     {
         bool has_data = false;
-        for (int c = 0; c < 4; c += 2) // EthetaMag, EphiMag; k = 1 below is the phase node of the same component
+        for (int c = 0; c < 4; c += 2) // e_theta_mag, e_phi_mag; k = 1 below is the phase node of the same component
             if (!pattern_node[4ULL * el + c].empty())
             {
                 has_data = true;
@@ -341,7 +376,7 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
     else
         *port_weights_re = arma::Mat<dtype>(n_elements, n_elements, arma::fill::eye);
 
-    node_name = pfx + "CouplingPhase";
+    node_name = pfx + "port_weights_phase";
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
         *port_weights_im = arma::Mat<dtype>(n_elements, n_ports, arma::fill::zeros);
@@ -349,10 +384,10 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
     {
         arma::Col<dtype> tmp;
         if (!qd_qdant_parse_list(node, &tmp))
-            return "Malformed number list in 'CouplingPhase'.";
+            return "Malformed number list in 'port_weights_phase'.";
         tmp *= deg2rad;
         if (tmp.n_elem != n_elements * n_ports)
-            return "Number of entries in 'CouplingPhase' must match number of entries in 'CouplingAbs'.";
+            return "Number of entries in 'port_weights_phase' must match number of entries in 'port_weights_abs'.";
         arma::Mat<dtype> tmp2 = arma::reshape(tmp, n_elements, n_ports);
         *port_weights_im = *port_weights_re % sin(tmp2);
         *port_weights_re = *port_weights_re % cos(tmp2);
@@ -371,7 +406,7 @@ static std::string qd_qdant_read_entry(const pugi::xml_node &node_qdant, const s
     const double x_max = 10.0 * std::log10((double)std::numeric_limits<dtype>::max());
 
     for (auto el = 0ULL; el < n_elements; ++el)
-        for (int c = 0; c < 4; c += 2) // Etheta, then Ephi
+        for (int c = 0; c < 4; c += 2) // e_theta, then e_phi
         {
             node = pattern_node[4ULL * el + c];
             if (node.empty())
@@ -774,11 +809,11 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
 
     // Write data
     node_arrayant.append_child((pfx + "name").c_str()).text().set(name->c_str());
-    node_arrayant.append_child((pfx + "CenterFrequency").c_str()).text().set(*center_freq);
+    node_arrayant.append_child((pfx + "center_freq").c_str()).text().set(*center_freq);
 
     arma::uword NoElements = e_theta_re->n_slices;
     if (NoElements > 1)
-        node_arrayant.append_child((pfx + "NoElements").c_str()).text().set(NoElements);
+        node_arrayant.append_child((pfx + "n_elements").c_str()).text().set(NoElements);
 
     std::ostringstream strm;
     std::string str;
@@ -790,7 +825,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
 
     // Element positions
     if (!element_pos->empty())
-        node_arrayant.append_child((pfx + "ElementPosition").c_str()).text().set(qd_qdant_float_columns(*element_pos).c_str());
+        node_arrayant.append_child((pfx + "element_pos").c_str()).text().set(qd_qdant_float_columns(*element_pos).c_str());
 
     const dtype rad2deg = dtype(57.295779513082323);
 
@@ -802,7 +837,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     row_vec_tmp.raw_print(strm);
     str = strm.str();
     str.erase(str.size() - 1);
-    node_arrayant.append_child((pfx + "ElevationGrid").c_str()).text().set(str.c_str());
+    node_arrayant.append_child((pfx + "elevation_grid").c_str()).text().set(str.c_str());
     strm.str("");
 
     // Azimuth grid
@@ -812,7 +847,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     row_vec_tmp.raw_print(strm);
     str = strm.str();
     str.erase(str.size() - 1);
-    node_arrayant.append_child((pfx + "AzimuthGrid").c_str()).text().set(str.c_str());
+    node_arrayant.append_child((pfx + "azimuth_grid").c_str()).text().set(str.c_str());
     strm.str("");
 
     // Port weights; an empty one (identity) is written out when the reader would not create it (too many elements)
@@ -821,7 +856,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
         port_weights_eye.eye(NoElements, NoElements), port_weights_re = &port_weights_eye;
     if (!port_weights_re->empty())
     {
-        // Coupling absolute value
+        // Absolute values of the port weights
         arma::Mat<dtype> mat_tmp;
         if (port_weights_im->empty())
             mat_tmp = arma::square(*port_weights_re);
@@ -830,13 +865,13 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
 
         mat_tmp.transform([](dtype x)
                           { return std::sqrt(x); });
-        node_arrayant.append_child((pfx + "CouplingAbs").c_str()).text().set(qd_qdant_float_columns(mat_tmp).c_str());
+        node_arrayant.append_child((pfx + "port_weights_abs").c_str()).text().set(qd_qdant_float_columns(mat_tmp).c_str());
 
-        // Coupling phase
+        // Phases of the port weights
         if (!port_weights_im->empty())
         {
             mat_tmp = arma::atan2(*port_weights_im, *port_weights_re) * rad2deg;
-            node_arrayant.append_child((pfx + "CouplingPhase").c_str()).text().set(qd_qdant_float_columns(mat_tmp).c_str());
+            node_arrayant.append_child((pfx + "port_weights_phase").c_str()).text().set(qd_qdant_float_columns(mat_tmp).c_str());
         }
     }
 
@@ -908,7 +943,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
     };
 
     // Peak of each element over both components; an element that is zero in both components gets an all -Inf
-    // 'EthetaMag' node, so that every element is backed by data in the file
+    // 'e_theta_mag' node, so that every element is backed by data in the file
     std::vector<double> theta_peak(NoElements), phi_peak(NoElements);
     {
         arma::uword n_links = e_theta_re->n_rows * e_theta_re->n_cols;
@@ -936,7 +971,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
             if (write_mag) // Write magnitude
             {
                 pattern_text(mag, nullptr, element_peak, str);
-                std::string node_name_x = pfx + eName + "Mag";
+                std::string node_name_x = pfx + eName + "_mag";
                 node_pat = node_arrayant.append_child(node_name_x.c_str());
                 node_pat.append_attribute("el").set_value(i + 1);
                 node_pat.text().set(str.c_str());
@@ -948,7 +983,7 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                 calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), phase.memptr(), n_links);
                 if (pattern_text(mag, &phase, element_peak, str))
                 {
-                    std::string node_name_x = pfx + eName + "Phase";
+                    std::string node_name_x = pfx + eName + "_phase";
                     node_pat = node_arrayant.append_child(node_name_x.c_str());
                     node_pat.append_attribute("el").set_value(i + 1);
                     node_pat.text().set(str.c_str());
@@ -957,8 +992,8 @@ static std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
         }
         return;
     };
-    write_e_field(e_theta_re, e_theta_im, "Etheta", true);
-    write_e_field(e_phi_re, e_phi_im, "Ephi", false);
+    write_e_field(e_theta_re, e_theta_im, "e_theta", true);
+    write_e_field(e_phi_re, e_phi_im, "e_phi", false);
     str.clear();
 
     // Process layout data
@@ -1025,9 +1060,9 @@ Read arrayant objects from a QDANT file
 - Without `ids`, the entries listed in the layout are returned, each once, in order of first appearance (column-major scan); all entries if the file has no layout. This is the way to load frequency-dependent models, where `center_freq` of each entry identifies the frequency.
 - Throws `std::invalid_argument` if an ID is 0 or the file has no entry with it. The first entry of a file is ID 1 only
   if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
-- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`NoElements`) must be
+- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`n_elements`) must be
   backed by data in the file (element positions, port weights, or pattern nodes of the last element). Elements without
-  pattern nodes read as zeros; their zero patterns, and the identity port weights of a file without `CouplingAbs`, are
+  pattern nodes read as zeros; their zero patterns, and the identity port weights of a file without `port_weights_abs`, are
   limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without
   port weights).
 
@@ -1143,11 +1178,10 @@ Write arrayant data to a QDANT (XML) file
   a low level is quantized relative to its own peak. Element positions and port weights (magnitude, phase) are written
   as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
   to 0.001 degree
-- The port weights are stored in the tags `CouplingAbs` and `CouplingPhase` of the file format
 - An empty `element_pos` or empty port weights are not written; [[qdant_read]] returns zeros and identity for them.
   Above 4096 elements the identity port weights are written, because the reader requires them in the file
 - All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
-  zero in both field components is written as an all `-inf` `EthetaMag` node.
+  zero in both field components is written as an all `-inf` `e_theta_mag` node.
 - Vector form: writes each entry with sequential 1-based IDs and a `[n_entries, 1]` layout `1, 2, ..., n_entries`; the
   file must not exist yet (an existing file throws `std::runtime_error` and is left unchanged); for frequency-dependent
   models where each entry holds the pattern at its `center_freq`; read back with [[qdant_read]]

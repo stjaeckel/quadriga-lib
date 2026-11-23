@@ -443,7 +443,7 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#qdant_read) · [Pytho
 - With a scalar `ids`, a single entry is read as a struct; useful for picking one frequency from a multi-frequency file
 - With a vector `ids`, the entries are read in the given order (duplicates allowed) and returned as a struct array
 - An ID that is 0 or not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
-- Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
+- Malformed files are an error, also when they declare more elements (`n_elements`) than the file has data for;
   elements without pattern data read as zeros (at most 2^24 zero values per entry)
 
 ### Usage:

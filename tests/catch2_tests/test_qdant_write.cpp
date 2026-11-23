@@ -8,6 +8,7 @@
 // Each case writes its own file in the working folder and removes it.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 #include "quadriga_tools.hpp"
@@ -367,7 +368,7 @@ TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
     std::remove(fn.c_str());
     quadriga_lib::qdant_write(fn, a);
     const std::string txt = read_text(fn);
-    CHECK(txt.find("<ElementPosition>1200,-0,123456 1e-04,1e-05,0.1 2.5e-07,1e+15,16777216</ElementPosition>") != std::string::npos);
+    CHECK(txt.find("<element_pos>1200,-0,123456 1e-04,1e-05,0.1 2.5e-07,1e+15,16777216</element_pos>") != std::string::npos);
 
     // A locale with a decimal comma (if one is installed) must not change a single byte
     const std::string old_locale = std::setlocale(LC_NUMERIC, nullptr);
@@ -468,7 +469,7 @@ TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace pr
     std::string txt((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     CHECK(txt.find("<name>") == std::string::npos);
     CHECK(txt.find("<arrayant") == std::string::npos);
-    CHECK(txt.find("<EthetaMag") == std::string::npos);
+    CHECK(txt.find("<e_theta_mag") == std::string::npos);
     std::remove(fn.c_str());
 }
 
@@ -890,20 +891,89 @@ TEST_CASE("QDANT vector - Invalid entry keeps existing file")
     std::filesystem::remove(fn);
 }
 
-TEST_CASE("QDANT write - Port weights use the format's coupling tags")
+TEST_CASE("QDANT tags - Writer uses current names, earlier names stay readable")
 {
-    const std::string fn = "test_qdant_coupling_tags.qdant";
+    const std::string fn = "test_qdant_tag_names.qdant";
     std::remove(fn.c_str());
-    auto ant = quadriga_lib::generate_antenna<double>("xpol", 30.0);
+    auto ant = quadriga_lib::generate_antenna<double>("xpol", 30.0); // Non-default values in every tag
+    ant.center_freq = 2.6e9;
+    ant.element_pos = arma::mat({{0.0, 0.1}, {0.0, 0.0}, {0.0, 0.0}});
+    ant.e_theta_im = 0.5 * ant.e_theta_re;
+    ant.e_phi_im = -0.5 * ant.e_phi_re;
     ant.port_weights_re = arma::mat({{0.5, 0.5}, {0.5, -0.5}});
-    ant.port_weights_im = arma::mat(2, 2, arma::fill::zeros);
+    ant.port_weights_im = arma::mat({{0.0, 0.5}, {0.5, 0.0}});
     quadriga_lib::qdant_write(fn, ant);
 
     std::ifstream in(fn);
-    std::stringstream text;
-    text << in.rdbuf();
-    CHECK(text.str().find("CouplingAbs>") != std::string::npos);
-    CHECK(text.str().find("CouplingPhase>") != std::string::npos);
-    CHECK(text.str().find("port_weights") == std::string::npos);
+    std::stringstream buffer;
+    buffer << in.rdbuf();
+    in.close();
+    const std::string text_new = buffer.str();
+
+    const char *tags[][2] = {{"CenterFrequency", "center_freq"},
+                             {"NoElements", "n_elements"},
+                             {"ElementPosition", "element_pos"},
+                             {"ElevationGrid", "elevation_grid"},
+                             {"AzimuthGrid", "azimuth_grid"},
+                             {"CouplingAbs", "port_weights_abs"},
+                             {"CouplingPhase", "port_weights_phase"},
+                             {"EthetaMag", "e_theta_mag"},
+                             {"EthetaPhase", "e_theta_phase"},
+                             {"EphiMag", "e_phi_mag"},
+                             {"EphiPhase", "e_phi_phase"}};
+    std::string text_old = text_new;
+    for (const auto &tag : tags)
+    {
+        CHECK(text_new.find(std::string("<") + tag[1]) != std::string::npos);
+        CHECK(text_new.find(std::string("<") + tag[0]) == std::string::npos);
+        for (const std::string prefix : {"<", "</"})
+        {
+            const std::string from = prefix + tag[1], to = prefix + tag[0];
+            for (size_t pos = text_old.find(from); pos != std::string::npos; pos = text_old.find(from, pos + to.size()))
+                text_old.replace(pos, from.size(), to);
+        }
+    }
+    const auto write_text = [&](const std::string &text)
+    {
+        std::ofstream out(fn, std::ios::trunc);
+        out << text;
+    };
+
+    // The same values under the earlier names
+    const auto a = quadriga_lib::qdant_read<double>(fn, {1})[0];
+    write_text(text_old);
+    const auto b = quadriga_lib::qdant_read<double>(fn, {1})[0];
+    CHECK(a.center_freq == 2.6e9);
+    CHECK(b.center_freq == 2.6e9);
+    CHECK(arma::approx_equal(a.elevation_grid, b.elevation_grid, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.azimuth_grid, b.azimuth_grid, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.e_theta_im, b.e_theta_im, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.e_phi_re, b.e_phi_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.e_phi_im, b.e_phi_im, "absdiff", 0.0));
+    CHECK(arma::approx_equal(b.e_theta_im, ant.e_theta_im, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(b.e_phi_im, ant.e_phi_im, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(a.element_pos, b.element_pos, "absdiff", 0.0));
+    CHECK(arma::approx_equal(b.element_pos, ant.element_pos, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(a.port_weights_re, b.port_weights_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.port_weights_im, b.port_weights_im, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.port_weights_re, ant.port_weights_re, "absdiff", 1e-6));
+
+    // Updating a file with earlier names keeps its other entries readable
+    write_text(text_old);
+    auto ant2 = ant;
+    ant2.center_freq = 3.5e9;
+    quadriga_lib::qdant_write(fn, ant2, 2);
+    const auto c = quadriga_lib::qdant_read<double>(fn, {1, 2});
+    REQUIRE(c.size() == 2);
+    CHECK(c[0].center_freq == 2.6e9);
+    CHECK(c[1].center_freq == 3.5e9);
+    CHECK(arma::approx_equal(c[0].port_weights_re, a.port_weights_re, "absdiff", 0.0));
+
+    // Both names of one tag in an entry are an error
+    std::string text_both = text_new;
+    text_both.insert(text_both.find("</arrayant>"), "<CenterFrequency>1e9</CenterFrequency>");
+    write_text(text_both);
+    CHECK_THROWS_WITH(quadriga_lib::qdant_read<double>(fn), Catch::Matchers::ContainsSubstring("both 'center_freq'"));
     std::remove(fn.c_str());
 }

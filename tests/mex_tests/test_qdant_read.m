@@ -177,7 +177,7 @@ try
     [~] = quadriga_lib.qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Antenna array object must have an ''AzimuthGrid''.';
+    expectedErrorMessage = 'Antenna array object must have an ''azimuth_grid''.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -234,7 +234,7 @@ try
     [~] = quadriga_lib.qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = '''CouplingAbs'' must be a matrix with number of rows equal to number of elements';
+    expectedErrorMessage = '''port_weights_abs'' must be a matrix with number of rows equal to number of elements';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -253,7 +253,7 @@ try
     [~] = quadriga_lib.qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of entries in ''CouplingPhase'' must match number of entries in ''CouplingAbs''.';
+    expectedErrorMessage = 'Number of entries in ''port_weights_phase'' must match number of entries in ''port_weights_abs''.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
