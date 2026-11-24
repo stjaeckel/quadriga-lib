@@ -534,7 +534,8 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 Also in: [MATLAB](../mex/antennas-transducers-and-patterns.md#generate_speaker) · [Python](../python/antennas-transducers-and-patterns.md#generate_speaker)
 
 - Creates one [arrayant](#arrayant) per frequency with a single element at the origin. Its real-valued pattern in `e_theta_re` is
-  the product of the driver directivity, the enclosure radiation and the bandpass frequency response
+  the product of the driver directivity, the enclosure radiation and the bandpass frequency response; a negative value
+  is a 180° phase inversion (piston side lobes, dipole rear)
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining the results with
   [join_arrays](#join_arrays) and [set_element_pos](#set_element_pos); the crossover follows from the overlapping bandpass responses
 
@@ -615,7 +616,7 @@ auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
   - `hemisphere`: $R = 1 - b + b (1 + \cos\alpha) / 2$ with $b = f^2 / (f^2 + f_b^2)$ and the baffle-step frequency
     $f_b = c / (\pi \sqrt{W H})$, $W$ = `baffle_width`, $H$ = `baffle_height`; omnidirectional at low and cardioid-like
     at high frequencies
-  - `dipole`: $R = \lvert\cos\alpha\rvert$; the pattern is negative in the rear hemisphere (180° phase inversion)
+  - `dipole`: $R = \cos\alpha$, negative in the rear hemisphere
   - `cardioid`: $R = (1 + \cos\alpha) / 2$
 
 ### See also:

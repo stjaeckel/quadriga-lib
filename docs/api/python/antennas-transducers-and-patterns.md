@@ -435,7 +435,8 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#generate_speaker) · 
 
 - Creates a multi-frequency arrayant with a single element at the origin, one frequency entry per value of
   `center_freq`. Its real-valued pattern in `e_theta_re` is the product of the driver directivity, the enclosure
-  radiation and the bandpass frequency response
+  radiation and the bandpass frequency response; a negative value is a 180° phase inversion (piston side lobes, dipole
+  rear)
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining the results with
   [join_arrays](#join_arrays) and the key `element_pos`; the crossover follows from the overlapping bandpass responses
 
@@ -495,7 +496,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_
   - `hemisphere`: $R = 1 - b + b (1 + \cos\alpha) / 2$ with $b = f^2 / (f^2 + f_b^2)$ and the baffle-step frequency
     $f_b = c / (\pi \sqrt{W H})$, $W$ = `baffle_width`, $H$ = `baffle_height`; omnidirectional at low and cardioid-like
     at high frequencies
-  - `dipole`: $R = \lvert\cos\alpha\rvert$; the pattern is negative in the rear hemisphere (180° phase inversion)
+  - `dipole`: $R = \cos\alpha$, negative in the rear hemisphere
   - `cardioid`: $R = (1 + \cos\alpha) / 2$
 
 ### See also:

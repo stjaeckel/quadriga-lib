@@ -512,7 +512,8 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 Also in: [C++](quadriga_lib_api_cpp.md#generate_speaker) · [Python](quadriga_lib_api_python.md#generate_speaker)
 
 - Creates one arrayant per frequency with a single element at the origin. Its real-valued pattern in `e_theta_re` is the
-  product of the driver directivity, the enclosure radiation and the bandpass frequency response
+  product of the driver directivity, the enclosure radiation and the bandpass frequency response; a negative value is a
+  180° phase inversion (piston side lobes, dipole rear)
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining the results with
   [join_arrays](#join_arrays) and the field `element_pos`; the crossover follows from the overlapping bandpass responses
 
@@ -573,7 +574,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
   - `hemisphere`: `R = 1 - b + b (1 + cos α) / 2` with `b = f² / (f² + f_b²)` and the baffle-step frequency
     `f_b = c / (π √(W H))`, W = `baffle_width`, H = `baffle_height`; omnidirectional at low and cardioid-like at high
     frequencies
-  - `dipole`: `R = abs(cos α)`; the pattern is negative in the rear hemisphere (180° phase inversion)
+  - `dipole`: `R = cos α`, negative in the rear hemisphere
   - `cardioid`: `R = (1 + cos α) / 2`
 
 ### See also:

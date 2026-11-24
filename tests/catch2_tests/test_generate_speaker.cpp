@@ -130,7 +130,7 @@ TEST_CASE("Speaker - Omni + Dipole: figure-8 pattern")
                                                       "dipole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
-    // Dipole: R = |cos(theta_off)|, rear has phase flip
+    // Dipole: R = cos(theta_off), negative in the rear
     // On-axis (ct=1): positive, amplitude = freq_response ≈ 1.0
     double on_axis = spk[0].e_theta_re(9, 18, 0);
     CHECK(std::abs(on_axis - 1.0) < 0.001);
@@ -273,10 +273,10 @@ TEST_CASE("Speaker - Piston directivity increases with frequency")
     REQUIRE(spk.size() == 2);
 
     // At 500 Hz (ka=0.457): nearly omni
-    double ratio_500 = spk[0].e_theta_re(9, 27, 0) / spk[0].e_theta_re(9, 18, 0);
+    double ratio_500 = std::abs(spk[0].e_theta_re(9, 27, 0) / spk[0].e_theta_re(9, 18, 0));
 
-    // At 5000 Hz (ka=4.57): noticeably directional
-    double ratio_5k = spk[1].e_theta_re(9, 27, 0) / spk[1].e_theta_re(9, 18, 0);
+    // At 5000 Hz (ka=4.57): noticeably directional, 90 deg lies in the first side lobe (negative)
+    double ratio_5k = std::abs(spk[1].e_theta_re(9, 27, 0) / spk[1].e_theta_re(9, 18, 0));
 
     // Higher frequency → more directional → lower side/on-axis ratio
     CHECK(ratio_500 > ratio_5k);
@@ -288,8 +288,8 @@ TEST_CASE("Speaker - Piston directivity follows 2 J1(x) / x")
 {
     // ka = 2*pi*15000/343 * 0.05 = 13.739; along the horizon the off-axis angle is the azimuth, x = ka*sin(az).
     // Reference values of 2*J1(x)/x from the glibc Bessel function: main lobe, near the first null (x = 3.832),
-    // first side lobe, near the second null (x = 7.016), second side lobe, and 90 deg off axis. The pattern holds
-    // the magnitude, so the side lobes are compared without their sign.
+    // first side lobe (negative, 180 deg out of phase), near the second null (x = 7.016), second side lobe, and
+    // 90 deg off axis.
     arma::vec freqs = {15000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
@@ -305,8 +305,8 @@ TEST_CASE("Speaker - Piston directivity follows 2 J1(x) / x")
                             -0.012865974451, 0.023300213152, 0.012624254489};
     for (int i = 0; i < 6; ++i)
     {
-        CHECK(std::abs(spk[0].e_theta_re(18, 36 + step[i], 0) / on_axis - std::abs(D_ref[i])) < 1e-7);
-        CHECK(std::abs(spk[0].e_theta_re(18, 36 - step[i], 0) / on_axis - std::abs(D_ref[i])) < 1e-7);
+        CHECK(std::abs(spk[0].e_theta_re(18, 36 + step[i], 0) / on_axis - D_ref[i]) < 1e-7);
+        CHECK(std::abs(spk[0].e_theta_re(18, 36 - step[i], 0) / on_axis - D_ref[i]) < 1e-7);
     }
 }
 
@@ -499,7 +499,7 @@ TEST_CASE("Speaker - Piston + Dipole combined")
     // Side (az=90°): dipole null regardless of piston directivity
     CHECK(std::abs(side) < 1e-10);
 
-    // Rear: dipole R = |ct| = 1 with phase flip; the rear is on the piston axis (sin(theta_off) = 0), so the piston
+    // Rear: dipole R = ct = -1; the rear is on the piston axis (sin(theta_off) = 0), so the piston
     // factor 2*J1(x)/x at x = 0 is 1
     CHECK(std::abs(rear + on_axis) < 0.001); // Equal magnitude, opposite sign
 }
@@ -520,8 +520,10 @@ TEST_CASE("Speaker - Piston + Cardioid combined")
     // Rear: cardioid null → zero regardless of piston
     CHECK(std::abs(rear) < 1e-10);
 
-    // All values should be non-negative (cardioid has no phase flip)
-    CHECK(spk[0].e_theta_re.min() >= -1e-10);
+    // The cardioid adds no phase flip; the sign follows the piston: ka = 4.58, first null at 56.8 deg
+    CHECK(spk[0].e_theta_re(9, 22, 0) > 0.0); // 40 deg, main lobe
+    CHECK(spk[0].e_theta_re(9, 25, 0) < 0.0); // 70 deg, first side lobe
+    CHECK(spk[0].e_theta_re(9, 27, 0) < 0.0); // 90 deg, first side lobe
 }
 
 TEST_CASE("Speaker - Horn + Cardioid combined")
