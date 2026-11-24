@@ -5,6 +5,7 @@
 #include "quadriga_gbsm.hpp"
 #include "qd_helpers_shared.hpp"
 #include "qd_helpers_gbsm.hpp"
+#include "qd_csv.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -439,88 +440,23 @@ enum qd_conf_num : unsigned char
     QD_NUM_RANGE    // Beyond the range of a double
 };
 
-// Parse one number token: [+-] digits [. digits] [e|E [+-] digits], with at least one digit before the
-// exponent, or [+-] Inf in any case; anything else (NaN, complex, hex, trailing text) is QD_NUM_INVALID
+// Parse one number token (grammar and conversion in qd_csv.hpp): [+-] digits [. digits] [e|E [+-] digits], with at
+// least one digit before the exponent, or [+-] Inf in any case; anything else (NaN, complex, hex, trailing text) is
+// QD_NUM_INVALID
 // - A number beyond the range of a double is QD_NUM_RANGE; a number below the smallest subnormal is the 0 with its
 //   sign, which is what strtod returns in the C locale
 // - 'v' is written only for QD_NUM_OK
-// - The conversion uses a stream with the classic locale, not std::from_chars: in libstdc++ the double overload of
-//   from_chars needs GLIBCXX_3.4.29, which the libstdc++ shipped with MATLAB R2024a does not provide
 static qd_conf_num qd_conf_parse_number(const std::string &s, double &v)
 {
-    const size_t n = s.size();
-    size_t i = 0;
-    bool negative = false;
-    if (i < n && (s[i] == '+' || s[i] == '-'))
-        negative = s[i++] == '-';
-
-    if (n - i == 3 && (s[i] == 'i' || s[i] == 'I') && (s[i + 1] == 'n' || s[i + 1] == 'N') &&
-        (s[i + 2] == 'f' || s[i + 2] == 'F'))
+    switch (qd_csv::parse_number(s, v, false))
     {
-        v = negative ? -QD_INF : QD_INF;
+    case qd_csv::number_status::ok:
         return QD_NUM_OK;
-    }
-
-    // Decimal order of the first non-zero digit: digits before the point counted from it, minus the zeros after
-    // the point before it; plus the exponent (saturated)
-    long long order = 0;
-    bool nonzero = false;
-    size_t n_digit = 0;
-    while (i < n && s[i] >= '0' && s[i] <= '9')
-    {
-        nonzero = nonzero || s[i] != '0';
-        order += nonzero ? 1 : 0;
-        ++i, ++n_digit;
-    }
-    if (i < n && s[i] == '.')
-    {
-        ++i;
-        while (i < n && s[i] >= '0' && s[i] <= '9')
-        {
-            nonzero = nonzero || s[i] != '0';
-            order -= nonzero ? 0 : 1;
-            ++i, ++n_digit;
-        }
-    }
-    if (n_digit == 0)
-        return QD_NUM_INVALID;
-
-    if (i < n && (s[i] == 'e' || s[i] == 'E'))
-    {
-        ++i;
-        bool negative_exp = false;
-        if (i < n && (s[i] == '+' || s[i] == '-'))
-            negative_exp = s[i++] == '-';
-        size_t n_exp = 0;
-        long long exp = 0;
-        while (i < n && s[i] >= '0' && s[i] <= '9')
-        {
-            exp = std::min(exp * 10 + (s[i] - '0'), 1000000000LL);
-            ++i, ++n_exp;
-        }
-        if (n_exp == 0)
-            return QD_NUM_INVALID;
-        order += negative_exp ? -exp : exp;
-    }
-    if (i != n)
-        return QD_NUM_INVALID;
-
-    // The text is a plain decimal number; convert it independent of the global locale. The stream fails on
-    // overflow (LWG 23); on underflow to 0, some libraries return 0 (libstdc++) and others fail (MSVC). libc++ also
-    // fails on a subnormal result, but stores its correct value.
-    std::istringstream is(s);
-    is.imbue(std::locale::classic());
-    double w = 0.0;
-    is >> w;
-    if (!is.fail())
-    {
-        v = w;
-        return QD_NUM_OK;
-    }
-    if (nonzero && order > 0)
+    case qd_csv::number_status::range:
         return QD_NUM_RANGE;
-    v = (w != 0.0 && std::isfinite(w)) ? w : (negative ? -0.0 : 0.0);
-    return QD_NUM_OK;
+    default:
+        return QD_NUM_INVALID;
+    }
 }
 
 // Values of a parameter set in table order; keys that are not in 'scenpar' have their default
@@ -660,21 +596,7 @@ static const char *const qd_conf_pl_formulas[][2] = {
 // Number text that 'qd_conf_parse_number' reads back to the same double: the fewest of 15, 16, 17 significant digits
 static std::string qd_conf_number(double v)
 {
-    if (std::isinf(v))
-        return v < 0.0 ? "-Inf" : "Inf";
-    std::string s;
-    for (int prec = 15; prec <= 17; ++prec)
-    {
-        std::ostringstream os;
-        os.imbue(std::locale::classic());
-        os.precision(prec);
-        os << v;
-        s = os.str();
-        double w;
-        if (qd_conf_parse_number(s, w) == QD_NUM_OK && std::memcmp(&v, &w, sizeof(double)) == 0)
-            break;
-    }
-    return s; // 17 digits always read back for a correctly rounding parser
+    return qd_csv::format_number(v, 15, 17);
 }
 
 // One assignment line: name padded to 19 characters, value padded to 13, comment

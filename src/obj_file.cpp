@@ -4,6 +4,7 @@
 
 #include "quadriga_tools.hpp"
 #include "qd_helpers_shared.hpp"
+#include "qd_csv.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -120,18 +121,6 @@ static inline int qd_parse_face_refs(const char *s, unsigned long long *mag, boo
     return n;
 }
 
-// Split a CSV line into trimmed cells
-// Note: std::getline drops truly-trailing empty fields, so callers pad rows to the header width before indexing.
-static inline std::vector<std::string> qd_split_csv(const std::string &line)
-{
-    std::vector<std::string> out;
-    std::istringstream ss(line);
-    std::string cell;
-    while (std::getline(ss, cell, ','))
-        out.push_back(qd_trim_ws(cell));
-    return out;
-}
-
 // Return the base material name: everything before the first '.' is the CSV lookup key.
 // "itu_concrete.001" -> "itu_concrete"; "concrete.gray.001" -> "concrete".
 // Names without a dot are returned unchanged. This lets one CSV material back many
@@ -142,41 +131,28 @@ static inline std::string qd_base_material_name(const std::string &s)
     return (dot == std::string::npos) ? s : s.substr(0, dot);
 }
 
-// Parse a material table from any input stream. The reader is schema-blind: it requires only a
-// "name" column (the join key for .obj materials); every other column is treated as numeric.
-// Empty numeric cells parse as 0.0. A non-empty cell must be one finite number in full ("1.5x", "nan" and "inf" are
-// errors).
-static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
+// Build the material table from a parsed CSV table. The reader is schema-blind: it requires only a "name" column (the
+// join key for .obj materials); every other column is treated as numeric. Empty numeric cells parse as 0.0. A non-empty
+// cell must be one finite number in full ("1.5x", "nan" and "inf" are errors).
+static MtlTable qd_mtl_table_from_csv(const qd_csv::table &C)
 {
     MtlTable T;
-    std::string line;
-
-    if (!std::getline(in, line))
-        throw std::runtime_error("Material file '" + src + "' is empty.");
-
-    // Strip UTF-8 BOM if present
-    if (line.size() >= 3 && (unsigned char)line[0] == 0xEF &&
-        (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF)
-        line.erase(0, 3);
-
-    std::vector<std::string> header = qd_split_csv(line);
-    if (header.empty())
-        throw std::runtime_error("Material file '" + src + "' has an empty header.");
+    const std::string &src = C.source;
+    const std::vector<std::string> &header = C.header;
 
     // Locate the mandatory "name" column
-    arma::uword name_col = (arma::uword)header.size();
-    for (arma::uword k = 0; k < (arma::uword)header.size(); ++k)
-        if (header[k] == "name")
-        {
-            name_col = k;
-            break;
-        }
-    if (name_col == (arma::uword)header.size())
+    const size_t name_col = C.find("name");
+    if (name_col == qd_csv::table::npos)
         throw std::runtime_error("Material file '" + src + "' is missing required column 'name'.");
 
+    // Empty names at the end of the header (a trailing comma) are no columns
+    size_t n_header = header.size();
+    while (n_header > 0 && header[n_header - 1].empty())
+        --n_header;
+
     // Collect numeric columns, preserving CSV order
-    std::vector<arma::uword> num_pos;
-    for (arma::uword k = 0; k < (arma::uword)header.size(); ++k)
+    std::vector<size_t> num_pos;
+    for (size_t k = 0; k < n_header; ++k)
         if (k != name_col)
         {
             if (header[k].empty())
@@ -185,24 +161,16 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
             num_pos.push_back(k);
         }
     T.values.resize(T.columns.size());
+    for (auto &col : T.values)
+        col.reserve(C.n_rows());
 
     std::unordered_set<std::string> seen;
-    arma::uword line_num = 1;
-
-    while (std::getline(in, line))
+    for (size_t r = 0; r < C.n_rows(); ++r)
     {
-        ++line_num;
-        if (qd_trim_ws(line).empty())
-            continue;
-
-        std::vector<std::string> cell = qd_split_csv(line);
-        if (cell.size() < header.size())
-            cell.resize(header.size()); // pad trailing empties dropped by getline
-
-        const std::string &nm = cell[name_col];
+        const std::string nm(C.cell(r, name_col));
         if (nm.empty())
-            throw std::runtime_error("Material file '" + src + "' line " +
-                                     std::to_string(line_num) + " has an empty material name.");
+            throw std::runtime_error("Material file '" + src + "' line " + std::to_string(C.line(r)) +
+                                     " has an empty material name.");
         if (!seen.insert(nm).second)
             throw std::runtime_error("Duplicate material name '" + nm + "' in '" + src + "'.");
 
@@ -210,27 +178,7 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
         T.names.push_back(nm);
 
         for (size_t c = 0; c < T.columns.size(); ++c)
-        {
-            const std::string &v = cell[num_pos[c]];
-            double d = 0.0; // empty cell -> 0.0
-            if (!v.empty())
-            {
-                size_t n_read = 0;
-                try
-                {
-                    d = std::stod(v, &n_read);
-                }
-                catch (const std::exception &)
-                {
-                    n_read = 0;
-                }
-                if (n_read != v.size() || !std::isfinite(d)) // the whole cell must be one finite number
-                    throw std::runtime_error("Material file '" + src + "' line " +
-                                             std::to_string(line_num) + " column '" + T.columns[c] +
-                                             "' is not numeric ('" + v + "').");
-            }
-            T.values[c].push_back(d);
-        }
+            T.values[c].push_back(C.get_double(r, num_pos[c], 0.0, false, false)); // empty cell -> 0.0
     }
 
     if (T.names.empty())
@@ -240,19 +188,17 @@ static MtlTable qd_parse_mtl_table(std::istream &in, const std::string &src)
 }
 
 // Load the material table: built-in default if fn_csv is empty, otherwise from the CSV file.
+// Long rows are ignored (extra cells dropped) and equal column names are tolerated.
 static MtlTable qd_load_mtl_table(const std::string &fn_csv)
 {
+    qd_csv::options opt;
+    opt.allow_long_rows = true;
+    opt.allow_duplicate_header = true;
     if (fn_csv.empty())
-    {
-        std::istringstream ss(DEFAULT_MATERIAL_CSV);
-        return qd_parse_mtl_table(ss, "<default materials>");
-    }
+        return qd_mtl_table_from_csv(qd_csv::parse(DEFAULT_MATERIAL_CSV, "<default materials>", opt));
     if (!std::filesystem::exists(fn_csv))
         throw std::runtime_error("CSV file '" + fn_csv + "' does not exist.");
-    std::ifstream f(fn_csv);
-    if (!f.is_open())
-        throw std::runtime_error("Cannot open file '" + fn_csv + "'.");
-    return qd_parse_mtl_table(f, fn_csv);
+    return qd_mtl_table_from_csv(qd_csv::read(fn_csv, opt));
 }
 
 // Read Principled BSDF (visual) properties from the companion .mtl file, one row per name in 'names'
@@ -760,6 +706,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
   vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::runtime_error`. The file is
   parsed and validated for any combination of requested outputs, also when no output is requested.
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
+- In the material CSV, a cell may be quoted with `"` (`""` is a quote inside), lines starting with `#` and blank lines are skipped, and a number is one decimal number (no hexadecimal).
 - Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
