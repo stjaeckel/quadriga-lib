@@ -690,6 +690,19 @@ elseif(NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(DIRECTORY data/config/ DESTINATION share/quadriga-lib/config FILES_MATCHING PATTERN "*.conf")
 endif()
 
+# Folder of the shipped conf files, compiled into conf_file_list and conf_file_read: data/config of the source tree for
+# the local layout, share/quadriga-lib/config of the prefix for a system install; none for pip, whose Python module
+# finds the folder at run time, as the MEX files do
+if(DEFINED SKBUILD_PLATLIB_DIR)
+    set(QD_CONF_DIR "")
+elseif(INSTALL_IS_LOCAL)
+    set(QD_CONF_DIR "${CMAKE_SOURCE_DIR}/data/config")
+else()
+    set(QD_CONF_DIR "${CMAKE_INSTALL_PREFIX}/share/quadriga-lib/config")
+endif()
+set_source_files_properties(${CMAKE_SOURCE_DIR}/src/qd_scenpar.cpp PROPERTIES
+                            COMPILE_DEFINITIONS "QUADRIGA_LIB_CONF_DIR=\"${QD_CONF_DIR}\"")
+
 if(BUILD_STATIC_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(TARGETS quadriga_static
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}

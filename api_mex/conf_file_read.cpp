@@ -5,6 +5,23 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "qd_helpers_mex_types.hpp"
+#include "qd_helpers_gbsm.hpp"
+
+// Folder of the shipped conf files, found next to the package folder that 'which' reports, so that a moved
+// installation finds it: +quadriga_lib/../config (installed), +quadriga_lib/../data/config (source tree)
+static std::string qd_mex_conf_dir()
+{
+    mxArray *name = mxCreateString("quadriga_lib.conf_file_list"), *path = nullptr;
+    std::string file;
+    if (mexCallMATLAB(1, &path, 1, &name, "which") == 0 && path != nullptr)
+    {
+        if (char *s = mxArrayToString(path))
+            file = s, mxFree(s);
+        mxDestroyArray(path);
+    }
+    mxDestroyArray(name);
+    return qd_conf_shipped_dir(file, {"../config", "../data/config"});
+}
 
 /*!SECTION
 Geometry-based stochastic model
@@ -19,15 +36,17 @@ the spatial consistency of clause 7.6.3, oxygen absorption (clause 7.6.1) and po
 7.6.16); [[gbsm_single_link_channel]] computes the coefficients of step 11 with the antennas.<br><br>
 
 **Scenario parameters.** A scenario is a struct of numeric fields (`scenpar`), a path-loss struct (`plpar`: the field
-`model` and the model parameters) and optional short names, read from a conf file by [[conf_file_read]]. 23 files for
-TR 38.901 v19.5.0 come with the library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`,
+`model` and the model parameters) and optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR
+38.901 v19.5.0 come with the library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`,
 `_NLOS`, `_LOS_O2I`, `_NLOS_O2I`; InH is `Indoor`, InF NLOS has one file per clutter type), in `data/config` of the
-source tree and in `share/quadriga-lib/config` of an installed package; [[conf_file_list]] finds them. Their comments
-give the meaning and unit of each key; [[conf_file_write]] with `write_defaults = true` writes the complete default
-set with these comments. Every function that takes `scenpar` accepts the struct of [[conf_file_read]] or
-[[scenpar_validate]] or any subset of its fields (`[]` = all defaults), completes a copy with the defaults of missing
-fields and validates it with [[scenpar_validate]], whose messages pass through, also for fields the function does not
-use. A field `SubpathMethod` (QuaDRiGa's structs) must be `'legacy'`.<br><br>
+source tree and in `share/quadriga-lib/config` of an installed package; [[conf_file_list]] lists them after the caller's
+folders, and [[conf_file_read]] reads one by its name. The MEX files find this folder next to their own folder
+`+quadriga_lib`, also after the installation was moved. Their comments give the meaning and unit of each key;
+[[conf_file_write]] with `write_defaults = true` writes the complete default set with these comments. Every function
+that takes `scenpar` accepts the struct of [[conf_file_read]] or [[scenpar_validate]] or any subset of its fields (`[]`
+= all defaults), completes a copy with the defaults of missing fields and validates it with [[scenpar_validate]], whose
+messages pass through, also for fields the function does not use. A field `SubpathMethod` (QuaDRiGa's structs) must be
+`'legacy'`.<br><br>
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -131,7 +150,8 @@ Read and validate a QuaDRiGa scenario configuration file
   `SubpathMethod` is an error, also with `validate = false`
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`),
   read independent of the locale; `Inf`, `+Inf` and `-Inf` in any case
-- An error is raised if the file cannot be opened or is a directory
+- An error is raised if the file cannot be opened or is a directory, or if `fn` is a name (see Inputs)
+  that is not a shipped scenario
 - An error with file name and line number for a line that is not blank, not a comment and not a
   well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a
   number is required or the reverse, text after the value, `NaN`, a number beyond the range of a
@@ -147,7 +167,9 @@ Read and validate a QuaDRiGa scenario configuration file
 ```
 
 ## Inputs:
-- **`fn`** — Path to the conf file; string
+- **`fn`** — Path to the conf file, or the name or short name of a shipped scenario (see
+  [[conf_file_list]]) if it does not end in `.conf` and contains no `/` or `\`; a file without the
+  extension is read by its path, e.g. `./name`; string
 - **`validate`** — `true`: apply the value checks of [[scenpar_validate]]; `false`: only the line
   grammar is checked; default: true
 
@@ -196,8 +218,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_short_names = (nlhs > 4) ? &short_names : nullptr;
     std::vector<std::string> *p_ignored_keys = (nlhs > 5) ? &ignored_keys : nullptr;
 
-    CALL_QD(scenpar = quadriga_lib::conf_file_read(fn, &pl_model, &plpar, p_lsp_xcorr, &lsp_xcorr_chk,
-                                                   &key_order, &pl_order, p_short_names, p_ignored_keys, validate));
+    CALL_QD(scenpar = quadriga_lib::conf_file_read(qd_conf_file_path(fn, qd_mex_conf_dir), &pl_model, &plpar,
+                                                   p_lsp_xcorr, &lsp_xcorr_chk, &key_order, &pl_order, p_short_names,
+                                                   p_ignored_keys, validate));
 
     // Scenario parameters: numeric keys in canonical order
     plhs[0] = qd_mex_scenpar2struct(scenpar, key_order);

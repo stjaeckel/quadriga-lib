@@ -144,6 +144,16 @@ assertEqual( scenpar13.DS_mu, -7.25 );
 assertEqual( short_names13, {'Bm'} );
 assertTrue( isempty(ignored_keys13) );
 
+%% A name without '.conf' and path separator is a shipped scenario
+[ sp_n, pl_n ] = quadriga_lib.conf_file_read( '3GPP_38.901_v19_UMa_LOS' );
+[ s_sh, f_sh, d_sh ] = quadriga_lib.conf_file_list( {} );
+i_sh = find( strcmp( s_sh, '3GPP_38.901_v19_UMa_LOS' ) );
+[ sp_p, pl_p ] = quadriga_lib.conf_file_read( fullfile( d_sh{i_sh}, f_sh{i_sh} ) );
+assertEqual( sp_n, sp_p );
+assertEqual( pl_n, pl_p );
+fn_no = 'test_conf_file_read_mex_no_such';
+assert_throws( @() quadriga_lib.conf_file_read( fn_no ), ['''', fn_no, ''''] );           % thrown by C++
+
 delete( fn );
 delete( fn_bad );
 

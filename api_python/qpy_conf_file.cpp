@@ -3,6 +3,25 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "qd_helpers_python_types.hpp"
+#include "qd_helpers_gbsm.hpp"
+
+// Folder of the shipped conf files, found at run time relative to the module folder: ../data/config (local lib/ build),
+// ../share/quadriga-lib/config (CMake install), ../../../share/quadriga-lib/config (POSIX site-packages, e.g. venv,
+// --user, dist-packages), ../../share/quadriga-lib/config (Windows); the folder compiled into the library if the module
+// path is unknown or none holds the files
+static std::string qd_python_conf_dir()
+{
+    std::string file;
+    try
+    {
+        file = py::module_::import("quadriga_lib").attr("__file__").cast<std::string>();
+    }
+    catch (const py::error_already_set &)
+    {
+    }
+    return qd_conf_shipped_dir(file, {"../data/config", "../share/quadriga-lib/config",
+                                      "../../../share/quadriga-lib/config", "../../share/quadriga-lib/config"});
+}
 
 /*!SECTION
 Geometry-based stochastic model
@@ -16,6 +35,8 @@ List the scenarios defined by the conf files in a set of directories
   scenario name) in each directory, not recursive: the directories in the given order, the files of one directory in
   byte-wise sorted order of their names
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
+- With `include_shipped = True` the folder of the conf files that come with the library is searched last, by the
+  same rules, so a file in `dirs` overrides the shipped file of the same name
 - With `parse_shortnames = True` every line `ShortName = name` that is not a comment adds an entry right after its file;
   other lines are not examined
 - Raises `RuntimeError` if a short name equals an earlier entry, if a file name equals an earlier short name, if a
@@ -25,27 +46,30 @@ List the scenarios defined by the conf files in a set of directories
 
 ## Usage:
 ```
-scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, *, parse_shortnames )
+scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, *, parse_shortnames, include_shipped )
 ```
 
 ## Inputs:
 - **`dirs`** — Directories, searched in this order; one path or a list or tuple of paths, each a str,
-  bytes or path-like object (e.g. `pathlib.Path`); an empty list or `None` lists nothing
+  bytes or path-like object (e.g. `pathlib.Path`); can be an empty list or `None`
 - **`parse_shortnames`** — `True`: read the files and add their short names; `False`: list the files
   only, which is faster; default: True
+- **`include_shipped`** — `True`: search the folder of the shipped conf files after `dirs`; `False`:
+  only `dirs`; default: True
 
 ## Outputs:
 - **`scenarios`** — Scenario names and short names; list of str; length `n_scen`
 - **`file_names`** — File name including `.conf` for each entry; list of str; length `n_scen`
 - **`file_dirs`** — Directory of the file for each entry, exactly as given in `dirs` (a path-like object
-  converted with `os.fspath`); list of str; length `n_scen`
+  converted with `os.fspath`), or the absolute path of the shipped folder; list of str; length `n_scen`
 
 ## See also:
 - [[conf_file_read]] (read one of the files)
 MD!*/
 
 py::tuple conf_file_list(py::handle dirs,
-                         py::handle parse_shortnames)
+                         py::handle parse_shortnames,
+                         py::handle include_shipped)
 {
     // Read inputs; one path (str, bytes, os.PathLike) is one directory, also when it is empty (= current directory)
     std::vector<std::string> dirs_v;
@@ -62,10 +86,15 @@ py::tuple conf_file_list(py::handle dirs,
     else if (!dirs.is_none())
         throw std::invalid_argument("Input 'dirs' must be a path, a list or tuple of paths, or None.");
     const bool parse_shortnames_b = qd_python_flag(parse_shortnames, true, "parse_shortnames");
+    const bool include_shipped_b = qd_python_flag(include_shipped, true, "include_shipped");
 
     std::vector<std::string> file_names, file_dirs;
 
-    const auto scenarios = quadriga_lib::conf_file_list(dirs_v, &file_names, &file_dirs, parse_shortnames_b);
+    const std::string shipped_dir = include_shipped_b ? qd_python_conf_dir() : std::string();
+    if (!shipped_dir.empty())
+        dirs_v.push_back(shipped_dir);
+
+    const auto scenarios = quadriga_lib::conf_file_list(dirs_v, &file_names, &file_dirs, parse_shortnames_b, false);
 
     auto scenarios_py = qd_python_copy2list(scenarios);
     auto file_names_py = qd_python_copy2list(file_names);
@@ -89,14 +118,14 @@ with the spatial consistency of clause 7.6.3, oxygen absorption (clause 7.6.1) a
 and the model parameters) and optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR 38.901
 v19.5.0 come with the library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`, `_NLOS`,
 `_LOS_O2I`, `_NLOS_O2I`; InH is `Indoor`, InF NLOS has one file per clutter type), in `data/config` of the source tree
-and in `share/quadriga-lib/config` of an installed package (for pip,
-`os.path.join(sys.prefix, "share", "quadriga-lib", "config")`); [[conf_file_list]] finds them. Their comments give the
-meaning and unit of each key; [[conf_file_write]] with `write_defaults = True` writes the complete default set with
-these comments. Every function that takes `scenpar` accepts the dict of [[conf_file_read]] or [[scenpar_validate]] or
-any subset of its keys (`None` = all defaults), completes a copy with the defaults of missing keys and validates it with
-[[scenpar_validate]], whose messages pass through, also for keys the function does not use. A key `SubpathMethod`
-(QuaDRiGa's structs) must be `"legacy"`. Invalid input raises `ValueError`, a problem with a file's access or
-content `RuntimeError`.<br><br>
+and in `share/quadriga-lib/config` of an installed package (for pip below `sys.prefix` or the user base);
+[[conf_file_list]] lists them after the caller's folders, and [[conf_file_read]] reads one by its name. The module finds
+this folder at run time, also after the installation was moved. Their comments give the meaning and unit of each key;
+[[conf_file_write]] with `write_defaults = True` writes the complete default set with these comments. Every function
+that takes `scenpar` accepts the dict of [[conf_file_read]] or [[scenpar_validate]] or any subset of its keys (`None` =
+all defaults), completes a copy with the defaults of missing keys and validates it with [[scenpar_validate]], whose
+messages pass through, also for keys the function does not use. A key `SubpathMethod` (QuaDRiGa's structs) must be
+`"legacy"`. Invalid input raises `ValueError`, a problem with a file's access or content `RuntimeError`.<br><br>
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -200,6 +229,7 @@ Read and validate a QuaDRiGa scenario configuration file
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read independent of
   the locale; `Inf`, `+Inf` and `-Inf` in any case
 - Raises `RuntimeError` if the file cannot be opened or is a directory
+- Raises `ValueError` if `fn` is a name (see Inputs) that is not a shipped scenario
 - Raises `RuntimeError` with file name and line number for a line that is not blank, not a comment and not a well-formed
   assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required or the reverse,
   text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a `ShortName` value
@@ -214,7 +244,9 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 ```
 
 ## Inputs:
-- **`fn`** — Path to the conf file
+- **`fn`** — Path to the conf file, or the name or short name of a shipped scenario (see [[conf_file_list]]) if it
+  does not end in `.conf` and contains no `/` or `\`; a file without the extension is read by its path, e.g.
+  `./name`
 - **`validate`** — `True`: apply the value checks of [[scenpar_validate]]; `False`: only the line
   grammar is checked; default: True
 
@@ -251,8 +283,9 @@ py::tuple conf_file_read(const py::handle &fn,
     auto lsp_xcorr_py = qd_python_init_output((arma::uword)8, (arma::uword)8, &lsp_xcorr);
 
     bool lsp_xcorr_chk = false;
-    const auto scenpar = quadriga_lib::conf_file_read(fn_s, &pl_model, &plpar, &lsp_xcorr, &lsp_xcorr_chk, &key_order,
-                                                      &pl_order, &short_names, &ignored_keys, validate_b);
+    const auto scenpar = quadriga_lib::conf_file_read(qd_conf_file_path(fn_s, qd_python_conf_dir), &pl_model, &plpar,
+                                                      &lsp_xcorr, &lsp_xcorr_chk, &key_order, &pl_order, &short_names,
+                                                      &ignored_keys, validate_b);
 
     // Scenario parameters: numeric keys in canonical order
     auto scenpar_py = qd_python_scenpar2dict(scenpar, key_order);

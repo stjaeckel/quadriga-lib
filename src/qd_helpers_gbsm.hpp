@@ -317,4 +317,16 @@ static inline bool qd_gbsm_chol8(const double *A, double *L)
     return true;
 }
 
+// Conf files (src/qd_scenpar.cpp): the folder of the shipped conf files; the public functions use the folder set by
+// CMake, the wrappers the folder they find at run time
+
+// Absolute path of the folder of the shipped conf files: the first of the folders 'rel' relative to the folder of 'file',
+// else the folder set by CMake at build time; a folder counts only if it holds a known shipped file; empty if none does
+std::string qd_conf_shipped_dir(const std::string &file = "", const std::vector<std::string> &rel = {});
+
+// Path of the file 'fn' of conf_file_read: 'fn' if it is empty, ends in ".conf" or contains '/' or '\'; else the
+// file of the scenario or short name 'fn' in the folder returned by 'shipped_dir', which is called only then; throws
+// std::invalid_argument if there is none
+std::string qd_conf_file_path(const std::string &fn, std::string (*shipped_dir)());
+
 #endif

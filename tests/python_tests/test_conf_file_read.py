@@ -257,6 +257,23 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.gbsm.conf_file_read(self.fn, no_such_argument=1)
 
+    def test_scenario_name(self):
+        # A name without ".conf" and path separator is a shipped scenario; oracle: the path from conf_file_list
+        scen, files, dirs = quadriga_lib.gbsm.conf_file_list([])
+        i = scen.index("3GPP_38.901_v19_UMa_LOS")
+        ref = quadriga_lib.gbsm.conf_file_read(os.path.join(dirs[i], files[i]))
+        for fn in ["3GPP_38.901_v19_UMa_LOS", pathlib.Path("3GPP_38.901_v19_UMa_LOS")]:
+            out = quadriga_lib.gbsm.conf_file_read(fn)
+            self.assertEqual(out[0], ref[0])
+            self.assertEqual(list(out[1]), list(ref[1]))
+            npt.assert_array_equal(out[2], ref[2])
+            self.assertEqual(out[3:], ref[3:])
+
+        # An unknown name: std::invalid_argument -> ValueError
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.gbsm.conf_file_read("conf_file_read_no_such_scenario")
+        self.assertIn("'conf_file_read_no_such_scenario'", str(ctx.exception))
+
     def test_submodule(self):
         # The conf functions are in quadriga_lib.gbsm, not in quadriga_lib.tools
         for name in ["conf_file_read", "conf_file_write", "conf_file_list", "scenpar_validate"]:

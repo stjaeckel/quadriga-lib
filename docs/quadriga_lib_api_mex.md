@@ -2079,15 +2079,17 @@ the spatial consistency of clause 7.6.3, oxygen absorption (clause 7.6.1) and po
 7.6.16); [gbsm_single_link_channel](#gbsm_single_link_channel) computes the coefficients of step 11 with the antennas.
 
 **Scenario parameters.** A scenario is a struct of numeric fields (`scenpar`), a path-loss struct (`plpar`: the field
-`model` and the model parameters) and optional short names, read from a conf file by [conf_file_read](#conf_file_read). 23 files for
-TR 38.901 v19.5.0 come with the library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`,
+`model` and the model parameters) and optional short names, read from a conf file by [conf_file_read](#conf_file_read). 23 files for TR
+38.901 v19.5.0 come with the library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`,
 `_NLOS`, `_LOS_O2I`, `_NLOS_O2I`; InH is `Indoor`, InF NLOS has one file per clutter type), in `data/config` of the
-source tree and in `share/quadriga-lib/config` of an installed package; [conf_file_list](#conf_file_list) finds them. Their comments
-give the meaning and unit of each key; [conf_file_write](#conf_file_write) with `write_defaults = true` writes the complete default
-set with these comments. Every function that takes `scenpar` accepts the struct of [conf_file_read](#conf_file_read) or
-[scenpar_validate](#scenpar_validate) or any subset of its fields (`[]` = all defaults), completes a copy with the defaults of missing
-fields and validates it with [scenpar_validate](#scenpar_validate), whose messages pass through, also for fields the function does not
-use. A field `SubpathMethod` (QuaDRiGa's structs) must be `'legacy'`.
+source tree and in `share/quadriga-lib/config` of an installed package; [conf_file_list](#conf_file_list) lists them after the caller's
+folders, and [conf_file_read](#conf_file_read) reads one by its name. The MEX files find this folder next to their own folder
+`+quadriga_lib`, also after the installation was moved. Their comments give the meaning and unit of each key;
+[conf_file_write](#conf_file_write) with `write_defaults = true` writes the complete default set with these comments. Every function
+that takes `scenpar` accepts the struct of [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate) or any subset of its fields (`[]`
+= all defaults), completes a copy with the defaults of missing fields and validates it with [scenpar_validate](#scenpar_validate), whose
+messages pass through, also for fields the function does not use. A field `SubpathMethod` (QuaDRiGa's structs) must be
+`'legacy'`.
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -2183,6 +2185,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_list) · [Python](quadriga_lib_
   given order, the files of one directory in byte-wise sorted order of their names
 - A file name found in an earlier directory is skipped, so a local folder can override the files of
   a shared one
+- With `include_shipped = true` the folder of the conf files that come with the library is searched
+  last, by the same rules, so a file in `dirs` overrides the shipped file of the same name
 - With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry
   right after its file; other lines are not examined
 - An error is raised if a short name equals an earlier entry, if a file name equals an earlier short
@@ -2192,21 +2196,23 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_list) · [Python](quadriga_lib_
 
 ### Usage:
 ```matlab
-[ scenarios, file_names, file_dirs ] = quadriga_lib.conf_file_list( dirs, parse_shortnames );
+[ scenarios, file_names, file_dirs ] = quadriga_lib.conf_file_list( dirs, parse_shortnames, include_shipped );
 ```
 
 ### Inputs:
-- **`dirs`** — Directories, searched in this order; one string or a cell array of strings; an empty
-  cell array lists nothing
+- **`dirs`** — Directories, searched in this order; one string or a cell array of strings; can be
+  an empty cell array
 - **`parse_shortnames`** — `true`: read the files and add their short names; `false`: list the files
   only, which is faster; default: true
+- **`include_shipped`** — `true`: search the folder of the shipped conf files after `dirs`; `false`:
+  only `dirs`; default: true
 
 ### Outputs:
 - **`scenarios`** — Scenario names and short names; cell array of strings; `[n_scen, 1]`
 - **`file_names`** — File name including `.conf` for each entry; cell array of strings;
   `[n_scen, 1]`
-- **`file_dirs`** — Directory of the file for each entry, exactly as given in `dirs`; cell array of
-  strings; `[n_scen, 1]`
+- **`file_dirs`** — Directory of the file for each entry, exactly as given in `dirs`, or the absolute
+  path of the shipped folder; cell array of strings; `[n_scen, 1]`
 
 ### See also:
 - [conf_file_read](#conf_file_read) (read one of the files)
@@ -2233,7 +2239,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [Python](quadriga_lib_
   `SubpathMethod` is an error, also with `validate = false`
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`),
   read independent of the locale; `Inf`, `+Inf` and `-Inf` in any case
-- An error is raised if the file cannot be opened or is a directory
+- An error is raised if the file cannot be opened or is a directory, or if `fn` is a name (see Inputs)
+  that is not a shipped scenario
 - An error with file name and line number for a line that is not blank, not a comment and not a
   well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a
   number is required or the reverse, text after the value, `NaN`, a number beyond the range of a
@@ -2249,7 +2256,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [Python](quadriga_lib_
 ```
 
 ### Inputs:
-- **`fn`** — Path to the conf file; string
+- **`fn`** — Path to the conf file, or the name or short name of a shipped scenario (see
+  [conf_file_list](#conf_file_list)) if it does not end in `.conf` and contains no `/` or `\`; a file without the
+  extension is read by its path, e.g. `./name`; string
 - **`validate`** — `true`: apply the value checks of [scenpar_validate](#scenpar_validate); `false`: only the line
   grammar is checked; default: true
 

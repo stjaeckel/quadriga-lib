@@ -706,13 +706,15 @@ with the spatial consistency of clause 7.6.3, oxygen absorption (clause 7.6.1) a
 (clause 7.6.16); [[gbsm_single_link_channel]] computes the coefficients of step 11 with the antennas.<br><br>
 
 **Scenario parameters.** A scenario is a set of numeric keys (`scenpar`), a path-loss model with its parameters and
-optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come with the
-library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`, `_NLOS`, `_LOS_O2I`,
-`_NLOS_O2I`; InH is `Indoor`, InF NLOS has one file per clutter type), in `data/config` of the source tree and in
-`share/quadriga-lib/config` of an installed package; [[conf_file_list]] finds them. Their comments give the meaning
-and unit of each key; [[conf_file_write]] with `write_defaults = true` writes the complete default set with these
-comments. The functions that read `scenpar` complete a copy with the defaults of missing keys and validate it with
-[[scenpar_validate]], whose messages pass through, also for keys the function does not use.<br><br>
+optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come with the library,
+one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`, `_NLOS`, `_LOS_O2I`, `_NLOS_O2I`; InH is
+`Indoor`, InF NLOS has one file per clutter type), in `data/config` of the source tree and in
+`share/quadriga-lib/config` of an installed package; [[conf_file_list]] lists them after the caller's folders, and
+[[conf_file_read]] reads one by its name. The library looks for this folder at its path at build time, so a library
+moved after the installation does not find it. Their comments give the meaning and unit of each key; [[conf_file_write]]
+with `write_defaults = true` writes the complete default set with these comments. The functions that read `scenpar`
+complete a copy with the defaults of missing keys and validate it with [[scenpar_validate]], whose messages pass
+through, also for keys the function does not use.<br><br>
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -815,6 +817,7 @@ Read and validate a QuaDRiGa scenario configuration file
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
   independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
+- Throws `std::invalid_argument` if `fn` is a name (see Inputs) that is not a shipped scenario
 - Throws `std::runtime_error` with file name and line number for a line that is not blank, not a comment and not
   a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
   or the reverse, text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a
@@ -837,7 +840,9 @@ std::unordered_map<std::string, double> quadriga_lib::conf_file_read(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the conf file
+- **`fn`** — Path to the conf file, or the name or short name of a shipped scenario (see [[conf_file_list]]) if it
+  does not end in `.conf` and contains no `/` or `\`; a file without the extension is read by its path, e.g.
+  `./name`
 - **`validate`** *(optional)* — `true`: apply the value checks of [[scenpar_validate]]; `false`: only the line
   grammar is checked
 
@@ -881,7 +886,8 @@ std::unordered_map<std::string, double> quadriga_lib::conf_file_read(const std::
     qd_check_alias_outputs(pl_order, "pl_order", ignored_keys, "ignored_keys");
     qd_check_alias_outputs(short_names, "short_names", ignored_keys, "ignored_keys");
 
-    const std::vector<std::string> lines = qd_conf_read_lines(fn);
+    const std::string path = qd_conf_file_path(fn, [] { return qd_conf_shipped_dir(); });
+    const std::vector<std::string> lines = qd_conf_read_lines(path);
 
     // Parse into local variables
     std::vector<double> val(qd_scenpar_n_key);
@@ -907,7 +913,7 @@ std::unordered_map<std::string, double> quadriga_lib::conf_file_read(const std::
     std::string key, value;
     for (arma::uword i_line = 0; i_line < lines.size(); ++i_line)
     {
-        const std::string where = fn + ", line " + std::to_string(i_line + 1) + ": ";
+        const std::string where = path + ", line " + std::to_string(i_line + 1) + ": ";
 
         const int kind = qd_conf_split_line(lines[i_line], key, value);
         if (kind == 0)
@@ -974,7 +980,7 @@ std::unordered_map<std::string, double> quadriga_lib::conf_file_read(const std::
     }
 
     if (validate)
-        qd_scenpar_check(val.data(), fn, val_line.data());
+        qd_scenpar_check(val.data(), path, val_line.data());
 
     double X[64];
     const bool positive_definite = qd_scenpar_xcorr(val.data(), X);
@@ -1091,6 +1097,8 @@ List the scenarios defined by the conf files in a set of directories
   scenario name) in each directory, not recursive: the directories in the given order, the files of one directory
   in byte-wise sorted order of their names
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
+- With `include_shipped = true` the folder of the conf files that come with the library is searched last, by the
+  same rules, so a file in `dirs` overrides the shipped file of the same name
 - With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry right after its
   file; other lines are not examined
 - Throws `std::runtime_error` if a short name equals an earlier entry, if a file name equals an earlier short
@@ -1104,17 +1112,21 @@ std::vector<std::string> quadriga_lib::conf_file_list(
     const std::vector<std::string> &dirs,
     std::vector<std::string> *file_names = nullptr,
     std::vector<std::string> *file_dirs = nullptr,
-    bool parse_shortnames = true);
+    bool parse_shortnames = true,
+    bool include_shipped = true);
 ```
 
 ## Inputs:
 - **`dirs`** — Directories, searched in this order; can be empty
 - **`parse_shortnames`** *(optional)* — `true`: read the files and add their short names; `false`: list the
   files only, which is faster
+- **`include_shipped`** *(optional)* — `true`: search the folder of the shipped conf files after `dirs`;
+  `false`: only `dirs`
 
 ## Outputs:
 - **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
-- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
+- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`, or the absolute
+  path of the shipped folder; `[n_scen]`
 
 ## Returns:
 - Scenario names and short names; `[n_scen]`
@@ -1126,7 +1138,8 @@ MD!*/
 std::vector<std::string> quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
                                                       std::vector<std::string> *file_names,
                                                       std::vector<std::string> *file_dirs,
-                                                      bool parse_shortnames)
+                                                      bool parse_shortnames,
+                                                      bool include_shipped)
 {
     qd_check_alias(file_names, "file_names", &dirs);
     qd_check_alias(file_dirs, "file_dirs", &dirs);
@@ -1135,7 +1148,12 @@ std::vector<std::string> quadriga_lib::conf_file_list(const std::vector<std::str
     std::vector<std::string> l_scenarios, l_file_names, l_file_dirs;
     std::unordered_set<std::string> file_set, short_set;
 
-    for (const std::string &dir : dirs)
+    std::vector<std::string> search = dirs; // The shipped folder last
+    const std::string shipped_dir = include_shipped ? qd_conf_shipped_dir() : std::string();
+    if (!shipped_dir.empty())
+        search.push_back(shipped_dir);
+
+    for (const std::string &dir : search)
     {
         const std::filesystem::path path = dir.empty() ? std::filesystem::path(".") : std::filesystem::path(dir);
 
@@ -1201,6 +1219,48 @@ std::vector<std::string> quadriga_lib::conf_file_list(const std::vector<std::str
         *file_dirs = std::move(l_file_dirs);
 
     return l_scenarios;
+}
+
+// Set by CMake for this file
+#ifndef QUADRIGA_LIB_CONF_DIR
+#define QUADRIGA_LIB_CONF_DIR ""
+#endif
+
+std::string qd_conf_shipped_dir(const std::string &file, const std::vector<std::string> &rel)
+{
+    std::vector<std::filesystem::path> dirs;
+    if (!file.empty())
+        for (const std::string &r : rel)
+            dirs.push_back(std::filesystem::path(file).parent_path() / r);
+    dirs.push_back(QUADRIGA_LIB_CONF_DIR);
+
+    std::error_code ec; // A folder counts only if it holds a known shipped file
+    for (const std::filesystem::path &dir : dirs)
+        if (!dir.empty() && std::filesystem::is_regular_file(dir / "3GPP_38.901_v19_UMa_LOS.conf", ec))
+        {
+            const std::filesystem::path abs = std::filesystem::absolute(dir, ec);
+            return ec ? std::string() : abs.lexically_normal().string();
+        }
+    return std::string();
+}
+
+std::string qd_conf_file_path(const std::string &fn, std::string (*shipped_dir)())
+{
+    if (fn.empty() || (fn.size() >= 5 && fn.compare(fn.size() - 5, 5, ".conf") == 0) ||
+        fn.find_first_of("/\\") != std::string::npos)
+        return fn;
+
+    const std::string dir = shipped_dir();
+    std::vector<std::string> scen, names, dirs;
+    if (!dir.empty())
+        scen = quadriga_lib::conf_file_list({dir}, &names, &dirs, true, false);
+    for (size_t i = 0; i < scen.size(); ++i)
+        if (scen[i] == fn)
+            return (std::filesystem::path(dirs[i]) / names[i]).string();
+
+    throw std::invalid_argument("Input 'fn' ('" + fn + "') is not a shipped scenario" +
+                                (scen.empty() ? " (no shipped conf files found)" : "") + "; use './" + fn +
+                                "' for a file without the extension.");
 }
 
 /*!MD

@@ -27,7 +27,7 @@ namespace quadriga_lib
     // Read and validate a QuaDRiGa scenario configuration file
     // - Returns the numeric scenario parameters 'scenpar', always all n_key keys; keys not in the file have their default value
     std::unordered_map<std::string, double> conf_file_read(
-        const std::string &fn,                                                 // Path to the .conf file
+        const std::string &fn,                                                 // Path to the .conf file, or a shipped scenario name
         std::string *pl_model = nullptr,                                       // Optional output: Value of 'PL_model', empty if not in file
         std::unordered_map<std::string, std::vector<double>> *plpar = nullptr, // Optional output: Path-loss parameters, keys without "PL_"
         arma::mat *lsp_xcorr = nullptr,                                        // Optional output: LSP cross-correlation matrix, [8, 8]
@@ -52,8 +52,9 @@ namespace quadriga_lib
     std::vector<std::string> conf_file_list(
         const std::vector<std::string> &dirs,           // Directories, searched in this order, not recursive
         std::vector<std::string> *file_names = nullptr, // Optional output: File name incl. ".conf" per entry, [n_scen]
-        std::vector<std::string> *file_dirs = nullptr,  // Optional output: Directory per entry, as given in 'dirs', [n_scen]
-        bool parse_shortnames = true);                  // Read the files and add their short names
+        std::vector<std::string> *file_dirs = nullptr,  // Optional output: Directory per entry, as given in 'dirs' or the shipped folder, [n_scen]
+        bool parse_shortnames = true,                   // Read the files and add their short names
+        bool include_shipped = true);                   // Search the folder of the shipped conf files after 'dirs'
 
     // Write a QuaDRiGa scenario configuration file
     // - All inputs are validated and the complete text is composed before the file is opened; an existing file is replaced;

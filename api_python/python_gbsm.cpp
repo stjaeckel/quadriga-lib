@@ -41,7 +41,8 @@ void quadriga_lib_gbsm(py::module_ &m)
     m.def("conf_file_list", &conf_file_list,
           py::arg("dirs"),
           py::kw_only(),
-          py::arg("parse_shortnames") = true);
+          py::arg("parse_shortnames") = true,
+          py::arg("include_shipped") = true);
 
     m.def("init_phases", &gbsm_init_phases,
           py::arg("scenpar"),

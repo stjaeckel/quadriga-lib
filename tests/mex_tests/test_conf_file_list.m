@@ -4,8 +4,9 @@
 
 function test_conf_file_list
 % MEX interface test for quadriga_lib.conf_file_list.
-% Scope: argument and output handling, string and cell inputs, defaults, error paths.
-% The listing rules are validated in the Catch2 suite (test_conf_file_list.cpp).
+% Scope: argument and output handling, string and cell inputs, defaults, error paths, the shipped folder.
+% The listing rules are validated in the Catch2 suite (test_conf_file_list.cpp). The calls that compare whole lists
+% leave out the shipped folder (include_shipped = false).
 
 %% Setup: two directories; X.conf exists in both, b/X.conf is shadowed
 da = 'test_conf_file_list_mex_a';
@@ -20,26 +21,26 @@ write_file( [db, '/A.conf'], { 'ShortName = As', 'ShortName = At' } );
 write_file( [db, '/notes.txt'], { 'ShortName = No' } );
 
 %% Basic call, all outputs
-[ scenarios, file_names, file_dirs ] = quadriga_lib.conf_file_list( { da, db } );
+[ scenarios, file_names, file_dirs ] = quadriga_lib.conf_file_list( { da, db }, [], false );
 assertEqual( scenarios, {'X'; 'Xs'; 'b'; 'A'; 'As'; 'At'} );
 assertEqual( file_names, {'X.conf'; 'X.conf'; 'b.conf'; 'A.conf'; 'A.conf'; 'A.conf'} );
 assertEqual( file_dirs, {da; da; da; db; db; db} );
 assertTrue( iscell(scenarios) && isequal(size(scenarios), [6, 1]) );
 
 % The order of the directories matters
-scenarios2 = quadriga_lib.conf_file_list( { db, da } );
+scenarios2 = quadriga_lib.conf_file_list( { db, da }, [], false );
 assertEqual( scenarios2, {'A'; 'As'; 'At'; 'X'; 'Other'; 'b'} );
 
 %% Input 'dirs': one string, row and column cell, empty cell
-[ scenarios3, ~, file_dirs3 ] = quadriga_lib.conf_file_list( da );
+[ scenarios3, ~, file_dirs3 ] = quadriga_lib.conf_file_list( da, [], false );
 assertEqual( scenarios3, {'X'; 'Xs'; 'b'} );
 assertEqual( file_dirs3, {da; da; da} );
-assertEqual( quadriga_lib.conf_file_list( { da; db } ), scenarios );
-[ scenarios4, file_names4, file_dirs4 ] = quadriga_lib.conf_file_list( {} );
+assertEqual( quadriga_lib.conf_file_list( { da; db }, [], false ), scenarios );
+[ scenarios4, file_names4, file_dirs4 ] = quadriga_lib.conf_file_list( {}, [], false );
 assertTrue( iscell(scenarios4) && isempty(scenarios4) );
 assertTrue( iscell(file_names4) && isempty(file_names4) );
 assertTrue( iscell(file_dirs4) && isempty(file_dirs4) );
-assertTrue( isempty( quadriga_lib.conf_file_list( 'test_conf_file_list_mex_missing' ) ) );
+assertTrue( isempty( quadriga_lib.conf_file_list( 'test_conf_file_list_mex_missing', [], false ) ) );
 
 % An empty string is the current directory, as a string and inside a cell
 fn = 'test_conf_file_list_mex_cwd.conf';
@@ -56,33 +57,42 @@ assertEqual( file_dirs6{i6}, '' );
 assertEqual( scenarios6(1:3), {'X'; 'Xs'; 'b'} );
 
 %% Optional input 'parse_shortnames': omitted, empty, explicit
-assertEqual( quadriga_lib.conf_file_list( { da, db }, [] ), scenarios );
-assertEqual( quadriga_lib.conf_file_list( { da, db }, true ), scenarios );
-[ scenarios7, file_names7, file_dirs7 ] = quadriga_lib.conf_file_list( { da, db }, false );
+assertEqual( quadriga_lib.conf_file_list( { da, db }, [], false ), scenarios );
+assertEqual( quadriga_lib.conf_file_list( { da, db }, true, false ), scenarios );
+[ scenarios7, file_names7, file_dirs7 ] = quadriga_lib.conf_file_list( { da, db }, false, false );
 assertEqual( scenarios7, {'X'; 'b'; 'A'} );
 assertEqual( file_names7, {'X.conf'; 'b.conf'; 'A.conf'} );
 assertEqual( file_dirs7, {da; da; db} );
 
+%% Optional input 'include_shipped': the shipped conf files after 'dirs'; omitted, empty, explicit
+% Oracle: the listing of the shipped folder given explicitly
+[ s_sh, ~, d_sh ] = quadriga_lib.conf_file_list( {} );
+assertFalse( isempty(s_sh) );
+assertTrue( d_sh{1}(1) == '/' || d_sh{1}(2) == ':' );                        % absolute path
+assertEqual( quadriga_lib.conf_file_list( d_sh{1}, true, false ), s_sh );
+assertEqual( quadriga_lib.conf_file_list( {}, [], [] ), s_sh );
+assertEqual( quadriga_lib.conf_file_list( { da, db }, true, true ), [ scenarios; s_sh ] );
+
 %% Outputs: none, and fewer than the maximum
-quadriga_lib.conf_file_list( { da, db } );
-[ ~, file_names8 ] = quadriga_lib.conf_file_list( { da, db } );
+quadriga_lib.conf_file_list( { da, db }, [], false );
+[ ~, file_names8 ] = quadriga_lib.conf_file_list( { da, db }, [], false );
 assertEqual( file_names8, file_names );
 
 %% Type handling
-assertEqual( quadriga_lib.conf_file_list( { da, db }, 0 ), scenarios7 );
-assertEqual( quadriga_lib.conf_file_list( { da, db }, uint32(1) ), scenarios );
+assertEqual( quadriga_lib.conf_file_list( { da, db }, 0, false ), scenarios7 );
+assertEqual( quadriga_lib.conf_file_list( { da, db }, uint32(1), int8(0) ), scenarios );
 
 %% Errors
 assert_throws( @() quadriga_lib.conf_file_list(), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.conf_file_list( da, true, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.conf_file_list( da, true, true, 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out4( da ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.conf_file_list( 5 ), 'Input ''dirs'' must be a string or a cell array of strings.' );
 assert_throws( @() quadriga_lib.conf_file_list( [] ), 'Input ''dirs'' must be a string or a cell array of strings.' );
 assert_cpp_error( @() quadriga_lib.conf_file_list( { da, 5 } ), 'Cell element 2 of ''dirs'' is not a string.' );
 assert_cpp_error( @() quadriga_lib.conf_file_list( { da, [] } ), 'Cell element 2 of ''dirs'' is not a string.' );
 write_file( [db, '/C.conf'], { 'ShortName = Xs' } );                        % short name of a/X.conf, thrown by C++
-assert_throws( @() quadriga_lib.conf_file_list( { da, db } ), 'ambiguous' );
-assertEqual( quadriga_lib.conf_file_list( { da, db }, false ), {'X'; 'b'; 'A'; 'C'} );
+assert_throws( @() quadriga_lib.conf_file_list( { da, db } ), 'ambiguous' );   % also with the shipped folder
+assertEqual( quadriga_lib.conf_file_list( { da, db }, false, false ), {'X'; 'b'; 'A'; 'C'} );
 
 cleanup( da, db );
 

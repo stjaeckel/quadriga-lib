@@ -10,7 +10,8 @@
 //
 // Pins down: which files of a directory are listed and in which order, the short names and their
 // position, shadowing of a file name by an earlier directory, the ambiguity errors, directories that
-// do not exist, and the three outputs.
+// do not exist, and the three outputs; the folder of the shipped conf files, searched last, where a
+// given file overrides a shipped file of the same name, and that the shipped files have no short names.
 // Left to other suites: the content of the files (test_conf_file_read).
 //
 // Oracles: the expected lists are written by hand next to the directory content of each case. The
@@ -19,7 +20,9 @@
 //
 // Conventions: every case builds its own directories 'test_conf_file_list_*' in the working directory
 // and removes them; no two cases use the same name. Names are sorted byte-wise, so digits come before
-// upper case before lower case.
+// upper case before lower case. The cases of the listing rules leave out the shipped folder (list_own).
+// The shipped folder is the one compiled in by CMake; a test binary configured for a system prefix needs
+// the installed files.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -55,6 +58,12 @@ namespace
         }
     };
 
+    // The listing of the given directories only, without the folder of the shipped conf files
+    strvec list_own(const strvec &dirs, strvec *files = nullptr, strvec *file_dirs = nullptr, bool parse = true)
+    {
+        return quadriga_lib::conf_file_list(dirs, files, file_dirs, parse, false);
+    }
+
     void print_list(const char *title, const strvec &scen, const strvec &files, const strvec &dirs)
     {
         QD_DIAG("\n# diag: conf_file_list %s\n", title);
@@ -84,7 +93,7 @@ TEST_CASE("conf_file_list - files ending in .conf are listed in byte-wise sorted
     { std::ofstream f(d.name + "/sub/nested.conf"); } // not recursive
 
     strvec scen = {"stale"}, files = {"stale"}, dirs = {"stale"};
-    scen = quadriga_lib::conf_file_list({d.name}, &files, &dirs);
+    scen = list_own({d.name}, &files, &dirs);
     print_list("sorted order", scen, files, dirs);
 
     const strvec ref = {"10", "3GPP_38.901_UMa", "A", "QuaDRiGa_x", "aa", "b", "mmMAGIC_x"};
@@ -108,7 +117,7 @@ TEST_CASE("conf_file_list - short names follow their file, comments do not defin
     d.add("Broken.conf", "DS_mu = abc\nthis is not a conf line\nNumClusters = -1\n"); // content is not checked here
 
     strvec scen, files, dirs;
-    scen = quadriga_lib::conf_file_list({d.name}, &files, &dirs);
+    scen = list_own({d.name}, &files, &dirs);
     print_list("short names", scen, files, dirs);
 
     CHECK(scen.size() == 7);
@@ -118,7 +127,7 @@ TEST_CASE("conf_file_list - short names follow their file, comments do not defin
     CHECK(dirs == strvec(7, d.name));
 
     // Without parsing, only the files are listed
-    scen = quadriga_lib::conf_file_list({d.name}, &files, &dirs, false);
+    scen = list_own({d.name}, &files, &dirs, false);
     CHECK(scen.size() == 4);
     CHECK(scen == strvec{"Broken", "Plain", "UMa_LOS", "UMa_NLOS"});
     CHECK(files == strvec{"Broken.conf", "Plain.conf", "UMa_LOS.conf", "UMa_NLOS.conf"});
@@ -135,7 +144,7 @@ TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipp
     b.add("A.conf");
 
     strvec scen, files, dirs;
-    scen = quadriga_lib::conf_file_list({a.name, b.name}, &files, &dirs);
+    scen = list_own({a.name, b.name}, &files, &dirs);
     print_list("two directories, X.conf shadowed", scen, files, dirs);
 
     CHECK(scen.size() == 6);
@@ -144,7 +153,7 @@ TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipp
     CHECK(dirs == strvec{a.name, a.name, a.name, b.name, b.name, b.name});
 
     // The other order of the directories lets the other X.conf win
-    scen = quadriga_lib::conf_file_list({b.name, a.name}, &files, &dirs);
+    scen = list_own({b.name, a.name}, &files, &dirs);
     CHECK(scen.size() == 6);
     CHECK(scen == strvec{"A", "X", "Other", "Y", "Ys", "Z"});
     CHECK(dirs == strvec{b.name, b.name, b.name, b.name, b.name, a.name});
@@ -152,13 +161,13 @@ TEST_CASE("conf_file_list - a file name defined by an earlier directory is skipp
     // A copy of a file with its short name in a second directory is not ambiguous
     b.add("Z.conf", "ShortName = Zs\n");
     a.add("Z.conf", "ShortName = Zs\n");
-    CHECK_NOTHROW(scen = quadriga_lib::conf_file_list({a.name, b.name}, &files, &dirs));
+    CHECK_NOTHROW(scen = list_own({a.name, b.name}, &files, &dirs));
     CHECK(scen == strvec{"X", "Xs", "Z", "Zs", "A", "Y", "Ys"});
 
     // The same directory twice adds nothing
     strvec once, twice;
-    once = quadriga_lib::conf_file_list({a.name});
-    twice = quadriga_lib::conf_file_list({a.name, a.name});
+    once = list_own({a.name});
+    twice = list_own({a.name, a.name});
     CHECK(once == twice);
 }
 
@@ -172,7 +181,7 @@ TEST_CASE("conf_file_list - directories that do not exist are skipped")
 
     SECTION("no directory")
     {
-        scen = quadriga_lib::conf_file_list({}, &files, &dirs);
+        scen = list_own({}, &files, &dirs);
         CHECK(scen.empty());
         CHECK(files.empty());
         CHECK(dirs.empty());
@@ -180,7 +189,7 @@ TEST_CASE("conf_file_list - directories that do not exist are skipped")
 
     SECTION("missing directory and a file given as directory")
     {
-        CHECK_NOTHROW(scen = quadriga_lib::conf_file_list(
+        CHECK_NOTHROW(scen = list_own(
                           {"test_conf_file_list_no_such_dir", a.name + "/plain_file", a.name, a.name + "/X.conf"}, &files, &dirs));
         CHECK(scen.size() == 1);
         CHECK(scen == strvec{"X"});
@@ -190,14 +199,14 @@ TEST_CASE("conf_file_list - directories that do not exist are skipped")
     SECTION("directory without conf files")
     {
         tmp_dir e("test_conf_file_list_skip_b");
-        scen = quadriga_lib::conf_file_list({e.name});
+        scen = list_own({e.name});
         CHECK(scen.empty());
     }
 
     SECTION("the directory is returned as given")
     {
         const std::string with_slash = a.name + "/";
-        scen = quadriga_lib::conf_file_list({with_slash}, &files, &dirs);
+        scen = list_own({with_slash}, &files, &dirs);
         CHECK(scen == strvec{"X"});
         CHECK(dirs == strvec{with_slash});
     }
@@ -215,7 +224,7 @@ TEST_CASE("conf_file_list - an empty string is the current directory")
     strvec scen, files, dirs;
     try
     {
-        scen = quadriga_lib::conf_file_list({""}, &files, &dirs);
+        scen = list_own({""}, &files, &dirs);
     }
     catch (...)
     {
@@ -249,17 +258,17 @@ TEST_CASE("conf_file_list - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(scen = quadriga_lib::conf_file_list({a.name, b.name}, &files, &dirs));
+        CHECK_NOTHROW(scen = list_own({a.name, b.name}, &files, &dirs));
         CHECK(scen == strvec{"M", "Ms", "N", "Ns"});
-        CHECK_NOTHROW(scen = quadriga_lib::conf_file_list({a.name, b.name})); // optional outputs omitted
+        CHECK_NOTHROW(scen = list_own({a.name, b.name})); // optional outputs omitted
         CHECK(scen == strvec{"M", "Ms", "N", "Ns"});
     }
 
     SECTION("outputs that alias inputs")
     {
         strvec d = {a.name, b.name};
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list(d, &files, &d), std::invalid_argument);     // file_dirs is 'dirs'
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list(d, &files, &files), std::invalid_argument); // file_dirs is 'file_names'
+        CHECK_THROWS_AS(scen = list_own(d, &files, &d), std::invalid_argument);     // file_dirs is 'dirs'
+        CHECK_THROWS_AS(scen = list_own(d, &files, &files), std::invalid_argument); // file_dirs is 'file_names'
         CHECK(d == strvec{a.name, b.name});
         CHECK(scen == marker);
     }
@@ -267,49 +276,49 @@ TEST_CASE("conf_file_list - input validation")
     SECTION("short name equals an earlier file name")
     {
         a.add("N.conf", "ShortName = M\n");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name, b.name}, &files, &dirs), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name, b.name}, &files, &dirs), std::runtime_error);
         CHECK(scen == marker); // outputs untouched
         CHECK(files == marker);
         CHECK(dirs == marker);
-        CHECK_NOTHROW(scen = quadriga_lib::conf_file_list({a.name, b.name}, &files, &dirs, false)); // not parsed
+        CHECK_NOTHROW(scen = list_own({a.name, b.name}, &files, &dirs, false)); // not parsed
         CHECK(scen == strvec{"M", "N"});
     }
 
     SECTION("short name equals its own file name")
     {
         a.add("N.conf", "ShortName = N\n");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name}), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name}), std::runtime_error);
     }
 
     SECTION("short name equals an earlier short name, same file")
     {
         a.add("N.conf", "ShortName = Ns\nShortName = Ns\n");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name}), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name}), std::runtime_error);
     }
 
     SECTION("short name equals an earlier short name, other directory")
     {
         b.add("P.conf", "ShortName = Ms\n");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name, b.name}, &files, &dirs), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name, b.name}, &files, &dirs), std::runtime_error);
         CHECK(scen == marker);
     }
 
     SECTION("file name equals an earlier short name")
     {
         a.add("Ms.conf"); // sorted after M.conf, which defines the short name 'Ms'
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name}), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name}), std::runtime_error);
         b.add("Ns.conf");
         std::filesystem::remove(a.name + "/Ms.conf");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name, b.name}), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name, b.name}), std::runtime_error);
         CHECK(scen == marker);
     }
 
     SECTION("malformed ShortName line")
     {
         a.add("N.conf", "ShortName =\n");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name}), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name}), std::runtime_error);
         a.add("N.conf", "ShortName = two words\n");
-        CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({a.name}), std::runtime_error);
+        CHECK_THROWS_AS(scen = list_own({a.name}), std::runtime_error);
         CHECK(scen == marker);
     }
 }
@@ -331,13 +340,13 @@ TEST_CASE("conf_file_list - a listed file that cannot be read is an error only w
     }
 
     strvec scen = {"marker"}, files = {"marker"}, dirs = {"marker"};
-    CHECK_THROWS_AS(scen = quadriga_lib::conf_file_list({d.name}, &files, &dirs), std::runtime_error);
+    CHECK_THROWS_AS(scen = list_own({d.name}, &files, &dirs), std::runtime_error);
     CHECK(scen == strvec{"marker"}); // outputs untouched
     CHECK(files == strvec{"marker"});
     CHECK(dirs == strvec{"marker"});
 
     // Without reading the short names the file is listed
-    CHECK_NOTHROW(scen = quadriga_lib::conf_file_list({d.name}, &files, &dirs, false));
+    CHECK_NOTHROW(scen = list_own({d.name}, &files, &dirs, false));
     CHECK(scen == strvec{"A", "B"});
     CHECK(files == strvec{"A.conf", "B.conf"});
 
@@ -360,7 +369,7 @@ TEST_CASE("conf_file_list - a symbolic link to a regular file is listed, other l
         SKIP("symbolic links cannot be created");
 
     strvec scen, files, dirs;
-    scen = quadriga_lib::conf_file_list({d.name}, &files, &dirs);
+    scen = list_own({d.name}, &files, &dirs);
     print_list("symbolic links", scen, files, dirs);
     CHECK(scen.size() == 2);
     CHECK(scen == strvec{"Link", "Rs"}); // the short name is read through the link
@@ -377,7 +386,45 @@ TEST_CASE("conf_file_list - a UTF-8 byte order mark before the first short name 
     d.add("Plain.conf", "\xEF\xBB\xBF% comment\nShortName = Ps\n");
 
     strvec scen, files;
-    scen = quadriga_lib::conf_file_list({d.name}, &files);
+    scen = list_own({d.name}, &files);
     print_list("byte order mark", scen, files, strvec(scen.size(), d.name));
     CHECK(scen == strvec{"Bom", "Bs", "Bt", "Plain", "Ps"});
+}
+
+TEST_CASE("conf_file_list - the shipped conf files are listed after the given directories")
+{
+    tmp_dir a("test_conf_file_list_shipped_a");
+    a.add("X.conf", "ShortName = Xs\n");
+
+    // Oracle: the listing of the shipped folder given explicitly
+    strvec shipped, files, dirs;
+    shipped = quadriga_lib::conf_file_list({}, &files, &dirs);
+    print_list("shipped", shipped, files, dirs);
+    REQUIRE(!shipped.empty());
+    CHECK(std::filesystem::path(dirs[0]).is_absolute());
+    CHECK(dirs == strvec(dirs.size(), dirs[0]));
+    CHECK(std::filesystem::is_regular_file(dirs[0] + "/3GPP_38.901_v19_UMa_LOS.conf"));
+    strvec ref_files, ref_dirs;
+    CHECK(list_own({dirs[0]}, &ref_files, &ref_dirs) == shipped);
+    CHECK(ref_files == files);
+
+    // The shipped files have no short names
+    CHECK(quadriga_lib::conf_file_list({}, nullptr, nullptr, false) == shipped);
+
+    // Given directory first; the shipped folder given in 'dirs' adds nothing
+    strvec ref = {"X", "Xs"};
+    ref.insert(ref.end(), shipped.begin(), shipped.end());
+    CHECK(quadriga_lib::conf_file_list({a.name}) == ref);
+    CHECK(quadriga_lib::conf_file_list({dirs[0]}, nullptr, &ref_dirs) == shipped);
+    CHECK(ref_dirs == dirs);
+
+    // A file of a given directory with the name of a shipped file wins; the first shipped name sorts before "X"
+    a.add(shipped[0] + ".conf");
+    ref = {shipped[0], "X", "Xs"};
+    ref.insert(ref.end(), shipped.begin() + 1, shipped.end());
+    strvec scen;
+    scen = quadriga_lib::conf_file_list({a.name}, nullptr, &ref_dirs);
+    REQUIRE(scen == ref);
+    CHECK(ref_dirs[0] == a.name);
+    CHECK(ref_dirs[3] == dirs[0]);
 }

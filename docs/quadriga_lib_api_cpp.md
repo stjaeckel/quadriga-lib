@@ -3555,13 +3555,15 @@ with the spatial consistency of clause 7.6.3, oxygen absorption (clause 7.6.1) a
 (clause 7.6.16); [gbsm_single_link_channel](#gbsm_single_link_channel) computes the coefficients of step 11 with the antennas.
 
 **Scenario parameters.** A scenario is a set of numeric keys (`scenpar`), a path-loss model with its parameters and
-optional short names, read from a conf file by [conf_file_read](#conf_file_read). 23 files for TR 38.901 v19.5.0 come with the
-library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`, `_NLOS`, `_LOS_O2I`,
-`_NLOS_O2I`; InH is `Indoor`, InF NLOS has one file per clutter type), in `data/config` of the source tree and in
-`share/quadriga-lib/config` of an installed package; [conf_file_list](#conf_file_list) finds them. Their comments give the meaning
-and unit of each key; [conf_file_write](#conf_file_write) with `write_defaults = true` writes the complete default set with these
-comments. The functions that read `scenpar` complete a copy with the defaults of missing keys and validate it with
-[scenpar_validate](#scenpar_validate), whose messages pass through, also for keys the function does not use.
+optional short names, read from a conf file by [conf_file_read](#conf_file_read). 23 files for TR 38.901 v19.5.0 come with the library,
+one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`, `_NLOS`, `_LOS_O2I`, `_NLOS_O2I`; InH is
+`Indoor`, InF NLOS has one file per clutter type), in `data/config` of the source tree and in
+`share/quadriga-lib/config` of an installed package; [conf_file_list](#conf_file_list) lists them after the caller's folders, and
+[conf_file_read](#conf_file_read) reads one by its name. The library looks for this folder at its path at build time, so a library
+moved after the installation does not find it. Their comments give the meaning and unit of each key; [conf_file_write](#conf_file_write)
+with `write_defaults = true` writes the complete default set with these comments. The functions that read `scenpar`
+complete a copy with the defaults of missing keys and validate it with [scenpar_validate](#scenpar_validate), whose messages pass
+through, also for keys the function does not use.
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -3708,6 +3710,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#conf_file_list) · [Python](quadriga_l
   scenario name) in each directory, not recursive: the directories in the given order, the files of one directory
   in byte-wise sorted order of their names
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
+- With `include_shipped = true` the folder of the conf files that come with the library is searched last, by the
+  same rules, so a file in `dirs` overrides the shipped file of the same name
 - With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry right after its
   file; other lines are not examined
 - Throws `std::runtime_error` if a short name equals an earlier entry, if a file name equals an earlier short
@@ -3721,17 +3725,21 @@ std::vector<std::string> quadriga_lib::conf_file_list(
     const std::vector<std::string> &dirs,
     std::vector<std::string> *file_names = nullptr,
     std::vector<std::string> *file_dirs = nullptr,
-    bool parse_shortnames = true);
+    bool parse_shortnames = true,
+    bool include_shipped = true);
 ```
 
 ### Inputs:
 - **`dirs`** — Directories, searched in this order; can be empty
 - **`parse_shortnames`** *(optional)* — `true`: read the files and add their short names; `false`: list the
   files only, which is faster
+- **`include_shipped`** *(optional)* — `true`: search the folder of the shipped conf files after `dirs`;
+  `false`: only `dirs`
 
 ### Outputs:
 - **`file_names`** *(optional)* — File name including `.conf` for each entry; `[n_scen]`
-- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`; `[n_scen]`
+- **`file_dirs`** *(optional)* — Directory of the file for each entry, exactly as given in `dirs`, or the absolute
+  path of the shipped folder; `[n_scen]`
 
 ### Returns:
 - Scenario names and short names; `[n_scen]`
@@ -3761,6 +3769,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#conf_file_read) · [Python](quadriga_l
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
   independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
+- Throws `std::invalid_argument` if `fn` is a name (see Inputs) that is not a shipped scenario
 - Throws `std::runtime_error` with file name and line number for a line that is not blank, not a comment and not
   a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
   or the reverse, text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a
@@ -3783,7 +3792,9 @@ std::unordered_map<std::string, double> quadriga_lib::conf_file_read(
 ```
 
 ### Inputs:
-- **`fn`** — Path to the conf file
+- **`fn`** — Path to the conf file, or the name or short name of a shipped scenario (see [conf_file_list](#conf_file_list)) if it
+  does not end in `.conf` and contains no `/` or `\`; a file without the extension is read by its path, e.g.
+  `./name`
 - **`validate`** *(optional)* — `true`: apply the value checks of [scenpar_validate](#scenpar_validate); `false`: only the line
   grammar is checked
 

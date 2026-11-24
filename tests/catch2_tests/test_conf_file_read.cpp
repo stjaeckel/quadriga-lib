@@ -10,7 +10,9 @@
 //
 // Pins down: the line grammar of QuaDRiGa scenario files (*.conf), the default parameter set, the
 // path-loss outputs, the mapping of the 28 correlation keys into the 8 x 8 LSP cross-correlation
-// matrix, the positive-definite flag, the value checks per validation class and the error behaviour.
+// matrix, the positive-definite flag, the value checks per validation class, the error behaviour and
+// the lookup of a scenario name in the folder of the shipped conf files (the internal function
+// qd_conf_file_path with a folder of the test for the short names).
 // Left to other suites: the value checks on a parameter set without a file (test_scenpar_validate),
 // the directory listing (test_conf_file_list).
 //
@@ -27,6 +29,7 @@
 #include <catch2/interfaces/catch_interfaces_capture.hpp>
 
 #include "quadriga_gbsm.hpp"
+#include "qd_helpers_gbsm.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -1070,4 +1073,78 @@ TEST_CASE("conf_file_read - outputs that alias inputs")
     CHECK(fn == f.fn);
     CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(name, &pl, nullptr, nullptr, nullptr, &ko, &po, &po, &ik), std::invalid_argument); // short_names is 'pl_order'
     CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(name, &pl, nullptr, nullptr, nullptr, &ik, &po, &sn, &ik), std::invalid_argument); // ignored_keys is 'key_order'
+}
+
+TEST_CASE("conf_file_read - a name without '.conf' and path separator is a shipped scenario")
+{
+    std::unordered_map<std::string, double> sp, ref;
+    std::string pl, pl_ref;
+
+    // Read from the shipped folder by file name; oracle: the path that conf_file_list gives
+    std::vector<std::string> scen, files, dirs;
+    scen = quadriga_lib::conf_file_list({}, &files, &dirs);
+    size_t i = 0;
+    while (i < scen.size() && scen[i] != "3GPP_38.901_v19_UMa_LOS")
+        ++i;
+    REQUIRE(i < scen.size());
+    REQUIRE_NOTHROW(sp = quadriga_lib::conf_file_read("3GPP_38.901_v19_UMa_LOS", &pl));
+    ref = quadriga_lib::conf_file_read(dirs[i] + "/" + files[i], &pl_ref);
+    CHECK(sp == ref);
+    CHECK(pl == pl_ref);
+
+    // An unknown name: std::invalid_argument with the name
+    std::string msg;
+    try
+    {
+        sp = quadriga_lib::conf_file_read("test_conf_file_read_no_such_scenario");
+    }
+    catch (const std::invalid_argument &e)
+    {
+        msg = e.what();
+    }
+    QD_DIAG("\n# diag: conf_file_read unknown name: %s\n", msg.c_str());
+    CHECK(msg.find("'./test_conf_file_read_no_such_scenario'") != std::string::npos);
+
+    // A path stays a path: a file without the extension is read as "./name", with '/' or '\\' or '.conf'; "" too
+    tmp_file f("test_conf_file_read_noext", "DS_mu = -6.5\n");
+    CHECK(quadriga_lib::conf_file_read("./test_conf_file_read_noext").at("DS_mu") == -6.5);
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read("test_conf_file_read_noext"), std::invalid_argument);
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read("3GPP_38.901_v19_UMa_LOS.conf"), std::runtime_error);
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read("x\\3GPP_38.901_v19_UMa_LOS"), std::runtime_error);
+    CHECK_THROWS_AS(sp = quadriga_lib::conf_file_read(""), std::runtime_error);
+}
+
+TEST_CASE("conf_file_read - the name lookup finds short names and needs the shipped folder")
+{
+    std::string (*test_dir)() = [] { return std::string("test_conf_file_read_shipped"); };
+    std::string (*no_dir)() = [] { return std::string(); };
+    std::string (*not_called)() = []() -> std::string { throw std::logic_error("folder looked up for a path"); };
+    std::filesystem::remove_all(test_dir());
+    std::filesystem::create_directory(test_dir());
+    {
+        std::ofstream f(test_dir() + "/Sa.conf", std::ios::binary);
+        f << "DS_mu = -6.25\nShortName = Sb\n";
+    }
+
+    const std::string path_a = qd_conf_file_path("Sa", test_dir);
+    std::error_code ec;
+    CHECK(std::filesystem::equivalent(path_a, test_dir() + "/Sa.conf", ec));
+    CHECK(qd_conf_file_path("Sb", test_dir) == path_a);
+    CHECK(qd_conf_file_path("x/Sb", not_called) == "x/Sb");
+    CHECK(quadriga_lib::conf_file_read(path_a).at("DS_mu") == -6.25);
+
+    std::string msg_none;
+    try
+    {
+        qd_conf_file_path("Sb", no_dir);
+    }
+    catch (const std::invalid_argument &e)
+    {
+        msg_none = e.what();
+    }
+    QD_DIAG("\n# diag: conf_file_read without shipped folder: %s\n", msg_none.c_str());
+    CHECK(msg_none.find("'Sb'") != std::string::npos);
+    CHECK(msg_none.find("no shipped conf files") != std::string::npos);
+
+    std::filesystem::remove_all(test_dir());
 }
