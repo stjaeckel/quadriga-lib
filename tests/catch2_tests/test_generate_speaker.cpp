@@ -284,6 +284,32 @@ TEST_CASE("Speaker - Piston directivity increases with frequency")
     CHECK(ratio_5k < 0.6);   // Notably directional at 5 kHz
 }
 
+TEST_CASE("Speaker - Piston directivity follows 2 J1(x) / x")
+{
+    // ka = 2*pi*15000/343 * 0.05 = 13.739; along the horizon the off-axis angle is the azimuth, x = ka*sin(az).
+    // Reference values of 2*J1(x)/x from the glibc Bessel function: main lobe, near the first null (x = 3.832),
+    // first side lobe, near the second null (x = 7.016), second side lobe, and 90 deg off axis. The pattern holds
+    // the magnitude, so the side lobes are compared without their sign.
+    arma::vec freqs = {15000.0};
+    auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+    REQUIRE(spk.size() == 1);
+    REQUIRE(std::abs(spk[0].azimuth_grid(36)) < 1e-12);
+    REQUIRE(std::abs(spk[0].elevation_grid(18)) < 1e-12);
+
+    const double on_axis = spk[0].e_theta_re(18, 36, 0);
+    REQUIRE(on_axis > 0.0);
+
+    const arma::uword step[] = {2, 3, 4, 6, 9, 18}; // 10, 15, 20, 30, 45, 90 deg
+    const double D_ref[] = {0.438622288425, 0.064094995789, -0.118688915789,
+                            -0.012865974451, 0.023300213152, 0.012624254489};
+    for (int i = 0; i < 6; ++i)
+    {
+        CHECK(std::abs(spk[0].e_theta_re(18, 36 + step[i], 0) / on_axis - std::abs(D_ref[i])) < 1e-7);
+        CHECK(std::abs(spk[0].e_theta_re(18, 36 - step[i], 0) / on_axis - std::abs(D_ref[i])) < 1e-7);
+    }
+}
+
 TEST_CASE("Speaker - Horn + Monopole: controlled directivity")
 {
     // Horn with radius=0.05 → auto horn_control_freq ≈ 1091.8 Hz

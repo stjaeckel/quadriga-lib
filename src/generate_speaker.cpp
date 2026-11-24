@@ -115,12 +115,23 @@ auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
 MD!*/
 
 // Piston directivity function: 2*J1(x)/x, returns 1.0 at x=0
+// J1 from Abramowitz & Stegun 9.4.4 (x <= 3) and 9.4.6 (x > 3); 2*J1(x)/x within 3e-8; std::cyl_bessel_j is not
+// available in libc++
 static double qd_piston_directivity(double x)
 {
-    double ax = std::abs(x);
-    if (ax < 1.0e-10)
-        return 1.0;
-    return 2.0 * std::cyl_bessel_j(1.0, ax) / ax;
+    const double ax = std::abs(x);
+    if (ax <= 3.0)
+    {
+        const double y = (ax / 3.0) * (ax / 3.0); // 2*J1(x)/x = 2 * (0.5 - 0.56249985 y + ...)
+        return 2.0 * (0.5 + y * (-0.56249985 + y * (0.21093573 + y * (-0.03954289 +
+                      y * (0.00443319 + y * (-0.00031761 + y * 0.00001109))))));
+    }
+    const double y = 3.0 / ax;
+    const double f1 = 0.79788456 + y * (0.00000156 + y * (0.01659667 + y * (0.00017105 +
+                      y * (-0.00249511 + y * (0.00113653 + y * -0.00020033)))));
+    const double t1 = ax - 2.35619449 + y * (0.12499612 + y * (0.00005650 + y * (-0.00637879 +
+                      y * (0.00074348 + y * (0.00079824 + y * -0.00029166)))));
+    return 2.0 * f1 * std::cos(t1) / (ax * std::sqrt(ax));
 }
 
 template <typename dtype>
