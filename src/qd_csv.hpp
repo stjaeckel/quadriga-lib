@@ -47,6 +47,7 @@
 #include <initializer_list>
 #include <limits>
 #include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -597,7 +598,7 @@ inline void write_cell(std::ostream &os, std::string_view t, bool single_column,
     for (char c : t)
     {
         if (c == '\n' || c == '\r')
-            throw std::invalid_argument("qd_csv::write: a cell contains a line break (" + source + ").");
+            throw std::invalid_argument("A cell contains a line break" + (source.empty() ? std::string() : " (" + source + ")") + ".");
         quote = quote || c == ',' || c == ';' || c == '"';
     }
     quote = quote || (!t.empty() && (is_blank(t.front()) || is_blank(t.back()) || t.front() == '#'));
@@ -618,12 +619,21 @@ inline void write_cell(std::ostream &os, std::string_view t, bool single_column,
 }
 } // namespace detail
 
+// Text of one cell as the writer writes it (quoted where the reader would otherwise change it); std::invalid_argument
+// for a line break
+inline std::string format_cell(std::string_view t)
+{
+    std::ostringstream os;
+    detail::write_cell(os, t, false, std::string());
+    return os.str();
+}
+
 // Write the header and the rows as text with LF line ends; throws std::invalid_argument for a cell with a line break,
 // for a table without columns and for a table with one column whose name is empty (its header line would be blank)
 inline void write(std::ostream &os, const table &T)
 {
     if (T.n_cols() == 0 || (T.n_cols() == 1 && T.header[0].empty()))
-        throw std::invalid_argument("qd_csv::write: a table needs a column, and one column needs a name (" + T.source + ").");
+        throw std::invalid_argument("A table needs a column, and one column needs a name (" + T.source + ").");
     const bool single = T.n_cols() == 1;
     for (size_t c = 0; c < T.n_cols(); ++c)
     {

@@ -590,6 +590,18 @@ TEST_CASE("qd_csv - writer: quoting rules and exact text")
     qd_csv::table Y;
     Y.header = {"a\r"};
     CHECK_THROWS_AS(written(Y), std::invalid_argument);
+    CHECK(what([&] { written(X); }) == "A cell contains a line break.");
+    X.source = "mem.csv";
+    CHECK(what([&] { written(X); }) == "A cell contains a line break (mem.csv).");
+    CHECK(what([&] { qd_csv::format_cell("a\nb"); }) == "A cell contains a line break.");
+
+    // The text of one cell as the writer writes it
+    CHECK(qd_csv::format_cell("plain") == "plain");
+    CHECK(qd_csv::format_cell("") == "");
+    CHECK(qd_csv::format_cell("a,b") == "\"a,b\"");
+    CHECK(qd_csv::format_cell("say \"hi\"") == "\"say \"\"hi\"\"\"");
+    CHECK(qd_csv::format_cell(" lead") == "\" lead\"");
+    CHECK(qd_csv::format_cell("#x") == "\"#x\"");
 }
 
 TEST_CASE("qd_csv - writer: number format")
