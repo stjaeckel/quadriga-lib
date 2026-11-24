@@ -141,6 +141,43 @@ namespace quadriga_lib
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN);                                     // Band in [Hz]; NaN = the same array for all bands
 
+    // ---- Tracks: sampling, generation and orientation ----
+
+    // Positions and orientations of one node at the snapshot times
+    // - Without times, each row of the node is one snapshot; with times, a point drop moves along its direction with its speed, and a
+    //   track is interpolated between its rows (linear position, shortest-way interpolation of each angle, ends held)
+    // - Row times come from 'time', else from the arc length and 'speed'; a track with neither throws if times are given
+    // - Orientations are in the GCS; for a node with relative = 1 they include the rotation by the direction of motion
+    void sample_track(
+        const layout_nodes &nodes,           // Nodes
+        arma::uword i_node,                  // Node index, 0-based
+        const arma::vec &times,              // Snapshot times in [s], [n_snap]; empty = one snapshot per row
+        arma::mat &pos,                      // Output: positions in [m], [3, n_snap]
+        arma::mat &orientation,              // Output: orientations (bank, tilt, heading) in [rad] in the GCS, [3, n_snap]
+        arma::uvec *i_row = nullptr);        // Optional output: row (0-based, into the arrays of 'nodes') at or before each snapshot, [n_snap]
+
+    // Replace the rows of nodes by a generated track or by a point drop
+    // - Each node keeps its first position; the call applies to all nodes with the name of a given node (sectors, panels)
+    // - 'point' keeps one row with speed and an explicit horizontal direction; the other types are tracks of equal speed whose
+    //   orientation follows the motion (as set_orientation with force = false does), without direction and time
+    void generate_track(
+        layout_nodes &nodes,                 // Nodes, updated in place
+        const uint_list &i_node,             // Node indices, 0-based
+        const std::string &type,             // "point", "linear", "circular" or "street"
+        double length = 0.0,                 // Length in [m]; 0 = type default; "point": unused
+        double speed = NAN,                  // Speed in [m/s]; NaN = keep the speed of the first row if valid
+        const arma::vec &direction = {},     // Start direction (azimuth) in [rad], [1] or one per index in i_node; empty = uniform random
+        double spacing = NAN,                // Point spacing in [m]; NaN = type default
+        const std::unordered_map<std::string, std::vector<double>> &options = {}, // Options of the type, e.g. {"turn_probability", {0.3}}
+        arma::sword seed = -1);              // Seed of the random draws, -1 = system random device
+
+    // Set the orientation of nodes from their motion, or to a given value
+    void set_orientation(
+        layout_nodes &nodes,                 // Nodes, updated in place
+        const arma::vec &orientation = {},   // [bank, tilt, heading] in [rad]; empty = 0
+        const uint_list &i_node = {},        // Node indices, 0-based; empty = all nodes
+        bool force = false);                 // false: from the motion of tracks plus 'orientation' as offset; true: 'orientation' on all rows
+
 }
 
 #endif

@@ -13,11 +13,16 @@
 // qd_layout_diff_array: first difference between two antenna arrays; numbers within 'tol' times the largest magnitude
 //                    of the member
 // qd_layout_folder:  names of the files in a folder, sorted
+// qd_layout_nodes_from: nodes "N0", "N1", ... (sector 0, generic antenna) with one track each, given as position
+//                    matrices [3, n]; orientation 0, no other member
+// qd_layout_rot:     3x3 rotation matrix of (bank, tilt, heading) in [rad] (library helper calc_rotation_matrix)
+// qd_layout_wrap:    angle in [rad] wrapped to [-pi, pi]
 
 #ifndef QD_TEST_LAYOUT_HPP
 #define QD_TEST_LAYOUT_HPP
 
 #include "quadriga_layout.hpp"
+#include "quadriga_math.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -211,6 +216,47 @@ static inline std::vector<std::string> qd_layout_folder(const std::string &dir)
         f.push_back(e.path().filename().string());
     std::sort(f.begin(), f.end());
     return f;
+}
+
+static inline quadriga_lib::layout_nodes qd_layout_nodes_from(const std::vector<arma::mat> &tracks)
+{
+    quadriga_lib::layout_nodes N;
+    const arma::uword nn = (arma::uword)tracks.size();
+    N.sector.zeros(nn);
+    N.i_antenna.zeros(nn);
+    N.offset.zeros(nn);
+    arma::uword n_row = 0;
+    for (arma::uword i = 0; i < nn; ++i)
+    {
+        N.name.push_back("N" + std::to_string(i));
+        N.offset[i] = n_row;
+        N.pos = arma::join_rows(N.pos, tracks[i]);
+        n_row += tracks[i].n_cols;
+    }
+    N.orientation.zeros(3, n_row);
+    return N;
+}
+
+// One position as [3, 1] matrix
+static inline arma::mat qd_layout_pt(double x, double y, double z)
+{
+    arma::mat p(3, 1);
+    p(0, 0) = x, p(1, 0) = y, p(2, 0) = z;
+    return p;
+}
+
+// R(bank, tilt, heading) as 3x3 matrix
+static inline arma::mat qd_layout_rot(double bank, double tilt, double heading)
+{
+    arma::mat o = {bank, tilt, heading}; // [3, 1]
+    arma::cube O(o.memptr(), 3, 1, 1, true), R;
+    quadriga_lib::calc_rotation_matrix(O, R);
+    return arma::mat(R.memptr(), 3, 3, true); // column-major
+}
+
+static inline double qd_layout_wrap(double a)
+{
+    return std::remainder(a, 2.0 * 3.14159265358979323846);
 }
 
 static inline quadriga_lib::layout qd_layout_build()

@@ -166,4 +166,18 @@ inline bool same_value(double a, double b) { return a == b || (a != a && b != b)
 
 } // namespace qd_layout
 
+// Seed of one random stream of a layout: the 64-bit FNV-1a hash of the 8 bytes of the base seed (least significant byte
+// first) followed by the bytes of the key, with the sign bit cleared. Equal base seeds and keys give equal seeds on all
+// platforms; the keys name the stream, e.g. "track|<node name>"
+static inline arma::sword qd_layout_seed_hash(arma::sword base_seed, const std::string &key)
+{
+    unsigned long long h = 14695981039346656037ULL; // FNV offset basis
+    const unsigned long long s = (unsigned long long)base_seed;
+    for (int i = 0; i < 8; ++i)
+        h = (h ^ ((s >> (8 * i)) & 0xFFULL)) * 1099511628211ULL; // FNV prime
+    for (unsigned char c : key)
+        h = (h ^ c) * 1099511628211ULL;
+    return (arma::sword)(h & 0x7FFFFFFFFFFFFFFFULL);
+}
+
 #endif
