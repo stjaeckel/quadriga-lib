@@ -842,7 +842,7 @@ It is a port of `qd_channel.merge` and `merge_coeff` of QuaDRiGa-NG, renamed aft
 - **LOS:** one LOS path is kept. Its phase, delay and path members come from one source segment, the new one unless its LOS power is 0, then the old one. Its coefficient is scaled so that `|h|² = (1 − w) |h_old|² + w |h_new|²`, using the path gain for rays and the tap power for taps. This deliberately deviates from NG, which mixes the two LOS coefficients linearly: in phase mobility the two segments evaluate the LOS with planar expansions about different reference points, so their phases differ and a coherent mix would fade in the ramp.
 - **GR:** the same rule as LOS if both segments have a GR path; otherwise a `sqrt` ramp of the one that exists.
 
-LOS and GR are identified by the `tap` entry in `par_data` (LOS 0, GR 3 if enabled), which `gbsm_single_link_channel` writes for both output forms. Delays are consistent because stage 3 uses absolute delays internally. The output holds `name`, `center_freq`, positions, orientations, `coeff_re`, `coeff_im` and `delay`, equal `n_rx` and `n_tx`, and valid `is_valid()`. For rays, the path-level members (`path_gain` scaled by the weight, `path_length`, `polmat` scaled by the square root of the weight, `path_angles`, `fbs_pos`, `lbs_pos`) are carried for every kept ray, because each ray keeps its geometry. For taps they are not carried, because a matched tap has no single geometry. `par_data` is not carried. Known NG faults are not ported (section 10.3). It is in the section "Channel functions", and in Python `qd.channel.crossfade_segments`.
+LOS and GR are identified by the `tap` entry in `par_data` (LOS 0, GR 3 if enabled), which `gbsm_single_link_channel` writes for both output forms. Delays are consistent because stage 3 uses absolute delays internally. The output holds `name`, `center_freq`, positions, orientations, `coeff_re`, `coeff_im` and `delay`, equal `n_rx` and `n_tx`, and valid `is_valid()`. For rays, the path-level members (`path_gain` scaled by the weight, `path_length`, `polmat` scaled by the square root of the weight, `path_angles`, `fbs_pos`, `lbs_pos`) are carried for every kept ray, because each ray keeps its geometry. For taps they are not carried, because a matched tap has no single geometry. `par_data` is not carried. The NG faults of section 10.3 are fixed in the port. It is in the section "Channel functions", and in Python `qd.channel.crossfade_segments`.
 
 ## 9. Wrappers
 
@@ -860,7 +860,7 @@ All public functions of section 2.1 get MEX and Python wrappers following the SP
 
 ## 10. QuaDRiGa-NG mapping
 
-This section is informative. The NG integration is a separate later session; this project changes nothing in NG. The mapping shows that the library can carry NG's functions, and which NG faults must not be ported.
+This section is informative. The NG integration is a separate later session; this project changes nothing in NG. The mapping shows that the library can carry NG's functions, and which NG faults the port fixes.
 
 ### 10.1 `qd_layout`
 
@@ -895,7 +895,9 @@ This section is informative. The NG integration is a separate later session; thi
 | `get_subtrack`, `correct_overlap` | `get_gbsm_channels` | Rewrite |
 | `checksum`, `copy` | | NG only; a cache uses its own revision |
 
-### 10.3 NG faults that must not be ported
+### 10.3 NG faults fixed in the port
+
+The library implementation does not copy these faults; it implements the intended behaviour, and the tests of the affected functions cover it. NG itself is not changed in this project.
 
 From reading the NG source, not run:
 
@@ -931,7 +933,7 @@ Each package runs these steps in order; agents run one after another, so each bu
 
 1. **Implement** (one agent): the package's sections of this plan, the SPEC documents, and the code it builds on. It writes tests first, implements, runs the affected tests, and reports what it did and every deviation.
 2. **Review** (one independent agent, or two focused ones for WP7 and WP10, one on the code and one on the physics): it receives the package's plan sections and the diff, not the implementer's reasoning, and works in its own scratch space. It reports bugs and also answers: Can the implementation be made less complex? Which requirement leads to the most complex code, and how would relaxing it lead to a leaner design? Which tests are too strict or too loose (for example bit-identical results versus reasonable numerical bounds)?
-3. **Fix**: the implementer, or the manager for small items, fixes what needs no decision. A finding that would change the interface, a decision of section 1.3, or a TR value is not fixed but recorded for the maintainer.
+3. **Fix**: the implementer, or the manager for small items, fixes what needs no decision. This includes small faults in existing library functions that the work exposes (a wrong result, a crash, a missing check), each fixed test-first in its own commit before the package's commit. Structural changes need the maintainer's OK and are recorded, not made: a change of an existing interface, a decision of section 1.3, model behaviour or a TR value, or a redesign of an existing function.
 4. **Commit** after the full suite passes.
 
 Model and effort per role (maximum Opus at high effort):
