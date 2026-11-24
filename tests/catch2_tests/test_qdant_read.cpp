@@ -506,3 +506,34 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed layout values")
     CHECK(layout.n_cols == 2);
     std::remove(fn.c_str());
 }
+
+// A file that cannot be opened or parsed throws std::runtime_error that names the file
+TEST_CASE("Arrayant reading from QDANT file - Errors of the file name the file")
+{
+    auto msg = [](const std::string &fn)
+    {
+        try
+        {
+            quadriga_lib::qdant_read<double>(fn, {1});
+        }
+        catch (const std::runtime_error &e)
+        {
+            return std::string(e.what());
+        }
+        catch (const std::exception &e)
+        {
+            return std::string("other: ") + e.what();
+        }
+        return std::string("no exception");
+    };
+    const std::string missing = "test_qdant_read_missing_7.qdant";
+    CHECK_THAT(msg(missing), Catch::Matchers::ContainsSubstring("'" + missing + "'"));
+    const std::string broken = "test_qdant_read_broken_7.qdant", other = "test_qdant_read_other_7.qdant";
+    std::ofstream(broken) << "<qdant><arrayant>";
+    std::ofstream(other) << "<other></other>";
+    CHECK_THAT(msg(broken), Catch::Matchers::ContainsSubstring("'" + broken + "'"));
+    CHECK_THAT(msg(other), Catch::Matchers::ContainsSubstring("'" + other + "'"));
+    CHECK_THAT(msg(""), Catch::Matchers::StartsWith("Cannot read the QDANT file"));
+    std::remove(broken.c_str());
+    std::remove(other.c_str());
+}

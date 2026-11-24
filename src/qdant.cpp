@@ -1102,8 +1102,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
 ## Notes:
 - **IDs**: the number used in the layout matrix and by [[qdant_write]]. A first entry without an `id` attribute (files
   from other tools) counts as ID 1
-- **Exceptions**: `std::invalid_argument` if an ID is 0 or the file has no entry with it; `std::runtime_error` for a
-  missing, unreadable or malformed file
+- **Exceptions**: `std::invalid_argument` if an ID is 0 or the file has no entry with it; `std::runtime_error` naming
+  the file for a missing, unreadable or malformed file
 - **Elements without data**: elements without pattern nodes read as zeros. A file whose element count is not backed by
   its data, or that exceeds the [reader limits](formats.html#qdant), throws
 
@@ -1123,7 +1123,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(const std::s
     arma::Mat<unsigned> file_layout;
     std::string error_message = qd_qdant_open(fn, doc, &node_qdant, &pfx, &file_layout);
     if (!error_message.empty())
-        throw std::runtime_error(error_message);
+        throw std::runtime_error("Cannot read the QDANT file '" + fn + "': " + error_message);
 
     // IDs to read: the given ones, or the unique non-zero IDs of the layout in order of first appearance
     const bool read_all = ids.n_elem == 0;
