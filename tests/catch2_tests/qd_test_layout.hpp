@@ -10,6 +10,9 @@
 // qd_layout_diff:    first difference between two layouts (empty string if equal); numbers within 'tol'
 // qd_layout_build:   Tx: site "BS1" with sectors 0 and 1 (one position, orientations 0 and 120 deg), site "BS2" with
 //                    one row; Rx: terminal "UT1" with a three-row track, "UT2" a point drop with speed and direction
+// qd_layout_diff_array: first difference between two antenna arrays; numbers within 'tol' times the largest magnitude
+//                    of the member
+// qd_layout_folder:  names of the files in a folder, sorted
 
 #ifndef QD_TEST_LAYOUT_HPP
 #define QD_TEST_LAYOUT_HPP
@@ -170,6 +173,44 @@ static inline std::string qd_layout_diff(const quadriga_lib::layout &a, const qu
     if (!qd_layout_same_int(a.pairing, b.pairing))
         return "pairing";
     return "";
+}
+
+template <class T>
+static inline bool qd_layout_same_data(const T &a, const T &b, double tol)
+{
+    if (arma::size(a) != arma::size(b))
+        return false;
+    if (a.n_elem == 0)
+        return true;
+    return arma::approx_equal(a, b, "absdiff", tol * std::max(arma::abs(a).max(), arma::abs(b).max()));
+}
+
+// First difference of two arrays ("" = equal): grids, patterns, element positions, port weights, center frequency
+static inline std::string qd_layout_diff_array(const quadriga_lib::arrayant<double> &a, const quadriga_lib::arrayant<double> &b, double tol = 0.0)
+{
+    if (a.n_elements() == 0 || b.n_elements() == 0)
+        return a.n_elements() == b.n_elements() ? "" : "n_elements";
+    if (!qd_layout_same_data(a.azimuth_grid, b.azimuth_grid, tol) || !qd_layout_same_data(a.elevation_grid, b.elevation_grid, tol))
+        return "grid";
+    if (!qd_layout_same_data(a.e_theta_re, b.e_theta_re, tol) || !qd_layout_same_data(a.e_theta_im, b.e_theta_im, tol) ||
+        !qd_layout_same_data(a.e_phi_re, b.e_phi_re, tol) || !qd_layout_same_data(a.e_phi_im, b.e_phi_im, tol))
+        return "pattern";
+    if (!qd_layout_same_data(a.element_pos, b.element_pos, tol))
+        return "element_pos";
+    if (!qd_layout_same_data(a.port_weights_re, b.port_weights_re, tol) || !qd_layout_same_data(a.port_weights_im, b.port_weights_im, tol))
+        return "port_weights";
+    if (std::abs(a.center_freq - b.center_freq) > tol * std::abs(a.center_freq))
+        return "center_freq";
+    return "";
+}
+
+static inline std::vector<std::string> qd_layout_folder(const std::string &dir)
+{
+    std::vector<std::string> f;
+    for (const auto &e : std::filesystem::directory_iterator(dir))
+        f.push_back(e.path().filename().string());
+    std::sort(f.begin(), f.end());
+    return f;
 }
 
 static inline quadriga_lib::layout qd_layout_build()

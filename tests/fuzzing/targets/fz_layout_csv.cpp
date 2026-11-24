@@ -6,6 +6,7 @@
 // with a valid file of the other side (so that the pairing, the shared antenna list and the band rules of two files are
 // reached), without and with a given frequency list. A layout that reads must be valid; it is written (compact and with
 // every cell) and read again, and all members that the files hold must be the same (angles within their 15 digits).
+// The antennas are not evaluated: arbitrary panel sizes would make single runs slow or exhaust the memory.
 
 #include "fuzz_target.hpp"
 #include "quadriga_layout.hpp"
@@ -42,7 +43,7 @@ static void check(const std::string &fn_tx, const std::string &fn_rx, const arma
     fz::clean([&]
               {
         std::vector<std::string> extra_tx, extra_rx;
-        L = quadriga_lib::layout_csv_read(fn_tx, fn_rx, freq, true, &extra_tx, &extra_rx);
+        L = quadriga_lib::layout_csv_read(fn_tx, fn_rx, freq, false, &extra_tx, &extra_rx);
         read = true; });
     if (!read)
         return;
@@ -62,7 +63,7 @@ static void check(const std::string &fn_tx, const std::string &fn_rx, const arma
         quadriga_lib::layout M;
         try
         {
-            M = quadriga_lib::layout_csv_read(tx, rx);
+            M = quadriga_lib::layout_csv_read(tx, rx, {}, false);
         }
         catch (const std::exception &)
         {

@@ -86,37 +86,60 @@ namespace quadriga_lib
         layout_links links;                               // Link states of the current realisation
         arma::sword seed = -1;                            // Layout seed, -1 = not set
         arma::vec center_freq;                            // Simulation frequencies in [Hz], strictly ascending, [n_freq]
-        std::vector<std::vector<arrayant<double>>> antenna;      // Evaluated antennas, [n_antenna][1 or n_freq]; empty = not evaluated
+        std::vector<std::vector<arrayant<double>>> antenna;      // Evaluated antennas, [n_antenna][0, 1 or n_freq]; empty = not evaluated
         std::vector<std::string> antenna_cols;                   // Names of the antenna columns, [n_col]
-        std::vector<std::vector<std::string>> antenna_args;      // CSV lines of the antenna columns, [n_antenna][0, 1 or n_freq]
+        std::vector<std::vector<std::string>> antenna_args;      // CSV lines of the antenna columns, [n_antenna][0, 1 or n_freq]; "" = evaluated array
         arma::mat wrap;                                   // Lattice vectors in [m], one per column, [2, 1] or [2, 2]; empty = none
         arma::umat pairing;                               // Tx site index and Rx terminal index of each linked pair, 0-based, [2, n_pair]; empty = all pairs
 
         arma::uword n_antenna() const;                    // Length of antenna_args, or of antenna if there are no arguments
+        void eval_antennas(const arma::vec &center_freq = {}); // Generates 'antenna' from 'antenna_args'; a given list in [Hz] replaces center_freq
         std::string is_valid() const;                     // Empty string if valid, else an error message
     };
 
     // Read the Tx and Rx CSV files of a layout
     // - Either file name may be "" for no nodes on that side
     // - Antenna columns are composed into antenna_args, antenna_cols and i_antenna; equal descriptions share one entry
-    // - The antennas are not evaluated yet: the argument 'eval_antennas' is accepted and ignored, antenna stays empty
+    // - With eval_antennas, the arrays are generated as by layout.eval_antennas()
     layout layout_csv_read(
         const std::string &fn_tx,                         // Tx CSV file, "" = no Tx nodes
         const std::string &fn_rx,                         // Rx CSV file, "" = no Rx nodes
         const arma::vec &center_freq = {},                // Simulation frequencies in [Hz]; empty = from the files
-        bool eval_antennas = true,                        // Currently ignored
+        bool eval_antennas = true,                        // true: generate the antennas; false: antenna stays empty
         std::vector<std::string> *extra_tx = nullptr,     // Optional output: names of unknown Tx columns
         std::vector<std::string> *extra_rx = nullptr);    // Optional output: names of unknown Rx columns
 
     // Write a layout to the Tx and Rx CSV files
     // - Either file name may be "" for not written; all files are composed and written to temporary files first, and
     //   only then are the existing files replaced
-    // - Antennas that have no CSV description cannot be written yet
+    // - Antenna bands that are evaluated arrays without text go to QDANT files <stem>_<k>.qdant next to the CSV file;
+    //   such files that the new CSV files do not reference are deleted
     void layout_csv_write(
         const std::string &fn_tx,                         // Tx CSV file, "" = not written
         const std::string &fn_rx,                         // Rx CSV file, "" = not written
         const layout &layout,                             // Layout
         bool compact = true);                             // true: empty cells where the format allows; false: every cell written
+
+    // Set the antenna of nodes from the arguments of generate_antenna; the layout stores them as an antenna line
+    // - Argument names as in generate_antenna; a name that the type does not use throws
+    // - With a center_freq, only that band is set, in a new antenna entry if others share the old one; a frequency
+    //   that is not in layout.center_freq is added
+    void set_antenna(
+        layout &layout,                                                // Layout, updated in place
+        const std::string &type,                                       // Antenna type of generate_antenna, or "none"
+        const std::unordered_map<std::string, arma::mat> &args = {},   // Arguments by name, e.g. {"panel", {4, 4, 1, 2}}; flags 0 or 1
+        bool rx_side = false,                                          // false: Tx nodes, true: Rx nodes
+        const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
+        double center_freq = NAN,                                      // Band in [Hz]; NaN = one antenna for all bands
+        bool evaluate = true);                                         // true: generate all antennas that are not evaluated yet
+
+    // Set the antenna of nodes from an evaluated array, e.g. a measurement read with qdant_read
+    void set_antenna(
+        layout &layout,                                                // Layout, updated in place
+        const arrayant<double> &array,                                 // Single-frequency array
+        bool rx_side = false,                                          // false: Tx nodes, true: Rx nodes
+        const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
+        double center_freq = NAN);                                     // Band in [Hz]; NaN = the same array for all bands
 
 }
 

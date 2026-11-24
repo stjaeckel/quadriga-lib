@@ -16,6 +16,7 @@
 #include "quadriga_layout.hpp"
 #include "qd_csv.hpp"
 
+#include <array>
 #include <map>
 #include <string>
 #include <string_view>
@@ -34,7 +35,8 @@ enum : unsigned
     t_multibeam = 16,
     t_device = 32,   // 3GPP-UT, 3GPP-CPE
     t_qdant = 64,    // the antenna is read from a QDANT file
-    t_all = 127
+    t_all = 127,     // the types above
+    t_none = 128     // 'none': no antenna (i_antenna = 0); takes no other antenna column
 };
 
 // The arguments of generate_antenna that have a column: name, kind of value, generator types that use it. A new
@@ -101,6 +103,22 @@ unsigned antenna_type_mask(const std::string &type);
 // The cells of an antenna line (CSV text of the antenna columns of a layout) as text
 std::vector<std::string> split_antenna_line(const std::string &line, size_t n_cols);
 
+// Cells of an antenna line by column, index = column id - c_center_freq
+using antenna_cells = std::array<std::string, n_antenna_col>;
+
+// The cells of a line of the antenna columns 'cols' (names), and the line of cells for 'cols'
+antenna_cells parse_antenna_line(const std::string &line, const std::vector<std::string> &cols);
+std::string join_antenna_line(const antenna_cells &cells, const std::vector<std::string> &cols);
+
+// Names of the antenna columns that some cell of the lines uses, in the order of the table; 'extra' are cells of lines
+// still to come
+std::vector<std::string> used_antenna_cols(const std::vector<std::vector<std::string>> &args, const std::vector<std::string> &cols,
+                                           const std::vector<antenna_cells> &extra = {});
+
+// The lines of 'args' rewritten from the columns 'cols' to 'new_cols'
+void rewrite_antenna_lines(std::vector<std::vector<std::string>> &args, const std::vector<std::string> &cols,
+                           const std::vector<std::string> &new_cols);
+
 // Number of a cell of column 'id' in class units; throws std::runtime_error with the file, line and column if the cell
 // is not a number of the column or outside its range. Integer columns need integer values
 double cell_number(const qd_csv::table &T, size_t row, size_t col, int id);
@@ -112,6 +130,11 @@ long long cell_int64(const qd_csv::table &T, size_t row, size_t col, int id);
 // the columns are used by the type, the cells have the syntax of their kind. 'ci' gives the column of T for each
 // column id, -1 = not in T
 void check_antenna_cells(const qd_csv::table &T, size_t row, const int *ci);
+
+// layout::eval_antennas, with the description of each node in the messages ('where_tx', 'where_rx': one text per
+// node, e.g. with file and line; nullptr = "Tx node '<name>', sector <s>")
+void eval_antennas(quadriga_lib::layout &L, const arma::vec &center_freq, const std::vector<std::string> *where_tx,
+                   const std::vector<std::string> *where_rx);
 
 // True if two frequencies are equal within a relative 1e-6
 inline bool same_freq(double a, double b) { return std::abs(a - b) <= 1.0e-6 * std::max(std::abs(a), std::abs(b)); }

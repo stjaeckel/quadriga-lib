@@ -9,8 +9,8 @@
 //
 // Oracles: CSV texts and the values they must give, typed by hand from the column rules; angles are 'deg' times
 // pi / 180; antenna lines and the file text of the writer are typed by hand. The round trips use the reader and the
-// writer against each other (the supporting function is the other one, checked by the typed cases). Antennas are not
-// evaluated by the reader, so no antenna array is built here.
+// writer against each other (the supporting function is the other one, checked by the typed cases). The layouts are
+// read without evaluating the antennas (test_set_antenna.cpp covers the evaluation), so no antenna array is built here.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -33,7 +33,7 @@ quadriga_lib::layout read_text(const qd_layout_files &dir, const std::string &tx
                                std::vector<std::string> *extra_tx = nullptr, std::vector<std::string> *extra_rx = nullptr)
 {
     const std::string fn_tx = tx.empty() ? "" : dir.write("tx.csv", tx), fn_rx = rx.empty() ? "" : dir.write("rx.csv", rx);
-    return quadriga_lib::layout_csv_read(fn_tx, fn_rx, freq, true, extra_tx, extra_rx);
+    return quadriga_lib::layout_csv_read(fn_tx, fn_rx, freq, false, extra_tx, extra_rx);
 }
 
 bool has(const std::string &text, const std::string &part) { return text.find(part) != std::string::npos; }
@@ -109,7 +109,7 @@ TEST_CASE("layout_csv_read - one side only, empty files and column order")
     const quadriga_lib::layout Lr = read_text(dir, "", basic_rx);
     CHECK(Lr.tx.n_node() == 0);
     CHECK(qd_layout_diff_nodes(Lr.rx, L.rx, 0.0) == "");
-    CHECK(quadriga_lib::layout_csv_read("", "").tx.n_node() == 0);
+    CHECK(quadriga_lib::layout_csv_read("", "", {}, false).tx.n_node() == 0);
 
     // A file with a header only has no nodes
     const quadriga_lib::layout Le = read_text(dir, "name,x,y,z\n", "# a comment\nname,x,y,z\n\n");
@@ -298,7 +298,7 @@ TEST_CASE("layout_csv_read - antenna columns")
     CHECK(L.antenna.empty());
     CHECK(L.is_valid() == "");
 
-    // Antennas are not evaluated by the reader yet, with or without the flag
+    // Read again: the same lists
     const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false);
     CHECK(qd_layout_diff(L, L2) == "");
 
@@ -347,7 +347,7 @@ TEST_CASE("layout_csv_read - QDANT files are named relative to the CSV file")
     std::filesystem::create_directories(dir.path("b"));
     const std::string tx = dir.write("a/tx.csv", "name,x,y,z,antenna,qdant_file,qdant_id\nBS,0,0,25,qdant,../ants.qdant,2\nBS2,1,0,25,qdant,ants.qdant,\n");
     const std::string rx = dir.write("b/rx.csv", "name,x,y,z,antenna,qdant_file\nUT,0,0,1.5,qdant,ants.qdant\nUT2,0,0,1.5,qdant,\"../a/../ants.qdant\"\n");
-    const quadriga_lib::layout L = quadriga_lib::layout_csv_read(tx, rx);
+    const quadriga_lib::layout L = quadriga_lib::layout_csv_read(tx, rx, {}, false);
     const std::string cwd = std::filesystem::current_path().string() + "/";
     const std::string root = cwd + dir.dir + "/";
     CHECK(L.antenna_cols == std::vector<std::string>{"antenna", "qdant_file", "qdant_id"});
@@ -563,13 +563,13 @@ TEST_CASE("layout_csv_write - antennas, bands and shared values")
                                 "UT2,-50,70,1.5,45,120,1.5,UMa,1,\n");
 
     // The text reads back to the same layout; the frequencies of the declaration are the list, and its antenna is one line
-    const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"));
+    const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false);
     CHECK(qd_layout_diff(L, L2) == "");
     CHECK(arma::approx_equal(L2.center_freq, arma::vec{3.5e9, 28e9}, "absdiff", 0.0));
 
     // With every cell written the result is the same
     quadriga_lib::layout_csv_write(dir.path("tx2.csv"), dir.path("rx2.csv"), L, false);
-    CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("tx2.csv"), dir.path("rx2.csv"))) == "");
+    CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("tx2.csv"), dir.path("rx2.csv"), {}, false)) == "");
 
     // A frequency that an antenna line carries is not declared again
     quadriga_lib::layout L3 = L;
@@ -578,7 +578,7 @@ TEST_CASE("layout_csv_write - antennas, bands and shared values")
     quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L3);
     CHECK(has(dir.read("tx.csv"), "\nBS1,0,10,10,25,,30,5,3,0.2,\"100,0;0,200\",7,5,3.5e9,3gpp,\"4,4,1,2\",\"a,b\"\nBS1,0,,,,,,,,,,,,28e9,3gpp,\"8,8,1,4\",\n"));
     CHECK(has(dir.read("rx.csv"), ",UMa,,,dipole\n") == false);
-    CHECK(qd_layout_diff(L3, quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"))) == "");
+    CHECK(qd_layout_diff(L3, quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false)) == "");
 
     // QDANT files are written relative to the folder of the CSV file
     quadriga_lib::layout L4 = qd_layout_build();
@@ -589,8 +589,8 @@ TEST_CASE("layout_csv_write - antennas, bands and shared values")
     std::filesystem::create_directories(dir.path("t"));
     quadriga_lib::layout_csv_write(dir.path("t/tx.csv"), "", L4);
     CHECK(has(dir.read("t/tx.csv"), "qdant,../q/ants.qdant,2"));
-    CHECK(qd_layout_diff_nodes(quadriga_lib::layout_csv_read(dir.path("t/tx.csv"), "").tx, L4.tx, 0.0) == "");
-    CHECK(quadriga_lib::layout_csv_read(dir.path("t/tx.csv"), "").antenna_args == L4.antenna_args);
+    CHECK(qd_layout_diff_nodes(quadriga_lib::layout_csv_read(dir.path("t/tx.csv"), "", {}, false).tx, L4.tx, 0.0) == "");
+    CHECK(quadriga_lib::layout_csv_read(dir.path("t/tx.csv"), "", {}, false).antenna_args == L4.antenna_args);
 }
 
 TEST_CASE("layout_csv_write - an extra sector with the default value")
@@ -605,7 +605,7 @@ TEST_CASE("layout_csv_write - an extra sector with the default value")
     for (bool compact : {true, false})
     {
         quadriga_lib::layout_csv_write(dir.path("tx.csv"), "", L, compact);
-        CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("tx.csv"), "")) == "");
+        CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("tx.csv"), "", {}, false)) == "");
     }
     quadriga_lib::layout_csv_write(dir.path("tx.csv"), "", L);
     CHECK(has(dir.read("tx.csv"), "\nBS1,0,10,10,25,5,10,30\nBS1,1,10,10,25,0,0,150\n"));
@@ -620,7 +620,7 @@ TEST_CASE("layout_csv_write - pairing")
     quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L);
     CHECK(has(dir.read("rx.csv"), "name,x,y,z,heading,direction_az,speed,pairing\nUT1,100,200,1.5,,,,BS2\n"));
     CHECK(has(dir.read("rx.csv"), "UT2,-50,70,1.5,45,120,1.5,\"BS1,BS2\"\n"));
-    CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"))) == "");
+    CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false)) == "");
     // A terminal without a pair cannot be written, because an empty cell means all sites
     L.pairing = arma::umat(arma::uvec{1, 0});
     CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L); }), "Terminal 'UT2' has no entry in 'pairing'"));
@@ -647,7 +647,7 @@ TEST_CASE("layout_csv_read - read, write and read again")
         const quadriga_lib::layout L = read_text(dir, tx, rx);
         REQUIRE(L.is_valid() == "");
         quadriga_lib::layout_csv_write(dir.path("tx_w.csv"), dir.path("rx_w.csv"), L, compact);
-        const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx_w.csv"), dir.path("rx_w.csv"));
+        const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx_w.csv"), dir.path("rx_w.csv"), {}, false);
         CHECK(qd_layout_diff(L, L2) == "");
         // The second cycle gives the same text
         const std::string text_tx = dir.read("tx_w.csv"), text_rx = dir.read("rx_w.csv");
@@ -684,7 +684,7 @@ TEST_CASE("layout_csv_write - files are replaced as a whole")
     M.rx.scenario[1] = "";
     quadriga_lib::layout M2 = L;
     M2.tx.scenario = {"UMa", "UMa", "UMi"};
-    M2.tx.i_antenna = {1, 1, 0}; // Antenna 1 has no CSV description
+    M2.tx.i_antenna = {1, 1, 0}; // Antenna 1 has neither a CSV description nor an array
     M2.antenna.resize(1);
     M2.antenna[0].resize(1);
     M2.antenna_args.clear();
@@ -694,7 +694,7 @@ TEST_CASE("layout_csv_write - files are replaced as a whole")
     CHECK(files() == expect);
     CHECK(dir.read("tx.csv") == tx);
     CHECK(dir.read("rx.csv") == rx);
-    CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), M2); }), "has no CSV description"));
+    CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), M2); }), "neither an antenna line nor an evaluated array"));
     CHECK(dir.read("tx.csv") == tx);
 
     // Failure while writing the Rx file: the Tx file is not replaced and no temporary file stays
@@ -723,12 +723,12 @@ TEST_CASE("layout_csv_read - file syntax of the CSV unit applies")
     // The writer quotes what needs it
     quadriga_lib::layout_csv_write(dir.path("w.csv"), "", L);
     CHECK(has(dir.read("w.csv"), "\nBS1,1,2,3,\"a;b, \"\"c\"\"\"\nBS2,4,5,6,\n"));
-    CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("w.csv"), "")) == "");
+    CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("w.csv"), "", {}, false)) == "");
     // A name that starts with '#'
     quadriga_lib::layout M = qd_layout_build();
     M.rx.name = {"#UT1", "#UT2"};
     quadriga_lib::layout_csv_write("", dir.path("w.csv"), M);
-    CHECK(qd_layout_diff_nodes(quadriga_lib::layout_csv_read("", dir.path("w.csv")).rx, M.rx, 0.0) == "");
+    CHECK(qd_layout_diff_nodes(quadriga_lib::layout_csv_read("", dir.path("w.csv"), {}, false).rx, M.rx, 0.0) == "");
     // Unknown columns of the layout must not repeat a column of the format
     M.rx.extra_names = {"x"};
     M.rx.extra = {{"1", "2", "3", "4"}};
@@ -766,13 +766,13 @@ TEST_CASE("layout_csv_read - input validation")
 {
     qd_layout_files dir("validation_read");
     const std::string tx = dir.write("tx.csv", basic_tx), rx = dir.write("rx.csv", basic_rx);
-    REQUIRE(qd_layout_throws([&] { quadriga_lib::layout_csv_read(tx, rx); }).empty());
+    REQUIRE(qd_layout_throws([&] { quadriga_lib::layout_csv_read(tx, rx, {}, false); }).empty());
     {
-        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(dir.path("missing.csv"), ""); }), "Cannot open file"));
-        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(dir.dir, ""); }), "it is a folder"));
-        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("empty.csv", "")); }), "there is no header line"));
-        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("dup.csv", "name,x,y,z,x\nA,0,0,0,0\n")); }), "used twice"));
-        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("long.csv", "name,x,y,z\nA,0,0,0,0\n")); }), "the row has 5 cells"));
+        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(dir.path("missing.csv"), "", {}, false); }), "Cannot open file"));
+        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(dir.dir, "", {}, false); }), "it is a folder"));
+        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("empty.csv", ""), {}, false); }), "there is no header line"));
+        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("dup.csv", "name,x,y,z,x\nA,0,0,0,0\n"), {}, false); }), "used twice"));
+        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("long.csv", "name,x,y,z\nA,0,0,0,0\n"), {}, false); }), "the row has 5 cells"));
         CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(tx, rx, arma::vec{2e9, 1e9}); }), "Input 'center_freq' must be strictly ascending"));
         CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(tx, rx, arma::vec{-1.0}); }), "Input 'center_freq' must be finite and positive"));
         CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(tx, rx, arma::vec{NaN}); }), "Input 'center_freq'"));
@@ -798,12 +798,13 @@ TEST_CASE("layout_csv_write - input validation")
         M = L;
         M.tx.i_antenna = {1, 0, 0, 0};
         CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_write(dir.path("a.csv"), dir.path("b.csv"), M); }), "i_antenna"));
-        // An extra sector cannot have no antenna if sector 0 has one
+        // An extra sector without antenna next to a sector 0 with one is written as 'none' (test_set_antenna.cpp)
         M = L;
         M.antenna_cols = {"antenna"};
         M.antenna_args = {{"omni"}};
         M.tx.i_antenna = {1, 0, 1, 0};
-        CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_write(dir.path("a.csv"), dir.path("b.csv"), M); }), "has no antenna, but sector 0"));
+        quadriga_lib::layout_csv_write(dir.path("n_tx.csv"), dir.path("n_rx.csv"), M);
+        CHECK(qd_layout_diff(M, quadriga_lib::layout_csv_read(dir.path("n_tx.csv"), dir.path("n_rx.csv"), {}, false)) == "");
         // A name with a line break is not valid
         M = L;
         M.rx.name[0] = "U\nT";
@@ -1048,7 +1049,7 @@ TEST_CASE("layout_csv_read - seeds are 64-bit integers")
     CHECK(L.tx.seed[1] == (1LL << 62) + 1);
     quadriga_lib::layout_csv_write(dir.path("w.csv"), "", L);
     CHECK(has(dir.read("w.csv"), "\nA,0,0,0,9007199254740993,4611686018427387904\nB,1,0,0,4611686018427387905,\n"));
-    const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("w.csv"), "");
+    const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("w.csv"), "", {}, false);
     CHECK(L2.seed == (1LL << 62));
     CHECK(L2.tx.seed[0] == (1LL << 53) + 1);
     CHECK(L2.tx.seed[1] == (1LL << 62) + 1);
@@ -1060,7 +1061,7 @@ TEST_CASE("layout_csv_read - seeds are 64-bit integers")
     quadriga_lib::layout_csv_write(dir.path("w.csv"), "", M);
     CHECK(has(dir.read("w.csv"), "9007199254740993"));
     CHECK(has(dir.read("w.csv"), "9223372036854775807"));
-    const quadriga_lib::layout M2 = quadriga_lib::layout_csv_read(dir.path("w.csv"), "");
+    const quadriga_lib::layout M2 = quadriga_lib::layout_csv_read(dir.path("w.csv"), "", {}, false);
     CHECK(M2.seed == M.seed);
     CHECK(arma::all(M2.tx.seed == M.tx.seed));
 

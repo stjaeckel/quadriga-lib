@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -34,7 +35,7 @@ Read the Tx and Rx CSV files of a layout
 - Columns, the meaning of empty cells, antenna columns and bands are described at the top of this section. Antenna columns are composed into `antenna_cols`, `antenna_args` and `i_antenna`; equal descriptions share one entry, Tx nodes first. A relative `qdant_file` is resolved against the folder of the CSV file and stored as a normalised absolute path
 - Simulation frequencies: the argument, else the `center_freq` values of the Tx file, else those of the Rx file; a node with bands must define all of them, and the values in the files must match the argument within a relative 1e-6
 - Unknown columns are kept and reported; a column in the wrong file (e.g. `pairing` in the Tx file), a value outside its range, an antenna column that the antenna type does not use and every violation of the rules above throw `std::runtime_error` with the file name, line and column; so does a terminal whose empty `pairing` cell leaves it without a pair, a first band without antenna cells next to a later band with antenna cells, and a layout that is not valid ([[layout]]), e.g. a name with a comma or a node with one row, `relative` = 1 and no direction
-- The antennas are not evaluated by this version: `antenna` stays empty and the generic antenna of two co-located polarized isotropic elements is used
+- With `eval_antennas`, the arrays `antenna` are generated as `layout.eval_antennas()` does ([[layout]]); a line that [[generate_antenna]] rejects, a QDANT file that cannot be read and an array spaced in wavelengths in a layout without frequencies throw `std::runtime_error`
 
 ## Declaration:
 ```
@@ -50,7 +51,7 @@ quadriga_lib::layout quadriga_lib::layout_csv_read(
 ## Inputs:
 - **`fn_tx`**, **`fn_rx`** — Tx and Rx CSV files; "" = no nodes on that side
 - **`center_freq`** *(optional)* — Simulation frequencies in [Hz], strictly ascending and positive; empty = from the files; `[n_freq]`
-- **`eval_antennas`** *(optional)* — Reserved for the evaluation of the antennas; has no effect in this version
+- **`eval_antennas`** *(optional)* — `true`: generate the antennas; `false`: `antenna` stays empty, `antenna_args` and `i_antenna` are kept, and the nodes use the generic antenna of two co-located polarized isotropic elements until `layout.eval_antennas()` is called
 
 ## Outputs:
 - **`extra_tx`**, **`extra_rx`** *(optional)* — Names of the unknown columns of the Tx and Rx file, in file order; written only if the call succeeds
@@ -71,8 +72,9 @@ Write a layout to the Tx and Rx CSV files
 - Writes only columns with content other than the default, in the order of the format, unknown columns last; angles in degrees, numbers with up to 15 significant digits (16 or 17 where 15 do not read back); reading the files gives the same layout within these digits, except for `name` and `links`, which are not stored
 - With `compact` the cells that the reader repeats from the previous row of the node (held values) or sets to the default (fixed values, which are written on the first row only) are left empty; an extra sector (sector above 0 of a site that has a sector 0) has all its cells in its first row, because an empty cell would be the value of sector 0
 - Antennas are written as their CSV lines, with each `qdant_file` relative to the folder of its CSV file. If no antenna line carries the frequencies of the layout, they are declared on the first node: `center_freq` on its first row and one band row per further frequency
-- All files are composed first and written to temporary files next to the targets; each target is replaced by a rename only after all files were composed and written, so an error in the layout, the composition or the writing leaves all files unchanged (a failing rename of the second file is not undone for the first). A layout whose antennas have no CSV description cannot be written in this version
-- The `seed`, `layout_seed` and `wrap` of the layout are stored in the Tx file; a Tx file for a layout without Tx nodes that has them throws. Not expressible in the format and therefore rejected: a scenario that returns to none after a scenario was set, a terminal without a pair in `pairing` (an empty cell means all sites), an extra sector without antenna next to a sector 0 with one
+- All files are composed first and written to temporary files next to the targets; each target is replaced by a rename only after all files were composed and written, so an error in the layout, the composition or the writing leaves all files unchanged (a failing rename of the second file is not undone for the first)
+- Antenna bands that are evaluated arrays without a line (set with the array form of [[set_antenna]]) are written to QDANT files next to the first written CSV file that uses the antenna, named `<stem>_<k>.qdant` (`<stem>` is the name of the CSV file without `.csv`, k = 1, 2, ... per CSV file, skipping names that `qdant` lines of the layout use), one file per antenna with one entry per exported band, and become `qdant` lines. Afterwards, the files `<stem>_<k>.qdant` next to a written CSV file that the new files do not reference are deleted; files of other names are never touched. These arrays must be evaluated: a layout whose `antenna` does not hold them throws
+- The `seed`, `layout_seed` and `wrap` of the layout are stored in the Tx file; a Tx file for a layout without Tx nodes that has them throws. Not expressible in the format and therefore rejected: a scenario that returns to none after a scenario was set, a terminal without a pair in `pairing` (an empty cell means all sites). An extra sector without antenna next to a sector 0 with one is written with the antenna `none`
 
 ## Declaration:
 ```
@@ -454,10 +456,19 @@ long qd_find_band(const std::vector<double> &F, double f)
 
 // Final antenna lines of one node: empty = no antenna of its own. The lines have the antenna cells of the node, one
 // per band (or one without a frequency), in the order of the frequency list.
-std::vector<acells> qd_node_lines(const side_data &S, size_t n, const std::vector<double> &F, const char *side)
+std::vector<acells> qd_node_lines(const side_data &S, size_t n, const std::vector<double> &F, const char *side, bool *none)
 {
     const std::vector<band_cells> &B = S.bands[n];
     const std::string where = S.fn + ", node '" + S.F.name[n] + "': ";
+    *none = B[0].content && B[0].cells[c_antenna - c_center_freq] == "none";
+    if (*none) // No antenna in all bands; band rows may declare frequencies, but not antennas
+    {
+        for (size_t b = 1; b < B.size(); ++b)
+            if (B[b].content)
+                throw std::runtime_error(S.fn + ", line " + std::to_string(S.first_line[n]) + ": the node '" + S.F.name[n] +
+                                         "' has the antenna 'none', which applies to all bands, but a band row has antenna cells.");
+        return {};
+    }
     if (!B[0].has_freq)
     {
         if (B.size() > 1)
@@ -519,8 +530,6 @@ std::string qd_join_line(const acells &a, const std::vector<int> &cols)
 quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, const std::string &fn_rx, const arma::vec &center_freq,
                                                    bool eval_antennas, std::vector<std::string> *extra_tx, std::vector<std::string> *extra_rx)
 {
-    (void)eval_antennas; // Antennas are not evaluated by the reader yet
-
     if (!center_freq.is_empty())
     {
         if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))
@@ -555,13 +564,16 @@ quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, con
 
     // Antennas of the nodes: Tx nodes first, then Rx nodes
     std::vector<std::vector<acells>> lines[2];
+    std::vector<char> none[2];
     bool used[n_col] = {};
     for (int s = 0; s < 2; ++s)
     {
         const side_data &S = s == 0 ? TX : RX;
         for (size_t n = 0; n < S.F.n_node; ++n)
         {
-            lines[s].push_back(qd_node_lines(S, n, F, s == 0 ? "Tx" : "Rx"));
+            bool is_none = false;
+            lines[s].push_back(qd_node_lines(S, n, F, s == 0 ? "Tx" : "Rx", &is_none));
+            none[s].push_back(is_none);
             for (const acells &a : lines[s].back())
                 for (int k = 0; k < n_antenna_col; ++k)
                     used[c_center_freq + k] = used[c_center_freq + k] || !a[(size_t)k].empty();
@@ -594,7 +606,7 @@ quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, con
             N.i_antenna[n] = ins.first->second;
         }
         for (size_t n = 0; n < S.F.n_node; ++n) // An extra sector without antenna cells has the antenna of sector 0
-            if (lines[s][n].empty() && S.ref[n] >= 0)
+            if (lines[s][n].empty() && !none[s][n] && S.ref[n] >= 0)
                 N.i_antenna[n] = N.i_antenna[(size_t)S.ref[n]];
     }
 
@@ -659,9 +671,29 @@ quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, con
         L.pairing = arma::umat(pairs.data(), 2, pairs.size() / 2);
     }
 
+    const std::string files = "'" + (fn_tx.empty() ? fn_rx : fn_tx) + (fn_tx.empty() || fn_rx.empty() ? "" : "' and '" + fn_rx) + "'";
     const std::string msg = L.is_valid();
     if (!msg.empty())
-        throw std::runtime_error("The layout in '" + (fn_tx.empty() ? fn_rx : fn_tx) + (fn_tx.empty() || fn_rx.empty() ? "" : "' and '" + fn_rx) + "' is not valid: " + msg);
+        throw std::runtime_error("The layout in " + files + " is not valid: " + msg);
+    if (eval_antennas) // The messages name the file and the first line of the node
+    {
+        std::vector<std::string> where[2];
+        for (int s = 0; s < 2; ++s)
+        {
+            const side_data &S = s == 0 ? TX : RX;
+            for (size_t n = 0; n < S.F.n_node; ++n)
+                where[s].push_back(S.fn + ", line " + std::to_string(S.first_line[n]) + " (" + (s == 0 ? "Tx" : "Rx") + " node '" + S.F.name[n] +
+                                   "', sector " + std::to_string((unsigned)S.F.v[c_sector][n]) + ")");
+        }
+        try
+        {
+            qd_layout::eval_antennas(L, {}, &where[0], &where[1]);
+        }
+        catch (const std::exception &e)
+        {
+            throw std::runtime_error(e.what());
+        }
+    }
 
     if (extra_tx != nullptr)
         *extra_tx = names_tx;
@@ -703,7 +735,8 @@ bool qd_has_value(const std::vector<T> &v, T dflt)
 // Text of one side of a layout. An extra sector (sector > 0 of a site with a sector 0) gets all its cells in the first
 // row, because an empty cell would be the value of sector 0; 'compact' leaves out what the reader repeats from the
 // previous row of the node and the defaults of the other nodes
-std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std::string &fn, bool compact)
+std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std::string &fn, bool compact, const std::vector<std::string> &acols,
+                            const std::vector<std::vector<std::string>> &aargs)
 {
     const quadriga_lib::layout_nodes &N = is_tx ? L.tx : L.rx;
     const flat F = flatten(N);
@@ -727,22 +760,21 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
     // Antenna lines of each node: cells per line
     std::vector<std::vector<std::vector<std::string>>> lines(n_node);
     std::vector<int> ant_cols_all;
-    for (const std::string &c : L.antenna_cols)
+    for (const std::string &c : acols)
         ant_cols_all.push_back(find_column(c));
     for (size_t n = 0; n < n_node; ++n)
     {
         if (N.i_antenna[n] == 0)
             continue;
-        if (L.antenna_args.empty() || L.antenna_args[N.i_antenna[n] - 1].empty())
-            throw std::invalid_argument("Antenna " + std::to_string(N.i_antenna[n]) + " of node '" + N.name[n] +
-                                        "' has no CSV description, which cannot be written yet.");
-        for (const std::string &line : L.antenna_args[N.i_antenna[n] - 1])
-            lines[n].push_back(split_antenna_line(line, L.antenna_cols.size()));
+        if (aargs.empty() || aargs[N.i_antenna[n] - 1].empty())
+            throw std::invalid_argument("Antenna " + std::to_string(N.i_antenna[n]) + " of node '" + N.name[n] + "' has no CSV description.");
+        for (const std::string &line : aargs[N.i_antenna[n] - 1])
+            lines[n].push_back(split_antenna_line(line, acols.size()));
     }
+    // An extra sector without antenna next to a sector 0 with one writes 'none': an empty cell would be the antenna of sector 0
+    std::vector<char> write_none(n_node, 0);
     for (size_t n = 0; n < n_node; ++n)
-        if (ref[n] >= 0 && N.i_antenna[n] == 0 && N.i_antenna[(size_t)ref[n]] != 0)
-            throw std::invalid_argument("Node '" + N.name[n] + "' (sector " + std::to_string(N.sector[n]) +
-                                        ") has no antenna, but sector 0 of the site has one; an empty antenna cell would mean the antenna of sector 0.");
+        write_none[n] = ref[n] >= 0 && N.i_antenna[n] == 0 && N.i_antenna[(size_t)ref[n]] != 0;
 
     // The frequency list is declared on the first node of the first non-empty side if no antenna line of a node carries it
     bool carried = false;
@@ -751,8 +783,8 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
             for (const quadriga_lib::layout_nodes *S : {&L.tx, &L.rx})
                 for (arma::uword i = 0; i < S->i_antenna.n_elem; ++i)
                     if (S->i_antenna[i] != 0)
-                        for (const std::string &line : L.antenna_args[S->i_antenna[i] - 1])
-                            carried = carried || !split_antenna_line(line, L.antenna_cols.size())[k].empty();
+                        for (const std::string &line : aargs[S->i_antenna[i] - 1])
+                            carried = carried || !split_antenna_line(line, acols.size())[k].empty();
     const bool declare = !carried && !L.center_freq.is_empty() && n_node != 0 && (is_tx || L.tx.n_node() == 0);
 
     // Columns
@@ -780,7 +812,7 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
     add_if(c_relative, qd_has_value(F.v[c_relative], 0.0));
     for (int id = c_center_freq; id < n_col; ++id)
     {
-        bool any = id == c_center_freq && declare;
+        bool any = (id == c_center_freq && declare) || (id == c_antenna && std::count(write_none.begin(), write_none.end(), 1) != 0);
         for (size_t k = 0; k < ant_cols_all.size() && !any; ++k)
             if (ant_cols_all[k] == id)
                 for (size_t n = 0; n < n_node && !any; ++n)
@@ -910,6 +942,8 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
             // Antenna cells of the first band
             if (!lines[n].empty() && (k == 0 || !compact))
                 set_antenna_cells(lines[n][0]);
+            if (write_none[n] && (k == 0 || !compact))
+                row[h_of_id[c_antenna]] = "none";
             if (declare && n == 0 && (k == 0 || !compact) && h_of_id[c_center_freq] != (size_t)-1)
                 row[h_of_id[c_center_freq]] = qd_csv::format_number(L.center_freq[0]);
             emit();
@@ -944,6 +978,193 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
 }
 } // namespace
 
+// ---- QDANT export ----
+
+namespace
+{
+// Name of a CSV file without the folder and without ".csv"
+std::string qd_csv_stem(const std::string &fn)
+{
+    std::string s = fs::path(fn).filename().string();
+    if (s.size() > 4)
+    {
+        std::string ext = s.substr(s.size() - 4);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+        if (ext == ".csv")
+            s.resize(s.size() - 4);
+    }
+    return s;
+}
+
+// A path as a normalised absolute path
+std::string qd_abs(const fs::path &p) { return fs::absolute(p).lexically_normal().string(); }
+
+// The antenna lines of the written files and the QDANT files that they need. Each band that is an evaluated array
+// without text becomes a 'qdant' line; the bands of one antenna go to one file, named after the first written CSV file
+// that uses the antenna: <stem>_<k>.qdant with k from 1 per CSV file, skipping names that a 'qdant' line of the layout uses
+struct qd_export
+{
+    std::vector<std::string> cols;
+    std::vector<std::vector<std::string>> args;
+    std::vector<std::string> files;                                  // Absolute paths
+    std::vector<std::vector<quadriga_lib::arrayant<double>>> arrays; // Entries of each file
+    std::vector<std::string> referenced;                             // QDANT files of the lines of the written nodes
+};
+
+qd_export qd_plan_export(const quadriga_lib::layout &L, const std::string fn[2])
+{
+    qd_export E;
+    const size_t n = (size_t)L.n_antenna(), nf = L.center_freq.n_elem, c_type = c_antenna - c_center_freq,
+                 c_file = c_qdant_file - c_center_freq, c_id = c_qdant_id - c_center_freq;
+    E.cols = L.antenna_cols;
+    E.args = L.antenna_args;
+    E.args.resize(n);
+
+    std::set<std::string> used; // QDANT files of the lines of the layout
+    for (const auto &lines : E.args)
+        for (const std::string &line : lines)
+            if (!line.empty())
+            {
+                const antenna_cells a = parse_antenna_line(line, E.cols);
+                if (antenna_type_mask(a[c_type]) == t_qdant && !a[c_file].empty())
+                    used.insert(qd_abs(a[c_file]));
+            }
+
+    // Antennas in order of first use by a written file, and the side of that file
+    std::vector<int> owner(n, -1);
+    std::vector<size_t> order;
+    std::vector<std::string> who(n); // The first node that uses the antenna, for the messages
+    for (int s = 0; s < 2; ++s)
+        if (!fn[s].empty())
+        {
+            const quadriga_lib::layout_nodes &N = s == 0 ? L.tx : L.rx;
+            for (arma::uword i = 0; i < N.i_antenna.n_elem; ++i)
+                if (N.i_antenna[i] != 0 && owner[N.i_antenna[i] - 1] < 0)
+                {
+                    const size_t a = N.i_antenna[i] - 1;
+                    owner[a] = s, order.push_back(a);
+                    who[a] = std::string(s == 0 ? "Tx" : "Rx") + " node '" + N.name[i] + "', sector " + std::to_string(N.sector[i]) + ": ";
+                }
+        }
+
+    struct new_line
+    {
+        size_t a, b;
+        bool all; // One line for all bands
+        antenna_cells cells;
+    };
+    std::vector<new_line> pending;
+    std::map<std::string, unsigned> next_k; // By folder and stem
+    for (size_t a : order)
+    {
+        const std::vector<std::string> &lines = E.args[a];
+        const size_t n_arr = L.antenna.empty() ? 0 : L.antenna[a].size();
+        const bool all = lines.empty() || (lines.size() == 1 && lines[0].empty());
+        std::vector<size_t> bands;
+        if (all && (n_arr != nf || nf < 2))
+            bands = {0};
+        else if (all || lines.size() > 1)
+            for (size_t b = 0; b < nf; ++b)
+                if (all || lines[b].empty())
+                    bands.push_back(b);
+        if (bands.empty())
+            continue;
+        const bool one = all && bands.size() == 1, one_band = one || nf == 0;
+        std::vector<quadriga_lib::arrayant<double>> vec;
+        for (size_t b : bands)
+        {
+            if (b >= n_arr || L.antenna[a][b].n_elements() == 0)
+                throw std::invalid_argument(who[a] + "the antenna is an evaluated array, but 'antenna' does not hold it" +
+                                            (L.antenna.empty() ? " (the layout is not evaluated)" : "") + ", so there is nothing to write.");
+            const std::string msg = L.antenna[a][b].is_valid();
+            if (!msg.empty())
+                throw std::invalid_argument(who[a] + (one_band ? "" : "the band " + qd_csv::format_number(L.center_freq[b]) + " Hz: ") +
+                                            "the evaluated array is not valid: " + msg);
+            vec.push_back(L.antenna[a][b]);
+        }
+        const std::string &csv = fn[owner[a]];
+        const fs::path folder = fs::absolute(fs::path(csv)).parent_path();
+        const std::string stem = qd_csv_stem(csv), key = qd_abs(folder / stem);
+        unsigned &k = next_k.emplace(key, 1).first->second;
+        std::string path;
+        for (;; ++k)
+            if (used.count(path = qd_abs(folder / (stem + "_" + std::to_string(k) + ".qdant"))) == 0)
+                break;
+        ++k;
+        E.files.push_back(path);
+        E.arrays.push_back(std::move(vec));
+        for (size_t j = 0; j < bands.size(); ++j)
+        {
+            new_line p{a, bands[j], one, antenna_cells()};
+            p.cells[c_type] = "qdant", p.cells[c_file] = path, p.cells[c_id] = std::to_string(j + 1);
+            if (!one)
+                p.cells[0] = qd_csv::format_number(L.center_freq[bands[j]]);
+            pending.push_back(p);
+        }
+    }
+
+    // The columns of the new lines are added; then the lines are replaced
+    std::vector<antenna_cells> extra;
+    for (const new_line &p : pending)
+        extra.push_back(p.cells);
+    const std::vector<std::string> cols = used_antenna_cols(E.args, E.cols, extra);
+    rewrite_antenna_lines(E.args, E.cols, cols);
+    E.cols = cols;
+    for (const new_line &p : pending)
+    {
+        std::vector<std::string> &lines = E.args[p.a];
+        if (p.all)
+            lines = {join_antenna_line(p.cells, E.cols)};
+        else
+        {
+            if (lines.size() != nf)
+                lines.assign(nf, std::string());
+            lines[p.b] = join_antenna_line(p.cells, E.cols);
+        }
+    }
+
+    // The QDANT files that the written CSV files reference
+    for (size_t a : order)
+        for (const std::string &line : E.args[a])
+            if (!line.empty())
+            {
+                const antenna_cells c = parse_antenna_line(line, E.cols);
+                if (!c[c_file].empty())
+                    E.referenced.push_back(qd_abs(c[c_file]));
+            }
+    return E;
+}
+
+// Deletes the files <stem>_<k>.qdant next to the CSV file that none of 'referenced' is
+void qd_delete_unreferenced(const std::string &csv, const std::vector<std::string> &referenced)
+{
+    std::error_code ec;
+    const fs::path folder = fs::absolute(fs::path(csv)).parent_path();
+    const std::string prefix = qd_csv_stem(csv) + "_", suffix = ".qdant";
+    std::vector<fs::path> remove;
+    for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec))
+    {
+        const std::string name = it->path().filename().string();
+        if (name.size() <= prefix.size() + suffix.size() || name.compare(0, prefix.size(), prefix) != 0 ||
+            name.compare(name.size() - suffix.size(), suffix.size(), suffix) != 0)
+            continue;
+        const std::string k = name.substr(prefix.size(), name.size() - prefix.size() - suffix.size());
+        if (k[0] == '0' || k.find_first_not_of("0123456789") != std::string::npos || !it->is_regular_file(ec))
+            continue;
+        bool keep = false;
+        for (const std::string &r : referenced)
+        {
+            std::error_code e;
+            keep = keep || qd_abs(it->path()) == r || fs::equivalent(it->path(), r, e);
+        }
+        if (!keep)
+            remove.push_back(it->path());
+    }
+    for (const fs::path &p : remove)
+        fs::remove(p, ec);
+}
+} // namespace
+
 void quadriga_lib::layout_csv_write(const std::string &fn_tx, const std::string &fn_rx, const quadriga_lib::layout &layout, bool compact)
 {
     std::error_code ec;
@@ -957,17 +1178,40 @@ void quadriga_lib::layout_csv_write(const std::string &fn_tx, const std::string 
     if (!fn_tx.empty() && layout.tx.n_node() == 0 && layout.rx.n_node() == 0 && !layout.center_freq.is_empty())
         throw std::invalid_argument("The frequencies of the layout need a node in the Tx or Rx file to be written.");
 
-    // Compose all files first, write them next to their targets, then replace the targets
+    // Compose all files first, write them next to their targets, then replace the targets: QDANT files first
     const std::string fn[2] = {fn_tx, fn_rx};
+    const qd_export E = qd_plan_export(layout, fn);
     std::string text[2];
     for (int s = 0; s < 2; ++s)
         if (!fn[s].empty())
-            text[s] = qd_compose_side(layout, s == 0, fn[s], compact);
+            text[s] = qd_compose_side(layout, s == 0, fn[s], compact, E.cols, E.args);
 
     std::string tmp[2];
-    auto cleanup = [&] { for (const std::string &t : tmp) if (!t.empty()) { std::error_code e; fs::remove(t, e); } };
+    std::vector<std::string> tmp_q(E.files.size());
+    auto cleanup = [&]
+    {
+        for (const std::string &t : tmp)
+            if (!t.empty())
+            {
+                std::error_code e;
+                fs::remove(t, e);
+            }
+        for (const std::string &t : tmp_q)
+            if (!t.empty())
+            {
+                std::error_code e;
+                fs::remove(t, e);
+            }
+    };
     try
     {
+        for (size_t f = 0; f < E.files.size(); ++f)
+        {
+            tmp_q[f] = E.files[f] + ".part";
+            std::error_code ec_stale;
+            fs::remove(tmp_q[f], ec_stale); // A temporary file of an earlier failed call
+            quadriga_lib::qdant_write(tmp_q[f], E.arrays[f]); // The arrays are checked by the plan
+        }
         for (int s = 0; s < 2; ++s)
         {
             if (fn[s].empty())
@@ -980,6 +1224,11 @@ void quadriga_lib::layout_csv_write(const std::string &fn_tx, const std::string 
             f.flush();
             if (!f)
                 throw std::runtime_error("Cannot write file '" + tmp[s] + "'.");
+        }
+        for (size_t f = 0; f < E.files.size(); ++f)
+        {
+            fs::rename(tmp_q[f], E.files[f]);
+            tmp_q[f].clear();
         }
         for (int s = 0; s < 2; ++s)
             if (!fn[s].empty())
@@ -998,4 +1247,9 @@ void quadriga_lib::layout_csv_write(const std::string &fn_tx, const std::string 
         cleanup();
         throw;
     }
+
+    // QDANT files of the stems of the written CSV files that the new files do not reference
+    for (int s = 0; s < 2; ++s)
+        if (!fn[s].empty())
+            qd_delete_unreferenced(fn[s], E.referenced);
 }
