@@ -8,10 +8,70 @@
 #include <armadillo>
 #include <cmath>
 #include <atomic>
+#include <initializer_list>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <vector>
 
 namespace quadriga_lib
 {
+    // List of non-negative integers for index and count arguments. Takes a uvec (used in place, no copy), a single
+    // value, a brace list, a std::vector, or an Armadillo vector or expression of any integer or floating-point type;
+    // a negative, fractional or non-finite value throws std::invalid_argument. Meant for function arguments only: it
+    // may refer to the uvec it was given.
+    class uint_list
+    {
+        template <typename T>
+        using number_only = typename std::enable_if<std::is_arithmetic<T>::value && !std::is_same<T, bool>::value, int>::type;
+
+    public:
+        uint_list() {}
+        uint_list(const arma::uvec &v) : ref(&v) {}
+        uint_list(arma::uvec &&v) : own(std::move(v)) {}
+        uint_list(const arma::uvec &&v) : own(v) {}                 // A const temporary is copied, not referenced
+        uint_list(std::initializer_list<arma::uword> l) : own(l) {} // Mixed types, e.g. {n, 2}
+        template <typename T, number_only<T> = 0>
+        uint_list(T i) : own(1) { own[0] = cast(i); }
+        template <typename T, number_only<T> = 0>
+        uint_list(std::initializer_list<T> l) { fill(l.begin(), l.size()); }
+        template <typename T, number_only<T> = 0>
+        uint_list(const std::vector<T> &v) { fill(v.begin(), v.size()); }
+        template <typename T, typename T1, number_only<T> = 0> // Armadillo vectors and expressions, e.g. find(x > 0)
+        uint_list(const arma::Base<T, T1> &x)
+        {
+            const arma::Mat<T> m(x.get_ref());
+            if (!m.is_vec() && !m.is_empty())
+                throw std::invalid_argument("Index and count arguments must be vectors.");
+            fill(m.begin(), m.n_elem);
+        }
+
+        const arma::uvec &vec() const { return ref ? *ref : own; } // The values as uvec
+
+    private:
+        arma::uvec own;
+        const arma::uvec *ref = nullptr;
+        template <typename T>
+        static arma::uword cast(T v)
+        {
+            bool ok = true;
+            if constexpr (std::is_floating_point<T>::value) // NaN fails the range test; at most 2^53
+                ok = v >= T(0) && v <= T(9007199254740992.0) && std::floor(v) == v;
+            else if constexpr (std::is_signed<T>::value)
+                ok = v >= T(0);
+            if (!ok)
+                throw std::invalid_argument("Index and count arguments must be non-negative integers.");
+            return (arma::uword)v;
+        }
+        template <typename It>
+        void fill(It it, size_t n)
+        {
+            own.set_size((arma::uword)n);
+            for (arma::uword k = 0; k < (arma::uword)n; ++k, ++it)
+                own[k] = cast(*it);
+        }
+    };
+
     // An array of antenna or acoustic elements: element patterns, positions and port weights
     template <typename dtype> // float or double
     class arrayant
@@ -68,7 +128,7 @@ namespace quadriga_lib
     template <typename dtype>
     void calc_beamwidth(
         const arrayant<dtype> &ant,                    // Valid arrayant
-        const arma::uvec &i_element = arma::uvec(),    // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
+        const uint_list &i_element = {},               // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
         double threshold_dB = 3.0,                     // Threshold in dB, positive and finite; 3 dB = FWHM
         arma::Col<dtype> *beamwidth_az_deg = nullptr,  // Optional output: azimuth beamwidth in degree; [n_out]
         arma::Col<dtype> *beamwidth_el_deg = nullptr,  // Optional output: elevation beamwidth in degree; [n_out]
@@ -79,7 +139,7 @@ namespace quadriga_lib
     template <typename dtype>
     void calc_beamwidth(
         const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector that passes is_valid
-        const arma::uvec &i_element = arma::uvec(),       // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
+        const uint_list &i_element = {},                  // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
         double threshold_dB = 3.0,                        // Threshold in dB, positive and finite; 3 dB = FWHM
         arma::Mat<dtype> *beamwidth_az_deg = nullptr,     // Optional output: azimuth beamwidth in degree; [n_out, n_freq]
         arma::Mat<dtype> *beamwidth_el_deg = nullptr,     // Optional output: elevation beamwidth in degree; [n_out, n_freq]
@@ -90,15 +150,15 @@ namespace quadriga_lib
     // - Returns the directivity in dBi; [n_out]
     template <typename dtype>
     arma::Col<dtype> calc_directivity(
-        const arrayant<dtype> &ant,                  // Valid arrayant
-        const arma::uvec &i_element = arma::uvec()); // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
+        const arrayant<dtype> &ant,       // Valid arrayant
+        const uint_list &i_element = {}); // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
 
     // Vector form: the same for each entry of a multi-frequency vector
     // - Returns the directivity in dBi; [n_out, n_freq]
     template <typename dtype>
     arma::Mat<dtype> calc_directivity(
         const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector that passes is_valid
-        const arma::uvec &i_element = arma::uvec());      // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
+        const uint_list &i_element = {});                 // Optional: 0-based element indices, duplicates allowed; empty = all; [n_out]
 
     // Apply the port weights: sum the element patterns, with the phase of the element positions, into one pattern per port
     // - Returns a new arrayant with n_ports elements and identity port weights, at the origin or with center_ports at the port centers
@@ -137,16 +197,16 @@ namespace quadriga_lib
     // Copy a single element to one or more destination slots, in place
     template <typename dtype>
     void copy_element(
-        arrayant<dtype> &ant,        // Valid arrayant; updated in-place
-        arma::uword i_source,        // Index of the element to copy, 0-based
-        const arma::uvec &i_target); // Target indices, 0-based; the array is enlarged to fit the largest index
+        arrayant<dtype> &ant,       // Valid arrayant; updated in-place
+        arma::uword i_source,       // Index of the element to copy, 0-based
+        const uint_list &i_target); // Target indices, 0-based; the array is enlarged to fit the largest index
 
     // Vector form: the same copy on every entry of a multi-frequency vector
     template <typename dtype>
     void copy_element(
         std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
         arma::uword i_source,                       // Index of the element to copy from; must be within current element count
-        const arma::uvec &i_target);                // Indices of target elements; enlarges all entries if any index exceeds current count
+        const uint_list &i_target);                 // Indices of target elements; enlarges all entries if any index exceeds current count
 
     // Set element positions for all entries in a multi-frequency arrayant vector
     // - Updates element_pos in-place on every entry in the vector identically.
@@ -155,20 +215,20 @@ namespace quadriga_lib
     // - All entries must have the same element count; uninitialized element_pos fields are zero-initialized before update.
     template <typename dtype>
     void set_element_pos(
-        std::vector<arrayant<dtype>> &arrayant_vec,  // Non-empty vector of arrayant objects; modified in-place
-        const arma::Mat<dtype> &element_pos,         // New (x, y, z) positions; [3, n_update]
-        const arma::uvec &i_element = arma::uvec()); // Indices of elements to update; empty = all elements are replaced
+        std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
+        const arma::Mat<dtype> &element_pos,        // New (x, y, z) positions; [3, n_update]
+        const uint_list &i_element = {});           // Indices of elements to update; empty = all elements are replaced
 
     // Export the patterns as a coloured mesh to a Wavefront OBJ file for 3D visualization
     template <typename dtype>
     void export_pattern_obj(
-        const std::string &fn,                       // Output OBJ filename; must end in .obj
-        const arrayant<dtype> &ant,                  // Valid arrayant
-        double directivity_range_dB = 30.0,          // Dynamic range of the visualized directivity pattern in dB
-        const std::string &colormap = "jet",         // Colormap for the visualization
-        double object_radius = 1.0,                  // Radius of the exported object
-        arma::uword icosphere_n_div = 4,             // Icosphere subdivision count; higher = finer mesh
-        const arma::uvec &i_element = arma::uvec()); // Optional: 0-based element indices to export; default: all
+        const std::string &fn,               // Output OBJ filename; must end in .obj
+        const arrayant<dtype> &ant,          // Valid arrayant
+        double directivity_range_dB = 30.0,  // Dynamic range of the visualized directivity pattern in dB
+        const std::string &colormap = "jet", // Colormap for the visualization
+        double object_radius = 1.0,          // Radius of the exported object
+        arma::uword icosphere_n_div = 4,     // Icosphere subdivision count; higher = finer mesh
+        const uint_list &i_element = {});    // Optional: 0-based element indices to export; default: all
 
     // Remove zero-valued entries from the pattern data, in place, reducing its size
     template <typename dtype>
@@ -179,19 +239,19 @@ namespace quadriga_lib
     // - Usage 0 and 1 adjust the sampling grid of non-uniformly sampled patterns, which needs all elements
     template <typename dtype>
     void rotate_pattern(
-        arrayant<dtype> &ant,                        // Valid arrayant; updated in-place
-        const arma::Mat<dtype> &orientation,         // Euler angles (bank, tilt, heading) in rad, finite; [3, 1] or [1, 3]
-        unsigned usage = 0,                          // 0 = pattern+polarization, 1 = pattern, 2 = polarization; 3, 4 = 0, 1 without grid adjustment
-        const arma::uvec &i_element = arma::uvec()); // Element indices, 0-based, no duplicates; empty = all
+        arrayant<dtype> &ant,                // Valid arrayant; updated in-place
+        const arma::Mat<dtype> &orientation, // Euler angles (bank, tilt, heading) in rad, finite; [3, 1] or [1, 3]
+        unsigned usage = 0,                  // 0 = pattern+polarization, 1 = pattern, 2 = polarization; 3, 4 = 0, 1 without grid adjustment
+        const uint_list &i_element = {});    // Element indices, 0-based, no duplicates; empty = all
 
     // Vector form: rotates every entry, with grid adjustment always disabled (uniform grids across frequencies)
     // - For scalar acoustic fields (pressure stored in e_theta_re only), use usage = 1 to avoid spurious polarization effects.
     template <typename dtype>
     void rotate_pattern(
-        std::vector<arrayant<dtype>> &arrayant_vec,  // Non-empty vector of arrayant objects; modified in-place
-        const arma::Mat<dtype> &orientation,         // Euler angles (bank, tilt, heading) in rad, finite; [3, 1] or [1, 3]
-        unsigned usage = 0,                          // Usage: 0 = pattern+polarization, 1 = pattern only, 2 = polarization only
-        const arma::uvec &i_element = arma::uvec()); // Element indices, 0-based, no duplicates; empty = all
+        std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
+        const arma::Mat<dtype> &orientation,        // Euler angles (bank, tilt, heading) in rad, finite; [3, 1] or [1, 3]
+        unsigned usage = 0,                         // Usage: 0 = pattern+polarization, 1 = pattern only, 2 = polarization only
+        const uint_list &i_element = {});           // Element indices, 0-based, no duplicates; empty = all
 
     // Interpolate the polarimetric field pattern of the elements at given azimuth and elevation angles
     // - Angles [1, n_ang]: the same for all outputs (planar wave); [n_out, n_ang]: one angle per output (spherical wave)
@@ -205,7 +265,7 @@ namespace quadriga_lib
         arma::Mat<dtype> &V_im,                                     // Output: e-theta (vertical) field, imaginary part; [n_out, n_ang]
         arma::Mat<dtype> &H_re,                                     // Output: e-phi (horizontal) field, real part; [n_out, n_ang]
         arma::Mat<dtype> &H_im,                                     // Output: e-phi (horizontal) field, imaginary part; [n_out, n_ang]
-        const arma::uvec &i_element = arma::uvec(),                 // Optional: 0-based element indices, duplicates allowed; [n_out]
+        const uint_list &i_element = {},                            // Optional: 0-based element indices, duplicates allowed; [n_out]
         const arma::Cube<dtype> &orientation = arma::Cube<dtype>(), // Optional: Euler angles (bank, tilt, heading) in rad; [3, 1, 1], [3, n_out, 1], [3, 1, n_ang] or [3, n_out, n_ang]
         const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),   // Optional: element positions in m, replacing ant.element_pos; [3, n_out]
         arma::Mat<dtype> *dist = nullptr,                           // Optional output: distance of each element from the wavefront plane through the origin in m; [n_out, n_ang]
@@ -230,7 +290,7 @@ namespace quadriga_lib
         arma::Cube<dtype> &H_re,                                    // Output: e-phi field, real part; [n_out, n_ang, n_freq]
         arma::Cube<dtype> &H_im,                                    // Output: e-phi field, imaginary part; [n_out, n_ang, n_freq]
         const arma::Col<dtype> &freq_new = arma::Col<dtype>(),      // Optional: target frequencies in Hz; default: the center frequencies of the entries; [n_freq]
-        const arma::uvec &i_element = arma::uvec(),                 // Optional: 0-based element indices; [n_out]
+        const uint_list &i_element = {},                            // Optional: 0-based element indices; [n_out]
         const arma::Cube<dtype> &orientation = arma::Cube<dtype>(), // Optional: Euler angles in rad, applied at all frequencies; shapes as in the single form
         const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),   // Optional: element positions in m; default: those of entry 0; [3, n_out]
         arma::Cube<std::complex<dtype>> *V = nullptr,               // Optional output: complex e-theta field, replaces V_re / V_im (then left empty); [n_out, n_ang, n_freq]
@@ -254,7 +314,7 @@ namespace quadriga_lib
     template <typename dtype = double>
     std::vector<arrayant<dtype>> qdant_read(
         const std::string &fn,            // Path to the QDANT file; must not be empty
-        const arma::uvec &ids = {},       // 1-based IDs of the entries to read, duplicates allowed; empty reads the entries in the layout
+        const uint_list &ids = {},        // 1-based IDs of the entries to read, duplicates allowed; empty reads the entries in the layout
         arma::u32_mat *layout = nullptr); // Optional output: layout matrix of the entry IDs in the file
 
     // Write arrayant data to a QDANT (XML) file; returns the ID written
@@ -286,14 +346,14 @@ namespace quadriga_lib
         double res = NAN,                                   // Grid resolution in degree, 0.1 to 90; NaN or <= 0 = 10 (omni, xpol) or 1
         double center_freq = 299792458.0,                   // Center frequency in Hz, positive, finite; NaN = 299792458
         const arma::vec &element = {},                      // Element parameters per type (custom, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
-        const arma::uvec &panel = {},                       // [M, N, Mg, Ng] (ula, 3GPP, multibeam)
+        const uint_list &panel = {},                        // [M, N, Mg, Ng] (ula, 3GPP, multibeam)
         const arma::vec &spacing = {},                      // [d_V, d_H, d_gV, d_gH] in wavelengths (ula, 3GPP, multibeam)
-        const arma::uvec &pol = {},                         // [polarization, model] (ula, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
-        const arma::uvec &ports = {},                       // [M_P, N_P] (ula, 3GPP)
+        const uint_list &pol = {},                          // [polarization, model] (ula, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
+        const uint_list &ports = {},                        // [M_P, N_P] (ula, 3GPP)
         const arma::mat &steer = {},                        // [tilt, pan] in degree, one row or one per panel (ula, 3GPP)
         const arma::mat &beams = {},                        // [2 or 3, n_beams] in degree; weights (multibeam)
         const arma::vec &device_size = {},                  // [X, Y, Z] in m (3GPP-UT, 3GPP-CPE)
-        const arma::uvec &locations = {},                   // TR location labels, 1-based (3GPP-UT 1 to 8, 3GPP-CPE 1 to 9)
+        const uint_list &locations = {},                    // TR location labels, 1-based (3GPP-UT 1 to 8, 3GPP-CPE 1 to 9)
         const arrayant<dtype> &pattern = arrayant<dtype>(), // Element pattern (ula, 3GPP, 3GPP-UT, 3GPP-CPE)
         bool separate_beams = false,                        // One port per beam (multibeam)
         bool apply_weights = false);                        // Apply the port weights, one pattern per port (ula, 3GPP, multibeam)

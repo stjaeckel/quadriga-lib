@@ -210,7 +210,7 @@ void quadriga_lib::baseband_freq_response_vec(
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     int use_kernel = 0);
 ```
 
@@ -237,8 +237,9 @@ template <typename dtype>
 void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> &coeff_re, const std::vector<arma::Cube<dtype>> &coeff_im,
                                               const std::vector<arma::Cube<dtype>> &delay, const arma::Col<dtype> &pilot_grid, const double bandwidth,
                                               std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
-                                              std::vector<arma::Cube<std::complex<dtype>>> *hmat, const arma::uvec &i_snap, int use_kernel)
+                                              std::vector<arma::Cube<std::complex<dtype>>> *hmat, const uint_list &i_snap_in, int use_kernel)
 {
+    const arma::uvec &i_snap = i_snap_in.vec();
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
     qd_kernel_auto_avx2(use_kernel);
     if (coeff_re.size() == 0)
@@ -273,12 +274,12 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
                                                        const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &pilot_grid, const double bandwidth,
                                                        std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
-                                                       std::vector<arma::Cube<std::complex<float>>> *hmat, const arma::uvec &i_snap, int use_kernel);
+                                                       std::vector<arma::Cube<std::complex<float>>> *hmat, const uint_list &i_snap, int use_kernel);
 
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
                                                        const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &pilot_grid, const double bandwidth,
                                                        std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
-                                                       std::vector<arma::Cube<std::complex<double>>> *hmat, const arma::uvec &i_snap, int use_kernel);
+                                                       std::vector<arma::Cube<std::complex<double>>> *hmat, const uint_list &i_snap, int use_kernel);
 
 /*!MD
 # baseband_freq_response_multi
@@ -689,7 +690,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     bool remove_delay_phase = true,
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     int use_kernel = 0);
 ```
 
@@ -721,8 +722,9 @@ void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vecto
                                                     const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
                                                     std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
                                                     std::vector<arma::Cube<std::complex<dtype>>> *hmat,
-                                                    bool remove_delay_phase, const arma::uvec &i_snap, int use_kernel)
+                                                    bool remove_delay_phase, const uint_list &i_snap_in, int use_kernel)
 {
+    const arma::uvec &i_snap = i_snap_in.vec();
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
     qd_kernel_auto_avx2(use_kernel);
     if (coeff_re.size() == 0)
@@ -764,7 +766,7 @@ template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<s
                                                              const arma::Col<float> &freq, const arma::Col<float> &freq_new,
                                                              std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
                                                              std::vector<arma::Cube<std::complex<float>>> *hmat,
-                                                             bool remove_delay_phase, const arma::uvec &i_snap, int use_kernel);
+                                                             bool remove_delay_phase, const uint_list &i_snap, int use_kernel);
 
 template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<double>>> &coeff_re,
                                                              const std::vector<std::vector<arma::Cube<double>>> &coeff_im,
@@ -772,4 +774,4 @@ template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<s
                                                              const arma::Col<double> &freq, const arma::Col<double> &freq_new,
                                                              std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
                                                              std::vector<arma::Cube<std::complex<double>>> *hmat,
-                                                             bool remove_delay_phase, const arma::uvec &i_snap, int use_kernel);
+                                                             bool remove_delay_phase, const uint_list &i_snap, int use_kernel);

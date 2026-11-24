@@ -30,7 +30,7 @@ void quadriga_lib::channel_export_obj_file(
     double gain_max_dB = -60.0,
     double gain_min_dB = -140.0,
     const std::string &colormap = "jet",
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     double radius_max = 0.05,
     double radius_min = 0.01,
     arma::uword n_edges = 5);
@@ -58,10 +58,11 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
                                            arma::uword max_paths,
                                            double gain_max_dB_in, double gain_min_dB_in,
                                            const std::string &colormap,
-                                           const arma::uvec &i_snap_sel,
+                                           const uint_list &i_snap_arg,
                                            double radius_max_in, double radius_min_in,
                                            arma::uword n_edges)
 {
+    const arma::uvec &i_snap_sel = i_snap_arg.vec();
     const dtype gain_max_dB = dtype(gain_max_dB_in);
     const dtype gain_min_dB = dtype(gain_min_dB_in);
     const dtype radius_max = dtype(radius_max_in);
@@ -337,9 +338,9 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
 
 template void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<float> &chan, arma::uword max_paths,
                                                     double gain_max_dB, double gain_min_dB, const std::string &colormap,
-                                                    const arma::uvec &i_snap, double radius_max, double radius_min,
+                                                    const uint_list &i_snap, double radius_max, double radius_min,
                                                     arma::uword n_edges);
 template void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<double> &chan, arma::uword max_paths,
                                                     double gain_max_dB, double gain_min_dB, const std::string &colormap,
-                                                    const arma::uvec &i_snap, double radius_max, double radius_min,
+                                                    const uint_list &i_snap, double radius_max, double radius_min,
                                                     arma::uword n_edges);

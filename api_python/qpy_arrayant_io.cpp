@@ -103,7 +103,7 @@ py::tuple qdant_read(const py::handle &fn,
         }
         if (i < 1 || i > (long long)std::numeric_limits<unsigned>::max())
             throw std::invalid_argument("Input 'ids' must be >= 1 (None reads the entries in the layout).");
-        auto ant_vec = quadriga_lib::qdant_read<double>(fn_s, {(arma::uword)i}, &layout);
+        auto ant_vec = quadriga_lib::qdant_read<double>(fn_s, i, &layout);
         output = qd_python_arrayant2dict(ant_vec[0]);
     }
 

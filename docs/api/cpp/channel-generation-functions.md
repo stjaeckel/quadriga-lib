@@ -50,7 +50,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
     const arma::vec &dist = arma::vec(),
-    const arma::uvec &n_floors = arma::uvec(),
+    const uint_list &n_floors = {},
     bool uplink = false,
     const arma::mat &offset_angles_deg = arma::mat(),
     arma::uword n_subpath = 20,
@@ -61,7 +61,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double sf_std_los_dB = NAN,
     double sf_std_nlos_dB = NAN,
     double dist_breakpoint = NAN,
-    const arma::uvec &n_walls = arma::uvec(),
+    const uint_list &n_walls = {},
     double wall_loss_dB = 5.0);
 ```
 

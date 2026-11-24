@@ -1067,7 +1067,7 @@ Read ray-tracing CIR data from a QRT file
 ```
 void quadriga_lib::qrt_file_read(
     const std::string &fn,
-    const arma::uvec &i_cir = {},
+    const uint_list &i_cir = {},
     arma::uword i_orig = 0,
     bool uplink = false,
     arma::Col<dtype> *center_freq = nullptr,
@@ -1651,7 +1651,7 @@ void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_cir, arma:
 }
 
 template <typename dtype>
-void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
+void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir_in, arma::uword i_orig, bool uplink,
                                  arma::Col<dtype> *center_freq, arma::Mat<dtype> *tx_pos, arma::Mat<dtype> *tx_orientation,
                                  arma::Mat<dtype> *rx_pos, arma::Mat<dtype> *rx_orientation,
                                  std::vector<arma::Mat<dtype>> *fbs_pos, std::vector<arma::Mat<dtype>> *lbs_pos,
@@ -1664,12 +1664,13 @@ void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir,
                                  std::vector<std::vector<uint8_t>> *interact_type,
                                  std::ifstream *file, const qrt_read_cache *cache)
 {
+    const arma::uvec &i_cir = i_cir_in.vec();
     qd_qrt_file_read_impl<dtype>(fn, i_cir, i_orig, uplink, center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
                                  fbs_pos, lbs_pos, path_gain, path_length, polmat, aod, eod, aoa, eoa, path_coord,
                                  normalize_polmat, n_interact, coord, interact_type, file, cache, nullptr, nullptr);
 }
 
-template void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
+template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir, arma::uword i_orig, bool uplink,
                                           arma::Col<float> *center_freq, arma::Mat<float> *tx_pos, arma::Mat<float> *tx_orientation,
                                           arma::Mat<float> *rx_pos, arma::Mat<float> *rx_orientation,
                                           std::vector<arma::Mat<float>> *fbs_pos, std::vector<arma::Mat<float>> *lbs_pos,
@@ -1682,7 +1683,7 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uve
                                           std::vector<std::vector<uint8_t>> *interact_type,
                                           std::ifstream *file, const qrt_read_cache *cache);
 
-template void quadriga_lib::qrt_file_read(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
+template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir, arma::uword i_orig, bool uplink,
                                           arma::Col<double> *center_freq, arma::Mat<double> *tx_pos, arma::Mat<double> *tx_orientation,
                                           arma::Mat<double> *rx_pos, arma::Mat<double> *rx_orientation,
                                           std::vector<arma::Mat<double>> *fbs_pos, std::vector<arma::Mat<double>> *lbs_pos,

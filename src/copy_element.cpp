@@ -30,12 +30,12 @@ Copy a single element of an antenna array to one or more destination slots
 void quadriga_lib::copy_element(
     arrayant<dtype> &ant,
     arma::uword i_source,
-    const arma::uvec &i_target);
+    const uint_list &i_target);
 
 void quadriga_lib::copy_element(
     std::vector<arrayant<dtype>> &arrayant_vec,
     arma::uword i_source,
-    const arma::uvec &i_target);
+    const uint_list &i_target);
 ```
 
 ## Inputs:
@@ -63,8 +63,9 @@ ant.element_pos.row(1) = arma::rowvec({-0.75, -0.25, 0.25, 0.75});
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::copy_element(arrayant<dtype> &ant, arma::uword i_source, const arma::uvec &i_target)
+void quadriga_lib::copy_element(arrayant<dtype> &ant, arma::uword i_source, const uint_list &i_target_in)
 {
+    const arma::uvec &i_target = i_target_in.vec();
     if (i_target.n_elem == 0)
         throw std::invalid_argument("Input 'i_target' cannot be empty.");
 
@@ -124,14 +125,15 @@ void quadriga_lib::copy_element(arrayant<dtype> &ant, arma::uword i_source, cons
     qd_arrayant_mark_valid(ant);
 }
 
-template void quadriga_lib::copy_element(arrayant<float> &, arma::uword, const arma::uvec &);
-template void quadriga_lib::copy_element(arrayant<double> &, arma::uword, const arma::uvec &);
+template void quadriga_lib::copy_element(arrayant<float> &, arma::uword, const uint_list &);
+template void quadriga_lib::copy_element(arrayant<double> &, arma::uword, const uint_list &);
 
 template <typename dtype>
 void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                arma::uword i_source,
-                                               const arma::uvec &i_target)
+                                               const uint_list &i_target_in)
 {
+    const arma::uvec &i_target = i_target_in.vec();
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
@@ -151,8 +153,8 @@ void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<dtype>> &arra
     }
 }
 
-template void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<float>> &, arma::uword, const arma::uvec &);
-template void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<double>> &, arma::uword, const arma::uvec &);
+template void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<float>> &, arma::uword, const uint_list &);
+template void quadriga_lib::copy_element(std::vector<quadriga_lib::arrayant<double>> &, arma::uword, const uint_list &);
 
 /*!MD
 # set_element_pos
@@ -165,7 +167,7 @@ Set element positions for all entries in a multi-frequency arrayant vector
 void quadriga_lib::set_element_pos(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        const arma::uvec &i_element = arma::uvec());
+        const uint_list &i_element = {});
 ```
 
 ## Inputs:
@@ -184,8 +186,9 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::set_element_pos(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                   const arma::Mat<dtype> &element_pos,
-                                                  const arma::uvec &i_element)
+                                                  const uint_list &i_element_in)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
@@ -248,5 +251,5 @@ void quadriga_lib::set_element_pos(std::vector<quadriga_lib::arrayant<dtype>> &a
     }
 }
 
-template void quadriga_lib::set_element_pos(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, const arma::uvec &);
-template void quadriga_lib::set_element_pos(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, const arma::uvec &);
+template void quadriga_lib::set_element_pos(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, const uint_list &);
+template void quadriga_lib::set_element_pos(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, const uint_list &);

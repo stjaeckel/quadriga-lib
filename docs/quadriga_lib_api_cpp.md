@@ -33,7 +33,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Speed of light/sound: `299792458.0` m/s (EM), `343.0` m/s (acoustic; the one value the library uses for sound: the acoustic frequency mapping, acoustic wavelengths and `generate_speaker`).
 - Counts: `n_<thing>`, e.g. `n_path`, `n_snap`, `n_interact` (interaction points per path; mesh intersections per ray in the ray-tracing functions).
 - Limits: `max_<things>` / `min_<things>` limit a count, e.g. `max_interactions`, `max_paths`, `min_segments`; a limit on a value names the quantity, e.g. `max_path_length`.
-- Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`.
+- Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`. C++: selectors and the count and code tuples (below) are `quadriga_lib::uint_list`, which takes a `uvec`, a single value (`0` is index 0), a brace list, or a `std::vector` or Armadillo vector of any integer or floating-point type; a negative, fractional or non-finite value throws.
 - Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 - Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
@@ -71,7 +71,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Antenna array generators (TR 38.901 tuples)**
 
-- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `arma::uvec` for counts and codes, `arma::vec` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
+- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `uint_list` for counts and codes, `arma::vec` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
 - `panel`: `[M, N, Mg, Ng]`: elements per column (along z), columns per panel (along y), panels per column, panels per row; default 1.
 - `spacing`: `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); defaults 0.5, `d_V`, `M d_V`, `N d_H`.
 - `ports`: `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; they divide `M` and `N`; default `[M, N]` (one port per element).
@@ -401,7 +401,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_beamwidth) · [Python](quadriga_l
 ```cpp
 void quadriga_lib::calc_beamwidth(
     const arrayant<dtype> &ant,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     double threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
@@ -410,7 +410,7 @@ void quadriga_lib::calc_beamwidth(
 
 void quadriga_lib::calc_beamwidth(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     double threshold_dB = 3.0,
     arma::Mat<dtype> *beamwidth_az_deg = nullptr,
     arma::Mat<dtype> *beamwidth_el_deg = nullptr,
@@ -470,11 +470,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_directivity) · [Python](quadriga
 ```cpp
 arma::Col<dtype> quadriga_lib::calc_directivity(
     const arrayant<dtype> &ant,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 
 arma::Mat<dtype> quadriga_lib::calc_directivity(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -517,12 +517,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#copy_element) · [Python](quadriga_lib
 void quadriga_lib::copy_element(
     arrayant<dtype> &ant,
     arma::uword i_source,
-    const arma::uvec &i_target);
+    const uint_list &i_target);
 
 void quadriga_lib::copy_element(
     std::vector<arrayant<dtype>> &arrayant_vec,
     arma::uword i_source,
-    const arma::uvec &i_target);
+    const uint_list &i_target);
 ```
 
 ### Inputs:
@@ -569,7 +569,7 @@ void quadriga_lib::export_pattern_obj(
     const std::string &colormap = "jet",
     double object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -613,14 +613,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
     double res = NAN,
     double center_freq = 299792458.0,
     const arma::vec &element = {},
-    const arma::uvec &panel = {},
+    const uint_list &panel = {},
     const arma::vec &spacing = {},
-    const arma::uvec &pol = {},
-    const arma::uvec &ports = {},
+    const uint_list &pol = {},
+    const uint_list &ports = {},
     const arma::mat &steer = {},
     const arma::mat &beams = {},
     const arma::vec &device_size = {},
-    const arma::uvec &locations = {},
+    const uint_list &locations = {},
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(),
     bool separate_beams = false,
     bool apply_weights = false);
@@ -857,7 +857,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Mat<dtype> &V_im,
     arma::Mat<dtype> &H_re,
     arma::Mat<dtype> &H_im,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Mat<dtype> *dist = nullptr,
@@ -877,7 +877,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Cube<std::complex<dtype>> *V = nullptr,
@@ -1051,7 +1051,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_a
 ```cpp
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
         const std::string &fn,
-        const arma::uvec &ids = {},
+        const uint_list &ids = {},
         arma::u32_mat *layout = nullptr);
 ```
 
@@ -1154,13 +1154,13 @@ void quadriga_lib::rotate_pattern(
     arrayant<dtype> &ant,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 
 void quadriga_lib::rotate_pattern(
     std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -1209,7 +1209,7 @@ Not in: MATLAB, Python
 void quadriga_lib::set_element_pos(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        const arma::uvec &i_element = arma::uvec());
+        const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -1653,7 +1653,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     bool remove_delay_phase = true,
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     int use_kernel = 0);
 ```
 
@@ -1701,7 +1701,7 @@ void quadriga_lib::baseband_freq_response_vec(
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     int use_kernel = 0);
 ```
 
@@ -1768,7 +1768,7 @@ void quadriga_lib::channel_export_obj_file(
     double gain_max_dB = -60.0,
     double gain_min_dB = -140.0,
     const std::string &colormap = "jet",
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     double radius_max = 0.05,
     double radius_min = 0.01,
     arma::uword n_edges = 5);
@@ -1858,7 +1858,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    const arma::uvec &i_snap = arma::uvec());
+    const uint_list &i_snap = {});
 ```
 
 ### Inputs:
@@ -1894,7 +1894,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_channel) · [Python](quadrig
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
     const std::string &fn,
     const arma::u32_mat &slots,
-    const arma::uvec &i_snap = arma::uvec());
+    const uint_list &i_snap = {});
 ```
 
 ### Inputs:
@@ -2354,7 +2354,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
 ```cpp
 void quadriga_lib::qrt_file_read(
     const std::string &fn,
-    const arma::uvec &i_cir = {},
+    const uint_list &i_cir = {},
     arma::uword i_orig = 0,
     bool uplink = false,
     arma::Col<dtype> *center_freq = nullptr,
@@ -2701,7 +2701,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
     const arma::vec &dist = arma::vec(),
-    const arma::uvec &n_floors = arma::uvec(),
+    const uint_list &n_floors = {},
     bool uplink = false,
     const arma::mat &offset_angles_deg = arma::mat(),
     arma::uword n_subpath = 20,
@@ -2712,7 +2712,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double sf_std_los_dB = NAN,
     double sf_std_nlos_dB = NAN,
     double dist_breakpoint = NAN,
-    const arma::uvec &n_walls = arma::uvec(),
+    const uint_list &n_walls = {},
     double wall_loss_dB = 5.0);
 ```
 

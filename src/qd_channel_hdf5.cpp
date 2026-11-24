@@ -1013,7 +1013,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    const arma::uvec &i_snap = arma::uvec());
+    const uint_list &i_snap = {});
 ```
 
 ## Inputs:
@@ -1344,8 +1344,9 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
 
 template <typename dtype>
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                             const arma::uvec &i_snap)
+                                                             const uint_list &i_snap_in)
 {
+    const arma::uvec &i_snap = i_snap_in.vec();
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
         throw std::runtime_error("File '" + fn + "' does not exist.");
@@ -1354,10 +1355,10 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
 }
 
 template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                                      const arma::uvec &i_snap);
+                                                                      const uint_list &i_snap);
 
 template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                                       const arma::uvec &i_snap);
+                                                                       const uint_list &i_snap);
 
 /*!MD
 # hdf5_read_channel_vec
@@ -1373,7 +1374,7 @@ Read the channels of several slots of an HDF5 file
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
     const std::string &fn,
     const arma::u32_mat &slots,
-    const arma::uvec &i_snap = arma::uvec());
+    const uint_list &i_snap = {});
 ```
 
 ## Inputs:
@@ -1391,8 +1392,9 @@ MD!*/
 
 template <typename dtype>
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::u32_mat &slots,
-                                                                              const arma::uvec &i_snap)
+                                                                              const uint_list &i_snap_in)
 {
+    const arma::uvec &i_snap = i_snap_in.vec();
     if (slots.n_cols != 0 && slots.n_rows != 4)
         throw std::invalid_argument("Input 'slots' must have 4 rows.");
     qHDF_file h;
@@ -1410,10 +1412,10 @@ std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(co
 }
 
 template std::vector<quadriga_lib::channel<float>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::u32_mat &slots,
-                                                                                       const arma::uvec &i_snap);
+                                                                                       const uint_list &i_snap);
 
 template std::vector<quadriga_lib::channel<double>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::u32_mat &slots,
-                                                                                        const arma::uvec &i_snap);
+                                                                                        const uint_list &i_snap);
 
 /*!MD
 # hdf5_reshape_layout

@@ -276,7 +276,7 @@ Calculate the beamwidth and pointing angles of the elements of an antenna array 
 ```
 void quadriga_lib::calc_beamwidth(
     const arrayant<dtype> &ant,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     double threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
@@ -285,7 +285,7 @@ void quadriga_lib::calc_beamwidth(
 
 void quadriga_lib::calc_beamwidth(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     double threshold_dB = 3.0,
     arma::Mat<dtype> *beamwidth_az_deg = nullptr,
     arma::Mat<dtype> *beamwidth_el_deg = nullptr,
@@ -332,10 +332,11 @@ quadriga_lib::calc_beamwidth(ant, {}, 3.0, &bw_az, &bw_el); // about 30 and 20 d
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::calc_beamwidth(const arrayant<dtype> &ant, const arma::uvec &i_element, double threshold_dB_in,
+void quadriga_lib::calc_beamwidth(const arrayant<dtype> &ant, const uint_list &i_element_in, double threshold_dB_in,
                                            arma::Col<dtype> *beamwidth_az_deg, arma::Col<dtype> *beamwidth_el_deg,
                                            arma::Col<dtype> *az_point_ang_deg, arma::Col<dtype> *el_point_ang_deg)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     const dtype threshold_dB = dtype(threshold_dB_in);
     const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
@@ -362,17 +363,18 @@ void quadriga_lib::calc_beamwidth(const arrayant<dtype> &ant, const arma::uvec &
                                            el_point_ang_deg == nullptr ? nullptr : el_point_ang_deg->memptr() + i);
 }
 
-template void quadriga_lib::calc_beamwidth(const arrayant<float> &, const arma::uvec &, double, arma::Col<float> *,
+template void quadriga_lib::calc_beamwidth(const arrayant<float> &, const uint_list &, double, arma::Col<float> *,
                                                     arma::Col<float> *, arma::Col<float> *, arma::Col<float> *);
-template void quadriga_lib::calc_beamwidth(const arrayant<double> &, const arma::uvec &, double, arma::Col<double> *,
+template void quadriga_lib::calc_beamwidth(const arrayant<double> &, const uint_list &, double, arma::Col<double> *,
                                                     arma::Col<double> *, arma::Col<double> *, arma::Col<double> *);
 
 template <typename dtype>
 void quadriga_lib::calc_beamwidth(const std::vector<arrayant<dtype>> &arrayant_vec,
-                                                 const arma::uvec &i_element, double threshold_dB_in,
+                                                 const uint_list &i_element_in, double threshold_dB_in,
                                                  arma::Mat<dtype> *beamwidth_az_deg, arma::Mat<dtype> *beamwidth_el_deg,
                                                  arma::Mat<dtype> *az_point_ang_deg, arma::Mat<dtype> *el_point_ang_deg)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     const dtype threshold_dB = dtype(threshold_dB_in);
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
@@ -403,9 +405,9 @@ void quadriga_lib::calc_beamwidth(const std::vector<arrayant<dtype>> &arrayant_v
                                                at(2, i, f), at(3, i, f));
 }
 
-template void quadriga_lib::calc_beamwidth(const std::vector<arrayant<float>> &, const arma::uvec &, double,
+template void quadriga_lib::calc_beamwidth(const std::vector<arrayant<float>> &, const uint_list &, double,
                                                           arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *);
-template void quadriga_lib::calc_beamwidth(const std::vector<arrayant<double>> &, const arma::uvec &, double,
+template void quadriga_lib::calc_beamwidth(const std::vector<arrayant<double>> &, const uint_list &, double,
                                                           arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *);
 
 /*!MD
@@ -420,11 +422,11 @@ Calculate the directivity in dBi of the elements of an antenna array
 ```
 arma::Col<dtype> quadriga_lib::calc_directivity(
     const arrayant<dtype> &ant,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 
 arma::Mat<dtype> quadriga_lib::calc_directivity(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ## Inputs:
@@ -452,8 +454,9 @@ arma::vec directivity_dBi = quadriga_lib::calc_directivity(ant); // about 1.76 d
 MD!*/
 
 template <typename dtype>
-arma::Col<dtype> quadriga_lib::calc_directivity(const arrayant<dtype> &ant, const arma::uvec &i_element)
+arma::Col<dtype> quadriga_lib::calc_directivity(const arrayant<dtype> &ant, const uint_list &i_element_in)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
         throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
@@ -465,13 +468,14 @@ arma::Col<dtype> quadriga_lib::calc_directivity(const arrayant<dtype> &ant, cons
     return directivity_dBi;
 }
 
-template arma::Col<float> quadriga_lib::calc_directivity(const arrayant<float> &, const arma::uvec &);
-template arma::Col<double> quadriga_lib::calc_directivity(const arrayant<double> &, const arma::uvec &);
+template arma::Col<float> quadriga_lib::calc_directivity(const arrayant<float> &, const uint_list &);
+template arma::Col<double> quadriga_lib::calc_directivity(const arrayant<double> &, const uint_list &);
 
 template <typename dtype>
 arma::Mat<dtype> quadriga_lib::calc_directivity(const std::vector<arrayant<dtype>> &arrayant_vec,
-                                                               const arma::uvec &i_element)
+                                                               const uint_list &i_element_in)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
     const std::string error_message = qd_arrayant_vec_is_valid_quick(arrayant_vec);
@@ -487,5 +491,5 @@ arma::Mat<dtype> quadriga_lib::calc_directivity(const std::vector<arrayant<dtype
     return directivity_dBi;
 }
 
-template arma::Mat<float> quadriga_lib::calc_directivity(const std::vector<arrayant<float>> &, const arma::uvec &);
-template arma::Mat<double> quadriga_lib::calc_directivity(const std::vector<arrayant<double>> &, const arma::uvec &);
+template arma::Mat<float> quadriga_lib::calc_directivity(const std::vector<arrayant<float>> &, const uint_list &);
+template arma::Mat<double> quadriga_lib::calc_directivity(const std::vector<arrayant<double>> &, const uint_list &);

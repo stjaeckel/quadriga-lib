@@ -90,7 +90,7 @@ namespace quadriga_lib
         double gain_max_dB = -60.0,              // Maximum path gain in dB (only for color-coding)
         double gain_min_dB = -140.0,             // Minimum path gain in dB (only for color-coding and path selection)
         const std::string &colormap = "jet",     // Colormap for the visualization
-        const arma::uvec &i_snap = arma::uvec(), // Snapshot indices, 0-based; empty = export all
+        const uint_list &i_snap = {},           // Snapshot indices, 0-based; empty = export all
         double radius_max = 0.05,                // Maximum tube radius in meters
         double radius_min = 0.01,                // Minimum tube radius in meters
         arma::uword n_edges = 5);                // Number of vertices in the circle building the tube, must be >= 3
@@ -282,14 +282,14 @@ namespace quadriga_lib
                                      unsigned iy = 0,                          // y-Index in the HDF file
                                      unsigned iz = 0,                          // z-Index in the HDF file
                                      unsigned iw = 0,                          // w-Index in the HDF file
-                                     const arma::uvec &i_snap = arma::uvec()); // Snapshot indices, 0-based; empty = all
+                                     const uint_list &i_snap = {});           // Snapshot indices, 0-based; empty = all
 
     // Read several channels from HDF5 file, one per column of 'slots', opening the file once
     // - Empty slots or slots outside the layout give empty channels; 'i_snap' as in hdf5_read_channel, for every slot
     template <typename dtype = double>                                                                   // Read as float or double
     std::vector<channel<dtype>> hdf5_read_channel_vec(const std::string &fn,                    // Filename of the HDF5 file
                                                       const arma::u32_mat &slots,               // Slot indices (ix, iy, iz, iw), 0-based, [4, n_slot]
-                                                      const arma::uvec &i_snap = arma::uvec()); // Snapshot indices, 0-based; empty = all
+                                                      const uint_list &i_snap = {});           // Snapshot indices, 0-based; empty = all
 
     // Read single unstructured dataset from HDF5 file
     // - Besides structured channel data, extra datasets of various types can be added
@@ -394,7 +394,7 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> *hmat_re = nullptr,            // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
         std::vector<arma::Cube<dtype>> *hmat_im = nullptr,            // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
         std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr, // Complex-valued frequency-domain channel matrices, same structure as hmat_re
-        const arma::uvec &i_snap = arma::uvec(),                      // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
+        const uint_list &i_snap = {},                                // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
         int use_kernel = 0);                                          // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients
@@ -412,7 +412,7 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> *hmat_im = nullptr,            // Output: imaginary part, same structure as hmat_re
         std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr, // Output: complex-valued, same structure as hmat_re
         bool remove_delay_phase = true,                               // Remove baked-in delay phase before SLERP interpolation
-        const arma::uvec &i_snap = arma::uvec(),                      // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
+        const uint_list &i_snap = {},                                // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
         int use_kernel = 0);                                          // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fixes the path delays to a grid of delay bins
@@ -503,7 +503,7 @@ namespace quadriga_lib
     template <typename dtype = double>
     void qrt_file_read(
         const std::string &fn,                                            // Path to the QRT file
-        const arma::uvec &i_cir = {},                                     // CIR indices, 0-based, [n_out]; empty = all CIRs
+        const uint_list &i_cir = {},                                     // CIR indices, 0-based, [n_out]; empty = all CIRs
         arma::uword i_orig = 0,                                           // Origin index (for downlink Origin = TX)
         bool uplink = false,                                              // Reverse direction: origin = RX, destination = TX
         arma::Col<dtype> *center_freq = nullptr,                          // Center frequency in [Hz], Size [n_freq]
@@ -787,7 +787,7 @@ namespace quadriga_lib
         double speed_station_kmh = 0.0,                   // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
         double speed_env_kmh = 1.2,                       // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
         const arma::vec &dist = arma::vec(),              // Distance between TX and RX in meters, [n_users] or [1]; empty = 4.99 m
-        const arma::uvec &n_floors = arma::uvec(),        // Number of floors per user (TGah / TGax), up to 4, [n_users] or [1]; empty = 0; attenuation only, no delay
+        const uint_list &n_floors = {},                  // Number of floors per user (TGah / TGax), up to 4, [n_users] or [1]; empty = 0; attenuation only, no delay
         bool uplink = false,                              // Default channel direction is downlink, set uplink to true to get reverse direction (transpose, same Doppler shift)
         const arma::mat &offset_angles_deg = arma::mat(), // Offset angles in degree for MU-MIMO channels, [4, n_users], rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty = TGac auto
         arma::uword n_subpath = 20,                       // Number of sub-paths per path and cluster for Laplacian AS mapping
@@ -798,7 +798,7 @@ namespace quadriga_lib
         double sf_std_los_dB = NAN,                       // Overrides the default shadow fading STD for LOS channels in dB; NAN = default, else finite and >= 0
         double sf_std_nlos_dB = NAN,                      // Overrides the default shadow fading STD for NLOS channels in dB; NAN = default, else finite and >= 0
         double dist_breakpoint = NAN,                     // Overrides the default breakpoint distance in meters; NAN = default, else finite and > 0
-        const arma::uvec &n_walls = arma::uvec(),         // Number of walls per user (TGax), [n_users] or [1]; empty = 0
+        const uint_list &n_walls = {},                   // Number of walls per user (TGax), [n_users] or [1]; empty = 0
         double wall_loss_dB = 5.0);                       // Penetration loss for a single wall in dB; TGax defines 5.0 (default) or 7.0
 
 }

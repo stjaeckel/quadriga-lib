@@ -191,7 +191,7 @@ Also in: [MATLAB](../mex/antennas-transducers-and-patterns.md#calc_beamwidth) ·
 ```cpp
 void quadriga_lib::calc_beamwidth(
     const arrayant<dtype> &ant,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     double threshold_dB = 3.0,
     arma::Col<dtype> *beamwidth_az_deg = nullptr,
     arma::Col<dtype> *beamwidth_el_deg = nullptr,
@@ -200,7 +200,7 @@ void quadriga_lib::calc_beamwidth(
 
 void quadriga_lib::calc_beamwidth(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     double threshold_dB = 3.0,
     arma::Mat<dtype> *beamwidth_az_deg = nullptr,
     arma::Mat<dtype> *beamwidth_el_deg = nullptr,
@@ -260,11 +260,11 @@ Also in: [MATLAB](../mex/antennas-transducers-and-patterns.md#calc_directivity) 
 ```cpp
 arma::Col<dtype> quadriga_lib::calc_directivity(
     const arrayant<dtype> &ant,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 
 arma::Mat<dtype> quadriga_lib::calc_directivity(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -307,12 +307,12 @@ Also in: [MATLAB](../mex/antennas-transducers-and-patterns.md#copy_element) · [
 void quadriga_lib::copy_element(
     arrayant<dtype> &ant,
     arma::uword i_source,
-    const arma::uvec &i_target);
+    const uint_list &i_target);
 
 void quadriga_lib::copy_element(
     std::vector<arrayant<dtype>> &arrayant_vec,
     arma::uword i_source,
-    const arma::uvec &i_target);
+    const uint_list &i_target);
 ```
 
 ### Inputs:
@@ -359,7 +359,7 @@ void quadriga_lib::export_pattern_obj(
     const std::string &colormap = "jet",
     double object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -403,14 +403,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
     double res = NAN,
     double center_freq = 299792458.0,
     const arma::vec &element = {},
-    const arma::uvec &panel = {},
+    const uint_list &panel = {},
     const arma::vec &spacing = {},
-    const arma::uvec &pol = {},
-    const arma::uvec &ports = {},
+    const uint_list &pol = {},
+    const uint_list &ports = {},
     const arma::mat &steer = {},
     const arma::mat &beams = {},
     const arma::vec &device_size = {},
-    const arma::uvec &locations = {},
+    const uint_list &locations = {},
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(),
     bool separate_beams = false,
     bool apply_weights = false);
@@ -647,7 +647,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Mat<dtype> &V_im,
     arma::Mat<dtype> &H_re,
     arma::Mat<dtype> &H_im,
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Mat<dtype> *dist = nullptr,
@@ -667,7 +667,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
     const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
-    const arma::uvec &i_element = arma::uvec(),
+    const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
     arma::Cube<std::complex<dtype>> *V = nullptr,
@@ -841,7 +841,7 @@ Also in: [MATLAB](../mex/antennas-transducers-and-patterns.md#qdant_read) · [Py
 ```cpp
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
         const std::string &fn,
-        const arma::uvec &ids = {},
+        const uint_list &ids = {},
         arma::u32_mat *layout = nullptr);
 ```
 
@@ -944,13 +944,13 @@ void quadriga_lib::rotate_pattern(
     arrayant<dtype> &ant,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 
 void quadriga_lib::rotate_pattern(
     std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ### Inputs:
@@ -999,7 +999,7 @@ Not in: MATLAB, Python
 void quadriga_lib::set_element_pos(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        const arma::uvec &i_element = arma::uvec());
+        const uint_list &i_element = {});
 ```
 
 ### Inputs:

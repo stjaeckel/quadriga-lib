@@ -46,7 +46,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
     const arma::vec &dist = arma::vec(),
-    const arma::uvec &n_floors = arma::uvec(),
+    const uint_list &n_floors = {},
     bool uplink = false,
     const arma::mat &offset_angles_deg = arma::mat(),
     arma::uword n_subpath = 20,
@@ -57,7 +57,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double sf_std_los_dB = NAN,
     double sf_std_nlos_dB = NAN,
     double dist_breakpoint = NAN,
-    const arma::uvec &n_walls = arma::uvec(),
+    const uint_list &n_walls = {},
     double wall_loss_dB = 5.0);
 ```
 
@@ -111,7 +111,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        double speed_station_kmh,
                                        double speed_env_kmh,
                                        const arma::vec &dist,
-                                       const arma::uvec &n_floors,
+                                       const uint_list &n_floors_in,
                                        bool uplink,
                                        const arma::mat &offset_angles_deg,
                                        arma::uword n_subpath,
@@ -122,10 +122,12 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        double sf_std_los_dB,
                                        double sf_std_nlos_dB,
                                        double dist_breakpoint,
-                                       const arma::uvec &n_walls,
+                                       const uint_list &n_walls_in,
                                        double wall_loss_dB)
 
 {
+    const arma::uvec &n_floors = n_floors_in.vec();
+    const arma::uvec &n_walls = n_walls_in.vec();
     auto error_message = qd_arrayant_is_valid_quick(ap_array);
     if (error_message.length() != 0)
     {

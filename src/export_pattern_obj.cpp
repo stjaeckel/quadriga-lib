@@ -35,7 +35,7 @@ void quadriga_lib::export_pattern_obj(
     const std::string &colormap = "jet",
     double object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ## Inputs:
@@ -59,8 +59,9 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::export_pattern_obj(const std::string &fn, const arrayant<dtype> &ant, double directivity_range_dB_in,
                                             const std::string &colormap, double object_radius_in,
-                                            arma::uword icosphere_n_div, const arma::uvec &i_element_in)
+                                            arma::uword icosphere_n_div, const uint_list &i_element_arg)
 {
+    const arma::uvec &i_element_in = i_element_arg.vec();
     const dtype directivity_range_dB = dtype(directivity_range_dB_in);
     const dtype object_radius = dtype(object_radius_in);
     std::string error_message = qd_arrayant_is_valid_quick(ant);
@@ -413,5 +414,5 @@ void quadriga_lib::export_pattern_obj(const std::string &fn, const arrayant<dtyp
     }
 }
 
-template void quadriga_lib::export_pattern_obj(const std::string &, const arrayant<float> &, double, const std::string &, double, arma::uword, const arma::uvec &);
-template void quadriga_lib::export_pattern_obj(const std::string &, const arrayant<double> &, double, const std::string &, double, arma::uword, const arma::uvec &);
+template void quadriga_lib::export_pattern_obj(const std::string &, const arrayant<float> &, double, const std::string &, double, arma::uword, const uint_list &);
+template void quadriga_lib::export_pattern_obj(const std::string &, const arrayant<double> &, double, const std::string &, double, arma::uword, const uint_list &);

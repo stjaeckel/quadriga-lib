@@ -775,14 +775,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
     double res = NAN,
     double center_freq = 299792458.0,
     const arma::vec &element = {},
-    const arma::uvec &panel = {},
+    const uint_list &panel = {},
     const arma::vec &spacing = {},
-    const arma::uvec &pol = {},
-    const arma::uvec &ports = {},
+    const uint_list &pol = {},
+    const uint_list &ports = {},
     const arma::mat &steer = {},
     const arma::mat &beams = {},
     const arma::vec &device_size = {},
-    const arma::uvec &locations = {},
+    const uint_list &locations = {},
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(),
     bool separate_beams = false,
     bool apply_weights = false);
@@ -901,11 +901,15 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
-                                                             const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
-                                                             const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
-                                                             const arma::mat &beams, const arma::vec &device_size, const arma::uvec &locations, const arrayant<dtype> &pattern,
+                                                             const arma::vec &element, const uint_list &panel_in, const arma::vec &spacing,
+                                                             const uint_list &pol_in, const uint_list &ports_in, const arma::mat &steer,
+                                                             const arma::mat &beams, const arma::vec &device_size, const uint_list &locations_in, const arrayant<dtype> &pattern,
                                                              bool separate_beams, bool apply_weights)
 {
+    const arma::uvec &panel = panel_in.vec();
+    const arma::uvec &pol = pol_in.vec();
+    const arma::uvec &ports = ports_in.vec();
+    const arma::uvec &locations = locations_in.vec();
     // Inputs per type, as bit masks over the optional inputs below
     const char *name[12] = {"panel", "spacing", "ports", "pol", "steer", "element", "pattern", "beams", "separate_beams", "apply_weights",
                             "device_size", "locations"};
@@ -971,13 +975,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(const std::string &
 }
 
 template quadriga_lib::arrayant<float> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
-                                                                      const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
-                                                                      const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
-                                                                      const arma::mat &beams, const arma::vec &device_size, const arma::uvec &locations, const arrayant<float> &pattern,
+                                                                      const arma::vec &element, const uint_list &panel, const arma::vec &spacing,
+                                                                      const uint_list &pol, const uint_list &ports, const arma::mat &steer,
+                                                                      const arma::mat &beams, const arma::vec &device_size, const uint_list &locations, const arrayant<float> &pattern,
                                                                       bool separate_beams, bool apply_weights);
 
 template quadriga_lib::arrayant<double> quadriga_lib::generate_antenna(const std::string &type, double res, double center_freq,
-                                                                       const arma::vec &element, const arma::uvec &panel, const arma::vec &spacing,
-                                                                       const arma::uvec &pol, const arma::uvec &ports, const arma::mat &steer,
-                                                                       const arma::mat &beams, const arma::vec &device_size, const arma::uvec &locations, const arrayant<double> &pattern,
+                                                                       const arma::vec &element, const uint_list &panel, const arma::vec &spacing,
+                                                                       const uint_list &pol, const uint_list &ports, const arma::mat &steer,
+                                                                       const arma::mat &beams, const arma::vec &device_size, const uint_list &locations, const arrayant<double> &pattern,
                                                                        bool separate_beams, bool apply_weights);

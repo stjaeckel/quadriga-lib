@@ -328,7 +328,7 @@ void quadriga_lib::baseband_freq_response_multi_vec(
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     bool remove_delay_phase = true,
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     int use_kernel = 0);
 ```
 
@@ -376,7 +376,7 @@ void quadriga_lib::baseband_freq_response_vec(
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     int use_kernel = 0);
 ```
 
@@ -443,7 +443,7 @@ void quadriga_lib::channel_export_obj_file(
     double gain_max_dB = -60.0,
     double gain_min_dB = -140.0,
     const std::string &colormap = "jet",
-    const arma::uvec &i_snap = arma::uvec(),
+    const uint_list &i_snap = {},
     double radius_max = 0.05,
     double radius_min = 0.01,
     arma::uword n_edges = 5);
@@ -533,7 +533,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    const arma::uvec &i_snap = arma::uvec());
+    const uint_list &i_snap = {});
 ```
 
 ### Inputs:
@@ -569,7 +569,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_channel) · [Python](../
 std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
     const std::string &fn,
     const arma::u32_mat &slots,
-    const arma::uvec &i_snap = arma::uvec());
+    const uint_list &i_snap = {});
 ```
 
 ### Inputs:
@@ -1029,7 +1029,7 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_read) · [Python](../pyth
 ```cpp
 void quadriga_lib::qrt_file_read(
     const std::string &fn,
-    const arma::uvec &i_cir = {},
+    const uint_list &i_cir = {},
     arma::uword i_orig = 0,
     bool uplink = false,
     arma::Col<dtype> *center_freq = nullptr,

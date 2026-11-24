@@ -8,11 +8,14 @@
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 #include "qd_test_arrayant.hpp"
 
 #include <cmath>
+#include <type_traits>
+#include <vector>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -372,4 +375,64 @@ TEST_CASE("Arrayant calc_beamwidth - outputs that are the same variable")
     arma::mat m1, m2;
     CHECK_THROWS_AS(quadriga_lib::calc_beamwidth(v, {}, 3.0, &m1, &m1), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::calc_beamwidth<double>(v, {}, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
+}
+
+// Index arguments take a single integer, brace lists and integer vectors of any type; a literal 0 is index 0 (#98)
+TEST_CASE("Arrayant - Index arguments accept integers and integer vectors")
+{
+    const auto ant = quadriga_lib::generate_antenna<double>("xpol", 10.0);
+    const arma::vec ref0 = quadriga_lib::calc_directivity(ant, {0});
+    const arma::vec ref10 = quadriga_lib::calc_directivity(ant, {1, 0});
+    REQUIRE(ref0.n_elem == 1);
+    REQUIRE(ref10.n_elem == 2);
+
+    arma::vec d;
+    REQUIRE_NOTHROW(d = quadriga_lib::calc_directivity(ant, 0));
+    CHECK(arma::approx_equal(d, ref0, "absdiff", 1e-12));
+
+    const int i1 = 1, i0 = 0;
+    const arma::uvec u10 = {1, 0};
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, 1u), ref10.head(1), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, {i1, i0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, std::vector<int>{1, 0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, std::vector<size_t>{1, 0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, arma::ivec{1, 0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, arma::u32_vec{1, 0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, arma::urowvec{1, 0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, u10), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, arma::uvec{1, 0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, {arma::uword(1), 0}), ref10, "absdiff", 1e-12));
+    CHECK(quadriga_lib::calc_directivity(ant, std::vector<int>{}).n_elem == 2); // Empty = all
+    CHECK(quadriga_lib::calc_directivity(ant, arma::umat(0, 3)).n_elem == 2);
+
+    const arma::vec sel = {0.0, 1.0};
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, arma::find(sel > 0.5)), ref10.head(1), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, u10.head(1)), ref10.head(1), "absdiff", 1e-12));
+
+    CHECK_THROWS_WITH(quadriga_lib::calc_directivity(ant, -1), "Index and count arguments must be non-negative integers.");
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, {-1}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, std::vector<int>{1, -2}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, arma::umat(2, 2, arma::fill::zeros)), std::invalid_argument);
+
+
+    // Floating-point values are accepted when they are non-negative integers
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, 1.0), ref10.head(1), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, 1.0f), ref10.head(1), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, {1.0, 0.0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, arma::vec{1.0, 0.0}), ref10, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(quadriga_lib::calc_directivity(ant, std::vector<double>{1.0, 0.0}), ref10, "absdiff", 1e-12));
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, 1.5), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, -1.0), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, arma::datum::nan), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_directivity(ant, arma::vec{0.0, arma::datum::inf}), std::invalid_argument);
+
+    // A uvec is used in place; a count tuple takes a single integer
+    CHECK(&quadriga_lib::uint_list(u10).vec() == &u10);
+    const auto ula4 = quadriga_lib::generate_antenna<double>("ula", 10.0, 3.0e9, {}, 4);
+    CHECK(ula4.n_elements() == quadriga_lib::generate_antenna<double>("ula", 10.0, 3.0e9, {}, {4}).n_elements());
+    CHECK(ula4.n_elements() == 4);
+
+    // A null pointer and bool are not accepted
+    static_assert(!std::is_convertible<std::nullptr_t, quadriga_lib::uint_list>::value, "nullptr");
+    static_assert(!std::is_convertible<bool, quadriga_lib::uint_list>::value, "bool");
 }

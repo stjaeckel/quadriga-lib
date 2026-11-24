@@ -33,13 +33,13 @@ void quadriga_lib::rotate_pattern(
     arrayant<dtype> &ant,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 
 void quadriga_lib::rotate_pattern(
     std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Mat<dtype> &orientation,
     unsigned usage = 0,
-    const arma::uvec &i_element = arma::uvec());
+    const uint_list &i_element = {});
 ```
 
 ## Inputs:
@@ -77,8 +77,9 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::rotate_pattern(arrayant<dtype> &ant, const arma::Mat<dtype> &orientation,
-                                           unsigned usage, const arma::uvec &i_element)
+                                           unsigned usage, const uint_list &i_element_in)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
         throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
@@ -352,14 +353,15 @@ void quadriga_lib::rotate_pattern(arrayant<dtype> &ant, const arma::Mat<dtype> &
         quadriga_lib::trim_pattern(ant);
 }
 
-template void quadriga_lib::rotate_pattern(arrayant<float> &, const arma::Mat<float> &, unsigned, const arma::uvec &);
-template void quadriga_lib::rotate_pattern(arrayant<double> &, const arma::Mat<double> &, unsigned, const arma::uvec &);
+template void quadriga_lib::rotate_pattern(arrayant<float> &, const arma::Mat<float> &, unsigned, const uint_list &);
+template void quadriga_lib::rotate_pattern(arrayant<double> &, const arma::Mat<double> &, unsigned, const uint_list &);
 
 template <typename dtype>
 void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                  const arma::Mat<dtype> &orientation, unsigned usage,
-                                                 const arma::uvec &i_element)
+                                                 const uint_list &i_element_in)
 {
+    const arma::uvec &i_element = i_element_in.vec();
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
@@ -391,8 +393,8 @@ void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<dtype>> &ar
     }
 }
 
-template void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, unsigned, const arma::uvec &);
-template void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, unsigned, const arma::uvec &);
+template void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, unsigned, const uint_list &);
+template void quadriga_lib::rotate_pattern(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, unsigned, const uint_list &);
 
 /*!MD
 # trim_pattern

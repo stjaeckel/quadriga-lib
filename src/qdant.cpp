@@ -1084,7 +1084,7 @@ Read arrayant objects from a QDANT file
 ```
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
         const std::string &fn,
-        const arma::uvec &ids = {},
+        const uint_list &ids = {},
         arma::u32_mat *layout = nullptr);
 ```
 
@@ -1114,8 +1114,9 @@ MD!*/
 
 // Read antenna array objects and layout from QDANT file; the file is parsed once
 template <typename dtype>
-std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(const std::string &fn, const arma::uvec &ids, arma::u32_mat *layout)
+std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(const std::string &fn, const uint_list &ids_in, arma::u32_mat *layout)
 {
+    const arma::uvec &ids = ids_in.vec();
     pugi::xml_document doc;
     pugi::xml_node node_qdant;
     std::string pfx;
@@ -1191,8 +1192,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(const std::s
 
     return result;
 }
-template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::qdant_read(const std::string &, const arma::uvec &, arma::u32_mat *);
-template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::qdant_read(const std::string &, const arma::uvec &, arma::u32_mat *);
+template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::qdant_read(const std::string &, const uint_list &, arma::u32_mat *);
+template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::qdant_read(const std::string &, const uint_list &, arma::u32_mat *);
 
 /*!MD
 # qdant_write
