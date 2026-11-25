@@ -472,8 +472,8 @@ TEST_CASE("generate_layout - TR 38.901 presets")
         arma::uword nx, ny;
         double h_bs, h_ut, d_min, l_max;
     };
-    const in_row in[] = {{"38.901_InH_Open", "InH_Open", 120.0, 50.0, NaN, 20.0, 6, 2, 3.0, 1.0, 0.0, NaN},
-                         {"38.901_InH_Mixed", "InH_Mixed", 120.0, 50.0, NaN, 20.0, 6, 2, 3.0, 1.0, 0.0, NaN},
+    const in_row in[] = {{"38.901_InH_Open", "InH_Open", 120.0, 50.0, NaN, 20.0, 6, 2, 3.0, 1.0, 0.0, 120.0},
+                         {"38.901_InH_Mixed", "InH_Mixed", 120.0, 50.0, NaN, 20.0, 6, 2, 3.0, 1.0, 0.0, 120.0},
                          {"38.901_InF_SL", "InF_SL", 120.0, 60.0, 10.0, 20.0, 6, 3, 1.5, 1.5, 1.0, 120.0},
                          {"38.901_InF_DL", "InF_DL", 300.0, 150.0, 10.0, 50.0, 6, 3, 1.5, 1.5, 1.0, 300.0},
                          {"38.901_InF_SH", "InF_SH", 300.0, 150.0, 10.0, 50.0, 6, 3, 8.0, 1.5, 1.0, 300.0},
@@ -512,17 +512,19 @@ TEST_CASE("generate_layout - TR 38.901 presets")
             CHECK(want.count({50000, 10000}) == 1);
         }
 
-        // InF hall parameters: V/S (TR Table 7.5-6 Part-3, DS of InF) and the largest dimension (clause 7.6.9)
+        // Hall and office parameters: V/S of the InF hall (TR Table 7.5-6 Part-3, DS of InF) and the largest dimension of
+        // the hall or office (clause 7.6.9; InH: 120 m x 50 m x 3 m, L = 120 m)
         if (!std::isnan(p.hgt))
         {
             REQUIRE(L.tx.scenpar_override.count("DS_VS") == 1);
-            REQUIRE(L.tx.scenpar_override.count("absTOA_Lmax") == 1);
             const double vs = p.len * p.wid * p.hgt / (2.0 * (p.len * p.wid + p.len * p.hgt + p.wid * p.hgt));
             CHECK(arma::approx_equal(L.tx.scenpar_override.at("DS_VS"), arma::vec(L.tx.n_node(), arma::fill::value(vs)), "absdiff", 1.0e-12));
-            CHECK(arma::all(L.tx.scenpar_override.at("absTOA_Lmax") == p.l_max));
         }
         else
-            CHECK(L.tx.scenpar_override.empty());
+            CHECK(L.tx.scenpar_override.count("DS_VS") == 0);
+        CHECK(L.tx.scenpar_override.size() == (std::isnan(p.hgt) ? 1 : 2));
+        REQUIRE(L.tx.scenpar_override.count("absTOA_Lmax") == 1);
+        CHECK(arma::all(L.tx.scenpar_override.at("absTOA_Lmax") == p.l_max));
         CHECK(L.is_valid() == "");
 
         // UTs: two per BS, in the hall, at hUT, the minimum distance, 3 km/h, no O2I state
@@ -543,6 +545,16 @@ TEST_CASE("generate_layout - TR 38.901 presets")
     REQUIRE(W.tx.scenpar_override.count("absTOA_Lmax") == 1);
     CHECK(arma::all(W.tx.scenpar_override.at("absTOA_Lmax") == 80.0));
     CHECK(arma::all(arma::abs(W.tx.scenpar_override.at("DS_VS") - 48000.0 / 12400.0) < 1.0e-12));
+
+    // An office whose largest dimension is the width: 40 m x 70 m, 6 x 2 BSs at 5 m and 20 m
+    const auto O = gen("38.901_InH_Mixed", 0, {5.0, 20.0}, {}, {40.0, 70.0});
+    REQUIRE(O.tx.scenpar_override.count("absTOA_Lmax") == 1);
+    CHECK(arma::all(O.tx.scenpar_override.at("absTOA_Lmax") == 70.0));
+    CHECK(O.tx.scenpar_override.count("DS_VS") == 0);
+    // An office smaller than its height of 3 m (Table 7.2-2): L = 3 m; one BS
+    const auto Q = gen("38.901_InH_Open", 0, {1.0, 1.0}, {1.0, 1.0}, {2.0, 2.5});
+    REQUIRE(Q.tx.scenpar_override.count("absTOA_Lmax") == 1);
+    CHECK(arma::all(Q.tx.scenpar_override.at("absTOA_Lmax") == 3.0));
 }
 
 TEST_CASE("generate_layout - exactly n_ut per cell")

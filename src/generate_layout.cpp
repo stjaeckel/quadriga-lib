@@ -617,7 +617,7 @@ struct qd_preset
     double grid[3];      // Rings (hexagonal) or BSs in x and y; sectors per site
     double area[3];      // Length, width, height of the hall or road area in [m]; NaN = not used
     double h_bs, tilt;   // BS height in [m] and mechanical tilt in [deg] (positive down); NaN tilt = SMa rule
-    bool hall_scenpar;   // Writes the hall parameters DS_VS and absTOA_Lmax (InF)
+    bool hall_scenpar;   // Writes the hall parameters DS_VS and absTOA_Lmax (InF); the InH presets write absTOA_Lmax only
     double lane[2];      // Roads: lane width in [m] and lanes per direction; NaN = no roads
     qd_drop_values drop; // UT drop; roads: h_ut is the antenna height of a passenger vehicle, speed that of the lanes
 };
@@ -827,6 +827,9 @@ void qd_build_indoor(const qd_preset &p, const qd_geometry_args &a, quadriga_lib
         T.scenpar_override["DS_VS"] = arma::vec(nn, arma::fill::value(vs));
         T.scenpar_override["absTOA_Lmax"] = arma::vec(nn, arma::fill::value(std::max(std::max(len, wid), hgt)));
     }
+    else if (p.set_scenario && std::string(p.family).compare(0, 3, "InH") == 0)
+        // The office of InH (clause 7.6.9): L = max(length, width, height), height 3 m (Table 7.2-2; not an input)
+        T.scenpar_override["absTOA_Lmax"] = arma::vec(nn, arma::fill::value(std::max(std::max(len, wid), 3.0)));
     L.wrap.reset();
     out.bounds = {-0.5 * len, 0.5 * len, -0.5 * wid, 0.5 * wid};
 }
@@ -1168,9 +1171,9 @@ Network layout from a preset: BS sites and a drop of UTs
 - Indoor presets, centred at the origin, one sector, no wrap; a lattice of BSs centred in the hall, ordered by y and then by x:
   - `38.901_InH_Open`, `38.901_InH_Mixed`: 120 × 50 m, 6 × 2 BSs at 20 m, hBS 3 m
   - `38.901_InF_SL`: 120 × 60 × 10 m, 6 × 3 BSs at 20 m, hBS 1.5 m; `38.901_InF_DL`: 300 × 150 × 10 m, 6 × 3 BSs at 50 m, hBS 1.5 m; `38.901_InF_SH`: as DL with hBS 8 m; `38.901_InF_DH`: as SL with hBS 8 m; `38.901_InF_HH`: as SH (the TR has no calibration layout for it)
-  - The InF presets set `scenpar_override` `DS_VS` (V/S of the hall) and `absTOA_Lmax` (its largest dimension) on the Tx rows
+  - The InF presets set `scenpar_override` `DS_VS` (V/S of the hall) and `absTOA_Lmax` (its largest dimension) on the Tx rows, the TR 38.901 InH presets `absTOA_Lmax` (the largest of length, width and the office height 3 m)
 - ITU-R M.2412 presets (Report M.2412-0, section 8.3 and Table 5), geometry and drop only; option `config` 1, 2, 3 for configurations A, B, C (default 1); mechanical tilt 0; minimum distance and O2I fields of the TR 38.901 model that the Report maps the environment to. `d2d_in` is the TR 38.901 minimum of two uniforms (library choice; the Report's model A at or below 6 GHz uses one uniform). The building-loss shares of Table 5 (20 % high, 80 % low loss) are set with `o2i_low = 0.8` of [[init_link_states]], not by the preset:
-  - `M.2412_InH`: as `38.901_InH_Open` with hUT 1.5 m
+  - `M.2412_InH`: as `38.901_InH_Open` with hUT 1.5 m, without scenario and `scenpar_override`
   - `M.2412_DenseUrban`: as `38.901_UMa` with ISD 200 m; 80 % in buildings with floors, 20 % in cars at 30 km/h. Config 3 adds 3 micro sites per macro TRxP, uniform in its cell, one TRxP each, `h_micro` high (option, 10 m), at least 35 m from the macro sites and 20 m from each other; they form no cells: a macro TRxP cell receives `n_ut` UTs for itself and for each of its micro TRxPs, at least 10 m from the micro sites, over the whole macro layer (Table 5 b: within a cluster)
   - `M.2412_Rural`: as `38.901_RMa`, hUT 1.5 m; configs 1 and 2: 50 % in buildings, 50 % in cars at 120 km/h; config 3: ISD 6000 m, 40 % in buildings, 40 % outdoors, 20 % in cars at 30 km/h
   - `M.2412_UrbanMacro`: hBS 25 m, hUT 1.5 m; option `service` 1 (mMTC, default): ISD 500 m (config 1) or 1732 m (config 2), 80 % in buildings, 3 km/h; 2 (URLLC, configs 1 and 2): ISD 500 m, 20 % in buildings, outdoors 30 km/h

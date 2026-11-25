@@ -613,7 +613,7 @@ SMa options: `p_residential` (0.9). Residential buildings use `d2D-in` up to 10 
 | `38.901_InF_DH` | 120 × 60 × 10 | 6 × 3 | 20 | 8 | 1.5 | 1 m | as SL |
 | `38.901_InF_HH` | 300 × 150 × 10 | 6 × 3 | 50 | 8 | 3 (library value above `h_clutter = 2 m`, not a TR value) | 1 m | as SL |
 
-InH positions are `x = −50:20:50`, `y = ±10` after centring. InF positions keep `D / 2` to the walls. The InF presets write `scenpar_override` for `DS_VS` (V/S of the hall) and `absTOA_Lmax` (largest dimension) on the Tx rows. InF-HH has no calibration layout in the TR; the preset uses the big hall, and its documentation says so.
+InH positions are `x = −50:20:50`, `y = ±10` after centring. InF positions keep `D / 2` to the walls. The InF presets write `scenpar_override` for `DS_VS` (V/S of the hall) and `absTOA_Lmax` (largest dimension) on the Tx rows; the TR 38.901 InH presets write `absTOA_Lmax` = max(length, width, 3 m) (clause 7.6.9; added in the implementation). InF-HH has no calibration layout in the TR; the preset uses the big hall, and its documentation says so.
 
 **ITU-R M.2412 (Report M.2412-0, sections 8.5 and 8.6, Table 5).** Geometry and drop only, `scenario` stays empty and the user sets it. The presets take `options["config"]` (A, B, C as 1, 2, 3) and, for Urban Macro, `options["service"]` (1 = mMTC, 2 = URLLC).
 
