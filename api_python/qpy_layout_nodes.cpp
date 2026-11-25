@@ -10,10 +10,11 @@ SECTION!*/
 
 /*!MD
 # set_antenna
-Set the antenna of layout nodes from the arguments of generate_antenna or from a QDANT file
+Set the antenna of layout nodes from the arguments of generate_antenna, a QDANT file, or by index
 
-- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file;
-  [[set_antenna_array]] sets it from an array, e.g. a measured pattern read with [[qdant_read]]
+- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file,
+  or, with a numeric `type`, to antennas that the layout already has, by their index; [[set_antenna_array]] sets it from
+  an array, e.g. a measured pattern read with [[qdant_read]]
 - Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
 - Stores an antenna description, which [[layout.csv_write]] writes as antenna columns (a QDANT file as a reference,
   without a copy)
@@ -26,8 +27,10 @@ layout_out = quadriga_lib.layout.set_antenna( layout_in, type, args, *, rx, i_no
 ## Inputs:
 - **`layout_in`** — Layout dict, keys in [[layout.csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`type`** — Antenna type of [[generate_antenna]], str, e.g. `"3GPP"`, `"dipole"`; a QDANT file, str or path-like,
-  i.e. a name ending in `.qdant` (any case), absolute or relative to the current folder; or `"none"` (no antenna, for
-  all bands, without `args`)
+  i.e. a name ending in `.qdant` (any case), absolute or relative to the current folder; `"none"` (no antenna, for all
+  bands, without `args`); or antenna entries of the layout, int or `(n,)`, 1-based as `i_antenna` of the nodes, 0 =
+  generic antenna, one value for all chosen nodes or one per node in the order of `i_node`, an empty list = 0 (then
+  `args` must be None and `evaluate` is not used)
 - **`args`** — Dict with the arguments of [[generate_antenna]] as keys, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
   vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
@@ -39,7 +42,8 @@ layout_out = quadriga_lib.layout.set_antenna( layout_in, type, args, *, rx, i_no
   `False`
 - **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; int or `(n,)`; `None`: all of them;
   default: `None`
-- **`center_freq`** — Band in [Hz], positive; NaN: one antenna for all bands; default: NaN
+- **`center_freq`** — Band in [Hz], positive; NaN: one antenna for all bands; with antenna entries, a band of the
+  layout, which the nodes take from the given entries; default: NaN
 - **`evaluate`** — `True`: generate all antennas of the layout that are not evaluated yet; `False`: none, the nodes of
   new antennas use the generic antenna until [[eval_antennas]] is called; default: `True`
 
@@ -52,6 +56,7 @@ import quadriga_lib as qd
 layout, _, _ = qd.layout.csv_read( "tx.csv", "rx.csv" )
 layout = qd.layout.set_antenna( layout, "3GPP", {"panel": [4, 4, 1, 2], "pol": 3}, center_freq=3.5e9 )
 layout = qd.layout.set_antenna( layout, "measured/handset.qdant", {"id": 2}, rx=True )
+layout = qd.layout.set_antenna( layout, 2, rx=True, i_node=[0, 1] )
 ```
 
 ## Notes:
@@ -69,6 +74,9 @@ layout = qd.layout.set_antenna( layout, "measured/handset.qdant", {"id": 2}, rx=
   array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file raises a
   `RuntimeError`; without evaluation, an entry that the file does not have raises an error when the antennas are
   evaluated
+- **Index form**: with `center_freq`, that band of the antenna of each node becomes the band of its entry, copied as in
+  the other forms; the generic antenna (0) applies to all bands only. A node listed twice in `i_node` with different
+  entries raises an error. The C++ index form is an overload of `set_antenna`; here the type of `type` selects it
 - **`layout_in` / `layout_out`**: the C++ in/out argument `layout` is split, so that the input stays unchanged
 
 ## See also:
@@ -87,12 +95,22 @@ py::dict set_antenna(const py::dict &layout_in,
                      py::handle evaluate)
 {
     auto lay = qd_python_dict2layout(layout_in, false, "layout_in");
-    const auto args_m = qd_pl_args(args, "args");
     const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
+    const bool rx_b = qd_python_flag(rx, false, "rx"), evaluate_b = qd_python_flag(evaluate, true, "evaluate");
 
-    const std::string type_s = qd_python_path(type, "type"); // An antenna type or a QDANT file
-    quadriga_lib::set_antenna(lay, type_s, args_m, qd_python_flag(rx, false, "rx"), i_node_a, center_freq,
-                              qd_python_flag(evaluate, true, "evaluate"));
+    std::string type_s; // An antenna type or a QDANT file; anything else: the index form
+    if (qd_python_try_path(type, type_s))
+        quadriga_lib::set_antenna(lay, type_s, qd_pl_args(args, "args"), rx_b, i_node_a, center_freq, evaluate_b);
+    else
+    {
+        if (!args.is_none())
+            throw std::invalid_argument("Input 'args' must be None for antenna entries.");
+        const py::array arr = py::array::ensure(type);
+        if (py::isinstance<py::bool_>(type) || (arr && arr.dtype().kind() == 'b'))
+            throw std::invalid_argument("Input 'type' must be an antenna type, a QDANT file or antenna entries, not bool.");
+        const auto i_antenna = qd_python_numpy2arma_Col<arma::uword>(type, true, false, "type"); // 1-based, 0 = generic antenna
+        quadriga_lib::set_antenna(lay, quadriga_lib::uint_list(i_antenna), rx_b, i_node_a, center_freq);
+    }
     return qd_python_layout2dict(lay);
 }
 

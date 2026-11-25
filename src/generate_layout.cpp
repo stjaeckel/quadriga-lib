@@ -1388,8 +1388,8 @@ Drop UTs into the cells of the Tx nodes of a layout
 - Replaces the Rx nodes by new UTs `UT1`, `UT2`, ..., dropped uniformly into the cells of the sites with the rules of
   the scenario of each site (minimum distance, height, speed, indoor state), as [[generate_layout]] drops them
 - Use it to drop UTs for any set of Tx nodes, e.g. sites read from a CSV file or edited after [[generate_layout]]
-- The Tx nodes, the antenna lists and `layout.seed` stay; `pairing` and `links` are emptied, and the new UTs have the
-  generic antenna
+- The Tx nodes, the antenna lists and `layout.seed` stay; `pairing` and `links` are emptied. The new UTs get the antenna
+  that all old Rx nodes shared (`i_antenna`, with its bands), else the generic antenna
 
 ## Declaration:
 ```
@@ -1466,6 +1466,8 @@ void quadriga_lib::drop_terminals(layout &layout, arma::uword n_ut, const arma::
     layout_nodes R;
     if (n_ut > 0)
         R = qd_drop_sites(layout.tx, rules, pd, layout.wrap, bounds, o, n_ut, per_cell, s);
+    const arma::u32_vec &old = layout.rx.i_antenna; // The antenna that all old Rx nodes share, else the generic one
+    R.i_antenna.fill(old.n_elem != 0 && arma::all(old == old[0]) ? old[0] : 0u);
     layout.rx = std::move(R);
     layout.pairing.reset();
     layout.links.reset();

@@ -281,6 +281,38 @@ TEST_CASE("drop_terminals - the Rx side is replaced")
     CHECK(L.rx.n_node() == 0);
 }
 
+TEST_CASE("drop_terminals - the new UTs keep the antenna that all old Rx nodes shared")
+{
+    using args_t = std::unordered_map<std::string, arma::mat>;
+    auto L = quadriga_lib::generate_layout("38.901_UMa", 1, {}, {0.0}, {}, {}, {}, {}, {}, true, 7); // One site, 3 UTs
+    REQUIRE(L.rx.n_node() == 3);
+    L.center_freq = {2e9, 6e9};
+    quadriga_lib::set_antenna(L, "dipole", args_t{{"res", {45.0}}}, false); // Entry 1: the Tx nodes
+    quadriga_lib::set_antenna(L, "omni", args_t{{"res", {45.0}}}, true, {}, 2e9); // Entry 2: per band for the Rx nodes
+    quadriga_lib::set_antenna(L, "xpol", args_t{{"res", {45.0}}}, true, {}, 6e9);
+    REQUIRE(arma::all(L.rx.i_antenna == 2u));
+    const auto args = L.antenna_args;
+
+    // All old Rx nodes share entry 2: the new UTs get it, with both bands
+    auto M = L;
+    quadriga_lib::drop_terminals(M, 2, {}, {}, {}, {}, true, 3);
+    REQUIRE(M.rx.n_node() == 6);
+    CHECK(arma::all(M.rx.i_antenna == 2u));
+    CHECK(M.antenna_args == args);
+    CHECK(M.is_valid() == "");
+
+    // The old Rx nodes have different antennas: the generic antenna
+    quadriga_lib::set_antenna(L, "none", {}, true, {0});
+    quadriga_lib::drop_terminals(L, 2, {}, {}, {}, {}, true, 3);
+    CHECK(arma::all(L.rx.i_antenna == 0u));
+    CHECK(L.is_valid() == "");
+
+    // No old Rx nodes: the generic antenna
+    quadriga_lib::drop_terminals(L, 0, {}, {}, {}, {}, true, 3);
+    quadriga_lib::drop_terminals(L, 1, {}, {}, {}, {}, true, 3);
+    CHECK(arma::all(L.rx.i_antenna == 0u));
+}
+
 TEST_CASE("drop_terminals - rules from the scenarios of the sites")
 {
     // BS1 and BS2 InF-SL (min 1 m, hUT 1.5 m, 3 km/h; TR 38.901 Table 7.8-7), BS3 UMa (min 35 m to d2D-out, floors, O2I),

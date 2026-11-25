@@ -56,9 +56,9 @@ gain. Between the stages, link states and rays can be inspected or edited, [[att
 of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
 **Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]], from an
-entry of a QDANT file or from an array; in the CSV files, antenna columns describe it. A node has one antenna for all
-bands or one per band. A node without an antenna uses the generic antenna: two co-located isotropic elements with
-vertical and horizontal polarization.
+entry of a QDANT file, from an array or by the index of an antenna that the layout already has; in the CSV files,
+antenna columns describe it. A node has one antenna for all bands or one per band. A node without an antenna uses the
+generic antenna: two co-located isotropic elements with vertical and horizontal polarization.
 
 **Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 
@@ -1325,9 +1325,11 @@ std::vector<std::string> qd_who(const quadriga_lib::layout &L, const std::vector
 // arrays, the picked nodes get their new antenna, and the table is encoded again as the reader does: equal descriptions
 // (lines without arrays) share one entry, an antenna with arrays stays shared by the nodes that shared it, entries are
 // numbered in order of first use (Tx nodes first), and unused entries disappear. eval_mode: 0 = no evaluation, 1 = the
-// entries that had arrays before or hold the given array, 2 = all entries not evaluated yet
+// entries that had arrays before or hold the given array, 2 = all entries not evaluated yet. 'entry' (one per node of
+// the side, 1-based, 0 = none) replaces 'cells' and 'given': the picked nodes get these entries of the layout, or with
+// a band, that band of them
 void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const qd_ant *given, bool rx,
-                    const quadriga_lib::uint_list &i_node, double freq, int eval_mode)
+                    const quadriga_lib::uint_list &i_node, double freq, int eval_mode, const std::vector<arma::u32> *entry = nullptr)
 {
     std::string msg = qd_check_lists(L);
     if (!msg.empty())
@@ -1365,6 +1367,8 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         for (size_t b = 0; b < S.freq.size(); ++b)
             if (same_freq(S.freq[b], freq))
                 band = (long)b;
+        if (band < 0 && entry != nullptr)
+            throw std::invalid_argument("Input 'center_freq' must be one of the frequencies of the layout.");
         if (band < 0)
         {
             const size_t n_old = S.freq.size(), p = (size_t)(std::upper_bound(S.freq.begin(), S.freq.end(), freq) - S.freq.begin());
@@ -1402,7 +1406,31 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         std::vector<qd_slot> slots;
         bool want = false; // Evaluated in eval_mode 1
     };
-    auto compose = [&](size_t a)
+    // Band b of the antenna 'a' (1-based, 0 = none) as a line (or array) of that band
+    auto band_of = [&](size_t a, size_t b, std::string &line, qd_slot &slot)
+    {
+        static const std::vector<std::string> no_lines;
+        static const std::vector<qd_slot> no_slots;
+        const std::vector<std::string> &old = a == 0 ? no_lines : S.args[a - 1];
+        const std::vector<qd_slot> &old_sl = a == 0 ? no_slots : S.slots[a - 1];
+        line.clear(), slot = qd_slot();
+        if (old.size() == nf && nf > 1) // One line per band
+        {
+            line = old[b];
+            slot = old_sl.size() == nf ? old_sl[b] : qd_slot();
+            return;
+        }
+        if (a != 0)
+            slot = old_sl.size() == 1 ? old_sl[0] : (old_sl.size() == nf ? old_sl[b] : qd_slot());
+        if (a != 0 && (old.empty() || old[0].empty())) // One array for all bands
+            return;
+        antenna_cells m; // One line for all bands, or no antenna: no description for the band
+        if (a != 0)
+            m = parse_antenna_line(old[0], S.cols);
+        m[0] = qd_csv::format_number(S.freq[b]);
+        line = join_antenna_line(m, S.cols);
+    };
+    auto compose = [&](size_t a, size_t e)
     {
         value v;
         v.want = given != nullptr;
@@ -1414,29 +1442,16 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
                 v.slots.push_back({-2, 0});
             return v;
         }
-        const std::vector<std::string> old = a == 0 ? std::vector<std::string>() : S.args[a - 1];
-        const std::vector<qd_slot> old_sl = a == 0 ? std::vector<qd_slot>() : S.slots[a - 1];
         v.want = v.want || (a != 0 && had_arrays[a - 1]);
         v.lines.assign(nf, std::string()), v.slots.assign(nf, qd_slot());
         for (size_t b = 0; b < nf; ++b)
+            band_of(a, b, v.lines[b], v.slots[b]);
+        if (entry != nullptr)
         {
-            if (old.size() == nf && nf > 1) // One line per band
-            {
-                v.lines[b] = old[b];
-                v.slots[b] = old_sl.size() == nf ? old_sl[b] : qd_slot();
-                continue;
-            }
-            if (a != 0)
-                v.slots[b] = old_sl.size() == 1 ? old_sl[0] : (old_sl.size() == nf ? old_sl[b] : qd_slot());
-            if (a != 0 && (old.empty() || old[0].empty())) // One array for all bands
-                continue;
-            antenna_cells m; // One line for all bands, or no antenna: no description for the band
-            if (a != 0)
-                m = parse_antenna_line(old[0], S.cols);
-            m[0] = qd_csv::format_number(S.freq[b]);
-            v.lines[b] = join_antenna_line(m, S.cols);
+            band_of(e, (size_t)band, v.lines[(size_t)band], v.slots[(size_t)band]);
+            v.want = v.want || had_arrays[e - 1];
         }
-        if (cells != nullptr)
+        else if (cells != nullptr)
         {
             antenna_cells m = *cells;
             m[0] = qd_csv::format_number(S.freq[(size_t)band]);
@@ -1490,16 +1505,19 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         const arma::u32_vec &old = (s == 0 ? L.tx : L.rx).i_antenna;
         for (arma::uword n = 0; n < old.n_elem; ++n)
         {
-            const arma::u32 a = old[n];
-            const bool pick = (s == 1) == rx && picked[n];
-            const std::string origin = pick ? (band < 0 ? "n" : "c" + std::to_string(a)) : "o" + std::to_string(a);
+            arma::u32 a = old[n];
+            bool pick = (s == 1) == rx && picked[n];
+            const arma::u32 e = pick && entry != nullptr ? (*entry)[n] : 0;
+            if (pick && entry != nullptr && band < 0) // An entry for all bands: as if the node had it
+                a = e, pick = false;
+            const std::string origin = pick ? (band < 0 ? "n" : "c" + std::to_string(a) + "e" + std::to_string(e)) : "o" + std::to_string(a);
             const auto it = done.find(origin);
             if (it != done.end())
                 ia[s].push_back(it->second);
             else if (!pick && a == 0)
                 ia[s].push_back(done[origin] = 0);
             else
-                ia[s].push_back(done[origin] = encode(pick ? compose(a) : value{S.args[a - 1], S.slots[a - 1], had_arrays[a - 1] != 0}, origin));
+                ia[s].push_back(done[origin] = encode(pick ? compose(a, e) : value{S.args[a - 1], S.slots[a - 1], had_arrays[a - 1] != 0}, origin));
         }
     }
     const std::vector<std::string> cols = used_antenna_cols(T.args, T.cols);
@@ -1576,10 +1594,11 @@ void quadriga_lib::layout::eval_antennas(const arma::vec &center_freq_new)
 
 /*!MD
 # set_antenna
-Set the antenna of layout nodes from the arguments of generate_antenna, from a QDANT file or from an evaluated array
+Set the antenna of layout nodes from the arguments of generate_antenna, a QDANT file, an array, or by index
 
 - Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file
-  (first form), or from an array (second form), e.g. a measured pattern read with [[qdant_read]]
+  (first form), from an array (second form), e.g. a measured pattern read with [[qdant_read]], or to antennas that the
+  layout already has, by their index (third form)
 - Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
 - The first form stores an antenna description, which [[layout_csv_write]] writes as antenna columns (a QDANT file as a
   reference, without a copy); the second form stores the array, which the writer exports to a QDANT file
@@ -1601,6 +1620,13 @@ void quadriga_lib::set_antenna(
     bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN);
+
+void quadriga_lib::set_antenna(
+    quadriga_lib::layout &layout,
+    const uint_list &i_antenna,
+    bool rx = false,
+    const uint_list &i_node = {},
+    double center_freq = NAN);
 ```
 
 ## Inputs:
@@ -1614,9 +1640,12 @@ void quadriga_lib::set_antenna(
   second form); `center_freq` here is the same as the argument. For a QDANT file only `id`, the 1-based entry of the
   file (default 1)
 - **`array`** — Valid single-frequency array
+- **`i_antenna`** — Antenna entries of the layout, 1-based as `i_antenna` of the nodes, 0 = generic antenna; one value
+  for all picked nodes or one per node in the order of `i_node`; empty: 0
 - **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
 - **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
-- **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
+- **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands. Third form: a band of the
+  layout, which the nodes take from the given entries
 - **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none,
   the nodes of new antennas use the generic antenna until `layout.eval_antennas()` is called
 
@@ -1626,6 +1655,7 @@ quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_antenna(L, "3GPP", {{"panel", {4, 4, 1, 2}}, {"pol", {3}}}, false, {}, 3.5e9);
 quadriga_lib::set_antenna(L, "measured/handset.qdant", {{"id", {2}}}, true);
 quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0], true);
+quadriga_lib::set_antenna(L, arma::uvec{2}, true, {0, 1});
 ```
 
 ## Notes:
@@ -1642,6 +1672,9 @@ quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0
 - **QDANT file**: stored as a normalised absolute path; [[layout_csv_write]] writes it relative to the CSV file. The
   array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file throws
   `std::runtime_error`; without evaluation, an entry that the file does not have throws when the antennas are evaluated
+- **Index form**: with `center_freq`, that band of the antenna of each node becomes the band of its entry, copied as in
+  the other forms; the generic antenna (0) applies to all bands only. In C++, a brace list such as `{2}` also builds a
+  `std::string` and makes the call ambiguous; pass a number, a variable, an `arma::uvec` or a `uint_list`
 - A failed call leaves the layout unchanged
 
 ## See also:
@@ -1753,4 +1786,22 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const arrayant<doub
     if (!msg.empty())
         throw std::invalid_argument("Input 'array' is not valid: " + msg);
     qd_set_antenna(layout, nullptr, &array, rx, i_node, center_freq, 1);
+}
+
+void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const uint_list &i_antenna, bool rx, const uint_list &i_node, double center_freq)
+{
+    const arma::uvec &ia = i_antenna.vec(), &in = i_node.vec();
+    const arma::uword n_node = (rx ? layout.rx : layout.tx).n_node(), n_sel = in.is_empty() ? n_node : in.n_elem;
+    if (ia.n_elem > 1 && ia.n_elem != n_sel)
+        throw std::invalid_argument("Input 'i_antenna' must have 0, 1 or " + std::to_string(n_sel) + " entries (one per node).");
+    for (arma::uword v : ia)
+        if (v > layout.n_antenna())
+            throw std::invalid_argument("Input 'i_antenna' has an entry larger than the number of antennas (" + std::to_string(layout.n_antenna()) + ").");
+    if (!std::isnan(center_freq) && (ia.is_empty() || arma::any(ia == 0)))
+        throw std::invalid_argument("Input 'i_antenna': the generic antenna (0) applies to all bands.");
+    std::vector<arma::u32> entry(n_node, 0);
+    for (arma::uword k = 0; k < n_sel; ++k)
+        if (const arma::uword n = in.is_empty() ? k : in[k]; n < n_node) // An index outside the nodes throws below
+            entry[n] = ia.is_empty() ? 0 : (arma::u32)ia[ia.n_elem == 1 ? 0 : k];
+    qd_set_antenna(layout, nullptr, nullptr, rx, i_node, center_freq, 1, &entry);
 }

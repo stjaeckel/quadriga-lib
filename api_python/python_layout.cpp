@@ -87,7 +87,7 @@ void quadriga_lib_layout(py::module_ &m)
 
     m.def("set_antenna", &set_antenna,
           py::arg("layout_in"),
-          py::arg("type"),
+          py::arg("type").none(false),
           py::arg("args") = py::none(),
           py::kw_only(),
           py::arg("rx") = false,

@@ -40,11 +40,11 @@ the geometry-based stochastic model (GBSM), and [[get_gbsm_channels]] applies th
 gain. Between the stages, link states and rays can be inspected or edited, [[attach_terminals]] selects the serving cell
 of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
-**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]] or from an
-entry of a QDANT file, [[set_antenna_array]] from an array; in the CSV files, antenna columns describe it.
-[[eval_antennas]] generates the arrays from these descriptions. A node has one antenna for all bands or one per band. A
-node without an antenna uses the generic antenna: two co-located isotropic elements with vertical and horizontal
-polarization.
+**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]], from an
+entry of a QDANT file or by the index of an antenna that the layout already has, [[set_antenna_array]] from an array; in
+the CSV files, antenna columns describe it. [[eval_antennas]] generates the arrays from these descriptions. A node has
+one antenna for all bands or one per band. A node without an antenna uses the generic antenna: two co-located isotropic
+elements with vertical and horizontal polarization.
 
 **Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 

@@ -149,6 +149,83 @@ TEST_CASE("set_antenna - a beams cell lists one beam per ';'-part")
     CHECK(has(qd_layout_throws([&] { quadriga_lib::set_antenna(V, "multibeam", args_t{{"beams", arma::mat(4, 2, arma::fill::zeros)}}); }), "'beams' must be a matrix with 2 or 3 rows"));
 }
 
+TEST_CASE("set_antenna - the index form assigns entries of the layout")
+{
+    quadriga_lib::layout L = qd_layout_build();
+    L.center_freq = {3.5e9, 28e9};
+    const ant_t A = measured(50.0, 0.5);
+    quadriga_lib::set_antenna(L, "dipole", args_t{{"res", {45.0}}}, false, {0});                     // Entry 1
+    quadriga_lib::set_antenna(L, "3gpp", args_t{{"res", {45.0}}, {"panel", {2.0, 1.0}}}, false, {1}); // Entry 2
+    quadriga_lib::set_antenna(L, A, true, {0});                                                       // Entry 3
+    REQUIRE(arma::all(L.tx.i_antenna == arma::u32_vec{1, 2, 0}));
+    REQUIRE(arma::all(L.rx.i_antenna == arma::u32_vec{3, 0}));
+    REQUIRE(L.is_valid() == "");
+
+    // One value for the picked nodes, all bands: the entry is shared, nothing is copied
+    quadriga_lib::layout M = L;
+    quadriga_lib::set_antenna(M, arma::uvec{2}, false, {2});
+    CHECK(arma::all(M.tx.i_antenna == arma::u32_vec{1, 2, 2}));
+    CHECK(M.antenna_args == L.antenna_args);
+    REQUIRE(M.antenna.size() == 3);
+    CHECK(qd_layout_diff_array(M.antenna[1][1], L.antenna[1][1]) == "");
+
+    // One value per node, in the order of i_node
+    quadriga_lib::set_antenna(M, arma::uvec{3, 1}, true, {1, 0});
+    CHECK(arma::all(M.rx.i_antenna == arma::u32_vec{1, 3}));
+    REQUIRE(M.antenna.size() == 3);
+    CHECK(qd_layout_diff_array(M.antenna[2][0], A) == "");
+    CHECK(M.is_valid() == "");
+
+    // A number, a variable; empty = the generic antenna; unused entries are removed
+    quadriga_lib::set_antenna(M, 1, true);
+    CHECK(arma::all(M.rx.i_antenna == arma::u32_vec{1, 1}));
+    const arma::uword k = 2;
+    quadriga_lib::set_antenna(M, k, false, {0});
+    CHECK(arma::all(M.tx.i_antenna == arma::u32_vec{1, 1, 1})); // Renumbered in order of first use: 3gpp, then dipole
+    CHECK(arma::all(M.rx.i_antenna == arma::u32_vec{2, 2}));
+    CHECK(M.antenna_args.size() == 2);
+    quadriga_lib::set_antenna(M, quadriga_lib::uint_list(), false);
+    CHECK(arma::all(M.tx.i_antenna == arma::u32_vec{0, 0, 0}));
+    CHECK(M.is_valid() == "");
+
+    // One band: that band of the node's antenna takes the band of the entry, as a copy; the other nodes keep theirs
+    quadriga_lib::layout N = L;
+    quadriga_lib::set_antenna(N, arma::uvec{2}, false, {0}, 28e9);
+    CHECK(N.antenna_cols == std::vector<std::string>{"center_freq", "antenna", "res", "panel"});
+    REQUIRE(N.tx.i_antenna[0] != 0);
+    CHECK(N.antenna_args[N.tx.i_antenna[0] - 1] == std::vector<std::string>{"3.5e9,dipole,45,", "28e9,3gpp,45,\"2,1\""});
+    REQUIRE(N.antenna[N.tx.i_antenna[0] - 1].size() == 2);
+    CHECK(qd_layout_diff_array(N.antenna[N.tx.i_antenna[0] - 1][0], L.antenna[0][0]) == "");
+    CHECK(qd_layout_diff_array(N.antenna[N.tx.i_antenna[0] - 1][1], L.antenna[1][1]) == "");
+    CHECK(N.antenna_args[N.tx.i_antenna[1] - 1] == std::vector<std::string>{",3gpp,45,\"2,1\""});
+    CHECK(N.is_valid() == "");
+
+    // A band from an array for all bands; the other band of a node without antenna is not set yet
+    const arma::uword a = N.rx.i_antenna[0];
+    quadriga_lib::set_antenna(N, a, true, {1}, 3.5e9);
+    REQUIRE(N.rx.i_antenna[1] != 0);
+    REQUIRE(N.antenna[N.rx.i_antenna[1] - 1].size() == 2);
+    CHECK(qd_layout_diff_array(N.antenna[N.rx.i_antenna[1] - 1][0], A) == "");
+    CHECK(has(N.is_valid(), "Node 'UT2' (sector 0)"));
+
+    // Errors leave the layout as it was
+    auto msg = [&](const quadriga_lib::uint_list &ia, bool rx, const quadriga_lib::uint_list &in, double f)
+    {
+        quadriga_lib::layout X = L;
+        const std::string m = qd_layout_throws([&] { quadriga_lib::set_antenna(X, ia, rx, in, f); });
+        CHECK(qd_layout_diff(X, L) == "");
+        return m;
+    };
+    CHECK(msg(arma::uvec{4}, false, {}, NAN) == "Input 'i_antenna' has an entry larger than the number of antennas (3).");
+    CHECK(msg(arma::uvec{1, 2}, false, {}, NAN) == "Input 'i_antenna' must have 0, 1 or 3 entries (one per node).");
+    CHECK(msg(arma::uvec{1, 2}, false, {0}, NAN) == "Input 'i_antenna' must have 0 or 1 entries for one node.");
+    CHECK(msg(arma::uvec{1, 2}, true, {0, 0}, NAN) == "Input 'i_node' lists the node 0 twice with different entries.");
+    CHECK(qd_layout_throws([&] { quadriga_lib::layout X = L; quadriga_lib::set_antenna(X, arma::uvec{2, 2}, true, {0, 0}); }) == "");
+    CHECK(msg(arma::uvec{0}, false, {}, 3.5e9) == "Input 'i_antenna': the generic antenna (0) applies to all bands.");
+    CHECK(msg(arma::uvec{1}, false, {}, 5e9) == "Input 'center_freq' must be one of the frequencies of the layout.");
+    CHECK(has(msg(arma::uvec{1}, true, {2}, NAN), "Input 'i_node'"));
+}
+
 TEST_CASE("set_antenna - one line for all bands is generated per band")
 {
     quadriga_lib::layout L = qd_layout_build();
@@ -198,7 +275,7 @@ TEST_CASE("set_antenna - a per-band call copies a shared antenna")
     quadriga_lib::set_antenna(L, "3gpp", args_t{{"res", {45.0}}, {"panel", {4.0, 2.0}}}, false, {2}, 28e9);
 
     CHECK(L.antenna_cols == std::vector<std::string>{"center_freq", "antenna", "res", "panel"});
-    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{",3gpp,45,\"2,2\""}, {"3500000000,3gpp,45,\"2,2\"", "28000000000,3gpp,45,\"4,2\""}});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{",3gpp,45,\"2,2\""}, {"3.5e9,3gpp,45,\"2,2\"", "28e9,3gpp,45,\"4,2\""}});
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 1, 2}));
     CHECK(L.is_valid() == "");
     REQUIRE(L.antenna.size() == 2);
@@ -213,7 +290,7 @@ TEST_CASE("set_antenna - a per-band call copies a shared antenna")
     // Setting the band back keeps one line per band: the node stays set band by band, a new band is not covered
     quadriga_lib::set_antenna(L, "3gpp", args_t{{"res", {45.0}}, {"panel", {2.0, 2.0}}}, false, {2}, 28e9);
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 1, 2}));
-    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{",3gpp,45,\"2,2\""}, {"3500000000,3gpp,45,\"2,2\"", "28000000000,3gpp,45,\"2,2\""}});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{",3gpp,45,\"2,2\""}, {"3.5e9,3gpp,45,\"2,2\"", "28e9,3gpp,45,\"2,2\""}});
     CHECK(L.antenna.size() == 2);
     CHECK(L.is_valid() == "");
 }
@@ -225,7 +302,7 @@ TEST_CASE("set_antenna - a new frequency is added and leaves nodes incomplete")
     quadriga_lib::set_antenna(L, "3gpp", args_t{{"res", {45.0}}, {"panel", {4.0, 1.0}}}, false, {0, 1}, 28e9);
     quadriga_lib::set_antenna(L, "dipole", args_t{{"res", {45.0}}}, true); // One line for all bands
     CHECK(arma::approx_equal(L.center_freq, arma::vec{3.5e9, 28e9}, "absdiff", 0.0));
-    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3500000000,3gpp,45,\"2,1\"", "28000000000,3gpp,45,\"4,1\""}, {",dipole,45,"}});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3.5e9,3gpp,45,\"2,1\"", "28e9,3gpp,45,\"4,1\""}, {",dipole,45,"}});
     CHECK(L.is_valid() == "");
     const ant_t band0 = L.antenna[0][0], band1 = L.antenna[0][1];
 
@@ -235,8 +312,8 @@ TEST_CASE("set_antenna - a new frequency is added and leaves nodes incomplete")
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 1, 2})); // Entries in order of first use, Tx nodes first
     CHECK(arma::all(L.rx.i_antenna == arma::u32_vec{3, 3}));
     REQUIRE(L.antenna_args.size() == 3);
-    CHECK(L.antenna_args[0] == std::vector<std::string>{"3500000000,3gpp,45,\"2,1\"", "6000000000,,,", "28000000000,3gpp,45,\"4,1\""});
-    CHECK(L.antenna_args[1] == std::vector<std::string>{"3500000000,,,", "6000000000,omni,45,", "28000000000,,,"});
+    CHECK(L.antenna_args[0] == std::vector<std::string>{"3.5e9,3gpp,45,\"2,1\"", "6e9,,,", "28e9,3gpp,45,\"4,1\""});
+    CHECK(L.antenna_args[1] == std::vector<std::string>{"3.5e9,,,", "6e9,omni,45,", "28e9,,,"});
     CHECK(L.antenna_args[2] == std::vector<std::string>{",dipole,45,"});
     CHECK(has(L.is_valid(), "Node 'BS1' (sector 0)"));
     CHECK(has(L.is_valid(), "6000000000 Hz"));
@@ -258,8 +335,8 @@ TEST_CASE("set_antenna - a new frequency is added and leaves nodes incomplete")
     CHECK(has(L.is_valid(), "Node 'BS2' (sector 0)"));
     quadriga_lib::set_antenna(L, "omni", args_t{{"res", {45.0}}}, false, {2}, 28e9);
     CHECK(L.is_valid() == "");
-    CHECK(L.antenna_args[0] == std::vector<std::string>{"3500000000,3gpp,45,\"2,1\"", "6000000000,3gpp,45,\"3,1\"", "28000000000,3gpp,45,\"4,1\""});
-    CHECK(L.antenna_args[1] == std::vector<std::string>{"3500000000,omni,45,", "6000000000,omni,45,", "28000000000,omni,45,"}); // Not folded
+    CHECK(L.antenna_args[0] == std::vector<std::string>{"3.5e9,3gpp,45,\"2,1\"", "6e9,3gpp,45,\"3,1\"", "28e9,3gpp,45,\"4,1\""});
+    CHECK(L.antenna_args[1] == std::vector<std::string>{"3.5e9,omni,45,", "6e9,omni,45,", "28e9,omni,45,"}); // Not folded
     REQUIRE(L.antenna[0].size() == 3);
     CHECK(qd_layout_diff_array(L.antenna[0][1], quadriga_lib::generate_antenna<double>("3gpp", 45.0, 6e9, {}, {3, 1}), gen_tol) == "");
     CHECK(L.antenna[1].size() == 3);
@@ -339,7 +416,7 @@ TEST_CASE("set_antenna - the array form")
     quadriga_lib::set_antenna(L, A, true, {1});
     quadriga_lib::set_antenna(L, B, false, {0}, 28e9);
     CHECK(L.antenna_cols == std::vector<std::string>{"center_freq", "antenna", "res"});
-    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3500000000,dipole,45", ""}, {",dipole,45"}, {}});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3.5e9,dipole,45", ""}, {",dipole,45"}, {}});
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 2, 2}));
     CHECK(arma::all(L.rx.i_antenna == arma::u32_vec{0, 3}));
     CHECK(L.is_valid() == "");
@@ -375,7 +452,7 @@ TEST_CASE("layout_csv_write - evaluated arrays are exported to QDANT files")
     const std::string rx = dir.read("rx.csv");
     CHECK(has(rx, "name,x,y,z,heading,direction_az,speed,center_freq,antenna,qdant_file,qdant_id\n"));
     CHECK(has(rx, "\nUT1,100,200,1.5,,,,,qdant,rx_1.qdant,1\n"));
-    CHECK(has(rx, "\nUT2,-50,70,1.5,45,120,1.5,3500000000,qdant,rx_2.qdant,1\nUT2,,,,,,,28000000000,qdant,rx_2.qdant,2\n"));
+    CHECK(has(rx, "\nUT2,-50,70,1.5,45,120,1.5,3.5e9,qdant,rx_2.qdant,1\nUT2,,,,,,,28e9,qdant,rx_2.qdant,2\n"));
     CHECK(has(dir.read("tx.csv"), "\nBS1,0,10,10,25,,30,3gpp,45,\"2,1\"\n"));
 
     // One entry per exported band
@@ -392,7 +469,7 @@ TEST_CASE("layout_csv_write - evaluated arrays are exported to QDANT files")
     CHECK(qd_layout_diff_nodes(L2.tx, L.tx) == "");
     CHECK(arma::approx_equal(L2.center_freq, L.center_freq, "absdiff", 0.0));
     const std::string f1 = abs_path(dir.path("rx_1.qdant")), f2 = abs_path(dir.path("rx_2.qdant"));
-    CHECK(L2.antenna_args == std::vector<std::vector<std::string>>{{",3gpp,,,45,\"2,1\""}, {",qdant," + f1 + ",1,,"}, {"3500000000,qdant," + f2 + ",1,,", "28000000000,qdant," + f2 + ",2,,"}});
+    CHECK(L2.antenna_args == std::vector<std::vector<std::string>>{{",3gpp,,,45,\"2,1\""}, {",qdant," + f1 + ",1,,"}, {"3.5e9,qdant," + f2 + ",1,,", "28e9,qdant," + f2 + ",2,,"}});
     REQUIRE(L2.antenna.size() == 3);
     CHECK(qd_layout_diff_array(L2.antenna[0][1], L.antenna[0][1], gen_tol) == "");
     REQUIRE(L2.antenna[1].size() == 1);
@@ -413,7 +490,7 @@ TEST_CASE("layout_csv_write - evaluated arrays are exported to QDANT files")
     quadriga_lib::layout L5 = L2;
     quadriga_lib::set_antenna(L5, B, true, {1}, 3.5e9);
     quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L5);
-    CHECK(has(dir.read("rx.csv"), "\nUT2,-50,70,1.5,45,120,1.5,3500000000,qdant,rx_3.qdant,1\nUT2,,,,,,,28000000000,qdant,rx_2.qdant,2\n"));
+    CHECK(has(dir.read("rx.csv"), "\nUT2,-50,70,1.5,45,120,1.5,3.5e9,qdant,rx_3.qdant,1\nUT2,,,,,,,28e9,qdant,rx_2.qdant,2\n"));
     CHECK(dir.read("rx_1.qdant") == q1);
     CHECK(dir.read("rx_2.qdant") == q2);
     CHECK(qd_layout_folder(dir.dir) == std::vector<std::string>{"other_1.qdant", "rx.csv", "rx_07.qdant", "rx_1.qdant", "rx_2.qdant", "rx_2.qdant.bak", "rx_3.qdant", "rx_x.qdant", "tx.csv"});
@@ -537,7 +614,7 @@ TEST_CASE("set_antenna - columns are merged")
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 2}));
     CHECK(L.is_valid() == "");
     quadriga_lib::layout_csv_write(dir.path("w.csv"), "", L);
-    CHECK(has(dir.read("w.csv"), "name,x,y,z,center_freq,antenna,panel,spacing,pol\nBS1,0,0,25,3500000000,3gpp,\"4,4\",,\nBS2,9,0,25,,3gpp,\"2,2\",0.6,3\n"));
+    CHECK(has(dir.read("w.csv"), "name,x,y,z,center_freq,antenna,panel,spacing,pol\nBS1,0,0,25,3.5e9,3gpp,\"4,4\",,\nBS2,9,0,25,,3gpp,\"2,2\",0.6,3\n"));
     CHECK(qd_layout_diff(L, quadriga_lib::layout_csv_read(dir.path("w.csv"), "", {}, false)) == "");
 }
 
@@ -614,7 +691,7 @@ TEST_CASE("layout::eval_antennas - input validation")
     CHECK(has(msg(arma::vec{1e9, 2.5e9}), "Input 'center_freq'"));
     // A line that cannot be generated, a QDANT file that is missing
     quadriga_lib::layout M = base;
-    M.antenna_args[0][1] = "2000000000,3gpp,45,\"3,1\",\"2,1\"";
+    M.antenna_args[0][1] = "2e9,3gpp,45,\"3,1\",\"2,1\"";
     M.antenna_cols.push_back("ports");
     M.antenna_args[0][0] += ",";
     CHECK(has(qd_layout_throws([&] { M.eval_antennas(); }), "Tx node 'BS1', sector 0: "));
@@ -666,7 +743,7 @@ TEST_CASE("set_antenna - per-band lines are not folded")
     quadriga_lib::set_antenna(L, "dipole", dip, false, {0}, 2e9, false);
     quadriga_lib::set_antenna(L, "dipole", dip, false, {1}, 1e9, false);
     quadriga_lib::set_antenna(L, "omni", omni, false, {1}, 2e9, false);
-    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"1000000000,dipole,45", "2000000000,dipole,45"}, {"1000000000,dipole,45", "2000000000,omni,45"}});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"1e9,dipole,45", "2e9,dipole,45"}, {"1e9,dipole,45", "2e9,omni,45"}});
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 2, 0}));
     CHECK(L.is_valid() == "");
 
@@ -687,7 +764,7 @@ TEST_CASE("set_antenna - per-band lines are not folded")
     quadriga_lib::set_antenna(M, "dipole", dip, false, {}, 28e9, false);
     CHECK(M.antenna_args == std::vector<std::vector<std::string>>{{"dipole,45"}});
     quadriga_lib::set_antenna(M, "omni", omni, false, {2}, 3.5e9, false);
-    CHECK(M.antenna_args == std::vector<std::vector<std::string>>{{",dipole,45"}, {"3500000000,omni,45", "28000000000,dipole,45"}});
+    CHECK(M.antenna_args == std::vector<std::vector<std::string>>{{",dipole,45"}, {"3.5e9,omni,45", "28e9,dipole,45"}});
     CHECK(arma::all(M.tx.i_antenna == arma::u32_vec{1, 1, 2}));
     CHECK(M.is_valid() == "");
 }
@@ -930,7 +1007,7 @@ TEST_CASE("set_antenna - a per-band call with a QDANT file copies a shared anten
     quadriga_lib::set_antenna(L, dir.path("meas.qdant")); // Entry 1, all Tx nodes, all bands
     quadriga_lib::set_antenna(L, dir.path("meas.qdant"), args_t{{"id", {2.0}}}, false, {0}, 28e9);
     CHECK(L.antenna_cols == std::vector<std::string>{"center_freq", "antenna", "qdant_file", "qdant_id"});
-    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3500000000,qdant," + F + ",1", "28000000000,qdant," + F + ",2"}, {",qdant," + F + ",1"}});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3.5e9,qdant," + F + ",1", "28e9,qdant," + F + ",2"}, {",qdant," + F + ",1"}});
     CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 2, 2}));
     CHECK(L.is_valid() == "");
     REQUIRE(L.antenna.size() == 2);
@@ -942,7 +1019,7 @@ TEST_CASE("set_antenna - a per-band call with a QDANT file copies a shared anten
 
     // A band of a node without antenna: the other band is not set yet
     quadriga_lib::set_antenna(L, dir.path("meas.qdant"), args_t{{"id", {2.0}}}, true, {0}, 3.5e9);
-    CHECK(L.antenna_args[2] == std::vector<std::string>{"3500000000,qdant," + F + ",2", "28000000000,,,"});
+    CHECK(L.antenna_args[2] == std::vector<std::string>{"3.5e9,qdant," + F + ",2", "28e9,,,"});
     CHECK(has(L.is_valid(), "Node 'UT1' (sector 0)"));
 }
 
@@ -981,6 +1058,12 @@ TEST_CASE("set_antenna - input validation of the QDANT form")
     CHECK(has(msg(dir.path("meas.qdant"), {{"id", {3.0}}}), "QDANT file '" + abs_path(dir.path("meas.qdant")) + "'"));
     CHECK(has(msg(dir.path("meas.qdant"), id1, true, {2}), "Input 'i_node'"));
     CHECK(has(msg(dir.path("meas.qdant"), id1, false, {}, -1.0), "Input 'center_freq'"));
+
+    // A large entry id is written exactly
+    quadriga_lib::layout Q = base;
+    quadriga_lib::set_antenna(Q, dir.path("meas.qdant"), args_t{{"id", {1234567891.0}}}, true, {}, NAN, false);
+    quadriga_lib::layout_csv_write(dir.path("q_tx.csv"), dir.path("q_rx.csv"), Q);
+    CHECK(has(dir.read("q_rx.csv"), ",qdant,meas.qdant,1234567891\n"));
 
     // The file name ends in ".qdant" in any case
     quadriga_lib::qdant_write(dir.path("upper.QDant"), std::vector<ant_t>{measured(50.0, 0.5)});

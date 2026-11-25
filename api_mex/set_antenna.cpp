@@ -12,10 +12,11 @@ SECTION!*/
 
 /*!MD
 # SET_ANTENNA
-Set the antenna of layout nodes from the arguments of generate_antenna or from a QDANT file
+Set the antenna of layout nodes from the arguments of generate_antenna, a QDANT file, or by index
 
-- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file;
-  [[set_antenna_array]] sets an array, e.g. a measured pattern read with [[qdant_read]]
+- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file,
+  or, with a numeric second input, to antennas that the layout already has, by their index; [[set_antenna_array]] sets
+  an array, e.g. a measured pattern read with [[qdant_read]]
 - Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
 - Stores an antenna description, which [[layout_csv_write]] writes as antenna columns (a QDANT file as a reference,
   without a copy)
@@ -23,6 +24,7 @@ Set the antenna of layout nodes from the arguments of generate_antenna or from a
 ## Usage:
 ```
 layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center_freq, evaluate );
+layout_out = quadriga_lib.set_antenna( layout_in, i_antenna, rx, i_node, center_freq );
 ```
 
 ## Inputs:
@@ -37,10 +39,13 @@ layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center
   with [[set_antenna_array]]); the field `center_freq` is the same as the argument; e.g.
   `struct( 'panel', [4 4 1 2], 'pol', 3 )`. For a QDANT file only `id`, the 1-based entry of the file (default 1).
   Default: `[]` (none)
+- **`i_antenna`** — Antenna entries of the layout, 1-based as `i_antenna` of the nodes, 0 = generic antenna; one value
+  for all chosen nodes or one per node in the order of `i_node`; `[]` = 0
 - **`rx`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
   `false`
 - **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 1-based; `[]` = all of them; default: `[]`
-- **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
+- **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; with `i_antenna`, a band of the layout,
+  which the nodes take from the given entries; default: NaN
 - **`evaluate`** — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none, the nodes of
   new antennas use the generic antenna until [[eval_antennas]] is called; default: `true`
 
@@ -52,6 +57,7 @@ layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center
 layout = quadriga_lib.layout_csv_read( 'tx.csv', 'rx.csv' );
 layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2], 'pol', 3 ), false, [], 3.5e9 );
 layout = quadriga_lib.set_antenna( layout, 'measured/handset.qdant', struct( 'id', 2 ), true );
+layout = quadriga_lib.set_antenna( layout, 2, true, [ 1, 2 ] );
 ```
 
 ## Notes:
@@ -68,6 +74,9 @@ layout = quadriga_lib.set_antenna( layout, 'measured/handset.qdant', struct( 'id
 - **QDANT file**: stored as a normalised absolute path; [[layout_csv_write]] writes it relative to the CSV file. The
   array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file raises an error;
   without evaluation, an entry that the file does not have raises an error when the antennas are evaluated
+- **Index form**: with `center_freq`, that band of the antenna of each node becomes the band of its entry, copied as in
+  the other forms; the generic antenna (0) applies to all bands only. A node listed twice in `i_node` with different
+  entries raises an error
 - The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
 
 ## See also:
@@ -86,6 +95,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     quadriga_lib::layout layout = qd_mex_struct2layout(prhs[0], true, "layout_in");
+
+    // Index form: numeric second input
+    if (mxIsNumeric(prhs[1]) || mxIsLogical(prhs[1]))
+    {
+        if (nrhs > 5)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+        const arma::uvec i_antenna = qd_mex_get_Col<arma::uword>(prhs[1], true, "i_antenna"); // 1-based, 0 = generic antenna; no shift intended
+        const bool rx = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "rx", false);
+        const arma::uvec i_node = (nrhs < 4) ? arma::uvec() : qd_mex_get_index_Col<arma::uword>(prhs[3], "i_node"); // 1-based -> 0-based
+        const double center_freq = (nrhs < 5) ? NAN : qd_mex_get_scalar<double>(prhs[4], "center_freq", NAN);
+        CALL_QD(quadriga_lib::set_antenna(layout, quadriga_lib::uint_list(i_antenna), rx, i_node, center_freq));
+        plhs[0] = qd_mex_layout2struct(layout);
+        return;
+    }
+
     const std::string type = qd_mex_get_string(prhs[1], "", "type");
     const auto args = (nrhs < 3) ? std::unordered_map<std::string, arma::mat>() : qd_mex_layout_args(prhs[2], "args");
     const bool rx = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "rx", false);

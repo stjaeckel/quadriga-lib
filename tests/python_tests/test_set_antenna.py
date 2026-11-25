@@ -75,9 +75,9 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(L3["rx"]["i_antenna"], [0, 1])
         npt.assert_array_equal(L3["tx"]["i_antenna"], [0, 0])
         L4 = quadriga_lib.layout.set_antenna(L, "dipole", center_freq=2e9)  # one band: a line per band
-        self.assertEqual(L4["antenna_args"], [["2000000000,dipole", "3500000000,"]])
+        self.assertEqual(L4["antenna_args"], [["2e9,dipole", "3.5e9,"]])
         L4 = quadriga_lib.layout.set_antenna(L4, "3GPP", panel, center_freq=3.5e9)
-        self.assertEqual(L4["antenna_args"], [["2000000000,dipole,", '3500000000,3GPP,"2,2,1,2"']])
+        self.assertEqual(L4["antenna_args"], [["2e9,dipole,", '3.5e9,3GPP,"2,2,1,2"']])
         self.assertEqual(L4["antenna"][0][1]["element_pos"].shape, (3, 8))
         L5 = quadriga_lib.layout.set_antenna(L, "3GPP", panel, evaluate=False)  # no evaluation
         self.assertEqual(L5["antenna"], [])
@@ -86,7 +86,7 @@ class test_case(unittest.TestCase):
         L6 = quadriga_lib.layout.set_antenna(L6, "none", i_node=0)  # no antenna for the first node
         npt.assert_array_equal(L6["tx"]["i_antenna"], [0, 1])
         L7 = quadriga_lib.layout.set_antenna(L, "3GPP", {"panel": np.array([2, 2, 1, 2], dtype=np.float32), "center_freq": 3.5e9})
-        self.assertEqual(L7["antenna_args"][0][1], '3500000000,3GPP,"2,2,1,2"')  # the band in args
+        self.assertEqual(L7["antenna_args"][0][1], '3.5e9,3GPP,"2,2,1,2"')  # the band in args
         L8 = quadriga_lib.layout.set_antenna(L, "ula", {"panel": [4, 1, 1, 1], "steer": [10, 5], "apply_weights": True}, evaluate=False)
         self.assertEqual(L8["antenna_args"], [['ula,"4,1,1,1","10,5",1']])  # a 1D steer is one row; bool as 1
         # None, other types and keywords
@@ -94,6 +94,35 @@ class test_case(unittest.TestCase):
                                              center_freq=np.nan, evaluate=None)
         self.assertTrue(same(L9, quadriga_lib.layout.set_antenna(L, "3GPP", panel)))
         self.assertTrue(same(quadriga_lib.layout.set_antenna(L, "dipole", None), quadriga_lib.layout.set_antenna(L, "dipole")))
+
+    def test_index_form(self):
+        L2 = quadriga_lib.layout.set_antenna(self.L, "3GPP", self.panel)  # entry 1 for the Tx nodes
+        L3 = quadriga_lib.layout.set_antenna(L2, "dipole", rx=True, i_node=0)  # entry 2 for Rx node 0
+        npt.assert_array_equal(L3["rx"]["i_antenna"], [2, 0])
+        L4 = quadriga_lib.layout.set_antenna(L3, 1, rx=True, i_node=1)  # 1-based entries, 0-based nodes
+        npt.assert_array_equal(L4["rx"]["i_antenna"], [2, 1])
+        self.assertEqual(L4["antenna_args"], L3["antenna_args"])
+        L5 = quadriga_lib.layout.set_antenna(L3, np.array([0, 2], dtype=np.uint8), i_node=[1, 0])  # one per node
+        npt.assert_array_equal(L5["tx"]["i_antenna"], [1, 0])  # renumbered: the 3GPP panel is unused
+        self.assertEqual(L5["antenna_args"], [["dipole"]])
+        L6 = quadriga_lib.layout.set_antenna(L3, [], rx=True)  # empty: the generic antenna
+        npt.assert_array_equal(L6["rx"]["i_antenna"], [0, 0])
+        L7 = quadriga_lib.layout.set_antenna(L3, 2, i_node=0, center_freq=3.5e9)  # one band of Tx node 0 from entry 2
+        self.assertEqual(L7["antenna_args"][L7["tx"]["i_antenna"][0] - 1], ['2e9,3GPP,"2,2,1,2"', "3.5e9,dipole,"])
+        with self.assertRaisesRegex(ValueError, "Input 'args' must be None for antenna entries"):
+            quadriga_lib.layout.set_antenna(L3, 1, {"res": 10})
+        with self.assertRaisesRegex(ValueError, "Input 'type'"):  # negative entry
+            quadriga_lib.layout.set_antenna(L3, -1)
+        with self.assertRaisesRegex(ValueError, "larger than the number of antennas"):  # C++
+            quadriga_lib.layout.set_antenna(L3, 3)
+        with self.assertRaises(TypeError):
+            quadriga_lib.layout.set_antenna(L3, None)
+        with self.assertRaisesRegex(ValueError, "not bool"):
+            quadriga_lib.layout.set_antenna(L3, True)
+        with self.assertRaisesRegex(ValueError, "not bool"):
+            quadriga_lib.layout.set_antenna(L3, [True, False], i_node=[0, 1])
+        with self.assertRaisesRegex(ValueError, "lists the node 0 twice"):  # C++
+            quadriga_lib.layout.set_antenna(L3, [1, 2], rx=True, i_node=[0, 0])
 
     def test_qdant_file(self):
         L = self.L
@@ -113,7 +142,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(L3["antenna_args"], [["qdant," + F + ",2"]])
         npt.assert_array_equal(L3["antenna"][0][0]["e_theta_re"], ref["e_theta_re"])
         L4 = quadriga_lib.layout.set_antenna(L, fn, {"id": 2}, center_freq=3.5e9)  # the other band is not set yet
-        self.assertEqual(L4["antenna_args"], [["2000000000,,,", "3500000000,qdant," + F + ",2"]])
+        self.assertEqual(L4["antenna_args"], [["2e9,,,", "3.5e9,qdant," + F + ",2"]])
         L5 = quadriga_lib.layout.set_antenna(L, fn, evaluate=False)
         self.assertEqual(L5["antenna_args"], L2["antenna_args"])
         self.assertEqual(L5["antenna"], [])  # not evaluated

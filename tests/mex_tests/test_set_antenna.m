@@ -37,9 +37,9 @@ L3 = quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ), tru
 assertEqual( L3.rx.i_antenna, uint32( [ 0; 1 ] ) );
 assertEqual( L3.tx.i_antenna, uint32( [ 0; 0 ] ) );
 L4 = quadriga_lib.set_antenna( L, 'dipole', [], false, [], 2e9 );              % one band: a line per band, the layout is not valid yet
-assertEqual( L4.antenna_args, { { '2000000000,dipole'; '3500000000,' } } );
+assertEqual( L4.antenna_args, { { '2e9,dipole'; '3.5e9,' } } );
 L4 = quadriga_lib.set_antenna( L4, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ), false, [], 3.5e9 );
-assertEqual( L4.antenna_args, { { '2000000000,dipole,'; '3500000000,3GPP,"2,2,1,2"' } } );
+assertEqual( L4.antenna_args, { { '2e9,dipole,'; '3.5e9,3GPP,"2,2,1,2"' } } );
 assertEqual( size( L4.antenna{1}(2).element_pos ), [ 3, 8 ] );
 L5 = quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ), false, [], NaN, false );   % no evaluation
 assertEqual( size( L5.antenna ), [ 0, 1 ] );
@@ -48,7 +48,7 @@ assertEqual( L5.antenna_args, L2.antenna_args );
 L6 = quadriga_lib.set_antenna( L2, 'none', [], false, 1 );                      % no antenna for the first node
 assertEqual( L6.tx.i_antenna, uint32( [ 0; 1 ] ) );
 L7 = quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', single( [ 2; 2; 1; 2 ] ), 'center_freq', 3.5e9 ) );   % the band in args
-assertEqual( L7.antenna_args, { { '2000000000,,'; '3500000000,3GPP,"2,2,1,2"' } } );   % the other band is not set
+assertEqual( L7.antenna_args, { { '2e9,,'; '3.5e9,3GPP,"2,2,1,2"' } } );   % the other band is not set
 
 %% A QDANT file: entry 1 by default, the entry in args, a band, no evaluation
 F = strrep( fullfile( pwd, fn_q ), '\', '/' );                                  % normalised absolute path
@@ -63,10 +63,24 @@ assertEqual( Q2.rx.i_antenna, uint32( [ 0; 1 ] ) );
 assertEqual( Q2.antenna_args, { { [ 'qdant,', F, ',2' ] } } );
 assertEqual( Q2.antenna{1}.e_theta_re, r2.e_theta_re );
 Q3 = quadriga_lib.set_antenna( L, fn_q, struct( 'id', 2 ), false, [], 3.5e9 ); % one band: the other band is not set yet
-assertEqual( Q3.antenna_args, { { '2000000000,,,'; [ '3500000000,qdant,', F, ',2' ] } } );
+assertEqual( Q3.antenna_args, { { '2e9,,,'; [ '3.5e9,qdant,', F, ',2' ] } } );
 Q4 = quadriga_lib.set_antenna( L, fn_q, [], false, [], NaN, false );
 assertEqual( Q4.antenna_args, Q1.antenna_args );
 assertTrue( isempty( Q4.antenna ) );                                            % not evaluated
+
+%% Index form: entries of the layout by their 1-based index, 0 = generic antenna
+L9 = quadriga_lib.set_antenna( L2, 'dipole', [], true, 1 );                    % entry 2 for Rx node 1
+assertEqual( L9.rx.i_antenna, uint32( [ 2; 0 ] ) );
+L10 = quadriga_lib.set_antenna( L9, 1, true, 2 );                              % entry 1 (the 3GPP panel) for Rx node 2
+assertEqual( L10.rx.i_antenna, uint32( [ 2; 1 ] ) );
+assertEqual( L10.antenna_args, L9.antenna_args );
+L11 = quadriga_lib.set_antenna( L9, uint8( [ 0; 2 ] ), 0, [ 2, 1 ] );           % one per node, in the order of i_node
+assertEqual( L11.tx.i_antenna, uint32( [ 1; 0 ] ) );                            % renumbered: the 3GPP panel is unused
+assertEqual( L11.antenna_args, { { 'dipole' } } );
+L12 = quadriga_lib.set_antenna( L9, [], true );                                % empty: the generic antenna
+assertEqual( L12.rx.i_antenna, uint32( [ 0; 0 ] ) );
+L13 = quadriga_lib.set_antenna( L9, 2, false, 1, 3.5e9 );                     % one band of Tx node 1 from entry 2
+assertEqual( L13.antenna_args{ L13.tx.i_antenna(1) }, { '2e9,3GPP,"2,2,1,2"'; '3.5e9,dipole,' } );
 
 %% Outputs: none
 quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ) );
@@ -78,6 +92,10 @@ assertTrue( isequaln( L8, L2 ) );
 
 %% Errors
 assert_throws( @() quadriga_lib.set_antenna( L ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.set_antenna( L, 1, false, [], NaN, true ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.set_antenna( L2, -1 ), 'i_antenna' );
+assert_throws( @() quadriga_lib.set_antenna( L2, 2 ), 'Input ''i_antenna'' has an entry larger than the number of antennas (1).' );   % C++
+assert_throws( @() quadriga_lib.set_antenna( L2, 0, false, [], 2e9 ), 'Input ''i_antenna'': the generic antenna (0) applies to all bands.' );   % C++
 assert_throws( @() quadriga_lib.set_antenna( L, 'dipole', [], false, [], NaN, true, 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out2( L, 'dipole' ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.set_antenna( 1, 'dipole' ), 'Input ''layout_in'' must be a 1x1 struct.' );

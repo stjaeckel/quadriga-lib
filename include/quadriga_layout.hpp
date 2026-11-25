@@ -143,6 +143,15 @@ namespace quadriga_lib
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN);                                     // Band in [Hz]; NaN = the same array for all bands
 
+    // Set the antenna of nodes to antenna entries of the layout by index
+    // - C++ callers pass a typed value (a uint_list, a uvec or a variable), since a brace list also builds a std::string
+    void set_antenna(
+        layout &layout,                                                // Layout, updated in place
+        const uint_list &i_antenna,                                    // Entries, 1-based, 0 = generic antenna; one value or one per node; empty = 0
+        bool rx = false,                                               // false: Tx nodes, true: Rx nodes
+        const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
+        double center_freq = NAN);                                     // Band in [Hz] of the layout; NaN = all bands
+
     // ---- Tracks: sampling, generation and orientation ----
 
     // Positions and orientations of one node at the snapshot times
