@@ -262,6 +262,18 @@ namespace quadriga_lib
         bool oxygen = false,                                 // Oxygen absorption (TR 38.901 clause 7.6.1)
         bool use_absolute_delays = false,                    // Include the LOS delay in all delays
         double overlap = 0.5);                               // Overlap of consecutive segments, 0 to 1
+
+    // Serving Tx node of each terminal by the large-scale gain or by RSRP; returns the Tx node per Rx terminal, 0-based, [n_rx_terminal]
+    // - Evaluates all sites at the first position of each node and ignores layout.pairing; a terminal with several nodes
+    //   takes the highest value of its nodes, a tie the lowest Tx node index
+    arma::uvec attach_terminals(
+        const layout &layout,                                    // Layout with links from init_link_states
+        const std::string &rule = "large_scale",                 // "large_scale" or "rsrp"
+        const std::vector<std::vector<gbsm_rays>> &rays = {},    // "rsrp": rays of all links from generate_rays, required; "large_scale": unused
+        arma::uvec *site = nullptr,                              // Optional output: serving site per Rx terminal, 0-based, [n_rx_terminal]
+        arma::mat *gain_dB = nullptr,                            // Optional output: coupling gain or RSRP in [dB], [n_rx_terminal, n_tx_node]
+        arma::uword i_freq = 0,                                  // Frequency index into layout.center_freq, 0-based
+        arma::uword tx_port = 0);                                // Port of the Tx antennas, 0-based
 }
 
 #endif

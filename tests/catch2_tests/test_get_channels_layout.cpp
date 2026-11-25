@@ -120,6 +120,29 @@ TEST_CASE("get_channels_layout - empty links: the result of the manual path, the
     CHECK(diff(quadriga_lib::get_channels_layout(L, {}, "taps", "", nullptr, "auto", 0.5, 17), manual(L)) != "");
 }
 
+TEST_CASE("get_channels_layout - an empty Tx or Rx side gives empty results")
+{
+    for (int side = 0; side < 2; ++side)
+    {
+        quadriga_lib::layout L = small();
+        if (side == 0)
+            L.tx = quadriga_lib::layout_nodes(), L.rx.scenario = {"UMa", "UMa", "UMa", "UMa"}; // default sides: no nodes
+        else
+            L.rx = quadriga_lib::layout_nodes();
+        CHECK(L.is_valid().empty());
+        arma::umat idx;
+        CHECK(quadriga_lib::get_channels_layout(L, {}, "taps", "", &idx).empty());
+        CHECK(idx.n_rows == 3);
+        CHECK(idx.n_cols == 0);
+        quadriga_lib::init_link_states(L);
+        CHECK(L.links.n_link() == 0);
+        const auto rays = quadriga_lib::generate_rays(L);
+        CHECK(rays.empty());
+        CHECK(quadriga_lib::get_gbsm_channels(L, rays).empty());
+        CHECK(quadriga_lib::get_channels_layout(L).empty());
+    }
+}
+
 TEST_CASE("get_channels_layout - filled and edited links are used")
 {
     // An edited LOS state gives the conf and the hashed seed of the new state: the same rays and channel as a layout

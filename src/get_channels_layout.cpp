@@ -178,8 +178,9 @@ arma::mat qd_images(const arma::mat &wrap)
 bool qd_sizes_ok(const quadriga_lib::layout_nodes &N)
 {
     const arma::uword nn = (arma::uword)N.name.size(), nr = N.pos.n_cols;
-    if (N.sector.n_elem != nn || N.i_antenna.n_elem != nn || N.offset.n_elem != nn || N.pos.n_rows != 3 || N.orientation.n_rows != 3 ||
-        N.orientation.n_cols != nr || (nn == 0 && nr != 0))
+    const bool none = nn == 0 && N.pos.is_empty() && N.orientation.is_empty(); // a side without nodes, e.g. default-constructed
+    if (N.sector.n_elem != nn || N.i_antenna.n_elem != nn || N.offset.n_elem != nn ||
+        (!none && (N.pos.n_rows != 3 || N.orientation.n_rows != 3 || N.orientation.n_cols != nr || nn == 0)))
         return false;
     for (arma::uword i = 0; i < nn; ++i)
         if ((i == 0 && N.offset[0] != 0) || (i > 0 && N.offset[i] <= N.offset[i - 1]) || N.offset[i] >= nr)
@@ -754,7 +755,7 @@ class qd_pipe
 
     static constexpr size_t qd_par_rays = 4; // Size limit of the parallel ray generation (groups), see qd_par_channels
 
-    qd_pipe(const quadriga_lib::layout &layout, const quadriga_lib::layout_links &links, bool check_hash) : L(layout), K(links)
+    qd_pipe(const quadriga_lib::layout &layout, const quadriga_lib::layout_links &links, bool check_hash, bool check_pairing = true) : L(layout), K(links)
     {
         if (K.method.empty())
             throw std::invalid_argument("Call 'init_link_states' first.");
@@ -769,7 +770,7 @@ class qd_pipe
         n_freq = L.center_freq.n_elem;
         S = qd_make_sides(L);
         img = qd_images(L.wrap);
-        if (!L.pairing.is_empty() && (L.pairing.n_rows != 2 || L.pairing.row(0).max() >= S.n_site || L.pairing.row(1).max() >= S.n_term))
+        if (check_pairing && !L.pairing.is_empty() && (L.pairing.n_rows != 2 || L.pairing.row(0).max() >= S.n_site || L.pairing.row(1).max() >= S.n_term))
             throw std::invalid_argument("Input 'layout' is not valid: member 'pairing' must have 2 rows with indices of sites and terminals.");
         const arma::uword n_link = K.n_link();
         if (K.o2i_rnd.n_rows != S.n_term || K.conf_files.size() != K.conf_names.size())
@@ -1139,18 +1140,11 @@ std::vector<qd_item> qd_items(const qd_pipe &P, const std::vector<arma::uword> &
     return items;
 }
 
-// Stage 3 for the channel links 'items' of the propagation links 'sel' with their rays; channels [n_freq * n_item],
-// frequency slowest
-std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays,
-                                                       const std::vector<arma::uword> &sel, const std::vector<qd_item> &items, const arma::vec &times,
-                                                       const std::string &output, const std::string &mobility, bool oxygen, bool use_absolute_delays)
+// Checks the entries of 'rays': 1 or n_freq objects per link with the frequencies of the layout
+void qd_check_rays(const quadriga_lib::layout &L, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays)
 {
-    const quadriga_lib::layout &L = P.L;
-    const quadriga_lib::layout_links &K = P.K;
-    const arma::uword n_freq = P.n_freq;
-    if (rays.size() != sel.size())
-        throw std::invalid_argument("Input 'rays' must have one entry per link of 'i_link'.");
-    for (size_t j = 0; j < sel.size(); ++j)
+    const arma::uword n_freq = L.center_freq.n_elem;
+    for (size_t j = 0; j < rays.size(); ++j)
     {
         const auto &r = rays[j];
         if (r.size() != 1 && r.size() != n_freq)
@@ -1166,6 +1160,20 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                 throw std::invalid_argument("Entry " + std::to_string(j) + ": The frequencies of 'rays' do not match 'center_freq' of the layout.");
         }
     }
+}
+
+// Stage 3 for the channel links 'items' of the propagation links 'sel' with their rays; channels [n_freq * n_item],
+// frequency slowest
+std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays,
+                                                       const std::vector<arma::uword> &sel, const std::vector<qd_item> &items, const arma::vec &times,
+                                                       const std::string &output, const std::string &mobility, bool oxygen, bool use_absolute_delays)
+{
+    const quadriga_lib::layout &L = P.L;
+    const quadriga_lib::layout_links &K = P.K;
+    const arma::uword n_freq = P.n_freq;
+    if (rays.size() != sel.size())
+        throw std::invalid_argument("Input 'rays' must have one entry per link of 'i_link'.");
+    qd_check_rays(L, rays);
     for (arma::uword k = 0; k < times.n_elem; ++k)
         if (!std::isfinite(times[k]))
             throw std::invalid_argument("Input 'times' must be finite.");
@@ -1296,6 +1304,45 @@ std::vector<arma::uword> qd_selection(const quadriga_lib::uint_list &i_link, arm
     }
     return sel;
 }
+
+// RSRP of Tx port p at snapshot s of a channel with one path per ray (output "rays"), linear: per Rx port the sum of
+// |h|^2 over the paths, the mean over the Rx ports (TR 36.873 eq. (8.1-1)). A channel statistic; 0 without Rx ports
+double qd_rsrp(const quadriga_lib::channel<double> &c, arma::uword p, arma::uword s = 0)
+{
+    const arma::cube &re = c.coeff_re[s], &im = c.coeff_im[s];
+    double sum = 0.0;
+    for (arma::uword i = 0; i < re.n_slices; ++i)
+        for (arma::uword r = 0; r < re.n_rows; ++r)
+        {
+            const double a = re(r, p, i), b = im(r, p, i);
+            sum += a * a + b * b;
+        }
+    return re.n_rows == 0 ? 0.0 : sum / (double)re.n_rows;
+}
+
+// Antenna gain of one unit-gain LOS path from the Tx position T to the Rx position R (get_channels_planar, Jones matrix
+// diag(1, -1) of TR 38.901 eq. (7.5-29)): the mean over the Rx ports of |h|^2 of Tx port p, linear
+double qd_los_gain(const quadriga_lib::arrayant<double> &ta, const quadriga_lib::arrayant<double> &ra, const arma::mat &T, const arma::mat &To,
+                   const arma::mat &R, const arma::mat &Ro, double fc, arma::uword p)
+{
+    const double dx = R(0, 0) - T(0, 0), dy = R(1, 0) - T(1, 0), dz = R(2, 0) - T(2, 0), dh = std::hypot(dx, dy);
+    const arma::vec aod = {std::atan2(dy, dx)}, eod = {std::atan2(dz, dh)}, aoa = {std::atan2(-dy, -dx)}, eoa = {-eod[0]};
+    arma::mat M(8, 1, arma::fill::zeros);
+    M(0, 0) = 1.0, M(6, 0) = -1.0;
+    arma::cube re, im, dl;
+    quadriga_lib::get_channels_planar<double>(ta, ra, T, To, R, Ro, aod, eod, aoa, eoa, arma::vec{1.0}, arma::vec{std::sqrt(dh * dh + dz * dz)}, M,
+                                              re, im, dl, fc);
+    double sum = 0.0;
+    for (arma::uword r = 0; r < re.n_rows; ++r)
+        sum += re(r, p, 0) * re(r, p, 0) + im(r, p, 0) * im(r, p, 0);
+    return re.n_rows == 0 ? 0.0 : sum / (double)re.n_rows;
+}
+
+// Size limits of the parallel evaluation of node pairs in attach_terminals (one thread vs. 32, the loop follows serial work,
+// so waking the threads costs about 0.3 ms): the LOS gain of a pair costs 4 us (generic antennas) to 23 us (32-element
+// panel), 2x at 32 pairs for the panel; the RSRP of a pair about 0.4 ms (full TR ray sets), 2x at 4 pairs
+constexpr size_t qd_par_attach_ls = 32;
+constexpr size_t qd_par_attach_rsrp = 4;
 } // namespace
 
 /*!MD
@@ -1555,4 +1602,176 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(con
     }
     qd_index(items, P.n_freq, index);
     return out;
+}
+
+/*!MD
+# attach_terminals
+Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
+
+- Evaluates all Tx nodes for each terminal at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
+- `"large_scale"` (TR 38.901 Table 7.8-1): the link gain `−PL − O2I + 10 lg(SF)` plus the gain of one unit-gain LOS path from [[get_channels_planar]] (port weights, element positions, orientations); no rays
+- `"rsrp"` (TR 36.873 eq. (8.1-1)): per Rx port the sum of `|h|²` over the rays of [[gbsm_single_link_channel]] (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
+- Both rules take `|h|²` of Tx port `tx_port` and average it over the Rx ports, so a dual-polarized UT (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT antenna of the TR
+- A terminal takes the highest value of its nodes; the serving node has the highest value, a tie the lowest index. A Tx node without a propagation link (co-located) has −Inf; a terminal without any link gets node 0
+- `layout.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, n_rx_terminal − 1))` links the sectors of the serving sites
+
+## Declaration:
+```
+arma::uvec quadriga_lib::attach_terminals(
+    const layout &layout,
+    const std::string &rule = "large_scale",
+    const std::vector<std::vector<gbsm_rays>> &rays = {},
+    arma::uvec *site = nullptr,
+    arma::mat *gain_dB = nullptr,
+    arma::uword i_freq = 0,
+    arma::uword tx_port = 0);
+```
+
+## Inputs:
+- **`layout`** — Layout with links from [[init_link_states]]; Tx nodes required if there are terminals
+- **`rule`** *(optional)* — `"large_scale"` or `"rsrp"`
+- **`rays`** *(optional)* — `"rsrp"`: rays of all links from [[generate_rays]], possibly edited; `[n_link][1 or n_freq]`
+- **`i_freq`** *(optional)* — Frequency index, 0-based
+- **`tx_port`** *(optional)* — Port of the Tx antennas, 0-based
+
+## Outputs:
+- **`site`** *(optional)* — Serving site per terminal, 0-based; `[n_rx_terminal]`
+- **`gain_dB`** *(optional)* — Coupling gain or RSRP in [dB]; `[n_rx_terminal, n_tx_node]`
+
+## Returns:
+- Serving Tx node per terminal, 0-based; `[n_rx_terminal]`
+
+## See also:
+- [[init_link_states]], [[generate_rays]] (link states and rays)
+- [[get_gbsm_channels]] (channels of the linked pairs)
+MD!*/
+
+arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::string &rule, const std::vector<std::vector<gbsm_rays>> &rays,
+                                          arma::uvec *site, arma::mat *gain_dB, arma::uword i_freq, arma::uword tx_port)
+{
+    const bool rsrp = rule == "rsrp";
+    if (!rsrp && rule != "large_scale")
+        throw std::invalid_argument("Input 'rule' must be 'large_scale' or 'rsrp'.");
+    qd_pipe P(layout, layout.links, true, false); // pairing is not used
+    const layout_links &K = layout.links;
+    const arma::uword n_freq = P.n_freq, n_link = K.n_link(), n_tx = layout.tx.n_node(), n_rx = layout.rx.n_node();
+    const size_t n_term = P.S.n_term, n_site = P.S.n_site;
+    if (i_freq >= n_freq)
+        throw std::invalid_argument("Input 'i_freq' must be below the number of frequencies of the layout (" + std::to_string(n_freq) + ").");
+    if (rsrp)
+    {
+        if (rays.size() != n_link)
+            throw std::invalid_argument("Input 'rays' must hold the rays of all links of the layout (from 'generate_rays') for the rule 'rsrp'.");
+        qd_check_rays(layout, rays);
+    }
+    if (n_term == 0) // no terminals: empty outputs
+    {
+        if (site != nullptr)
+            site->set_size(0);
+        if (gain_dB != nullptr)
+            gain_dB->set_size(0, n_tx);
+        return arma::uvec();
+    }
+    if (n_tx == 0)
+        throw std::invalid_argument("Input 'layout' has no Tx nodes.");
+
+    // The arrays at frequency i_freq (serial: an antenna that is not evaluated may throw), the port of the Tx arrays
+    std::vector<arrayant<double>> xpol(n_freq);
+    xpol[i_freq] = generate_antenna<double>("xpol", NAN, layout.center_freq[i_freq]);
+    std::vector<const arrayant<double> *> atx(n_tx), arx(n_rx);
+    for (arma::uword i = 0; i < n_tx; ++i)
+    {
+        atx[i] = qd_array(layout, layout.tx, "Tx", i, i_freq, xpol);
+        if (tx_port >= atx[i]->n_ports())
+            throw std::invalid_argument("Input 'tx_port' must be below the number of ports (" + std::to_string(atx[i]->n_ports()) + ") of the antenna of Tx node '" +
+                                        layout.tx.name[i] + "' (sector " + std::to_string(layout.tx.sector[i]) + ").");
+    }
+    for (arma::uword i = 0; i < n_rx; ++i)
+        arx[i] = qd_array(layout, layout.rx, "Rx", i, i_freq, xpol);
+
+    // Orientations of the nodes at their first row (in the GCS, as sample_track gives them)
+    arma::mat otx(3, n_tx), orx(3, n_rx);
+    for (int side = 0; side < 2; ++side)
+    {
+        const layout_nodes &N = side == 0 ? layout.tx : layout.rx;
+        arma::mat &O = side == 0 ? otx : orx;
+        for (arma::uword i = 0; i < N.n_node(); ++i)
+        {
+            arma::mat pos, o;
+            sample_track(N, i, {}, pos, o);
+            O.col(i) = o.col(0);
+        }
+    }
+
+    // Link gain of each link at the drop
+    std::vector<arma::uword> all(n_link);
+    for (arma::uword l = 0; l < n_link; ++l)
+        all[l] = l;
+    P.prepare(all);
+    for (arma::uword l = 0; l < n_link; ++l)
+        P.lsf(P.group[l]);
+    arma::vec lg(n_link);
+    qd_batch_loop(n_link, n_link >= qd_par_links, nullptr, [&](size_t l)
+                  {
+                      arma::mat g, kfr;
+                      P.link_gain((arma::uword)l, P.groups[P.group[l]].tx, P.rx0((arma::uword)l), g, kfr);
+                      lg[l] = g(0, i_freq);
+                  });
+
+    // Value of each pair of a Tx node and an Rx node with a link, [n_rx, n_tx]
+    std::vector<arma::uword> link(n_site * n_term, n_link);
+    for (arma::uword l = 0; l < n_link; ++l)
+        link[K.i_tx[l] * n_term + K.i_rx[l]] = l;
+    arma::mat V(n_rx, n_tx);
+    const size_t n_pair = (size_t)(n_rx * n_tx);
+    qd_batch_loop(n_pair, n_pair >= (rsrp ? qd_par_attach_rsrp : qd_par_attach_ls), nullptr, [&](size_t c)
+                  {
+                      const arma::uword r = (arma::uword)(c % n_rx), i = (arma::uword)(c / n_rx);
+                      const arma::uword l = link[P.S.site_of_tx[i] * n_term + P.S.term_of_rx[r]];
+                      if (l == n_link)
+                      {
+                          V(r, i) = -arma::datum::inf;
+                          return;
+                      }
+                      const arma::mat T = P.groups[P.group[l]].tx, R = P.rx0(l);
+                      qd_named("Channel '" + qd_node_name(layout.tx, i) + "_" + qd_node_name(layout.rx, r) + "': ", [&]
+                               {
+                                   if (!rsrp)
+                                       V(r, i) = lg[l] + 10.0 * std::log10(qd_los_gain(*atx[i], *arx[r], T, otx.col(i), R, orx.col(r), layout.center_freq[i_freq], tx_port));
+                                   else
+                                   {
+                                       const auto &y = rays[l];
+                                       const bool per_freq = y.size() == n_freq; // as in stage 3
+                                       const gbsm_rays &ray = per_freq ? y[i_freq] : y[0];
+                                       const channel<double> ch = gbsm_single_link_channel(*atx[i], *arx[r], ray, arma::vec{lg[l]}, "phase", "rays",
+                                                                                           per_freq ? 0 : i_freq, T, R, otx.col(i), orx.col(r));
+                                       V(r, i) = 10.0 * std::log10(qd_rsrp(ch, tx_port));
+                                   }
+                               });
+                  });
+
+    // The highest value of the nodes of each terminal; the serving node, ties to the lowest index
+    arma::mat G(n_term, n_tx);
+    G.fill(-arma::datum::inf);
+    for (arma::uword r = 0; r < n_rx; ++r)
+        for (arma::uword i = 0; i < n_tx; ++i)
+            if (V(r, i) > G(P.S.term_of_rx[r], i))
+                G(P.S.term_of_rx[r], i) = V(r, i);
+    arma::uvec serving(n_term, arma::fill::zeros);
+    for (size_t t = 0; t < n_term; ++t)
+        for (arma::uword i = 1; i < n_tx; ++i)
+            if (G(t, i) > G(t, serving[t]))
+                serving[t] = i;
+    if (site != nullptr)
+    {
+        site->set_size(n_term);
+        for (size_t t = 0; t < n_term; ++t)
+            (*site)[t] = (arma::uword)P.S.site_of_tx[serving[t]];
+    }
+    if (gain_dB != nullptr)
+    {
+        gain_dB->set_size(n_term, n_tx);
+        std::copy(G.begin(), G.end(), gain_dB->begin());
+    }
+    return serving;
 }
