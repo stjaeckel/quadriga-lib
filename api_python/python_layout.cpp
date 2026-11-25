@@ -39,6 +39,7 @@ void quadriga_lib_layout(py::module_ &m)
     m.def("generate_layout", &generate_layout,
           py::arg("type"),
           py::arg("n_ut") = 0,
+          py::arg("center_freq") = py::none(),
           py::kw_only(),
           py::arg("spacing") = py::none(),
           py::arg("grid") = py::none(),

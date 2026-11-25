@@ -45,9 +45,8 @@ channels, index = quadriga_lib.layout.get_channels_layout( layout, *, times, out
 
 ## Example:
 ```
-import numpy as np, quadriga_lib as qd
-layout = qd.layout.generate_layout( "38.901_UMa", 1 )
-layout["center_freq"] = np.array([3.5e9])
+import quadriga_lib as qd
+layout = qd.layout.generate_layout( "38.901_UMa", 1, [3.5e9] )
 channels, index = qd.layout.get_channels_layout( layout )
 ```
 

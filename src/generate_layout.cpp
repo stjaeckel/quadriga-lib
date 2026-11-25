@@ -1212,7 +1212,7 @@ Network layout from a preset: BS sites and a drop of UTs
 - Creates a standard evaluation layout with the values of its tables: the hexagonal and indoor layouts of 3GPP TR
   38.901, the test environments of ITU-R M.2412 and the road layouts of 3GPP TR 37.885
 - The result has the sites `BS1`, `BS2`, ... with one Tx node per sector and the UTs `UT1`, `UT2`, ... as point drops;
-  set the frequencies and the antennas next ([[set_antenna]]), until then the nodes use the generic antenna
+  set the antennas next ([[set_antenna]]), until then the nodes use the generic antenna
 - The other inputs change single values of the preset: an entry of a tuple that is NaN or omitted keeps the value of the
   preset; an entry or option that the preset does not use throws
 
@@ -1221,6 +1221,7 @@ Network layout from a preset: BS sites and a drop of UTs
 quadriga_lib::layout quadriga_lib::generate_layout(
     const std::string &type,
     arma::uword n_ut = 0,
+    const arma::vec &center_freq = {},
     const arma::vec &spacing = {},
     const arma::vec &grid = {},
     const arma::vec &area = {},
@@ -1243,6 +1244,8 @@ quadriga_lib::layout quadriga_lib::generate_layout(
   | `M.2412_InH`, `M.2412_DenseUrban`, `M.2412_Rural`, `M.2412_UrbanMacro` | Test environments of Report ITU-R M.2412-0 (see Notes) |
   | `37.885_Urban`, `37.885_Highway` | Roads and vehicles of TR 37.885, no BSs (see Notes) |
 - **`n_ut`** *(optional)* — UTs per cell (`per_cell`) or in total, at most 1e7 in total; 0 = no UTs
+- **`center_freq`** *(optional)* — Simulation frequencies (bands) in [Hz], finite, positive and strictly ascending,
+  stored as `layout.center_freq`; empty: not set
 - **`spacing`** *(optional)* — `[d_x, d_y]` in [m], > 0: the ISD of a hexagonal preset (`d_y` not used), the spacing of
   the indoor grid or of the urban road grid
 - **`grid`** *(optional)* — `[n_x, n_y, n_sector]`, whole numbers: rings of a hexagonal preset (0 to 50, 0 = one site;
@@ -1270,7 +1273,7 @@ quadriga_lib::layout quadriga_lib::generate_layout(
 
 ## Example:
 ```
-quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 10, {}, {}, {}, {}, {NAN, NAN, NAN, 0.0, 90.0}, {}, {}, true, 42);
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 10, {3.5e9}, {}, {}, {}, {}, {NAN, NAN, NAN, 0.0, 90.0}, {}, {}, true, 42);
 quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
 ```
 
@@ -1279,8 +1282,9 @@ quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
   $\max(\lvert q \rvert, \lvert r \rvert, \lvert q + r \rvert) \le n$ for $n$ rings is at $x = \sqrt{3}\, q d / 2$,
   $y = (q / 2 + r)\, d$ with the ISD $d$, ordered by ring and then by azimuth in (-30°, 330°]. The wrap vectors
   $a_1 = (\sqrt{3}\, n d / 2, \ (3 n / 2 + 1)\, d)$ and $a_2$, $a_1$ turned by 60°, make the cluster tile the plane.
-  With the wrap-around, each link uses the copy of its site nearest to the terminal, so that the cells at the edge get
-  the interference of a large network (TR 38.901 Table 7.8-1; see the Notes of [[layout]])
+  With the wrap-around, each link uses the copy of its site nearest to the first position of the terminal, kept for the
+  whole track, so that the cells at the edge get the interference of a large network (TR 38.901 Table 7.8-1; see the
+  Notes of [[layout]])
 - **`38.901_SMa`**: mechanical tilt 5° at ISD 1299 m and 2° at 1732 m (other ISDs: that of the nearer one); option
   `p_residential` (0.9)
 - **Indoor presets**: centred at the origin, one sector, no wrap-around; the BSs form a lattice centred in the hall,
@@ -1333,7 +1337,7 @@ quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
     correlated fields at the UT positions (TR 38.901 clause 7.6.3.3); `d2d_in` up to 25 m (UMi, UMa, SMa commercial) or
     10 m (RMa, SMa residential)
 - **Reproducibility**: the layout is a function of the seed and does not depend on the thread count; seed -1 draws a
-  seed, which is stored in `layout.seed`. `center_freq` is empty
+  seed, which is stored in `layout.seed`
 
 ## See also:
 - [[drop_terminals]] (the same drop for any set of Tx nodes)
@@ -1342,7 +1346,7 @@ quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
 - [[layout]] (the members)
 MD!*/
 
-quadriga_lib::layout quadriga_lib::generate_layout(const std::string &type, arma::uword n_ut, const arma::vec &spacing,
+quadriga_lib::layout quadriga_lib::generate_layout(const std::string &type, arma::uword n_ut, const arma::vec &center_freq, const arma::vec &spacing,
                                                    const arma::vec &grid, const arma::vec &area, const arma::vec &bs, const arma::vec &ut,
                                                    const arma::vec &indoor, const std::unordered_map<std::string, std::vector<double>> &options,
                                                    bool per_cell, arma::sword seed)
@@ -1353,6 +1357,9 @@ quadriga_lib::layout quadriga_lib::generate_layout(const std::string &type, arma
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
     qd_check_n_ut(n_ut, 0, false);
+    for (arma::uword i = 0; i < center_freq.n_elem; ++i)
+        if (!std::isfinite(center_freq[i]) || center_freq[i] <= 0.0 || (i > 0 && !(center_freq[i] > center_freq[i - 1])))
+            throw std::invalid_argument("Input 'center_freq' must be finite, positive and strictly ascending.");
     const bool roads = !std::isnan(p.lane[0]);
     if (roads && n_ut > 0)
         throw std::invalid_argument("Input 'n_ut' must be 0 for " + by + ": the vehicles follow from the gaps along the lanes.");
@@ -1368,6 +1375,7 @@ quadriga_lib::layout quadriga_lib::generate_layout(const std::string &type, arma
 
     layout L;
     L.seed = qd_resolve_seed(seed);
+    L.center_freq = center_freq;
     qd_build_out out;
     p.build(p, a, L, out);
     if (roads)

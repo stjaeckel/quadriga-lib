@@ -8,7 +8,7 @@ function test_drop_terminals
 % The cells, the drop rules and the random streams are tested in the Catch2 suite (test_generate_layout.cpp).
 
 %% Setup: UMa, one ring (7 sites, 3 sectors), without UTs
-L = quadriga_lib.generate_layout( '38.901_UMa', 0, [], [ 1, NaN, 3 ], [], [], [], [], [], true, 9 );
+L = quadriga_lib.generate_layout( '38.901_UMa', 0, [], [], [ 1, NaN, 3 ], [], [], [], [], [], true, 9 );
 assertTrue( isempty( L.rx.pos ) );
 
 %% Basic call: the drop equals that of generate_layout with the same seed; the input stays unchanged
@@ -18,11 +18,11 @@ assertEqual( L1.rx.name(1:2)', { 'UT1', 'UT2' } );
 assertEqual( L1.rx.offset(1:3), uint64( [ 1; 2; 3 ] ) );                        % 1-based
 assertEqual( L1.tx, L.tx );
 assertTrue( isempty( L.rx.pos ) );
-Lg = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [ 1, NaN, 3 ], [], [], [], [], [], true, 9 );
+Lg = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [], [ 1, NaN, 3 ], [], [], [], [], [], true, 9 );
 assertTrue( isequaln( L1, Lg ) );
 
 %% The member tx.cell: the micro sites of M.2412 Dense Urban config 3 have no cells of their own (uint32, 0)
-D = quadriga_lib.generate_layout( 'M.2412_DenseUrban', 0, [], [], [], [], [], [], struct( 'config', 3 ), true, 4 );
+D = quadriga_lib.generate_layout( 'M.2412_DenseUrban', 0, [], [], [], [], [], [], [], struct( 'config', 3 ), true, 4 );
 assertEqual( D.tx.cell, uint32( [ ones( 57, 1 ); zeros( 171, 1 ) ] ) );
 D1 = quadriga_lib.drop_terminals( D, 1, [], [], [], [], true, 4 );
 assertEqual( size( D1.rx.pos ), [ 3, 228 ] );                                   % 4 UTs in each of the 57 macro cells
@@ -34,7 +34,7 @@ D.tx.cell = uint32( zeros( 228, 1 ) );
 assert_throws( @() quadriga_lib.drop_terminals( D, 1 ), 'Input ''layout'' has no site with ''cell'' = 1.' );
 
 %% Optional inputs: bounds, ut, per_cell and seed
-H = quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], true, 5 );
+H = quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], [], true, 5 );
 H1 = quadriga_lib.drop_terminals( H, 4, [ -60, 60, -25, 25 ], [], [], [], false, 2 );
 assertEqual( size( H1.rx.pos ), [ 3, 4 ] );                                     % per_cell = false: 4 UTs in total
 assertTrue( all( abs( H1.rx.pos(1, :) ) <= 60 ) && all( abs( H1.rx.pos(2, :) ) <= 25 ) );

@@ -110,7 +110,7 @@ quadriga_lib::layout gen(const std::string &type, arma::uword n_ut, const arma::
                          const arma::vec &area = {}, const arma::vec &bs = {}, const arma::vec &ut = {}, const arma::vec &indoor = {},
                          const opts &o = {}, bool per_cell = true, arma::sword seed = 7)
 {
-    return quadriga_lib::generate_layout(type, n_ut, spacing, grid, area, bs, ut, indoor, o, per_cell, seed);
+    return quadriga_lib::generate_layout(type, n_ut, {}, spacing, grid, area, bs, ut, indoor, o, per_cell, seed);
 }
 
 // Bound of five standard deviations for a share p of n UTs whose states come from one field with 50 m correlation over
@@ -149,7 +149,7 @@ TEST_CASE("generate_layout - input validation")
 {
     auto G = [](const std::string &type, const arma::vec &spacing = {}, const arma::vec &grid = {}, const arma::vec &area = {},
                 const arma::vec &bs = {}, const arma::vec &ut = {}, const arma::vec &indoor = {}, const opts &o = {}, arma::sword seed = 1)
-    { return qd_layout_throws([&] { quadriga_lib::generate_layout(type, 1, spacing, grid, area, bs, ut, indoor, o, true, seed); }); };
+    { return qd_layout_throws([&] { quadriga_lib::generate_layout(type, 1, {}, spacing, grid, area, bs, ut, indoor, o, true, seed); }); };
 
     CHECK(G("38.901_UMa", {}, {1.0}) == "");
     CHECK(G("38.901_uma", {NaN, NaN}, {1.0, NaN, NaN}, {NaN, NaN, NaN}, {NaN, NaN, NaN}, {NaN, NaN, NaN, NaN, NaN, NaN}, {NaN, NaN, NaN, NaN}) == "");
@@ -232,7 +232,7 @@ TEST_CASE("generate_layout - input validation")
     {
         auto V = [](const std::string &type, arma::uword n_ut, const arma::vec &spacing = {}, const arma::vec &grid = {}, const arma::vec &area = {},
                     const arma::vec &bs = {}, const arma::vec &ut = {}, const arma::vec &indoor = {}, const opts &o = {})
-        { return qd_layout_throws([&] { quadriga_lib::generate_layout(type, n_ut, spacing, grid, area, bs, ut, indoor, o, true, 1); }); };
+        { return qd_layout_throws([&] { quadriga_lib::generate_layout(type, n_ut, {}, spacing, grid, area, bs, ut, indoor, o, true, 1); }); };
         CHECK(V("37.885_Highway", 0) == "");
         CHECK(V("37.885_Urban", 0, {433.0, 250.0}, {}, {1299.0, 750.0}, {}, {1.5, NaN, 10.0, 0.0, 0.0, 0.0}, {}, {{"p_truck", {0.5}}}) == "");
         CHECK(has(V("37.885_Highway", 1), "'n_ut'"));
@@ -263,7 +263,7 @@ TEST_CASE("generate_layout - input validation")
     {
         // UTs: at most 1e7 in total, also when n_ut times the number of cells (57) wraps around in 64 bits
         auto N = [](arma::uword n_ut, bool per_cell)
-        { return qd_layout_throws([&] { quadriga_lib::generate_layout("38.901_UMa", n_ut, {}, {}, {}, {}, {}, {}, {}, per_cell, 1); }); };
+        { return qd_layout_throws([&] { quadriga_lib::generate_layout("38.901_UMa", n_ut, {}, {}, {}, {}, {}, {}, {}, {}, per_cell, 1); }); };
         CHECK(has(N(323627089012448274ULL, true), "'n_ut'"));
         CHECK(has(N(200000, true), "'n_ut'"));
         CHECK(has(N(10000001, false), "'n_ut'"));
@@ -786,10 +786,22 @@ TEST_CASE("generate_layout - seeds and determinism")
     const auto I = gen("38.901_InF_SH", 1);
     quadriga_lib::layout_csv_write(F.path("tx.csv"), F.path("rx.csv"), A);
     const auto A2 = quadriga_lib::layout_csv_read(F.path("tx.csv"), F.path("rx.csv"), {}, false);
-    CHECK(qd_layout_diff(A, A2, 1.0e-8) == ""); // The writer keeps 9 significant digits
+    CHECK(qd_layout_diff(A, A2, 1.0e-8, 0.5e-6, 0.5e-9) == ""); // 9 significant digits, positions 1 um
     quadriga_lib::layout_csv_write(F.path("tx.csv"), F.path("rx.csv"), I);
     const auto I2 = quadriga_lib::layout_csv_read(F.path("tx.csv"), F.path("rx.csv"), {}, false);
-    CHECK(qd_layout_diff(I, I2, 1.0e-8) == "");
+    CHECK(qd_layout_diff(I, I2, 1.0e-8, 0.5e-6, 0.5e-9) == "");
+}
+
+TEST_CASE("generate_layout - center_freq is stored")
+{
+    const auto L = quadriga_lib::generate_layout("38.901_UMa", 1, {3.5e9, 28e9}, {}, {0.0});
+    CHECK(arma::approx_equal(L.center_freq, arma::vec{3.5e9, 28e9}, "absdiff", 0.0));
+    CHECK(L.is_valid() == "");
+    CHECK(quadriga_lib::generate_layout("38.901_UMa", 1, {}, {}, {0.0}).center_freq.is_empty());
+    CHECK(arma::approx_equal(quadriga_lib::generate_layout("37.885_Highway", 0, {5.9e9}).center_freq, arma::vec{5.9e9}, "absdiff", 0.0));
+    const std::string m = "Input 'center_freq' must be finite, positive and strictly ascending.";
+    for (const arma::vec &f : {arma::vec{3.5e9, 2e9}, arma::vec{3.5e9, 3.5e9}, arma::vec{-1.0}, arma::vec{0.0}, arma::vec{NaN}, arma::vec{arma::datum::inf}})
+        CHECK(qd_layout_throws([&] { quadriga_lib::generate_layout("38.901_UMa", 1, f); }) == m);
 }
 
 TEST_CASE("generate_layout - ITU-R M.2412 presets")

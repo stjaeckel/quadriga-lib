@@ -17,14 +17,14 @@ Network layout from a preset: BS sites and a drop of UTs
 - Creates a standard evaluation layout with the values of its tables: the hexagonal and indoor layouts of 3GPP TR
   38.901, the test environments of ITU-R M.2412 and the road layouts of 3GPP TR 37.885
 - The result has the sites `BS1`, `BS2`, ... with one Tx node per sector and the UTs `UT1`, `UT2`, ... as point drops;
-  set the frequencies and the antennas next ([[set_antenna]]), until then the nodes use the generic antenna
+  set the antennas next ([[set_antenna]]), until then the nodes use the generic antenna
 - The other inputs change single values of the preset: an entry of a tuple that is NaN or omitted keeps the value of the
   preset; an entry or option that the preset does not use raises an error
 
 ## Usage:
 ```
-layout = quadriga_lib.generate_layout( type, n_ut, spacing, grid, area, bs, ut, indoor, options, ...
-    per_cell, seed );
+layout = quadriga_lib.generate_layout( type, n_ut, center_freq, spacing, grid, area, bs, ut, indoor, ...
+    options, per_cell, seed );
 ```
 
 ## Inputs:
@@ -38,6 +38,8 @@ layout = quadriga_lib.generate_layout( type, n_ut, spacing, grid, area, bs, ut, 
   | `M.2412_InH`, `M.2412_DenseUrban`, `M.2412_Rural`, `M.2412_UrbanMacro` | Test environments of Report ITU-R M.2412-0 (see Notes) |
   | `37.885_Urban`, `37.885_Highway` | Roads and vehicles of TR 37.885, no BSs (see Notes) |
 - **`n_ut`** — UTs per cell (`per_cell`) or in total, at most 1e7 in total; 0 = no UTs; default: 0
+- **`center_freq`** — Simulation frequencies (bands) in [Hz], finite, positive and strictly ascending, stored as
+  `layout.center_freq`; default: `[]` (not set)
 - **`spacing`** — `[d_x, d_y]` in [m], > 0: the ISD of a hexagonal preset (`d_y` not used), the spacing of the indoor
   grid or of the urban road grid; default: `[]`
 - **`grid`** — `[n_x, n_y, n_sector]`, whole numbers: rings of a hexagonal preset (0 to 50, 0 = one site; `n_y` not
@@ -65,7 +67,7 @@ layout = quadriga_lib.generate_layout( type, n_ut, spacing, grid, area, bs, ut, 
 
 ## Example:
 ```
-layout = quadriga_lib.generate_layout( '38.901_UMa', 10, [], [], [], [], [NaN NaN NaN 0 90], [], [], true, 42 );
+layout = quadriga_lib.generate_layout( '38.901_UMa', 10, 3.5e9, [], [], [], [], [NaN NaN NaN 0 90], [], [], true, 42 );
 layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2] ) );
 ```
 
@@ -73,9 +75,9 @@ layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2] ) 
 - **Hexagonal presets** (2 rings, 3 sectors, wrap-around): site (q, r) with `max(abs(q), abs(r), abs(q + r)) <= n` for n
   rings is at `x = sqrt(3) · q · d / 2`, `y = (q / 2 + r) · d` with the ISD d, ordered by ring and then by azimuth in
   (-30°, 330°]. The wrap vectors `a1 = (sqrt(3) · n · d / 2, (3 · n / 2 + 1) · d)` and a2, a1 turned by 60°, make the
-  cluster tile the plane. With the wrap-around, each link uses the copy of its site nearest to the terminal, so that the
-  cells at the edge get the interference of a large network (TR 38.901 Table 7.8-1; see the Notes of
-  [[layout_csv_read]])
+  cluster tile the plane. With the wrap-around, each link uses the copy of its site nearest to the first position of the
+  terminal, kept for the whole track, so that the cells at the edge get the interference of a large network (TR 38.901
+  Table 7.8-1; see the Notes of [[layout_csv_read]])
 - **`38.901_SMa`**: mechanical tilt 5° at ISD 1299 m and 2° at 1732 m (other ISDs: that of the nearer one); option
   `p_residential` (0.9)
 - **Indoor presets**: centred at the origin, one sector, no wrap-around; the BSs form a lattice centred in the hall,
@@ -127,7 +129,7 @@ layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2] ) 
     correlated fields at the UT positions (TR 38.901 clause 7.6.3.3); `d2d_in` up to 25 m (UMi, UMa, SMa commercial) or
     10 m (RMa, SMa residential)
 - **Reproducibility**: the layout is a function of the seed and does not depend on the thread count; seed -1 draws a
-  seed, which is stored in `layout.seed`. `center_freq` is empty
+  seed, which is stored in `layout.seed`
 
 ## See also:
 - [[drop_terminals]] (the same drop for any set of Tx nodes)
@@ -137,22 +139,23 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 11)
+    if (nrhs < 1 || nrhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     const std::string type = qd_mex_get_string(prhs[0], "", "type");
     const arma::uword n_ut = (nrhs < 2) ? 0 : qd_mex_get_scalar<arma::uword>(prhs[1], "n_ut", 0);
-    const arma::vec spacing = qd_mex_layout_vec(nrhs, prhs, 2, "spacing"), grid = qd_mex_layout_vec(nrhs, prhs, 3, "grid");
-    const arma::vec area = qd_mex_layout_vec(nrhs, prhs, 4, "area"), bs = qd_mex_layout_vec(nrhs, prhs, 5, "bs");
-    const arma::vec ut = qd_mex_layout_vec(nrhs, prhs, 6, "ut"), indoor = qd_mex_layout_vec(nrhs, prhs, 7, "indoor");
-    const auto options = (nrhs < 9) ? std::unordered_map<std::string, std::vector<double>>() : qd_mex_layout_options(prhs[8], "options");
-    const bool per_cell = (nrhs < 10) ? true : qd_mex_get_scalar<bool>(prhs[9], "per_cell", true);
-    const arma::sword seed = (nrhs < 11) ? -1 : (arma::sword)qd_mex_get_seed(prhs[10], "seed");
+    const arma::vec center_freq = qd_mex_layout_vec(nrhs, prhs, 2, "center_freq");
+    const arma::vec spacing = qd_mex_layout_vec(nrhs, prhs, 3, "spacing"), grid = qd_mex_layout_vec(nrhs, prhs, 4, "grid");
+    const arma::vec area = qd_mex_layout_vec(nrhs, prhs, 5, "area"), bs = qd_mex_layout_vec(nrhs, prhs, 6, "bs");
+    const arma::vec ut = qd_mex_layout_vec(nrhs, prhs, 7, "ut"), indoor = qd_mex_layout_vec(nrhs, prhs, 8, "indoor");
+    const auto options = (nrhs < 10) ? std::unordered_map<std::string, std::vector<double>>() : qd_mex_layout_options(prhs[9], "options");
+    const bool per_cell = (nrhs < 11) ? true : qd_mex_get_scalar<bool>(prhs[10], "per_cell", true);
+    const arma::sword seed = (nrhs < 12) ? -1 : (arma::sword)qd_mex_get_seed(prhs[11], "seed");
 
     quadriga_lib::layout layout;
-    CALL_QD(layout = quadriga_lib::generate_layout(type, n_ut, spacing, grid, area, bs, ut, indoor, options, per_cell, seed));
+    CALL_QD(layout = quadriga_lib::generate_layout(type, n_ut, center_freq, spacing, grid, area, bs, ut, indoor, options, per_cell, seed));
 
     plhs[0] = qd_mex_layout2struct(layout);
 }

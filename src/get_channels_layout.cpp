@@ -1243,8 +1243,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
 
 ## Example:
 ```
-quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1);
-L.center_freq = {3.5e9};
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1, {3.5e9});
 auto channels = quadriga_lib::get_channels_layout(L);
 ```
 
@@ -1381,8 +1380,7 @@ arma::uvec quadriga_lib::attach_terminals(
 
 ## Example:
 ```
-quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1);
-L.center_freq = {3.5e9};
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1, {3.5e9});
 quadriga_lib::init_link_states(L);
 arma::uvec site;
 quadriga_lib::attach_terminals(L, "large_scale", {}, &site);

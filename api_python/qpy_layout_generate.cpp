@@ -15,14 +15,14 @@ Network layout from a preset: BS sites and a drop of UTs
 - Creates a standard evaluation layout with the values of its tables: the hexagonal and indoor layouts of 3GPP TR
   38.901, the test environments of ITU-R M.2412 and the road layouts of 3GPP TR 37.885
 - The result has the sites `BS1`, `BS2`, ... with one Tx node per sector and the UTs `UT1`, `UT2`, ... as point drops;
-  set the frequencies and the antennas next ([[set_antenna]]), until then the nodes use the generic antenna
+  set the antennas next ([[set_antenna]]), until then the nodes use the generic antenna
 - The other inputs change single values of the preset: an entry of a tuple that is NaN or omitted keeps the value of the
   preset; an entry or option that the preset does not use raises an error
 
 ## Usage:
 ```
-layout = quadriga_lib.layout.generate_layout( type, n_ut, *, spacing, grid, area, bs, ut, indoor, options, \
-    per_cell, seed )
+layout = quadriga_lib.layout.generate_layout( type, n_ut, center_freq, *, spacing, grid, area, bs, ut, indoor, \
+    options, per_cell, seed )
 ```
 
 ## Inputs:
@@ -36,6 +36,8 @@ layout = quadriga_lib.layout.generate_layout( type, n_ut, *, spacing, grid, area
   | `M.2412_InH`, `M.2412_DenseUrban`, `M.2412_Rural`, `M.2412_UrbanMacro` | Test environments of Report ITU-R M.2412-0 (see Notes) |
   | `37.885_Urban`, `37.885_Highway` | Roads and vehicles of TR 37.885, no BSs (see Notes) |
 - **`n_ut`** — UTs per cell (`per_cell`) or in total, at most 1e7 in total; 0 = no UTs; int; default: 0
+- **`center_freq`** — Simulation frequencies (bands) in [Hz], finite, positive and strictly ascending, stored as
+  `layout["center_freq"]`; `(n_freq,)`; default: None (not set)
 - **`spacing`** — `[d_x, d_y]` in [m], > 0: the ISD of a hexagonal preset (`d_y` not used), the spacing of the indoor
   grid or of the urban road grid; default: `None`
 - **`grid`** — `[n_x, n_y, n_sector]`, whole numbers: rings of a hexagonal preset (0 to 50, 0 = one site; `n_y` not
@@ -64,7 +66,7 @@ layout = quadriga_lib.layout.generate_layout( type, n_ut, *, spacing, grid, area
 ## Example:
 ```
 import quadriga_lib as qd
-layout = qd.layout.generate_layout( "38.901_UMa", 10, ut=[float("nan")] * 3 + [0, 90], seed=42 )
+layout = qd.layout.generate_layout( "38.901_UMa", 10, [3.5e9], ut=[float("nan")] * 3 + [0, 90], seed=42 )
 layout = qd.layout.set_antenna( layout, "3GPP", {"panel": [4, 4, 1, 2]} )
 ```
 
@@ -73,8 +75,9 @@ layout = qd.layout.set_antenna( layout, "3GPP", {"panel": [4, 4, 1, 2]} )
   $\max(\lvert q \rvert, \lvert r \rvert, \lvert q + r \rvert) \le n$ for $n$ rings is at $x = \sqrt{3}\, q d / 2$,
   $y = (q / 2 + r)\, d$ with the ISD $d$, ordered by ring and then by azimuth in (-30°, 330°]. The wrap vectors
   $a_1 = (\sqrt{3}\, n d / 2, \ (3 n / 2 + 1)\, d)$ and $a_2$, $a_1$ turned by 60°, make the cluster tile the plane.
-  With the wrap-around, each link uses the copy of its site nearest to the terminal, so that the cells at the edge get
-  the interference of a large network (TR 38.901 Table 7.8-1; see the Notes of [[layout.csv_read]])
+  With the wrap-around, each link uses the copy of its site nearest to the first position of the terminal, kept for the
+  whole track, so that the cells at the edge get the interference of a large network (TR 38.901 Table 7.8-1; see the
+  Notes of [[layout.csv_read]])
 - **`38.901_SMa`**: mechanical tilt 5° at ISD 1299 m and 2° at 1732 m (other ISDs: that of the nearer one); option
   `p_residential` (0.9)
 - **Indoor presets**: centred at the origin, one sector, no wrap-around; the BSs form a lattice centred in the hall,
@@ -127,7 +130,7 @@ layout = qd.layout.set_antenna( layout, "3GPP", {"panel": [4, 4, 1, 2]} )
     correlated fields at the UT positions (TR 38.901 clause 7.6.3.3); `d2d_in` up to 25 m (UMi, UMa, SMa commercial) or
     10 m (RMa, SMa residential)
 - **Reproducibility**: the layout is a function of the seed and does not depend on the thread count; seed -1 draws a
-  seed, which is stored in `layout["seed"]`. `center_freq` is empty
+  seed, which is stored in `layout["seed"]`
 
 ## See also:
 - [[drop_terminals]] (the same drop for any set of Tx nodes)
@@ -137,6 +140,7 @@ layout = qd.layout.set_antenna( layout, "3GPP", {"panel": [4, 4, 1, 2]} )
 MD!*/
 py::dict generate_layout(const std::string &type,
                          arma::uword n_ut,
+                         py::handle center_freq,
                          py::handle spacing,
                          py::handle grid,
                          py::handle area,
@@ -147,6 +151,7 @@ py::dict generate_layout(const std::string &type,
                          py::handle per_cell,
                          long long seed)
 {
+    const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto spacing_a = qd_python_numpy2arma_Col<double>(spacing, true);
     const auto grid_a = qd_python_numpy2arma_Col<double>(grid, true);
     const auto area_a = qd_python_numpy2arma_Col<double>(area, true);
@@ -156,8 +161,8 @@ py::dict generate_layout(const std::string &type,
     const auto options_m = qd_pl_options(options, "options");
     const bool per_cell_b = qd_python_flag(per_cell, true, "per_cell");
 
-    const auto lay = quadriga_lib::generate_layout(type, n_ut, spacing_a, grid_a, area_a, bs_a, ut_a, indoor_a, options_m,
-                                                   per_cell_b, (arma::sword)seed);
+    const auto lay = quadriga_lib::generate_layout(type, n_ut, center_freq_a, spacing_a, grid_a, area_a, bs_a, ut_a, indoor_a,
+                                                   options_m, per_cell_b, (arma::sword)seed);
     return qd_python_layout2dict(lay);
 }
 

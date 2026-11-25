@@ -49,7 +49,7 @@ POSITIONAL_OPTIONAL = {
     "channel.qrt_file_read": ("i_cir", "i_orig"),
     "gbsm.conf_file_write": ("plpar",),
     "gbsm.scenpar_validate": ("scenpar_in",),
-    "layout.generate_layout": ("n_ut",),
+    "layout.generate_layout": ("n_ut", "center_freq"),
     "layout.set_antenna": ("args",),
     "sos.preset": ("dist_decorr",),
     "sos.val": ("pos_b",),

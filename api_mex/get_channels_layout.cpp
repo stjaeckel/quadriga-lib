@@ -46,8 +46,7 @@ Channel coefficients of a layout in one call
 
 ## Example:
 ```
-layout = quadriga_lib.generate_layout( '38.901_UMa', 1 );
-layout.center_freq = 3.5e9;
+layout = quadriga_lib.generate_layout( '38.901_UMa', 1, 3.5e9 );
 channels = quadriga_lib.get_channels_layout( layout );
 ```
 

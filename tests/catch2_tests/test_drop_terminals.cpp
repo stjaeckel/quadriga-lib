@@ -152,7 +152,7 @@ TEST_CASE("drop_terminals - input validation")
     }
     SECTION("a failed call leaves the layout unchanged")
     {
-        auto L = quadriga_lib::generate_layout("38.901_UMi", 1, {}, {1.0}, {}, {}, {}, {}, {}, true, 3);
+        auto L = quadriga_lib::generate_layout("38.901_UMi", 1, {}, {}, {1.0}, {}, {}, {}, {}, {}, true, 3);
         const auto L1 = L;
         CHECK(has(qd_layout_throws([&] { quadriga_lib::drop_terminals(L, 2, {}, {}, {}, {{"p_residential", {0.5}}}); }), "'p_residential'"));
         CHECK(qd_layout_diff(L, L1) == "");
@@ -218,7 +218,7 @@ TEST_CASE("drop_terminals - wrap vectors bound the drop")
 {
     // The Tx side of a hexagonal layout with one ring (7 sites, 21 sectors): without bounds the wrapped cluster is the
     // drop area, every UT is nearest to image 0 of its site, 4 UTs per sector
-    auto L = quadriga_lib::generate_layout("38.901_UMi", 0, {}, {1.0}, {}, {}, {}, {}, {}, true, 2);
+    auto L = quadriga_lib::generate_layout("38.901_UMi", 0, {}, {}, {1.0}, {}, {}, {}, {}, {}, true, 2);
     quadriga_lib::drop_terminals(L, 4, {}, {}, {}, {}, true, 3);
     REQUIRE(L.rx.n_node() == 84);
     const auto S = qd_layout_sites(L.tx);
@@ -250,7 +250,7 @@ TEST_CASE("drop_terminals - wrap vectors bound the drop")
 
 TEST_CASE("drop_terminals - the Rx side is replaced")
 {
-    auto L = quadriga_lib::generate_layout("38.901_UMa", 2, {}, {1.0}, {}, {}, {}, {}, {}, true, 21);
+    auto L = quadriga_lib::generate_layout("38.901_UMa", 2, {}, {}, {1.0}, {}, {}, {}, {}, {}, true, 21);
     L.pairing = arma::umat{{0, 1}, {0, 1}};
     auto &K = L.links; // One valid link
     K.i_tx = {0}, K.i_rx = {0}, K.i_segment = {0}, K.image = {0}, K.i_conf = {0}, K.los = {1}, K.floor_id = {0};
@@ -284,7 +284,7 @@ TEST_CASE("drop_terminals - the Rx side is replaced")
 TEST_CASE("drop_terminals - the new UTs keep the antenna that all old Rx nodes shared")
 {
     using args_t = std::unordered_map<std::string, arma::mat>;
-    auto L = quadriga_lib::generate_layout("38.901_UMa", 1, {}, {0.0}, {}, {}, {}, {}, {}, true, 7); // One site, 3 UTs
+    auto L = quadriga_lib::generate_layout("38.901_UMa", 1, {}, {}, {0.0}, {}, {}, {}, {}, {}, true, 7); // One site, 3 UTs
     REQUIRE(L.rx.n_node() == 3);
     L.center_freq = {2e9, 6e9};
     quadriga_lib::set_antenna(L, "dipole", args_t{{"res", {45.0}}}, false); // Entry 1: the Tx nodes

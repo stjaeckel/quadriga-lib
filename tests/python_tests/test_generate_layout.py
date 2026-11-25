@@ -103,10 +103,16 @@ class test_case(unittest.TestCase):
         self.assertTrue(same(L5, L4))
         L6 = quadriga_lib.layout.generate_layout("38.901_UMa", n_ut=5, **kw)  # n_ut by keyword
         self.assertTrue(same(L6, L4))
+        Lf = quadriga_lib.layout.generate_layout("38.901_UMa", 0, [3.5e9, 28e9], grid=[0, np.nan, 1])  # by position
+        npt.assert_array_equal(Lf["center_freq"], [3.5e9, 28e9])
+        Lk = quadriga_lib.layout.generate_layout("38.901_UMa", center_freq=np.array([3.5e9]), grid=[0, np.nan, 1])
+        npt.assert_array_equal(Lk["center_freq"], [3.5e9])
 
     def test_errors(self):
         with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # the tuples are keyword-only
-            quadriga_lib.layout.generate_layout("38.901_UMa", 1, [1000, np.nan])
+            quadriga_lib.layout.generate_layout("38.901_UMa", 1, None, [1000, np.nan])
+        with self.assertRaisesRegex(ValueError, "Input 'center_freq' must be finite, positive and strictly ascending"):
+            quadriga_lib.layout.generate_layout("38.901_UMa", 1, [2e9, 1e9])
         with self.assertRaises(TypeError):
             quadriga_lib.layout.generate_layout(1)
         with self.assertRaises(TypeError):  # n_ut is an unsigned integer

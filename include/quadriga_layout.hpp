@@ -202,6 +202,7 @@ namespace quadriga_lib
     layout generate_layout(
         const std::string &type,                // Preset
         arma::uword n_ut = 0,                   // UTs per cell (per_cell) or in total; 0 = no UTs
+        const arma::vec &center_freq = {},      // Simulation frequencies in [Hz], stored as layout.center_freq; empty = not set
         const arma::vec &spacing = {},          // [d_x, d_y] in [m]; hexagonal: d_x = ISD
         const arma::vec &grid = {},             // [n_x, n_y, n_sector]; hexagonal: n_x = rings (0 = one site), n_y unused
         const arma::vec &area = {},             // [length, width, height] of the hall, floor or road area in [m]

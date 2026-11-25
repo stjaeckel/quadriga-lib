@@ -9,7 +9,7 @@ function test_generate_layout
 
 %% Setup: UMa, one ring of sites (7 sites with 3 sectors = 21 Tx nodes), 2 UTs per cell
 d2r = pi / 180;
-L = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [ 1, NaN, 3 ], [], [], [], [], [], true, 42 );
+L = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [], [ 1, NaN, 3 ], [], [], [], [], [], true, 42 );
 
 %% Basic call: sizes, classes and values of the preset
 assertEqual( fieldnames( L )', { 'name', 'tx', 'rx', 'links', 'seed', 'center_freq', 'antenna', 'antenna_cols', 'antenna_args', 'wrap', 'pairing' } );
@@ -31,46 +31,49 @@ assertElementsAlmostEqual( L.rx.speed, 3 / 3.6 * ones( 42, 1 ), 'absolute', 1e-1
 assertTrue( isempty( L.links.i_tx ) && isempty( L.center_freq ) && isempty( L.antenna ) );
 
 %% The layout is a function of the seed
-L2 = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [ 1, NaN, 3 ], [], [], [], [], [], true, 42 );
+L2 = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [], [ 1, NaN, 3 ], [], [], [], [], [], true, 42 );
 assertTrue( isequaln( L, L2 ) );
-L3 = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [ 1, NaN, 3 ], [], [], [], [], [], true, 43 );
+L3 = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [], [ 1, NaN, 3 ], [], [], [], [], [], true, 43 );
 assertEqual( L3.tx.pos, L.tx.pos );
 assertFalse( isequal( L3.rx.pos, L.rx.pos ) );
 
 %% Optional inputs: tuples in degrees and metres (NaN = preset value), options, per_cell, seed
-L4 = quadriga_lib.generate_layout( '38.901_UMa', 5, [ 1000, NaN ], [ 0, NaN, 1 ], [], [ 10, NaN, 15 ], [ NaN, NaN, NaN, 0, 90 ], [], [], false, 7 );
+L4 = quadriga_lib.generate_layout( '38.901_UMa', 5, [], [ 1000, NaN ], [ 0, NaN, 1 ], [], [ 10, NaN, 15 ], [ NaN, NaN, NaN, 0, 90 ], [], [], false, 7 );
 assertEqual( size( L4.tx.pos ), [ 3, 1 ] );
 assertEqual( size( L4.rx.pos ), [ 3, 5 ] );                                     % per_cell = false: 5 UTs in total
 assertEqual( L4.tx.pos(3), 10 );
 assertElementsAlmostEqual( L4.tx.orientation(:, 1)', [ 0, 0, 45 ] * d2r, 'absolute', 1e-14 );     % boresight 30 deg + offset 15 deg
 assertElementsAlmostEqual( L4.rx.orientation(1:2, :), [ zeros( 1, 5 ); 90 * d2r * ones( 1, 5 ) ], 'absolute', 1e-14 );
-Ls = quadriga_lib.generate_layout( '38.901_SMa', 1, [], [ 0, NaN, 1 ], [], [], [], [], struct( 'p_residential', 0.5 ), true, 3 );
+Ls = quadriga_lib.generate_layout( '38.901_SMa', 1, [], [], [ 0, NaN, 1 ], [], [], [], [], struct( 'p_residential', 0.5 ), true, 3 );
 assertEqual( size( Ls.tx.pos ), [ 3, 1 ] );
-Ln = quadriga_lib.generate_layout( '38.901_UMa', 0, [], [ 0, NaN, 1 ] );        % without UTs; no seed: one is drawn
+Lf = quadriga_lib.generate_layout( '38.901_UMa', 0, [ 3.5e9, 28e9 ], [], [ 0, NaN, 1 ] );   % simulation frequencies
+assertEqual( Lf.center_freq, [ 3.5e9; 28e9 ] );
+Ln = quadriga_lib.generate_layout( '38.901_UMa', 0, [], [], [ 0, NaN, 1 ] );        % without UTs; no seed: one is drawn
 assertTrue( isempty( Ln.rx.pos ) );
 assertTrue( Ln.seed >= 0 );
-Lh = quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], true, 5 );                       % indoor hall, 6 x 2 BSs at 20 m, no wrap
+Lh = quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], [], true, 5 );                       % indoor hall, 6 x 2 BSs at 20 m, no wrap
 assertEqual( size( Lh.tx.pos ), [ 3, 12 ] );
 assertEqual( Lh.tx.pos(:, [ 1, 12 ]), [ -50, 50; -10, 10; 3, 3 ] );
 assertEqual( size( Lh.wrap ), [ 0, 0 ] );
 
 %% Outputs: none
-quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], true, 5 );
+quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], [], true, 5 );
 assertTrue( isequaln( ans, Lh ) );
 
 %% Type handling: single and int32 arguments
-L5 = quadriga_lib.generate_layout( '38.901_UMa', int32( 5 ), single( [ 1000; NaN ] ), single( [ 0; NaN; 1 ] ), [], single( [ 10; NaN; 15 ] ), single( [ NaN, NaN, NaN, 0, 90 ] ), [], [], 0, uint8( 7 ) );
+L5 = quadriga_lib.generate_layout( '38.901_UMa', int32( 5 ), [], single( [ 1000; NaN ] ), single( [ 0; NaN; 1 ] ), [], single( [ 10; NaN; 15 ] ), single( [ NaN, NaN, NaN, 0, 90 ] ), [], [], 0, uint8( 7 ) );
 assertTrue( isequaln( L5, L4 ) );
 
 %% Errors
 assert_throws( @() quadriga_lib.generate_layout(), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.generate_layout( '38.901_UMa', 1, [], [], [], [], [], [], [], true, 1, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.generate_layout( '38.901_UMa', 1, [], [], [], [], [], [], [], [], true, 1, 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out2( '38.901_UMa' ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.generate_layout( 1 ), 'Input ''type'' must be a string' );
 assert_throws( @() quadriga_lib.generate_layout( '38.901_UMa', 1.5 ), 'Input ''n_ut'' must be' );
-assert_throws( @() quadriga_lib.generate_layout( '38.901_UMa', 1, [], [], [], [], [], [], [], true, -2 ), 'Input ''seed'' must be -1 or a non-negative integer.' );
-assert_throws( @() quadriga_lib.generate_layout( '38.901_InH_Open', 3, [], [], [], [], [], [], struct( 'foo', 1 ) ), 'Input ''options'' has an unknown key (''foo'').' );   % C++
-assert_throws( @() quadriga_lib.generate_layout( '38.901_InH_Open', 3, [], [], [], [], [], [], 5 ), 'Input ''options'' must be a 1x1 struct.' );
+assert_throws( @() quadriga_lib.generate_layout( '38.901_UMa', 1, [], [], [], [], [], [], [], [], true, -2 ), 'Input ''seed'' must be -1 or a non-negative integer.' );
+assert_throws( @() quadriga_lib.generate_layout( '38.901_InH_Open', 3, [], [], [], [], [], [], [], struct( 'foo', 1 ) ), 'Input ''options'' has an unknown key (''foo'').' );   % C++
+assert_throws( @() quadriga_lib.generate_layout( '38.901_InH_Open', 3, [], [], [], [], [], [], [], 5 ), 'Input ''options'' must be a 1x1 struct.' );
+assert_throws( @() quadriga_lib.generate_layout( '38.901_UMa', 0, [ 2e9, 1e9 ] ), 'Input ''center_freq'' must be finite, positive and strictly ascending.' );   % C++
 assert_throws( @() quadriga_lib.generate_layout( 'no_such_preset' ), 'no_such_preset' );                                % C++
 
 end
