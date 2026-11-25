@@ -455,7 +455,7 @@ TEST_CASE("crossfade_segments - fading taps of real channels follow the power ra
             L.rx.pos(0, i) = 100.0 + 0.1 * (double)i, L.rx.pos(1, i) = 20.0, L.rx.pos(2, i) = 1.5;
         L.center_freq = {3.5e9}, L.seed = 4711;
         quadriga_lib::init_link_states(L);
-        seg.push_back(quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "taps")[0]);
+        seg.push_back(quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, {}, "taps")[0]);
     }
     const ch_t A = cut(seg[0], 0, 100), &B = seg[1];
     for (double ov : {0.2, 0.5, 1.0})
@@ -551,8 +551,8 @@ TEST_CASE("crossfade_segments - channels with one ray per cluster and no GR keep
             L.rx.pos(0, i) = 100.0 + 0.1 * (double)i, L.rx.pos(1, i) = 20.0, L.rx.pos(2, i) = 1.5;
         L.center_freq = {3.5e9}, L.seed = seed;
         quadriga_lib::init_link_states(L);
-        seg.push_back(quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "rays")[0]);
-        segt.push_back(quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "taps")[0]);
+        seg.push_back(quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, {}, "rays")[0]);
+        segt.push_back(quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, {}, "taps")[0]);
     }
     const arma::uword na = seg[0].coeff_re[0].n_slices, nb = seg[1].coeff_re[0].n_slices;
     for (const ch_t &s : seg)

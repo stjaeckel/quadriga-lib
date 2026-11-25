@@ -16,7 +16,8 @@ Join the channels of consecutive segments of one link by a power cross-fade
 
 - Joins the channels of the segments of one link, e.g. of a track whose scenario changes, into one channel; consecutive
   segments share snapshots, over which the paths of the old segment fade out and those of the new one fade in
-- [[get_gbsm_channels]] joins the segments of tracks with this function; it is a port of the channel merger of QuaDRiGa
+- [[get_channels_from_rays]] joins the segments of tracks with this function; it is a port of the channel merger of
+  QuaDRiGa
 
 ## Usage:
 ```
@@ -59,7 +60,7 @@ channel = quadriga_lib.crossfade_segments( segments, n_overlap, overlap, par );
   [[gbsm_single_link_channel]]
 
 ## See also:
-- [[get_gbsm_channels]] (joins the segments of tracks with this function)
+- [[get_channels_from_rays]] (joins the segments of tracks with this function)
 - [[gbsm_single_link_channel]] (channels of one segment)
 MD!*/
 

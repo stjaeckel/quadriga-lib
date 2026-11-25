@@ -11,18 +11,19 @@ Network layouts and mobility
 SECTION!*/
 
 /*!MD
-# GET_GBSM_CHANNELS
+# GET_CHANNELS_FROM_RAYS
 Channel coefficients of a layout from given rays (stage 3 of the channel pipeline)
 
-- Applies the antennas of the nodes, the motion along their tracks and the link gain to the rays of [[generate_rays]],
-  and returns one channel per Tx node, Rx node and frequency
+- Stage 3 alone, from given rays, e.g. for edited link states or rays; [[get_channels_layout]] computes the channels
+  from the layout in one call. Applies the antennas of the nodes, the motion along their tracks and the link gain to the
+  rays of [[generate_rays]], and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
 - Tracks with several segments are joined by [[crossfade_segments]]
 
 ## Usage:
 ```
-[ channels, index ] = quadriga_lib.get_gbsm_channels( layout, rays, i_link, times, output, mobility, ...
+[ channels, index ] = quadriga_lib.get_channels_from_rays( layout, rays, i_link, times, output, mobility, ...
     oxygen, use_absolute_delays, overlap );
 ```
 
@@ -95,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<quadriga_lib::channel<double>> channels;
     arma::umat index;
     arma::umat *p_index = (nlhs > 1) ? &index : nullptr;
-    CALL_QD(channels = quadriga_lib::get_gbsm_channels(layout, rays, i_link, times, output, p_index, mobility, oxygen, use_absolute_delays, overlap));
+    CALL_QD(channels = quadriga_lib::get_channels_from_rays(layout, rays, i_link, times, output, p_index, mobility, oxygen, use_absolute_delays, overlap));
 
     plhs[0] = qd_mex_channel2struct(channels);
     if (nlhs > 1)

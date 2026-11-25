@@ -264,7 +264,7 @@ namespace quadriga_lib
 
     // Stage 3: channels of the channel links of the given propagation links
     // - Applies the antennas, the motion along the tracks and the link gain to the rays
-    std::vector<channel<double>> get_gbsm_channels(
+    std::vector<channel<double>> get_channels_from_rays(
         const layout &layout,                                // Layout with links from init_link_states
         const std::vector<std::vector<gbsm_rays>> &rays,     // Rays from generate_rays, possibly edited, [n_out][1 or n_freq]
         const uint_list &i_link = {},                        // The propagation links of 'rays', 0-based, [n_out]; empty = all

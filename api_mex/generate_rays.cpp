@@ -16,7 +16,7 @@ Rays of the propagation links of a layout (stage 2 of the channel pipeline)
 
 - Runs the chain of the section "Geometry-based stochastic model" for the chosen links, from the link states of
   [[init_link_states]]: large-scale parameters, clusters, rays and, on request, the scatterers
-- The rays have no antennas; [[get_gbsm_channels]] applies them. Edit the rays in between to study a change of the
+- The rays have no antennas; [[get_channels_from_rays]] applies them. Edit the rays in between to study a change of the
   propagation, or pass them to [[attach_terminals]] and [[export_rays_qrt]]
 - The rays of a link do not depend on the other requested links
 
@@ -54,7 +54,7 @@ rays = quadriga_lib.generate_rays( layout, i_link, scatterers );
   floor 0 at 0 m
 
 ## See also:
-- [[init_link_states]] (stage 1), [[get_gbsm_channels]] (stage 3)
+- [[init_link_states]] (stage 1), [[get_channels_from_rays]] (stage 3)
 - [[ssf_rays]] (the ray data)
 MD!*/
 

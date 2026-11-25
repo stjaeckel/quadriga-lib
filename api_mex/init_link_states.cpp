@@ -91,7 +91,7 @@ layout_out = quadriga_lib.init_link_states( layout_in, method, o2i_low, pol_vari
   wrapper adds the folder of the shipped conf files to `config_dirs`
 
 ## See also:
-- [[generate_rays]], [[get_gbsm_channels]] (stages 2 and 3)
+- [[generate_rays]], [[get_channels_from_rays]] (stages 2 and 3)
 - [[get_channels_layout]] (all stages in one call)
 MD!*/
 

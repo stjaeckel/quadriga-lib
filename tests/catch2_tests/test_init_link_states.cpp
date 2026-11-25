@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Tests of the channel pipeline of a layout, stage by stage: init_link_states (link states), generate_rays (rays) and
-// get_gbsm_channels (channels), on small hand-built layouts of point drops and tracks.
+// get_channels_from_rays (channels), on small hand-built layouts of point drops and tracks.
 // Oracles, all computed in this file from the documented rules and the public functions they name:
 //  - seeds: the 64-bit FNV-1a hash of the base seed and the stream key (qd_layout_oracle_seed of the fixture)
 //  - LOS state: sos_rand (Exp256) seeded by "los|<site>|<image>|<family>" at the first (x, y) of the terminal, at the
@@ -524,7 +524,7 @@ TEST_CASE("init_link_states - wrap image equals the brute-force nearest image an
     // Rays and channels refer to the virtual site position
     const auto rays = quadriga_lib::generate_rays(L);
     arma::umat idx;
-    const auto ch = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "taps", &idx);
+    const auto ch = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "taps", &idx);
     for (arma::uword l = 0; l < K.n_link(); ++l)
     {
         const arma::uword s = K.i_tx[l], k = K.image[l];
@@ -773,7 +773,7 @@ TEST_CASE("generate_rays - input validation")
     const auto rays = quadriga_lib::generate_rays(M);
     M.antenna_args.push_back(M.antenna_args[0]); // a second description without an array
     M.tx.i_antenna[2] = 2;
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(M, rays); }) ==
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(M, rays); }) ==
           "Input 'layout' is not valid: Members 'antenna' and 'antenna_args' must have the same length.");
     M = L;
     M.links.conf_names = {"UMa_LOS", "UMa_NLOS"}; // the derived conf of a building link is not in the list
@@ -783,7 +783,7 @@ TEST_CASE("generate_rays - input validation")
     CHECK(qd_layout_throws([&] { quadriga_lib::generate_rays(M); }).find("is not in 'links.conf_names'") != std::string::npos);
 }
 
-TEST_CASE("get_gbsm_channels - link gain equals path loss, O2I loss and shadow fading")
+TEST_CASE("get_channels_from_rays - link gain equals path loss, O2I loss and shadow fading")
 {
     // UT1 outdoor, UT2 building (fixed d2d_in 20 m, so that the TR geometric distance and the legacy outdoor distance
     // give different path loss), UT3 in a car, UT4 moving 60 m (beyond the SF decorrelation distance); snapshots over
@@ -802,7 +802,7 @@ TEST_CASE("get_gbsm_channels - link gain equals path loss, O2I loss and shadow f
         const auto &K = L.links;
         const auto rays = quadriga_lib::generate_rays(L);
         arma::umat idx;
-        const auto ch = quadriga_lib::get_gbsm_channels(L, rays, {}, times, "taps", &idx);
+        const auto ch = quadriga_lib::get_channels_from_rays(L, rays, {}, times, "taps", &idx);
         REQUIRE(ch.size() == 3 * 4);
         for (size_t c = 0; c < ch.size(); ++c)
         {
@@ -841,7 +841,7 @@ TEST_CASE("get_gbsm_channels - link gain equals path loss, O2I loss and shadow f
     }
 }
 
-TEST_CASE("get_gbsm_channels - the random environment height is held along a track")
+TEST_CASE("get_channels_from_rays - the random environment height is held along a track")
 {
     // UMa LOS at 1000 m and 19.5 m UT height: the loss beyond the breakpoint depends on hE; the UT moves 100 m
     quadriga_lib::layout L = two_sites(col3(1000.0, 0.0, 19.5));
@@ -853,7 +853,7 @@ TEST_CASE("get_gbsm_channels - the random environment height is held along a tra
     const auto &K = L.links;
     const arma::vec times = arma::linspace(0.0, 10.0, 6);
     arma::umat idx;
-    const auto ch = quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, times, "taps", &idx);
+    const auto ch = quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, times, "taps", &idx);
     const arma::uword l = link_of(K, 0, 0);
     const conf_t cf = conf("UMa_LOS");
     arma::mat R = arma::repmat(col3(1000.0, 0.0, 19.5), 1, 6);
@@ -866,7 +866,7 @@ TEST_CASE("get_gbsm_channels - the random environment height is held along a tra
     CHECK(arma::approx_equal(qd_layout_par<arma::vec>(ch[0], "link_gain_dB"), held, "absdiff", 1e-9));
 
     // The K-factor of the coefficient powers follows the K-factor at the positions: LOS (tap 0) over NLOS power
-    const auto cr = quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L, l), l, times, "rays");
+    const auto cr = quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L, l), l, times, "rays");
     const arma::u32_vec tap = qd_layout_par<arma::u32_vec>(cr[0], "tap");
     arma::vec kc(6);
     for (arma::uword s = 0; s < 6; ++s)
@@ -880,7 +880,7 @@ TEST_CASE("get_gbsm_channels - the random environment height is held along a tra
     CHECK(arma::approx_equal(kc / kc(0), kfr, "reldiff", 1e-9));
 }
 
-TEST_CASE("get_gbsm_channels - output order, index, names and pairing")
+TEST_CASE("get_channels_from_rays - output order, index, names and pairing")
 {
     // UT1 has two panels (sectors 0 and 1), two frequencies; the pair BS2-UT2 is not linked
     quadriga_lib::layout L = two_sites(four_uts().cols(0, 1));
@@ -890,7 +890,7 @@ TEST_CASE("get_gbsm_channels - output order, index, names and pairing")
     quadriga_lib::init_link_states(L);
     CHECK(L.links.n_link() == 4); // links hold all pairs, pairing selects at the output
     arma::umat idx;
-    const auto ch = quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "taps", &idx);
+    const auto ch = quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, {}, "taps", &idx);
     const arma::umat expect = {{0, 1, 2, 0, 1, 2, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1},
                                {0, 0, 0, 1, 1, 1, 2, 2, 0, 0, 0, 1, 1, 1, 2, 2},
                                {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1}};
@@ -904,7 +904,7 @@ TEST_CASE("get_gbsm_channels - output order, index, names and pairing")
         CHECK(ch[c].center_freq(0) == L.center_freq(idx(2, c)));
     // The selection of propagation links: only channels whose link is in i_link
     const arma::uword l = link_of(L.links, 1, 0);
-    const auto one = quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L, l), l, {}, "taps", &idx);
+    const auto one = quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L, l), l, {}, "taps", &idx);
     REQUIRE(one.size() == 4);
     CHECK(one[0].name == "BS2:0_UT1:0");
     CHECK(one[1].name == "BS2:0_UT1:1");
@@ -912,10 +912,10 @@ TEST_CASE("get_gbsm_channels - output order, index, names and pairing")
     L.rx = qd_layout_points({"UT1", "UT2"}, {0, 0}, four_uts().cols(0, 1));
     L.pairing.reset();
     quadriga_lib::init_link_states(L);
-    CHECK(quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L))[1].name == "BS1:1_UT1");
+    CHECK(quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L))[1].name == "BS1:1_UT1");
 }
 
-TEST_CASE("get_gbsm_channels - the generic antenna gives the polarization matrix as coefficients")
+TEST_CASE("get_channels_from_rays - the generic antenna gives the polarization matrix as coefficients")
 {
     // xpol at both ends, orientation 0, the drop position: the coefficient of each kept ray (power > 0, LOS and GR) and
     // element pair is sqrt(power · 10^(link gain / 10)) times the entry of the polarization matrix of the ray data times
@@ -926,7 +926,7 @@ TEST_CASE("get_gbsm_channels - the generic antenna gives the polarization matrix
     quadriga_lib::init_link_states(L);
     const auto rays = quadriga_lib::generate_rays(L, 0);
     const quadriga_lib::gbsm_rays &y = rays[0][0];
-    const auto ch = quadriga_lib::get_gbsm_channels(L, rays, 0, {}, "rays");
+    const auto ch = quadriga_lib::get_channels_from_rays(L, rays, 0, {}, "rays");
     REQUIRE(ch.size() == 2);
     const auto &c = ch[0];
     REQUIRE(c.coeff_re[0].n_rows == 2);
@@ -956,12 +956,12 @@ TEST_CASE("get_gbsm_channels - the generic antenna gives the polarization matrix
     CHECK(worst < 1e-6);
 }
 
-TEST_CASE("get_gbsm_channels - sectors share rays and differ by antennas")
+TEST_CASE("get_channels_from_rays - sectors share rays and differ by antennas")
 {
     quadriga_lib::layout L = two_sites(four_uts().cols(0, 0));
     quadriga_lib::set_antenna(L, "3gpp", {{"panel", {2, 1, 1, 1}}}, false, {0});
     quadriga_lib::init_link_states(L);
-    const auto ch = quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L, 0), 0, {}, "rays");
+    const auto ch = quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L, 0), 0, {}, "rays");
     REQUIRE(ch.size() == 2);
     CHECK(ch[0].coeff_re[0].n_cols == 2);  // 3gpp panel, 2 elements
     CHECK(ch[1].coeff_re[0].n_cols == 2);  // xpol
@@ -970,19 +970,19 @@ TEST_CASE("get_gbsm_channels - sectors share rays and differ by antennas")
     CHECK(!arma::approx_equal(ch[0].coeff_re[0], ch[1].coeff_re[0], "absdiff", 1e-9));
 }
 
-TEST_CASE("get_gbsm_channels - a moving site leaves the values of other sites unchanged")
+TEST_CASE("get_channels_from_rays - a moving site leaves the values of other sites unchanged")
 {
     quadriga_lib::layout L = two_sites(four_uts());
     const arma::vec times = arma::linspace(0.0, 1.0, 3);
     quadriga_lib::init_link_states(L);
     const auto r0 = quadriga_lib::generate_rays(L);
-    const auto c0 = quadriga_lib::get_gbsm_channels(L, r0, {}, times);
+    const auto c0 = quadriga_lib::get_channels_from_rays(L, r0, {}, times);
     const auto K0 = L.links;
     L.tx.speed = {2.0, 2.0, 0.0}; // BS1 moves: dual mobility for BS1 only
     L.tx.direction = arma::mat{{0.3, 0.3, arma::datum::nan}, {0.0, 0.0, 0.0}};
     quadriga_lib::init_link_states(L);
     const auto r1 = quadriga_lib::generate_rays(L);
-    const auto c1 = quadriga_lib::get_gbsm_channels(L, r1, {}, times);
+    const auto c1 = quadriga_lib::get_channels_from_rays(L, r1, {}, times);
     REQUIRE(c1.size() == c0.size());
     arma::uword n_diff = 0;
     for (arma::uword l = 0; l < L.links.n_link(); ++l)
@@ -1003,17 +1003,17 @@ TEST_CASE("get_gbsm_channels - a moving site leaves the values of other sites un
         }
 }
 
-TEST_CASE("get_gbsm_channels - input validation")
+TEST_CASE("get_channels_from_rays - input validation")
 {
     quadriga_lib::layout L = two_sites(four_uts().cols(0, 1));
     const std::vector<std::vector<quadriga_lib::gbsm_rays>> none;
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, none); }) == "Call 'init_link_states' first.");
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, none); }) == "Call 'init_link_states' first.");
     quadriga_lib::init_link_states(L);
     const auto rays = quadriga_lib::generate_rays(L);
-    CHECK_NOTHROW(quadriga_lib::get_gbsm_channels(L, rays));
+    CHECK_NOTHROW(quadriga_lib::get_channels_from_rays(L, rays));
     auto thr = [&](const std::vector<std::vector<quadriga_lib::gbsm_rays>> &r, const quadriga_lib::uint_list &i, const arma::vec &times,
                    const std::string &output, const std::string &mobility, double overlap, const std::string &msg)
-    { CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, r, i, times, output, nullptr, mobility, false, false, overlap); }) == msg); };
+    { CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, r, i, times, output, nullptr, mobility, false, false, overlap); }) == msg); };
     thr(rays, {0, 1}, {}, "taps", "auto", 0.5, "Input 'rays' must have one entry per link of 'i_link'.");
     thr(rays, {}, {}, "tap", "auto", 0.5, "Input 'output' must be 'taps' or 'rays'.");
     thr(rays, {}, {}, "taps", "drift2", 0.5, "Input 'mobility' must be 'phase', 'drift' or 'auto'.");
@@ -1030,13 +1030,13 @@ TEST_CASE("get_gbsm_channels - input validation")
     // Members outside the hash are checked where they address memory
     quadriga_lib::layout M = L;
     M.pairing = arma::umat{{0, 2}, {0, 0}};
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(M, rays); }) ==
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(M, rays); }) ==
           "Input 'layout' is not valid: member 'pairing' must have 2 rows with indices of sites and terminals.");
     CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_layout(M); }) ==
           "Input 'layout' is not valid: member 'pairing' must have 2 rows with indices of sites and terminals.");
     M = L;
     M.rx.i_antenna[0] = 3;
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(M, rays); }) ==
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(M, rays); }) ==
           "Input 'layout' is not valid: rx: Member 'i_antenna' is larger than the number of antennas.");
     // Two tracks without times need equal row counts
     L.rx = qd_layout_points({"UT1"}, {0}, arma::mat{{10.0, 20.0, 30.0}, {100.0, 100.0, 100.0}, {1.5, 1.5, 1.5}});
@@ -1044,11 +1044,11 @@ TEST_CASE("get_gbsm_channels - input validation")
     L.tx.scenario = {"UMa", "UMa"};
     quadriga_lib::init_link_states(L);
     const auto r3 = quadriga_lib::generate_rays(L);
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, r3); }) ==
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, r3); }) ==
           "Channel 'BS1_UT1': the Tx and the Rx track have 2 and 3 rows; give 'times' or tracks with equal row counts.");
 }
 
-TEST_CASE("get_gbsm_channels - default quadriga run")
+TEST_CASE("get_channels_from_rays - default quadriga run")
 {
     quadriga_lib::layout L = two_sites(four_uts().cols(0, 1));
     L.center_freq = {3.5e9, 3.6e9};
@@ -1058,7 +1058,7 @@ TEST_CASE("get_gbsm_channels - default quadriga run")
     REQUIRE(rays[0].size() == 1);
     CHECK(rays[0][0].n_freq() == 2);
     CHECK(rays[0][0].fbs_pos.n_cols == rays[0][0].n_ray());
-    const auto ch = quadriga_lib::get_gbsm_channels(L, rays, {}, arma::vec{0.0, 0.5});
+    const auto ch = quadriga_lib::get_channels_from_rays(L, rays, {}, arma::vec{0.0, 0.5});
     REQUIRE(ch.size() == 3 * 2 * 2);
     for (const auto &c : ch)
     {
@@ -1096,7 +1096,7 @@ TEST_CASE("generate_rays - an edited indoor state equals the state fixed by the 
             const auto ra = quadriga_lib::generate_rays(A, ls), rb = quadriga_lib::generate_rays(B, ls);
             for (size_t j = 0; j < ls.size(); ++j)
                 CHECK(qd_layout_diff_rays(ra[j][0], rb[j][0], 1e-12) == "");
-            const auto ca = quadriga_lib::get_gbsm_channels(A, ra, ls), cb = quadriga_lib::get_gbsm_channels(B, rb, ls);
+            const auto ca = quadriga_lib::get_channels_from_rays(A, ra, ls), cb = quadriga_lib::get_channels_from_rays(B, rb, ls);
             REQUIRE(ca.size() == cb.size());
             for (size_t c = 0; c < ca.size(); ++c)
                 CHECK(arma::approx_equal(qd_layout_par<arma::vec>(ca[c], "link_gain_dB"), qd_layout_par<arma::vec>(cb[c], "link_gain_dB"), "absdiff", 1e-9));
@@ -1150,7 +1150,7 @@ TEST_CASE("generate_rays - the ground reflection")
     }
 }
 
-TEST_CASE("get_gbsm_channels - antennas that are not evaluated")
+TEST_CASE("get_channels_from_rays - antennas that are not evaluated")
 {
     // An antenna that is not evaluated uses the generic antenna, except one spaced in wavelengths, whose size in metres is
     // not defined
@@ -1158,18 +1158,18 @@ TEST_CASE("get_gbsm_channels - antennas that are not evaluated")
     quadriga_lib::init_link_states(L);
     const auto rays = quadriga_lib::generate_rays(L);
     quadriga_lib::set_antenna(L, "dipole", {}, false, {2}, NAN, false);
-    auto ch = quadriga_lib::get_gbsm_channels(L, rays);
+    auto ch = quadriga_lib::get_channels_from_rays(L, rays);
     REQUIRE(ch.size() == 3);
     CHECK(ch[2].n_tx() == 2);
     quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 1, 1, 1}}}, false, {2}, NAN, false);
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, rays); }) ==
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, rays); }) ==
           "Tx node 'BS2' (sector 0): its antenna is spaced in wavelengths and not evaluated; call 'eval_antennas' of the layout.");
     L.eval_antennas();
-    ch = quadriga_lib::get_gbsm_channels(L, rays);
+    ch = quadriga_lib::get_channels_from_rays(L, rays);
     CHECK(ch[2].n_tx() == 4);
 }
 
-TEST_CASE("get_gbsm_channels - a layout without propagation links gives empty results")
+TEST_CASE("get_channels_from_rays - a layout without propagation links gives empty results")
 {
     // The only pair is co-located: stage 1 gives an empty link table, the other stages and the one call empty results
     quadriga_lib::layout L = two_sites(col3(0.0, 0.0, 25.0));
@@ -1183,7 +1183,7 @@ TEST_CASE("get_gbsm_channels - a layout without propagation links gives empty re
     CHECK(L.links.n_link() == 0);
     const auto rays = quadriga_lib::generate_rays(L);
     CHECK(rays.empty());
-    CHECK(quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "taps", &idx).empty());
+    CHECK(quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "taps", &idx).empty());
     CHECK(idx.n_cols == 0);
     CHECK(quadriga_lib::get_channels_layout(L).empty());
 }
@@ -1279,7 +1279,7 @@ TEST_CASE("generate_rays - the rays of segment k refer to its first row")
     }
 }
 
-TEST_CASE("get_gbsm_channels - the cross-fade of a track with two segments is continuous in power")
+TEST_CASE("get_channels_from_rays - the cross-fade of a track with two segments is continuous in power")
 {
     // One site, a track of 12 rows in steps of 1 m: rows 0-5 UMa_LOS, rows 6-11 UMa_NLOS. Oracle: the channel of each
     // segment from gbsm_single_link_channel with the link gain and K-factor ratio of its first row (segment 1 also over
@@ -1317,7 +1317,7 @@ TEST_CASE("get_gbsm_channels - the cross-fade of a track with two segments is co
             part[k] = quadriga_lib::gbsm_single_link_channel(xpol, xpol, rays[k][0], g, "auto", output, 0, T.cols(a, b), R.cols(a, b), O, O, kf);
         }
         const quadriga_lib::channel<double> X = quadriga_lib::crossfade_segments(part, arma::uvec{0, 6}, 0.5);
-        const auto C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, output);
+        const auto C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, output);
         REQUIRE(C.size() == 1);
         REQUIRE(C[0].n_snap() == 12);
         for (arma::uword s = 0; s < 12; ++s)
@@ -1340,7 +1340,7 @@ TEST_CASE("get_gbsm_channels - the cross-fade of a track with two segments is co
         }
 
         // Snapshot times at the rows (speed 1 m/s) give the same channel; the one call gives that of the manual path
-        const auto Ct = quadriga_lib::get_gbsm_channels(L, rays, {}, arma::regspace(0.0, 11.0), output);
+        const auto Ct = quadriga_lib::get_channels_from_rays(L, rays, {}, arma::regspace(0.0, 11.0), output);
         const auto C1 = quadriga_lib::get_channels_layout(L, {}, output);
         for (arma::uword s = 0; s < 12; ++s)
         {
@@ -1351,10 +1351,10 @@ TEST_CASE("get_gbsm_channels - the cross-fade of a track with two segments is co
     }
 
     // A selected segment alone gives its own snapshots; non-consecutive selected segments throw
-    const auto C0 = quadriga_lib::get_gbsm_channels(L, {rays[1]}, arma::uvec{1}, {}, "rays");
+    const auto C0 = quadriga_lib::get_channels_from_rays(L, {rays[1]}, arma::uvec{1}, {}, "rays");
     CHECK(C0[0].n_snap() == 6);
     const arma::vec back = {0.0, 1.0, 8.0, 2.0};
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, rays, {}, back, "rays"); }) ==
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, rays, {}, back, "rays"); }) ==
           "Terminal 'N0': the snapshots of a segment are not consecutive; a track with several segments needs increasing 'times'.");
 }
 
@@ -1407,7 +1407,7 @@ std::vector<std::string> two_confs(arma::uword n1, const std::string &a, arma::u
     return s;
 }
 
-TEST_CASE("get_gbsm_channels - delays in the ramp are those of the paths' own segments")
+TEST_CASE("get_channels_from_rays - delays in the ramp are those of the paths' own segments")
 {
     // A track away from the site, 20 rows 10 m apart, UMa_LOS then UMa_NLOS: the LOS distance grows by 100 m over the
     // old segment. In "phase" each segment's paths keep their delays relative to its own LOS, in "drift" to the LOS at
@@ -1422,8 +1422,8 @@ TEST_CASE("get_gbsm_channels - delays in the ramp are those of the paths' own se
     for (const char *mob : {"phase", "drift"})
         for (const char *out : {"taps", "rays"})
         {
-            const auto C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, out, nullptr, mob);
-            const auto A = quadriga_lib::get_gbsm_channels(L, {rays[0]}, arma::uvec{0}, {}, out, nullptr, mob); // old segment alone
+            const auto C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, out, nullptr, mob);
+            const auto A = quadriga_lib::get_channels_from_rays(L, {rays[0]}, arma::uvec{0}, {}, out, nullptr, mob); // old segment alone
             REQUIRE(C[0].n_snap() == 20);
             REQUIRE(A[0].n_snap() == 10);
             for (arma::uword s = 0; s < 20; ++s)
@@ -1439,12 +1439,12 @@ TEST_CASE("get_gbsm_channels - delays in the ramp are those of the paths' own se
                     for (arma::uword p = 1; p < A[0].delay[s].n_slices; ++p)
                         CHECK(std::abs(C[0].delay[s](0, 0, p) - A[0].delay[s](0, 0, p)) <= 1e-15);
         }
-    const auto D = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "rays", nullptr, "drift", false, true);
+    const auto D = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "rays", nullptr, "drift", false, true);
     for (arma::uword s = 1; s < 20; ++s)
         CHECK(std::abs(D[0].delay[s](0, 0, 0) - D[0].delay[s - 1](0, 0, 0)) <= 10.0 / c0 + 1e-15);
 }
 
-TEST_CASE("get_gbsm_channels - the O2I loss has no step at the first row of an indoor segment")
+TEST_CASE("get_channels_from_rays - the O2I loss has no step at the first row of an indoor segment")
 {
     // 200 rows 0.1 m apart, rows 0-99 outdoor (UMa_LOS), rows 100-199 in a building (UMa_LOS_O2I, indoor 1). The O2I
     // values are drawn at the first row of the track; the loss deviation follows the 10 m field at every other row.
@@ -1459,19 +1459,19 @@ TEST_CASE("get_gbsm_channels - the O2I loss has no step at the first row of an i
     REQUIRE(K.n_link() == 2);
     REQUIRE(K.indoor[1] == 1);
     const auto rays = quadriga_lib::generate_rays(L);
-    const auto S = quadriga_lib::get_gbsm_channels(L, {rays[1]}, arma::uvec{1}, {}, "taps");
+    const auto S = quadriga_lib::get_channels_from_rays(L, {rays[1]}, arma::uvec{1}, {}, "taps");
     REQUIRE(S[0].n_snap() == 100);
     const arma::mat R = L.rx.pos.cols(100, 199), T = arma::repmat(col3(0.0, 0.0, 25.0), 1, 100);
     const std::string model = K.o2i_model[0] == 0 ? "low" : "high";
     const arma::vec g = gain("38.901", conf("UMa_LOS_O2I"), K.gbsm_seed[1], col3(0.0, 0.0, 25.0), R.col(0), T, R, K.floor_id[1], K.d2d_in[1], L.center_freq, 0,
                              model, K.o2i_rnd.row(0), 25.0, 4711, "UMa", true, {}, nullptr, false, L.rx.pos.col(0));
     CHECK(arma::approx_equal(qd_layout_par<arma::vec>(S[0], "link_gain_dB"), g, "absdiff", 1e-9));
-    const auto C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "rays");
+    const auto C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "rays");
     for (arma::uword s = 100; s + 1 < 200; ++s)
         CHECK(std::abs(10.0 * std::log10(arma::accu(C[0].path_gain[s]) / arma::accu(C[0].path_gain[s + 1]))) < 3.0);
 }
 
-TEST_CASE("get_gbsm_channels - times that skip a short segment join its neighbours")
+TEST_CASE("get_channels_from_rays - times that skip a short segment join its neighbours")
 {
     // 11 rows at 1 s, a one-row middle segment (row 5); snapshots every 2 s hold segments 0 and 2 only
     std::vector<std::string> sc(11, "UMa_LOS");
@@ -1482,10 +1482,10 @@ TEST_CASE("get_gbsm_channels - times that skip a short segment join its neighbou
     const auto rays = quadriga_lib::generate_rays(L);
     const arma::vec times = arma::regspace(0.0, 2.0, 10.0);
     std::vector<quadriga_lib::channel<double>> C;
-    CHECK_NOTHROW(C = quadriga_lib::get_gbsm_channels(L, rays, {}, times, "rays"));
+    CHECK_NOTHROW(C = quadriga_lib::get_channels_from_rays(L, rays, {}, times, "rays"));
     REQUIRE(C.size() == 1);
     CHECK(C[0].n_snap() == 6);
-    const auto A = quadriga_lib::get_gbsm_channels(L, {rays[0]}, arma::uvec{0}, times, "rays"); // segment 0 alone: t = 0, 2, 4
+    const auto A = quadriga_lib::get_channels_from_rays(L, {rays[0]}, arma::uvec{0}, times, "rays"); // segment 0 alone: t = 0, 2, 4
     REQUIRE(A[0].n_snap() == 3);
     CHECK(qd_layout_same_data(C[0].coeff_re[0], A[0].coeff_re[0], 1e-12));
 }
@@ -1513,7 +1513,7 @@ TEST_CASE("generate_rays - with a moving site, segment k pairs its first row wit
         CHECK(qd_layout_diff_rays(rays[k][0], ref[0][0], 1e-12) == "");
     }
     const arma::vec times = arma::regspace(6.0, 11.0);
-    const auto S = quadriga_lib::get_gbsm_channels(L, {rays[1]}, arma::uvec{1}, times, "taps");
+    const auto S = quadriga_lib::get_channels_from_rays(L, {rays[1]}, arma::uvec{1}, times, "taps");
     REQUIRE(S[0].n_snap() == 6);
     arma::mat T(3, 6);
     for (arma::uword i = 0; i < 6; ++i)

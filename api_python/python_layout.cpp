@@ -138,7 +138,7 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("i_link") = py::none(),
           py::arg("scatterers") = false);
 
-    m.def("get_gbsm_channels", &get_gbsm_channels,
+    m.def("get_channels_from_rays", &get_channels_from_rays,
           py::arg("layout"),
           py::arg("rays").none(false),
           py::kw_only(),

@@ -11,7 +11,9 @@
 #include <cctype>
 #include <cerrno>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -44,14 +46,14 @@ store them in files, move the nodes along tracks and compute the channels of all
 
 1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [[layout_csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes
-2. Set the frequencies `layout.center_freq` and the antennas ([[set_antenna]])
+2. Set the frequencies `layout.center_freq` (or give them to [[generate_layout]]) and the antennas ([[set_antenna]])
 3. Optionally, move the nodes: [[generate_track]] creates tracks, [[set_orientation]] turns the antennas along the
    motion, [[sample_track]] gives the positions at given times
 4. Compute the channels with [[get_channels_layout]]
 5. Store the layout with [[layout_csv_write]]
 
 For more control, step 4 runs in three stages: [[init_link_states]] draws the link states, [[generate_rays]] the rays of
-the geometry-based stochastic model (GBSM), and [[get_gbsm_channels]] applies the antennas, the motion and the link
+the geometry-based stochastic model (GBSM), and [[get_channels_from_rays]] applies the antennas, the motion and the link
 gain. Between the stages, link states and rays can be inspected or edited, [[attach_terminals]] selects the serving cell
 of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
@@ -81,7 +83,7 @@ generic antenna: two co-located isotropic elements with vertical and horizontal 
 - **Scenario**: a family (e.g. `UMa`), which draws the LOS and indoor state of each link, or a conf name (e.g.
   `UMa_NLOS`), which fixes them
 - **Wrap-around**: copies of the sites, displaced by the lattice vectors `layout.wrap`, so that a cluster of cells tiles
-  the plane; each link uses the copy (*image*) nearest to the terminal
+  the plane; each link uses the copy (*image*) nearest to the first position of the terminal, kept for the whole track
 - **Orientation**: bank, tilt and heading of the antenna; a positive tilt points down. **Direction**: azimuth and
   elevation of the motion of a point drop
 
@@ -133,10 +135,10 @@ Class for a network layout: Tx and Rx nodes, antennas, frequencies and link stat
   description and for an array spaced in wavelengths in a layout without frequencies
 - **Wrap-around**: a cluster of a few rings of sites is finite, so the cells at its edge lack the interferers that
   surround them in a large network. With `wrap`, the cluster is repeated periodically by the lattice vectors, and each
-  link uses the copy (image) of its site that is nearest to the terminal, which the channel generation treats as a site
-  of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping; clause 7.5, step 1). Every terminal then has
-  neighbours on all sides, as in the middle of a network. One vector repeats the cluster along one direction, e.g. along
-  a road
+  link uses the copy (image) of its site nearest to the first position of the terminal, kept for the whole track, which
+  the channel generation treats as a site of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping;
+  clause 7.5, step 1). Every terminal then has neighbours on all sides, as in the middle of a network. One vector
+  repeats the cluster along one direction, e.g. along a road
 - **Wrap vectors**: two vectors form a reduced basis,
   $0 \le a_1 \cdot a_2 \le \min(\lvert a_1 \rvert^2, \lvert a_2 \rvert^2) / 2$, so that $\pm a_1$, $\pm a_2$ and
   $\pm(a_1 - a_2)$ are the nearest images
@@ -586,6 +588,50 @@ quadriga_lib::layout_nodes unflatten(const flat &F)
 } // namespace qd_layout
 
 // ---- Validation ----
+
+std::string qd_layout::format_value(double v, int digits)
+{
+    if (!std::isfinite(v))
+        return qd_csv::format_number(v);
+    if (v == 0.0)
+        return "0";
+    // The significant digits and the decimal exponent, read from the "%.*e" text (the locale's point does not matter)
+    std::string d;
+    int x = 0;
+    char buf[48];
+    for (int p = digits > 0 ? std::min(digits, 17) : 1;; ++p)
+    {
+        std::snprintf(buf, sizeof(buf), "%.*e", p - 1, std::abs(v));
+        const char *e = std::strchr(buf, 'e');
+        d.clear();
+        for (const char *c = buf; c < e; ++c)
+            if (*c >= '0' && *c <= '9')
+                d += *c;
+        x = std::atoi(e + 1);
+        if (digits > 0 || p >= 17)
+            break;
+        double w = 0.0;
+        const std::string t = d.substr(0, 1) + (d.size() > 1 ? "." + d.substr(1) : std::string()) + "e" + std::to_string(x);
+        if (qd_csv::parse_number(t, w) == qd_csv::number_status::ok && w == std::abs(v))
+            break;
+    }
+    while (d.size() > 1 && d.back() == '0')
+        d.pop_back();
+    // The digits with the decimal point after n of them
+    auto place = [&](int n) -> std::string
+    {
+        if (n <= 0)
+            return "0." + std::string((size_t)-n, '0') + d;
+        if ((size_t)n >= d.size())
+            return d + std::string((size_t)n - d.size(), '0');
+        return d.substr(0, (size_t)n) + "." + d.substr((size_t)n);
+    };
+    const std::string sign = v < 0.0 ? "-" : "";
+    if (x >= -3 && x <= 5)
+        return sign + place(x + 1);
+    const int x3 = (int)std::floor((double)x / 3.0) * 3;
+    return sign + place(x - x3 + 1) + "e" + std::to_string(x3);
+}
 
 arma::uword quadriga_lib::layout_nodes::n_node() const { return (arma::uword)name.size(); }
 arma::uword quadriga_lib::layout_nodes::n_row() const { return pos.n_cols; }
@@ -1380,7 +1426,7 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
             const size_t n_old = S.freq.size(), p = (size_t)(std::upper_bound(S.freq.begin(), S.freq.end(), freq) - S.freq.begin());
             S.freq.insert(S.freq.begin() + (long)p, freq);
             antenna_cells missing;
-            missing[0] = qd_csv::format_number(freq);
+            missing[0] = format_value(freq);
             for (size_t i = 0; i < S.args.size(); ++i)
             {
                 std::vector<std::string> &lines = S.args[i];
@@ -1433,7 +1479,7 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         antenna_cells m; // One line for all bands, or no antenna: no description for the band
         if (a != 0)
             m = parse_antenna_line(old[0], S.cols);
-        m[0] = qd_csv::format_number(S.freq[b]);
+        m[0] = format_value(S.freq[b]);
         line = join_antenna_line(m, S.cols);
     };
     auto compose = [&](size_t a, size_t e)
@@ -1460,7 +1506,7 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         else if (cells != nullptr)
         {
             antenna_cells m = *cells;
-            m[0] = qd_csv::format_number(S.freq[(size_t)band]);
+            m[0] = format_value(S.freq[(size_t)band]);
             v.lines[(size_t)band] = join_antenna_line(m, S.cols), v.slots[(size_t)band] = qd_slot();
         }
         else
@@ -1679,8 +1725,10 @@ quadriga_lib::set_antenna(L, arma::uvec{2}, true, {0, 1});
   array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file throws
   `std::runtime_error`; without evaluation, an entry that the file does not have throws when the antennas are evaluated
 - **Index form**: with `center_freq`, that band of the antenna of each node becomes the band of its entry, copied as in
-  the other forms; the generic antenna (0) applies to all bands only. In C++, a brace list such as `{2}` also builds a
-  `std::string` and makes the call ambiguous; pass a number, a variable, an `arma::uvec` or a `uint_list`
+  the other forms; the generic antenna (0) applies to all bands only. A node listed twice in `i_node` with different
+  entries throws. In C++, a brace list such as `{2}` also builds a `std::string` and makes the call ambiguous, and so
+  does a literal `0` or `{}` with only two arguments; pass a number, a variable, an `arma::uvec` or a `uint_list`, e.g.
+  `uint_list(0)` or `arma::uvec{0}` to reset nodes to the generic antenna
 - A failed call leaves the layout unchanged
 
 ## See also:
@@ -1726,6 +1774,14 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &
     antenna_cells cells;
     cells[c_antenna - cf] = type;
     double freq = center_freq;
+    auto cell_text = [](const arma::mat &M) // Rows joined by ';', the values of a row by ','
+    {
+        std::string s;
+        for (arma::uword r = 0; r < M.n_rows; ++r)
+            for (arma::uword c = 0; c < M.n_cols; ++c)
+                s += (c == 0 ? (r == 0 ? "" : ";") : ",") + format_value(M(r, c));
+        return s;
+    };
     std::vector<std::string> keys;
     for (const auto &kv : args)
         keys.push_back(kv.first);
@@ -1759,7 +1815,7 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &
         case col_kind::number:
             if (v.n_elem != 1)
                 fail("a scalar");
-            cell = qd_csv::format_number(v[0]);
+            cell = format_value(v[0]);
             break;
         case col_kind::flag:
             if (v.n_elem != 1 || (v[0] != 0.0 && v[0] != 1.0))
@@ -1769,7 +1825,7 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &
         case col_kind::matrix: // 'beams' [2 or 3, n_beams] is written with one beam per ';'-part; a vector is one beam
             if (id == c_beams && (v.is_vec() ? v.n_elem : v.n_rows) != 2 && (v.is_vec() ? v.n_elem : v.n_rows) != 3)
                 fail("a matrix with 2 or 3 rows, or a vector of 2 or 3 values");
-            cell = id == c_beams ? qd_csv::format_matrix(v.is_vec() ? arma::mat(arma::vectorise(v)).t() : v.t()) : qd_csv::format_matrix(v);
+            cell = cell_text(id == c_beams ? (v.is_vec() ? arma::mat(arma::vectorise(v)).t() : arma::mat(v.t())) : v);
             break;
         default: // Lists
             if (!v.is_vec())
@@ -1778,7 +1834,7 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &
                 for (double x : v)
                     if (!(x >= 0.0 && x <= 4294967295.0 && std::floor(x) == x))
                         fail("a vector of non-negative integers");
-            cell = qd_csv::format_list(std::vector<double>(v.begin(), v.end()));
+            cell = cell_text(arma::mat(arma::vectorise(v)).t());
         }
     }
     if (mask == t_none && !std::isnan(freq))
@@ -1799,15 +1855,22 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const uint_list &i_
     const arma::uvec &ia = i_antenna.vec(), &in = i_node.vec();
     const arma::uword n_node = (rx ? layout.rx : layout.tx).n_node(), n_sel = in.is_empty() ? n_node : in.n_elem;
     if (ia.n_elem > 1 && ia.n_elem != n_sel)
-        throw std::invalid_argument("Input 'i_antenna' must have 0, 1 or " + std::to_string(n_sel) + " entries (one per node).");
+        throw std::invalid_argument(n_sel <= 1 ? std::string("Input 'i_antenna' must have 0 or 1 entries for one node.")
+                                               : "Input 'i_antenna' must have 0, 1 or " + std::to_string(n_sel) + " entries (one per node).");
     for (arma::uword v : ia)
         if (v > layout.n_antenna())
             throw std::invalid_argument("Input 'i_antenna' has an entry larger than the number of antennas (" + std::to_string(layout.n_antenna()) + ").");
     if (!std::isnan(center_freq) && (ia.is_empty() || arma::any(ia == 0)))
         throw std::invalid_argument("Input 'i_antenna': the generic antenna (0) applies to all bands.");
     std::vector<arma::u32> entry(n_node, 0);
+    std::vector<char> seen(n_node, 0);
     for (arma::uword k = 0; k < n_sel; ++k)
         if (const arma::uword n = in.is_empty() ? k : in[k]; n < n_node) // An index outside the nodes throws below
-            entry[n] = ia.is_empty() ? 0 : (arma::u32)ia[ia.n_elem == 1 ? 0 : k];
+        {
+            const arma::u32 e = ia.is_empty() ? 0 : (arma::u32)ia[ia.n_elem == 1 ? 0 : k];
+            if (seen[n] && entry[n] != e)
+                throw std::invalid_argument("Input 'i_node' lists the node " + std::to_string(n) + " twice with different entries.");
+            entry[n] = e, seen[n] = 1;
+        }
     qd_set_antenna(layout, nullptr, nullptr, rx, i_node, center_freq, 1, &entry);
 }

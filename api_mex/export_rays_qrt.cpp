@@ -43,9 +43,9 @@ shift = quadriga_lib.export_rays_qrt( fn, layout, rays );
   site) and the site name; a destination per terminal with its name and one CIR per row, with the orientation of the
   first node of the terminal (its nodes share their positions)
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
-  link gain and the K-factor ratio of [[get_gbsm_channels]] at the row, [[ssf_paths]] with `'drift'`. A CIR read back
-  gives the channel of [[get_gbsm_channels]] (`output = 'rays'`, `mobility = 'drift'`) at the row within float32
-  accuracy
+  link gain and the K-factor ratio of [[get_channels_from_rays]] at the row, [[ssf_paths]] with `'drift'`. A CIR read
+  back gives the channel of [[get_channels_from_rays]] (`output = 'rays'`, `mobility = 'drift'`) at the row within
+  float32 accuracy
 - **Reading back**: [[gbsm_rays_from_paths]] with the method of the links and the `n_interact` of the file as
   `path_type`, then [[gbsm_single_link_channel]] with link gain 0 and mobility `'drift'`
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop
@@ -56,7 +56,7 @@ shift = quadriga_lib.export_rays_qrt( fn, layout, rays );
 - The file is written to `fn + '.part'` and renamed at the end; a failed call leaves an existing file unchanged
 
 ## See also:
-- [[generate_rays]], [[get_gbsm_channels]] (the rays and the link gain)
+- [[generate_rays]], [[get_channels_from_rays]] (the rays and the link gain)
 - [[qrt_file_read]], [[gbsm_rays_from_paths]], [[gbsm_single_link_channel]] (evaluation of the file)
 MD!*/
 

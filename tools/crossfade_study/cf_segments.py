@@ -44,8 +44,8 @@ def times():
 def layout(case, variant, seed, method, work_dir, tag='w'):
     _write(case, variant, work_dir, tag)
     L, _, _ = qd.layout.csv_read(os.path.join(work_dir, f'tx_{tag}.csv'), os.path.join(work_dir, f'rx_{tag}.csv'))
-    L = qd.layout.set_antenna(L, 'ula', {'panel': [1, 4]}, rx_side=False)
-    L = qd.layout.set_antenna(L, 'ula', {'panel': [1, 4]}, rx_side=True)
+    L = qd.layout.set_antenna(L, 'ula', {'panel': [1, 4]}, rx=False)
+    L = qd.layout.set_antenna(L, 'ula', {'panel': [1, 4]}, rx=True)
     return qd.layout.init_link_states(L, method=method, seed=seed)
 
 
@@ -72,7 +72,7 @@ def segments(case, seed, method, mobility, work_dir, tag='w', shift=0, overlap=0
     for v in ('A', 'B'):
         L = layout(case, v, seed, method, work_dir, tag)
         rays = qd.layout.generate_rays(L, scatterers=(mobility == 'drift'))
-        ch, _ = qd.layout.get_gbsm_channels(L, rays, times=t, output='rays', mobility=mobility, stack=True)
+        ch, _ = qd.layout.get_channels_from_rays(L, rays, times=t, output='rays', mobility=mobility, stack=True)
         out[v] = _stack(ch[0], rays[0][0])
     change = int(np.sum(s < LA - 1e-9))
     nA = change + int(shift)
@@ -82,7 +82,7 @@ def segments(case, seed, method, mobility, work_dir, tag='w', shift=0, overlap=0
     if with_lib:            # the channel of the library for the track with both segments (ramp ending at the change row)
         L = layout(case, 'AB', seed, method, work_dir, tag)
         rays = qd.layout.generate_rays(L, scatterers=(mobility == 'drift'))
-        lr, _ = qd.layout.get_gbsm_channels(L, rays, times=t, output='rays', mobility=mobility, stack=False, overlap=overlap)
-        lt, _ = qd.layout.get_gbsm_channels(L, rays, times=t, output='taps', mobility=mobility, stack=True, overlap=overlap)
+        lr, _ = qd.layout.get_channels_from_rays(L, rays, times=t, output='rays', mobility=mobility, stack=False, overlap=overlap)
+        lt, _ = qd.layout.get_channels_from_rays(L, rays, times=t, output='taps', mobility=mobility, stack=True, overlap=overlap)
         out['lib_rays'], out['lib_taps'] = lr[0], lt[0]
     return out

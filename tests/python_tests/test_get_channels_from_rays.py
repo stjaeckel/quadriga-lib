@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.layout.get_gbsm_channels.
+# Python interface test for quadriga_lib.layout.get_channels_from_rays.
 # Scope: argument and output handling, index base, defaults, stack, rays of several forms, error paths.
 # The channels are tested in the Catch2 suite (test_get_channels_layout.cpp).
 # Physics validation lives in the Catch2 suite.
@@ -61,7 +61,7 @@ class test_case(unittest.TestCase):
 
     def test_basic_call(self):
         L2, rays = self.L2, self.rays
-        out = quadriga_lib.layout.get_gbsm_channels(L2, rays)
+        out = quadriga_lib.layout.get_channels_from_rays(L2, rays)
         self.assertIsInstance(out, tuple)
         ch, index = out
         self.assertEqual(len(ch), 8)  # Tx node fastest, then Rx node, then frequency
@@ -85,36 +85,36 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         L2, rays = self.L2, self.rays
-        ch, index = quadriga_lib.layout.get_gbsm_channels(L2, rays[:2], i_link=[0, 1])  # terminal U1 with both sites
+        ch, index = quadriga_lib.layout.get_channels_from_rays(L2, rays[:2], i_link=[0, 1])  # terminal U1 with both sites
         self.assertEqual(len(ch), 4)
         npt.assert_array_equal(index, [[0, 1, 0, 1], [0, 0, 0, 0], [0, 0, 1, 1]])
-        ch, _ = quadriga_lib.layout.get_gbsm_channels(L2, [rays[2], rays[0]], i_link=[2, 0])  # another order: the channels follow the nodes
+        ch, _ = quadriga_lib.layout.get_channels_from_rays(L2, [rays[2], rays[0]], i_link=[2, 0])  # another order: the channels follow the nodes
         self.assertEqual([c["name"] for c in ch], ["A_U1", "A_U2", "A_U1", "A_U2"])
-        ch, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, times=[0, 1, 2])  # U1 moves 2 m/s north
+        ch, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, times=[0, 1, 2])  # U1 moves 2 m/s north
         self.assertEqual(len(ch[0]["coeff"]), 3)
         npt.assert_allclose(ch[0]["rx_pos"], [[100] * 3, [0, 2, 4], [1.5] * 3], atol=1e-12, rtol=0)
         npt.assert_array_equal(ch[2]["rx_pos"], np.tile([[900], [0], [1.5]], (1, 3)))  # a static terminal is repeated
-        chs, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, times=[0, 1, 2], stack=True)  # one array with the snapshot last
+        chs, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, times=[0, 1, 2], stack=True)  # one array with the snapshot last
         self.assertEqual(chs[0]["coeff"].shape, ch[0]["coeff"][0].shape + (3,))
         npt.assert_array_equal(chs[0]["coeff"][..., 1], ch[0]["coeff"][1])
-        ch, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, output="rays")
+        ch, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, output="rays")
         self.assertIn("path_gain", ch[0])
         self.assertEqual(ch[0]["path_gain"][0].shape[0], ch[0]["coeff"][0].shape[2])
         rs = quadriga_lib.layout.generate_rays(L2, scatterers=True)
-        chd, _ = quadriga_lib.layout.get_gbsm_channels(L2, rs, times=[0, 1, 2], mobility="drift")  # needs the scatterers
-        chp, _ = quadriga_lib.layout.get_gbsm_channels(L2, rs, times=[0, 1, 2], mobility="phase")
+        chd, _ = quadriga_lib.layout.get_channels_from_rays(L2, rs, times=[0, 1, 2], mobility="drift")  # needs the scatterers
+        chp, _ = quadriga_lib.layout.get_channels_from_rays(L2, rs, times=[0, 1, 2], mobility="phase")
         self.assertEqual(chp[0]["coeff"][0].shape, chd[0]["coeff"][0].shape)
-        cho, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, oxygen=True)
+        cho, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, oxygen=True)
         self.assertEqual(len(cho), 8)
-        cha, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, use_absolute_delays=True)  # the LOS delay in all delays
+        cha, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, use_absolute_delays=True)  # the LOS delay in all delays
         npt.assert_allclose(cha[0]["delay"][0][0, 0, 0], np.hypot(100, 23.5) / 299792458, atol=1e-15, rtol=0)
-        chv, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, overlap=0.2)
+        chv, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, overlap=0.2)
         self.assertEqual(len(chv), 8)
         Lp = dict(L2, pairing=np.array([[1], [0]]))  # only the pair (site B, terminal U1), 0-based
-        ch, index = quadriga_lib.layout.get_gbsm_channels(Lp, rays)
+        ch, index = quadriga_lib.layout.get_channels_from_rays(Lp, rays)
         self.assertEqual([c["name"] for c in ch], ["B_U1", "B_U1"])
         npt.assert_array_equal(index, [[1, 1], [0, 0], [0, 1]])
-        ch, _ = quadriga_lib.layout.get_gbsm_channels(L2, rays, i_link=None, times=None, output="taps", mobility="auto", oxygen=None,
+        ch, _ = quadriga_lib.layout.get_channels_from_rays(L2, rays, i_link=None, times=None, output="taps", mobility="auto", oxygen=None,
                                                       use_absolute_delays=None, overlap=0.5, stack=None)  # the defaults
         self.assertEqual(len(ch), 8)
 
@@ -123,50 +123,50 @@ class test_case(unittest.TestCase):
         rays_before, L2_before = copy.deepcopy(rays), copy.deepcopy(L2)
         re = [[dict(r) for r in link] for link in rays]
         re[0][0]["power"] = np.zeros_like(re[0][0]["power"])  # an edited ray set: no power in band 0 of link 0
-        ch, _ = quadriga_lib.layout.get_gbsm_channels(L2, re, output="rays")
+        ch, _ = quadriga_lib.layout.get_channels_from_rays(L2, re, output="rays")
         npt.assert_array_equal(ch[0]["path_gain"][0], 0)
         self.assertTrue(np.any(ch[2]["path_gain"][0] > 0))
         self.assertTrue(same(rays, rays_before))  # the rays and the layout of the caller stay unchanged
         self.assertTrue(same(L2, L2_before))
         # Ray dicts with other dtypes and tuples of rays; one ray dict alone for a link with one object ('quadriga')
         rs = [tuple(dict(r, power=r["power"].astype(np.float32)) for r in link) for link in rays]
-        ch, _ = quadriga_lib.layout.get_gbsm_channels(L2, tuple(rs))
+        ch, _ = quadriga_lib.layout.get_channels_from_rays(L2, tuple(rs))
         self.assertEqual(len(ch), 8)
         Lq = quadriga_lib.layout.init_link_states(self.L, method="quadriga", seed=5)
         rq = quadriga_lib.layout.generate_rays(Lq)
-        chq, _ = quadriga_lib.layout.get_gbsm_channels(Lq, rq)
-        chd, _ = quadriga_lib.layout.get_gbsm_channels(Lq, [link[0] for link in rq])
+        chq, _ = quadriga_lib.layout.get_channels_from_rays(Lq, rq)
+        chd, _ = quadriga_lib.layout.get_channels_from_rays(Lq, [link[0] for link in rq])
         self.assertTrue(same(chd, chq))
 
     def test_errors(self):
         L2, rays = self.L2, self.rays
         with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # i_link is keyword-only
-            quadriga_lib.layout.get_gbsm_channels(L2, rays, [0])
+            quadriga_lib.layout.get_channels_from_rays(L2, rays, [0])
         with self.assertRaises(TypeError):
-            quadriga_lib.layout.get_gbsm_channels(L2)
+            quadriga_lib.layout.get_channels_from_rays(L2)
         with self.assertRaises(TypeError):
-            quadriga_lib.layout.get_gbsm_channels(L2, None)
+            quadriga_lib.layout.get_channels_from_rays(L2, None)
         with self.assertRaises(TypeError):
-            quadriga_lib.layout.get_gbsm_channels(1, rays)
+            quadriga_lib.layout.get_channels_from_rays(1, rays)
         with self.assertRaisesRegex(ValueError, "Input 'rays' must be a list"):
-            quadriga_lib.layout.get_gbsm_channels(L2, 5)
+            quadriga_lib.layout.get_channels_from_rays(L2, 5)
         with self.assertRaisesRegex(ValueError, r"Input 'rays\[0\]' must be a ray dict or a list of ray dicts"):
-            quadriga_lib.layout.get_gbsm_channels(L2, [1])
+            quadriga_lib.layout.get_channels_from_rays(L2, [1])
         bad = [[{k: v for k, v in r.items() if k != "delay"} for r in link] for link in rays]
         with self.assertRaisesRegex(ValueError, r"Entry 'delay' of 'rays\[0\]\[0\]' is missing"):
-            quadriga_lib.layout.get_gbsm_channels(L2, bad)
+            quadriga_lib.layout.get_channels_from_rays(L2, bad)
         with self.assertRaisesRegex(ValueError, "Input 'i_link'"):  # negative index
-            quadriga_lib.layout.get_gbsm_channels(L2, rays, i_link=-1)
+            quadriga_lib.layout.get_channels_from_rays(L2, rays, i_link=-1)
         with self.assertRaisesRegex(TypeError, "Input 'oxygen' must be a bool or None"):
-            quadriga_lib.layout.get_gbsm_channels(L2, rays, oxygen=1)
+            quadriga_lib.layout.get_channels_from_rays(L2, rays, oxygen=1)
         with self.assertRaisesRegex(ValueError, "rays"):  # C++: one entry per link of i_link
-            quadriga_lib.layout.get_gbsm_channels(L2, rays, i_link=[1])
+            quadriga_lib.layout.get_channels_from_rays(L2, rays, i_link=[1])
         with self.assertRaisesRegex(ValueError, "output"):  # C++
-            quadriga_lib.layout.get_gbsm_channels(L2, rays, output="foo")
+            quadriga_lib.layout.get_channels_from_rays(L2, rays, output="foo")
         with self.assertRaisesRegex(ValueError, "drift"):  # C++: no scatterers
-            quadriga_lib.layout.get_gbsm_channels(L2, rays, mobility="drift")
+            quadriga_lib.layout.get_channels_from_rays(L2, rays, mobility="drift")
         with self.assertRaisesRegex(ValueError, "init_link_states"):  # C++: no links
-            quadriga_lib.layout.get_gbsm_channels(self.L, rays)
+            quadriga_lib.layout.get_channels_from_rays(self.L, rays)
 
 
 if __name__ == "__main__":

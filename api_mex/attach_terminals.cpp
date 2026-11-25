@@ -48,10 +48,10 @@ layout.pairing = [ site.'; 1:numel( site ) ];
 
 ## Notes:
 - **Evaluation**: at the first rows of both nodes and `layout.center_freq(i_freq)`, with the link states of the first
-  segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
-- **`'large_scale'`** (TR 38.901 Table 7.8-1): the link gain of [[get_gbsm_channels]] plus the gain of one unit-gain LOS
-  path through both antennas (port weights, element positions, orientations), as [[get_channels_planar]] gives it; no
-  rays
+  segment, the wrap image and the antennas as in [[get_channels_from_rays]]; `layout.pairing` is ignored
+- **`'large_scale'`** (TR 38.901 Table 7.8-1): the link gain of [[get_channels_from_rays]] plus the gain of one
+  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [[get_channels_planar]]
+  gives it; no rays
 - **`'rsrp'`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of `abs(h)^2` over the rays of [[gbsm_single_link_channel]]
   (`output = 'rays'`, mobility `'phase'`), link gain included, transmit power 1
 - **Ports**: both rules take `abs(h)^2` of Tx port `tx_port` and average it over the Rx ports, so a dual-polarized UT
@@ -64,7 +64,7 @@ layout.pairing = [ site.'; 1:numel( site ) ];
 
 ## See also:
 - [[init_link_states]], [[generate_rays]] (link states and rays)
-- [[get_gbsm_channels]] (channels of the linked pairs)
+- [[get_channels_from_rays]] (channels of the linked pairs)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -36,15 +36,16 @@ store them in files, move the nodes along tracks and compute the channels of all
 
 1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [[layout.csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes
-2. Set the frequencies `layout["center_freq"]` and the antennas ([[set_antenna]], [[set_antenna_array]]);
-   [[eval_antennas]] generates the antennas that are not evaluated yet, or all of them for new frequencies
+2. Set the frequencies `layout["center_freq"]` (or give them to [[generate_layout]]) and the antennas ([[set_antenna]],
+   [[set_antenna_array]]); [[eval_antennas]] generates the antennas that are not evaluated yet, or all of them for new
+   frequencies
 3. Optionally, move the nodes: [[generate_track]] creates tracks, [[set_orientation]] turns the antennas along the
    motion, [[sample_track]] gives the positions at given times
 4. Compute the channels with [[get_channels_layout]]
 5. Store the layout with [[layout.csv_write]]
 
 For more control, step 4 runs in three stages: [[init_link_states]] draws the link states, [[generate_rays]] the rays of
-the geometry-based stochastic model (GBSM), and [[get_gbsm_channels]] applies the antennas, the motion and the link
+the geometry-based stochastic model (GBSM), and [[get_channels_from_rays]] applies the antennas, the motion and the link
 gain. Between the stages, link states and rays can be inspected or edited, [[attach_terminals]] selects the serving cell
 of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
@@ -75,7 +76,8 @@ elements with vertical and horizontal polarization.
 - **Scenario**: a family (e.g. `UMa`), which draws the LOS and indoor state of each link, or a conf name (e.g.
   `UMa_NLOS`), which fixes them
 - **Wrap-around**: copies of the sites, displaced by the lattice vectors `layout["wrap"]`, so that a cluster of cells
-  tiles the plane; each link uses the copy (*image*) nearest to the terminal
+  tiles the plane; each link uses the copy (*image*) nearest to the first position of the terminal, kept for the whole
+  track
 - **Orientation**: bank, tilt and heading of the antenna; a positive tilt points down. **Direction**: azimuth and
   elevation of the motion of a point drop
 
@@ -171,10 +173,10 @@ layout, extra_tx, extra_rx = quadriga_lib.layout.csv_read( fn_tx, fn_rx, *, cent
   node with a band that is not set is reported), the frequencies, `wrap` and `pairing`
 - **Wrap-around**: a cluster of a few rings of sites is finite, so the cells at its edge lack the interferers that
   surround them in a large network. With `wrap`, the cluster is repeated periodically by the lattice vectors, and each
-  link uses the copy (image) of its site that is nearest to the terminal, which the channel generation treats as a site
-  of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping; clause 7.5, step 1). Every terminal then has
-  neighbours on all sides, as in the middle of a network. One vector repeats the cluster along one direction, e.g. along
-  a road
+  link uses the copy (image) of its site nearest to the first position of the terminal, kept for the whole track, which
+  the channel generation treats as a site of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping;
+  clause 7.5, step 1). Every terminal then has neighbours on all sides, as in the middle of a network. One vector
+  repeats the cluster along one direction, e.g. along a road
 - **Antennas**: equal descriptions share one entry of the antenna lists, Tx nodes first; a relative `qdant_file` is
   stored as a normalised absolute path
 - **Memory**: large arrays on the default 1° grid need much memory ([Antennas](formats.html#layout-csv-antennas)); give
@@ -205,8 +207,8 @@ py::tuple layout_csv_read(const py::handle &fn_tx,
 Write a layout to the Tx and Rx CSV files
 
 - Writes the Tx nodes to the Tx file and the Rx nodes to the Rx file in the
-  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within 9 significant
-  digits, except for `name` and `links`, which are not stored
+  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within the written digits
+  (9 significant digits, positions 1 µm, times 1 ns), except for `name` and `links`, which are not stored
 - Antennas without a description, e.g. a measured array set with [[set_antenna_array]], are written to QDANT files next
   to the CSV file
 - A failed call leaves the existing files unchanged

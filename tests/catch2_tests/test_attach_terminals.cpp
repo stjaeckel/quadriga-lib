@@ -352,7 +352,7 @@ TEST_CASE("attach_terminals - RSRP equals the sum of the ray powers and differs 
             CHECK(site(t) == site_of_node(srv(t)));
 
         // The taps of the edited link: mean over the Rx ports of the sum of |h|^2 over the taps
-        const auto ch = quadriga_lib::get_gbsm_channels(L, rays_t{rays[le]}, le, {}, "taps", nullptr, "phase");
+        const auto ch = quadriga_lib::get_channels_from_rays(L, rays_t{rays[le]}, le, {}, "taps", nullptr, "phase");
         REQUIRE(ch.size() == 4);
         const auto &c = ch[2]; // BS1 sector 0, frequency 1
         REQUIRE(c.name == "BS1:0_UT1");
@@ -495,7 +495,7 @@ TEST_CASE("attach_terminals - pairing is ignored and the result stored as pairin
 
     L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, 2));
     arma::umat idx;
-    quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "taps", &idx);
+    quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, {}, "taps", &idx);
     arma::uword n = 0;
     for (arma::uword t = 0; t < 3; ++t)
         n += site(t) == 0 ? 2 : 1;

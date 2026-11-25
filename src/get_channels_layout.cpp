@@ -1058,7 +1058,7 @@ Rays of the propagation links of a layout (stage 2 of the channel pipeline)
 
 - Runs the chain of the section "Geometry-based stochastic model" for the chosen links, from the link states of
   [[init_link_states]]: large-scale parameters, clusters, rays and, on request, the scatterers
-- The rays have no antennas; [[get_gbsm_channels]] applies them. Edit the rays in between to study a change of the
+- The rays have no antennas; [[get_channels_from_rays]] applies them. Edit the rays in between to study a change of the
   propagation, or pass them to [[attach_terminals]] and [[export_rays_qrt]]
 - The rays of a link do not depend on the other requested links
 
@@ -1099,7 +1099,7 @@ std::vector<std::vector<gbsm_rays>> quadriga_lib::generate_rays(
   floor 0 at 0 m
 
 ## See also:
-- [[init_link_states]] (stage 1), [[get_gbsm_channels]] (stage 3)
+- [[init_link_states]] (stage 1), [[get_channels_from_rays]] (stage 3)
 - [[gbsm_rays]] (the ray data)
 MD!*/
 
@@ -1110,18 +1110,19 @@ std::vector<std::vector<quadriga_lib::gbsm_rays>> quadriga_lib::generate_rays(co
 }
 
 /*!MD
-# get_gbsm_channels
+# get_channels_from_rays
 Channel coefficients of a layout from given rays (stage 3 of the channel pipeline)
 
-- Applies the antennas of the nodes, the motion along their tracks and the link gain to the rays of [[generate_rays]],
-  and returns one channel per Tx node, Rx node and frequency
+- Stage 3 alone, from given rays, e.g. for edited link states or rays; [[get_channels_layout]] computes the channels
+  from the layout in one call. Applies the antennas of the nodes, the motion along their tracks and the link gain to the
+  rays of [[generate_rays]], and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
 - Tracks with several segments are joined by [[crossfade_segments]]
 
 ## Declaration:
 ```
-std::vector<channel<double>> quadriga_lib::get_gbsm_channels(
+std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const layout &layout,
     const std::vector<std::vector<gbsm_rays>> &rays,
     const uint_list &i_link = {},
@@ -1185,7 +1186,7 @@ std::vector<channel<double>> quadriga_lib::get_gbsm_channels(
 - [[get_channels_layout]] (all stages in one call)
 MD!*/
 
-std::vector<quadriga_lib::channel<double>> quadriga_lib::get_gbsm_channels(const layout &layout, const std::vector<std::vector<gbsm_rays>> &rays,
+std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_from_rays(const layout &layout, const std::vector<std::vector<gbsm_rays>> &rays,
                                                                            const uint_list &i_link, const arma::vec &times, const std::string &output,
                                                                            arma::umat *index, const std::string &mobility, bool oxygen,
                                                                            bool use_absolute_delays, double overlap)
@@ -1203,9 +1204,12 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_gbsm_channels(const
 # get_channels_layout
 Channel coefficients of a layout in one call
 
-- Computes one channel per Tx node, Rx node and frequency, for the pairs in `layout.pairing` (empty: all pairs)
-- Runs the stages [[init_link_states]], [[generate_rays]] and [[get_gbsm_channels]] with their default settings; the
-  results are those of the stages called one by one
+- Computes the channels in one call from the layout: one channel per Tx node, Rx node and frequency, for the pairs in
+  `layout.pairing` (empty: all pairs); [[get_channels_from_rays]] is the third stage alone, from given rays
+- Supports tracks (with times or speeds), point drops that move with their speed, tracks of several segments, joined by
+  the cross-fade of [[crossfade_segments]], and both output forms, `"taps"` and `"rays"`
+- Runs the stages [[init_link_states]], [[generate_rays]] and [[get_channels_from_rays]] with their default settings;
+  the results are those of the stages called one by one
 - Without link states in `layout.links`, draws them for this call only and leaves the layout unchanged; with link
   states, uses them, also when they were edited
 
@@ -1225,7 +1229,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
 
 ## Inputs:
 - **`layout`** — Layout with `center_freq`; antennas as evaluated in `layout.antenna`, nodes without one use the generic
-  antenna (see [[get_gbsm_channels]])
+  antenna (see [[get_channels_from_rays]])
 - **`times`** *(optional)* — Snapshot times in [s]; omitted = one snapshot per row; `[n_snap]`
 - **`output`** *(optional)* — `"taps"` or `"rays"`
 - **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` or `"quadriga"`; omitted = the method of filled links, else
@@ -1255,7 +1259,7 @@ auto channels = quadriga_lib::get_channels_layout(L);
 - **Scatterers**: the mobility `"drift"` (also `"auto"` with `"quadriga"`) solves the scatterers
 
 ## See also:
-- [[init_link_states]], [[generate_rays]], [[get_gbsm_channels]] (the three stages)
+- [[init_link_states]], [[generate_rays]], [[get_channels_from_rays]] (the three stages)
 - [[generate_layout]] (layouts of the TR scenarios)
 MD!*/
 
@@ -1389,10 +1393,10 @@ L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, site.n_el
 
 ## Notes:
 - **Evaluation**: at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first
-  segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
-- **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [[get_gbsm_channels]] plus the gain of one unit-gain LOS
-  path through both antennas (port weights, element positions, orientations), as [[get_channels_planar]] gives it; no
-  rays
+  segment, the wrap image and the antennas as in [[get_channels_from_rays]]; `layout.pairing` is ignored
+- **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [[get_channels_from_rays]] plus the gain of one
+  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [[get_channels_planar]]
+  gives it; no rays
 - **`"rsrp"`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of $\lvert h \rvert^2$ over the rays of
   [[gbsm_single_link_channel]] (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
 - **Ports**: both rules take $\lvert h \rvert^2$ of Tx port `tx_port` and average it over the Rx ports, so a
@@ -1406,7 +1410,7 @@ L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, site.n_el
 
 ## See also:
 - [[init_link_states]], [[generate_rays]] (link states and rays)
-- [[get_gbsm_channels]] (channels of the linked pairs)
+- [[get_channels_from_rays]] (channels of the linked pairs)
 MD!*/
 
 arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::string &rule, const std::vector<std::vector<gbsm_rays>> &rays,
@@ -1573,8 +1577,8 @@ arma::vec quadriga_lib::export_rays_qrt(
   site) and the site name; a destination per terminal with its name and one CIR per row, with the orientation of the
   first node of the terminal (its nodes share their positions)
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
-  link gain and the K-factor ratio of [[get_gbsm_channels]] at the row, [[ssf_paths]] with `"drift"`,
-  [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_gbsm_channels]] (`output = "rays"`,
+  link gain and the K-factor ratio of [[get_channels_from_rays]] at the row, [[ssf_paths]] with `"drift"`,
+  [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_channels_from_rays]] (`output = "rays"`,
   `mobility = "drift"`) at the row within float32 accuracy
 - **Reading back**: [[gbsm_rays_from_paths]] with the method of the links and the `n_interact` of the file as
   `path_type`, then [[gbsm_single_link_channel]] with link gain 0 and mobility `"drift"`
@@ -1586,7 +1590,7 @@ arma::vec quadriga_lib::export_rays_qrt(
 - The file is written to `fn + ".part"` and renamed at the end; a failed call leaves an existing file unchanged
 
 ## See also:
-- [[generate_rays]], [[get_gbsm_channels]] (the rays and the link gain)
+- [[generate_rays]], [[get_channels_from_rays]] (the rays and the link gain)
 - [[qrt_file_read]], [[gbsm_rays_from_paths]], [[gbsm_single_link_channel]] (evaluation of the file)
 - [[qrt_paths_from_scatterers]] (the stored paths)
 MD!*/

@@ -15,7 +15,7 @@ SECTION!*/
 Positions and orientations of a node at snapshot times
 
 - Returns the position and the orientation of one node at each snapshot time, for point drops and tracks;
-  [[get_gbsm_channels]] samples both ends of each link this way
+  [[get_channels_from_rays]] samples both ends of each link this way
 - Without `times`, each row of the node is one snapshot
 - The orientation includes the rotation of mounted antennas (`relative = 1`), so it is the orientation in the GCS
 

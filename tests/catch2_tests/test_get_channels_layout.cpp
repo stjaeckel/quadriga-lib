@@ -3,8 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Tests of get_channels_layout, the one call from a layout to channel coefficients, of the O2I loss of the link gain
-// of get_gbsm_channels along a track, and of the rules that tie the stages together: the manual path
-// (init_link_states, generate_rays, get_gbsm_channels) as oracle of the one call, the stale-link hash, edited link
+// of get_channels_from_rays along a track, and of the rules that tie the stages together: the manual path
+// (init_link_states, generate_rays, get_channels_from_rays) as oracle of the one call, the stale-link hash, edited link
 // states, pairing, dual mobility, per-band antennas and layouts read back from CSV files.
 // Oracles: the manual path; the exact names of the conf files (an edited LOS state equals the state fixed by name);
 // the Doppler phase -2 pi (v_rx - v_tx) t / lambda of a LOS path between two ends that move along the LOS direction.
@@ -71,7 +71,7 @@ std::vector<quadriga_lib::channel<double>> manual(quadriga_lib::layout L, const 
 {
     if (L.links.empty())
         quadriga_lib::init_link_states(L, method);
-    return quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, times, "taps", index);
+    return quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, times, "taps", index);
 }
 
 const std::string stale = "The layout has changed since 'init_link_states': call 'init_link_states' again.";
@@ -139,7 +139,7 @@ TEST_CASE("get_channels_layout - an empty Tx or Rx side gives empty results")
         CHECK(L.links.n_link() == 0);
         const auto rays = quadriga_lib::generate_rays(L);
         CHECK(rays.empty());
-        CHECK(quadriga_lib::get_gbsm_channels(L, rays).empty());
+        CHECK(quadriga_lib::get_channels_from_rays(L, rays).empty());
         CHECK(quadriga_lib::get_channels_layout(L).empty());
     }
 }
@@ -228,7 +228,7 @@ TEST_CASE("get_channels_layout - drift requests scatterers")
     REQUIRE(ch.size() == 12);
     CHECK(qd_layout_par<arma::fmat>(ch[0], "fbs_pos").n_cols > 0);
     quadriga_lib::init_link_states(L);
-    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "taps", nullptr, "drift"); })
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, quadriga_lib::generate_rays(L), {}, {}, "taps", nullptr, "drift"); })
               .find("solve the scatterers first") != std::string::npos);
 }
 
@@ -258,7 +258,7 @@ TEST_CASE("get_channels_layout - dual mobility gives the relative Doppler of bot
         CHECK(L.links.image[0] == (los ? 1u : 0u));
         const auto rays = quadriga_lib::generate_rays(L);
         const quadriga_lib::gbsm_rays &y = rays[0][0];
-        const auto ch = quadriga_lib::get_gbsm_channels(L, rays, {}, arma::vec{0.0, dt}, "rays", nullptr, "phase");
+        const auto ch = quadriga_lib::get_channels_from_rays(L, rays, {}, arma::vec{0.0, dt}, "rays", nullptr, "phase");
         REQUIRE(ch.size() == 1);
         const auto &c = ch[0];
         CHECK(std::abs(c.tx_pos(0, 0) - (los ? 200.0 : 0.0)) < 1e-12); // the virtual site
@@ -380,7 +380,7 @@ TEST_CASE("get_channels_layout - batches keep the segments of a track together")
     CHECK(diff(quadriga_lib::get_channels_layout(L), manual(L)) == "");
 }
 
-TEST_CASE("get_gbsm_channels - the O2I loss of a car is drawn per vehicle")
+TEST_CASE("get_channels_from_rays - the O2I loss of a car is drawn per vehicle")
 {
     // A UT on a 200 m track (21 rows 10 m apart along x, 1 m/s) from (100, 20, 1.5), BS at (0, 0, 25), UMa. A car UT
     // (indoor 2) has the links and rays of the same UT outdoors (the outdoor conf, TR 38.901 clause 7.4.3.2), so the
@@ -402,7 +402,7 @@ TEST_CASE("get_gbsm_channels - the O2I loss of a car is drawn per vehicle")
     auto power_dB = [](const quadriga_lib::layout &X)
     {
         quadriga_lib::layout Y = X;
-        const auto C = quadriga_lib::get_gbsm_channels(Y, quadriga_lib::generate_rays(Y));
+        const auto C = quadriga_lib::get_channels_from_rays(Y, quadriga_lib::generate_rays(Y));
         REQUIRE(C.size() == 1);
         REQUIRE(C[0].n_snap() == 21);
         arma::vec p(21);

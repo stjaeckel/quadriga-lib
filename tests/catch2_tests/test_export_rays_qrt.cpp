@@ -6,7 +6,7 @@
 // round trip through qrt_file_read, gbsm_rays_from_paths and gbsm_single_link_channel, pairing, given rays, parallel and
 // serial runs, input validation.
 // Oracles:
-//  - the channels of stage 3 (get_gbsm_channels with output "rays" and mobility "drift", rays from generate_rays with
+//  - the channels of stage 3 (get_channels_from_rays with output "rays" and mobility "drift", rays from generate_rays with
 //    scatterers) at each row of the terminals: a CIR read back, shifted by the returned shift and evaluated with link
 //    gain 0 at the read positions gives these channels path by path
 //  - a moved UT: gbsm_single_link_channel with the rays of generate_rays, the link gain of the drop and the moved Rx
@@ -155,7 +155,7 @@ double compare_all(const std::string &fn, const quadriga_lib::layout &L, const a
                    size_t &n_empty)
 {
     arma::umat idx;
-    const std::vector<chan_t> C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "rays", &idx, "drift");
+    const std::vector<chan_t> C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "rays", &idx, "drift");
     double worst = 0.0;
     n_compared = 0, n_empty = 0;
     QD_DIAG("\n# diag: export_rays_qrt, file CIR vs stage 3 (error over the bound)\n");
@@ -309,7 +309,7 @@ TEST_CASE("export_rays_qrt - a moved UT from a file has the channel of its rays 
     QD_DIAG("\n# diag: export_rays_qrt, moved UT from the file vs the rays at the drop link gain\n");
     QD_DIAG("tx_node,rx_node,freq,distance_m,link_gain_dB,rel_error\n");
     arma::umat idx;
-    const std::vector<chan_t> C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "rays", &idx, "drift");
+    const std::vector<chan_t> C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "rays", &idx, "drift");
     size_t n_moved = 0;
     for (arma::uword j = 0; j < C.size(); ++j)
     {
@@ -580,7 +580,7 @@ TEST_CASE("export_rays_qrt - each row takes the rays of its segment")
             continue;
         const arma::uword s = L.links.i_tx[l], seg = L.links.i_segment[l];
         arma::umat idx;
-        const std::vector<chan_t> C = quadriga_lib::get_gbsm_channels(L, {rays[l]}, arma::uvec{l}, {}, "rays", &idx, "drift");
+        const std::vector<chan_t> C = quadriga_lib::get_channels_from_rays(L, {rays[l]}, arma::uvec{l}, {}, "rays", &idx, "drift");
         for (arma::uword j = 0; j < C.size(); ++j)
         {
             REQUIRE(C[j].n_snap() == (seg == 0 ? 2u : 1u));
