@@ -18,7 +18,7 @@ SECTION!*/
 
 /*!MD
 # quadriga_lib_version
-Returns the quadriga-lib version number
+Version number of quadriga-lib
 
 ## Declaration:
 ```
@@ -62,7 +62,7 @@ namespace arma
 
 /*!MD
 # quadriga_lib_has_AVX2
-Checks whether AVX2 kernels can be used
+Check whether AVX2 kernels can be used
 
 - True if the library was built with AVX2 support and the CPU runs the AVX2 test kernel correctly
 - The test kernel runs once; later calls return the stored result
@@ -98,7 +98,7 @@ bool quadriga_lib::quadriga_lib_has_AVX2()
 
 /*!MD
 # quadriga_lib_has_CUDA
-Checks whether CUDA kernels can be used
+Check whether CUDA kernels can be used
 
 - True if the library was built with CUDA support and a CUDA-capable GPU runs the test kernel correctly
 

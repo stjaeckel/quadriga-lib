@@ -17,7 +17,7 @@ SECTION!*/
 
 /*!MD
 # crossfade_segments
-Joins the channels of consecutive segments of one link by a power cross-fade
+Join the channels of consecutive segments of one link by a power cross-fade
 
 - Joins the channels of the segments of one link, e.g. of a track whose scenario changes, into one channel; consecutive
   segments share snapshots, over which the paths of the old segment fade out and those of the new one fade in

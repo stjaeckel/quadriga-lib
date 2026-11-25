@@ -238,7 +238,7 @@ py::tuple calc_cross_polarization_ratio(py::list powers,
 
 /*!MD
 # calc_delay_spread
-Calculates RMS delay spread from per-CIR delays and linear-scale powers
+RMS delay spread from per-CIR delays and linear-scale powers
 
 - Computes RMS delay spread from a set of delays and corresponding linear-scale powers per CIR
 - Inputs are lists of 1D arrays so each CIR can have a different number of paths

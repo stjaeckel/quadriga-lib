@@ -16,7 +16,7 @@ SECTION!*/
 
 /*!MD
 # calc_delay_spread
-Calculates RMS delay spread from per-CIR delays and linear-scale powers
+RMS delay spread from per-CIR delays and linear-scale powers
 
 - Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; default of 100 dB effectively includes all paths.
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their powers summed before computing the spread; function recurses on the binned profile.

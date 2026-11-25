@@ -45,7 +45,7 @@ void hdf5_create_file(const py::handle &fn, unsigned nx, unsigned ny, unsigned n
 
 /*!MD
 # hdf5_read_channel
-Reads channel data from HDF5 files
+Read channel data from HDF5 files
 
 - Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file
 - Each of ix, iy, iz, iw may be a scalar, vector, or omitted (= None)
@@ -298,7 +298,7 @@ py::tuple hdf5_read_layout(const py::handle &fn)
 
 /*!MD
 # hdf5_reshape_layout
-Reshapes the storage layout inside an existing HDF5 file
+Reshape the storage layout inside an existing HDF5 file
 
 - Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
 - The total number of slots (`nx · ny · nz · nw`) must match the original layout

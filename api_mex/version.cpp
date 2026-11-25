@@ -11,7 +11,7 @@ SECTION!*/
 
 /*!MD
 # VERSION
-Returns the quadriga-lib version number
+Version number of quadriga-lib
 
 - If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
   a suffix `_AVX2` is added after the version number

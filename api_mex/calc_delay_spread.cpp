@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # CALC_DELAY_SPREAD
-Calculates RMS delay spread from per-CIR delays and linear-scale powers
+RMS delay spread from per-CIR delays and linear-scale powers
 
 - Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; the default
   of 100 dB effectively includes all paths

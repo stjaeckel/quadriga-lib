@@ -2560,7 +2560,7 @@ template double quadriga_lib::refractive_index(const std::unordered_map<std::str
 
 /*!MD
 # ray_mesh_interact
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
+Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 - One face event per ray: from the first and second hit (FBS, SBS) of [[ray_triangle_intersect]], the interface
   coefficients between homogeneous isotropic media (TE/TM Fresnel; one scalar pressure coefficient for types 3–5,

@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # RAY_MESH_INTERACT
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
+Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 - Computes interaction of plane waves with planar interfaces between homogeneous isotropic media
 - Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`)
