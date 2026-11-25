@@ -12,15 +12,13 @@ SECTION!*/
 
 /*!MD
 # DROP_TERMINALS
-Drop UTs into the cells of the Tx side of a layout
+Drop UTs into the cells of the Tx nodes of a layout
 
-- Cells: the Voronoi regions of the sites (the Tx nodes of one name, at the position of their first row), with the wrap images when `layout.wrap` is set. A site with several sectors is split into wedges by the nearest sector heading (±60° around each boresight for three sectors at equal spacing)
-- Drop area: with two wrap vectors, the wrapped cluster, i.e. the points nearest to image 0 of a site among the images 0, ±a1, ±a2 and ±(a1 − a2); else `bounds`, which is then required. Given bounds limit the drop in both cases
-- The drop of [[generate_layout]] applies in the cells of each site, with the rules of the scenario family in its `scenario` (minimum distance, heights and floors, speeds, O2I states). Sites without a family (no scenario, a conf name): height 1.5 m, no minimum distance, speed 0, no O2I state; their UTs get `indoor` -1, `floor` -1 and `d2d_in` NaN when other UTs have states. A site without a family has no minimum distance unless `ut` entry 1 gives one, and the distance kept from a site with `cell` = 0 follows that site's own family
-- Sites with `cell` = 0, e.g. the micro sites of `M.2412_DenseUrban` config 3, form no cells: with `per_cell`, each of their Tx nodes adds `n_ut` UTs to the cell that holds its position, as the drop of [[generate_layout]] does (there 4 `n_ut` per macro TRxP cell), and the UTs keep the minimum distance of the site's family (`ut` entry 1 if given) from them. A site closer than twice the minimum distance to another one can leave a cell too little room; such a cell raises an error
-- The Rx side is replaced by the UTs `UT1`, `UT2`, ... (ordered by cell with `per_cell`) with the generic antenna; `pairing` and `links` are emptied. The Tx side, the antenna lists and `layout.seed` stay. A failed call leaves the layout unchanged
-- Random streams: the positions use the key `drop`, the heading and direction of a UT `ut|<name>`, its floor `floor|<family>|<name>`, the O2I fields `<purpose>|<family>`; the base of all is the seed of the call
-- The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
+- Replaces the Rx nodes by new UTs `UT1`, `UT2`, ..., dropped uniformly into the cells of the sites with the rules of
+  the scenario of each site (minimum distance, height, speed, indoor state), as [[generate_layout]] drops them
+- Use it to drop UTs for any set of Tx nodes, e.g. sites read from a CSV file or edited after [[generate_layout]]
+- The Tx nodes, the antenna lists and `layout.seed` stay; `pairing` and `links` are emptied, and the new UTs have the
+  generic antenna
 
 ## Usage:
 ```
@@ -29,13 +27,32 @@ layout_out = quadriga_lib.drop_terminals( layout_in, n_ut, bounds, ut, indoor, o
 
 ## Inputs:
 - **`layout_in`** — Valid layout struct, fields in [[layout_csv_read]]; the sectors of one site need different headings
-- **`n_ut`** — UTs per cell (`per_cell`) or in total, at most 10<sup>7</sup> in total; 0 = no UTs
-- **`bounds`** — `[x_min, x_max, y_min, y_max]` in [m], finite, `x_min < x_max`, `y_min < y_max`; required unless `layout_in.wrap` has two vectors; default: `[]`
-- **`ut`**, **`indoor`**, **`options`**, **`per_cell`** — As in [[generate_layout]]; an entry or option that no family of the sites uses raises an error; defaults: `[]`, `[]`, `[]`, `true`
+- **`n_ut`** — UTs per cell (`per_cell`) or in total, at most 1e7 in total; 0 = no UTs
+- **`bounds`** — `[x_min, x_max, y_min, y_max]` in [m], finite, `x_min < x_max`, `y_min < y_max`; required unless
+  `layout_in.wrap` has two vectors; default: `[]`
+- **`ut`**, **`indoor`**, **`options`**, **`per_cell`** — As in [[generate_layout]]; an entry or option that no family
+  of the sites uses raises an error; defaults: `[]`, `[]`, `[]`, `true`
 - **`seed`** — Seed >= 0; -1 = `layout_in.seed` if it is set, else the system random device; default: -1
 
 ## Outputs:
-- **`layout_out`** — The layout with the Rx side replaced by the dropped UTs
+- **`layout_out`** — The layout with the Rx nodes replaced by the dropped UTs
+
+## Notes:
+- **Cells**: the Voronoi regions of the sites (the Tx nodes of one name, at the position of their first row), with the
+  wrap images when `layout_in.wrap` is set. A site with several sectors is split into wedges by the nearest sector
+  heading (±60° around each boresight for three sectors at equal spacing)
+- **Drop area**: with two wrap vectors, the wrapped cluster, i.e. the points nearest to image 0 of a site among the
+  images 0, ±a1, ±a2 and ±(a1 - a2); else `bounds`, which is then required. Given bounds limit the drop in both cases
+- **Sites without a scenario family** (no scenario, or a conf name): height 1.5 m, no minimum distance unless `ut` entry
+  1 gives one, speed 0, no O2I state; their UTs get `indoor` -1, `floor` -1 and `d2d_in` NaN when other UTs have states
+- **Sites with `cell` = 0**, e.g. the micro sites of `M.2412_DenseUrban` config 3, form no cells: with `per_cell`, each
+  of their Tx nodes adds `n_ut` UTs to the cell that holds its position, and the UTs keep the minimum distance of the
+  site's own family (`ut` entry 1 if given) from them. A site closer than twice the minimum distance to another one can
+  leave a cell too little room; such a cell raises an error
+- **Order and reproducibility**: with `per_cell` the UTs are ordered by cell. The drop is a function of the seed and
+  does not depend on the thread count; each UT draws its heading, direction and floor from its own random stream, keyed
+  by its name
+- The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
 
 ## See also:
 - [[generate_layout]] (layouts from presets, with this drop)

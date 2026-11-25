@@ -207,11 +207,10 @@ bool drop_direction(const quadriga_lib::layout_nodes &nodes, arma::uword row, do
 # sample_track
 Positions and orientations of a node at snapshot times
 
-- A **snapshot** is one sample of the channel in time and space; a **row** is a point stored in the layout. Without `times`, each row of the node is one snapshot. With `times`, a point drop gives as many snapshots as times, and a track is interpolated between its rows
-- Point drop (one row): the position is `p0 + v d t` with the speed `v` of the row and the unit vector `d` of its direction (azimuth, elevation; an elevation of NaN is 0). Without direction (NaN azimuth), `d = [cos(tilt) cos(heading), cos(tilt) sin(heading), -sin(tilt)]` from the orientation; bank has no effect. The orientation is constant
-- Track (several rows): the time of each row is `time`, else it follows from the arc length and the speed of the row, `t(0) = 0`, `t(i+1) = t(i) + |Δp| / speed(i)`; a step of zero length with speed 0 takes no time. The position is interpolated linearly in time, bank and heading of the orientation along the shorter way and the tilt linearly; before the first and after the last time, the first and the last row are held. If several rows have the same time, the later row holds at that time. The times in `times` need not increase. A track with neither `time` nor a speed throws if `times` is given; a moving step with speed 0 throws
-- Mounted antennas (`relative = 1`): the orientation is relative to the direction of motion, and the output is `R(motion) R(orientation)` in the GCS, with bank 0 in `R(motion)`. For a point drop, the motion is its direction, which must be given. For a track, it is the direction of the step of the row segment that holds the snapshot (the step from a row to the next one, the last step repeated at the end); a step of zero length takes the previous direction, at the start the next one that exists. The stored orientation is interpolated first, then rotated by the motion of the segment
-- Members of `nodes` with sizes that do not fit, and a `direction` on a track, throw `std::invalid_argument`; the other rules of [[layout]] are not checked
+- Returns the position and the orientation of one node at each snapshot time, for point drops and tracks;
+  [[get_gbsm_channels]] samples both ends of each link this way
+- Without `times`, each row of the node is one snapshot
+- The orientation includes the rotation of mounted antennas (`relative = 1`), so it is the orientation in the GCS
 
 ## Declaration:
 ```
@@ -225,14 +224,16 @@ void quadriga_lib::sample_track(
 ```
 
 ## Inputs:
-- **`nodes`** — Nodes of one side of a layout ([[layout]])
+- **`nodes`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`)
 - **`i_node`** — Node index, 0-based
 - **`times`** — Snapshot times in [s], finite; `[n_snap]`; empty = one snapshot per row
 
 ## Outputs:
 - **`pos`** — Positions in [m]; `[3, n_snap]`
-- **`orientation`** — Orientations (bank, tilt, heading) in [rad] in the GCS, including the mounting rotation; `[3, n_snap]`
-- **`i_row`** *(optional)* — Row at or before each snapshot, 0-based, index into the arrays of `nodes` (not into the rows of the node); `[n_snap]`
+- **`orientation`** — Orientations (bank, tilt, heading) in [rad] in the GCS, including the mounting rotation;
+  `[3, n_snap]`
+- **`i_row`** *(optional)* — Row at or before each snapshot, 0-based, index into the arrays of `nodes` (not into the
+  rows of the node); `[n_snap]`
 
 ## Example:
 ```
@@ -240,6 +241,25 @@ quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 arma::mat pos, ori;
 quadriga_lib::sample_track(L.rx, 0, arma::linspace(0.0, 1.0, 11), pos, ori);
 ```
+
+## Notes:
+- **Point drop** (one row): $p(t) = p_0 + v t \hat{d}$ with the speed $v$ of the row and the unit vector $\hat{d}$ of
+  its direction (azimuth, elevation; an elevation of NaN is 0). Without a direction (NaN azimuth),
+  $\hat{d} = (\cos\beta \cos\alpha, \cos\beta \sin\alpha, -\sin\beta)$ with the tilt $\beta$ and the heading $\alpha$ of
+  the orientation; the bank has no effect. The orientation is constant
+- **Track** (several rows): the time of row $i$ is `time`, else it follows from the speed $v_i$ of the row, $t_0 = 0$,
+  $t_{i+1} = t_i + \lvert p_{i+1} - p_i \rvert / v_i$; a step of zero length with speed 0 takes no time. The position is
+  interpolated linearly in time, bank and heading along the shorter way and the tilt linearly; before the first and
+  after the last time, the first and the last row hold. If several rows have the same time, the later row holds at that
+  time. The times in `times` need not increase. A track with neither `time` nor a speed throws if `times` is given; a
+  moving step with speed 0 throws
+- **Mounted antennas** (`relative = 1`): the orientation is relative to the direction of motion, and the output is
+  $R_\mathrm{motion} R_\mathrm{orientation}$, with bank 0 in $R_\mathrm{motion}$. For a point drop, the motion is its
+  direction, which must be given. For a track, it is the direction of the step from the row at or before the snapshot to
+  the next row (the last step repeated at the end); a step of zero length takes the previous direction, at the start the
+  next one that exists. The stored orientation is interpolated first, then rotated by the motion
+- **Checks**: members of `nodes` with sizes that do not fit, and a `direction` on a track, throw
+  `std::invalid_argument`; the other rules of [[layout]] are not checked
 
 ## See also:
 - [[generate_track]] (creates tracks)
@@ -385,12 +405,11 @@ void quadriga_lib::sample_track(const layout_nodes &nodes, arma::uword i_node, c
 # set_orientation
 Set the orientation of nodes from their motion, or to a given value
 
-- The orientation is that of the antenna: bank, tilt, heading = (γ, β, α) of 3GPP TR 38.901; a positive tilt points down (aviation pitch is -tilt), the heading is counted counter-clockwise from the x-axis
-- `force = false`, track (several rows): bank 0, tilt and heading from the steps between the rows (forward difference, the last step repeated, or for a closed track the first row, as `qd_track.calc_orientation` of the NG library does); `orientation` is added as an offset and the angles are wrapped to [-π, π]. A step of zero length keeps the previous orientation, at the start the next one that exists; a vertical step has the tilt -90° (up) or 90° (down) and keeps the previous heading (a deliberate deviation from NG, where it is 0). A rising track has a negative tilt. A track that does not move keeps its orientation (plus the offset)
-- `force = false`, point drop (one row): the orientation stays and receives the offset; without an offset it is not touched. Random orientations of point drops are not generated here
-- `force = false` leaves nodes with `relative = 1` unchanged, offset included: their orientation is relative to the motion, which [[sample_track]] applies at each snapshot
-- `force = true`: every row of the nodes gets exactly `orientation`, also the nodes with `relative = 1`
-- A failed call leaves `nodes` unchanged
+- Turns the antennas of tracks along their motion, e.g. for a UT held in the direction of travel, or sets all rows of
+  the nodes to a fixed orientation
+- `force = false`: tracks get bank 0 and the tilt and heading of the steps between their rows, plus `orientation` as an
+  offset; point drops keep their orientation plus the offset
+- `force = true`: every row of the nodes gets exactly `orientation`
 
 ## Declaration:
 ```
@@ -402,10 +421,11 @@ void quadriga_lib::set_orientation(
 ```
 
 ## Inputs:
-- **`nodes`** — Nodes, updated in place
+- **`nodes`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`), updated in place
 - **`orientation`** *(optional)* — Bank, tilt, heading in [rad], 3 finite values; empty = 0
 - **`i_node`** *(optional)* — Node indices, 0-based; empty = all nodes
-- **`force`** *(optional)* — `false`: orientation from the motion of tracks, plus `orientation` as offset; `true`: `orientation` on all rows
+- **`force`** *(optional)* — `false`: orientation from the motion of tracks, plus `orientation` as offset; `true`:
+  `orientation` on all rows
 
 ## Example:
 ```
@@ -413,6 +433,18 @@ quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_orientation(L.rx);                                  // The antennas look along the motion
 quadriga_lib::set_orientation(L.rx, arma::vec{0.0, 0.0, 0.5});        // The same, turned by 0.5 rad
 ```
+
+## Notes:
+- **Tracks** (`force = false`): forward differences between the rows, the last step repeated, or for a closed track the
+  step to the first row, as `qd_track.calc_orientation` of the NG library does; the angles are wrapped to [-π, π]. A
+  step of zero length keeps the previous orientation, at the start the next one that exists. A vertical step has the
+  tilt -90° (up) or 90° (down) and keeps the previous heading (a deliberate deviation from NG, where it is 0). A rising
+  track has a negative tilt; a track that does not move keeps its orientation (plus the offset)
+- **Point drops** (`force = false`): without an offset, the orientation is not touched; random orientations are not
+  generated here
+- **Mounted antennas**: `force = false` leaves nodes with `relative = 1` unchanged, offset included, since their
+  orientation is relative to the motion, which [[sample_track]] applies at each snapshot; `force = true` sets them too
+- A failed call leaves `nodes` unchanged
 
 ## See also:
 - [[generate_track]] (creates tracks with this orientation)
@@ -564,15 +596,12 @@ double option_value(const std::string &key, const std::vector<double> &v, double
 # generate_track
 Replace the rows of nodes by a generated track or a point drop
 
-- Each node keeps its first position; the call applies to all nodes with the name of a given node (the sectors of a site, the panels of a terminal), which get the same track. Tracks are horizontal at the height of the first row. The other members of the new rows (`scenario`, `indoor`, `floor`, `d2d_in`, extra columns) take the values of the first row of the node; `time` is cleared
-- Types (not case sensitive):
-  - `point`: the nodes become point drops with `speed` and an explicit horizontal `direction` (random if not given), the form of short-term mobility in 3GPP TR 38.901; the rows after the first are removed; `length` is not used
-  - `linear`: a straight track of `length` (default 1 m) in the start direction; two points, or `ceil(length / spacing) + 1` equidistant points
-  - `circular`: a closed circle with the circumference `length` (default 20π m, radius 10 m) and 129 points, or `max(3, ceil(length / spacing)) + 1` points; the first and last point are equal. `direction` is the angle of the start point on the circle seen from its centre: a positive value runs counter-clockwise, a negative one clockwise (e.g. 0 starts in the east of the circle and runs north, -π/2 starts in the south and runs west); a random direction is drawn in [0, 2π), so random circles run counter-clockwise
-  - `street`: the route of a car through a city grid as in `qd_track.generate` of the NG library. Straight streets of random length (normal distribution, drawn again below `street_length_min`) are separated by crossings; at a crossing the car turns with the probability `turn_probability` by about 90° (standard deviation 15°) to the left or right, cutting the corner along a path of length 2 `curve_radius` cos(turn / 2); the direction stays within 105° of the start direction, so the car does not drive in circles. The route has the length `length` (default 1000 m) and is sampled with a point spacing of `spacing` (default 1 m); the chords between the points are slightly shorter than the route at the corners
-- `linear`, `circular` and `street` give tracks of equal `speed` without `direction`, and their orientation follows the motion as [[set_orientation]] with `force = false` gives it; nodes with `relative = 1` keep the orientation of their first row on all rows. `point` keeps the orientation of the node
-- Reproducibility: a seed >= 0 gives the same track on all platforms; each name (all its nodes) has its own stream, keyed by `track|<name>`, so the track does not depend on the other nodes or the order in `i_node`. Seed -1 uses the system random device
-- A failed call leaves `nodes` unchanged
+- Gives nodes a straight, circular or street-like track, or makes them point drops with a speed and a direction, the
+  short-term mobility of 3GPP TR 38.901
+- All nodes with the name of a given node (the sectors of a site, the panels of a terminal) get the same track. It
+  starts at the first position of the node and is horizontal at the height of the first row
+- The antennas look along the motion, as [[set_orientation]] turns them; [[sample_track]] gives the positions at
+  snapshot times
 
 ## Declaration:
 ```
@@ -589,14 +618,26 @@ void quadriga_lib::generate_track(
 ```
 
 ## Inputs:
-- **`nodes`** — Nodes, updated in place
+- **`nodes`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`), updated in place
 - **`i_node`** — Node indices, 0-based, not empty
-- **`type`** — `point`, `linear`, `circular` or `street`
+- **`type`** — Type of the track, not case sensitive:
+  - `point`: a point drop with `speed` and a horizontal `direction`; the rows after the first are removed; `length` is
+    not used
+  - `linear`: a straight track of `length` (default 1 m) in the start direction
+  - `circular`: a closed circle of circumference `length` (default 20π m, radius 10 m); the first and the last point are
+    equal
+  - `street`: the route of a car through a city grid of straight streets and crossings, of `length` (default 1000 m),
+    see Notes
 - **`length`** *(optional)* — Length in [m], finite and >= 0; 0 = default of the type
-- **`speed`** *(optional)* — Speed in [m/s], finite and >= 0, and > 0 for tracks; NaN = the speed of the first row of the node if it is valid (> 0 for a track); without one, `point` gets 0 and the other types throw
-- **`direction`** *(optional)* — Start direction (azimuth) in [rad], finite; one value for all nodes, or one per entry of `i_node` (nodes of one name need equal values); empty = uniform random in [0, 2π)
-- **`spacing`** *(optional)* — Point spacing in [m], > 0; NaN = two points (`linear`), 129 points (`circular`), 1 m (`street`)
-- **`options`** *(optional)* — Options of `street`, one value each: `street_length_min` = 50, `street_length_mu` = 187, `street_length_std` = 83 (all in [m], >= 0; with a std of 0, mu must be >= min and > 0), `curve_radius` = 10 [m], `turn_probability` = 0.5 (in [0, 1]); other keys, and these keys for the other types, throw
+- **`speed`** *(optional)* — Speed in [m/s], finite and >= 0, and > 0 for tracks; NaN = the speed of the first row of
+  the node if it is valid (> 0 for a track); without one, `point` gets 0 and the other types throw
+- **`direction`** *(optional)* — Start direction (azimuth) in [rad], finite; one value for all nodes, or one per entry
+  of `i_node` (nodes of one name need equal values); empty = uniform random in [0, 2π)
+- **`spacing`** *(optional)* — Point spacing in [m], > 0; NaN = two points (`linear`), 129 points (`circular`), 1 m
+  (`street`)
+- **`options`** *(optional)* — Options of `street`, one value each: `street_length_min` = 50, `street_length_mu` = 187,
+  `street_length_std` = 83 (all in [m], >= 0; with a std of 0, mu must be >= min and > 0), `curve_radius` = 10 [m],
+  `turn_probability` = 0.5 (in [0, 1]); other keys, and these keys for the other types, throw
 - **`seed`** *(optional)* — Seed, >= 0 for reproducible draws; -1 = system random device; below -1 throws
 
 ## Example:
@@ -604,6 +645,26 @@ void quadriga_lib::generate_track(
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("", "rx.csv");
 quadriga_lib::generate_track(L.rx, {0}, "street", 500.0, 10.0, {}, NAN, {{"turn_probability", {0.3}}}, 42);
 ```
+
+## Notes:
+- **Points**: `linear` has two points, or `ceil(length / spacing) + 1` equidistant points; `circular` 129 points, or
+  `max(3, ceil(length / spacing)) + 1`; `street` is sampled with the point spacing `spacing`, and the chords between the
+  points are slightly shorter than the route at the corners
+- **Direction of a circle**: the angle of the start point seen from the centre of the circle. A positive value runs
+  counter-clockwise, a negative one clockwise: 0 starts in the east of the circle and runs north, -π/2 starts in the
+  south and runs west. A random direction is drawn in [0, 2π), so random circles run counter-clockwise
+- **Street route** (as `qd_track.generate` of the NG library): straight streets of random length (normal distribution,
+  drawn again below `street_length_min`) are separated by crossings. At a crossing the car turns with the probability
+  `turn_probability` by about 90° (standard deviation 15°) to the left or right, cutting the corner along a path of
+  length $2 r \cos(\varphi / 2)$ for the turn angle $\varphi$ and the `curve_radius` $r$. The direction stays within
+  105° of the start direction, so that the car does not drive in circles
+- **Values of the new rows**: `linear`, `circular` and `street` give tracks of equal `speed` without `direction`,
+  oriented along the motion as [[set_orientation]] with `force = false`; nodes with `relative = 1` keep the orientation
+  of their first row on all rows. `point` keeps the orientation of the node. `scenario`, `indoor`, `floor`, `d2d_in` and
+  the extra columns take the values of the first row; `time` is cleared
+- **Reproducibility**: a seed >= 0 gives the same track on all platforms. Each name (all its nodes) has its own random
+  stream, so the track does not depend on the other nodes or the order in `i_node`
+- A failed call leaves `nodes` unchanged
 
 ## See also:
 - [[sample_track]] (snapshots of a track)

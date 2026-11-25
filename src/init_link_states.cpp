@@ -342,18 +342,12 @@ SECTION!*/
 
 /*!MD
 # init_link_states
-Draws the discrete state of the propagation links of a layout (stage 1 of the channel pipeline)
+Draw the discrete state of the propagation links of a layout (stage 1 of the channel pipeline)
 
-- One propagation link per site, terminal and segment, for pairs farther apart than 1e-4 m at the first row, terminal-major (all sites of terminal 0 first); co-located pairs have no link, a later segment that starts at the site throws. `layout.pairing` does not limit the links, it selects at the output of the channel functions
-- Scenario of a link: the value of the terminal, else that of the site; a scenario family (e.g. `UMa`) draws the LOS and indoor state, a conf name of the family table (e.g. `UMa_NLOS_O2I`, also with the prefix `3GPP_38.901_v19_`) fixes them, any other name is a user conf file used in either state without O2I loss. A conf that several families list (`Indoor_LOS`, `InF_LOS`) belongs to the family of the site if that lists it, else to the first. Conf files are found with [[conf_file_list]], the folders of `config_dirs` first
-- Wrap image: the image of the site (`layout.wrap`) with the shortest 2D distance to the first position of the terminal, ties to the lowest index in the order 0, +a1, −a1, +a2, −a2, +(a1 − a2), −(a1 − a2); all distances of the link use this virtual site position
-- O2I state per terminal from spatially correlated fields at its first position (TR 38.901 clause 7.6.3.3): building UTs with the share of TR 38.901 Table 7.2-1 (0.8 in UMa and UMi), Table 7.2-3 (0.5 in RMa) and Table 7.8-1A (0.8 in SMa), the other UTs outdoors or, in RMa and SMa, in cars; residential or commercial building in SMa (0.9); the O2I model and `d2d_in` as in [[o2i_loss]]. The values `indoor`, `floor` and `d2d_in` of the Rx side fix them; an exact conf name that contradicts a fixed `indoor` throws. All links of a terminal share one O2I state (TR 38.901: all the links from a UT have the same indoor/outdoor state): a terminal linked to sites of several families has the state of the first family with O2I in site order, and an exact name on a site fixes it for the links to all sites; InH and InF have none
-- `o2i_low` applies to the families with a low-loss and a high-loss building model (UMa, UMi); RMa and SMa have one building model
-- LOS state per link: a uniform field per site, image and family at the first position of the segment, at the `LOS_state_lambda` of the NLOS conf (InF with `d_clutter`: `d_clutter / 2`), below [[los_probability]] at `d2d_out = max(d2D − d2d_in, 0)`; InF-HH is always LOS
-- Random streams: [[sos_rand]] with the preset `Exp256` and seeds hashed from a base seed and a key (64-bit FNV-1a, sign bit cleared): base = the site seed or the layout seed; keys `los|<site>|<image>|<family>`, `gbsm|<site>|<image>|<conf>` (the seed of [[gbsm_init_phases]]) and, with the layout seed, `<purpose>|<family>` for the O2I fields. Adding a terminal does not change the states of the others
-- The TR methods draw the cluster and ray sets of frequency `k` with the index `k` into `layout.center_freq`, so a frequency inserted below another changes the rays of the higher bands
-- Segments: on the Rx side, a row whose `scenario` or `indoor` value differs from the row before it starts a segment (the values of the Rx side are compared: an empty `scenario` differs from an explicit one), with distances to a moving site at the time of the segment start, with its own propagation links (order: terminal, site, segment), LOS state, indoor state, conf and seed, drawn at its first row; the wrap image and the O2I random values (`o2i_rnd`, `o2i_model`, a drawn indoor state) are those of the first row of the track, and a fixed `d2d_in` must be equal at all segment starts. A segment of a long track keeps its LOS state, so long tracks need explicit segments
-- A layout without any pair farther apart than 1e-4 m gives links without entries; the later stages then return empty results
+- Draws for each propagation link (one site, one terminal, one segment) the state that the later stages need: the wrap
+  image, the scenario and conf file, the LOS and indoor state and the seeds, stored in `layout.links` ([[layout_links]])
+- The states follow from the seeds and the positions, so adding a terminal does not change the states of the others
+- `layout.pairing` does not limit the links; it selects at the output of the channel functions
 
 ## Declaration:
 ```
@@ -369,14 +363,53 @@ void quadriga_lib::init_link_states(
 ```
 
 ## Inputs:
-- **`layout`** — Layout, valid, with `center_freq`; `layout.links` and `layout.seed` are written, the rest is unchanged. A copy of `layout.links` stays usable after another realisation: the links hold their master seed, which the later stages use
-- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` (TR 38.901 clause 7.6.5.1) or `"quadriga"`, see [[generate_rays]]
-- **`o2i_low`** *(optional)* — Share of the low-loss model among the building UTs of UMa and UMi, in [0, 1]; the other families have one building model; `[1]`
+- **`layout`** — Layout, valid, with `center_freq`; `layout.links` and `layout.seed` are written, the rest is unchanged
+- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` (TR 38.901 clause 7.6.5.1) or `"quadriga"`, see
+  [[generate_rays]]
+- **`o2i_low`** *(optional)* — Share of the low-loss model among the building UTs of UMa and UMi, in [0, 1]; omitted:
+  the share of TR 38.901 Table 7.8-1 (0.5); the other families have one building model; `[1]`
 - **`pol_variability`** *(optional)* — Polarization power variability of TR 38.901 clause 7.6.16; TR methods only
 - **`anchor_freq`** *(optional)* — Anchor frequency of `"38.901_MF"` in [Hz]
-- **`sos_preset`** *(optional)* — SOS preset of the GBSM random sets, see [[sos_preset]]; omitted: `Exp256` (TR methods), `Comb256` (`"quadriga"`)
-- **`seed`** *(optional)* — Master seed, >= -1; -1 = `layout.seed`, if that is -1 one draw of the system random device. The seed used is written to `layout.seed`
+- **`sos_preset`** *(optional)* — SOS preset of the GBSM random sets, see [[sos_preset]]; omitted: `Exp256` (TR
+  methods), `Comb256` (`"quadriga"`)
+- **`seed`** *(optional)* — Master seed, >= -1; -1 = `layout.seed`, if that is -1 one draw of the system random device.
+  The seed used is written to `layout.seed`
 - **`config_dirs`** *(optional)* — Folders of user conf files, searched before the shipped folder
+
+## Notes:
+- **Links**: one per site, terminal and segment, for pairs farther apart than 1e-4 m at the first row, terminal-major
+  (all sites of terminal 0 first). Co-located pairs have no link; a later segment that starts at the site throws. A
+  layout without any pair farther apart gives links without entries, and the later stages return empty results
+- **Scenario** of a link: the value of the terminal, else that of the site. A scenario family (e.g. `UMa`) draws the LOS
+  and indoor state, a conf name of the family table (e.g. `UMa_NLOS_O2I`, also with the prefix `3GPP_38.901_v19_`) fixes
+  them, and any other name is a user conf file, used in either state without O2I loss. A conf that several families list
+  (`Indoor_LOS`, `InF_LOS`) belongs to the family of the site if that lists it, else to the first. Conf files are found
+  with [[conf_file_list]], the folders of `config_dirs` first
+- **Wrap image**: the image of the site (`layout.wrap`) with the shortest 2D distance to the first position of the
+  terminal, ties to the lowest index in the order 0, $+a_1$, $-a_1$, $+a_2$, $-a_2$, $+(a_1 - a_2)$, $-(a_1 - a_2)$; all
+  distances of the link use this virtual site position
+- **O2I state** per terminal, from spatially correlated fields at its first position (TR 38.901 clause 7.6.3.3):
+  building UTs with the share of TR 38.901 Table 7.2-1 (0.8 in UMa and UMi), Table 7.2-3 (0.5 in RMa) and Table 7.8-1A
+  (0.8 in SMa), the other UTs outdoors or, in RMa and SMa, in cars; residential or commercial building in SMa (0.9); the
+  O2I model and `d2d_in` as in [[o2i_loss]]. The values `indoor`, `floor` and `d2d_in` of the Rx nodes fix them; an
+  exact conf name that contradicts a fixed `indoor` throws
+- **One O2I state per terminal** (TR 38.901: all the links from a UT have the same indoor/outdoor state): a terminal
+  linked to sites of several families has the state of the first family with O2I in site order, and an exact name on a
+  site fixes it for the links to all sites; InH and InF have none
+- **LOS state** per link: a uniform field per site, image and family at the first position of the segment, at the
+  `LOS_state_lambda` of the NLOS conf (InF with `d_clutter`: `d_clutter / 2`), below [[los_probability]] at
+  $d_\mathrm{2D,out} = \max(d_\mathrm{2D} - d_\mathrm{2D,in}, 0)$; InF-HH is always LOS
+- **Segments**: on the Rx nodes, a row whose `scenario` or `indoor` differs from the row before it starts a segment (an
+  empty `scenario` differs from an explicit one). A segment has its own propagation links (order: terminal, site,
+  segment), LOS state, indoor state, conf and seed, drawn at its first row, with the distances to a moving site at the
+  time of the segment start. The wrap image and the O2I random values (`o2i_rnd`, `o2i_model`, a drawn indoor state) are
+  those of the first row of the track; a fixed `d2d_in` must be equal at all segment starts. A segment keeps its LOS
+  state along its length, so long tracks need explicit segments
+- **Random values**: [[sos_rand]] with the preset `Exp256`; each field has its own seed, hashed from the site seed (else
+  the layout seed) and a key of its purpose, site, image and family or conf. `gbsm_seed` is the seed of
+  [[gbsm_init_phases]]
+- **Frequencies**: the TR methods draw the cluster and ray sets of frequency `k` with the index `k` into
+  `layout.center_freq`, so a frequency inserted below another changes the rays of the higher bands
 
 ## See also:
 - [[layout_links]] (the link states)

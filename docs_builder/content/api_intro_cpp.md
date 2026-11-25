@@ -80,8 +80,9 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Network layouts and mobility**
 
-- `layout`: the nodes of a radio network and how they move, in two flat tables, one for the Tx side (BS, AP) and one for the Rx side (UT, STA), with their antennas, the link states of one realisation and the lattice of the wrap-around; the CSV files of a layout have the same two tables.
-- Node: one (`name`, `sector`) pair on one side of a layout, with one antenna and one track. Site: all Tx nodes with one name (its sectors share position and scenario). Terminal: all Rx nodes with one name, e.g. the panels of one device.
+- `layout`: the nodes of a radio network and how they move, in two tables, the Tx nodes (BS, AP) and the Rx nodes (UT, STA), with their antennas, the link states of one realisation and the lattice of the wrap-around; the two [layout CSV files](formats.html#layout_csv) hold the same tables.
+- Tx nodes, Rx nodes: the two node tables of a layout, `layout.tx` and `layout.rx`; a function that works on one of them takes the table or `rx_side` (`false`: Tx nodes, `true`: Rx nodes).
+- Node: one transmitter or receiver of a layout, identified by its `name` and `sector`, with one antenna and one track. Site: all Tx nodes with one name (its sectors share position and scenario). Terminal: all Rx nodes with one name, e.g. the panels of one device.
 - Row: a position with orientation and the values that apply from it on; the rows of a node are consecutive, the first at `offset`. Snapshot: one sample of the channel in time and space; without snapshot times, each row of a node is one snapshot.
 - Track: a node with several rows, which moves along its positions. Point drop: a node with one row, which stays at its position or moves along its `direction` with its `speed`.
 - Segment: the part of a track with one scenario and indoor state; a change of `scenario` or `indoor` at a row starts a new segment, which has its own links and is joined to the preceding one by `crossfade_segments`.

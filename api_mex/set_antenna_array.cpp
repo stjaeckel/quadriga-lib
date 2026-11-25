@@ -14,9 +14,9 @@ SECTION!*/
 # SET_ANTENNA_ARRAY
 Set the antenna of layout nodes from an evaluated array
 
-- Stores an array, e.g. a measurement read with [[qdant_read]], which [[layout_csv_write]] exports to a QDANT file; for the antenna lists of the layout, the bands and the renumbering of `i_antenna` see [[set_antenna]]
-- Without `center_freq`, the array applies to all bands. With `center_freq`, only that band of the nodes' antenna is set: a frequency that is not in `layout_in.center_freq` is added, the other bands of the nodes keep their antenna
-- The C++ function `set_antenna` with an array argument has this name in MATLAB, because MATLAB does not overload by type; the in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
+- Sets the antenna of Tx nodes or Rx nodes from an array, e.g. a measured pattern read with [[qdant_read]]
+- Without `center_freq`, the array applies to all bands; with `center_freq`, it is the antenna of that band
+- Stores the array, which [[layout_csv_write]] exports to a QDANT file
 
 ## Usage:
 ```
@@ -26,9 +26,10 @@ layout_out = quadriga_lib.set_antenna_array( layout_in, array, rx_side, i_node, 
 ## Inputs:
 - **`layout_in`** — Layout struct, fields in [[layout_csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`array`** — Valid single-frequency array, 1x1 struct, fields as in [[generate_antenna]]
-- **`rx_side`** — `false`: nodes of `layout_in.tx`; `true`: nodes of `layout_in.rx`; default: `false`
-- **`i_node`** — Indices of the nodes of that side, 1-based; `[]` = all nodes of the side; default: `[]`
-- **`center_freq`** — Band in [Hz], positive; NaN = the same array for all bands; default: NaN
+- **`rx_side`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
+  `false`
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 1-based; `[]` = all of them; default: `[]`
+- **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
 
 ## Outputs:
 - **`layout_out`** — The layout with the new antenna lists and `i_antenna`
@@ -39,9 +40,16 @@ layout = quadriga_lib.layout_csv_read( 'tx.csv', 'rx.csv' );
 layout = quadriga_lib.set_antenna_array( layout, quadriga_lib.qdant_read( 'handset.qdant' ), true );
 ```
 
+## Notes:
+- **Bands and antenna lists**: as in [[set_antenna]]
+- This is the second form of the C++ function `set_antenna`, which takes an array; it has its own name in MATLAB,
+  because MATLAB does not overload by type. The C++ in/out argument `layout` is split into `layout_in` / `layout_out`,
+  so that the input stays unchanged
+
 ## See also:
 - [[set_antenna]] (sets the antenna from the arguments of generate_antenna)
 - [[qdant_read]] (reads an array from a QDANT file)
+- [[layout_csv_write]] (exports the array)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

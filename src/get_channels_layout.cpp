@@ -26,29 +26,31 @@ SECTION!*/
 # layout_links
 State of the propagation links of one realisation of a layout
 
-- Holds the discrete state of the links (line of sight, indoor state, scenario and random seeds), no large-scale parameters, phases or rays; it is not stored in the CSV files
-- A propagation link is one site, one terminal and one segment of a track with one resolved scenario; its arrays have one entry per link
+- Written by [[init_link_states]], read by the later stages; one entry per propagation link (one site, one terminal, one
+  segment)
+- Holds the discrete state of the links (LOS and indoor state, scenario, seeds), from which the later stages regenerate
+  the large-scale parameters, phases and rays; not stored in the CSV files
 
 ## Attributes:<br>
 | Attribute | Size | Description |
 | --------- | ---- | ----------- |
 | `arma::u32_vec i_tx`, `i_rx`, `i_segment` | `[n_link]` | Site, terminal and segment of each link, 0-based |
-| `arma::u32_vec image` | `[n_link]` | Wrap-around image of the site, 0 = the real site |
-| `arma::u32_vec i_conf` | `[n_link]` | Index into `conf_names`, derived from scenario, LOS and indoor state |
+| `arma::u32_vec image` | `[n_link]` | Wrap image of the site, 0 = the real site |
+| `arma::u32_vec i_conf` | `[n_link]` | Index into `conf_names`, from scenario, LOS and indoor state |
 | `std::vector<std::string> conf_names` | `[n_conf]` | Resolved conf names |
 | `arma::u32_vec los` | `[n_link]` | 1 = line of sight |
 | `arma::s32_vec indoor` | `[n_link]` | Indoor state at the start of the segment, as in [[layout_nodes]] |
-| `arma::u32_vec floor_id` | `[n_link]` | Floor number - 1, 0 outdoors; of the drawn state, stages 2 and 3 derive it from `indoor` |
-| `arma::vec d2d_in` | `[n_link]` | Indoor 2D distance in [m]; of the drawn state, stages 2 and 3 derive it from `indoor` |
+| `arma::u32_vec floor_id` | `[n_link]` | Floor number - 1, 0 outdoors, of the drawn state |
+| `arma::vec d2d_in` | `[n_link]` | Indoor 2D distance in [m] of the drawn state |
 | `arma::mat o2i_rnd` | `[n_terminal, 4]` | Random inputs of [[o2i_loss]] |
 | `arma::u32_vec o2i_model` | `[n_terminal]` | Building O2I model, index into the list of the family; for every terminal of a family with O2I, also outdoors |
 | `arma::s64_vec gbsm_seed` | `[n_link]` | Seed of the random phases; equal for one site, image and conf |
-| `arma::sword seed` | scalar | Master seed, the base of the streams of all stages; -1 = not set |
+| `arma::sword seed` | scalar | Master seed, the base of the random values of all stages; -1 = not set |
 | `std::string method`, `sos_preset` | | Method and SOS preset as used; an empty `method` means not filled |
 | `double anchor_freq` | scalar | Anchor frequency of the multi-frequency model in [Hz], default 2e9 |
 | `bool pol_variability` | scalar | Polarization power variability, default false |
 | `std::vector<std::string> conf_files` | `[n_conf]` | Resolved paths of the conf files; empty = not resolved |
-| `unsigned long long layout_hash` | scalar | Hash of all layout members that determine the links |
+| `unsigned long long layout_hash` | scalar | Hash of the layout members that determine the links (see Notes) |
 
 ## Member functions:<br>
 | Function | Description |
@@ -58,8 +60,19 @@ State of the propagation links of one realisation of a layout
 | `.reset()` | Empties all members and restores the defaults |
 | `.is_valid()` | `std::string`: empty if the object is valid, else an error message; checks the sizes, the indices into `conf_names` and the ranges |
 
+## Notes:
+- **Layout hash**: covers the positions, names, sectors, frequencies, site seeds, scenarios, the O2I columns, clutter,
+  scenario overrides, wrap vectors and whether a site moves. The later stages throw when it no longer matches the
+  layout; `layout.links.reset()` discards the links. Orientations, antennas and `pairing` may change without new links
+- **Forced states**: editing `los` or `indoor` before [[generate_rays]] forces that state; the conf and its seed follow
+  from it. `floor_id` and `d2d_in` stay those of the drawn state; the later stages derive the values of the forced state
+  from `indoor`
+- **Restoring**: the links hold the master seed they were drawn with, so a copy of `layout.links` can be restored after
+  another realisation
+
 ## See also:
 - [[layout]] (holds the links as `links`)
+- [[init_link_states]] (draws the links)
 - [[o2i_loss]] (uses `o2i_rnd`)
 MD!*/
 
@@ -1041,13 +1054,13 @@ constexpr size_t qd_par_export = 8;
 
 /*!MD
 # generate_rays
-Rays of propagation links of a layout (stage 2 of the channel pipeline)
+Rays of the propagation links of a layout (stage 2 of the channel pipeline)
 
-- Runs the GBSM chain of the section "Geometry-based stochastic model" for the links with one site, image, conf and seed: [[gbsm_init_phases]] and [[gbsm_draw]] of the random sets, [[path_loss]] (for `rnd_he` and the SF standard deviation), [[lsp_generate]], [[ssf_clusters]], [[ssf_rays]] and, on request, [[ssf_scatterers]]; at the first row of the segment of the terminal and the site (moved by the wrap image) at the same time (a moving site: sampled at the time of the row, without times on the Rx track the row of the same index)
-- TR methods: preset of the links (default `Exp256`), no bias removal, path loss at the geometric distance, `angle_model = "additive"`, `pol_model = "38.901"`, one set of clusters and rays per frequency (`"38.901_MF"`: clusters at the anchor frequency, rays per frequency). `"quadriga"`: bias removal over the positions of all links of the group, the legacy outdoor distance, `"rotation"`, `"quadriga"`, one ray set for all frequencies, always with scatterers
-- A site with more than one row or a speed uses dual mobility; other sites are not affected
-- The conf and seed of a link follow from its scenario and the edited `los` and `indoor` of `layout.links`; a changed conf uses its hashed seed, an edited `gbsm_seed` is used while the conf is unchanged. The floor and the indoor distance follow the indoor state: building UTs on the floor of the Rx side (else from z) at the distance of the stored O2I inputs, others on floor 0 at 0 m; the members `floor_id` and `d2d_in` of the links are those of the drawn state
-- The values of a link do not depend on the other requested links
+- Runs the chain of the section "Geometry-based stochastic model" for the chosen links, from the link states of
+  [[init_link_states]]: large-scale parameters, clusters, rays and, on request, the scatterers
+- The rays have no antennas; [[get_gbsm_channels]] applies them. Edit the rays in between to study a change of the
+  propagation, or pass them to [[attach_terminals]] and [[export_rays_qrt]]
+- The rays of a link do not depend on the other requested links
 
 ## Declaration:
 ```
@@ -1058,12 +1071,32 @@ std::vector<std::vector<gbsm_rays>> quadriga_lib::generate_rays(
 ```
 
 ## Inputs:
-- **`layout`** — Layout with links from [[init_link_states]]; throws if a member that determines the links changed since then, or if the sizes of its members do not match
-- **`i_link`** *(optional)* — Propagation links, 0-based, without repetition; omitted = all (none for links without entries); `[n_out]`
+- **`layout`** — Layout with links from [[init_link_states]]; throws if a member that determines the links changed since
+  then, or if the sizes of its members do not match
+- **`i_link`** *(optional)* — Propagation links, 0-based, without repetition; omitted = all (none for links without
+  entries); `[n_out]`
 - **`scatterers`** *(optional)* — Solve the first- and last-bounce scatterers, needed for the mobility `"drift"`
 
 ## Returns:
-- Rays per link and frequency, `[n_out][n_freq]` with one frequency each for the TR methods, `[n_out][1]` with all frequencies for `"quadriga"`
+- Rays per link and frequency, `[n_out][n_freq]` with one frequency each for the TR methods, `[n_out][1]` with all
+  frequencies for `"quadriga"`
+
+## Notes:
+- **Chain**: [[gbsm_init_phases]] and [[gbsm_draw]] of the random sets, [[path_loss]] (for `rnd_he` and the SF standard
+  deviation), [[lsp_generate]], [[ssf_clusters]], [[ssf_rays]] and, with `scatterers`, [[ssf_scatterers]], once for the
+  links of one site, image, conf and seed
+- **Position**: the first row of the segment of the terminal and the site (moved by its wrap image) at the same time; a
+  moving site is sampled at the time of the row, without times on the Rx track at the row of the same index. A site with
+  more than one row or a speed uses dual mobility; the other sites are not affected
+- **TR methods**: the SOS preset of the links (default `Exp256`), no bias removal, path loss at the geometric distance,
+  `angle_model = "additive"`, `pol_model = "38.901"`, one set of clusters and rays per frequency (`"38.901_MF"`:
+  clusters at the anchor frequency, rays per frequency)
+- **`"quadriga"`**: bias removal over the positions of all links of the group, the legacy outdoor distance,
+  `"rotation"`, `"quadriga"`, one ray set for all frequencies, always with scatterers
+- **Edited link states**: the conf and the seed of a link follow from its scenario and the `los` and `indoor` of
+  `layout.links`; a changed conf uses its hashed seed, an edited `gbsm_seed` is used while the conf is unchanged.
+  Building UTs are on the floor of the Rx nodes (else from z) at the distance of the stored O2I inputs, the others on
+  floor 0 at 0 m
 
 ## See also:
 - [[init_link_states]] (stage 1), [[get_gbsm_channels]] (stage 3)
@@ -1078,13 +1111,13 @@ std::vector<std::vector<quadriga_lib::gbsm_rays>> quadriga_lib::generate_rays(co
 
 /*!MD
 # get_gbsm_channels
-Channel coefficients of the channel links of propagation links of a layout (stage 3 of the channel pipeline)
+Channel coefficients of a layout from given rays (stage 3 of the channel pipeline)
 
-- One channel per Tx node, Rx node and frequency whose propagation link is in `i_link` and whose pair is in `layout.pairing` (empty: all); order: Tx node fastest, then Rx node, then frequency; name `<tx>:<sector>_<rx>:<sector>`, without the sector where all sectors of the side are 0
-- Snapshots of both ends from [[sample_track]] over `times`; a node with one snapshot is repeated to the count of the other; two tracks without `times` need equal row counts
-- Link gain per snapshot (see the GBSM terms): [[gbsm_draw]] of the `"lsf"` set at the snapshot, [[path_loss]] with the random environment height `rnd_he` held at the start of the segment, [[lsp_generate]] (SF and the K-factor ratio), [[o2i_loss]] for building and car UTs with the model of the link state, the deviation of a building UT at the snapshot, that of a car UT at the first row of the terminal for its whole track (TR 38.901 eq. 7.4-4: one value per UT); evaluated once for a link whose ends do not move
-- [[gbsm_single_link_channel]] with the node antennas at the frequency (inner entry `i_freq` of `layout.antenna`, or entry 0 for all bands), the generic antenna with two co-located isotropic elements of vertical and horizontal polarization for nodes without one and for antennas that are not evaluated (an antenna spaced in wavelengths that is not evaluated throws), and the Tx positions moved by the wrap image of the link; rays with `n_freq` entries are used as entry `i_freq` (TR methods), rays with one entry at frequency `i_freq` (`"quadriga"`)
-- Tracks with several segments: the snapshots of a segment are those whose row (see [[sample_track]]) is in it; each segment also covers the snapshots of the preceding one, with its link gain, rays and K-factor ratio referred to its first row; [[crossfade_segments]] joins them. Relative delays: in `"phase"` the paths of each segment relative to its own LOS, in `"drift"` relative to the LOS at the snapshot. The selected segments of a channel link must be consecutive (segments without snapshots are skipped), with increasing `times`
+- Applies the antennas of the nodes, the motion along their tracks and the link gain to the rays of [[generate_rays]],
+  and returns one channel per Tx node, Rx node and frequency
+- Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
+  the sectors of a site share the rays of their propagation link
+- Tracks with several segments are joined by [[crossfade_segments]]
 
 ## Declaration:
 ```
@@ -1102,21 +1135,50 @@ std::vector<channel<double>> quadriga_lib::get_gbsm_channels(
 ```
 
 ## Inputs:
-- **`layout`** — Layout with links from [[init_link_states]]; throws if a member that determines the links changed since then
-- **`rays`** — Rays of the links from [[generate_rays]], possibly edited, with the frequencies of the layout; `[n_out][1 or n_freq]`
+- **`layout`** — Layout with links from [[init_link_states]]; throws if a member that determines the links changed since
+  then
+- **`rays`** — Rays of the links from [[generate_rays]], possibly edited, with the frequencies of the layout;
+  `[n_out][1 or n_freq]`
 - **`i_link`** *(optional)* — The propagation links of `rays`, 0-based; omitted = all links; `[n_out]`
-- **`times`** *(optional)* — Snapshot times in [s], finite, the same for all nodes; omitted = one snapshot per row; `[n_snap]`
+- **`times`** *(optional)* — Snapshot times in [s], finite, the same for all nodes; omitted = one snapshot per row;
+  `[n_snap]`
 - **`output`** *(optional)* — `"taps"` or `"rays"`, see [[gbsm_single_link_channel]]
-- **`mobility`** *(optional)* — `"phase"`, `"drift"` (needs rays with scatterers) or `"auto"` (phase for the TR methods, drift for `"quadriga"`)
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` (needs rays with scatterers) or `"auto"` (phase for the TR methods,
+  drift for `"quadriga"`)
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
-- **`overlap`** *(optional)* — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1], see [[crossfade_segments]]
+- **`overlap`** *(optional)* — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1],
+  see [[crossfade_segments]]
 
 ## Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
 
 ## Returns:
 - Channels, see [[gbsm_single_link_channel]]; `[n_channel]`
+
+## Notes:
+- **Order and names**: Tx node fastest, then Rx node, then frequency; name `<tx>:<sector>_<rx>:<sector>`, without the
+  sector where all Tx nodes (or all Rx nodes) have sector 0
+- **Snapshots** of both ends from [[sample_track]] over `times`; a node with one snapshot is repeated to the count of
+  the other; two tracks without `times` need equal row counts
+- **Link gain** per snapshot, $G = -\mathrm{PL} - L_\mathrm{O2I} + 10 \log_{10} \mathrm{SF}$ in dB: the path loss PL of
+  [[path_loss]] with the random environment height `rnd_he` held at the start of the segment, the shadow fading SF and
+  the K-factor ratio of [[lsp_generate]] from [[gbsm_draw]] of the `"lsf"` set at the snapshot, and the O2I loss of
+  [[o2i_loss]] for building and car UTs with the model of the link state (the deviation of a building UT at the
+  snapshot, that of a car UT at the first row of the terminal for its whole track, TR 38.901 eq. 7.4-4). A link whose
+  ends do not move is evaluated once
+- **Antennas**: [[gbsm_single_link_channel]] with the antenna of each node at the frequency (its band `i_freq` in
+  `layout.antenna`, or its only entry for all bands) and the Tx positions moved by the wrap image of the link. Nodes
+  without an antenna and antennas that are not evaluated use the generic antenna; an antenna spaced in wavelengths that
+  is not evaluated throws
+- **Frequencies**: rays with `n_freq` entries are used as entry `i_freq` (TR methods), rays with one entry at frequency
+  `i_freq` (`"quadriga"`)
+- **Segments**: the snapshots of a segment are those whose row (see [[sample_track]]) is in it; each segment also covers
+  the snapshots of the preceding one, with its link gain, rays and K-factor ratio referred to its first row. The
+  selected segments of a channel link must be consecutive (segments without snapshots are skipped), with increasing
+  `times`
+- **Relative delays**: in `"phase"` the paths of each segment relative to its own LOS, in `"drift"` relative to the LOS
+  at the snapshot
 
 ## See also:
 - [[generate_rays]] (stage 2)
@@ -1141,9 +1203,11 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_gbsm_channels(const
 # get_channels_layout
 Channel coefficients of a layout in one call
 
-- Runs [[init_link_states]] (if `layout.links` was not filled), [[generate_rays]] and [[get_gbsm_channels]] in batches of at most 256 propagation links (the segments of a track in one batch), so that the rays of a batch bound the memory; the results are those of the manual path with the default settings and do not depend on the batches
-- Without links (`layout.links.method` empty, e.g. after `reset()`), the link states are drawn for this call only and the layout is unchanged; with filled links, these are used, also when edited, and `seed` and `config_dirs` are not used. No linked pair gives an empty result
-- The mobility `"drift"` (also `"auto"` with `"quadriga"`) solves the scatterers
+- Computes one channel per Tx node, Rx node and frequency, for the pairs in `layout.pairing` (empty: all pairs)
+- Runs the stages [[init_link_states]], [[generate_rays]] and [[get_gbsm_channels]] with their default settings; the
+  results are those of the stages called one by one
+- Without link states in `layout.links`, draws them for this call only and leaves the layout unchanged; with link
+  states, uses them, also when they were edited
 
 ## Declaration:
 ```
@@ -1160,10 +1224,12 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
 ```
 
 ## Inputs:
-- **`layout`** — Layout with `center_freq`; antennas as evaluated in `layout.antenna`, nodes without one use the generic antenna (see [[get_gbsm_channels]])
+- **`layout`** — Layout with `center_freq`; antennas as evaluated in `layout.antenna`, nodes without one use the generic
+  antenna (see [[get_gbsm_channels]])
 - **`times`** *(optional)* — Snapshot times in [s]; omitted = one snapshot per row; `[n_snap]`
 - **`output`** *(optional)* — `"taps"` or `"rays"`
-- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` or `"quadriga"`; omitted = the method of filled links, else `"38.901"`; another method than that of filled links throws
+- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` or `"quadriga"`; omitted = the method of filled links, else
+  `"38.901"`; another method than that of filled links throws
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"`
 - **`overlap`** *(optional)* — Overlap of consecutive segments, in [0, 1]
 - **`seed`** *(optional)* — Master seed for empty links, as in [[init_link_states]]; with filled links only -1
@@ -1181,6 +1247,13 @@ quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1);
 L.center_freq = {3.5e9};
 auto channels = quadriga_lib::get_channels_layout(L);
 ```
+
+## Notes:
+- **Memory**: the links are processed in batches of at most 256 propagation links (the segments of a track in one
+  batch), so that the rays of one batch bound the memory; the results do not depend on the batches
+- **Link states**: `layout.links` holds none when `layout.links.method` is empty, e.g. after `layout.links.reset()`.
+  With link states, `seed` and `config_dirs` are not used. A layout without linked pairs gives an empty result
+- **Scatterers**: the mobility `"drift"` (also `"auto"` with `"quadriga"`) solves the scatterers
 
 ## See also:
 - [[init_link_states]], [[generate_rays]], [[get_gbsm_channels]] (the three stages)
@@ -1273,12 +1346,10 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(con
 # attach_terminals
 Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
 
-- Evaluates all Tx nodes for each terminal at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
-- `"large_scale"` (TR 38.901 Table 7.8-1): the link gain `−PL − O2I + 10 lg(SF)` plus the gain of one unit-gain LOS path from [[get_channels_planar]] (port weights, element positions, orientations); no rays
-- `"rsrp"` (TR 36.873 eq. (8.1-1)): per Rx port the sum of `|h|²` over the rays of [[gbsm_single_link_channel]] (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
-- Both rules take `|h|²` of Tx port `tx_port` and average it over the Rx ports, so a dual-polarized UT (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT antenna of the TR
-- A terminal takes the highest value of its nodes; the serving node has the highest value, a tie the lowest index. A Tx node without a propagation link (co-located) has −Inf; a terminal without any link gets node 0
-- `layout.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, n_rx_terminal − 1))` links the sectors of the serving sites
+- Evaluates every Tx node for each terminal and returns the one with the highest coupling gain (`"large_scale"`) or the
+  highest RSRP (`"rsrp"`), with its site and the gains of all nodes
+- Use it to link each terminal to its serving site in `layout.pairing` (see Example), so that the channel functions
+  compute only the serving links
 
 ## Declaration:
 ```
@@ -1305,6 +1376,31 @@ arma::uvec quadriga_lib::attach_terminals(
 
 ## Returns:
 - Serving Tx node per terminal, 0-based; `[n_rx_terminal]`
+
+## Example:
+```
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1);
+L.center_freq = {3.5e9};
+quadriga_lib::init_link_states(L);
+arma::uvec site;
+quadriga_lib::attach_terminals(L, "large_scale", {}, &site);
+L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, site.n_elem - 1));
+```
+
+## Notes:
+- **Evaluation**: at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first
+  segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
+- **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [[get_gbsm_channels]] plus the gain of one unit-gain LOS
+  path through both antennas (port weights, element positions, orientations), as [[get_channels_planar]] gives it; no
+  rays
+- **`"rsrp"`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of $\lvert h \rvert^2$ over the rays of
+  [[gbsm_single_link_channel]] (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
+- **Ports**: both rules take $\lvert h \rvert^2$ of Tx port `tx_port` and average it over the Rx ports, so a
+  dual-polarized UT (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT
+  antenna of the TR
+- **Choice**: a terminal takes the highest value of its nodes; ties go to the lowest index. A Tx node without a
+  propagation link (co-located) has -Inf; a terminal without any link gets node 0
+- **Pairing**: `layout.pairing` holds pairs of site and terminal, so the Example links all sectors of the serving site
 
 ## See also:
 - [[init_link_states]], [[generate_rays]] (link states and rays)
@@ -1442,16 +1538,14 @@ arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::strin
 
 /*!MD
 # export_rays_qrt
-Writes the rays of a layout with their link gain to a QRT file
+Write the rays of a layout with their link gain to a QRT file
 
-- Separates the ray generation from the antennas: [[qrt_file_read]], [[gbsm_rays_from_paths]] (with the method of the links and the `n_interact` of the file as `path_type`) and [[gbsm_single_link_channel]] (link gain 0, mobility `"drift"`) turn a CIR into channels for any arrays, orientations and positions
-- One origin per site at its position, with the orientation of sector 0 (else of the first node of the site) and the site name; one destination per terminal with its name and one CIR per row (the nodes of a terminal share their positions; the CIR has the orientation of the first node)
-- Per CIR: the rays of the link and of the segment that holds the row (scatterers added where missing), the link gain and the K-factor ratio of [[get_gbsm_channels]] at the row, [[ssf_paths]] with `"drift"`, [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_gbsm_channels]] (`output = "rays"`, `mobility = "drift"`) at the row within float32 accuracy
-- A point drop with speed has one CIR; its motion is applied at the evaluation, at the link gain of the drop
-- Only the pairs of `layout.pairing` (empty: all) are written; the other CIRs of an origin hold no paths
-- Positions in the file are local: the returned shift, the centroid of the site and CIR positions in x and y, is subtracted (z unchanged); add it to the positions read back
-- The QRT format stores no tap index and no ground permittivity: a CIR gives rays, not the taps of the TR, and moving a ground-reflection ray from a file throws
-- The file is written to `fn + ".part"` and renamed at the end; a failed call leaves an existing file unchanged
+- Stores the rays of the linked pairs with their link gain as CIRs: one origin per site, one destination per terminal
+  and one CIR per row of the terminal
+- Separates the ray generation from the antennas: [[qrt_file_read]], [[gbsm_rays_from_paths]] and
+  [[gbsm_single_link_channel]] turn a CIR into channels for any arrays, orientations and positions, without the GBSM
+  chain
+- Positions in the file are local; add the returned shift to the positions read back
 
 ## Declaration:
 ```
@@ -1463,11 +1557,31 @@ arma::vec quadriga_lib::export_rays_qrt(
 
 ## Inputs:
 - **`fn`** — QRT file, replaced if it exists
-- **`layout`** — Layout with links from [[init_link_states]]: one frequency for the TR methods (`"quadriga"`: 1 to 127), Tx nodes with one row and no speed, no wrap-around, each terminal paired with a site and no row of a terminal at a site position
-- **`rays`** *(optional)* — Rays of all links from [[generate_rays]], possibly edited, one object with all frequencies per link; omitted = generated for batches of sites with up to 256 links, which bounds the memory; `[n_link][1]`
+- **`layout`** — Layout with links from [[init_link_states]]: one frequency for the TR methods (`"quadriga"`: 1 to 127),
+  Tx nodes with one row and no speed, no wrap-around, each terminal paired with a site and no row of a terminal at a
+  site position
+- **`rays`** *(optional)* — Rays of all links from [[generate_rays]], possibly edited, one object with all frequencies
+  per link; omitted = generated for batches of sites with up to 256 links, which bounds the memory; `[n_link][1]`
 
 ## Returns:
 - Shift of the local coordinates in x and y in [m]; `[2]`
+
+## Notes:
+- **Origins and destinations**: an origin at each site, with the orientation of sector 0 (else of the first node of the
+  site) and the site name; a destination per terminal with its name and one CIR per row, with the orientation of the
+  first node of the terminal (its nodes share their positions)
+- **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
+  link gain and the K-factor ratio of [[get_gbsm_channels]] at the row, [[ssf_paths]] with `"drift"`,
+  [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_gbsm_channels]] (`output = "rays"`,
+  `mobility = "drift"`) at the row within float32 accuracy
+- **Reading back**: [[gbsm_rays_from_paths]] with the method of the links and the `n_interact` of the file as
+  `path_type`, then [[gbsm_single_link_channel]] with link gain 0 and mobility `"drift"`
+- **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop
+- **Pairs**: only the pairs of `layout.pairing` (empty: all) are written; the other CIRs of an origin hold no paths
+- **Shift**: the centroid of the site and CIR positions in x and y is subtracted; z is unchanged
+- **Limits of the format**: no tap index and no ground permittivity, so a CIR gives rays, not the taps of the TR, and
+  moving a ground-reflection ray from a file throws
+- The file is written to `fn + ".part"` and renamed at the end; a failed call leaves an existing file unchanged
 
 ## See also:
 - [[generate_rays]], [[get_gbsm_channels]] (the rays and the link gain)

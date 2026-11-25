@@ -26,76 +26,119 @@ Network layouts and mobility
 SECTION!*/
 
 /*!SECTION_DESC
-A **layout** describes the nodes of a radio network and how they move: where each transmitter (Tx) and receiver (Rx) is, which scenario applies there and which antenna it has. It is stored in two flat tables, one per side, and in two CSV files with the same format.
+A **layout** describes a radio network for channel simulation: the transmitters (Tx) and receivers (Rx), where they are
+and how they move, which antenna each one has and which scenario applies. The functions of this section create layouts,
+store them in files, move the nodes along tracks and compute the channels of all Tx-Rx pairs.
 
-**Terms.** A *node* is one (`name`, `sector`) pair on one side. It has one antenna and one *track*: its *rows*, each a position with orientation and further values that apply from that row on. A node with one row is a *point drop*; it stays at its position, or, with a speed, moves along its direction. A node with several rows is a track and moves along its positions. A *site* is all Tx nodes with one name; its sectors share position and scenario. A *terminal* is all Rx nodes with one name, e.g. the panels of one device. Angles are in degrees in the CSV files and in radians in the classes. The orientation (bank, tilt, heading) is that of the antenna, a positive tilt points down; the optional direction (azimuth, elevation of travel) is that of the movement, and an unset direction follows the orientation.
+**What a layout holds** ([[layout]]):
 
-**CSV files.** [[layout_csv_read]] and [[layout_csv_write]] read and write the files. The first line is the header; the columns are optional, in any order, except `name`, `x`, `y`, `z`. Cells follow the syntax of the other CSV files of the library: quoting with `"`, lines starting with `#` are comments, numbers are decimal (NaN and Inf in any case). Empty cells follow the class of the column:
+- The **Tx nodes** in `layout.tx` (base stations, access points) and the **Rx nodes** in `layout.rx` (user terminals,
+  stations), each a [[layout_nodes]] table. A node has a name, a sector number, an antenna and one or more rows:
+  positions with orientation, scenario and indoor state
+- The **antennas** of the nodes and the simulation frequencies `layout.center_freq`
+- The **link states** `layout.links` of one realisation: LOS and indoor state, scenario and seeds of each Tx-Rx pair
+  ([[layout_links]])
 
-| Class | Columns | An empty cell is |
-| ----- | ------- | ---------------- |
-| Identity | `name`, `sector` | `name` is required; an empty `sector` is 0 |
-| Per row | `x`, `y`, `z`, `time` | an error; except for the one row of an extra sector of a static site, which takes the position of sector 0; `time` is given on all rows of a node or on none |
-| Held | `bank`, `tilt`, `heading`, `direction_az`, `direction_el`, `speed`, `scenario`, `indoor`, `floor`, `d2d_in` | the value of the previous row of the node; on the first row the value of sector 0 for an extra sector, else the default; NaN is a value |
-| Fixed | all others | the value of the first row, for an extra sector that of sector 0; later rows are empty or repeat it, and a different value is an error |
+**Typical workflow:**
 
-| Column | Unit | Meaning |
-| ------ | ---- | ------- |
-| `bank`, `tilt`, `heading` | degree | Antenna orientation, default 0 |
-| `direction_az`, `direction_el` | degree | Direction of travel; empty or NaN azimuth follows the orientation; only for point drops |
-| `speed` | m/s | Speed from this row on, default 0 |
-| `time` | s | Time of the row, strictly increasing; a node has `time` or a speed |
-| `scenario` | | Scenario family or conf file name, never a path |
-| `indoor`, `floor`, `d2d_in` | | Indoor state (-1 or empty: draw, 0 outdoor, 1 building, 2 car, 3 residential building), floor from 1 (-1: from z), indoor 2D distance in m (NaN: draw); they change only where `scenario` or `indoor` changes |
-| `d_clutter`, `r_clutter`, `h_clutter`, `scenpar.<key>` | | Tx side: clutter inputs and overrides of scenario parameters, equal for all sectors of a site |
-| `seed`, `layout_seed`, `wrap` | | Tx side: seed of the site, seed of the layout, lattice vectors in m (`"ax,ay;bx,by"`) |
-| `cell` | | Tx side: 0 = the site has no drop cells of its own (see [[drop_terminals]]), default 1; equal for all sectors of a site |
-| `pairing` | | Rx side: names of the Tx sites linked to the terminal, empty: all |
-| `relative` | | 1: the orientation is relative to the direction of motion |
-| `center_freq`, `antenna`, `qdant_file`, `qdant_id` and the inputs of [[generate_antenna]] | | Antenna columns, see below |
+1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
+   [[layout_csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes
+2. Set the frequencies `layout.center_freq` and the antennas ([[set_antenna]], [[set_antenna_qdant]])
+3. Optionally, move the nodes: [[generate_track]] creates tracks, [[set_orientation]] turns the antennas along the
+   motion, [[sample_track]] gives the positions at given times
+4. Compute the channels with [[get_channels_layout]]
+5. Store the layout with [[layout_csv_write]]
 
-**Antennas.** The antenna columns of a node (type `antenna` as in [[generate_antenna]], or `qdant` with the file `qdant_file` relative to the CSV file and its 1-based entry `qdant_id`) are kept as one text line per antenna in `antenna_args`, with the names of the columns in `antenna_cols`. Nodes with equal lines share one entry of the lists, Tx nodes first, and `i_antenna` is the 1-based index of it, 0 for the generic antenna with two co-located isotropic elements of vertical and horizontal polarization. A column that the type does not use is an error. An extra sector without antenna cells has the antenna of sector 0; the type `none` (no other antenna cells) gives a node no antenna, e.g. an extra sector next to a sector 0 with one. The member function `eval_antennas` of [[layout]] generates the arrays `antenna` from the lines: a line without `center_freq` once per simulation frequency, so that an array spaced in wavelengths keeps its spacing in each band (co-located elements give one array for all bands), a line of a band at its frequency, a `qdant` line by reading its entry as stored. [[set_antenna]] sets the antenna of nodes from the arguments of [[generate_antenna]] or from an evaluated array, which [[layout_csv_write]] writes to a QDANT file next to the CSV file; [[set_antenna_qdant]] sets an entry of a QDANT file, which the writer refers to.
+For more control, step 4 runs in three stages: [[init_link_states]] draws the link states, [[generate_rays]] the rays of
+the geometry-based stochastic model (GBSM), and [[get_gbsm_channels]] applies the antennas, the motion and the link
+gain. Between the stages, link states and rays can be inspected or edited, [[attach_terminals]] selects the serving cell
+of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
-**Bands.** A row with `center_freq` and no position adds a frequency, and optionally an antenna for it, to its node. The frequencies of the Tx side (else of the Rx side) are the simulation frequencies `center_freq` of the layout. A node without bands has all of them with one antenna description; a node with bands defines all of them. An empty antenna in a band repeats the antenna of the first band.
+**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]] or from an
+array, [[set_antenna_qdant]] from an entry of a QDANT file; in the CSV files, antenna columns describe it. A node has
+one antenna for all bands or one per band. A node without an antenna uses the generic antenna: two co-located isotropic
+elements with vertical and horizontal polarization.
 
-**Unknown columns** are kept as text in `extra_names` and `extra` and written back unchanged.
+**Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 
-**Channels from a layout.** The channel coefficients are computed in three stages. [[init_link_states]] draws the discrete state of each *propagation link*, one site and one terminal: its wrap image, scenario and conf file, LOS and indoor state and seeds, stored in `layout.links`. [[generate_rays]] runs the chain of the section "Geometry-based stochastic model" for chosen links and returns their rays. [[get_gbsm_channels]] applies the antennas, the motion along the tracks and the link gain, for each *channel link*, one Tx node and one Rx node; the sectors of a site share the rays of their propagation link. [[get_channels_layout]] runs all three stages. [[attach_terminals]] chooses the serving Tx node and site of each terminal by the large-scale gain or by RSRP, for `layout.pairing`. [[export_rays_qrt]] writes the rays with their link gain to a QRT file, which gives channels for other antennas and positions without the GBSM chain. All random values are addressed: they follow from the seeds, a stream key and the position, so that the evaluation order, the batches and the thread count do not change them, and only the discrete states are stored. `layout.links` holds a hash of the layout members that determine the links (positions, names, sectors, frequencies, site seeds, scenarios, the O2I columns, clutter, scenario overrides, wrap vectors and whether a site moves); stages 2 and 3 throw when it no longer matches, and `layout.links.reset()` discards the links. The links hold the master seed they were drawn with, so a copy of `layout.links` can be restored after another realisation. Editing `los` or `indoor` of the links between stage 1 and stage 2 forces a state; orientations, antennas and `pairing` may change without new links.
+- **Tx nodes**, **Rx nodes**: the two node tables of a layout, `layout.tx` and `layout.rx`. A function that works on one
+  of them takes the table itself or `rx_side` (`false`: Tx nodes, `true`: Rx nodes)
+- **Node**: one transmitter or receiver, identified by its `name` and `sector`, with one antenna and one track
+- **Site**: all Tx nodes of one name, e.g. the three sectors of a base station; they share position and scenario
+- **Terminal**: all Rx nodes of one name, e.g. the antenna panels of one device; they share their positions
+- **Row**: one position and orientation of a node, with the values that apply from there on (speed, scenario, indoor
+  state)
+- **Point drop**: a node with one row; it stays where it is or, with a speed, moves along its direction
+- **Track**: a node with several rows; it moves along its positions
+- **Snapshot**: one sample of the channel in time; without snapshot times, each row is one snapshot
+- **Segment**: a part of a track with one scenario and indoor state; a new segment starts where one of them changes
+- **Propagation link**: one site, one terminal and one segment, with its own LOS and indoor state, large-scale
+  parameters and rays
+- **Channel link**: one Tx node and one Rx node; it applies their antennas to the rays of its propagation link, which
+  the sectors of a site share
+- **Band**: one of the simulation frequencies `layout.center_freq`
+- **Scenario**: a family (e.g. `UMa`), which draws the LOS and indoor state of each link, or a conf name (e.g.
+  `UMa_NLOS`), which fixes them
+- **Wrap-around**: copies of the sites, displaced by the lattice vectors `layout.wrap`, so that a cluster of cells tiles
+  the plane; each link uses the copy (*image*) nearest to the terminal
+- **Orientation**: bank, tilt and heading of the antenna; a positive tilt points down. **Direction**: azimuth and
+  elevation of the motion of a point drop
 
-**Indices.** All indices are 0-based: the members `offset`, `pairing` and, in `links`, `i_tx`, `i_rx`, `i_segment`, `i_conf` and `o2i_model`, the index arguments of the functions and the functions that return indices. `i_antenna` is the index into the antenna lists with 0 = generic antenna; `sector`, `image`, `floor_id`, `indoor`, `floor` and the seeds are values. The MATLAB / Octave API counts the indices from 1.
+**Conventions.** Angles are in radians in the classes and in degrees in the CSV files. Indices are 0-based, except
+`i_antenna`, the antenna of a node, where 0 is the generic antenna and 1 the first antenna of the layout. Random values
+follow from the seeds and the positions, not from the order of evaluation, the batches or the number of threads. The
+file format is described in [Layout CSV files](formats.html#layout_csv).
 SECTION_DESC!*/
 
 /*!MD
 # layout
 Class for a network layout: Tx and Rx nodes, antennas, frequencies and link states
 
-- `tx` and `rx` are the two sides, each a [[layout_nodes]] object; the nodes of a side may share positions (sectors, panels)
-- The antenna lists `antenna_cols`, `antenna_args` and `antenna` are shared by both sides; `i_antenna` of a node indexes them, starting at 1
-- Written and read by [[layout_csv_read]] and [[layout_csv_write]]; the model and the file format are described at the top of this section
+- Holds the Tx nodes `tx` and the Rx nodes `rx` (each a [[layout_nodes]] table), the antennas they use, the simulation
+  frequencies and the link states of one realisation
+- Created by [[generate_layout]] or [[layout_csv_read]], stored by [[layout_csv_write]]; the section introduction
+  describes the model
 
 ## Attributes:<br>
 | Attribute | Size | Description |
 | --------- | ---- | ----------- |
 | `std::string name` | string | Name of the layout; not stored in the CSV files |
-| `layout_nodes tx`, `layout_nodes rx` | | Tx (BS or AP) and Rx (UT or STA) nodes |
-| `layout_links links` | | State of the propagation links of the current realisation, see [[layout_links]] |
+| `layout_nodes tx`, `layout_nodes rx` | | Tx nodes (BS, AP) and Rx nodes (UT, STA) |
+| `layout_links links` | | Link states of the current realisation, see [[layout_links]] |
 | `arma::sword seed` | scalar | Seed of the layout, -1 = not set |
-| `arma::vec center_freq` | `[n_freq]` | Simulation frequencies in [Hz], strictly ascending |
-| `std::vector<std::string> antenna_cols` | `[n_col]` | Names of the antenna columns of the CSV files |
-| `std::vector<std::vector<std::string>> antenna_args` | `[n_antenna][0, 1 or n_freq]` | CSV lines of the antenna columns: one line for all bands or one per band; no line or an empty line = an evaluated array without description; a line without antenna type = a band that is not set yet |
-| `std::vector<std::vector<arrayant<double>>> antenna` | `[n_antenna][0, 1 or n_freq]` | Evaluated arrays, one for all bands or one per band; an entry without arrays or an array without elements is not evaluated, its nodes use the generic antenna; empty = not evaluated |
-| `arma::mat wrap` | `[2, 1]` or `[2, 2]` | Lattice vectors in [m], one per column; two vectors form a reduced basis, 0 <= a1·a2 <= min(a1·a1, a2·a2) / 2, so that ±a1, ±a2 and ±(a1 − a2) are the nearest images; empty = none |
-| `arma::umat pairing` | `[2, n_pair]` | Tx site index and Rx terminal index of the linked pairs, 0-based; empty = all pairs |
+| `arma::vec center_freq` | `[n_freq]` | Simulation frequencies (bands) in [Hz], strictly ascending |
+| `std::vector<std::string> antenna_cols` | `[n_col]` | Names of the antenna columns of the lines in `antenna_args` |
+| `std::vector<std::vector<std::string>> antenna_args` | `[n_antenna][0, 1 or n_freq]` | Antenna descriptions, one line for all bands or one per band (see Notes) |
+| `std::vector<std::vector<arrayant<double>>> antenna` | `[n_antenna][0, 1 or n_freq]` | Evaluated arrays, one for all bands or one per band; empty = not evaluated |
+| `arma::mat wrap` | `[2, 1]` or `[2, 2]` | Lattice vectors of the wrap-around in [m], one per column (see Notes); empty = none |
+| `arma::umat pairing` | `[2, n_pair]` | Site index and terminal index of the linked pairs, 0-based; empty = all pairs |
 
 ## Member functions:<br>
 | Function | Description |
 | -------- | ----------- |
-| `.n_antenna()` | Number of antennas: length of `antenna_args`, or of `antenna` if there are no arguments |
-| `.eval_antennas(center_freq)` | Generates the arrays of `antenna` that are not evaluated yet from `antenna_args`; a frequency list in [Hz] (optional) replaces `center_freq` and regenerates all lines; throws for a band without description and for an array spaced in wavelengths without a frequency |
-| `.is_valid()` | `std::string`: empty if the object is valid, else an error message; checks all members of both sides and `links`, the sizes and ranges, equal positions, motion (`speed`, `time`, `direction`) and shared values of the nodes of one site or terminal, the antenna lists (a node with a band that is not set is reported), the frequencies, `wrap` and `pairing` |
+| `.n_antenna()` | Number of antennas: length of `antenna_args`, or of `antenna` if there are no descriptions |
+| `.eval_antennas(center_freq)` | Generates the arrays of `antenna` that are not evaluated yet (see Notes); a frequency list in [Hz] (optional) replaces `center_freq` and regenerates all |
+| `.is_valid()` | `std::string`: empty if the object is valid, else an error message (see Notes) |
+
+## Notes:
+- **Antenna descriptions**: a line of `antenna_args` holds the cells of the antenna columns `antenna_cols` as in the
+  [Layout CSV files](formats.html#layout-csv-antennas). Nodes with equal lines share one antenna; `i_antenna` of a node
+  is its 1-based index, 0 the generic antenna. No line or an empty line is an array without description (array form of
+  [[set_antenna]]); a line without antenna type is a band that is not set yet
+- **Evaluation** (`eval_antennas`): a line for all bands is generated once per band at its frequency, so that an array
+  spaced in wavelengths keeps its spacing (an array of co-located elements is stored once for all bands); a line of a
+  band at the frequency of that band; a `qdant` line is read as stored. Until an antenna is evaluated (its entry of
+  `antenna` holds no arrays, or an array without elements), its nodes use the generic antenna. Throws for a band without
+  description and for an array spaced in wavelengths in a layout without frequencies
+- **Wrap vectors**: two vectors form a reduced basis,
+  $0 \le a_1 \cdot a_2 \le \min(\lvert a_1 \rvert^2, \lvert a_2 \rvert^2) / 2$, so that $\pm a_1$, $\pm a_2$ and
+  $\pm(a_1 - a_2)$ are the nearest images
+- **Validity** (`is_valid()`): checks both node tables and `links`, the values that the nodes of one site or terminal
+  share ([Layout CSV files](formats.html#layout-csv-rows)), the antenna lists (a node with a band that is not set is
+  reported), the frequencies, `wrap` and `pairing`
 
 ## See also:
-- [[layout_nodes]] (one side of a layout)
+- [[layout_nodes]] (the Tx nodes and the Rx nodes)
 - [[layout_links]] (link states)
 - [[layout_csv_read]], [[layout_csv_write]] (load and store a layout)
 - [[set_antenna]], [[set_antenna_qdant]] (set the antennas of nodes)
@@ -103,32 +146,36 @@ MD!*/
 
 /*!MD
 # layout_nodes
-One side of a layout: nodes with their rows, in flat arrays
+The Tx nodes or the Rx nodes of a layout, as a table of flat arrays
 
-- The nodes are in order of first appearance; the rows of node `i` are `offset(i)` to `offset(i+1)-1` (the last node to the end), so each node has at least one row
-- Optional members may be empty with the meaning given below; `is_valid()` accepts both forms
+- `layout.tx` holds the Tx nodes, `layout.rx` the Rx nodes. Per-node members have one entry per node, per-row members
+  one per row; the members are the columns of the [Layout CSV files](formats.html#layout-csv-columns), with angles in
+  rad
+- The rows of node `i` are `offset(i)` to `offset(i+1) - 1` (the last node to the end), so each node has at least one
+  row
+- Optional members may be empty, with the meaning given below
 
 ## Attributes:<br>
 | Attribute | Size | Description |
 | --------- | ---- | ----------- |
 | `std::vector<std::string> name` | `[n_node]` | Site or terminal name, 1 to 255 bytes, without comma, semicolon, quote and line break, and without leading or trailing blank |
-| `arma::u32_vec sector` | `[n_node]` | Sector index; (name, sector) is unique |
-| `arma::u32_vec i_antenna` | `[n_node]` | 1-based index into the antenna lists of the layout, 0 = generic antenna |
+| `arma::u32_vec sector` | `[n_node]` | Sector number; (`name`, `sector`) is unique |
+| `arma::u32_vec i_antenna` | `[n_node]` | Antenna: 1-based index into the antenna lists of the layout, 0 = generic antenna |
 | `arma::uvec offset` | `[n_node]` | First row of each node, 0-based |
 | `arma::mat pos` | `[3, n_row]` | Positions in [m] |
 | `arma::mat orientation` | `[3, n_row]` | Bank, tilt, heading in [rad] |
-| `arma::mat direction` | `[2, n_row]` | Azimuth, elevation of travel in [rad]; NaN azimuth = follow the orientation; empty = all NaN; NaN on all rows of a track |
-| `arma::vec speed` | `[n_row]` | Speed in [m/s], applies from this row on; empty = 0 |
-| `arma::vec time` | `[n_row]` | Time in [s]; NaN on all rows of a node = not given; empty = none; a node has `time` or a speed |
+| `arma::mat direction` | `[2, n_row]` | Azimuth, elevation of travel in [rad]; NaN azimuth = along the orientation; NaN on all rows of a track; empty = all NaN |
+| `arma::vec speed` | `[n_row]` | Speed in [m/s] from this row on; empty = 0 |
+| `arma::vec time` | `[n_row]` | Time in [s]; NaN on all rows of a node = not given; empty = none |
 | `std::vector<std::string> scenario` | `[n_row]` | Scenario family or conf name, "" = none; empty = none |
 | `arma::s32_vec indoor` | `[n_row]` | -1 = draw, 0 outdoor, 1 building, 2 car, 3 residential building; empty = all -1 |
-| `arma::s32_vec floor` | `[n_row]` | Floor number from 1, -1 = derive from z; empty = all -1 |
+| `arma::s32_vec floor` | `[n_row]` | Floor number from 1, -1 = from z; empty = all -1 |
 | `arma::vec d2d_in` | `[n_row]` | Indoor 2D distance in [m], NaN = draw; empty = all NaN |
 | `arma::mat clutter` | `[3, n_node]` | `d_clutter`, `r_clutter` and `h_clutter`, NaN = model default; empty = all NaN |
 | `std::unordered_map<std::string, arma::vec> scenpar_override` | each `[n_node]` | Overrides of scenario parameters by key, NaN = none |
 | `arma::s64_vec seed` | `[n_node]` | Seed of the site, -1 = derived from the seed of the layout; empty = all -1 |
 | `arma::u32_vec relative` | `[n_node]` | 1 = orientation relative to the direction of motion; empty = all 0 |
-| `arma::u32_vec cell` | `[n_node]` | Tx side: 1 = the site has drop cells, 0 = none of its own ([[drop_terminals]]); equal for all sectors of a site; empty = all 1 |
+| `arma::u32_vec cell` | `[n_node]` | Tx nodes only: 0 = the site has no drop cells of its own ([[drop_terminals]]); empty = all 1 |
 | `std::vector<std::string> extra_names` | `[n_extra]` | Names of unknown CSV columns |
 | `std::vector<std::vector<std::string>> extra` | `[n_extra][n_row]` | Their cells as text |
 
@@ -138,10 +185,10 @@ One side of a layout: nodes with their rows, in flat arrays
 | `.n_node()` | Number of nodes |
 | `.n_row()` | Number of rows of all nodes |
 | `.n_row(i_node)` | Number of rows of one node (0-based, throws `std::invalid_argument` for an index outside the nodes) |
-| `.is_valid()` | `std::string`: empty if the object is valid, else an error message; checks sizes, `offset`, finite positions and orientations, names, ranges and the rules for `time`, `speed`, `direction`, `floor` and `d2d_in` |
+| `.is_valid()` | `std::string`: empty if the object is valid, else an error message; checks the sizes, `offset`, finite positions and orientations, names, ranges and the rules for `time`, `speed`, `direction`, `floor` and `d2d_in` of the [Layout CSV files](formats.html#layout-csv-columns) |
 
 ## See also:
-- [[layout]] (the class that holds both sides)
+- [[layout]] (the class that holds the Tx nodes and the Rx nodes)
 - [[layout_csv_read]] (fills the members from a CSV file)
 MD!*/
 
@@ -1528,12 +1575,11 @@ void quadriga_lib::layout::eval_antennas(const arma::vec &center_freq_new)
 # set_antenna
 Set the antenna of layout nodes from the arguments of generate_antenna or from an evaluated array
 
-- The first form stores the arguments of [[generate_antenna]] (see there for their meaning) as an antenna line of the layout, which [[layout_csv_write]] writes as CSV cells; the second form stores an array, e.g. a measurement read with [[qdant_read]], which the writer exports to a QDANT file
-- Without `center_freq`, the antenna applies to all bands. With `center_freq`, only that band of the nodes' antenna is set: a frequency that is not in `layout.center_freq` is added, the other bands of the nodes keep their antenna, and nodes that shared the old entry keep it; until all bands of a node are set, `layout.is_valid()` reports it
-- A node set band by band keeps one line per band, also when the lines are equal, so a band added later is reported as not set for it; in a layout with one band, the line of a node set for that band also covers bands added later
-- The antenna lists are encoded again after the call as [[layout_csv_read]] composes them: equal lines share one entry, entries are numbered in order of first use (Tx nodes first), and entries that no node uses are removed, so `i_antenna` of other nodes can change
-- An array spaced in wavelengths (`ula`, `3GPP`, `multibeam` with several element positions) in a layout without frequencies is generated only when a frequency is set; its nodes use the generic antenna meanwhile
-- A failed call leaves the layout unchanged
+- Sets the antenna of Tx nodes or Rx nodes, from the arguments of [[generate_antenna]] (first form) or from an array
+  (second form), e.g. a measured pattern read with [[qdant_read]]
+- Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
+- The first form stores the arguments as an antenna description, which [[layout_csv_write]] writes as antenna columns;
+  the second form stores the array, which the writer exports to a QDANT file
 
 ## Declarations:
 ```
@@ -1556,13 +1602,19 @@ void quadriga_lib::set_antenna(
 
 ## Inputs:
 - **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
-- **`type`** — Antenna type of [[generate_antenna]], e.g. `3GPP`, `dipole`, or `none` (no antenna, for all bands, without `args`)
-- **`args`** *(optional)* — Arguments of [[generate_antenna]] by name: `res`, `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers, vectors or matrices (`steer`, `beams` row by row as there), `separate_beams` and `apply_weights` as 0 or 1; a name that the type does not use throws; `pattern` is not available (an array built with it is set with the second form); `center_freq` here is the same as the argument
+- **`type`** — Antenna type of [[generate_antenna]], e.g. `3GPP`, `dipole`, or `none` (no antenna, for all bands,
+  without `args`)
+- **`args`** *(optional)* — Arguments of [[generate_antenna]] by name, with the meaning given there: `res`,
+  `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
+  vectors or matrices (`steer`, `beams` row by row as there), `separate_beams` and `apply_weights` as 0 or 1; a name
+  that the type does not use throws; `pattern` is not available (an array built with it is set with the second form);
+  `center_freq` here is the same as the argument
 - **`array`** — Valid single-frequency array
-- **`rx_side`** *(optional)* — `false`: nodes of `layout.tx`; `true`: nodes of `layout.rx`
-- **`i_node`** *(optional)* — Indices of the nodes of that side, 0-based; empty: all nodes of the side
+- **`rx_side`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
+- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; empty: all of them
 - **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
-- **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none, the nodes of new antennas use the generic antenna until `layout.eval_antennas()` is called
+- **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none,
+  the nodes of new antennas use the generic antenna until `layout.eval_antennas()` is called
 
 ## Example:
 ```
@@ -1570,6 +1622,19 @@ quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_antenna(L, "3GPP", {{"panel", {4, 4, 1, 2}}, {"pol", {3}}}, false, {}, 3.5e9);
 quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0], true);
 ```
+
+## Notes:
+- **Bands**: with `center_freq`, only that band of the antenna of the nodes is set. A frequency that is not in
+  `layout.center_freq` is added; the other bands of the nodes keep their antenna, and nodes that shared the old entry
+  keep it. Until all bands of a node are set, `layout.is_valid()` reports it
+- **Bands set one by one**: such a node keeps one line per band, also when the lines are equal, so a band added later is
+  reported as not set for it. In a layout with one band, the line of a node set for that band also covers bands added
+  later
+- **Antenna lists**: after the call, equal descriptions share one entry, entries are numbered in order of first use (Tx
+  nodes first), and entries that no node uses are removed, so `i_antenna` of other nodes can change
+- **Deferred evaluation**: an array spaced in wavelengths (`ula`, `3GPP`, `multibeam` with several element positions) in
+  a layout without frequencies is generated only when a frequency is set; its nodes use the generic antenna meanwhile
+- A failed call leaves the layout unchanged
 
 ## See also:
 - [[generate_antenna]] (the meaning of the arguments)
@@ -1657,9 +1722,11 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const arrayant<doub
 # set_antenna_qdant
 Set the antenna of layout nodes to an entry of a QDANT file
 
-- Stores a `qdant` antenna line with the file as normalised absolute path and the entry `qdant_id`, as [[layout_csv_read]] composes it from the columns `antenna`, `qdant_file` and `qdant_id`; [[layout_csv_write]] writes this line with the path relative to the CSV file and exports no copy of the array
-- The array is read as stored, for all bands; bands, the sharing of entries and the renumbering of `i_antenna` follow [[set_antenna]]
-- A missing or unreadable file throws `std::runtime_error`; without evaluation, an entry that the file does not have throws when the antennas are evaluated; a failed call leaves the layout unchanged
+- Sets the antenna of Tx nodes or Rx nodes to an array stored in a QDANT file, e.g. a measured or simulated pattern
+- The layout refers to the file: [[layout_csv_write]] writes the reference (the columns `antenna` = `qdant`,
+  `qdant_file`, `qdant_id`), relative to the CSV file, and exports no copy of the array
+- The array is used as stored, not rescaled to the frequency of a band; the rules for bands and the antenna lists are
+  those of [[set_antenna]]
 
 ## Declaration:
 ```
@@ -1677,8 +1744,8 @@ void quadriga_lib::set_antenna_qdant(
 - **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
 - **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
 - **`qdant_id`** *(optional)* — 1-based entry of the file
-- **`rx_side`** *(optional)* — `false`: nodes of `layout.tx`; `true`: nodes of `layout.rx`
-- **`i_node`** *(optional)* — Indices of the nodes of that side, 0-based; empty: all nodes of the side
+- **`rx_side`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
+- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; empty: all of them
 - **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
 - **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none
 
@@ -1687,6 +1754,11 @@ void quadriga_lib::set_antenna_qdant(
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_antenna_qdant(L, "measured/handset.qdant", 2, true);
 ```
+
+## Notes:
+- **Path**: the file is stored as a normalised absolute path
+- **Errors**: a missing or unreadable file throws `std::runtime_error`; without evaluation, an entry that the file does
+  not have throws when the antennas are evaluated. A failed call leaves the layout unchanged
 
 ## See also:
 - [[set_antenna]] (sets the antenna from the arguments of generate_antenna or from an array)

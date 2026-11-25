@@ -15,6 +15,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 ## Data formats
 - [QuaDRiGa Array Antenna Exchange Format (QDANT)](formats/qdant.md): XML file format for antenna array patterns: elements, positions, port weights and the layout of several antennas
 - [Material Properties](formats/materials.md): The material table of the ray functions: CSV columns, built-in EM materials and the .mtl mapping
+- [Layout CSV files](formats/layout_csv.md): Two CSV files that hold a network layout: the Tx and Rx nodes with their tracks, scenarios and antennas
 
 ## API reference
 - [C++ API, complete](quadriga_lib_api_cpp.md)

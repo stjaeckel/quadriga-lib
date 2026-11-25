@@ -14,12 +14,10 @@ SECTION!*/
 # ATTACH_TERMINALS
 Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
 
-- Evaluates all Tx nodes for each terminal at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
-- `'large_scale'` (TR 38.901 Table 7.8-1): the link gain `−PL − O2I + 10 lg(SF)` plus the gain of one unit-gain LOS path from [[get_channels_planar]] (port weights, element positions, orientations); no rays
-- `'rsrp'` (TR 36.873 eq. (8.1-1)): per Rx port the sum of `|h|²` over the rays of [[gbsm_single_link_channel]] (`output = 'rays'`, mobility `'phase'`), link gain included, transmit power 1
-- Both rules take `|h|²` of Tx port `tx_port` and average it over the Rx ports, so a dual-polarized UT (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT antenna of the TR
-- A terminal takes the highest value of its nodes; the serving node has the highest value, a tie the lowest index. A Tx node without a propagation link (co-located) has −Inf; a terminal without any link gets node 0
-- `layout.pairing = [ site.'; 1:n_rx_terminal ]` links the sectors of the serving sites (1-based)
+- Evaluates every Tx node for each terminal and returns the one with the highest coupling gain (`'large_scale'`) or the
+  highest RSRP (`'rsrp'`), with its site and the gains of all nodes
+- Use it to link each terminal to its serving site in `layout.pairing` (see Example), so that the channel functions
+  compute only the serving links
 
 ## Usage:
 ```
@@ -27,9 +25,11 @@ Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
 ```
 
 ## Inputs:
-- **`layout`** — Layout struct with links from [[init_link_states]], Tx nodes required if there are terminals; fields in [[layout_csv_read]]
+- **`layout`** — Layout struct with links from [[init_link_states]]; fields in [[layout_csv_read]]; Tx nodes required if
+  there are terminals
 - **`rule`** — `'large_scale'` or `'rsrp'`; default: `'large_scale'`
-- **`rays`** — `'rsrp'`: rays of all links from [[generate_rays]], possibly edited, required; cell array `[n_link, 1]` of `1xN` struct arrays, `N = 1` or `n_freq`; default: `{}`
+- **`rays`** — `'rsrp'`: rays of all links from [[generate_rays]], possibly edited, required; cell array `[n_link, 1]`
+  of `1xN` struct arrays, `N = 1` or `n_freq`; default: `{}`
 - **`i_freq`** — Frequency index into `layout.center_freq`, 1-based; default: 1
 - **`tx_port`** — Port of the Tx antennas, 1-based; default: 1
 
@@ -37,6 +37,26 @@ Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
 - **`node`** — Serving Tx node per terminal, 1-based; uint64; `[n_rx_terminal, 1]`
 - **`site`** — Serving site per terminal, 1-based; uint64; `[n_rx_terminal, 1]`
 - **`gain_dB`** — Coupling gain or RSRP in [dB]; `[n_rx_terminal, n_tx_node]`
+
+## Example:
+```
+[ ~, site ] = quadriga_lib.attach_terminals( layout, 'large_scale' );
+layout.pairing = [ site.'; 1:numel( site ) ];
+```
+
+## Notes:
+- **Evaluation**: at the first rows of both nodes and `layout.center_freq(i_freq)`, with the link states of the first
+  segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
+- **`'large_scale'`** (TR 38.901 Table 7.8-1): the link gain of [[get_gbsm_channels]] plus the gain of one unit-gain LOS
+  path through both antennas (port weights, element positions, orientations), as [[get_channels_planar]] gives it; no
+  rays
+- **`'rsrp'`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of `abs(h)^2` over the rays of [[gbsm_single_link_channel]]
+  (`output = 'rays'`, mobility `'phase'`), link gain included, transmit power 1
+- **Ports**: both rules take `abs(h)^2` of Tx port `tx_port` and average it over the Rx ports, so a dual-polarized UT
+  (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT antenna of the TR
+- **Choice**: a terminal takes the highest value of its nodes; ties go to the lowest index. A Tx node without a
+  propagation link (co-located) has -Inf; a terminal without any link gets node 1
+- **Pairing**: `layout.pairing` holds pairs of site and terminal, so the Example links all sectors of the serving site
 
 ## See also:
 - [[init_link_states]], [[generate_rays]] (link states and rays)

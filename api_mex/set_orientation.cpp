@@ -14,13 +14,11 @@ SECTION!*/
 # SET_ORIENTATION
 Set the orientation of nodes from their motion, or to a given value
 
-- The orientation is that of the antenna: bank, tilt, heading = (γ, β, α) of 3GPP TR 38.901; a positive tilt points down (aviation pitch is -tilt), the heading is counted counter-clockwise from the x-axis
-- `force = false`, track (several rows): bank 0, tilt and heading from the steps between the rows (forward difference, the last step repeated, or for a closed track the first row, as `qd_track.calc_orientation` of the NG library does); `orientation` is added as an offset and the angles are wrapped to [-π, π]. A step of zero length keeps the previous orientation, at the start the next one that exists; a vertical step has the tilt -90° (up) or 90° (down) and keeps the previous heading (a deliberate deviation from NG, where it is 0). A rising track has a negative tilt. A track that does not move keeps its orientation (plus the offset)
-- `force = false`, point drop (one row): the orientation stays and receives the offset; without an offset it is not touched. Random orientations of point drops are not generated here
-- `force = false` leaves nodes with `relative = 1` unchanged, offset included: their orientation is relative to the motion, which [[sample_track]] applies at each snapshot
-- `force = true`: every row of the nodes gets exactly `orientation`, also the nodes with `relative = 1`
-- A failed call leaves `nodes` unchanged
-- The C++ in/out argument `nodes` is split into `nodes_in` / `nodes_out`, so that the input stays unchanged
+- Turns the antennas of tracks along their motion, e.g. for a UT held in the direction of travel, or sets all rows of
+  the nodes to a fixed orientation
+- `force = false`: tracks get bank 0 and the tilt and heading of the steps between their rows, plus `orientation` as an
+  offset; point drops keep their orientation plus the offset
+- `force = true`: every row of the nodes gets exactly `orientation`
 
 ## Usage:
 ```
@@ -28,10 +26,11 @@ nodes_out = quadriga_lib.set_orientation( nodes_in, orientation, i_node, force )
 ```
 
 ## Inputs:
-- **`nodes_in`** — Nodes of one side of a layout, e.g. `layout.rx`; fields in [[layout_csv_read]]
+- **`nodes_in`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`); fields in [[layout_csv_read]]
 - **`orientation`** — Bank, tilt, heading in [rad], 3 finite values; `[]` = 0; default: `[]`
 - **`i_node`** — Node indices, 1-based; `[]` = all nodes; default: `[]`
-- **`force`** — `false`: orientation from the motion of tracks, plus `orientation` as offset; `true`: `orientation` on all rows; default: `false`
+- **`force`** — `false`: orientation from the motion of tracks, plus `orientation` as offset; `true`: `orientation` on
+  all rows; default: `false`
 
 ## Outputs:
 - **`nodes_out`** — The nodes with the new orientations
@@ -41,6 +40,18 @@ nodes_out = quadriga_lib.set_orientation( nodes_in, orientation, i_node, force )
 layout.rx = quadriga_lib.set_orientation( layout.rx );                    % The antennas look along the motion
 layout.rx = quadriga_lib.set_orientation( layout.rx, [0 0 0.5] );         % The same, turned by 0.5 rad
 ```
+
+## Notes:
+- **Tracks** (`force = false`): forward differences between the rows, the last step repeated, or for a closed track the
+  step to the first row, as `qd_track.calc_orientation` of the NG library does; the angles are wrapped to [-π, π]. A
+  step of zero length keeps the previous orientation, at the start the next one that exists. A vertical step has the
+  tilt -90° (up) or 90° (down) and keeps the previous heading (a deliberate deviation from NG, where it is 0). A rising
+  track has a negative tilt; a track that does not move keeps its orientation (plus the offset)
+- **Point drops** (`force = false`): without an offset, the orientation is not touched; random orientations are not
+  generated here
+- **Mounted antennas**: `force = false` leaves nodes with `relative = 1` unchanged, offset included, since their
+  orientation is relative to the motion, which [[sample_track]] applies at each snapshot; `force = true` sets them too
+- The C++ in/out argument `nodes` is split into `nodes_in` / `nodes_out`, so that the input stays unchanged
 
 ## See also:
 - [[generate_track]] (creates tracks with this orientation)

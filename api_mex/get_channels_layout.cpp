@@ -14,10 +14,11 @@ SECTION!*/
 # GET_CHANNELS_LAYOUT
 Channel coefficients of a layout in one call
 
-- Runs [[init_link_states]] (if `layout.links` was not filled), [[generate_rays]] and [[get_gbsm_channels]] in batches of at most 256 propagation links (the segments of a track in one batch), so that the rays of a batch bound the memory; the results are those of the manual path with the default settings and do not depend on the batches
-- Without links (`layout.links.method` empty, e.g. after `reset()`), the link states are drawn for this call only and the layout is unchanged; with filled links, these are used, also when edited, and `seed` and `config_dirs` are not used. No linked pair gives an empty result
-- The mobility `'drift'` (also `'auto'` with `'quadriga'`) solves the scatterers
-- The index output is the second output; the folder of the shipped conf files is added to `config_dirs` by the wrapper
+- Computes one channel per Tx node, Rx node and frequency, for the pairs in `layout.pairing` (empty: all pairs)
+- Runs the stages [[init_link_states]], [[generate_rays]] and [[get_gbsm_channels]] with their default settings; the
+  results are those of the stages called one by one
+- Without link states in `layout.links`, draws them for this call only and leaves the layout unchanged; with link
+  states, uses them, also when they were edited
 
 ## Usage:
 ```
@@ -26,17 +27,21 @@ Channel coefficients of a layout in one call
 ```
 
 ## Inputs:
-- **`layout`** — Layout struct with `center_freq`; fields in [[layout_csv_read]]; antennas as evaluated in `layout.antenna`, nodes without one use the generic antenna (see [[get_gbsm_channels]])
+- **`layout`** — Layout struct with `center_freq`; fields in [[layout_csv_read]]; antennas as evaluated in
+  `layout.antenna`, nodes without one use the generic antenna (see [[get_gbsm_channels]])
 - **`times`** — Snapshot times in [s]; `[]` = one snapshot per row; default: `[]`; `[n_snap]`
 - **`output`** — `'taps'` or `'rays'`; default: `'taps'`
-- **`method`** — `'38.901'`, `'38.901_MF'` or `'quadriga'`; `''` = the method of filled links, else `'38.901'`; another method than that of filled links raises an error; default: `''`
+- **`method`** — `'38.901'`, `'38.901_MF'` or `'quadriga'`; `''` = the method of filled links, else `'38.901'`; another
+  method than that of filled links raises an error; default: `''`
 - **`mobility`** — `'phase'`, `'drift'` or `'auto'`; default: `'auto'`
 - **`overlap`** — Overlap of consecutive segments, in [0, 1]; default: 0.5
 - **`seed`** — Master seed for empty links, as in [[init_link_states]]; with filled links only -1; default: -1
-- **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell array of strings; default: `{}`
+- **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell
+  array of strings; default: `{}`
 
 ## Outputs:
-- **`channels`** — Channels, Tx node fastest, then Rx node, then frequency; struct array, fields in [[hdf5_read_channel]]; `[1, n_channel]`
+- **`channels`** — Channels, Tx node fastest, then Rx node, then frequency; struct array, fields in
+  [[hdf5_read_channel]]; `[1, n_channel]`
 - **`index`** — Tx node, Rx node and frequency index of each channel, 1-based; uint64; `[3, n_channel]`
 
 ## Example:
@@ -45,6 +50,14 @@ layout = quadriga_lib.generate_layout( '38.901_UMa', 1 );
 layout.center_freq = 3.5e9;
 channels = quadriga_lib.get_channels_layout( layout );
 ```
+
+## Notes:
+- **Memory**: the links are processed in batches of at most 256 propagation links (the segments of a track in one
+  batch), so that the rays of one batch bound the memory; the results do not depend on the batches
+- **Link states**: `layout.links` holds none when `layout.links.method` is empty, e.g. after `layout.links = []`. With
+  link states, `seed` and `config_dirs` are not used. A layout without linked pairs gives an empty result
+- **Scatterers**: the mobility `'drift'` (also `'auto'` with `'quadriga'`) solves the scatterers
+- The C++ output `index` is the second output; the wrapper adds the folder of the shipped conf files to `config_dirs`
 
 ## See also:
 - [[init_link_states]], [[generate_rays]], [[get_gbsm_channels]] (the three stages)

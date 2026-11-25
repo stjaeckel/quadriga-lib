@@ -14,10 +14,10 @@ SECTION!*/
 # SET_ANTENNA_QDANT
 Set the antenna of layout nodes to an entry of a QDANT file
 
-- Stores a `qdant` antenna line with the file as normalised absolute path and the entry `qdant_id`, as [[layout_csv_read]] composes it from the columns `antenna`, `qdant_file` and `qdant_id`; [[layout_csv_write]] writes this line with the path relative to the CSV file and exports no copy of the array
-- The array is read as stored, for all bands; bands, the sharing of entries and the renumbering of `i_antenna` follow [[set_antenna]]
-- A missing or unreadable file raises an error; without evaluation, an entry that the file does not have raises an error when the antennas are evaluated
-- The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
+- Sets the antenna of Tx nodes or Rx nodes to an array stored in a QDANT file, e.g. a measured or simulated pattern
+- The layout refers to the file: [[layout_csv_write]] writes the reference (the columns `antenna` = `qdant`,
+  `qdant_file`, `qdant_id`), relative to the CSV file, and exports no copy of the array
+- The array is used as stored, for all bands; the rules for bands and the antenna lists are those of [[set_antenna]]
 
 ## Usage:
 ```
@@ -28,10 +28,12 @@ layout_out = quadriga_lib.set_antenna_qdant( layout_in, qdant_file, qdant_id, rx
 - **`layout_in`** — Layout struct, fields in [[layout_csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
 - **`qdant_id`** — 1-based entry of the file; default: 1
-- **`rx_side`** — `false`: nodes of `layout_in.tx`; `true`: nodes of `layout_in.rx`; default: `false`
-- **`i_node`** — Indices of the nodes of that side, 1-based; `[]` = all nodes of the side; default: `[]`
+- **`rx_side`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
+  `false`
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 1-based; `[]` = all of them; default: `[]`
 - **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
-- **`evaluate`** — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none; default: `true`
+- **`evaluate`** — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none; default:
+  `true`
 
 ## Outputs:
 - **`layout_out`** — The layout with the new antenna lists and `i_antenna`
@@ -42,9 +44,15 @@ layout = quadriga_lib.layout_csv_read( 'tx.csv', 'rx.csv' );
 layout = quadriga_lib.set_antenna_qdant( layout, 'measured/handset.qdant', 2, true );
 ```
 
+## Notes:
+- **Path**: the file is stored as a normalised absolute path
+- **Errors**: a missing or unreadable file raises an error; without evaluation, an entry that the file does not have
+  raises an error when the antennas are evaluated
+- The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
+
 ## See also:
 - [[set_antenna]] (sets the antenna from the arguments of generate_antenna)
-- [[set_antenna_array]] (sets an evaluated array)
+- [[set_antenna_array]] (sets an array)
 - [[qdant_read]] (reads the entries of a QDANT file)
 MD!*/
 

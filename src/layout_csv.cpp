@@ -31,12 +31,10 @@ SECTION!*/
 # layout_csv_read
 Read the Tx and Rx CSV files of a layout
 
-- The nodes of each file are created in order of first appearance; the rows of a node need not be consecutive in the file, and their order is the track order. Angles are converted from degrees to radians
-- Columns, the meaning of empty cells, antenna columns and bands are described at the top of this section. Antenna columns are composed into `antenna_cols`, `antenna_args` and `i_antenna`; equal descriptions share one entry, Tx nodes first. A relative `qdant_file` is resolved against the folder of the CSV file and stored as a normalised absolute path
-- Simulation frequencies: the argument, else the `center_freq` values of the Tx file, else those of the Rx file; a node with bands must define all of them, and the values in the files must match the argument within a relative 1e-6
-- Unknown columns are kept and reported; a column in the wrong file (e.g. `pairing` in the Tx file), a value outside its range, an antenna column that the antenna type does not use and every violation of the rules above throw `std::runtime_error` with the file name, line and column; so does a terminal whose empty `pairing` cell leaves it without a pair, a first band without antenna cells next to a later band with antenna cells, and a layout that is not valid ([[layout]]), e.g. a name with a comma or a node with one row, `relative` = 1 and no direction
-- With `eval_antennas`, the arrays `antenna` are generated as `layout.eval_antennas()` does ([[layout]]); a line that [[generate_antenna]] rejects, a QDANT file that cannot be read and an array spaced in wavelengths in a layout without frequencies throw `std::runtime_error`
-- Large arrays on the default 1° grid need much memory (`3GPP` with `panel` 16,16,1,4 holds about 2 GB per band): give a `res` column or read with `eval_antennas = false`
+- Reads the Tx file and the Rx file of a layout in the [Layout CSV format](formats.html#layout_csv) and returns the
+  layout, with angles in rad
+- Generates the antennas of the nodes from their antenna columns, unless `eval_antennas` is `false`
+- Keeps unknown columns and returns their names, so that a typo in a column name is visible
 
 ## Declaration:
 ```
@@ -50,15 +48,28 @@ quadriga_lib::layout quadriga_lib::layout_csv_read(
 ```
 
 ## Inputs:
-- **`fn_tx`**, **`fn_rx`** — Tx and Rx CSV files; "" = no nodes on that side
-- **`center_freq`** *(optional)* — Simulation frequencies in [Hz], strictly ascending and positive; empty = from the files; `[n_freq]`
-- **`eval_antennas`** *(optional)* — `true`: generate the antennas; `false`: `antenna` stays empty, `antenna_args` and `i_antenna` are kept, and the nodes use the generic antenna of two co-located polarized isotropic elements until `layout.eval_antennas()` is called
+- **`fn_tx`**, **`fn_rx`** — Tx and Rx CSV files; "" = no Tx nodes or no Rx nodes
+- **`center_freq`** *(optional)* — Simulation frequencies in [Hz], strictly ascending and positive; empty = from the
+  files; `[n_freq]`
+- **`eval_antennas`** *(optional)* — `true`: generate the antennas; `false`: `antenna` stays empty, `antenna_args` and
+  `i_antenna` are kept, and the nodes use the generic antenna until `layout.eval_antennas()` is called
 
 ## Outputs:
-- **`extra_tx`**, **`extra_rx`** *(optional)* — Names of the unknown columns of the Tx and Rx file, in file order; written only if the call succeeds
+- **`extra_tx`**, **`extra_rx`** *(optional)* — Names of the unknown columns of the Tx and Rx file, in file order;
+  written only if the call succeeds
 
 ## Returns:
 - `quadriga_lib::layout` — The layout; `name` and `links` are empty
+
+## Notes:
+- **Errors**: a violation of the format and a layout that is not valid ([[layout]]) throw `std::runtime_error` with the
+  file name, the line and the column (see [Reading](formats.html#layout-csv-reading)); with `eval_antennas`, so do a
+  line that [[generate_antenna]] rejects, a QDANT file that cannot be read and an array spaced in wavelengths in a
+  layout without frequencies
+- **Antennas**: equal descriptions share one entry of the antenna lists, Tx nodes first; a relative `qdant_file` is
+  stored as a normalised absolute path
+- **Memory**: large arrays on the default 1° grid need much memory ([Antennas](formats.html#layout-csv-antennas)); give
+  a `res` column or read with `eval_antennas = false`
 
 ## See also:
 - [[layout_csv_write]] (stores a layout)
@@ -70,13 +81,12 @@ MD!*/
 # layout_csv_write
 Write a layout to the Tx and Rx CSV files
 
-- Writes only columns with content other than the default, in the order of the format, unknown columns last; angles in degrees, numbers with up to 15 significant digits (16 or 17 where 15 do not read back); reading the files gives the same layout within these digits, except for `name` and `links`, which are not stored
-- With `compact` the cells that the reader repeats from the previous row of the node (held values) or sets to the default (fixed values, which are written on the first row only) are left empty; an extra sector (sector above 0 of a site that has a sector 0) has all its cells in its first row, because an empty cell would be the value of sector 0
-- Antennas are written as their CSV lines, with each `qdant_file` relative to the folder of its CSV file. If no antenna line carries the frequencies of the layout, they are declared on the first node: `center_freq` on its first row and one band row per further frequency
-- All files are composed first and written to temporary files next to the targets; each target is replaced by a rename only after all files were composed and written, so an error in the layout, the composition or the writing leaves all files unchanged (a failing rename of the second file is not undone for the first)
-- Antenna bands that are evaluated arrays without a line (set with the array form of [[set_antenna]]) are written to QDANT files next to the first written CSV file that uses the antenna, named `<stem>_<k>.qdant` (`<stem>` is the name of the CSV file without `.csv`, k = 1, 2, ... per CSV file, skipping names that `qdant` lines of the layout use), one file per antenna with one entry per exported band, and become `qdant` lines. Afterwards, the files `<stem>_<k>.qdant` next to a written CSV file that the new files do not reference are deleted; files of other names are never touched. These arrays must be evaluated: a layout whose `antenna` does not hold them throws
-- A band set with [[set_antenna_qdant]] is a `qdant` line: it is written as a reference to its file, relative to the CSV file, and not exported
-- The `seed`, `layout_seed` and `wrap` of the layout are stored in the Tx file; a Tx file for a layout without Tx nodes that has them throws. Not expressible in the format and therefore rejected: a scenario that returns to none after a scenario was set, a terminal without a pair in `pairing` (an empty cell means all sites). An extra sector without antenna next to a sector 0 with one is written with the antenna `none`
+- Writes the Tx nodes to the Tx file and the Rx nodes to the Rx file in the
+  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within 15 significant
+  digits, except for `name` and `links`, which are not stored
+- Antennas without a description, e.g. a measured array set with the array form of [[set_antenna]], are written to QDANT
+  files next to the CSV file
+- A failed call leaves the existing files unchanged
 
 ## Declaration:
 ```
@@ -88,9 +98,18 @@ void quadriga_lib::layout_csv_write(
 ```
 
 ## Inputs:
-- **`fn_tx`**, **`fn_rx`** — Tx and Rx CSV files; "" = not written; different files (also if the paths are spelled differently)
+- **`fn_tx`**, **`fn_rx`** — Tx and Rx CSV files; "" = not written; different files (also if the paths are spelled
+  differently)
 - **`layout`** — Layout; must be valid ([[layout]])
-- **`compact`** *(optional)* — `true`: empty cells where the format allows; `false`: every cell is written
+- **`compact`** *(optional)* — `true`: cells that the reader fills in are left empty; `false`: every cell is written
+
+## Notes:
+- **Rules of the writer**: the columns written, the number format, the compact form, the names of the QDANT files and
+  what cannot be written are described in [Writing](formats.html#layout-csv-writing)
+- **QDANT files**: one file `<stem>_<k>.qdant` per antenna without description, with one entry per band. Files of this
+  name pattern next to a written CSV file that the new files do not refer to are deleted. The arrays must be evaluated:
+  a layout whose `antenna` does not hold them throws. An antenna set with [[set_antenna_qdant]] is written as a
+  reference to its file, not exported
 
 ## See also:
 - [[layout_csv_read]] (reads a layout)
