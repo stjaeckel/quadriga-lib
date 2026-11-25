@@ -124,6 +124,7 @@ python_test:
 # environment replace the defaults.
 test-asan:
 	cmake -B $(ASAN_BUILD_DIR) $(CMAKE_GENERATOR_ARG) $(CMAKE_CXX_ARG) \
+		-D CMAKE_INSTALL_PREFIX=$(CURDIR) \
 		-D ENABLE_SANITIZERS=ON \
 		-D ENABLE_TESTS=ON \
 		-D ENABLE_MATLAB=OFF \
