@@ -8,6 +8,7 @@
 # Value: the MATLAB name.
 
 [families]
+eval_antennas = ["layout"]
 get_channels_planar = ["get_channels_planar", "get_channels_planar_vec"]
 get_channels_spherical = ["get_channels_spherical", "get_channels_spherical_vec"]
 hdf5_read_channel = ["hdf5_read_channel", "hdf5_read_channel_vec"]

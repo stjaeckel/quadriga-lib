@@ -9,7 +9,7 @@
 // ../share/quadriga-lib/config (CMake install), ../../../share/quadriga-lib/config (POSIX site-packages, e.g. venv,
 // --user, dist-packages), ../../share/quadriga-lib/config (Windows); the folder compiled into the library if the module
 // path is unknown or none holds the files
-static std::string qd_python_conf_dir()
+std::string qd_python_conf_dir()
 {
     std::string file;
     try

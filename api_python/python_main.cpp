@@ -10,6 +10,7 @@ namespace py = pybind11;
 void quadriga_lib_arrayant(py::module_ &m);
 void quadriga_lib_channel(py::module_ &m);
 void quadriga_lib_gbsm(py::module_ &m);
+void quadriga_lib_layout(py::module_ &m);
 void quadriga_lib_RTtools(py::module_ &m);
 void quadriga_lib_sos(py::module_ &m);
 void quadriga_lib_tools(py::module_ &m);
@@ -35,6 +36,9 @@ PYBIND11_MODULE(quadriga_lib, m)
 
     py::module_ gbsm = m.def_submodule("gbsm", "Geometry-based stochastic model");
     quadriga_lib_gbsm(gbsm);
+
+    py::module_ layout = m.def_submodule("layout", "Network layouts and mobility");
+    quadriga_lib_layout(layout);
   
     m.def("components", &components);
 

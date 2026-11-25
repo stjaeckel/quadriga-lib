@@ -21,9 +21,9 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 **General conventions**
 
 - Shapes: `[a, b, c]` means `[rows, cols, slices]`, `[rows, cols]` a matrix and `[n]` a vector; arrays are column-major (C++: `arma::Cube`, `arma::Mat`, `arma::Col` / `arma::Row`).
-- Index base: 0-based unless the field is explicitly called "1-based" (which applies to `mtl_ind`, `fbs_ind`, `sbs_ind`, `point_ind`, `forward_ind`, `mesh_ind`, and QDANT `id`).
+- Index base: 0-based unless the field is explicitly called "1-based" (which applies to `mtl_ind`, `fbs_ind`, `sbs_ind`, `point_ind`, `forward_ind`, `mesh_ind`, `i_antenna` and QDANT `id`).
 - Units: SI units, angles in radians, powers and gains linear. A value in dB, dBi or degrees carries the unit in its name (`threshold_dB`, `directivity_dBi`, `quantize_deg`); a value in the default unit carries no suffix. Other non-SI units keep their suffix, e.g. `speed_station_kmh`.
-- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant), so that orientations from TR 38.901 are entered as published: a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
+- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation; (bank, tilt, heading) are the angles (γ, β, α) of 3GPP TR 38.901, called (slant, downtilt, bearing) there, so that orientations from TR 38.901 are entered as published: a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down (the aviation pitch is -tilt), a positive bank turns the y-axis toward z.
 - Complex data: separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. `polmat`), for compatibility with older Octave versions, whose MEX interface has no interleaved complex arrays. Some functions also offer an optional `std::complex` output, which replaces the split pair (then left empty).
 - Speed of light/sound: `299792458.0` m/s (EM), `343.0` m/s (acoustic; the one value the library uses for sound: the acoustic frequency mapping, acoustic wavelengths and `generate_speaker`).
 - Counts: `n_<thing>`, e.g. `n_path`, `n_snap`, `n_interact` (interaction points per path; mesh intersections per ray in the ray-tracing functions).
@@ -76,6 +76,20 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `beams`: `[2 or 3, n_beams]`: azimuth and elevation in degrees, weight (linear).
 - `device_size`: `[X, Y, Z]` in m: depth, width and height of a UT device (TR 38.901 clause 7.3.0); the default depends on the device type.
 - `locations`: candidate antenna locations of a UT device as the labels of the TR figures, 1-based in all APIs because they are names, not indices; default all.
+
+**Network layouts and mobility**
+
+- `layout`: the nodes of a radio network and how they move, in two flat tables, one for the Tx side (BS, AP) and one for the Rx side (UT, STA), with their antennas, the link states of one realisation and the lattice of the wrap-around; the CSV files of a layout have the same two tables.
+- Node: one (`name`, `sector`) pair on one side of a layout, with one antenna and one track. Site: all Tx nodes with one name (its sectors share position and scenario). Terminal: all Rx nodes with one name, e.g. the panels of one device.
+- Row: a position with orientation and the values that apply from it on; the rows of a node are consecutive, the first at `offset`. Snapshot: one sample of the channel in time and space; without snapshot times, each row of a node is one snapshot.
+- Track: a node with several rows, which moves along its positions. Point drop: a node with one row, which stays at its position or moves along its `direction` with its `speed`.
+- Segment: the part of a track with one scenario and indoor state; a change of `scenario` or `indoor` at a row starts a new segment, which has its own links and is joined to the preceding one by `crossfade_segments`.
+- Propagation link: one site, one terminal and one segment (with the wrap image of the site), with its LOS and indoor state, conf file and seeds, stored in `layout.links`. Channel link: one Tx node and one Rx node of a propagation link (and one frequency); the sectors of a site share the rays of their propagation link.
+- Band: one simulation frequency of `center_freq` of a layout; the antenna of a node has one description for all bands or one per band.
+- Scenario family, conf name: a family (`UMa`, `InH`, ...) selects the conf file of a link from its LOS and indoor state; a conf name (e.g. `UMa_NLOS_O2I`, or a user conf file) names one file and fixes the state.
+- Wrap image: the site displaced by lattice vectors `wrap` of the layout; each link uses the image of the site that is nearest to the terminal (`image` = 0: the site itself).
+- `i_antenna`: 1-based index into the antenna lists of a layout, 0 = the generic antenna with two co-located isotropic elements of vertical and horizontal polarization.
+- Angles: degrees in the CSV files and in the tuples typed by hand (`bs`, `ut` of `generate_layout`, the arguments of `generate_antenna` in `set_antenna`), radians in all class members, `orientation` and `direction`.
 
 **Kernel selection**
 

@@ -502,6 +502,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#obj_file_read) · [Py
   vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::runtime_error`. The file is
   parsed and validated for any combination of requested outputs, also when no output is requested.
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
+- In the material CSV, a cell may be quoted with `"` (`""` is a quote inside), lines starting with `#` and blank lines are skipped, and a number is one decimal number (no hexadecimal).
 - Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.

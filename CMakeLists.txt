@@ -566,6 +566,7 @@ if (BUILD_PYTHON)
         api_python/python_sos.cpp
         api_python/python_tools.cpp
         api_python/python_gbsm.cpp
+        api_python/python_layout.cpp
     )
     add_library(quadriga_py MODULE ${PYTHON_SOURCES})
     target_include_directories(quadriga_py PRIVATE

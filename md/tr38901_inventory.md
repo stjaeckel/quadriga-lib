@@ -6,7 +6,7 @@ This document lists the features of 3GPP TR 38.901 v19.5.0 (2026-09) and states,
 
 Scope and basis:
 
-- **Library state:** main after the source cleanup of 2026-11-19. Line numbers refer to that state and move with later edits; the function names stay valid longer.
+- **Library state:** main after the layout system was added (2026-11-25). Line numbers refer to that state and move with later edits; the function names stay valid longer.
 - **What counts:** only the C++ library (`src/`, `include/`) and the scenario files in `data/config/` (cited by file name and key). The MATLAB and Python wrappers expose the same functions but are not counted separately. QuaDRiGa-NG, which builds a full simulator on top of the library, is not part of this inventory.
 - **Method:** the TR text and the code were read side by side. Nothing was run for this document. Where a finding rests on an existing record (a test, an API doc block, the maintainer notes in `md/ssf_notes.md` with their IDs D, A, W), the record is cited. Where it rests on reading the code only, the comment says "(from reading, not measured)". Section 6 proposes runs that would confirm these points.
 - **TR reference:** the clause numbers, tables and equations of v19.5.0. The ISAC CRs of v19.1 to v19.5 and CR 0043 ("Correction on ZOD generation", v19.5) are newer than any 3GPP calibration campaign (see `md/3gpp_calibration_references.md`).
@@ -15,7 +15,7 @@ How to read the table:
 
 - **Sections:** numbered after the TR. Clause 7.x is section 3.x, clause 8 is section 4 and Annex A is section 5, each titled with the TR heading. Where a clause holds several functional blocks (7.4, 7.6, 7.8, 7.9), sub-clause 7.x.y has its own section 3.x.y (for example 7.6.1 oxygen absorption is 3.6.1). The other clauses are one table each, and the TR ref column gives the sub-clause of each row.
 - **Covered:** **Yes** = implemented, possibly with a different API. **Partial** = some parts exist, or only building blocks that the caller has to combine. **No** = not implemented. Two informative sub-clauses that define no model are marked n/a.
-- **Function, location:** the public function with the line where its definition starts, followed by the line of the block that implements the feature (`ssf_clusters` (`src/ssf_clusters.cpp:440`; block `:651`)).
+- **Function, location:** the public function with the line where its definition starts, followed by the line of the block that implements the feature (`ssf_clusters` (`src/ssf_clusters.cpp:449`; block `:658`)).
 - **Comment:** API differences, then deviations. A deviation that changes the result compared with the TR is marked **Drift:**. API differences are allowed and are noted for orientation only. These conventions recur and are not repeated in every row:
   - Angles are **elevation angles** (EoD, EoA = 90° − ZOD, ZOA; +90° points up) in **radians** in the GCS. Spreads are the same in both conventions (ESD = ZSD, ESA = ZSA). The EoD offset is −μ_offset,ZOD.
   - Antenna orientations are **Euler angles (bank, tilt, heading)** in rad, corresponding to the TR's (γ, β, α) of clause 7.1; a positive tilt points down, as the TR β.
@@ -54,13 +54,13 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 | Clause (section) | Rows | Yes | Partial | No | n/a |
 |---|---|---|---|---|---|
 | 7.1 Coordinate system (3.1) | 6 | 6 | 0 | 0 | 0 |
-| 7.2 Scenarios (3.2) | 5 | 0 | 5 | 0 | 0 |
+| 7.2 Scenarios (3.2) | 5 | 4 | 1 | 0 | 0 |
 | 7.3 Antenna modelling (3.3) | 8 | 8 | 0 | 0 | 0 |
 | 7.4 Path loss, LOS probability, penetration (3.4) | 20 | 17 | 3 | 0 | 0 |
 | 7.5 Fast fading model incl. parameter tables (3.5) | 46 | 43 | 2 | 1 | 0 |
-| 7.6 Additional modelling components (3.6) | 36 | 17 | 4 | 14 | 1 |
+| 7.6 Additional modelling components (3.6) | 36 | 18 | 3 | 14 | 1 |
 | 7.7 Link-level models (3.7) | 16 | 1 | 8 | 7 | 0 |
-| 7.8 Calibration (3.8) | 14 | 0 | 10 | 4 | 0 |
+| 7.8 Calibration (3.8) | 14 | 1 | 9 | 4 | 0 |
 | 7.9 ISAC (3.9) | 23 | 0 | 8 | 15 | 0 |
 | 8 Map-based hybrid model (4) | 23 | 9 | 5 | 8 | 1 |
 | Annex A (5) | 6 | 1 | 4 | 1 | 0 |
@@ -73,7 +73,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 |---|---|---|---|---|
 | Spherical angles and field components | 7.1.1, Fig. 7.1.1 | Yes | `interpolate_pattern` (`src/interpolate_pattern.cpp:207`); kernel `qd_interpolate_pattern_GENERIC` (`src/interpolate_pattern_generic.cpp:14`; basis vectors `:95`) | Elevation instead of zenith; azimuth equals the TR φ. `e_theta`/`e_phi` are F_θ/F_φ. Patterns are sampled on an elevation grid [−π/2, π/2] and interpolated. |
 | Local and global coordinate systems | 7.1.2 | Yes | `arrayant` class (`include/quadriga_arrayant.hpp`); `interpolate_pattern` (`src/interpolate_pattern.cpp:207`) | Patterns and `element_pos` are given in the LCS; the array position is the Tx/Rx position, its rotation the `orientation` input (per array, element or angle). |
-| LCS→GCS rotation matrix | 7.1.3, eq. 7.1-2 to 7.1-5 | Yes | `calc_rotation_matrix` (`src/calc_rotation_matrix.cpp:39`); `qd_rotation_matrix` (`src/qd_helpers_shared.hpp:254`); call in `src/interpolate_pattern.cpp:80` | Same R = Rz·Ry·Rx. Euler angles (bank, tilt, heading) = (γ, β, α): a positive tilt points the antenna down, as the TR β, in all functions; pinned by the test cases "A positive tilt points down" and `tests/catch2_tests/test_interpolate_pattern.cpp:471`. |
+| LCS→GCS rotation matrix | 7.1.3, eq. 7.1-2 to 7.1-5 | Yes | `calc_rotation_matrix` (`src/calc_rotation_matrix.cpp:39`); `qd_rotation_matrix` (`src/qd_helpers_shared.hpp:256`); call in `src/interpolate_pattern.cpp:80` | Same R = Rz·Ry·Rx. Euler angles (bank, tilt, heading) = (γ, β, α): a positive tilt points the antenna down, as the TR β, in all functions; pinned by the test cases "A positive tilt points down" and `tests/catch2_tests/test_interpolate_pattern.cpp:471`. |
 | GCS→LCS angle mapping | 7.1.3, eq. 7.1-6 to 7.1-8 | Yes | kernel (`src/interpolate_pattern_generic.cpp:14`; block `:82`) | Cartesian R⁻¹·ρ̂ with atan2/asin, equivalent to 7.1-7/7.1-8. Local angles are an optional output. |
 | Polarisation rotation ψ | 7.1.3, eq. 7.1-9 to 7.1-17 | Yes | kernel (`src/interpolate_pattern_generic.cpp:14`; block `:95`) | ψ from dot products of the rotated local θ̂ with the global θ̂, φ̂ (the approach of 7.1-12). Optional output `gamma`. |
 | Downtilt-only transformation | 7.1.4, eq. 7.1-18 to 7.1-26 | Yes | as 7.1.3 | General rotation with bank = heading = 0; no separate code path. |
@@ -82,11 +82,11 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| UMi-street canyon and UMa | 7.2, Table 7.2-1 | Partial | `3GPP_38.901_v19_UMi_*.conf`, `3GPP_38.901_v19_UMa_*.conf` | Propagation parameters only (LOS, NLOS, O2I files). The 19-site hexagonal layout, ISD, BS heights, the hUT floor rule, the 80 % indoor ratio, minimum distances and the UT drop are the caller's; the library has no layout or drop helper. |
-| Indoor office (open, mixed) | 7.2, Table 7.2-2 | Partial | `3GPP_38.901_v19_Indoor_{LOS,NLOS}.conf`; `los_probability` `38.901_InH_Open`, `38.901_InH_Mixed` | One file pair for both offices; the TR says they differ only in LOS probability. Room layout and heights are the caller's. |
-| RMa | 7.2, Table 7.2-3 | Partial | `3GPP_38.901_v19_RMa_*.conf` | Layout, heights and the indoor / in-car split are the caller's; in-car UTs use `o2i_loss` model `car`. |
-| InF (SL, DL, SH, DH, HH) | 7.2, Table 7.2-4 | Partial | `3GPP_38.901_v19_InF_LOS.conf`, `_InF_NLOS_{SL,DL,SH,DH}.conf`; `los_probability` `38.901_InF_*` | No HH file: HH is LOS only, so the LOS file plus `38.901_InF_HH` (p = 1) covers it. Hall size and clutter parameters are inputs. |
-| SMa (Rel-19) | 7.2, Table 7.2-5 | Partial | `3GPP_38.901_v19_SMa_*.conf` | Layout, the residential/commercial split, floor heights and the in-car share are the caller's. |
+| UMi-street canyon and UMa | 7.2, Table 7.2-1 | Yes | `generate_layout` presets `38.901_UMi`, `38.901_UMa` (`src/generate_layout.cpp:1235`; preset table `:657`, `:658`; building share and d2D-out rule `:500`); `init_link_states` (`src/init_link_states.cpp:387`; O2I fields `:190`, LOS field `:276`); `3GPP_38.901_v19_UMi_*.conf`, `3GPP_38.901_v19_UMa_*.conf` | The 19-site hexagonal layout with wrap-around vectors, ISD, BS heights, the hUT floor rule, the 80 % indoor ratio, minimum distances and the UT drop come from the preset; the LOS and indoor state of each link is drawn in `init_link_states`; the propagation parameters are in the conf files. The minimum distance of building UTs is applied to d2D-out (TR 36.873 Table 6-1, note 1), so a rejected UT is redrawn with its O2I state and the building share is slightly below 80 %: measured 0.794 (UMi, ISD 200 m), 0.801 (UMa, 500 m) and 0.798 (SMa, 1299 m); `tests/catch2_tests/test_generate_layout.cpp:615` bounds it. |
+| Indoor office (open, mixed) | 7.2, Table 7.2-2 | Yes | `generate_layout` presets `38.901_InH_Open`, `38.901_InH_Mixed` (`src/generate_layout.cpp:1235`; preset table `:661`, `:662`); `3GPP_38.901_v19_Indoor_{LOS,NLOS}.conf`; `los_probability` `38.901_InH_Open`, `38.901_InH_Mixed` | One file pair for both offices; the TR says they differ only in LOS probability, which follows from the scenario family of the preset. Both presets place 6 × 2 BSs at 20 m in a 120 × 50 m hall (hBS 3 m) and drop the UTs inside. |
+| RMa | 7.2, Table 7.2-3 | Yes | `generate_layout` preset `38.901_RMa` (`src/generate_layout.cpp:1235`; preset table `:659`; building and car state `:547`); `3GPP_38.901_v19_RMa_*.conf` | Layout, heights, the indoor / in-car split (50 % each) and the UT drop come from the preset; in-car UTs use `o2i_loss` model `car`. |
+| InF (SL, DL, SH, DH, HH) | 7.2, Table 7.2-4 | Partial | `generate_layout` presets `38.901_InF_*` (`src/generate_layout.cpp:1235`; preset table `:663` to `:667`); `3GPP_38.901_v19_InF_LOS.conf`, `_InF_NLOS_{SL,DL,SH,DH}.conf`; `los_probability` `38.901_InF_*` | No HH file: HH is LOS only, so the LOS file plus `38.901_InF_HH` (p = 1) covers it. The presets set the hall, the BS lattice, hBS and the conf keys `DS_VS` and `absTOA_Lmax` of the hall. The layout of HH is a library choice (as SH; the TR has no calibration layout for it); clutter parameters differing from the conf defaults are inputs (`clutter`). |
+| SMa (Rel-19) | 7.2, Table 7.2-5 | Yes | `generate_layout` preset `38.901_SMa` (`src/generate_layout.cpp:1235`; preset table `:660`; residential and floors `:547`); `3GPP_38.901_v19_SMa_*.conf` | Layout, the residential/commercial split (option `p_residential`, default 0.9), floor heights and the in-car share come from the preset. |
 
 ### 3.3 Antenna modelling (7.3)
 
@@ -131,7 +131,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Building loss: low, high, low-loss A | 7.4.3.1, eq. 7.4-2/-3, Tables 7.4.3-1/-2 | Yes | `o2i_loss` (`src/o2i_loss.cpp:71`; materials `:145`, σ_P `:151`, loss `:174`) | Values match, including the Rel-19 IRR glass (25.4 + 0.11f). One N(0,1) draw per UT for all frequencies. The model mix is chosen per UT by `weights`; random inputs come from the caller. Tests `tests/catch2_tests/test_o2i_loss.cpp:78`, `:211`. |
+| Building loss: low, high, low-loss A | 7.4.3.1, eq. 7.4-2/-3, Tables 7.4.3-1/-2 | Yes | `o2i_loss` (`src/o2i_loss.cpp:71`; materials `:145`, σ_P `:151`, loss `:174`) | Values match, including the Rel-19 IRR glass (25.4 + 0.11f). One N(0,1) draw per UT for all frequencies. The model mix is chosen per UT by `weights`; random inputs come from the caller. Tests `tests/catch2_tests/test_o2i_loss.cpp:75`, `:209`. |
 | General material mix, wood | 7.4.3.1, eq. 7.4-3, Table 7.4.3-1 | Partial | `o2i_loss` (`src/o2i_loss.cpp:71`) | Only the fixed mixes of Table 7.4.3-2; no user-defined mix, wood unused. |
 | Indoor 2D distance | 7.4.3.1 | Yes | `o2i_loss` (`:176`); conf `O2I_d2D_in_max` | min(U1, U2)·d_max: 25 m (UMa, UMi, SMa), 10 m (RMa). SMa residential buildings (10 m) need a second call; the SMa files hold the commercial 25 m. |
 | Backward-compatible O2I below 6 GHz | 7.4.3.1, Table 7.4.3-3 | Yes | `o2i_loss` model `legacy_6GHz` (`:181`) | PL_tw = 20 dB, σ_P = 0; σ_SF = 7 dB from the UMa/UMi O2I files. Test `test_o2i_loss.cpp:115`. |
@@ -141,7 +141,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Exponential SF autocorrelation | 7.4.4, eq. 7.4-5 | Yes | `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:431`), `gbsm_draw` (`:607`), "lsf" generators (`:82`); `sos_preset` (`src/sos_preset.cpp:1563`); conf `SF_lambda` | Sum-of-sinusoids fields in the horizontal plane, per floor; all `SF_lambda` values match. **Drift (default):** preset `Comb256` (Gaussian up to d_cor, exponential beyond) with bias removal; the TR-literal setting is `Exp256` without bias removal (API doc `:368`). |
+| Exponential SF autocorrelation | 7.4.4, eq. 7.4-5 | Yes | `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:430`), `gbsm_draw` (`:606`), "lsf" generators (`:82`); `sos_preset` (`src/sos_preset.cpp:1563`); conf `SF_lambda` | Sum-of-sinusoids fields in the horizontal plane, per floor; all `SF_lambda` values match. **Drift (default):** preset `Comb256` (Gaussian up to d_cor, exponential beyond) with bias removal; the TR-literal setting is `Exp256` without bias removal (API doc `:368`). |
 
 ### 3.5 Fast fading model (7.5)
 
@@ -149,46 +149,46 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Angle notation (LOS, cluster, ray) | 7.5, Table 7.5-1, Fig. 7.5-2 | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:440`; LOS angles `:605`; zenith/elevation helper `:30`) | Elevation in rad, azimuth wrapped to [−π, π); N + 1 slots, not sorted (ssf_notes D4, W3). |
+| Angle notation (LOS, cluster, ray) | 7.5, Table 7.5-1, Fig. 7.5-2 | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:449`; LOS angles `:612`; zenith/elevation helper `:30`) | Elevation in rad, azimuth wrapped to [−π, π); N + 1 slots, not sorted (ssf_notes D4, W3). |
 | Uplink by reciprocity (CR 0035) | 7.5 introduction | Partial | `ssf_clusters`, `ssf_rays` | No uplink switch; the caller generates the downlink and transposes it. A Tx/Rx swap with mirrored random fields is exactly reciprocal only for `eod_offset_deg` = 0 and no O2I link (ssf_notes A7, D2). |
-| Step 1a: scenario, GCS | 7.5 step 1a | Yes | `conf_file_read` (`src/qd_scenpar.cpp:866`); 23 files `data/config/3GPP_38.901_v19_*.conf` | One file per scenario and LOS/O2I state (InH is `Indoor`; one InF NLOS file per clutter type). The TR frequency limits are stated in the file comments only. |
-| Step 1b–c: positions, LOS angles | 7.5 step 1b, 1c | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:440`; LOS geometry `:600`) | Tx is the BS (downlink). Wrap-around copies are the caller's. |
+| Step 1a: scenario, GCS | 7.5 step 1a | Yes | `conf_file_read` (`src/qd_scenpar.cpp:792`); 23 files `data/config/3GPP_38.901_v19_*.conf` | One file per scenario and LOS/O2I state (InH is `Indoor`; one InF NLOS file per clutter type). The TR frequency limits are stated in the file comments only. |
+| Step 1b–c: positions, LOS angles | 7.5 step 1b, 1c | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:449`; LOS geometry `:607`) | Tx is the BS (downlink). Wrap-around: `init_link_states` (`src/init_link_states.cpp:387`; images `:88`, nearest image `:96`) takes the image of the site (`layout.wrap`) nearest to the terminal and all distances of the link use it; `ssf_clusters` itself uses the positions it is given. |
 | Step 1d–e: patterns, arrays, orientations | 7.5 step 1d, 1e | Yes | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:117`) | `arrayant` in the LCS, Euler orientations (see 7.1). |
 | Step 1f: UT speed and direction | 7.5 step 1f | Yes | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:117`) | Positions per snapshot (`mobility` `phase` or `drift`). |
 | Step 1g: carrier frequency | 7.5 step 1g | Yes | `center_freq` [Hz] in all GBSM functions | The bandwidth matters only for 7.6.2. |
-| Step 2: LOS/NLOS and indoor state | 7.5 step 2 | Partial | `los_probability` (`src/los_probability.cpp:164`); workflow in section doc `src/qd_scenpar.cpp:721` | The library gives p_LOS. The caller draws the states (spatially consistent with the SOS generators at `LOS_state_lambda`, `IO_state_lambda`) and picks the scenario file. The LOS condition is a property of the file: LOS when `KF_mu > −30` dB (ssf_notes W1). |
+| Step 2: LOS/NLOS and indoor state | 7.5 step 2 | Partial | `los_probability` (`src/los_probability.cpp:164`); workflow in section doc `src/qd_scenpar.cpp:644` | The library gives p_LOS. The caller draws the states (spatially consistent with the SOS generators at `LOS_state_lambda`, `IO_state_lambda`) and picks the scenario file. The LOS condition is a property of the file: LOS when `KF_mu > −30` dB (ssf_notes W1). |
 | Step 3: path loss | 7.5 step 3 | Yes | `path_loss` (`src/path_loss.cpp:181`) | See 3.4.1. |
 | Step 4: log-normal LSPs, frequency terms, fc floors | 7.5 step 4, Table 7.5-6 notes | Yes | `lsp_generate` (`src/lsp_generate.cpp:177`; per-link loop `:317`); `qd_gbsm_lsp_stats` (`src/qd_helpers_gbsm.hpp:199`; fc floor `:226`) | μ = P_μ + P_γ·lg(P_ω + max(fc, `LSP_fc_min`)), floors UMa 6, UMi 2, InH 6 GHz as in the notes. Output `lsp`: DS in s, spreads in deg, K, SF, XPR linear; `lsp_mu`/`lsp_sigma` in the log domain. NLOS K "N/A" is `KF_mu` = −100 dB. |
-| Step 4: SF standard deviation | 7.5 step 4 (σ_SF from Table 7.4.1-1) | Yes | `lsp_generate` input `sf_sigma_dB` (`src/lsp_generate.cpp:318`) | **Drift (default):** without `sf_sigma_dB` from `path_loss`, RMa and SMa LOS use the file value 5 dB instead of 4/6 dB before/after the breakpoint (conf comment; `tests/catch2_tests/test_lsp_generate.cpp:811`). |
-| Step 4: cross-correlation | 7.5 step 4 | Yes | Cholesky `src/lsp_generate.cpp:239`, symmetric root `:253`; matrix `src/qd_scenpar.cpp:309` | Default Cholesky in TR order [SF, K, DS, ASD, ASA, ZSD, ZSA]. XPR is an 8th, uncorrelated LSP (QuaDRiGa extension) placed last, so it does not change the others. All 23 files are positive definite (`test_conf_files_v19.cpp:167`). `cholesky = false` is QuaDRiGa's symmetric root (not TR). |
+| Step 4: SF standard deviation | 7.5 step 4 (σ_SF from Table 7.4.1-1) | Yes | `lsp_generate` input `sf_sigma_dB` (`src/lsp_generate.cpp:318`) | **Drift (default):** without `sf_sigma_dB` from `path_loss`, RMa and SMa LOS use the file value 5 dB instead of 4/6 dB before/after the breakpoint (conf comment; `tests/catch2_tests/test_lsp_generate.cpp:813`). |
+| Step 4: cross-correlation | 7.5 step 4 | Yes | Cholesky `src/lsp_generate.cpp:239`, symmetric root `:253`; matrix `src/qd_scenpar.cpp:310` | Default Cholesky in TR order [SF, K, DS, ASD, ASA, ZSD, ZSA]. XPR is an 8th, uncorrelated LSP (QuaDRiGa extension) placed last, so it does not change the others. All 23 files are positive definite (`test_conf_files_v19.cpp:167`). `cholesky = false` is QuaDRiGa's symmetric root (not TR). |
 | Step 4: spread clipping (104°, 52°) | 7.5 step 4 | Yes | limits `src/lsp_generate.cpp:292`, applied `:322` | Default on; `clip_spreads = false` is a QuaDRiGa option. |
-| Step 4: co-sited sectors, different sites and floors | 7.5 step 4, Table 7.5-6 note 3 | Yes | `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:431`); `gbsm_draw` floor offsets (`:244`) | One seed per site and scenario; sectors of a site share the LSPs; other sites need other seeds. **Drift:** floors are exactly uncorrelated only at equal horizontal positions; elsewhere a residual correlation up to about 0.16 remains (source comment `:234`, doc `:538`). |
+| Step 4: co-sited sectors, different sites and floors | 7.5 step 4, Table 7.5-6 note 3 | Yes | `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:430`); `gbsm_draw` floor offsets (`:243`) | One seed per site and scenario; sectors of a site share the LSPs; other sites need other seeds. **Drift:** floors are exactly uncorrelated only at equal horizontal positions; elsewhere a residual correlation up to about 0.16 remains (source comment `:233`, doc `:537`). |
 | Step 4: LSP decorrelation distances | 7.5 step 4, Table 7.5-6 | Yes | `gbsm_draw` "lsf" generators (`src/qd_gbsm_phases.cpp:82`); conf `*_lambda` | All distances match. Default SOS preset as in 3.4.4. `XPR_lambda` has no TR source. |
 | Step 4: ZSD mean vs d2D, hUT, hBS, fc | Tables 7.5-7 to 7.5-12 | Yes | `src/qd_helpers_gbsm.hpp:281`; conf `ES_D_mu_*` | Written as ESD; the TR constant 0.01·1.5 is folded into `ES_D_mu`. Test `test_conf_files_v19.cpp:294`. |
 | Step 4: ZOD offset μ_offset,ZOD | Tables 7.5-7 to 7.5-12 | Yes | `lsp_generate` EoD offset block (`src/lsp_generate.cpp:332`); conf `EoD_offset_*` | Output `eod_offset_deg` = −μ_offset,ZOD. UMa NLOS uses the v19 form with the fc = 6 GHz floor; UMi, SMa, InH, InF follow the TR (`test_lsp_generate.cpp:530`). **Drift (RMa NLOS, O2I):** the library uses the SMa form with the actual hBS, hUT and the gate hUT < 3.5 m; the TR fixes hBS = 35 m, hUT = 1.5 m and has no gate. Equal at 35/1.5 m; 0 instead of about 1° for hUT ≥ 3.5 m (from reading, not measured). |
 | Step 4: InF DS with hall V/S | Table 7.5-6 Part-3 | Yes | DS term `src/qd_helpers_gbsm.hpp:258`; conf `DS_VS`, `DS_VS_a`, `DS_VS_b` | NLOS files hold the V/S of their calibration hall (4 or 4.55). **Drift (default):** `InF_LOS.conf` uses the average 4.27 for all halls, about ±0.024 in μ_lgDS (55.8 ns instead of 52.7 or 59.0 ns median) unless the caller sets `DS_VS` (conf comment; from reading, not measured). |
-| Step 5: exponential cluster delays | 7.5 step 5, eq. 7.5-1/-2 | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:440`); kernel `qd_ssf_tr` (`:43`; delays `:47`) | No sort: the TR's first cluster is the one with the smallest delay (W3). X_n from a spatially consistent field (D6). Delays in s relative to the LOS delay. Method `38.901` accepts one frequency only (D2). |
+| Step 5: exponential cluster delays | 7.5 step 5, eq. 7.5-1/-2 | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:449`); kernel `qd_ssf_tr` (`:43`; delays `:47`) | No sort: the TR's first cluster is the one with the smallest delay (W3). X_n from a spatially consistent field (D6). Delays in s relative to the LOS delay. Method `38.901` accepts one frequency only (D2). |
 | Step 5: uniform delay distribution | 7.5 step 5 | No | – | Only the exponential distribution, which Table 7.5-6 prescribes for all scenarios. |
 | Step 5: LOS delay scaling C_τ | 7.5 step 5, eq. 7.5-3/-4 | Yes | `qd_ssf_tr` (`src/ssf_clusters.cpp:43`) | **Drift:** K limited to ≥ −5 dB in the polynomial (ssf_notes W2; `tests/catch2_tests/test_ssf_clusters.cpp:351`). LOS chosen per scenario file, not per link (W1). |
 | Step 6: cluster powers with per-cluster shadowing | 7.5 step 6, eq. 7.5-5/-6 | Yes | `qd_ssf_tr` (`src/ssf_clusters.cpp:47`); conf `r_DS`, `LNS_ksi` | Normalised in the log domain (W18). Z_n from the per-frequency random set (D6). |
-| Step 6: LOS power and LOS cluster powers | 7.5 step 6, eq. 7.5-7/-8 | Yes | `qd_ssf_tr` (`:77`); LOS slot `src/ssf_clusters.cpp:705` | Output = coefficient powers of 7.5-30; the 7.5-8 powers are used inside the angle mapping only (D7, A16). |
+| Step 6: LOS power and LOS cluster powers | 7.5 step 6, eq. 7.5-7/-8 | Yes | `qd_ssf_tr` (`:77`); LOS slot `src/ssf_clusters.cpp:712` | Output = coefficient powers of 7.5-30; the 7.5-8 powers are used inside the angle mapping only (D7, A16). |
 | Step 6: −25 dB cluster removal | 7.5 step 6 | Yes | `qd_ssf_tr` (`src/ssf_clusters.cpp:68`) | Criterion on the 7.5-6 powers; a removed cluster keeps its slot with power 0, no renormalisation (D5, A10; `test_ssf_clusters.cpp:372`). |
-| Step 6: ray power P_n/M | 7.5 step 6 | Yes | `ssf_rays` (`src/ssf_rays.cpp:180`; `:494`) | M = `NumSubPaths` (20 in all files). |
+| Step 6: ray power P_n/M | 7.5 step 6 | Yes | `ssf_rays` (`src/ssf_rays.cpp:180`; `:492`) | M = `NumSubPaths` (20 in all files). |
 | Step 7: AOA/AOD with C_φ | 7.5 step 7, eq. 7.5-9 to 7.5-12, Table 7.5-2 | Yes | `qd_ssf_tr` (`src/ssf_clusters.cpp:74`; mapping `:103`, LOS alignment `:109`) | C_φ interpolated between table entries, constant outside (D5, A8). **Drift:** the K ≥ −5 dB limit also enters the LOS factor of 7.5-10 (W2). C_φ uses the cluster count before the −25 dB removal; the TR does not say which count (from reading, not measured). |
-| Step 7: ZOA with C_θ, O2I ZOA = 90° | 7.5 step 7, eq. 7.5-14 to 7.5-17, Table 7.5-4 | Yes | `qd_ssf_tr` (`:97`, `:103`); O2I centre `src/ssf_clusters.cpp:637` | C_θ as C_φ; non-monotonic entries used as given (A8). The caller passes the `o2i` flag per link; the O2I file alone does not set 90°. |
-| Step 7: ZOD with μ_offset,ZOD (CR 0043) | 7.5 step 7, eq. 7.5-19 | Yes | `qd_ssf_tr`; offset applied `src/ssf_clusters.cpp:636` | `eod_offset_deg` from `lsp_generate`, passed by the caller (omitted = 0). Applied in NLOS only; LOS follows 7.5-17 without offset, as in v19.5. |
-| Step 7: ray offset angles | 7.5 step 7, eq. 7.5-13, 7.5-18, 7.5-20, Table 7.5-3 | Yes | `ssf_rays` (`src/ssf_rays.cpp:180`; table `:21`, c_ZSD `:445`, angles `:497`); conf `PerClusterAS_*`, `PerClusterES_A`, `PerClusterES_D_scale` | c_ZSD = 3/8·10^μ_lgZSD from `lsp_mu` slice 5 (A18). Table 7.5-3 at M = 20; other M use a deterministic non-TR rule (W24). |
+| Step 7: ZOA with C_θ, O2I ZOA = 90° | 7.5 step 7, eq. 7.5-14 to 7.5-17, Table 7.5-4 | Yes | `qd_ssf_tr` (`:97`, `:103`); O2I centre `src/ssf_clusters.cpp:644` | C_θ as C_φ; non-monotonic entries used as given (A8). The caller passes the `o2i` flag per link; the O2I file alone does not set 90°. |
+| Step 7: ZOD with μ_offset,ZOD (CR 0043) | 7.5 step 7, eq. 7.5-19 | Yes | `qd_ssf_tr`; offset applied `src/ssf_clusters.cpp:643` | `eod_offset_deg` from `lsp_generate`, passed by the caller (omitted = 0). Applied in NLOS only; LOS follows 7.5-17 without offset, as in v19.5. |
+| Step 7: ray offset angles | 7.5 step 7, eq. 7.5-13, 7.5-18, 7.5-20, Table 7.5-3 | Yes | `ssf_rays` (`src/ssf_rays.cpp:180`; table `:21`, c_ZSD `:443`, angles `:495`); conf `PerClusterAS_*`, `PerClusterES_A`, `PerClusterES_D_scale` | c_ZSD = 3/8·10^μ_lgZSD from `lsp_mu` slice 5 (A18). Table 7.5-3 at M = 20; other M use a deterministic non-TR rule (W24). |
 | Step 7: zenith wrap | 7.5 step 7 | Yes | `qd_gbsm_elev` (`src/qd_helpers_gbsm.hpp:71`); ray fold `src/ssf_rays.cpp:333` | **Drift (rare cases):** the same fold is applied to ZOD, which the TR states for ZOA only, and the azimuth is not flipped (ssf_notes A12, A23, D5; `test_ssf_clusters.cpp:454`). |
-| Step 8: random coupling of rays | 7.5 step 8 | Yes | `ssf_rays` (`src/ssf_rays.cpp:455`) | Rank fields give independent random permutations within each cluster and sub-cluster, the TR's joint distribution (A20). Spatially consistent, kept per drop (D14). |
-| Step 9: per-ray XPR | 7.5 step 9, eq. 7.5-21 | Yes | `ssf_rays` (`src/ssf_rays.cpp:534`) | μ, σ from `lsp_mu`/`lsp_sigma` slice 7 in dB. `pol_model = "quadriga"` is a non-TR option. |
+| Step 8: random coupling of rays | 7.5 step 8 | Yes | `ssf_rays` (`src/ssf_rays.cpp:453`) | Rank fields give independent random permutations within each cluster and sub-cluster, the TR's joint distribution (A20). Spatially consistent, kept per drop (D14). |
+| Step 9: per-ray XPR | 7.5 step 9, eq. 7.5-21 | Yes | `ssf_rays` (`src/ssf_rays.cpp:532`) | μ, σ from `lsp_mu`/`lsp_sigma` slice 7 in dB. `pol_model = "quadriga"` is a non-TR option. |
 | Steps 1–9 shared by co-sited sectors | 7.5 step 9 | Yes | `ssf_rays` | Ray data are antenna-free; sectors differ only in the channel call. |
-| Step 10: initial phases | 7.5 step 10 | Yes | `ssf_rays` (`src/ssf_rays.cpp:506`); `gbsm_draw` (`src/qd_gbsm_phases.cpp:607`) | Uniform in (−π, π) from a spatially consistent field; stored as Jones entries (θθ, φθ, θφ, φφ). |
-| Step 11: NLOS coefficient | 7.5 step 11, eq. 7.5-22 to 7.5-24 | Yes | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:117`; planar call `:322`); `get_channels_planar` (`src/get_channels_planar.cpp:109`; patterns `:263`, F_rx^T·M·F_tx `:309`, phase `:325`) | Each path also gets the phase −2π(d3D + cτ)/λ, which has no statistical effect (from reading, not measured). **Drift (wideband only):** delays are per element pair including the array geometry (7.6.2.1 always on), 0.2–2.3 ns on large arrays, where 7.5 uses one delay per cluster (ssf_notes section 14, D27). |
-| Step 11: Doppler term | 7.5 step 11, eq. 7.5-22, 7.5-25 | Yes | `ssf_paths` (`src/ssf_paths.cpp:103`; `:246`, `:275`) via `gbsm_single_link_channel` | Displacement form, equal to r̂·v·t while r̂ is fixed (A25, mobility `phase`). `drift` is a non-TR mode (D11). Test `tests/catch2_tests/test_ssf_paths.cpp:209`. |
-| Step 11: sub-clusters of the two strongest clusters | 7.5 step 11, eq. 7.5-26 to 7.5-28, Table 7.5-5 | Yes | `ssf_rays` (selection `src/ssf_rays.cpp:412`, groups `:308`, delays `:492`); c_DS `qd_gbsm_cds` (`src/qd_helpers_gbsm.hpp:123`) | Strongest = largest coefficient power; LOS and GR never split; only for M = 20 and the TR methods (A17, D13). c_DS = 3.91 ns where the TR gives N/A. UMa c_DS floor: see the UMa parameters row in 3.5. |
-| Step 11: LOS coefficient | 7.5 step 11, eq. 7.5-29 | Yes | `ssf_rays` (`src/ssf_rays.cpp:397`); `get_channels_planar` (`src/get_channels_planar.cpp:325`) | Jones matrix diag(1, −1), phase from d3D, geometric angles. |
-| Step 11: K-factor combination | 7.5 step 11, eq. 7.5-30 | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:705`); `ssf_paths` (`src/ssf_paths.cpp:196`) | Already in the coefficient powers (D7). LOS and the first sub-cluster are two taps at delay 0: one more tap than the TR, same sum (`test_gbsm_single_link_channel.cpp:513`). `kf_ratio` is a non-TR option. |
-| Step 12: path loss and shadowing | 7.5 step 12 | Yes | `ssf_paths` (`src/ssf_paths.cpp:301`); `gbsm_single_link_channel` | The caller passes `link_gain_dB` = −PL − O2I + 10·lg SF per snapshot (D24). |
+| Step 10: initial phases | 7.5 step 10 | Yes | `ssf_rays` (`src/ssf_rays.cpp:504`); `gbsm_draw` (`src/qd_gbsm_phases.cpp:606`) | Uniform in (−π, π) from a spatially consistent field; stored as Jones entries (θθ, φθ, θφ, φφ). |
+| Step 11: NLOS coefficient | 7.5 step 11, eq. 7.5-22 to 7.5-24 | Yes | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:117`; planar call `:322`); `get_channels_planar` (`src/get_channels_planar.cpp:109`; patterns `:258`, F_rx^T·M·F_tx `:304`, phase `:320`) | Each path also gets the phase −2π(d3D + cτ)/λ, which has no statistical effect (from reading, not measured). **Drift (wideband only):** delays are per element pair including the array geometry (7.6.2.1 always on), 0.2–2.3 ns on large arrays, where 7.5 uses one delay per cluster (ssf_notes section 14, D27). |
+| Step 11: Doppler term | 7.5 step 11, eq. 7.5-22, 7.5-25 | Yes | `ssf_paths` (`src/ssf_paths.cpp:103`; `:243`, `:272`) via `gbsm_single_link_channel` | Displacement form, equal to r̂·v·t while r̂ is fixed (A25, mobility `phase`). `drift` is a non-TR mode (D11). Test `tests/catch2_tests/test_ssf_paths.cpp:209`. |
+| Step 11: sub-clusters of the two strongest clusters | 7.5 step 11, eq. 7.5-26 to 7.5-28, Table 7.5-5 | Yes | `ssf_rays` (selection `src/ssf_rays.cpp:410`, groups `:308`, delays `:490`); c_DS `qd_gbsm_cds` (`src/qd_helpers_gbsm.hpp:123`) | Strongest = largest coefficient power; LOS and GR never split; only for M = 20 and the TR methods (A17, D13). c_DS = 3.91 ns where the TR gives N/A. UMa c_DS floor: see the UMa parameters row in 3.5. |
+| Step 11: LOS coefficient | 7.5 step 11, eq. 7.5-29 | Yes | `ssf_rays` (`src/ssf_rays.cpp:395`); `get_channels_planar` (`src/get_channels_planar.cpp:320`) | Jones matrix diag(1, −1), phase from d3D, geometric angles. |
+| Step 11: K-factor combination | 7.5 step 11, eq. 7.5-30 | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:712`); `ssf_paths` (`src/ssf_paths.cpp:193`) | Already in the coefficient powers (D7). LOS and the first sub-cluster are two taps at delay 0: one more tap than the TR, same sum (`test_gbsm_single_link_channel.cpp:513`). `kf_ratio` is a non-TR option. |
+| Step 12: path loss and shadowing | 7.5 step 12 | Yes | `ssf_paths` (`src/ssf_paths.cpp:298`); `gbsm_single_link_channel` | The caller passes `link_gain_dB` = −PL − O2I + 10·lg SF per snapshot (D24). |
 
 #### Parameter tables
 
@@ -209,16 +209,16 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Oxygen loss per cluster | 7.6.1, eq. 7.6-1, Table 7.6.1-1 | Yes | `ssf_paths` (`src/ssf_paths.cpp:103`; table `:210`, applied `:302`); switch `oxygen` of `gbsm_single_link_channel` | Off by default. Table at 52–68 GHz, linear interpolation, 0 outside (W27). Loss from each path's own length (sub-cluster rays up to +0.13 dB, A24). **Drift:** τ_Δ = min τ′_n is not added: in NLOS without absolute TOA the loss is too low (60 GHz p99: UMi 0.71 dB, UMa 1.28 dB; ssf_notes A19, section 14). |
+| Oxygen loss per cluster | 7.6.1, eq. 7.6-1, Table 7.6.1-1 | Yes | `ssf_paths` (`src/ssf_paths.cpp:103`; table `:207`, applied `:299`); switch `oxygen` of `gbsm_single_link_channel` | Off by default. Table at 52–68 GHz, linear interpolation, 0 outside (W27). Loss from each path's own length (sub-cluster rays up to +0.13 dB, A24). **Drift:** τ_Δ = min τ′_n is not added: in NLOS without absolute TOA the loss is too low (60 GHz p99: UMi 0.71 dB, UMa 1.28 dB; ssf_notes A19, section 14). |
 | Oxygen loss across a large bandwidth | 7.6.1, eq. 7.6-2 | No | – | Evaluated at each `center_freq` only (A24). |
 
 #### 3.6.2 Large bandwidth and large antenna array (7.6.2)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Per-element, per-ray propagation delay | 7.6.2.1, eq. 7.6-3, 7.6-4 | Yes | `get_channels_planar` (`src/get_channels_planar.cpp:109`; `:325`); `gbsm_single_link_channel` output `rays` | Delay τ − r̂·d/c per element pair; the frequency dependence comes through a frequency response. Output `taps` uses one mean delay per tap. The B > c/D test is the caller's. |
+| Per-element, per-ray propagation delay | 7.6.2.1, eq. 7.6-3, 7.6-4 | Yes | `get_channels_planar` (`src/get_channels_planar.cpp:109`; `:320`); `gbsm_single_link_channel` output `rays` | Delay τ − r̂·d/c per element pair; the frequency dependence comes through a frequency response. Output `taps` uses one mean delay per tap. The B > c/D test is the caller's. |
 | Random per-ray angle offsets | 7.6.2.2 item 1, eq. 7.6-5 | No | – | Only the fixed offsets of Table 7.5-3 (ssf_notes section 16: future work). |
-| Intra-cluster ray delays | 7.6.2.2 item 2 | Partial | `ssf_rays` (`src/ssf_rays.cpp:470`) | Only in the non-TR method `quadriga`, where delays are zero-mean per cluster instead of minimum-subtracted and the field uses its own decorrelation distance (D15). The TR methods keep the sub-cluster split. |
+| Intra-cluster ray delays | 7.6.2.2 item 2 | Partial | `ssf_rays` (`src/ssf_rays.cpp:468`) | Only in the non-TR method `quadriga`, where delays are zero-mean per cluster instead of minimum-subtracted and the field uses its own decorrelation distance (D15). The TR methods keep the sub-cluster split. |
 | Unequal ray powers | 7.6.2.2 item 3, eq. 7.6-6, 7.6-7 | No | – | Ray power is always P_n/M. |
 | Number of rays from bandwidth and aperture | 7.6.2.2 item 4, eq. 7.6-8 | No | – | M is the key `NumSubPaths`; formula 7.6-8 is not computed. |
 
@@ -226,15 +226,15 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Spatially consistent cluster and ray variables | 7.6.3.1 | Yes | `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:431`), `gbsm_draw` (`:607`; cluster set `:100`, ray set `:121`) | SOS fields at `SC_lambda` for delays, shadowing, signs and offsets, coupling ranks, XPR, phases, η; slots keep the cluster identity (W3, A2). The 7.5 steps stay discontinuous under spatial consistency (documented jumps, ssf_notes section 2). **Drift:** the offsets Y_n are kept along a track together with the signs; the TR keeps only the signs (D5, A1). Separately dropped UTs keep correlated taps over 0.3–0.8·`SC_lambda` (TR-literal; issue #25). |
+| Spatially consistent cluster and ray variables | 7.6.3.1 | Yes | `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:430`), `gbsm_draw` (`:606`; cluster set `:100`, ray set `:121`) | SOS fields at `SC_lambda` for delays, shadowing, signs and offsets, coupling ranks, XPR, phases, η; slots keep the cluster identity (W3, A2). The 7.5 steps stay discontinuous under spatial consistency (documented jumps, ssf_notes section 2). **Drift:** the offsets Y_n are kept along a track together with the signs; the TR keeps only the signs (D5, A1). Separately dropped UTs keep correlated taps over 0.3–0.8·`SC_lambda` (TR-literal; issue #25). |
 | Correlation distances | Table 7.6.3.1-2 | Yes | conf `SC_lambda`, `LOS_state_lambda`, `IO_state_lambda` | All values match. The LOS and indoor distances are read by the caller. |
 | Procedure A (cluster updates for moving UT/BS) | 7.6.3.2, eq. 7.6-9 to 7.6-14 | No | – | Not implemented (ssf_notes D1, section 16). Instead: mobility `phase` (fixed delays and angles, displacement phase only) and `drift` (fixed scatterers, geometry per position, non-TR; D11). |
 | Procedure B | 7.6.3.2, eq. 7.6-15 to 7.6-17f | No | – | Dropped after measurement: as written it gives 0.47–0.74 (NLOS) and 0.14–0.19 (LOS) of the input spreads (ssf_notes D1, section 2). |
-| LOS/NLOS and indoor state | 7.6.3.3 | Partial | `los_probability` (`src/los_probability.cpp:164`); `sos_rand`, `sos_randn` | The library gives p_LOS and the generators; the draw and the comparison are the caller's. |
+| LOS/NLOS and indoor state | 7.6.3.3 | Yes | `init_link_states` (`src/init_link_states.cpp:387`; LOS field `:276`, p_LOS `:316`); `los_probability` (`src/los_probability.cpp:164`); `sos_rand` | The LOS state of each link is a spatially correlated uniform field per site, image and family compared with p_LOS; the indoor state of each terminal is drawn from correlated fields. Both are stored in `layout.links` and can be edited before the rays are generated. |
 | Soft LOS state | 7.6.3.3, eq. 7.6-18, 7.6-19 | Partial | `los_probability` (`src/los_probability.cpp:338`) | 7.6-18 per frequency with the caller's G (`rnd_g`); the two channel runs and their combination (7.6-19) are the caller's. Test `test_los_probability.cpp:413`. |
-| O2I parameters | 7.6.3.3 | Yes | `o2i_loss` (`src/o2i_loss.cpp:71`; `:162`) | The caller supplies spatially consistent `rnd` at the TR distances. |
-| Same floor correlated, different floors not | 7.6.3.3 | Yes | `gbsm_draw` floor IDs (`src/qd_gbsm_phases.cpp:222`) | **Drift:** residual floor correlation, see 3.5 step 4. |
-| Correlation among TRPs, uncorrelated states | 7.6.3.4, Tables 7.6.3.4-1/-2 | Yes | seed rule of `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:431`) | One seed per site and scenario; LOS, NLOS and O2I scenarios need different seeds (W21). |
+| O2I parameters | 7.6.3.3 | Yes | `o2i_loss` (`src/o2i_loss.cpp:71`; `:162`); `init_link_states` (`src/init_link_states.cpp:387`; `o2i_rnd` `:190`, `o2i_loss` call `:257`) | Called with spatially consistent `rnd` at the first position of each terminal (`o2i_rnd` of `layout.links`); direct callers of `o2i_loss` supply them. |
+| Same floor correlated, different floors not | 7.6.3.3 | Yes | `gbsm_draw` floor IDs (`src/qd_gbsm_phases.cpp:221`) | **Drift:** residual floor correlation, see 3.5 step 4. |
+| Correlation among TRPs, uncorrelated states | 7.6.3.4, Tables 7.6.3.4-1/-2 | Yes | seed rule of `gbsm_init_phases` (`src/qd_gbsm_phases.cpp:430`) | One seed per site and scenario; LOS, NLOS and O2I scenarios need different seeds (W21). |
 
 #### 3.6.4 Blockage (7.6.4)
 
@@ -248,13 +248,13 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Multi-frequency rules | 7.6.5 | Yes | `lsp_generate`, `ssf_clusters`, `ssf_rays`; per-frequency random sets | Same LSP random values at all frequencies, Z_n and steps 8–11 per frequency (D14). Method `38.901` rejects more than one frequency because 7.5 cannot keep delays and angles frequency-independent (A3, D2); use `38.901_MF`. |
-| Alternative generation method | 7.6.5.1, eq. 7.6-30a to 7.6-30m | Yes | `ssf_clusters` method `38.901_MF` (`src/ssf_clusters.cpp:440`; kernel `qd_ssf_mf` `:128`) | TR-literal, including "wrap, then scale by √(1+K)" with its LOS jumps; none of the 7.5 rules added (D1, A4). Anchor LSPs are an input (`lsp_anchor`). Added: the 7.5 zenith fold on the final zenith angles (W4). Tests `test_ssf_clusters_mf.cpp:169`. |
+| Alternative generation method | 7.6.5.1, eq. 7.6-30a to 7.6-30m | Yes | `ssf_clusters` method `38.901_MF` (`src/ssf_clusters.cpp:449`; kernel `qd_ssf_mf` `:128`) | TR-literal, including "wrap, then scale by √(1+K)" with its LOS jumps; none of the 7.5 rules added (D1, A4). Anchor LSPs are an input (`lsp_anchor`). Added: the 7.5 zenith fold on the final zenith angles (W4). Tests `test_ssf_clusters_mf.cpp:169`. |
 
 #### 3.6.6 Time-varying Doppler shift (7.6.6)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Time-varying Doppler | 7.6.6, eq. 7.6-31 | Yes | `ssf_paths` (`src/ssf_paths.cpp:244`, `:275`) | Displacement form, exact for any trajectory while r̂ is fixed (A25). |
+| Time-varying Doppler | 7.6.6, eq. 7.6-31 | Yes | `ssf_paths` (`src/ssf_paths.cpp:241`, `:272`) | Displacement form, exact for any trajectory while r̂ is fixed (A25). |
 
 #### 3.6.7 UT rotation (7.6.7)
 
@@ -266,20 +266,20 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Ground reflection path | 7.6.8, eq. 7.6-32 to 7.6-40 | Yes | `ssf_clusters` (GR block `src/ssf_clusters.cpp:592`); `ssf_rays` (`src/ssf_rays.cpp:385`); `ssf_paths` (`src/ssf_paths.cpp:223`); key `GR_enabled` | Off in all files (TR optional). GR slot power K/(K+1)·(d3D/d_GR)²·R², coefficient diag(R∥, −R⊥)/R, equal to the TR form (W7). Additive, no renormalisation, as written (median +1.6 dB link power in UMi LOS; A14). Test `test_ssf_clusters.cpp:517`. |
-| Ground permittivity | 7.6.8, eq. 7.6-41, 7.6-42, Table 7.6.8-1 | Partial | `lsp_generate` (`src/lsp_generate.cpp:360`) | **Drift:** QuaDRiGa's dry/medium/wet fits; only very dry ground agrees with the table (3.5 GHz medium 16.87 + j0.67 vs 13.23 + j1.39, wet j1.65 vs j3.93; source comment). The caller can pass table values as `gr_eps_re`, `gr_eps_im`. |
+| Ground reflection path | 7.6.8, eq. 7.6-32 to 7.6-40 | Yes | `ssf_clusters` (GR block `src/ssf_clusters.cpp:599`); `ssf_rays` (`src/ssf_rays.cpp:383`); `ssf_paths` (`src/ssf_paths.cpp:220`); key `GR_enabled` | Off in all files (TR optional). GR slot power K/(K+1)·(d3D/d_GR)²·R², coefficient diag(R∥, −R⊥)/R, equal to the TR form (W7). Additive, no renormalisation, as written (median +1.6 dB link power in UMi LOS; A14). Test `test_ssf_clusters.cpp:517`. |
+| Ground permittivity | 7.6.8, eq. 7.6-41, 7.6-42, Table 7.6.8-1 | Partial | `lsp_generate` (`src/lsp_generate.cpp:359`) | **Drift:** QuaDRiGa's dry/medium/wet fits; only very dry ground agrees with the table (3.5 GHz medium 16.87 + j0.67 vs 13.23 + j1.39, wet j1.65 vs j3.93; source comment). The caller can pass table values as `gr_eps_re`, `gr_eps_im`. |
 
 #### 3.6.9 Absolute time of arrival (7.6.9)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Absolute time of arrival | 7.6.9, eq. 7.6-43, 7.6-44, Table 7.6.9-1 | Yes | `lsp_generate` (`src/lsp_generate.cpp:349`); `ssf_clusters` (`src/ssf_clusters.cpp:677`); conf `absTOA_*` | All values match, including the 2L/c bound. Spatially consistent, NLOS files only (including O2I; the TR does not say whether O2I counts as NLOS). Tests `test_ssf_clusters.cpp:476`, `test_lsp_generate.cpp:900`. |
+| Absolute time of arrival | 7.6.9, eq. 7.6-43, 7.6-44, Table 7.6.9-1 | Yes | `lsp_generate` (`src/lsp_generate.cpp:349`); `ssf_clusters` (`src/ssf_clusters.cpp:684`); conf `absTOA_*` | All values match, including the 2L/c bound. Spatially consistent, NLOS files only (including O2I; the TR does not say whether O2I counts as NLOS). Tests `test_ssf_clusters.cpp:476`, `test_lsp_generate.cpp:900`. |
 
 #### 3.6.10 Dual mobility (7.6.10)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Doppler with Tx and Rx moving | 7.6.10, eq. 7.6-45 | Yes | `ssf_paths` (`src/ssf_paths.cpp:244`); `gbsm_draw` `dual_mobility` | Both ends in the displacement form; mirrored random fields for swap reciprocity (D2, A7, A26). |
+| Doppler with Tx and Rx moving | 7.6.10, eq. 7.6-45 | Yes | `ssf_paths` (`src/ssf_paths.cpp:241`); `gbsm_draw` `dual_mobility` | Both ends in the displacement form; mirrored random fields for swap reciprocity (D2, A7, A26). |
 | Mobile scatterers | 7.6.10, eq. 7.6-46 | No | – | No α, D term (ssf_notes section 16). |
 
 #### 3.6.11 Sources of EM interference (7.6.11)
@@ -299,27 +299,27 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Near-field LOS (element-wise phase and patterns) | 7.6.13, eq. 7.6-50, 7.6-51 | Yes | `get_channels_spherical` (`src/get_channels_spherical.cpp:145`; elements `src/qd_helpers_channel.hpp:233`, paths `:256`) | Exact distance and angles per element pair. Through `gbsm_single_link_channel` only with mobility `drift` (non-TR for the TR methods, D11). |
-| Near-field NLOS (s_TRP, s_UE) | 7.6.13, eq. 7.6-47 to 7.6-49, Table 7.6.13-1 | No | – | `NF_*` keys are in the files and match the table but are not read (`src/qd_scenpar.cpp:1030`). `ssf_scatterers` places scatterers by a different rule (D16). |
+| Near-field NLOS (s_TRP, s_UE) | 7.6.13, eq. 7.6-47 to 7.6-49, Table 7.6.13-1 | No | – | `NF_*` keys are in the files and match the table but are not read (`src/qd_scenpar.cpp:957`). `ssf_scatterers` places scatterers by a different rule (D16). |
 
 #### 3.6.14 Spatial non-stationarity channel model (7.6.14)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | SNS at the TRP, blocker-based | 7.6.14.1, eq. 7.6-52 | No | – | |
-| SNS at the TRP, stochastic visibility regions | 7.6.14.1, eq. 7.6-53 to 7.6-58 | No | – | `SNS_*` keys match the tables but are not read (`src/qd_scenpar.cpp:1030`). |
+| SNS at the TRP, stochastic visibility regions | 7.6.14.1, eq. 7.6-53 to 7.6-58 | No | – | `SNS_*` keys match the tables but are not read (`src/qd_scenpar.cpp:957`). |
 | SNS at the UT (grip attenuation) | 7.6.14.2, Tables 7.6.14.2-1/-2 | No | – | Could be expressed as per-element gains of the UT `arrayant`. |
 
 #### 3.6.15 Number of cluster variability model (7.6.15)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Number-of-cluster variability | 7.6.15, Table 7.6.15-1 | Yes | `ssf_clusters` `n_cluster` (`src/ssf_clusters.cpp:547`, `:598`); conf `NumClusters`, `NumClusters_min` | Files hold N + 1 in both keys (D4, A9); ranges match the table; the choice is the caller's (W11). Test `test_ssf_clusters.cpp:936`. |
+| Number-of-cluster variability | 7.6.15, Table 7.6.15-1 | Yes | `ssf_clusters` `n_cluster` (`src/ssf_clusters.cpp:556`, `:605`); conf `NumClusters`, `NumClusters_min` | Files hold N + 1 in both keys (D4, A9); ranges match the table; the choice is the caller's (W11). Test `test_ssf_clusters.cpp:936`. |
 
 #### 3.6.16 Polarization power variability model (7.6.16)
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Polarisation power variability | 7.6.16, eq. 7.6-59 to 7.6-62 | Yes | `ssf_rays` (`src/ssf_rays.cpp:539`); key `PolVar_sigma` | 3 dB in all files; NLOS rays only, `pol_model = "38.901"`. **Drift:** η from spatially consistent fields at `SC_lambda` instead of independent draws (same marginals; A22). |
+| Polarisation power variability | 7.6.16, eq. 7.6-59 to 7.6-62 | Yes | `ssf_rays` (`src/ssf_rays.cpp:537`); key `PolVar_sigma` | 3 dB in all files; NLOS rays only, `pol_model = "38.901"`. **Drift:** η from spatially consistent fields at `SC_lambda` instead of independent draws (same marginals; A22). |
 
 ### 3.7 Channel models for link-level evaluations (7.7)
 
@@ -327,8 +327,8 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 |---|---|---|---|---|
 | CDL-A to CDL-E tables | 7.7.1, Tables 7.7.1-1 to 7.7.1-5 | No | – | No tables or presets. |
 | CDL step 1: ray angles | 7.7.1 step 1, eq. 7.7-0a | Partial | `ssf_rays` (`src/ssf_rays.cpp:180`; offsets `:30`) | The caller can pass the tabulated clusters as cluster cubes (elevations, rad, linear powers, LOS in slot 0) and the CDL c_ASD, c_ASA, c_ZSA, c_ZSD as `PerCluster*` keys (ssf_notes D10). Untested route (from reading, not measured). |
-| CDL step 2: random coupling | 7.7.1 step 2 | Partial | `ssf_rays` (`src/ssf_rays.cpp:455`) | **Drift:** with M = 20 and the TR methods the two strongest clusters are always split into sub-clusters (delays +1.28·c_DS, +2.56·c_DS, coupling within sub-clusters); CDL treats all clusters as unsplit. No option turns this off (from reading, not measured). |
-| CDL step 3: per-ray XPR | 7.7.1 step 3, eq. 7.7-0b | Partial | `ssf_rays` (`src/ssf_rays.cpp:534`) | Fixed CDL XPR via μ = table value and σ = 0 supplied by the caller. |
+| CDL step 2: random coupling | 7.7.1 step 2 | Partial | `ssf_rays` (`src/ssf_rays.cpp:453`) | **Drift:** with M = 20 and the TR methods the two strongest clusters are always split into sub-clusters (delays +1.28·c_DS, +2.56·c_DS, coupling within sub-clusters); CDL treats all clusters as unsplit. No option turns this off (from reading, not measured). |
+| CDL step 3: per-ray XPR | 7.7.1 step 3, eq. 7.7-0b | Partial | `ssf_rays` (`src/ssf_rays.cpp:532`) | Fixed CDL XPR via μ = table value and σ = 0 supplied by the caller. |
 | CDL step 4: coefficients | 7.7.1 step 4 | Partial | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:117`) | Mobility `phase` with the ray data; the step-2 drift applies. |
 | Brick-wall window | 7.7.1 | No | – | |
 | TDL-A to TDL-E tables | 7.7.2, Tables 7.7.2-1 to 7.7.2-5 | No | – | `get_channels_ieee_indoor` is the IEEE TGn model; `quantize_delays` (`src/qd_channel_quantize_delays.cpp:234`) maps paths to a tap grid. Neither is TR TDL. |
@@ -340,7 +340,7 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 | Spatial filter: generation procedure | 7.7.4.2, eq. 7.7-4 | Partial | `interpolate_pattern` (`src/interpolate_pattern.cpp:207`); `rotate_pattern` (`src/pattern_transform.cpp`) | Building blocks only; no function applies 7.7-4 or picks the dominant direction. |
 | CDL angle translation and scaling | 7.7.5.1, eq. 7.7-5 to 7.7-6b, Table 7.7.5.1-1 | No | – | |
 | TDL correlation matrix | 7.7.5.2 | No | – | |
-| K-factor of CDL/TDL-D and -E | 7.7.6, eq. 7.7.6-1, 7.7.6-2 | Partial | `gbsm_single_link_channel` `kf_ratio` → `ssf_paths` (`src/ssf_paths.cpp:196`) | API: ratio K_desired/K_model. **Drift:** the library keeps the LOS + NLOS sum where the TR keeps the LOS power (same K, different total gain), and the delay renormalisation to DS = 1 is missing (from reading, not measured). |
+| K-factor of CDL/TDL-D and -E | 7.7.6, eq. 7.7.6-1, 7.7.6-2 | Partial | `gbsm_single_link_channel` `kf_ratio` → `ssf_paths` (`src/ssf_paths.cpp:193`) | API: ratio K_desired/K_model. **Drift:** the library keeps the LOS + NLOS sum where the TR keeps the LOS power (same K, different total gain), and the delay renormalisation to DS = 1 is missing (from reading, not measured). |
 
 ### 3.8 Channel model calibration (7.8)
 
@@ -350,7 +350,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Large-scale setup | 7.8.1, Tables 7.8-1, 7.8-1A | Partial | `path_loss`, `lsp_generate` (SF), `los_probability`, `o2i_loss`, `generate_antenna` | Per-link loss, SF, LOS state, O2I and the tilted vertical array exist. Hexagonal layout, wrap-around, UT drop, attachment and the DFT virtualisation are the caller's. |
+| Large-scale setup | 7.8.1, Tables 7.8-1, 7.8-1A | Partial | `generate_layout` (`src/generate_layout.cpp:1235`; hexagonal presets `:657`, `:658`); `init_link_states` (`src/init_link_states.cpp:387`; LOS field `:276`, O2I fields `:190`); `attach_terminals` (`src/get_channels_layout.cpp:1312`; large-scale gain `:1402`, RSRP `:1410`); `path_loss`, `lsp_generate` (SF), `los_probability`, `o2i_loss`, `generate_antenna` | The hexagonal layout with wrap-around (`38.901_UMa`, `38.901_UMi`), the UT drop, per-link loss, SF, LOS state, O2I, the tilted vertical array and the attachment of each UT to its serving cell by the large-scale gain (rule `large_scale`) or by RSRP exist. The DFT virtualisation is the caller's. |
 | Large-scale metrics: coupling loss, geometry | Table 7.8-1 | Partial | `acdf` (`src/qd_tools_acdf.cpp:59`) | CDFs only; coupling loss and SIR are the caller's. |
 | Large-scale comparison with 3GPP results | 7.8.1 | No | – | |
 
@@ -359,7 +359,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Full calibration setup | 7.8.2, Tables 7.8-2, 7.8-2A | Partial | `lsp_generate`, `ssf_clusters`, `ssf_rays`, `gbsm_single_link_channel`, `generate_antenna` | Chain and BS arrays exist (the BS configurations of Tables 7.8-2 and 7.8-2A, including the config 1 port mapping, are `generate_antenna` tuples, see 3.3); the handheld UT configurations are missing (7.3). |
-| Full metric: DS and AS CDFs | Table 7.8-2 | Partial | `calc_delay_spread` (`src/qd_tools_calc_delay_spread.cpp:54`); `calc_angular_spread` (`src/qd_tools_calc_angular_spread.cpp:150`) | **Drift:** the metric asks for the TR 25.996 circular AS; the library uses another definition (see Annex A.1). |
+| Full metric: DS and AS CDFs | Table 7.8-2 | Partial | `calc_delay_spread` (`src/qd_tools_calc_delay_spread.cpp:55`); `calc_angular_spread` (`src/qd_tools_calc_angular_spread.cpp:150`) | **Drift:** the metric asks for the TR 25.996 circular AS; the library uses another definition (see Annex A.1). |
 | Full metric: PRB singular values | Table 7.8-2 | Partial | `baseband_freq_response` (`src/baseband_freq_response.cpp:68`) | H per subcarrier; PRB averaging and eigenvalues are the caller's. |
 | Full comparison with 3GPP results | 7.8.2 | No | – | Open item in ssf_notes section 7. |
 
@@ -377,7 +377,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| InF setup | 7.8.4, Table 7.8-7 | Partial | `los_probability` defaults; conf `DS_VS`, `absTOA_Lmax` | Clutter defaults and hall V/S and L match (`tests/catch2_tests/test_conf_files_v19.cpp:131`, `test_los_probability.cpp:219`). BS lattice and UT drop are the caller's. |
+| InF setup | 7.8.4, Table 7.8-7 | Yes | `generate_layout` presets `38.901_InF_*` (`src/generate_layout.cpp:1235`; preset table `:663` to `:667`); `los_probability` defaults; conf `DS_VS`, `absTOA_Lmax` | Clutter defaults and hall V/S and L match (`tests/catch2_tests/test_conf_files_v19.cpp:131`, `test_los_probability.cpp:219`). The BS lattice and the UT drop come from the presets. |
 | InF metrics incl. first-path delay | Table 7.8-7 | Partial | `calc_angular_spread`, `calc_delay_spread`, `lsp_generate` `abs_toa` | AS definition drift (A.1). |
 
 ### 3.9 Channel model(s) for ISAC (7.9)
@@ -413,7 +413,7 @@ The library has no sensing-specific code (no target, RCS or monostatic model). T
 | Step 1: layout, scattering points | 7.9.4.0 | Partial | `get_channels_spherical` (`src/get_channels_spherical.cpp:145`) | Generic positions, patterns, orientations; no target object with scattering points. |
 | Steps 2–4: LOS, PL, LSPs per link | 7.9.4.1 | Partial | `los_probability`, `path_loss`, `lsp_generate` | The monostatic rule (identical LSPs for both links of a point) is the caller's. |
 | Steps 5–8: clusters and rays per link | 7.9.4.1 | Partial | `ssf_clusters`, `ssf_rays` | Monostatic equalities of angles and coupling are not available. |
-| Step 9: coupling across the two links | 7.9.4.1 | Partial | `get_channels_irs` (`src/get_channels_irs.cpp:137`); `combine_irs_coord` (`src/combine_irs_coord.cpp:62`) | Building block only: the IRS cascade combines all path pairs (Option 1). Option 2 and the LOS-LOS rule are missing. |
+| Step 9: coupling across the two links | 7.9.4.1 | Partial | `get_channels_irs` (`src/get_channels_irs.cpp:141`); `combine_irs_coord` (`src/combine_irs_coord.cpp:62`) | Building block only: the IRS cascade combines all path pairs (Option 1). Option 2 and the LOS-LOS rule are missing. |
 | Step 10: path power with RCS, X dB pruning | 7.9.4.1, eq. 7.9.4-1 | No | – | |
 | Step 11: absolute delay of the combined path | 7.9.4.1, eq. 7.9.4-2 | Partial | `get_channels_irs` | Sum of segment delays; Δτ rules are the caller's. |
 | Steps 12–13: XPR and phases at the point | 7.9.4.1, eq. 7.9.4-3 | No | – | |
@@ -428,7 +428,7 @@ The library has no sensing-specific code (no target, RCS or monostatic model). T
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Spatial consistency for ISAC links | 7.9.5.1, Table 7.9.5.1-1 | No | – | |
-| Type-2 environment object (specular wall) | 7.9.5.2, eq. 7.9.5-1 to 7.9.5-13 | Partial | `plane` (`src/mesh_primitives.cpp:187`); ray tracer (`ray_progress` `src/ray_progress.cpp:301`, `ray_mesh_interact` `src/ray_mesh_interact.cpp:2707`; Fresnel `:848`) | A meshed wall gives the finite-face reflection with TE/TM Fresnel coefficients. Insertion into the target channel and the power rule are missing. Material drift as in section 4. |
+| Type-2 environment object (specular wall) | 7.9.5.2, eq. 7.9.5-1 to 7.9.5-13 | Partial | `plane` (`src/mesh_primitives.cpp:187`); ray tracer (`ray_progress` `src/ray_progress.cpp:301`, `ray_mesh_interact` `src/ray_mesh_interact.cpp:2711`; Fresnel `:848`) | A meshed wall gives the finite-face reflection with TE/TM Fresnel coefficients. Insertion into the target channel and the power rule are missing. Material drift as in section 4. |
 | Power normalisation, mobile scatterers, low-power clusters, blockage | 7.9.5.3 to 7.9.5.6 | No | – | |
 
 #### 3.9.6 Channel model calibration (7.9.6)
@@ -443,28 +443,28 @@ The deterministic part of clause 8 maps onto the library's ray tracer: `obj_file
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Coordinate system | 8.1 | Yes | `get_channels_spherical` (`src/get_channels_spherical.cpp:145`); `qrt_file_read` (`src/qd_channel_qrt.cpp:1447`) | As clause 7. |
+| Coordinate system | 8.1 | Yes | `get_channels_spherical` (`src/get_channels_spherical.cpp:145`); `qrt_file_read` (`src/qd_channel_qrt.cpp:1654`) | As clause 7. |
 | Scenarios | 8.2 | n/a | – | No maps are shipped; the caller supplies the scene. |
 | Antenna modelling | 8.3 | Yes | `get_channels_spherical`; `get_channels_multifreq` (`src/get_channels_multifreq.cpp:212`) | Same `arrayant` model; frequency-dependent patterns per bin. |
-| Step 1: digital map import | 8.4 step 1 | Yes | `obj_file_read` (`src/obj_file.cpp:831`); `mitsuba_xml_file_write` (`src/mitsuba_xml_file_write.cpp:122`) | Wavefront OBJ with a material name per face; thickness from solid geometry or a sheet `thk` value. Random small objects are the caller's. |
-| Material properties (ITU-R P.2040) | 8.4 step 1, eq. 7.6-40 to 7.6-42, Table 7.6.8-1 | Yes | `ray_mesh_interact` (`src/ray_mesh_interact.cpp:2707`; `Material::eta` `:489`); table `src/obj_file.cpp:30`; `data/materials_rf.csv` | ε = a·f^b − j·17.98·c·f^d/f, as 7.6-40 to 7.6-42; extensions (permeability, Lorentz pole, sheets). **Drift:** the built-in values come from a later P.2040 revision than Table 7.6.8-1: concrete, brick and plasterboard differ (e.g. concrete 5.24/0/0.0462/0.7822 vs 5.31/0/0.0326/0.8095); wood, floorboard, metal and grounds match. A user CSV can supply the TR values (from reading, not measured). |
+| Step 1: digital map import | 8.4 step 1 | Yes | `obj_file_read` (`src/obj_file.cpp:778`); `mitsuba_xml_file_write` (`src/mitsuba_xml_file_write.cpp:119`) | Wavefront OBJ with a material name per face; thickness from solid geometry or a sheet `thk` value. Random small objects are the caller's. |
+| Material properties (ITU-R P.2040) | 8.4 step 1, eq. 7.6-40 to 7.6-42, Table 7.6.8-1 | Yes | `ray_mesh_interact` (`src/ray_mesh_interact.cpp:2711`; `Material::eta` `:489`); table `src/obj_file.cpp:31`; `data/materials_rf.csv` | ε = a·f^b − j·17.98·c·f^d/f, as 7.6-40 to 7.6-42; extensions (permeability, Lorentz pole, sheets). **Drift:** the built-in values come from a later P.2040 revision than Table 7.6.8-1: concrete, brick and plasterboard differ (e.g. concrete 5.24/0/0.0462/0.7822 vs 5.31/0/0.0326/0.8095); wood, floorboard, metal and grounds match. A user CSV can supply the TR values (from reading, not measured). |
 | Step 2: layout, antennas, motion | 8.4 step 2 | Yes | `get_channels_spherical` | Positions per snapshot. |
 | Step 2f: frequency bins | 8.4 step 2f | Partial | `ray_progress` (`src/ray_progress.cpp:301`); `get_channels_multifreq` | Geometry traced once, Jones and gain per frequency (up to 127). The bin rule K_B ≥ ⌈B·D/c⌉ is the caller's. |
 | Step 3: LOS path | 8.4 step 3, Table 8.4-1 | Yes | `calc_diffraction_gain` (`src/calc_diffraction_gain.cpp:118`); `ray_commit` (`src/ray_commit.cpp:134`; LOS polarisation `:394`) | Free-space loss from the path length. |
 | Step 3: reflection | 8.4 step 3 | Yes | `ray_progress` (reflection pass `src/ray_progress.cpp:1045`); `ray_mesh_interact` (Fresnel `:804`) | Shooting and bouncing ray tubes from an icosphere (`ray_init` `src/ray_init.cpp:112`) instead of images, which the TR allows. Order 0–255 (default 10). |
 | Step 3: penetration | 8.4 step 3 | Yes | `ray_progress` (transmission pass `src/ray_progress.cpp:1081`); `ray_mesh_interact` | Solids with refraction or thin sheets with the internal reflection series; order configurable (default 10, TR recommends 5). |
 | Step 3: diffraction | 8.4 step 3 | Partial | `calc_diffraction_gain` (`src/calc_diffraction_gain.cpp:118`); `generate_diffraction_paths` (`src/generate_diffraction_paths.cpp:66`) | **Drift:** Fresnel-ellipsoid obstruction with knife-edge weights calibrated to 2D UTD, applied to the direct path only; no explicit edge paths, no reflection + diffraction paths, so values differ from a UTD tracer (from reading, not measured). |
-| Step 3: scattering on small objects | 8.4 step 3 | No | – | "Scattering is not implemented" (`src/ray_mesh_interact.cpp:3335`). |
-| Step 3: outputs | 8.4 step 3 | Partial | `qrt_file_append` (`src/qd_channel_qrt.cpp:510`), `qrt_file_read` (`:1447`); `coord2path` (`src/coord2path.cpp:52`) | Interaction points, length, per-frequency gain and Jones matrix, angles, interaction count. Missing: −25 dB relative pruning (`min_gain_dB` is absolute), per-path XPR κ_RT, path IDs across positions. Delays are relative to d3D/c, not to the first arrival (from reading, not measured). |
+| Step 3: scattering on small objects | 8.4 step 3 | No | – | "Scattering is not implemented" (`src/ray_mesh_interact.cpp:3340`). |
+| Step 3: outputs | 8.4 step 3 | Partial | `qrt_file_append` (`src/qd_channel_qrt.cpp:553`), `qrt_file_read` (`:1447`); `coord2path` (`src/coord2path.cpp:52`) | Interaction points, length, per-frequency gain and Jones matrix, angles, interaction count. Missing: −25 dB relative pruning (`min_gain_dB` is absolute), per-path XPR κ_RT, path IDs across positions. Delays are relative to d3D/c, not to the first arrival (from reading, not measured). |
 | Step 4: LSPs for random clusters | 8.4 step 4 | No | – | |
 | Steps 5–6: random-cluster delays and powers | 8.4 steps 5–6, eq. 8.4-4 to 8.4-9 | No | – | |
 | Step 7: random-cluster angles | 8.4 step 7, eq. 8.4-10 to 8.4-18 | No | – | |
-| Step 8: merging of clusters | 8.4 step 8 | No | – | `qrt_paths_from_scatterers` (`src/qd_channel_qrt.cpp:1836`) can write GBSM paths next to traced paths, without the 8.4 rules (ssf_notes D25). |
+| Step 8: merging of clusters | 8.4 step 8 | No | – | `qrt_paths_from_scatterers` (`src/qd_channel_qrt.cpp:1955`) can write GBSM paths next to traced paths, without the 8.4 rules (ssf_notes D25). |
 | Steps 9–10: rays in deterministic and random clusters | 8.4 steps 9–10, eq. 8.4-19 to 8.4-25 | No | – | `gbsm_rays_from_paths` (`src/gbsm_rays_from_paths.cpp:74`) makes one ray per traced path. |
 | Step 11: XPR of deterministic clusters | 8.4 step 11, eq. 8.4-26 | No | – | Traced paths keep their Jones matrix. |
 | Step 12: initial phases | 8.4 step 12 | Partial | `get_channels_spherical` | Propagation phases of the traced paths; no random clusters. |
 | Step 13: coefficients | 8.4 step 13, eq. 8.4-27 to 8.4-32 | Partial | `get_channels_spherical`, `get_channels_multifreq`; or `gbsm_rays_from_paths` → `gbsm_single_link_channel` | Deterministic clusters only; spherical waves per element instead of plane waves. |
-| Step 13: oxygen absorption | 8.4 step 13, eq. 8.4-33 | Yes | `ssf_paths` (`src/ssf_paths.cpp:216`) via `gbsm_single_link_channel` | Per-path length as in 8.4-33; only through the GBSM route, not `get_channels_spherical`. |
+| Step 13: oxygen absorption | 8.4 step 13, eq. 8.4-33 | Yes | `ssf_paths` (`src/ssf_paths.cpp:213`) via `gbsm_single_link_channel` | Per-path length as in 8.4-33; only through the GBSM route, not `get_channels_spherical`. |
 | Step 13: blockage | 8.4 step 13 | No | – | |
 
 ## 5. Inventory: Annex A, further parameter definitions
@@ -533,6 +533,6 @@ Ray tracer and clause 8:
 ## 7. Notes
 
 - **CRs of v19.1 to v19.5:** Annex B gives only the subject of each CR, and the CR texts are not part of this review, so the mapping of a CR to individual table entries cannot be shown. The code and the scenario files match the v19.5.0 text in all reviewed clauses, which includes the effect of the 7–24 GHz corrections (CR 0028, 0036, 0040, 0042) and of CR 0043 (ZOD generation, tested at `tests/catch2_tests/test_lsp_generate.cpp:530`). CR 0032 (handheld UT polarised model) and the ISAC CRs (0029, 0031, 0033, 0038, 0039) are not implemented. CR 0035 (UL/DL reciprocity) is covered as described in 3.5.
-- **Scenario keys stored but unused:** `NF_*`, `SNS_*` and `LOS_scatter_radius` are validated but read by no function of this version (`src/qd_scenpar.cpp:1030`); `LOS_state_lambda` and `IO_state_lambda` are read by the caller.
+- **Scenario keys stored but unused:** `NF_*`, `SNS_*` and `LOS_scatter_radius` are validated but read by no function of this version (`src/qd_scenpar.cpp:957`); `LOS_state_lambda` and `IO_state_lambda` are read by the caller.
 - **TR text oddities found in passing (no code impact):** TDL-E tap 14 has delay 20.6519 where CDL-E cluster 14 has 20.6419; Table 7.7.5.1-1 has a stray value in the CDL-E ASD-25 row; Annex A.1 (circular standard deviation) and 7.8.2 metric 3 (TR 25.996 definition) name two different angular-spread definitions.
 - **Uncertain readings:** whether O2I links count as NLOS for 7.6.9; which cluster count enters C_φ and C_θ after the −25 dB removal.

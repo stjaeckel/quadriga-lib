@@ -12,6 +12,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
 | [channel_calc_effective_path_gain](#channel_calc_effective_path_gain) | Calculate the effective path gain per snapshot in linear scale |
 | [channel_export_obj_file](#channel_export_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
+| [crossfade_segments](#crossfade_segments) | Joins the channels of consecutive segments of one link by a power cross-fade |
 | [hdf5_create_file](#hdf5_create_file) | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_channel_vec](#hdf5_read_channel_vec) | Read the channels of several slots of an HDF5 file |
@@ -464,6 +465,40 @@ void quadriga_lib::channel_export_obj_file(
 ### See also:
 - [path_to_tube](site-specific-simulation-tools.md#path_to_tube) (generates tube geometry from path data)
 - [colormap](site-specific-simulation-tools.md#colormap) (colormap lookup used for coloring)
+
+---
+<a id="crossfade_segments"></a>
+## crossfade_segments
+Joins the channels of consecutive segments of one link by a power cross-fade
+
+Also in: [MATLAB](../mex/channel-functions.md#crossfade_segments) · [Python](../python/channel-functions.md#crossfade_segments)
+
+- Port of the channel merger of QuaDRiGa: segment `k` starts with `n_overlap[k]` snapshots that are also the last ones of segment `k − 1`; the output has `Σ (n_snap[k] − n_overlap[k])` snapshots
+- In the last `n_r = round(overlap · n_overlap[k])` shared snapshots (the ramp) the old paths fade out with `1 − w` and the new ones fade in with `w`, in power, `w = 0.5 (1 + sin((i / (n_r + 1) − 0.5) π))`, `i = 1 … n_r`; before the ramp the snapshots are those of the old segment
+- LOS (tap index 0 of the `par_data` entry `tap`) and GR (tap index 3 held by one ray, without index 4 or 5, as [ssf_rays](geometry-based-stochastic-model.md#ssf_rays) numbers them): one path with the data of the new segment (of the old one where the new one has no power), scaled to `|h|² = (1 − w) |h_old|² + w |h_new|²` by the path gain (rays) or the tap power (taps)
+- `"rays"` (channels with `path_gain`): the NLOS paths of both segments side by side, amplitudes `sqrt(1 − w)` and `sqrt(w)`; `path_length`, `path_angles`, `fbs_pos` and `lbs_pos` are kept where all segments have them
+- `"taps"` (without `path_gain`, one tap count per segment): one set of tap slots for all snapshots (LOS, GR, NLOS); the NLOS taps of the old segment hold `1 − w` and those of the new segment `w` of their mean power over the ramp; slots without power hold zero coefficients and the smallest delay of the snapshot
+- Delays as given (one reference for all segments); positions interpolated in the ramp, orientations along the shorter way; `name` and `center_freq` of segment 0; `par_data`, `n_interact` and `interact_coord` are not carried
+
+### Declaration:
+```cpp
+channel<double> quadriga_lib::crossfade_segments(
+    const std::vector<channel<double>> &segments,
+    const arma::uvec &n_overlap,
+    double overlap = 0.5);
+```
+
+### Inputs:
+- **`segments`** — Channels of one link in track order, valid, with coefficients, equal `n_rx`, `n_tx`, form and `center_freq` (at most one value); `[n_segment]`
+- **`n_overlap`** — Snapshots shared with the preceding segment, the first entry is 0, at most the snapshots of the preceding segment after its own shared ones; `[n_segment]`
+- **`overlap`** *(optional)* — Part of the shared snapshots used for the ramp, in [0, 1]
+
+### Returns:
+- The joined channel, see [channel](channel-class.md#channel)
+
+### See also:
+- [get_gbsm_channels](network-layouts-and-mobility.md#get_gbsm_channels) (joins the segments of tracks with this function)
+- [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) (channels of one segment)
 
 ---
 <a id="hdf5_create_file"></a>

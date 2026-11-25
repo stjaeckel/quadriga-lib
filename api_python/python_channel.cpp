@@ -9,6 +9,7 @@ namespace py = pybind11;
 
 #include "qpy_baseband_freq_response.cpp"
 #include "qpy_channel_export_obj_file.cpp"
+#include "qpy_crossfade_segments.cpp"
 #include "qpy_hdf5.cpp"
 #include "qpy_get_channels.cpp"
 #include "qpy_qrt_file.cpp"
@@ -34,6 +35,14 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("remove_delay_phase") = true,
           py::arg("i_snap") = py::none(),
           py::arg("use_kernel") = 0);
+
+    m.def("crossfade_segments", &crossfade_segments,
+          py::arg("segments").none(false),
+          py::arg("n_overlap").none(false),
+          py::kw_only(),
+          py::arg("overlap") = 0.5,
+          py::arg("par") = py::none(),
+          py::arg("stack") = false);
 
     m.def("export_obj_file", &channel_export_obj_file,
           py::arg("fn"),

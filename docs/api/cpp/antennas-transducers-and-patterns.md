@@ -860,8 +860,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read(
 ### Notes:
 - **IDs**: the number used in the layout matrix and by [qdant_write](#qdant_write). A first entry without an `id` attribute (files
   from other tools) counts as ID 1
-- **Exceptions**: `std::invalid_argument` if an ID is 0 or the file has no entry with it; `std::runtime_error` for a
-  missing, unreadable or malformed file
+- **Exceptions**: `std::invalid_argument` if an ID is 0 or the file has no entry with it; `std::runtime_error` naming
+  the file for a missing, unreadable or malformed file
 - **Elements without data**: elements without pattern nodes read as zeros. A file whose element count is not backed by
   its data, or that exceeds the [reader limits](../../formats/qdant.md), throws
 

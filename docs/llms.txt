@@ -23,32 +23,35 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: General usage notes](http://quadriga-lib.org/api/cpp/general-usage-notes.md)
 - [C++: Antennas, transducers and patterns](http://quadriga-lib.org/api/cpp/antennas-transducers-and-patterns.md): 16 functions
 - [C++: Channel class](http://quadriga-lib.org/api/cpp/channel-class.md): 2 functions
-- [C++: Channel functions](http://quadriga-lib.org/api/cpp/channel-functions.md): 26 functions
+- [C++: Channel functions](http://quadriga-lib.org/api/cpp/channel-functions.md): 27 functions
 - [C++: Channel generation functions](http://quadriga-lib.org/api/cpp/channel-generation-functions.md): 7 functions
 - [C++: Channel statistics](http://quadriga-lib.org/api/cpp/channel-statistics.md): 5 functions
 - [C++: Geometry-based stochastic model](http://quadriga-lib.org/api/cpp/geometry-based-stochastic-model.md): 17 functions
 - [C++: Math functions](http://quadriga-lib.org/api/cpp/math-functions.md): 9 functions
 - [C++: Miscellaneous / Tools](http://quadriga-lib.org/api/cpp/miscellaneous-tools.md): 3 functions
+- [C++: Network layouts and mobility](http://quadriga-lib.org/api/cpp/network-layouts-and-mobility.md): 17 functions
 - [C++: Site-specific simulation tools](http://quadriga-lib.org/api/cpp/site-specific-simulation-tools.md): 35 functions
 - [C++: Sum-of-sinusoids random number generator](http://quadriga-lib.org/api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](http://quadriga-lib.org/api/mex/general-usage-notes.md)
 - [MATLAB / Octave: Antennas, transducers and patterns](http://quadriga-lib.org/api/mex/antennas-transducers-and-patterns.md): 12 functions
-- [MATLAB / Octave: Channel functions](http://quadriga-lib.org/api/mex/channel-functions.md): 14 functions
+- [MATLAB / Octave: Channel functions](http://quadriga-lib.org/api/mex/channel-functions.md): 15 functions
 - [MATLAB / Octave: Channel generation functions](http://quadriga-lib.org/api/mex/channel-generation-functions.md): 5 functions
 - [MATLAB / Octave: Channel statistics](http://quadriga-lib.org/api/mex/channel-statistics.md): 5 functions
 - [MATLAB / Octave: Geometry-based stochastic model](http://quadriga-lib.org/api/mex/geometry-based-stochastic-model.md): 16 functions
 - [MATLAB / Octave: Math functions](http://quadriga-lib.org/api/mex/math-functions.md): 5 functions
 - [MATLAB / Octave: Miscellaneous / Tools](http://quadriga-lib.org/api/mex/miscellaneous-tools.md): 2 functions
+- [MATLAB / Octave: Network layouts and mobility](http://quadriga-lib.org/api/mex/network-layouts-and-mobility.md): 16 functions
 - [MATLAB / Octave: Site-specific simulation tools](http://quadriga-lib.org/api/mex/site-specific-simulation-tools.md): 17 functions
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](http://quadriga-lib.org/api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](http://quadriga-lib.org/api/python/general-usage-notes.md)
 - [Python: Antennas, transducers and patterns](http://quadriga-lib.org/api/python/antennas-transducers-and-patterns.md): 12 functions
-- [Python: Channel functions](http://quadriga-lib.org/api/python/channel-functions.md): 14 functions
+- [Python: Channel functions](http://quadriga-lib.org/api/python/channel-functions.md): 15 functions
 - [Python: Channel generation functions](http://quadriga-lib.org/api/python/channel-generation-functions.md): 5 functions
 - [Python: Channel statistics](http://quadriga-lib.org/api/python/channel-statistics.md): 5 functions
 - [Python: Geometry-based stochastic model](http://quadriga-lib.org/api/python/geometry-based-stochastic-model.md): 16 functions
 - [Python: Math functions](http://quadriga-lib.org/api/python/math-functions.md): 5 functions
 - [Python: Miscellaneous / Tools](http://quadriga-lib.org/api/python/miscellaneous-tools.md): 3 functions
+- [Python: Network layouts and mobility](http://quadriga-lib.org/api/python/network-layouts-and-mobility.md): 16 functions
 - [Python: Site-specific simulation tools](http://quadriga-lib.org/api/python/site-specific-simulation-tools.md): 16 functions
 - [Python: Sum-of-sinusoids random number generator](http://quadriga-lib.org/api/python/sum-of-sinusoids-random-number-generator.md): 14 functions
 
