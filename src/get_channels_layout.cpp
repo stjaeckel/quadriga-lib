@@ -201,6 +201,7 @@ class qd_pipe
     arma::uword n_freq;
     std::vector<qd_scen> scen;                    // Per link
     std::vector<const qd_family *> term_fam;      // Per terminal
+    std::vector<std::vector<arma::uword>> seg;    // Per terminal: the Rx rows at which its segments start
     std::vector<arma::uword> conf, group, row;    // Per link: derived conf index, group, Rx row at the segment start
     std::vector<arma::sword> seed;                // Per link
     arma::u32_vec floor_id;                       // Per link, from the (edited) indoor state
@@ -215,7 +216,7 @@ class qd_pipe
         std::vector<arma::uword> links;
         qd_spmap sp;    // Conf with the overrides of the site
         arma::cube lsf; // SOS phases of the "lsf" set; empty until needed
-        arma::mat tx;   // Virtual position of the site at its first row, [3, 1]
+        arma::mat tx;   // Virtual position of the site at the start of the segments of the group, [3, 1]
     };
     std::vector<grp> groups;
 
@@ -241,20 +242,19 @@ class qd_pipe
         const arma::uword n_link = K.n_link();
         if (K.o2i_rnd.n_rows != S.n_term || K.conf_files.size() != K.conf_names.size())
             throw std::invalid_argument("Member 'links' of 'layout' does not match the layout: call 'init_link_states' again.");
+        seg.resize(S.n_term);
+        for (size_t t = 0; t < S.n_term; ++t)
+            seg[t] = qd_segment_starts(L, S, t);
         for (arma::uword l = 0; l < n_link; ++l)
-        {
-            if (K.i_tx[l] >= S.n_site || K.i_rx[l] >= S.n_term || K.image[l] >= img.n_cols)
-                throw std::invalid_argument("Member 'links' of 'layout' has a site, terminal or image index outside the layout.");
-            if (K.i_segment[l] != 0)
-                throw std::invalid_argument("Member 'links' of 'layout': segments are not supported yet.");
-        }
+            if (K.i_tx[l] >= S.n_site || K.i_rx[l] >= S.n_term || K.image[l] >= img.n_cols || K.i_segment[l] >= seg[K.i_rx[l]].size())
+                throw std::invalid_argument("Member 'links' of 'layout' has a site, terminal, segment or image index outside the layout.");
 
         // Derived confs, seeds and O2I geometry
         qd_scenarios SC;
         scen.resize(n_link), conf.resize(n_link), seed.resize(n_link), row.resize(n_link);
         for (arma::uword l = 0; l < n_link; ++l)
         {
-            row[l] = qd_segment_row(L, S, K.i_rx[l], K.i_segment[l]);
+            row[l] = seg[K.i_rx[l]][K.i_segment[l]];
             scen[l] = SC.of(L, S, K.i_tx[l], row[l]);
             const std::string c = qd_conf_of(scen[l], K.los[l], K.indoor[l]);
             const auto jt = std::find(K.conf_names.begin(), K.conf_names.end(), c);
@@ -280,20 +280,20 @@ class qd_pipe
         for (size_t s = 0; s < S.n_site; ++s)
             dual[s] = qd_site_moves(L.tx, S.site_nodes[s][0]) ? 1 : 0;
 
-        // Groups
-        std::map<std::tuple<arma::uword, arma::uword, arma::uword, arma::sword>, arma::uword> gi;
+        // Groups; the site position paired with the first row of the segment (a moving site: at the same time)
+        std::map<std::tuple<arma::uword, arma::uword, arma::uword, arma::sword, double, double, double>, arma::uword> gi;
         group.resize(n_link);
         for (arma::uword l = 0; l < n_link; ++l)
         {
-            const auto key = std::make_tuple((arma::uword)K.i_tx[l], (arma::uword)K.image[l], conf[l], seed[l]);
+            const arma::vec p = qd_tx_at(L, S.site_nodes[K.i_tx[l]][0], S.term_nodes[K.i_rx[l]][0], row[l]);
+            const auto key = std::make_tuple((arma::uword)K.i_tx[l], (arma::uword)K.image[l], conf[l], seed[l], p[0], p[1], p[2]);
             auto it = gi.find(key);
             if (it == gi.end())
             {
                 it = gi.emplace(key, (arma::uword)groups.size()).first;
                 grp g;
                 g.site = K.i_tx[l], g.image = K.image[l], g.conf = conf[l], g.seed = seed[l];
-                const arma::uword r = L.tx.offset[S.site_nodes[g.site][0]];
-                g.tx = L.tx.pos.col(r);
+                g.tx = arma::mat(p);
                 g.tx(0, 0) += img(0, g.image), g.tx(1, 0) += img(1, g.image);
                 groups.push_back(g);
             }
@@ -498,9 +498,10 @@ class qd_pipe
             for (arma::uword i = 0; i <= n; ++i)
                 x.row(i) = K.o2i_rnd.row(t);
             arma::mat xy;
-            std::vector<arma::uword> moved;
+            std::vector<arma::uword> moved; // positions other than the first row of the terminal, where o2i_rnd was drawn
+            const arma::uword r0 = seg[t][0];
             for (arma::uword i = 1; i <= n; ++i)
-                if (B(0, i) != B(0, 0) || B(1, i) != B(1, 0))
+                if (B(0, i) != L.rx.pos(0, r0) || B(1, i) != L.rx.pos(1, r0))
                     moved.push_back(i);
             if (!moved.empty())
             {
@@ -572,7 +573,7 @@ constexpr size_t qd_par_channels = 4; // Channels
 constexpr size_t qd_par_links = 2;    // Links of the link gain
 
 // One channel link: Tx node, Rx node and the positions (in the list of propagation links of a call) of its propagation
-// links, one per segment of the track
+// links, one per segment of the track, in segment order
 struct qd_item
 {
     arma::uword tx, rx;
@@ -598,10 +599,13 @@ std::vector<qd_item> qd_items(const qd_pipe &P, const std::vector<arma::uword> &
             pairs[{s, u}].push_back((arma::uword)j);
     }
     std::vector<qd_item> items;
-    for (const auto &kv : pairs)
+    for (auto &kv : pairs)
+    {
+        std::sort(kv.second.begin(), kv.second.end(), [&](arma::uword a, arma::uword b) { return P.K.i_segment[sel[a]] < P.K.i_segment[sel[b]]; });
         for (arma::uword r : P.S.term_nodes[kv.first.second])
             for (arma::uword t : P.S.site_nodes[kv.first.first])
                 items.push_back({t, r, kv.second});
+    }
     std::sort(items.begin(), items.end(), [](const qd_item &a, const qd_item &b) { return a.rx != b.rx ? a.rx < b.rx : a.tx < b.tx; });
     return items;
 }
@@ -632,7 +636,8 @@ void qd_check_rays(const quadriga_lib::layout &L, const std::vector<std::vector<
 // frequency slowest
 std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays,
                                                        const std::vector<arma::uword> &sel, const std::vector<qd_item> &items, const arma::vec &times,
-                                                       const std::string &output, const std::string &mobility, bool oxygen, bool use_absolute_delays)
+                                                       const std::string &output, const std::string &mobility, bool oxygen, bool use_absolute_delays,
+                                                       double overlap)
 {
     const quadriga_lib::layout &L = P.L;
     const quadriga_lib::layout_links &K = P.K;
@@ -658,13 +663,78 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                 arx[it.rx * n_freq + k] = qd_array(L, L.rx, "Rx", it.rx, k, xpol);
         }
 
-    // Positions and link gain per propagation link
+    // Positions per propagation link over all snapshots, and the snapshots [own0, own1) of its segment
     const size_t n_sel = sel.size();
     std::vector<arma::mat> T(n_sel), R(n_sel), G(n_sel), KF(n_sel);
+    std::vector<arma::uword> own0(n_sel, 0), own1(n_sel, 0), first(n_sel, 0);
     std::vector<char> used(n_sel, 0);
     for (const qd_item &it : items)
         for (arma::uword j : it.j)
             used[j] = 1;
+    qd_batch_loop(n_sel, n_sel >= qd_par_links, nullptr, [&](size_t j)
+                  {
+                      if (!used[j])
+                          return;
+                      const arma::uword l = sel[j], t = K.i_rx[l], nt = P.S.site_nodes[K.i_tx[l]][0], nr = P.S.term_nodes[t][0];
+                      arma::mat o;
+                      arma::uvec i_row;
+                      quadriga_lib::sample_track(L.tx, nt, times, T[j], o);
+                      quadriga_lib::sample_track(L.rx, nr, times, R[j], o, &i_row);
+                      if (T[j].n_cols != R[j].n_cols)
+                      {
+                          if (T[j].n_cols == 1)
+                              T[j] = arma::repmat(T[j], 1, R[j].n_cols);
+                          else if (R[j].n_cols == 1)
+                              R[j] = arma::repmat(R[j], 1, T[j].n_cols), i_row = arma::repmat(i_row, R[j].n_cols, 1);
+                          else
+                              throw std::invalid_argument("Channel '" + qd_node_name(L.tx, nt) + "_" + qd_node_name(L.rx, nr) + "': the Tx and the Rx track have " +
+                                                          std::to_string(T[j].n_cols) + " and " + std::to_string(R[j].n_cols) +
+                                                          " rows; give 'times' or tracks with equal row counts.");
+                      }
+                      T[j].row(0) += P.img(0, K.image[l]), T[j].row(1) += P.img(1, K.image[l]);
+                      const std::vector<arma::uword> &st = P.seg[t];
+                      own1[j] = R[j].n_cols;
+                      if (st.size() > 1) // the snapshots whose row is in the segment, in one run
+                      {
+                          const arma::uword k = K.i_segment[l], a = st[k], b = k + 1 < st.size() ? st[k + 1] : (arma::uword)-1;
+                          own0[j] = own1[j] = 0;
+                          bool found = false;
+                          for (arma::uword s = 0; s < i_row.n_elem; ++s)
+                          {
+                              const bool in = i_row[s] >= a && i_row[s] < b;
+                              if (in && found && own1[j] != s)
+                                  throw std::invalid_argument("Terminal '" + L.rx.name[nr] + "': the snapshots of segment " + std::to_string(k) +
+                                                              " are not consecutive; a track with several segments needs increasing 'times'.");
+                              if (in)
+                                  own0[j] = found ? own0[j] : s, own1[j] = s + 1, found = true;
+                          }
+                      }
+                  });
+
+    // The segments of each channel link with snapshots: a segment also covers the snapshots of the preceding one
+    for (const qd_item &it : items)
+    {
+        long long prev = -1;
+        for (arma::uword j : it.j)
+        {
+            if (own1[j] == own0[j])
+                continue;
+            first[j] = own0[j];
+            if (prev >= 0)
+            {
+                const arma::uword p = (arma::uword)prev;
+                if (own1[p] != own0[j]) // segments between them have no snapshots
+                    throw std::invalid_argument("Channel '" + qd_node_name(L.tx, it.tx) + "_" + qd_node_name(L.rx, it.rx) +
+                                                "': the selected segments of a track and their snapshots must be consecutive.");
+                first[j] = own0[p];
+            }
+            prev = (long long)j;
+        }
+        if (prev < 0)
+            throw std::invalid_argument("Channel '" + qd_node_name(L.tx, it.tx) + "_" + qd_node_name(L.rx, it.rx) + "': no snapshot is in its selected segments.");
+    }
+
+    // Link gain per propagation link over its snapshots
     std::vector<arma::uword> need;
     for (size_t j = 0; j < n_sel; ++j)
         if (used[j])
@@ -674,24 +744,11 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
         P.lsf(P.group[l]);
     qd_batch_loop(n_sel, n_sel >= qd_par_links, nullptr, [&](size_t j)
                   {
-                      if (!used[j])
+                      if (!used[j] || own1[j] == own0[j])
                           return;
-                      const arma::uword l = sel[j], nt = P.S.site_nodes[K.i_tx[l]][0], nr = P.S.term_nodes[K.i_rx[l]][0];
-                      arma::mat o;
-                      quadriga_lib::sample_track(L.tx, nt, times, T[j], o);
-                      quadriga_lib::sample_track(L.rx, nr, times, R[j], o);
-                      if (T[j].n_cols != R[j].n_cols)
-                      {
-                          if (T[j].n_cols == 1)
-                              T[j] = arma::repmat(T[j], 1, R[j].n_cols);
-                          else if (R[j].n_cols == 1)
-                              R[j] = arma::repmat(R[j], 1, T[j].n_cols);
-                          else
-                              throw std::invalid_argument("Channel '" + qd_node_name(L.tx, nt) + "_" + qd_node_name(L.rx, nr) + "': the Tx and the Rx track have " +
-                                                          std::to_string(T[j].n_cols) + " and " + std::to_string(R[j].n_cols) +
-                                                          " rows; give 'times' or tracks with equal row counts.");
-                      }
-                      T[j].row(0) += P.img(0, K.image[l]), T[j].row(1) += P.img(1, K.image[l]);
+                      const arma::uword l = sel[j];
+                      if (first[j] != 0 || own1[j] != R[j].n_cols)
+                          T[j] = T[j].cols(first[j], own1[j] - 1), R[j] = R[j].cols(first[j], own1[j] - 1);
                       auto fixed = [](const arma::mat &X)
                       {
                           for (arma::uword i = 1; i < X.n_cols; ++i)
@@ -705,31 +762,54 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                           P.link_gain(l, T[j], R[j], G[j], KF[j]);
                   });
 
-    // Channels; one segment per track so far, so a channel link has one propagation link
+    // Channels; a channel link with several segments: one channel per segment, joined by crossfade_segments. "phase":
+    // each segment with the requested delays (its paths relative to its own LOS); "drift": absolute delays, then minus
+    // the LOS delay at the snapshot positions (equal to the per-segment form, and one reference for empty tap slots)
     const size_t n_item = items.size(), n_out = n_item * n_freq;
     std::vector<quadriga_lib::channel<double>> out(n_out);
     qd_batch_loop(n_out, n_out >= qd_par_channels, nullptr, [&](size_t c)
                   {
                       const arma::uword k = (arma::uword)(c / n_item);
                       const qd_item &it = items[c % n_item];
-                      const arma::uword j = it.j[0];
                       const std::string name = qd_node_name(L.tx, it.tx) + "_" + qd_node_name(L.rx, it.rx);
                       qd_named("Channel '" + name + "': ", [&]
                                {
                                    arma::mat pos, otx, orx;
                                    quadriga_lib::sample_track(L.tx, it.tx, times, pos, otx);
                                    quadriga_lib::sample_track(L.rx, it.rx, times, pos, orx);
-                                   const arma::uword n = T[j].n_cols;
-                                   if (otx.n_cols != n)
-                                       otx = arma::repmat(otx, 1, n);
-                                   if (orx.n_cols != n)
-                                       orx = arma::repmat(orx, 1, n);
-                                   const auto &r = rays[j];
-                                   const quadriga_lib::gbsm_rays &ray = r.size() == n_freq ? r[k] : r[0];
-                                   const arma::uword i_freq = r.size() == n_freq ? 0 : k;
-                                   out[c] = quadriga_lib::gbsm_single_link_channel(*atx[it.tx * n_freq + k], *arx[it.rx * n_freq + k], ray, G[j].col(k), mobility,
-                                                                                   output, i_freq, T[j], R[j], otx, orx, KF[j].col(k), oxygen, use_absolute_delays);
+                                   std::vector<arma::uword> chain;
+                                   for (arma::uword j : it.j)
+                                       if (own1[j] > own0[j])
+                                           chain.push_back(j);
+                                   const bool merge = chain.size() > 1;
+                                   std::vector<quadriga_lib::channel<double>> parts(chain.size());
+                                   const quadriga_lib::gbsm_rays &ray0 = rays[chain[0]].size() == n_freq ? rays[chain[0]][k] : rays[chain[0]][0];
+                                   const bool drift = mobility == "drift" || (mobility == "auto" && ray0.method == "quadriga");
+                                   for (size_t q = 0; q < chain.size(); ++q)
+                                   {
+                                       const arma::uword j = chain[q], a = first[j], b = own1[j] - 1;
+                                       const arma::mat ot = otx.n_cols == 1 ? otx : otx.cols(a, b), orr = orx.n_cols == 1 ? orx : orx.cols(a, b);
+                                       const auto &r = rays[j];
+                                       const quadriga_lib::gbsm_rays &ray = r.size() == n_freq ? r[k] : r[0];
+                                       const arma::uword i_freq = r.size() == n_freq ? 0 : k;
+                                       parts[q] = quadriga_lib::gbsm_single_link_channel(*atx[it.tx * n_freq + k], *arx[it.rx * n_freq + k], ray, G[j].col(k), mobility,
+                                                                                         output, i_freq, T[j], R[j], ot, orr, KF[j].col(k), oxygen,
+                                                                                         use_absolute_delays || (merge && drift));
+                                   }
+                                   if (!merge)
+                                   {
+                                       out[c] = std::move(parts[0]);
+                                       out[c].name = name;
+                                       return;
+                                   }
+                                   arma::uvec n_ov(chain.size(), arma::fill::zeros);
+                                   for (size_t q = 1; q < chain.size(); ++q)
+                                       n_ov[q] = own1[chain[q - 1]] - own0[chain[q - 1]];
+                                   out[c] = quadriga_lib::crossfade_segments(parts, n_ov, overlap);
                                    out[c].name = name;
+                                   if (drift && !use_absolute_delays)
+                                       for (arma::uword i = 0; i < out[c].n_snap(); ++i)
+                                           out[c].delay[i] -= arma::norm(out[c].rx_pos.col(i) - out[c].tx_pos.col(i)) / qd_speed_of_light;
                                });
                   });
     return out;
@@ -857,9 +937,9 @@ qd_export qd_export_setup(const qd_pipe &P, const std::vector<std::vector<quadri
     std::vector<char> paired(n_site * n_term, L.pairing.is_empty() ? 1 : 0);
     for (arma::uword p = 0; p < L.pairing.n_cols; ++p)
         paired[L.pairing(0, p) * n_term + L.pairing(1, p)] = 1;
-    std::vector<arma::uword> link(n_site * n_term, n_link); // One propagation link per pair: tracks have one segment so far
+    std::vector<std::vector<arma::uword>> link(n_site * n_term); // The propagation links of each pair, one per segment
     for (arma::uword l = 0; l < n_link; ++l)
-        link[K.i_tx[l] * n_term + K.i_rx[l]] = l;
+        link[K.i_tx[l] * n_term + K.i_rx[l]].push_back(l);
 
     qd_export E;
     E.site_pos.set_size(3, n_site), E.site_ori.set_size(3, n_site);
@@ -889,13 +969,14 @@ qd_export qd_export_setup(const qd_pipe &P, const std::vector<std::vector<quadri
             if (!paired[s * n_term + t])
                 continue;
             any = true;
-            bool at_site = link[s * n_term + t] == n_link; // co-located at the first row: no propagation link
+            const std::vector<arma::uword> &ls = link[s * n_term + t];
+            bool at_site = ls.empty(); // co-located at the first row: no propagation link
             for (arma::uword r = 0; r < E.cir_pos[t].n_cols && !at_site; ++r)
                 at_site = arma::norm(E.cir_pos[t].col(r) - E.site_pos.col(s)) <= 1.0e-4;
             if (at_site)
                 throw std::invalid_argument("Terminal '" + RX.name[i] + "' has a row at the position of site '" + TX.name[S.site_nodes[s][0]] +
                                             "'; a CIR needs a LOS path of non-zero length.");
-            E.site_links[s].push_back(link[s * n_term + t]);
+            E.site_links[s].insert(E.site_links[s].end(), ls.begin(), ls.end());
         }
         if (!any)
             throw std::invalid_argument("Terminal '" + RX.name[i] + "' has no site in 'pairing': each QRT destination needs the CIRs of at least one origin.");
@@ -916,11 +997,13 @@ qd_export qd_export_setup(const qd_pipe &P, const std::vector<std::vector<quadri
     return E;
 }
 
-// The paths of all CIRs of one link for qrt_file_append: per row of the terminal the link gain and K-factor ratio of
+// The paths of the CIRs of one link for qrt_file_append: per row of its segment the link gain and K-factor ratio of
 // stage 3, ssf_paths ("drift") in the coordinates of the layout, qrt_paths_from_scatterers in local coordinates
 std::vector<quadriga_lib::path> qd_export_link(qd_pipe &P, const qd_export &E, arma::uword l, const quadriga_lib::gbsm_rays &rays)
 {
-    const arma::uword t = P.K.i_rx[l];
+    const arma::uword t = P.K.i_rx[l], k = P.K.i_segment[l], off = P.L.rx.offset[P.S.term_nodes[t][0]];
+    const std::vector<arma::uword> &st = P.seg[t];
+    const arma::uword r0 = st[k] - off, r1 = k + 1 < st.size() ? st[k + 1] - off : E.cir_pos[t].n_cols; // rows of the segment
     const quadriga_lib::gbsm_rays *r = &rays;
     quadriga_lib::gbsm_rays with_scatterers;
     if (r->fbs_pos.is_empty())
@@ -929,7 +1012,7 @@ std::vector<quadriga_lib::path> qd_export_link(qd_pipe &P, const qd_export &E, a
         quadriga_lib::ssf_scatterers(with_scatterers);
         r = &with_scatterers;
     }
-    const arma::mat &R = E.cir_pos[t], &T = P.groups[P.group[l]].tx;
+    const arma::mat R = E.cir_pos[t].cols(r0, r1 - 1), &T = P.groups[P.group[l]].tx;
     arma::mat g, kfr, pg, fbs, lbs;
     P.link_gain(l, arma::repmat(T, 1, R.n_cols), R, g, kfr);
     const arma::mat tx = qd_local(T, E.shift);
@@ -941,7 +1024,7 @@ std::vector<quadriga_lib::path> qd_export_link(qd_pipe &P, const qd_export &E, a
         arma::u32_vec type;
         quadriga_lib::ssf_paths(*r, g.row(i).t(), pg, len, pm, "drift", T, R.col(i), kfr.row(i).t(), nullptr, nullptr, nullptr, nullptr, &fbs, &lbs, &type);
         std::vector<quadriga_lib::path> q = quadriga_lib::qrt_paths_from_scatterers(P.L.center_freq, tx, qd_local(R.col(i), E.shift), qd_local(fbs, E.shift),
-                                                                                     qd_local(lbs, E.shift), pg, pm, type, E.cir_offset[t] + i);
+                                                                                     qd_local(lbs, E.shift), pg, pm, type, E.cir_offset[t] + (unsigned)(r0 + i));
         out.insert(out.end(), std::make_move_iterator(q.begin()), std::make_move_iterator(q.end()));
     }
     return out;
@@ -959,7 +1042,7 @@ constexpr size_t qd_par_export = 8;
 # generate_rays
 Rays of propagation links of a layout (stage 2 of the channel pipeline)
 
-- Runs the GBSM chain of the section "Geometry-based stochastic model" for the links with one site, image, conf and seed: [[gbsm_init_phases]] and [[gbsm_draw]] of the random sets, [[path_loss]] (for `rnd_he` and the SF standard deviation), [[lsp_generate]], [[ssf_clusters]], [[ssf_rays]] and, on request, [[ssf_scatterers]]; at the first position of the site (moved by the wrap image) and of the terminal
+- Runs the GBSM chain of the section "Geometry-based stochastic model" for the links with one site, image, conf and seed: [[gbsm_init_phases]] and [[gbsm_draw]] of the random sets, [[path_loss]] (for `rnd_he` and the SF standard deviation), [[lsp_generate]], [[ssf_clusters]], [[ssf_rays]] and, on request, [[ssf_scatterers]]; at the first row of the segment of the terminal and the site (moved by the wrap image) at the same time (a moving site: sampled at the time of the row, without times on the Rx track the row of the same index)
 - TR methods: preset of the links (default `Exp256`), no bias removal, path loss at the geometric distance, `angle_model = "additive"`, `pol_model = "38.901"`, one set of clusters and rays per frequency (`"38.901_MF"`: clusters at the anchor frequency, rays per frequency). `"quadriga"`: bias removal over the positions of all links of the group, the legacy outdoor distance, `"rotation"`, `"quadriga"`, one ray set for all frequencies, always with scatterers
 - A site with more than one row or a speed uses dual mobility; other sites are not affected
 - The conf and seed of a link follow from its scenario and the edited `los` and `indoor` of `layout.links`; a changed conf uses its hashed seed, an edited `gbsm_seed` is used while the conf is unchanged. The floor and the indoor distance follow the indoor state: building UTs on the floor of the Rx side (else from z) at the distance of the stored O2I inputs, others on floor 0 at 0 m; the members `floor_id` and `d2d_in` of the links are those of the drawn state
@@ -998,8 +1081,9 @@ Channel coefficients of the channel links of propagation links of a layout (stag
 
 - One channel per Tx node, Rx node and frequency whose propagation link is in `i_link` and whose pair is in `layout.pairing` (empty: all); order: Tx node fastest, then Rx node, then frequency; name `<tx>:<sector>_<rx>:<sector>`, without the sector where all sectors of the side are 0
 - Snapshots of both ends from [[sample_track]] over `times`; a node with one snapshot is repeated to the count of the other; two tracks without `times` need equal row counts
-- Link gain per snapshot (see the GBSM terms): [[gbsm_draw]] of the `"lsf"` set at the snapshot, [[path_loss]] with the random environment height `rnd_he` held at the start of the track, [[lsp_generate]] (SF and the K-factor ratio), [[o2i_loss]] for building and car UTs with the model of the link state and the deviation at the snapshot; evaluated once for a link whose ends do not move
+- Link gain per snapshot (see the GBSM terms): [[gbsm_draw]] of the `"lsf"` set at the snapshot, [[path_loss]] with the random environment height `rnd_he` held at the start of the segment, [[lsp_generate]] (SF and the K-factor ratio), [[o2i_loss]] for building and car UTs with the model of the link state and the deviation at the snapshot; evaluated once for a link whose ends do not move
 - [[gbsm_single_link_channel]] with the node antennas at the frequency (inner entry `i_freq` of `layout.antenna`, or entry 0 for all bands), the generic antenna with two co-located isotropic elements of vertical and horizontal polarization for nodes without one and for antennas that are not evaluated (an antenna spaced in wavelengths that is not evaluated throws), and the Tx positions moved by the wrap image of the link; rays with `n_freq` entries are used as entry `i_freq` (TR methods), rays with one entry at frequency `i_freq` (`"quadriga"`)
+- Tracks with several segments: the snapshots of a segment are those whose row (see [[sample_track]]) is in it; each segment also covers the snapshots of the preceding one, with its link gain, rays and K-factor ratio referred to its first row; [[crossfade_segments]] joins them. Relative delays: in `"phase"` the paths of each segment relative to its own LOS, in `"drift"` relative to the LOS at the snapshot. The selected segments of a channel link must be consecutive (segments without snapshots are skipped), with increasing `times`
 
 ## Declaration:
 ```
@@ -1025,7 +1109,7 @@ std::vector<channel<double>> quadriga_lib::get_gbsm_channels(
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` (needs rays with scatterers) or `"auto"` (phase for the TR methods, drift for `"quadriga"`)
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
-- **`overlap`** *(optional)* — Overlap of consecutive segments of a track, in [0, 1]; not used yet (one segment per track)
+- **`overlap`** *(optional)* — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1], see [[crossfade_segments]]
 
 ## Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
@@ -1047,7 +1131,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_gbsm_channels(const
     qd_pipe P(layout, layout.links, true);
     const std::vector<arma::uword> sel = qd_selection(i_link, layout.links.n_link());
     const std::vector<qd_item> items = qd_items(P, sel);
-    std::vector<channel<double>> out = qd_channels(P, rays, sel, items, times, output, mobility, oxygen, use_absolute_delays);
+    std::vector<channel<double>> out = qd_channels(P, rays, sel, items, times, output, mobility, oxygen, use_absolute_delays, overlap);
     qd_index(items, P.n_freq, index);
     return out;
 }
@@ -1056,7 +1140,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_gbsm_channels(const
 # get_channels_layout
 Channel coefficients of a layout in one call
 
-- Runs [[init_link_states]] (if `layout.links` was not filled), [[generate_rays]] and [[get_gbsm_channels]] in batches of at most 256 propagation links, so that the rays of a batch bound the memory; the results are those of the manual path with the default settings and do not depend on the batches
+- Runs [[init_link_states]] (if `layout.links` was not filled), [[generate_rays]] and [[get_gbsm_channels]] in batches of at most 256 propagation links (the segments of a track in one batch), so that the rays of a batch bound the memory; the results are those of the manual path with the default settings and do not depend on the batches
 - Without links (`layout.links.method` empty, e.g. after `reset()`), the link states are drawn for this call only and the layout is unchanged; with filled links, these are used, also when edited, and `seed` and `config_dirs` are not used. No linked pair gives an empty result
 - The mobility `"drift"` (also `"auto"` with `"quadriga"`) solves the scatterers
 
@@ -1123,28 +1207,51 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(con
     qd_pipe P(layout, filled ? layout.links : local, filled);
     const bool scatterers = mobility == "drift" || (mobility == "auto" && P.qd);
 
-    // The paired links ordered by group, in batches of up to 256 links; the random sets are drawn once per group and
-    // batch, the SOS phases of the "lsf" sets stay cached in P, and the values of a link do not depend on its batch
+    // The paired links ordered by the group of the first segment of their pair, the segments of a pair together, in
+    // batches of up to 256 links that do not split a pair; the random sets are drawn once per group and batch, the SOS
+    // phases of the "lsf" sets stay cached in P, and the values of a link do not depend on its batch
     std::vector<arma::uword> links;
     {
-        std::vector<char> pair(P.S.n_site * P.S.n_term, layout.pairing.is_empty() ? 1 : 0);
+        const size_t n_pair = P.S.n_site * P.S.n_term;
+        std::vector<char> pair(n_pair, layout.pairing.is_empty() ? 1 : 0);
         for (arma::uword p = 0; p < layout.pairing.n_cols; ++p)
             pair[layout.pairing(0, p) * P.S.n_term + layout.pairing(1, p)] = 1;
+        std::vector<arma::uword> head(n_pair, P.K.n_link()); // the first link of each pair
         for (arma::uword l = 0; l < P.K.n_link(); ++l)
-            if (pair[P.K.i_tx[l] * P.S.n_term + P.K.i_rx[l]])
-                links.push_back(l);
-        std::stable_sort(links.begin(), links.end(), [&](arma::uword x, arma::uword y) { return P.group[x] < P.group[y]; });
+        {
+            const size_t q = P.K.i_tx[l] * P.S.n_term + P.K.i_rx[l];
+            if (pair[q])
+                links.push_back(l), head[q] = std::min(head[q], l);
+        }
+        auto key = [&](arma::uword l)
+        {
+            const arma::uword h = head[P.K.i_tx[l] * P.S.n_term + P.K.i_rx[l]];
+            return std::make_tuple(P.group[h], h, P.K.i_segment[l]);
+        };
+        std::sort(links.begin(), links.end(), [&](arma::uword x, arma::uword y) { return key(x) < key(y); });
     }
     const std::vector<qd_item> items = qd_items(P, links); // All channel links, canonical; j indexes 'links'
-    const size_t batch = 256, n_item = items.size(), n_batch = (links.size() + batch - 1) / batch;
+    const size_t batch = 256, n_item = items.size();
+    std::vector<size_t> start = {0}; // First position in 'links' of each batch
+    for (size_t a = 0; a < links.size();)
+    {
+        size_t e = a + 1;
+        while (e < links.size() && P.K.i_segment[links[e]] != 0) // the rest of the pair
+            ++e;
+        if (e - start.back() > batch && a > start.back())
+            start.push_back(a);
+        a = e;
+    }
+    start.push_back(links.size());
+    const size_t n_batch = start.size() - 1;
     std::vector<std::vector<size_t>> of_batch(n_batch); // The channel links of each batch
     for (size_t i = 0; i < n_item; ++i)
-        of_batch[items[i].j[0] / batch].push_back(i);
+        of_batch[(size_t)(std::upper_bound(start.begin(), start.end(), (size_t)items[i].j[0]) - start.begin()) - 1].push_back(i);
     std::vector<channel<double>> out(n_item * P.n_freq);
     for (size_t b = 0; b < n_batch; ++b)
     {
-        const size_t a = b * batch;
-        const std::vector<arma::uword> sel(links.begin() + (std::ptrdiff_t)a, links.begin() + (std::ptrdiff_t)std::min(a + batch, links.size()));
+        const size_t a = start[b];
+        const std::vector<arma::uword> sel(links.begin() + (std::ptrdiff_t)a, links.begin() + (std::ptrdiff_t)start[b + 1]);
         std::vector<qd_item> bi;
         for (size_t i : of_batch[b])
         {
@@ -1152,7 +1259,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(con
             for (arma::uword &j : bi.back().j)
                 j -= (arma::uword)a;
         }
-        auto ch = qd_channels(P, P.rays(sel, scatterers), sel, bi, times, output, mobility, false, false);
+        auto ch = qd_channels(P, P.rays(sel, scatterers), sel, bi, times, output, mobility, false, false, overlap);
         for (arma::uword k = 0; k < P.n_freq; ++k)
             for (size_t q = 0; q < bi.size(); ++q)
                 out[k * n_item + of_batch[b][q]] = std::move(ch[k * bi.size() + q]);
@@ -1165,7 +1272,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(con
 # attach_terminals
 Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
 
-- Evaluates all Tx nodes for each terminal at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
+- Evaluates all Tx nodes for each terminal at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first segment, the wrap image and the antennas as in [[get_gbsm_channels]]; `layout.pairing` is ignored
 - `"large_scale"` (TR 38.901 Table 7.8-1): the link gain `−PL − O2I + 10 lg(SF)` plus the gain of one unit-gain LOS path from [[get_channels_planar]] (port weights, element positions, orientations); no rays
 - `"rsrp"` (TR 36.873 eq. (8.1-1)): per Rx port the sum of `|h|²` over the rays of [[gbsm_single_link_channel]] (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
 - Both rules take `|h|²` of Tx port `tx_port` and average it over the Rx ports, so a dual-polarized UT (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT antenna of the TR
@@ -1260,25 +1367,24 @@ arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::strin
         }
     }
 
-    // Link gain of each link at the drop
-    std::vector<arma::uword> all(n_link);
+    // Link gain of the first segment of each pair at the drop
+    std::vector<arma::uword> all, link(n_site * n_term, n_link);
     for (arma::uword l = 0; l < n_link; ++l)
-        all[l] = l;
+        if (K.i_segment[l] == 0)
+            all.push_back(l), link[K.i_tx[l] * n_term + K.i_rx[l]] = l;
     P.prepare(all);
-    for (arma::uword l = 0; l < n_link; ++l)
+    for (arma::uword l : all)
         P.lsf(P.group[l]);
     arma::vec lg(n_link);
-    qd_batch_loop(n_link, n_link >= qd_par_links, nullptr, [&](size_t l)
+    qd_batch_loop(all.size(), all.size() >= qd_par_links, nullptr, [&](size_t i)
                   {
+                      const arma::uword l = all[i];
                       arma::mat g, kfr;
-                      P.link_gain((arma::uword)l, P.groups[P.group[l]].tx, P.rx0((arma::uword)l), g, kfr);
+                      P.link_gain(l, P.groups[P.group[l]].tx, P.rx0(l), g, kfr);
                       lg[l] = g(0, i_freq);
                   });
 
     // Value of each pair of a Tx node and an Rx node with a link, [n_rx, n_tx]
-    std::vector<arma::uword> link(n_site * n_term, n_link);
-    for (arma::uword l = 0; l < n_link; ++l)
-        link[K.i_tx[l] * n_term + K.i_rx[l]] = l;
     arma::mat V(n_rx, n_tx);
     const size_t n_pair = (size_t)(n_rx * n_tx);
     qd_batch_loop(n_pair, n_pair >= (rsrp ? qd_par_attach_rsrp : qd_par_attach_ls), nullptr, [&](size_t c)
@@ -1339,7 +1445,7 @@ Writes the rays of a layout with their link gain to a QRT file
 
 - Separates the ray generation from the antennas: [[qrt_file_read]], [[gbsm_rays_from_paths]] (with the method of the links and the `n_interact` of the file as `path_type`) and [[gbsm_single_link_channel]] (link gain 0, mobility `"drift"`) turn a CIR into channels for any arrays, orientations and positions
 - One origin per site at its position, with the orientation of sector 0 (else of the first node of the site) and the site name; one destination per terminal with its name and one CIR per row (the nodes of a terminal share their positions; the CIR has the orientation of the first node)
-- Per CIR: the rays of the link (scatterers added where missing), the link gain and the K-factor ratio of [[get_gbsm_channels]] at the row, [[ssf_paths]] with `"drift"`, [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_gbsm_channels]] (`output = "rays"`, `mobility = "drift"`) at the row within float32 accuracy
+- Per CIR: the rays of the link and of the segment that holds the row (scatterers added where missing), the link gain and the K-factor ratio of [[get_gbsm_channels]] at the row, [[ssf_paths]] with `"drift"`, [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_gbsm_channels]] (`output = "rays"`, `mobility = "drift"`) at the row within float32 accuracy
 - A point drop with speed has one CIR; its motion is applied at the evaluation, at the link gain of the drop
 - Only the pairs of `layout.pairing` (empty: all) are written; the other CIRs of an origin hold no paths
 - Positions in the file are local: the returned shift, the centroid of the site and CIR positions in x and y, is subtracted (z unchanged); add it to the positions read back

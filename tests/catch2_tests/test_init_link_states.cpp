@@ -124,22 +124,22 @@ arma::uword nearest_image(const arma::mat &images, double sx, double sy, double 
 std::vector<std::vector<quadriga_lib::gbsm_rays>> chain(const std::string &method, const conf_t &c, long long seed, const arma::mat &tx,
                                                         const arma::mat &rx, const arma::u32_vec &fl, const arma::vec &d2d,
                                                         const std::vector<bool> &o2i, const arma::vec &fc, const arma::mat &rx_all,
-                                                        bool scat = false, double anchor = 2.0e9, bool polvar = false)
+                                                        bool scat = false, double anchor = 2.0e9, bool polvar = false, bool dual = false)
 {
     const bool qd = method == "quadriga", mf = method == "38.901_MF";
     const std::string preset = qd ? "Comb256" : "Exp256", angle = qd ? "rotation" : "additive", pol = qd ? "quadriga" : "38.901";
     const spmap &sp = c.sp;
     const arma::uword n = rx.n_cols, F = fc.n_elem, N = (arma::uword)sp.at("NumClusters") - 1;
-    arma::cube ph = quadriga_lib::gbsm_init_phases(sp, "lsf", seed, -1, preset, qd ? tx : arma::mat(), qd ? rx_all : arma::mat(), false, qd, true);
+    arma::cube ph = quadriga_lib::gbsm_init_phases(sp, "lsf", seed, -1, preset, qd ? tx : arma::mat(), qd ? rx_all : arma::mat(), dual, qd, true);
     arma::mat rnd, sf, eod, rc, gre, gim;
-    quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, rnd, -1, preset, fl);
+    quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, rnd, -1, preset, fl, {}, dual);
     quadriga_lib::path_loss(c.pl, c.pp, sp, fc, tx, rx, &sf, qd ? d2d : arma::vec(), arma::vec(rnd.col(10)));
     arma::cube lsp, mu, sg;
     arma::vec toa;
     const bool gr = sp.at("GR_enabled") != 0.0;
     quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, sf, &toa, gr ? &gre : nullptr, gr ? &gim : nullptr, &eod, &mu, &sg);
     ph = quadriga_lib::gbsm_init_phases(sp, "cluster", seed, -1, preset);
-    quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, rc, -1, preset, fl);
+    quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, rc, -1, preset, fl, {}, dual);
     std::vector<std::vector<quadriga_lib::gbsm_rays>> out(n);
     arma::cube D, P, AOD, EOD, AOA, EOA;
     std::vector<quadriga_lib::gbsm_rays> rays;
@@ -148,7 +148,7 @@ std::vector<std::vector<quadriga_lib::gbsm_rays>> chain(const std::string &metho
         quadriga_lib::ssf_clusters(sp, tx, rx, lsp, rc, D, P, AOD, EOD, AOA, EOA, method, {}, {}, eod, toa, gre, gim, o2i);
         arma::mat rr;
         ph = quadriga_lib::gbsm_init_phases(sp, "ray", seed, -1, preset);
-        quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, rr, -1, preset, fl, fc);
+        quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, rr, -1, preset, fl, fc, dual);
         const arma::cube rnd_ray(rr.memptr(), rr.n_rows, rr.n_cols, 1);
         quadriga_lib::ssf_rays(sp, tx, rx, fc, lsp, mu, sg, D, P, AOD, EOD, AOA, EOA, rnd_ray, rays, method, 0, angle, pol, gre, gim);
         for (arma::uword i = 0; i < n; ++i)
@@ -161,10 +161,10 @@ std::vector<std::vector<quadriga_lib::gbsm_rays>> chain(const std::string &metho
         {
             ph = quadriga_lib::gbsm_init_phases(sp, "cluster", seed, (arma::sword)k, preset);
             arma::mat x;
-            quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, x, (arma::sword)k, preset, fl);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, x, (arma::sword)k, preset, fl, {}, dual);
             rf.slice(k) = x;
             ph = quadriga_lib::gbsm_init_phases(sp, "ray", seed, (arma::sword)k, preset);
-            quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, (arma::sword)k, preset, fl);
+            quadriga_lib::gbsm_draw(sp, "ray", ph, tx, rx, x, (arma::sword)k, preset, fl, {}, dual);
             if (k == 0)
                 rr.set_size(n, x.n_cols, F);
             rr.slice(k) = x;
@@ -200,21 +200,22 @@ std::vector<std::vector<quadriga_lib::gbsm_rays>> chain(const std::string &metho
 }
 
 // Link gain -PL - O2I + 10 lg(SF) at frequency k for the snapshot positions T, R [3, n] of a link whose segment starts at
-// (t0, r0), and optionally the K-factor ratio K(position) / K(start); 'o2i' [4] the inputs of o2i_loss at the start (column 3 is recomputed at moved positions from the field
-// "o2i_dev|<family>" with base seed 'base'); 'model' empty = no O2I loss; 'hold' = false draws hE at each position
+// (t0, r0), and optionally the K-factor ratio K(position) / K(start); 'o2i' [4] the inputs of o2i_loss drawn at 'o2i_at' (empty: the start; column 3 is recomputed at other positions from the field
+// "o2i_dev|<family>" with base seed 'base'); 'model' empty = no O2I loss; 'hold' = false draws hE at each position; 'dual': dual mobility
 arma::vec gain(const std::string &method, const conf_t &c, long long seed, const arma::mat &t0, const arma::mat &r0, const arma::mat &T,
                const arma::mat &R, double floor_id, double d2d, const arma::vec &fc, arma::uword k, const std::string &model = "",
                const arma::rowvec &o2i = {}, double dmax = 25.0, long long base = 0, const std::string &family = "", bool hold = true,
-               const arma::mat &rx_all = {}, arma::vec *kf_ratio = nullptr)
+               const arma::mat &rx_all = {}, arma::vec *kf_ratio = nullptr, bool dual = false,
+               const arma::mat &o2i_at = {})
 {
     const bool qd = method == "quadriga";
     const std::string preset = qd ? "Comb256" : "Exp256";
     const arma::uword n = R.n_cols;
-    const arma::cube ph = quadriga_lib::gbsm_init_phases(c.sp, "lsf", seed, -1, preset, qd ? t0 : arma::mat(), qd ? rx_all : arma::mat(), false, qd, true);
+    const arma::cube ph = quadriga_lib::gbsm_init_phases(c.sp, "lsf", seed, -1, preset, qd ? t0 : arma::mat(), qd ? rx_all : arma::mat(), dual, qd, true);
     arma::mat rnd0, rnd, sf, sf0;
     const arma::u32_vec fl0(1, arma::fill::value((arma::u32)floor_id)), fl(n, arma::fill::value((arma::u32)floor_id));
-    quadriga_lib::gbsm_draw(c.sp, "lsf", ph, t0, r0, rnd0, -1, preset, fl0);
-    quadriga_lib::gbsm_draw(c.sp, "lsf", ph, T, R, rnd, -1, preset, fl);
+    quadriga_lib::gbsm_draw(c.sp, "lsf", ph, t0, r0, rnd0, -1, preset, fl0, {}, dual);
+    quadriga_lib::gbsm_draw(c.sp, "lsf", ph, T, R, rnd, -1, preset, fl, {}, dual);
     const arma::vec he = hold ? arma::vec(n, arma::fill::value(rnd0(0, 10))) : arma::vec(rnd.col(10));
     const arma::mat pl = quadriga_lib::path_loss(c.pl, c.pp, c.sp, fc, T, R, &sf, qd ? arma::vec(n, arma::fill::value(d2d)) : arma::vec(), he);
     arma::cube lsp;
@@ -237,7 +238,8 @@ arma::vec gain(const std::string &method, const conf_t &c, long long seed, const
         for (arma::uword i = 0; i < n; ++i)
         {
             x.row(i) = o2i;
-            if (R(0, i) != r0(0, 0) || R(1, i) != r0(1, 0))
+            const arma::mat &at = o2i_at.is_empty() ? r0 : o2i_at; // where the O2I values were drawn
+            if (R(0, i) != at(0, 0) || R(1, i) != at(1, 0))
                 x(i, 3) = field(10.0, R(0, i), R(1, i), qd_layout_oracle_seed(base, "o2i_dev|" + family), true);
         }
         const arma::mat loss = quadriga_lib::o2i_loss(fc, x, {model}, arma::vec{1.0}, dmax);
@@ -294,13 +296,17 @@ TEST_CASE("init_link_states - input validation")
         L.rx.d2d_in = {5.0, 30.0, 5.0, 5.0};
         thr(L, "38.901", {}, false, 2e9, "", -1, "Terminal 'UT2': 'd2d_in' of 30 m is above the maximum indoor distance 25 m of the family 'UMa'.");
     }
-    SECTION("tracks with a scenario change")
+    SECTION("segments")
     {
+        // A segment that starts at a site position, and indoor distances that differ between segment starts
         quadriga_lib::layout L = ok();
-        L.rx = qd_layout_points({"UT1"}, {0}, arma::mat{{10.0, 20.0}, {100.0, 100.0}, {1.5, 1.5}});
-        L.rx.speed = {1.0, 1.0};
-        L.rx.scenario = {"UMa", "UMi"};
-        thr(L, "38.901", {}, false, 2e9, "", -1, "Terminal 'UT1': a change of 'scenario' or 'indoor' along a track is not supported yet.");
+        L.rx = qd_layout_points({"UT1"}, {0}, arma::mat{{10.0, 0.0}, {100.0, 0.0}, {1.5, 25.0}});
+        L.rx.scenario = {"UMa", "UMa_NLOS"};
+        thr(L, "38.901", {}, false, 2e9, "", -1, "Terminal 'UT1': segment 1 starts at the position of site 'BS1'; a segment start needs a LOS path of non-zero length.");
+        L.rx = qd_layout_points({"UT1"}, {0}, arma::mat{{10.0, 20.0, 30.0}, {100.0, 100.0, 100.0}, {1.5, 1.5, 1.5}});
+        L.rx.indoor = {1, 1, 3};
+        L.rx.d2d_in = {5.0, 5.0, 8.0};
+        thr(L, "38.901", {}, false, 2e9, "", -1, "Terminal 'UT1': 'd2d_in' is 5 m and 8 m at the starts of its segments; a terminal has one indoor distance.");
     }
     SECTION("rules of the pipeline")
     {
@@ -1180,4 +1186,339 @@ TEST_CASE("get_gbsm_channels - a layout without propagation links gives empty re
     CHECK(quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "taps", &idx).empty());
     CHECK(idx.n_cols == 0);
     CHECK(quadriga_lib::get_channels_layout(L).empty());
+}
+
+// A track of 6 rows along +x from (120, 40) in steps of 50 m (rows 0-1 the scenario of the site, UMa; rows 2-3 UMa_NLOS;
+// rows 4-5 UMa: three segments) and a track of 3 rows from (-90, 150) with indoor 0, 1, 1 (two segments)
+quadriga_lib::layout segment_layout()
+{
+    quadriga_lib::layout L = two_sites(four_uts().cols(0, 1));
+    arma::mat p1(3, 6), p2 = {{-90.0, -80.0, -70.0}, {150.0, 150.0, 150.0}, {1.5, 1.5, 1.5}};
+    for (arma::uword i = 0; i < 6; ++i)
+        p1(0, i) = 120.0 + 50.0 * (double)i, p1(1, i) = 40.0, p1(2, i) = 1.5;
+    L.rx = qd_layout_nodes_from({p1, p2});
+    L.rx.scenario = {"", "", "UMa_NLOS", "UMa_NLOS", "", "", "", "", ""};
+    L.rx.indoor = {0, 0, 0, 0, 0, 0, 0, 1, 1};
+    return L;
+}
+
+TEST_CASE("init_link_states - a change of scenario or indoor starts a segment, the wrap image is kept")
+{
+    quadriga_lib::layout L = segment_layout();
+    L.wrap = arma::mat{{500.0, 250.0}, {0.0, 433.0}};
+    quadriga_lib::init_link_states(L);
+    const auto &K = L.links;
+    REQUIRE(K.n_link() == 3 * 2 + 2 * 2);
+    // Order: terminal, site, segment
+    CHECK(qd_layout_same_int(K.i_rx, arma::u32_vec{0, 0, 0, 0, 0, 0, 1, 1, 1, 1}));
+    CHECK(qd_layout_same_int(K.i_tx, arma::u32_vec{0, 0, 0, 1, 1, 1, 0, 0, 1, 1}));
+    CHECK(qd_layout_same_int(K.i_segment, arma::u32_vec{0, 1, 2, 0, 1, 2, 0, 1, 0, 1}));
+    const arma::uword start[2][3] = {{0, 2, 4}, {6, 7, 0}};
+    const arma::mat images = qd_layout_images(L.wrap);
+    const char *site[2] = {"BS1", "BS2"};
+    const double sx[2] = {0.0, 400.0}, sy[2] = {0.0, 30.0}, sz[2] = {25.0, 20.0};
+    const double lambda = conf("UMa_NLOS").sp.at("LOS_state_lambda");
+    arma::uword n_moved = 0; // links whose nearest image at the segment start is not that of the first row
+    for (arma::uword l = 0; l < K.n_link(); ++l)
+    {
+        const arma::uword s = K.i_tx[l], t = K.i_rx[l], k = K.i_segment[l], r0 = start[t][0], r = start[t][k];
+        const arma::uword img = nearest_image(images, sx[s], sy[s], L.rx.pos(0, r0), L.rx.pos(1, r0));
+        CHECK(K.image[l] == img);
+        n_moved += nearest_image(images, sx[s], sy[s], L.rx.pos(0, r), L.rx.pos(1, r)) != img;
+        const double x = L.rx.pos(0, r), y = L.rx.pos(1, r), vx = sx[s] + images(0, img), vy = sy[s] + images(1, img);
+        const std::string img_s = std::to_string(img);
+        if (t == 0 && k == 1) // the exact name fixes NLOS
+            CHECK(K.los[l] == 0);
+        else // drawn at the segment start from the field of the site and image
+        {
+            const double d2d = K.d2d_in[l];
+            const arma::vec p = quadriga_lib::los_probability("38.901_UMa", arma::vec{std::max(std::hypot(x - vx, y - vy) - d2d, 0.0)}, arma::vec{sz[s]}, arma::vec{1.5});
+            const double u = field(lambda, x, y, qd_layout_oracle_seed(4711, std::string("los|") + site[s] + "|" + img_s + "|UMa"));
+            CHECK(K.los[l] == (u < p(0) ? 1u : 0u));
+        }
+        const bool building = t == 1 && k == 1;
+        CHECK(K.indoor[l] == (building ? 1 : 0));
+        if (building) // the O2I values of the first position of the terminal
+        {
+            const double c1 = field(25.0, -90.0, 150.0, qd_layout_oracle_seed(4711, "d2din1|UMa")), c2 = field(25.0, -90.0, 150.0, qd_layout_oracle_seed(4711, "d2din2|UMa"));
+            CHECK(std::abs(K.o2i_rnd(1, 1) - c1) < 1e-12);
+            CHECK(std::abs(K.d2d_in[l] - std::min(c1, c2) * 25.0) < 1e-9);
+            CHECK(K.floor_id[l] == 0);
+        }
+        else
+            CHECK(K.d2d_in[l] == 0.0);
+        const std::string cname = std::string("UMa_") + (K.los[l] ? "LOS" : "NLOS") + (building ? "_O2I" : "");
+        CHECK(K.conf_names[K.i_conf[l]] == cname);
+        CHECK(K.gbsm_seed[l] == qd_layout_oracle_seed(4711, std::string("gbsm|") + site[s] + "|" + img_s + "|" + cname));
+    }
+    CHECK(n_moved > 0); // the kept image differs from the nearest one at some segment start
+}
+
+TEST_CASE("generate_rays - the rays of segment k refer to its first row")
+{
+    // Oracle: the same terminal as a point drop at the first row of the segment, with the scenario and indoor state of
+    // the segment and the indoor distance of the link
+    quadriga_lib::layout L = segment_layout();
+    quadriga_lib::init_link_states(L);
+    const auto &K = L.links;
+    const auto rays = quadriga_lib::generate_rays(L);
+    const arma::uword start[2][3] = {{0, 2, 4}, {6, 7, 0}};
+    for (arma::uword l = 0; l < K.n_link(); ++l)
+    {
+        const arma::uword s = K.i_tx[l], t = K.i_rx[l], r = start[t][K.i_segment[l]];
+        CHECK(arma::approx_equal(arma::vectorise(rays[l][0].rx_pos), L.rx.pos.col(r), "absdiff", 0.0));
+        quadriga_lib::layout M = two_sites(L.rx.pos.col(r));
+        M.rx.scenario = {L.rx.scenario[r]};
+        M.rx.indoor = {L.rx.indoor[r]};
+        if (K.indoor[l] == 1)
+            M.rx.d2d_in = {K.d2d_in[l]};
+        quadriga_lib::init_link_states(M);
+        const arma::uword m = link_of(M.links, s, 0);
+        CHECK(M.links.los[m] == K.los[l]);
+        CHECK(qd_layout_diff_rays(rays[l][0], quadriga_lib::generate_rays(M, m)[0][0], 1e-12) == "");
+    }
+}
+
+TEST_CASE("get_gbsm_channels - the cross-fade of a track with two segments is continuous in power")
+{
+    // One site, a track of 12 rows in steps of 1 m: rows 0-5 UMa_LOS, rows 6-11 UMa_NLOS. Oracle: the channel of each
+    // segment from gbsm_single_link_channel with the link gain and K-factor ratio of its first row (segment 1 also over
+    // rows 0-5), each with delays relative to its own LOS ("phase"), joined by crossfade_segments (a ramp of
+    // round(0.5 * 6) = 3 snapshots)
+    quadriga_lib::layout L = two_sites(col3(100.0, 20.0, 1.5));
+    L.tx = qd_layout_points({"BS1"}, {0}, col3(0.0, 0.0, 25.0));
+    L.tx.scenario = {"UMa"};
+    for (const auto &kv : small_sets)
+        L.tx.scenpar_override[kv.first] = arma::vec{kv.second};
+    arma::mat R(3, 12);
+    for (arma::uword i = 0; i < 12; ++i)
+        R(0, i) = 100.0 + (double)i, R(1, i) = 20.0, R(2, i) = 1.5;
+    L.rx = qd_layout_nodes_from({R});
+    L.rx.scenario = {"UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS"};
+    L.rx.speed = arma::vec(12, arma::fill::ones);
+    quadriga_lib::init_link_states(L);
+    const auto &K = L.links;
+    REQUIRE(K.n_link() == 2);
+    const auto rays = quadriga_lib::generate_rays(L);
+    const arma::mat t0 = col3(0.0, 0.0, 25.0), T = arma::repmat(t0, 1, 12), O(3, 1, arma::fill::zeros);
+    const quadriga_lib::arrayant<double> xpol = quadriga_lib::generate_antenna<double>("xpol", NAN, 3.5e9);
+    std::vector<double> w;
+    for (arma::uword i = 1; i <= 3; ++i)
+        w.push_back(0.5 * (1.0 + std::sin(((double)i / 4.0 - 0.5) * 3.14159265358979323846)));
+    for (const char *output : {"taps", "rays"})
+    {
+        std::vector<quadriga_lib::channel<double>> part(2);
+        for (arma::uword k = 0; k < 2; ++k)
+        {
+            const arma::uword a = 0, b = k == 0 ? 5 : 11, r0 = k == 0 ? 0 : 6;
+            arma::vec kf;
+            const arma::vec g = gain("38.901", conf(k == 0 ? "UMa_LOS" : "UMa_NLOS"), K.gbsm_seed[k], t0, R.col(r0), T.cols(a, b), R.cols(a, b), 0.0, 0.0,
+                                     L.center_freq, 0, "", {}, 25.0, 0, "", true, {}, &kf);
+            part[k] = quadriga_lib::gbsm_single_link_channel(xpol, xpol, rays[k][0], g, "auto", output, 0, T.cols(a, b), R.cols(a, b), O, O, kf);
+        }
+        const quadriga_lib::channel<double> X = quadriga_lib::crossfade_segments(part, arma::uvec{0, 6}, 0.5);
+        const auto C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, output);
+        REQUIRE(C.size() == 1);
+        REQUIRE(C[0].n_snap() == 12);
+        for (arma::uword s = 0; s < 12; ++s)
+        {
+            REQUIRE(arma::size(C[0].coeff_re[s]) == arma::size(X.coeff_re[s]));
+            const double m = arma::abs(X.coeff_re[s]).max() + arma::abs(X.coeff_im[s]).max();
+            CHECK(arma::approx_equal(C[0].coeff_re[s], X.coeff_re[s], "absdiff", 1e-8 * m));
+            CHECK(arma::approx_equal(C[0].coeff_im[s], X.coeff_im[s], "absdiff", 1e-8 * m));
+            CHECK(arma::approx_equal(C[0].delay[s], X.delay[s], "absdiff", 1e-15));
+        }
+        if (std::string(output) == "rays") // the total path gain follows the ramp between the two segments
+        {
+            auto pg = [](const quadriga_lib::channel<double> &c, arma::uword s) { return arma::accu(c.path_gain[s]); };
+            for (arma::uword s = 0; s < 12; ++s)
+            {
+                const double expect = s < 3 ? pg(part[0], s) : (s < 6 ? (1.0 - w[s - 3]) * pg(part[0], s) + w[s - 3] * pg(part[1], s) : pg(part[1], s));
+                CHECK(std::abs(pg(C[0], s) - expect) <= 1e-8 * expect);
+            }
+            CHECK(std::abs(10.0 * std::log10(pg(part[0], 5) / pg(part[1], 6))) > 1.0); // a hard switch would step
+        }
+
+        // Snapshot times at the rows (speed 1 m/s) give the same channel; the one call gives that of the manual path
+        const auto Ct = quadriga_lib::get_gbsm_channels(L, rays, {}, arma::regspace(0.0, 11.0), output);
+        const auto C1 = quadriga_lib::get_channels_layout(L, {}, output);
+        for (arma::uword s = 0; s < 12; ++s)
+        {
+            CHECK(qd_layout_same_data(Ct[0].coeff_re[s], C[0].coeff_re[s], 1e-12));
+            CHECK(qd_layout_same_data(C1[0].coeff_re[s], C[0].coeff_re[s], 1e-12));
+            CHECK(qd_layout_same_data(C1[0].delay[s], C[0].delay[s], 1e-12));
+        }
+    }
+
+    // A selected segment alone gives its own snapshots; non-consecutive selected segments throw
+    const auto C0 = quadriga_lib::get_gbsm_channels(L, {rays[1]}, arma::uvec{1}, {}, "rays");
+    CHECK(C0[0].n_snap() == 6);
+    const arma::vec back = {0.0, 1.0, 8.0, 2.0};
+    CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, rays, {}, back, "rays"); }) ==
+          "Terminal 'N0': the snapshots of segment 0 are not consecutive; a track with several segments needs increasing 'times'.");
+}
+
+TEST_CASE("attach_terminals - a track with segments is attached by its first segment")
+{
+    // The same layout with the scenario of the first segment on all rows has the same links of segment 0
+    quadriga_lib::layout L = segment_layout(), M = L;
+    M.rx.scenario = {"", "", "", "", "", "", "", "", ""};
+    M.rx.indoor = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    quadriga_lib::init_link_states(L), quadriga_lib::init_link_states(M);
+    for (const char *rule : {"large_scale", "rsrp"})
+    {
+        arma::mat ga, gb;
+        const arma::uvec a = quadriga_lib::attach_terminals(L, rule, quadriga_lib::generate_rays(L), nullptr, &ga);
+        const arma::uvec b = quadriga_lib::attach_terminals(M, rule, quadriga_lib::generate_rays(M), nullptr, &gb);
+        CHECK(qd_layout_same_int(a, b));
+        CHECK(arma::approx_equal(ga, gb, "absdiff", 1e-9));
+    }
+}
+
+// One UMa site at (0, 0, 25) with the small random sets; a track of n rows along +x from (x0, 20, 1.5) in steps of
+// 'step' m at 'step' m/s (row i at i s), the conf names 'scen' per row, 'indoor' per row (empty: not set)
+quadriga_lib::layout track_layout(arma::uword n, double step, const std::vector<std::string> &scen, const std::vector<int> &indoor = {}, double x0 = 100.0)
+{
+    quadriga_lib::layout L = two_sites(col3(100.0, 20.0, 1.5));
+    L.tx = qd_layout_points({"BS1"}, {0}, col3(0.0, 0.0, 25.0));
+    L.tx.scenario = {"UMa"};
+    for (const auto &kv : small_sets)
+        L.tx.scenpar_override[kv.first] = arma::vec{kv.second};
+    arma::mat R(3, n);
+    for (arma::uword i = 0; i < n; ++i)
+        R(0, i) = x0 + step * (double)i, R(1, i) = 20.0, R(2, i) = 1.5;
+    L.rx = qd_layout_nodes_from({R});
+    L.rx.scenario = scen;
+    if (!indoor.empty())
+    {
+        L.rx.indoor.set_size(n);
+        for (arma::uword i = 0; i < n; ++i)
+            L.rx.indoor[i] = indoor[i];
+    }
+    L.rx.speed = arma::vec(n, arma::fill::value(step));
+    return L;
+}
+
+// n1 rows of conf a, then n2 rows of conf b
+std::vector<std::string> two_confs(arma::uword n1, const std::string &a, arma::uword n2, const std::string &b)
+{
+    std::vector<std::string> s(n1, a);
+    s.insert(s.end(), n2, b);
+    return s;
+}
+
+TEST_CASE("get_gbsm_channels - delays in the ramp are those of the paths' own segments")
+{
+    // A track away from the site, 20 rows 10 m apart, UMa_LOS then UMa_NLOS: the LOS distance grows by 100 m over the
+    // old segment. In "phase" each segment's paths keep their delays relative to its own LOS, in "drift" to the LOS at
+    // the snapshot; so in the ramp the old paths have the delays of the old segment alone, no powered path has a
+    // negative relative delay, no delay (also of an empty tap slot) is negative, and in "drift" the absolute LOS delay
+    // changes by at most the step of the Rx (10 m / c) from snapshot to snapshot
+    quadriga_lib::layout L = track_layout(20, 10.0, two_confs(10, "UMa_LOS", 10, "UMa_NLOS"));
+    quadriga_lib::init_link_states(L);
+    REQUIRE(L.links.n_link() == 2);
+    const auto rays = quadriga_lib::generate_rays(L, {}, true);
+    const double c0 = 299792458.0;
+    for (const char *mob : {"phase", "drift"})
+        for (const char *out : {"taps", "rays"})
+        {
+            const auto C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, out, nullptr, mob);
+            const auto A = quadriga_lib::get_gbsm_channels(L, {rays[0]}, arma::uvec{0}, {}, out, nullptr, mob); // old segment alone
+            REQUIRE(C[0].n_snap() == 20);
+            REQUIRE(A[0].n_snap() == 10);
+            for (arma::uword s = 0; s < 20; ++s)
+            {
+                const arma::cube &d = C[0].delay[s];
+                CHECK(d.min() >= -1e-12);
+                for (arma::uword p = 0; p < d.n_slices; ++p)
+                    if (arma::accu(arma::square(C[0].coeff_re[s].slice(p)) + arma::square(C[0].coeff_im[s].slice(p))) > 0.0)
+                        CHECK(d.slice(p).min() >= -1e-12);
+            }
+            if (std::string(out) == "rays") // the old NLOS paths of the ramp (5 snapshots) follow LOS and GR in old order
+                for (arma::uword s = 5; s < 10; ++s)
+                    for (arma::uword p = 1; p < A[0].delay[s].n_slices; ++p)
+                        CHECK(std::abs(C[0].delay[s](0, 0, p) - A[0].delay[s](0, 0, p)) <= 1e-15);
+        }
+    const auto D = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "rays", nullptr, "drift", false, true);
+    for (arma::uword s = 1; s < 20; ++s)
+        CHECK(std::abs(D[0].delay[s](0, 0, 0) - D[0].delay[s - 1](0, 0, 0)) <= 10.0 / c0 + 1e-15);
+}
+
+TEST_CASE("get_gbsm_channels - the O2I loss has no step at the first row of an indoor segment")
+{
+    // 200 rows 0.1 m apart, rows 0-99 outdoor (UMa_LOS), rows 100-199 in a building (UMa_LOS_O2I, indoor 1). The O2I
+    // values are drawn at the first row of the track; the loss deviation follows the 10 m field at every other row.
+    // Oracle: the link gain of segment 1 alone against path_loss, lsp_generate and o2i_loss with the deviation at each
+    // position; and the total path gain changes by less than 3 dB per 0.1 m in the indoor segment (the deviation
+    // decorrelates over 10 m: the difference over 0.1 m has a standard deviation of about 0.14 sigma, below 1 dB)
+    std::vector<int> io(200, 0);
+    std::fill(io.begin() + 100, io.end(), 1);
+    quadriga_lib::layout L = track_layout(200, 0.1, two_confs(100, "UMa_LOS", 100, "UMa_LOS_O2I"), io);
+    quadriga_lib::init_link_states(L);
+    const auto &K = L.links;
+    REQUIRE(K.n_link() == 2);
+    REQUIRE(K.indoor[1] == 1);
+    const auto rays = quadriga_lib::generate_rays(L);
+    const auto S = quadriga_lib::get_gbsm_channels(L, {rays[1]}, arma::uvec{1}, {}, "taps");
+    REQUIRE(S[0].n_snap() == 100);
+    const arma::mat R = L.rx.pos.cols(100, 199), T = arma::repmat(col3(0.0, 0.0, 25.0), 1, 100);
+    const std::string model = K.o2i_model[0] == 0 ? "low" : "high";
+    const arma::vec g = gain("38.901", conf("UMa_LOS_O2I"), K.gbsm_seed[1], col3(0.0, 0.0, 25.0), R.col(0), T, R, K.floor_id[1], K.d2d_in[1], L.center_freq, 0,
+                             model, K.o2i_rnd.row(0), 25.0, 4711, "UMa", true, {}, nullptr, false, L.rx.pos.col(0));
+    CHECK(arma::approx_equal(qd_layout_par<arma::vec>(S[0], "link_gain_dB"), g, "absdiff", 1e-9));
+    const auto C = quadriga_lib::get_gbsm_channels(L, rays, {}, {}, "rays");
+    for (arma::uword s = 100; s + 1 < 200; ++s)
+        CHECK(std::abs(10.0 * std::log10(arma::accu(C[0].path_gain[s]) / arma::accu(C[0].path_gain[s + 1]))) < 3.0);
+}
+
+TEST_CASE("get_gbsm_channels - times that skip a short segment join its neighbours")
+{
+    // 11 rows at 1 s, a one-row middle segment (row 5); snapshots every 2 s hold segments 0 and 2 only
+    std::vector<std::string> sc(11, "UMa_LOS");
+    sc[5] = "UMa_NLOS";
+    quadriga_lib::layout L = track_layout(11, 1.0, sc);
+    quadriga_lib::init_link_states(L);
+    REQUIRE(L.links.n_link() == 3);
+    const auto rays = quadriga_lib::generate_rays(L);
+    const arma::vec times = arma::regspace(0.0, 2.0, 10.0);
+    std::vector<quadriga_lib::channel<double>> C;
+    CHECK_NOTHROW(C = quadriga_lib::get_gbsm_channels(L, rays, {}, times, "rays"));
+    REQUIRE(C.size() == 1);
+    CHECK(C[0].n_snap() == 6);
+    const auto A = quadriga_lib::get_gbsm_channels(L, {rays[0]}, arma::uvec{0}, times, "rays"); // segment 0 alone: t = 0, 2, 4
+    REQUIRE(A[0].n_snap() == 3);
+    CHECK(qd_layout_same_data(C[0].coeff_re[0], A[0].coeff_re[0], 1e-12));
+}
+
+TEST_CASE("generate_rays - with a moving site, segment k pairs its first row with the site at the same time")
+{
+    // BS1 moves at 2 m/s along azimuth 0.3; the Rx track (12 rows, 1 m at 1 m/s) changes from UMa_LOS to UMa_NLOS at
+    // row 6, i.e. at 6 s. Oracle: the GBSM chain (dual mobility) at the Tx position of 6 s and the Rx at row 6; the link
+    // gain of segment 1 alone at the times 6 ... 11 s with that drop
+    quadriga_lib::layout L = track_layout(12, 1.0, two_confs(6, "UMa_LOS", 6, "UMa_NLOS"));
+    L.tx.speed = {2.0};
+    L.tx.direction = arma::mat(arma::vec{0.3, 0.0});
+    quadriga_lib::init_link_states(L);
+    const auto &K = L.links;
+    REQUIRE(K.n_link() == 2);
+    const auto rays = quadriga_lib::generate_rays(L);
+    const arma::mat dir = col3(std::cos(0.3), std::sin(0.3), 0.0);
+    for (arma::uword k = 0; k < 2; ++k)
+    {
+        const double t = 6.0 * (double)k;
+        const arma::mat tx = col3(0.0, 0.0, 25.0) + 2.0 * t * dir, rx = L.rx.pos.col(6 * k);
+        CHECK(arma::approx_equal(arma::vectorise(rays[k][0].tx_pos), arma::vectorise(tx), "absdiff", 1e-12));
+        const auto ref = chain("38.901", conf(k == 0 ? "UMa_LOS" : "UMa_NLOS"), K.gbsm_seed[k], tx, rx, arma::u32_vec{0}, arma::vec{0.0}, {false}, L.center_freq,
+                               {}, false, 2.0e9, false, true);
+        CHECK(qd_layout_diff_rays(rays[k][0], ref[0][0], 1e-12) == "");
+    }
+    const arma::vec times = arma::regspace(6.0, 11.0);
+    const auto S = quadriga_lib::get_gbsm_channels(L, {rays[1]}, arma::uvec{1}, times, "taps");
+    REQUIRE(S[0].n_snap() == 6);
+    arma::mat T(3, 6);
+    for (arma::uword i = 0; i < 6; ++i)
+        T.col(i) = col3(0.0, 0.0, 25.0) + 2.0 * times[i] * dir;
+    const arma::vec g = gain("38.901", conf("UMa_NLOS"), K.gbsm_seed[1], T.col(0), L.rx.pos.col(6), T, L.rx.pos.cols(6, 11), 0.0, 0.0, L.center_freq, 0, "", {}, 25.0,
+                             0, "", true, {}, nullptr, true);
+    CHECK(arma::approx_equal(qd_layout_par<arma::vec>(S[0], "link_gain_dB"), g, "absdiff", 1e-9));
 }

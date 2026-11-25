@@ -80,6 +80,14 @@ namespace quadriga_lib
     template <typename dtype>
     arma::Col<dtype> channel_calc_effective_path_gain(const channel<dtype> &chan);
 
+    // Join the channels of consecutive segments of one link by a power cross-fade
+    // - Segment k starts with n_overlap[k] snapshots that are also the last ones of segment k - 1
+    // - The last round(overlap * n_overlap[k]) shared snapshots are the ramp; overlap = 0 switches at the segment start
+    channel<double> crossfade_segments(
+        const std::vector<channel<double>> &segments, // Channels of one link in track order, [n_segment]
+        const arma::uvec &n_overlap,                  // Snapshots shared with the preceding segment, [n_segment]; entry 0 is 0
+        double overlap = 0.5);                        // Part of the shared snapshots used for the ramp, 0 to 1
+
     // Write propagation paths to a Wavefront OBJ file
     // - e.g. for visualization in Blender
     template <typename dtype>

@@ -353,3 +353,28 @@ TEST_CASE("get_channels_layout - parallel and serial runs agree")
 #endif
     CHECK(par.size() == 12);
 }
+
+TEST_CASE("get_channels_layout - batches keep the segments of a track together")
+{
+    // 129 terminals with a two-row track whose second row starts a segment (UMa_LOS, then UMa_NLOS), one site: 258
+    // links in groups by conf, so that a batch of 256 links would cut a pair; the one call equals the manual path
+    quadriga_lib::layout L = small();
+    L.tx = qd_layout_points({"BS1"}, {0}, arma::mat(arma::vec{0.0, 0.0, 25.0}));
+    L.tx.scenario = {"UMa"};
+    L.tx.scenpar_override["NumClusters"] = {5.0};
+    L.tx.scenpar_override["NumSubPaths"] = {4.0};
+    L.tx.scenpar_override["NumClusters_min"] = {0.0};
+    std::vector<arma::mat> tracks;
+    for (arma::uword i = 0; i < 129; ++i)
+    {
+        const double a = 0.05 * (double)i, r = 60.0 + 3.0 * (double)i;
+        tracks.push_back(arma::mat{{r * std::cos(a), r * std::cos(a) + 2.0}, {r * std::sin(a), r * std::sin(a)}, {1.5, 1.5}});
+    }
+    L.rx = qd_layout_nodes_from(tracks);
+    L.rx.scenario.clear();
+    for (arma::uword i = 0; i < 129; ++i)
+        L.rx.scenario.push_back("UMa_LOS"), L.rx.scenario.push_back("UMa_NLOS");
+    quadriga_lib::init_link_states(L);
+    REQUIRE(L.links.n_link() == 258);
+    CHECK(diff(quadriga_lib::get_channels_layout(L), manual(L)) == "");
+}

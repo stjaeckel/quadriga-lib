@@ -560,3 +560,68 @@ TEST_CASE("export_rays_qrt - input validation")
         CHECK(qd_layout_throws([&] { quadriga_lib::export_rays_qrt(F.dir, L); }) == "Input 'fn' is a folder; give the name of a file.");
     }
 }
+
+TEST_CASE("export_rays_qrt - each row takes the rays of its segment")
+{
+    // UT2 (a track of three rows, UMa_LOS) changes to UMa_NLOS at its third row: two segments. The CIR of each row read
+    // back gives the stage-3 channel of its segment alone (i_link = that segment) at the row
+    quadriga_lib::layout L = make_layout();
+    L.rx.scenario[4] = "UMa_NLOS";
+    quadriga_lib::init_link_states(L);
+    REQUIRE(L.links.n_link() == 8);
+    const rays_t rays = quadriga_lib::generate_rays(L, {}, true);
+    const qd_layout_files F("export_rays_qrt_segments");
+    const std::string fn = F.path("a.qrt");
+    const arma::vec shift = quadriga_lib::export_rays_qrt(fn, L, rays);
+    size_t n = 0;
+    for (arma::uword l = 0; l < L.links.n_link(); ++l)
+    {
+        if (L.links.i_rx[l] != 1)
+            continue;
+        const arma::uword s = L.links.i_tx[l], seg = L.links.i_segment[l];
+        arma::umat idx;
+        const std::vector<chan_t> C = quadriga_lib::get_gbsm_channels(L, {rays[l]}, arma::uvec{l}, {}, "rays", &idx, "drift");
+        for (arma::uword j = 0; j < C.size(); ++j)
+        {
+            REQUIRE(C[j].n_snap() == (seg == 0 ? 2u : 1u));
+            for (arma::uword q = 0; q < C[j].n_snap(); ++q)
+            {
+                const cir_t c = read_cir(fn, s, cir_first[1] + (seg == 0 ? q : 2), shift, L.links.method);
+                CHECK(rel_error(from_file(L, c, idx(0, j), idx(1, j), idx(2, j)), C[j], q, L.center_freq[idx(2, j)], c.e_len) <= 1.0);
+                ++n;
+            }
+        }
+    }
+    CHECK(n == 3 * 3); // 3 Tx nodes, 3 rows
+}
+
+TEST_CASE("export_rays_qrt - the O2I loss has no step at the first row of an indoor segment")
+{
+    // A track of 200 rows 0.1 m apart from (100, 20, 1.5), outdoor (UMa_LOS) then in a building (UMa_LOS_O2I, indoor 1)
+    // from row 100. The O2I loss deviation follows its 10 m field from the first row of the track on, so the path gain
+    // of the CIRs changes by less than 3 dB per 0.1 m at the start of the indoor segment (a difference over 0.1 m has a
+    // standard deviation of about 0.14 times that of the deviation, below 1 dB)
+    quadriga_lib::layout L = make_layout();
+    L.tx = qd_layout_points({"BS1"}, {0}, arma::mat(arma::vec{0.0, 0.0, 25.0}));
+    L.tx.scenario = {"UMa"};
+    L.tx.scenpar_override["NumClusters"] = {5.0}, L.tx.scenpar_override["NumSubPaths"] = {4.0}, L.tx.scenpar_override["NumClusters_min"] = {0.0};
+    arma::mat R(3, 200);
+    for (arma::uword i = 0; i < 200; ++i)
+        R(0, i) = 100.0 + 0.1 * (double)i, R(1, i) = 20.0, R(2, i) = 1.5;
+    L.rx = qd_layout_nodes_from({R});
+    L.rx.scenario.assign(200, "UMa_LOS");
+    L.rx.indoor.zeros(200);
+    for (arma::uword i = 100; i < 200; ++i)
+        L.rx.scenario[i] = "UMa_LOS_O2I", L.rx.indoor[i] = 1;
+    L.antenna.clear(), L.antenna_args.clear(), L.antenna_cols.clear();
+    quadriga_lib::init_link_states(L);
+    REQUIRE(L.links.n_link() == 2);
+    const qd_layout_files F("export_rays_qrt_o2i");
+    const std::string fn = F.path("a.qrt");
+    quadriga_lib::export_rays_qrt(fn, L);
+    std::vector<arma::mat> pg;
+    quadriga_lib::qrt_file_read<double>(fn, {99, 100, 101, 102, 103}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pg);
+    REQUIRE(pg.size() == 5);
+    for (size_t i = 1; i + 1 < pg.size(); ++i)
+        CHECK(std::abs(10.0 * std::log10(arma::accu(pg[i]) / arma::accu(pg[i + 1]))) < 3.0);
+}

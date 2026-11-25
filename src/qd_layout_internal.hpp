@@ -293,11 +293,62 @@ static inline qd_sides qd_make_sides(const quadriga_lib::layout &L)
     return S;
 }
 
-// Rx row at the start of a segment of terminal t; a track has one segment so far
-static inline arma::uword qd_segment_row(const quadriga_lib::layout &L, const qd_sides &S, size_t t, arma::uword i_segment)
+// Rx rows at which the segments of terminal t start (indices into the rows of the Rx side): the first row and each row
+// whose scenario or indoor state differs from the row before it, on the first node of the terminal
+static inline std::vector<arma::uword> qd_segment_starts(const quadriga_lib::layout &L, const qd_sides &S, size_t t)
 {
-    (void)i_segment;
-    return L.rx.offset[S.term_nodes[t][0]];
+    const arma::uword i = S.term_nodes[t][0], r0 = L.rx.offset[i], n = L.rx.n_row(i);
+    std::vector<arma::uword> v = {r0};
+    for (arma::uword r = r0 + 1; r < r0 + n; ++r)
+        if ((!L.rx.scenario.empty() && L.rx.scenario[r] != L.rx.scenario[r - 1]) || (!L.rx.indoor.is_empty() && L.rx.indoor[r] != L.rx.indoor[r - 1]))
+            v.push_back(r);
+    return v;
+}
+
+// Moving site: more than one row or a speed (dual mobility of the GBSM functions); all nodes of a site have equal motion
+static inline bool qd_site_moves(const quadriga_lib::layout_nodes &N, arma::uword i_node)
+{
+    const arma::uword first = N.offset[i_node], n = N.n_row(i_node);
+    if (n > 1)
+        return true;
+    return !N.speed.is_empty() && N.speed[first] != 0.0;
+}
+
+// Time of row r of node i as sample_track gives it: its 'time', else the arc length over the speed from the first row
+// (a point drop: 0); false for a track with neither
+static inline bool qd_row_time(const quadriga_lib::layout_nodes &N, arma::uword i, arma::uword r, double &t)
+{
+    const arma::uword first = N.offset[i], n = N.n_row(i);
+    if (!N.time.is_empty() && !std::isnan(N.time[first]))
+        return t = N.time[r], true;
+    bool timed = n == 1;
+    for (arma::uword k = first; k < first + n && !N.speed.is_empty(); ++k)
+        timed = timed || N.speed[k] != 0.0;
+    t = 0.0;
+    for (arma::uword k = first; k < r; ++k)
+    {
+        const double len = arma::norm(N.pos.col(k + 1) - N.pos.col(k)), v = N.speed.is_empty() ? 0.0 : N.speed[k];
+        t += (len > 0.0 && v > 0.0) ? len / v : 0.0;
+    }
+    return timed;
+}
+
+// Position of Tx node i_tx paired with Rx row r of node i_rx (the start of a segment), without the wrap image: a static
+// node its row; a moving one sampled at the time of the row if both nodes have times, else (the pairing of snapshots
+// without times) the Tx row with the index of r in its node, the last one for a shorter Tx track; [3]
+static inline arma::vec qd_tx_at(const quadriga_lib::layout &L, arma::uword i_tx, arma::uword i_rx, arma::uword r)
+{
+    const arma::uword ft = L.tx.offset[i_tx], nt = L.tx.n_row(i_tx);
+    if (!qd_site_moves(L.tx, i_tx))
+        return L.tx.pos.col(ft);
+    double t = 0.0, t_tx = 0.0;
+    if (qd_row_time(L.rx, i_rx, r, t) && qd_row_time(L.tx, i_tx, ft, t_tx))
+    {
+        arma::mat p, o;
+        quadriga_lib::sample_track(L.tx, i_tx, arma::vec{t}, p, o);
+        return p.col(0);
+    }
+    return L.tx.pos.col(ft + std::min(r - L.rx.offset[i_rx], nt - 1));
 }
 
 // The wrap images: 0, +a1, -a1, +a2, -a2, +(a1 - a2), -(a1 - a2); one vector: 0, +a1, -a1; [2, n_img]
@@ -390,14 +441,6 @@ struct qd_scenarios
     }
 };
 
-// Moving site: more than one row or a speed (dual mobility of the GBSM functions); all nodes of a site have equal motion
-static inline bool qd_site_moves(const quadriga_lib::layout_nodes &N, arma::uword i_node)
-{
-    const arma::uword first = N.offset[i_node], n = N.n_row(i_node);
-    if (n > 1)
-        return true;
-    return !N.speed.is_empty() && N.speed[first] != 0.0;
-}
 
 // The base seed of the streams of a site: its seed, else the master seed
 static inline arma::sword qd_site_base(const quadriga_lib::layout_nodes &tx, arma::uword i_node, arma::sword master)
