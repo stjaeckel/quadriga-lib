@@ -570,13 +570,13 @@ inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
     "eoa", "polmat", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
 inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
-// 1x1 gbsm_rays struct -> gbsm_rays
-// - Borrows the MATLAB memory (read-only); integer fields accept any real class (cast and checked)
-// - Missing optional fields mean empty; a missing other field or an unknown field throws, naming 'var_name'
-// - Empty arrays keep their dimensions (e.g. 'power' [0, n_freq] for n_ray = 0); validation is left to is_valid()
-inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, const std::string &var_name = "rays")
+// Element 'n' of a gbsm_rays struct array -> gbsm_rays; the rules of qd_mex_struct2gbsm_rays apply (the struct array
+// is not required to be 1x1)
+inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays_at(const mxArray *s, size_t n, const std::string &var_name = "rays")
 {
-    qd_mex_check_struct(s, var_name, true);
+    qd_mex_check_struct(s, var_name);
+    if (n >= mxGetNumberOfElements(s))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Struct index " + std::to_string(n + 1) + " in '" + var_name + "' out of range.").c_str());
     const auto &F = qd_mex_gbsm_rays_fields;
     for (int f = 0; f < mxGetNumberOfFields(s); ++f)
         if (std::find(F.begin(), F.end(), std::string(mxGetFieldNameByNumber(s, f))) == F.end())
@@ -590,7 +590,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, const s
 
     // Field data or nullptr (missing or unset)
     auto get = [&](const std::string &f) -> const mxArray *
-    { return mxGetField(s, 0, f.c_str()); };
+    { return mxGetField(s, (mwIndex)n, f.c_str()); };
 
     quadriga_lib::gbsm_rays r;
     const mxArray *a = get("method");
@@ -624,6 +624,16 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, const s
     if ((a = get("polmat")) != nullptr)
         r.polmat = qd_mex_get_Cube<double>(a, false, var_name + ".polmat");
     return r;
+}
+
+// 1x1 gbsm_rays struct -> gbsm_rays
+// - Borrows the MATLAB memory (read-only); integer fields accept any real class (cast and checked)
+// - Missing optional fields mean empty; a missing other field or an unknown field throws, naming 'var_name'
+// - Empty arrays keep their dimensions (e.g. 'power' [0, n_freq] for n_ray = 0); validation is left to is_valid()
+inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, const std::string &var_name = "rays")
+{
+    qd_mex_check_struct(s, var_name, true);
+    return qd_mex_struct2gbsm_rays_at(s, 0, var_name);
 }
 
 // Creates the 1 x n_link gbsm_rays struct array with all fields and aliases the attributes of 'rays' (resized to
