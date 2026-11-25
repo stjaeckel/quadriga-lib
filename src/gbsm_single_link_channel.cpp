@@ -97,6 +97,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 | Name | Type, size | Content |
 | --- | --- | --- |
 | `tap` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
+| `path_type` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | 0 = LOS, 1 = GR, 2 = NLOS per path; per tap the type of its rays, 2 if they differ |
 | `n_ray_tap` | `arma::u32_vec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `arma::fmat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
@@ -222,12 +223,14 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     const arma::u32_vec tap_val = arma::unique(rr.tap);
     const arma::uword n_tap = tap_val.n_elem, n_rx = rx_array.n_ports(), n_tx = tx_array.n_ports();
     arma::uvec q_of(n_kept);
-    arma::u32_vec n_ray_tap(n_tap, arma::fill::zeros);
+    arma::u32_vec n_ray_tap(n_tap, arma::fill::zeros), tap_type(n_tap); // tap_type: of the first ray, 2 (NLOS) if they differ
     arma::vec w(n_kept), w_sum(n_tap, arma::fill::zeros);
     for (arma::uword r = 0; r < n_kept; ++r)
     {
         q_of(r) = (arma::uword)(std::lower_bound(tap_val.begin(), tap_val.end(), rr.tap(r)) - tap_val.begin());
-        w_sum(q_of(r)) += rr.power(r, 0), n_ray_tap(q_of(r)) += 1;
+        const arma::uword q = q_of(r);
+        tap_type(q) = (n_ray_tap(q) == 0 || tap_type(q) == rr.path_type(r)) ? rr.path_type(r) : 2;
+        w_sum(q) += rr.power(r, 0), n_ray_tap(q) += 1;
     }
     for (arma::uword r = 0; r < n_kept; ++r)
         w(r) = (w_sum(q_of(r)) > 0.0) ? rr.power(r, 0) / w_sum(q_of(r)) : 1.0 / (double)n_ray_tap(q_of(r));
@@ -444,7 +447,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         }
     }
 
-    c.par_names = {"tap"}, c.par_data = {taps ? tap_val : rr.tap};
+    c.par_names = {"tap", "path_type"}, c.par_data = {taps ? tap_val : rr.tap, taps ? tap_type : rr.path_type};
     if (taps)
         c.par_names.push_back("n_ray_tap"), c.par_data.push_back(n_ray_tap);
     if (drift && taps)

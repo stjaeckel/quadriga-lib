@@ -1833,7 +1833,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#crossfade_segments) · [Python](quadri
 
 - Port of the channel merger of QuaDRiGa: segment `k` starts with `n_overlap[k]` snapshots that are also the last ones of segment `k − 1`; the output has `Σ (n_snap[k] − n_overlap[k])` snapshots
 - In the last `n_r = round(overlap · n_overlap[k])` shared snapshots (the ramp) the old paths fade out with `1 − w` and the new ones fade in with `w`, in power, `w = 0.5 (1 + sin((i / (n_r + 1) − 0.5) π))`, `i = 1 … n_r`; before the ramp the snapshots are those of the old segment
-- LOS (tap index 0 of the `par_data` entry `tap`) and GR (tap index 3 held by one ray, without index 4 or 5, as [ssf_rays](#ssf_rays) numbers them): one path with the data of the new segment (of the old one where the new one has no power), scaled to `|h|² = (1 − w) |h_old|² + w |h_new|²` by the path gain (rays) or the tap power (taps)
+- LOS and GR (types 0 and 1 of the `par_data` entry `path_type` of [gbsm_single_link_channel](#gbsm_single_link_channel); without it, tap index 0 of the entry `tap` and tap index 3 held by one ray, without index 4 or 5, as [ssf_rays](#ssf_rays) numbers them): one path with the data of the new segment (of the old one where the new one has no power), scaled to `|h|² = (1 − w) |h_old|² + w |h_new|²` by the path gain (rays) or the tap power (taps)
 - `"rays"` (channels with `path_gain`): the NLOS paths of both segments side by side, amplitudes `sqrt(1 − w)` and `sqrt(w)`; `path_length`, `path_angles`, `fbs_pos` and `lbs_pos` are kept where all segments have them
 - `"taps"` (without `path_gain`, one tap count per segment): one set of tap slots for all snapshots (LOS, GR, NLOS); the NLOS taps of the old segment hold `1 − w` and those of the new segment `w` of their mean power over the ramp; slots without power hold zero coefficients and the smallest delay of the snapshot
 - Delays as given (one reference for all segments); positions interpolated in the ramp, orientations along the shorter way; `name` and `center_freq` of segment 0; `par_data`, `n_interact` and `interact_coord` are not carried
@@ -4216,6 +4216,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 | Name | Type, size | Content |
 | --- | --- | --- |
 | `tap` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
+| `path_type` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | 0 = LOS, 1 = GR, 2 = NLOS per path; per tap the type of its rays, 2 if they differ |
 | `n_ray_tap` | `arma::u32_vec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `arma::fmat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |

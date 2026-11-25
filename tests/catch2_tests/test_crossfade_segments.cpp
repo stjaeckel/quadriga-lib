@@ -3,7 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Tests of crossfade_segments on small synthetic channels: 2 x 2 element pairs, paths with constant powers and delays,
-// phases that turn from snapshot to snapshot, tap indices of ssf_rays (LOS 0, GR 3, NLOS from 6), the forms "rays"
+// phases that turn from snapshot to snapshot, tap indices of ssf_rays (LOS 0, GR 3, NLOS from 6, or from 3 without GR)
+// and the path types of the entry path_type, the forms "rays"
 // (with path data) and "taps". Oracles: the ramp w = 0.5 (1 + sin((x - 0.5) pi)), x = i / (n_r + 1), on
 // n_r = round(overlap n_overlap) snapshots, and the power rule (1 - w) P_old + w P_new.
 
@@ -472,5 +473,122 @@ TEST_CASE("crossfade_segments - fading taps of real channels follow the power ra
         }
         CHECK(worst < 1.0);
         CHECK(std::abs(10.0 * std::log10(sum_c / sum_t)) < 0.1);
+    }
+}
+
+TEST_CASE("crossfade_segments - the par_data entry path_type marks the LOS, GR and NLOS paths")
+{
+    // "rays", one ramp snapshot (n_overlap 2, overlap 0.5): output snapshot 3, old snapshot 3, new snapshot 1. The merged
+    // LOS and GR are one path each; the NLOS paths of both segments are side by side. "taps": the slot counts
+    auto with_type = [](ch_t c, const arma::u32_vec &t)
+    {
+        c.par_names.push_back("path_type"), c.par_data.push_back(t);
+        return c;
+    };
+    auto n_ramp = [](const ch_t &a, const ch_t &b) { return quadriga_lib::crossfade_segments({a, b}, arma::uvec{0, 2}, 0.5).coeff_re[3].n_slices; };
+    for (bool rays : {true, false})
+    {
+        INFO("rays " << rays);
+        // NLOS taps from index 3 (clusters numbered without a GR slot): the tap rule takes the single ray of tap 3 for a
+        // GR ray (merged: LOS, GR, NLOS 6 old, NLOS 6, 9 new = 5 paths); with path_type it is NLOS (6 paths)
+        const ch_t A = synth({0, 3, 6}, {1.0, 0.3, 0.2}, {100e-9, 150e-9, 220e-9}, 4, rays);
+        const ch_t B = synth({0, 3, 6, 9}, {0.5, 0.4, 0.25, 0.15}, {100e-9, 120e-9, 300e-9, 500e-9}, 4, rays, 1.0, 2.0);
+        const ch_t At = with_type(A, {0, 2, 2}), Bt = with_type(B, {0, 2, 2, 2});
+        const ch_t c = quadriga_lib::crossfade_segments({At, Bt}, arma::uvec{0, 2}, 0.5);
+        CHECK(std::abs(total(c, 3) - 0.5 * (total(A, 3) + total(B, 1))) < 1e-12 * total(c, 3)); // Power rule at w = 0.5
+        if (!rays)
+        {
+            // Taps: one slot set for all snapshots, LOS, GR (untyped: tap 3), NLOS slots that fading taps share; regression
+            // values of a traced run: the untyped layout has the GR slot and 3 NLOS slots, the typed one 3 NLOS slots
+            CHECK(n_ramp(A, B) == 5);
+            CHECK(n_ramp(At, Bt) == 4);
+        }
+        if (rays)
+        {
+            CHECK(n_ramp(A, B) == 5);
+            CHECK(n_ramp(At, Bt) == 6);
+            // A GR at another tap index: NLOS for the tap rule (6 paths), GR with path_type (5 paths)
+            const ch_t C = synth({0, 5, 6}, {1.0, 0.3, 0.2}, {100e-9, 150e-9, 220e-9}, 4, rays);
+            const ch_t D = synth({0, 5, 6, 9}, {0.5, 0.4, 0.25, 0.15}, {100e-9, 120e-9, 300e-9, 500e-9}, 4, rays, 1.0, 2.0);
+            CHECK(n_ramp(C, D) == 6);
+            CHECK(n_ramp(with_type(C, {0, 1, 2}), with_type(D, {0, 1, 2, 2})) == 5);
+        }
+
+        // Invalid entries
+        auto msg = [&](const ch_t &a, const ch_t &b)
+        {
+            try
+            {
+                n_ramp(a, b);
+            }
+            catch (const std::invalid_argument &e)
+            {
+                return std::string(e.what());
+            }
+            return std::string();
+        };
+        CHECK(msg(with_type(A, {0, 3, 2}), Bt) == "Entry 0: the par_data entry 'path_type' of 'segments' must hold 0 (LOS), 1 (GR) or 2 (NLOS).");
+        CHECK(msg(At, with_type(B, {0, 2, 2})) == "Entry 1: the par_data entry 'path_type' of 'segments' must have one value per path in every snapshot.");
+    }
+}
+
+TEST_CASE("crossfade_segments - channels with one ray per cluster and no GR keep the NLOS tap 3")
+{
+    // UMa_LOS with NumSubPaths = 1 and GR_enabled = 0 (scenpar_override): the first NLOS cluster has the tap index 3 and
+    // one ray, which the tap rule takes for a GR ray. gbsm_single_link_channel marks it NLOS in path_type, so its old and
+    // new paths fade side by side: the ramp snapshot has n_old + n_new - 1 paths (one merged LOS); without the entry
+    // path_type, the tap rule merges tap 3 too (n_old + n_new - 2)
+    std::vector<ch_t> seg, segt; // "rays" and "taps"
+    for (arma::sword seed : {4711, 815})
+    {
+        quadriga_lib::layout L;
+        L.tx.name = {"BS1"}, L.tx.sector = {0}, L.tx.i_antenna = {0}, L.tx.offset = {0};
+        L.tx.pos = arma::mat(arma::vec{0.0, 0.0, 25.0}), L.tx.orientation.zeros(3, 1), L.tx.scenario = {"UMa_LOS"};
+        L.tx.scenpar_override["NumSubPaths"] = {1.0}, L.tx.scenpar_override["GR_enabled"] = {0.0};
+        L.rx.name = {"UT1"}, L.rx.sector = {0}, L.rx.i_antenna = {0}, L.rx.offset = {0};
+        L.rx.pos.set_size(3, 4), L.rx.orientation.zeros(3, 4);
+        for (arma::uword i = 0; i < 4; ++i)
+            L.rx.pos(0, i) = 100.0 + 0.1 * (double)i, L.rx.pos(1, i) = 20.0, L.rx.pos(2, i) = 1.5;
+        L.center_freq = {3.5e9}, L.seed = seed;
+        quadriga_lib::init_link_states(L);
+        seg.push_back(quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "rays")[0]);
+        segt.push_back(quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, {}, "taps")[0]);
+    }
+    const arma::uword na = seg[0].coeff_re[0].n_slices, nb = seg[1].coeff_re[0].n_slices;
+    for (const ch_t &s : seg)
+    {
+        auto entry = [&](const std::string &name)
+        {
+            for (size_t i = 0; i < s.par_names.size(); ++i)
+                if (s.par_names[i] == name)
+                    return std::any_cast<arma::u32_vec>(s.par_data[i]);
+            return arma::u32_vec();
+        };
+        const arma::u32_vec tap = entry("tap"), type = entry("path_type");
+        REQUIRE(tap.n_elem == s.coeff_re[0].n_slices);
+        REQUIRE(type.n_elem == tap.n_elem);
+        CHECK(arma::accu(tap == 3) == 1);
+        CHECK(arma::all(type.elem(arma::find(tap == 3)) == 2));
+        CHECK(arma::all(type.elem(arma::find(tap == 0)) == 0));
+    }
+    CHECK(quadriga_lib::crossfade_segments(seg, arma::uvec{0, 2}, 0.5).coeff_re[3].n_slices == na + nb - 1);
+    std::vector<ch_t> untyped = seg;
+    for (ch_t &s : untyped)
+        for (size_t i = 0; i < s.par_names.size(); ++i)
+            if (s.par_names[i] == "path_type")
+                s.par_names.erase(s.par_names.begin() + (std::ptrdiff_t)i), s.par_data.erase(s.par_data.begin() + (std::ptrdiff_t)i);
+    CHECK(quadriga_lib::crossfade_segments(untyped, arma::uvec{0, 2}, 0.5).coeff_re[3].n_slices == na + nb - 2);
+    {
+        std::vector<ch_t> ut = segt;
+        for (ch_t &s : ut)
+            for (size_t i = 0; i < s.par_names.size(); ++i)
+                if (s.par_names[i] == "path_type")
+                    s.par_names.erase(s.par_names.begin() + (std::ptrdiff_t)i), s.par_data.erase(s.par_data.begin() + (std::ptrdiff_t)i);
+        // Taps (13 per segment): slot counts of a traced run, also found by an independent probe; with path_type, tap 3 of
+        // both segments fades as an NLOS tap instead of one merged GR slot
+        REQUIRE(segt[0].coeff_re[0].n_slices == 13);
+        REQUIRE(segt[1].coeff_re[0].n_slices == 13);
+        CHECK(quadriga_lib::crossfade_segments(segt, arma::uvec{0, 2}, 0.5).coeff_re[3].n_slices == 17);
+        CHECK(quadriga_lib::crossfade_segments(ut, arma::uvec{0, 2}, 0.5).coeff_re[3].n_slices == 15);
     }
 }

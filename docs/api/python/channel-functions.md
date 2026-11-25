@@ -152,11 +152,11 @@ Also in: [C++](../cpp/channel-functions.md#crossfade_segments) · [MATLAB](../me
 
 - Port of the channel merger of QuaDRiGa: segment `k` starts with `n_overlap[k]` snapshots that are also the last ones of segment `k − 1`; the output has `Σ (n_snap[k] − n_overlap[k])` snapshots
 - In the last `n_r = round(overlap · n_overlap[k])` shared snapshots (the ramp) the old paths fade out with `1 − w` and the new ones fade in with `w`, in power, `w = 0.5 (1 + sin((i / (n_r + 1) − 0.5) π))`, `i = 1 … n_r`; before the ramp the snapshots are those of the old segment
-- LOS (tap index 0 of the `par_data` entry `tap`) and GR (tap index 3 held by one ray, without index 4 or 5, as [ssf_rays](geometry-based-stochastic-model.md#ssf_rays) numbers them): one path with the data of the new segment (of the old one where the new one has no power), scaled to `|h|² = (1 − w) |h_old|² + w |h_new|²` by the path gain (rays) or the tap power (taps)
+- LOS and GR (types 0 and 1 of the entry `path_type` of `par`; without it, tap index 0 of the entry `tap` and tap index 3 held by one ray, without index 4 or 5, as [ssf_rays](geometry-based-stochastic-model.md#ssf_rays) numbers them): one path with the data of the new segment (of the old one where the new one has no power), scaled to `|h|² = (1 − w) |h_old|² + w |h_new|²` by the path gain (rays) or the tap power (taps)
 - `"rays"` (channels with `path_gain`): the NLOS paths of both segments side by side, amplitudes `sqrt(1 − w)` and `sqrt(w)`; `path_length`, `path_angles`, `fbs_pos` and `lbs_pos` are kept where all segments have them
 - `"taps"` (without `path_gain`, one tap count per segment): one set of tap slots for all snapshots (LOS, GR, NLOS); the NLOS taps of the old segment hold `1 − w` and those of the new segment `w` of their mean power over the ramp; slots without power hold zero coefficients and the smallest delay of the snapshot
 - Delays as given (one reference for all segments); positions interpolated in the ramp, orientations along the shorter way; `name` and `center_freq` of segment 0; `par_data`, `n_interact` and `interact_coord` are not carried
-- The C++ channels carry the tap indices in their `par_data`; in Python they are the optional input `par`, as in [hdf5_write_channel](#hdf5_write_channel): the entries `tap` and `n_ray_tap` of each segment, as returned by [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) (any other key is ignored)
+- The C++ channels carry the tap indices in their `par_data`; in Python they are the optional input `par`, as in [hdf5_write_channel](#hdf5_write_channel): the entries `tap`, `path_type` and `n_ray_tap` of each segment, as returned by [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) (any other key is ignored)
 
 ### Usage:
 ```python
@@ -167,7 +167,7 @@ channel = quadriga_lib.channel.crossfade_segments( segments, n_overlap, *, overl
 - **`segments`** — Channels of one link in track order, valid, with coefficients, equal `n_rx`, `n_tx`, form and `center_freq` (at most one value); list of channel dicts, keys in [hdf5_read_channel](#hdf5_read_channel)
 - **`n_overlap`** — Snapshots shared with the preceding segment, entry 1 is 0, at most the snapshots of segment `k - 1` after its own shared ones; `(n_segment,)`
 - **`overlap`** — Part of the shared snapshots used for the ramp, in [0, 1]; default: 0.5
-- **`par`** — Unstructured data of the segments: list of dicts, one per segment, with the keys `tap` (tap index per path or tap, uint32) and `n_ray_tap` (rays per tap, `"taps"` only); a list that is given must have the key `tap` (other keys are ignored); `None` = no tap indices, all paths are NLOS; default: None
+- **`par`** — Unstructured data of the segments: list of dicts, one per segment, with the keys `tap` (tap index per path or tap, uint32), `path_type` (0 = LOS, 1 = GR, 2 = NLOS per path or tap, uint32, optional) and `n_ray_tap` (rays per tap, `"taps"` only); a list that is given must have the key `tap` or `path_type` (other keys are ignored); `None` = no tap indices, all paths are NLOS; default: None
 - **`stack`** — Snapshot layout of the channel as in [hdf5_read_channel](#hdf5_read_channel); default: `False`
 
 ### Outputs:

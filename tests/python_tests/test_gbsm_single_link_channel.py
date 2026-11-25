@@ -25,7 +25,7 @@ CONF_DIR = os.path.join(current_dir, "../../data/config")
 TX = np.array([[0.0, 0.0, 10.0]]).T
 RX = np.array([[60.0, 10.0, 1.5]]).T
 FC = np.array([3.5e9, 28e9])
-PAR = ["tap", "n_ray_tap", "fbs_pos", "lbs_pos", "gr_pos", "link_gain_dB", "b_med", "b_eff", "limit", "ratio",
+PAR = ["tap", "path_type", "n_ray_tap", "fbs_pos", "lbs_pos", "gr_pos", "link_gain_dB", "b_med", "b_eff", "limit", "ratio",
        "ratio_total"]
 
 
@@ -72,6 +72,8 @@ class test_case(unittest.TestCase):
         self.assertEqual(par["tap"].dtype, np.uint32)
         npt.assert_array_equal(par["tap"], self.taps)  # codes
         npt.assert_array_equal(par["tap"][:2], [0, 3])
+        self.assertEqual(par["path_type"].dtype, np.uint32)
+        npt.assert_array_equal(par["path_type"], [0, 1] + [2] * (len(self.taps) - 2))  # LOS, GR, NLOS per tap
         npt.assert_array_equal(par["ratio"], [0.0, 0.0])
         self.assertEqual(par["fbs_pos"].shape, (3, self.n_path))
         kept = np.any(self.rays["power"] > 0, 1) | (self.rays["path_type"] < 2)

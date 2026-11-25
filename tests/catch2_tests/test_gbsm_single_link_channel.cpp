@@ -148,13 +148,13 @@ namespace
     struct tap_t
     {
         arma::cube cr, ci, dl;
-        arma::u32_vec tap, n;
+        arma::u32_vec tap, n, type; // type: the path type of the rays of the tap, 2 (NLOS) if they differ
     };
     tap_t ref_taps(const rays_t &r, arma::uword f, const snap_t &s, const arma::vec *w_in = nullptr)
     {
         const arma::u32_vec tp = r.tap.elem(s.ind);
         tap_t o;
-        o.tap = arma::unique(tp), o.n.zeros(o.tap.n_elem);
+        o.tap = arma::unique(tp), o.n.zeros(o.tap.n_elem), o.type.zeros(o.tap.n_elem);
         o.cr.zeros(s.cr.n_rows, s.cr.n_cols, o.tap.n_elem), o.ci = o.cr, o.dl = o.cr;
         for (arma::uword q = 0; q < o.tap.n_elem; ++q)
         {
@@ -168,6 +168,8 @@ namespace
                 o.cr.slice(q) += s.cr.slice(in(j)), o.ci.slice(q) += s.ci.slice(in(j)),
                     o.dl.slice(q) += w(j) * s.dl.slice(in(j));
             o.dl.slice(q) /= arma::accu(w), o.n(q) = in.n_elem;
+            const arma::u32_vec ty = r.path_type.elem(s.ind.elem(in));
+            o.type(q) = arma::all(ty == ty(0)) ? ty(0) : 2;
         }
         return o;
     }
@@ -234,6 +236,8 @@ namespace
         }
         if (!e.empty())
             CHECK(arma::all(par<arma::u32_vec>(c, "tap") == a.r->tap.elem(e[0].ind)));
+        if (!e.empty())
+            CHECK(arma::all(par<arma::u32_vec>(c, "path_type") == a.r->path_type.elem(e[0].ind)));
     }
 
     // Channel of taps output against the tap oracle
@@ -251,6 +255,7 @@ namespace
             CHECK(dd <= 1e-12);
             CHECK(arma::all(par<arma::u32_vec>(c, "tap") == x.tap));
             CHECK(arma::all(par<arma::u32_vec>(c, "n_ray_tap") == x.n));
+            CHECK(arma::all(par<arma::u32_vec>(c, "path_type") == x.type));
             CHECK(c.path_gain.empty());
         }
     }
@@ -641,7 +646,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                 a.mob = mob, a.out = out, a.R = arma::mat{{120.0, 45.0, 1.5}, {120.2, 45.0, 1.5}, {120.4, 45.0, 1.5}}.t();
                 const chan_t c = a.run();
                 const arma::uword n_kept = r->n_ray() - 1, n_tap = gr ? 6 : 5;
-                std::vector<std::string> names = {"tap"};
+                std::vector<std::string> names = {"tap", "path_type"};
                 if (taps)
                     names.push_back("n_ray_tap");
                 if (drift && taps)
@@ -652,6 +657,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                     names.push_back(x);
                 CHECK(c.par_names == names);
                 CHECK(par<arma::u32_vec>(c, "tap").n_elem == (taps ? n_tap : n_kept));
+                CHECK(par<arma::u32_vec>(c, "path_type").n_elem == (taps ? n_tap : n_kept));
                 if (taps)
                     CHECK(par<arma::u32_vec>(c, "n_ray_tap").n_elem == n_tap);
                 if (drift && taps)

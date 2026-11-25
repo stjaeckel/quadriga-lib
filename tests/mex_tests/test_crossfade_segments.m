@@ -36,6 +36,15 @@ assertElementsAlmostEqual( sum( power, 1 ), [ 1, 1, 1.75, 3.25, 4, 4 ], 'absolut
 out = quadriga_lib.crossfade_segments( seg, n_overlap, 1, [] );
 assertEqual( size( out.coeff_re, 3 ), 2 );
 
+%% path_type: a single path of tap index 3 is a GR path for the tap rule (merged); path_type 2 makes it NLOS
+out = quadriga_lib.crossfade_segments( seg, n_overlap, 1, struct( 'tap', { uint32( 3 ), uint32( 3 ) } ) );
+assertEqual( size( out.coeff_re, 3 ), 1 );
+out = quadriga_lib.crossfade_segments( seg, n_overlap, 1, struct( 'tap', { uint32( 3 ), uint32( 3 ) }, 'path_type', { uint32( 2 ), uint32( 2 ) } ) );
+assertEqual( size( out.coeff_re, 3 ), 2 );
+out = quadriga_lib.crossfade_segments( seg, n_overlap, 1, struct( 'path_type', { 0, 0 } ) );   % path_type alone: both LOS
+assertEqual( size( out.coeff_re, 3 ), 1 );
+assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 1, struct( 'tap', { 0, 0 }, 'path_type', { 5, 2 } ) ), 'path_type' );   % C++
+
 %% Outputs: none
 quadriga_lib.crossfade_segments( seg, n_overlap, 1, par );
 assertEqual( size( ans.coeff_re ), [ 1, 1, 1, 6 ] );
@@ -51,7 +60,7 @@ assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 1, par, 1 ),
 assert_throws( @() out2( seg, n_overlap ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.crossfade_segments( 1, n_overlap ), 'Input ''segments'' must be a struct.' );
 assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 1, 5 ), 'Input ''par'' must be a struct.' );
-assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 1, struct( 'tapp', { 0, 0 } ) ), 'Input ''par'' has no field ''tap''.' );
+assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 1, struct( 'tapp', { 0, 0 } ) ), 'Input ''par'' has no field ''tap'' or ''path_type''.' );
 assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 1, par(1) ), 'Inputs ''par'' and ''segments'' must have the same number of entries.' );
 assert_throws( @() quadriga_lib.crossfade_segments( seg, [ 1, 2 ] ), 'n_overlap' );                                    % C++
 assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 2 ), 'overlap' );                                  % C++

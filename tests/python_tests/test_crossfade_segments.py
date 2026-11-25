@@ -97,6 +97,19 @@ class test_case(unittest.TestCase):
         outk = quadriga_lib.channel.crossfade_segments(segments=seg, n_overlap=n_overlap, overlap=1, par=self.par, stack=False)
         self.assertTrue(same(outk, quadriga_lib.channel.crossfade_segments(seg, n_overlap, overlap=1, par=self.par)))
 
+    def test_path_type(self):
+        # A single path of tap index 3 is a GR path for the tap rule (merged); path_type 2 makes it NLOS (side by side)
+        seg, n_overlap = self.seg, self.n_overlap
+        out = quadriga_lib.channel.crossfade_segments(seg, n_overlap, overlap=1, par=[{"tap": [3]}, {"tap": [3]}], stack=True)
+        self.assertEqual(out["coeff"].shape[2], 1)
+        par = [{"tap": [3], "path_type": [2]}, {"tap": [3], "path_type": np.array([2], dtype=np.uint32)}]
+        out = quadriga_lib.channel.crossfade_segments(seg, n_overlap, overlap=1, par=par, stack=True)
+        self.assertEqual(out["coeff"].shape[2], 2)
+        out = quadriga_lib.channel.crossfade_segments(seg, n_overlap, overlap=1, par=[{"path_type": [0]}, {"path_type": [0]}], stack=True)
+        self.assertEqual(out["coeff"].shape[2], 1)  # path_type alone: both LOS
+        with self.assertRaisesRegex(ValueError, "path_type"):
+            quadriga_lib.channel.crossfade_segments(seg, n_overlap, par=[{"tap": [0], "path_type": [5]}, {"tap": [0]}])
+
     def test_input_is_not_modified(self):
         seg = self.seg
         before = [dict(s, coeff=[c.copy() for c in s["coeff"]]) for s in seg]
@@ -116,7 +129,7 @@ class test_case(unittest.TestCase):
             quadriga_lib.channel.crossfade_segments(1, n_overlap)
         with self.assertRaisesRegex(ValueError, "Input 'par' must be a dict, a list of dicts, or None"):
             quadriga_lib.channel.crossfade_segments(seg, n_overlap, par=5)
-        with self.assertRaisesRegex(ValueError, "Input 'par' has no key 'tap'"):
+        with self.assertRaisesRegex(ValueError, "Input 'par' has no key 'tap' or 'path_type'"):
             quadriga_lib.channel.crossfade_segments(seg, n_overlap, par=[{"tapp": [0]}, {"tapp": [0]}])
         with self.assertRaisesRegex(ValueError, "Inputs 'par' and 'segments' must have the same number of entries"):
             quadriga_lib.channel.crossfade_segments(seg, n_overlap, par=par[:1])
