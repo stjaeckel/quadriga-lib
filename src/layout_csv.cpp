@@ -36,6 +36,7 @@ Read the Tx and Rx CSV files of a layout
 - Simulation frequencies: the argument, else the `center_freq` values of the Tx file, else those of the Rx file; a node with bands must define all of them, and the values in the files must match the argument within a relative 1e-6
 - Unknown columns are kept and reported; a column in the wrong file (e.g. `pairing` in the Tx file), a value outside its range, an antenna column that the antenna type does not use and every violation of the rules above throw `std::runtime_error` with the file name, line and column; so does a terminal whose empty `pairing` cell leaves it without a pair, a first band without antenna cells next to a later band with antenna cells, and a layout that is not valid ([[layout]]), e.g. a name with a comma or a node with one row, `relative` = 1 and no direction
 - With `eval_antennas`, the arrays `antenna` are generated as `layout.eval_antennas()` does ([[layout]]); a line that [[generate_antenna]] rejects, a QDANT file that cannot be read and an array spaced in wavelengths in a layout without frequencies throw `std::runtime_error`
+- Large arrays on the default 1° grid need much memory (`3GPP` with `panel` 16,16,1,4 holds about 2 GB per band): give a `res` column or read with `eval_antennas = false`
 
 ## Declaration:
 ```
