@@ -116,7 +116,7 @@ Read the Tx and Rx CSV files of a layout
     of strings
   - `antenna` — Evaluated arrays, entry `k` a 1xN struct array as in [[generate_antenna]], N = 0 (not evaluated), 1 (all
     bands) or `n_freq`; Cell `[n_antenna, 1]`
-  - `wrap` — Lattice vectors of the wrap-around in [m], one per column; two vectors form a reduced basis,
+  - `wrap` — Lattice vectors of the wrap-around in [m], one per column (see Notes); two vectors form a reduced basis,
     `0 <= a1·a2 <= min(abs(a1)^2, abs(a2)^2) / 2`, so that ±a1, ±a2 and ±(a1 - a2) are the nearest images; empty = none;
     `[2, 1]` or `[2, 2]`
   - `pairing` — Site index and terminal index of the linked pairs; empty = all pairs; uint64, `[2, n_pair]`
@@ -176,6 +176,12 @@ Read the Tx and Rx CSV files of a layout
   [Layout CSV files](formats.html#layout-csv-columns) for `time`, `speed`, `direction`, `floor` and `d2d_in` and for the
   values that the nodes of one site or terminal share ([Nodes and rows](formats.html#layout-csv-rows)); the antenna
   lists (a node with a band that is not set is reported), the frequencies, `wrap`, `pairing` and `links` are checked too
+- **Wrap-around**: a cluster of a few rings of sites is finite, so the cells at its edge lack the interferers that
+  surround them in a large network. With `wrap`, the cluster is repeated periodically by the lattice vectors, and each
+  link uses the copy (image) of its site that is nearest to the terminal, which the channel generation treats as a site
+  of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping; clause 7.5, step 1). Every terminal then has
+  neighbours on all sides, as in the middle of a network. One vector repeats the cluster along one direction, e.g. along
+  a road
 - **Antennas**: equal descriptions share one entry of the antenna lists, Tx nodes first; a relative `qdant_file` is
   stored as a normalised absolute path
 - **Memory**: large arrays on the default 1° grid need much memory ([Antennas](formats.html#layout-csv-antennas)); give

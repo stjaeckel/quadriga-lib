@@ -1278,7 +1278,9 @@ quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
 - **Hexagonal presets** (2 rings, 3 sectors, wrap-around): site $(q, r)$ with
   $\max(\lvert q \rvert, \lvert r \rvert, \lvert q + r \rvert) \le n$ for $n$ rings is at $x = \sqrt{3}\, q d / 2$,
   $y = (q / 2 + r)\, d$ with the ISD $d$, ordered by ring and then by azimuth in (-30°, 330°]. The wrap vectors
-  $a_1 = (\sqrt{3}\, n d / 2, \ (3 n / 2 + 1)\, d)$ and $a_2$, $a_1$ turned by 60°, make the cluster tile the plane
+  $a_1 = (\sqrt{3}\, n d / 2, \ (3 n / 2 + 1)\, d)$ and $a_2$, $a_1$ turned by 60°, make the cluster tile the plane.
+  With the wrap-around, each link uses the copy of its site nearest to the terminal, so that the cells at the edge get
+  the interference of a large network (TR 38.901 Table 7.8-1; see the Notes of [[layout]])
 - **`38.901_SMa`**: mechanical tilt 5° at ISD 1299 m and 2° at 1732 m (other ISDs: that of the nearer one); option
   `p_residential` (0.9)
 - **Indoor presets**: centred at the origin, one sector, no wrap-around; the BSs form a lattice centred in the hall,

@@ -122,7 +122,7 @@ layout, extra_tx, extra_rx = quadriga_lib.layout.csv_read( fn_tx, fn_rx, *, cent
   | `antenna_cols` | Names of the antenna columns of the lines in `antenna_args` | list of str |
   | `antenna_args` | Antenna descriptions, one line for all bands or one per band (see [[eval_antennas]]) | list `[n_antenna]` of lists of str |
   | `antenna` | Evaluated arrays as arrayant dicts of [[generate_antenna]], one for all bands or one per band; empty = not evaluated | list `[n_antenna]` of lists |
-  | `wrap` | Lattice vectors of the wrap-around in [m], one per column; two vectors form a reduced basis, $0 \le a_1 \cdot a_2 \le \min(\lvert a_1 \rvert^2, \lvert a_2 \rvert^2) / 2$, so that $\pm a_1$, $\pm a_2$ and $\pm(a_1 - a_2)$ are the nearest images; empty = none | `(2, 1)` or `(2, 2)` |
+  | `wrap` | Lattice vectors of the wrap-around in [m], one per column (see Notes); two vectors form a reduced basis, $0 \le a_1 \cdot a_2 \le \min(\lvert a_1 \rvert^2, \lvert a_2 \rvert^2) / 2$, so that $\pm a_1$, $\pm a_2$ and $\pm(a_1 - a_2)$ are the nearest images; empty = none | `(2, 1)` or `(2, 2)` |
   | `pairing` | Site index and terminal index of the linked pairs, 0-based; empty = all pairs | int64, `(2, n_pair)` |
   | `name` (`tx`, `rx`) | Site or terminal name, 1 to 255 bytes, without comma, semicolon, quote and line break, and without leading or trailing blank | list of str `[n_node]` |
   | `sector` | Sector number; (`name`, `sector`) is unique | uint32, `(n_node,)` |
@@ -169,6 +169,12 @@ layout, extra_tx, extra_rx = quadriga_lib.layout.csv_read( fn_tx, fn_rx, *, cent
   orientations, names, ranges and the rules of the [columns](formats.html#layout-csv-columns)) and `links`, the values
   that the nodes of one site or terminal share ([Nodes and rows](formats.html#layout-csv-rows)), the antenna lists (a
   node with a band that is not set is reported), the frequencies, `wrap` and `pairing`
+- **Wrap-around**: a cluster of a few rings of sites is finite, so the cells at its edge lack the interferers that
+  surround them in a large network. With `wrap`, the cluster is repeated periodically by the lattice vectors, and each
+  link uses the copy (image) of its site that is nearest to the terminal, which the channel generation treats as a site
+  of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping; clause 7.5, step 1). Every terminal then has
+  neighbours on all sides, as in the middle of a network. One vector repeats the cluster along one direction, e.g. along
+  a road
 - **Antennas**: equal descriptions share one entry of the antenna lists, Tx nodes first; a relative `qdant_file` is
   stored as a normalised absolute path
 - **Memory**: large arrays on the default 1° grid need much memory ([Antennas](formats.html#layout-csv-antennas)); give

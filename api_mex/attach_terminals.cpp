@@ -18,6 +18,8 @@ Serving Tx node of each terminal of a layout by the large-scale gain or by RSRP
   highest RSRP (`'rsrp'`), with its site and the gains of all nodes
 - Use it to link each terminal to its serving site in `layout.pairing` (see Example), so that the channel functions
   compute only the serving links
+- One call attaches at one frequency, `layout.center_freq(i_freq)`, the first band by default; this suits offloading
+  scenarios, where the higher bands serve as data pipes. The result is one serving Tx node per terminal
 
 ## Usage:
 ```
@@ -56,7 +58,9 @@ layout.pairing = [ site.'; 1:numel( site ) ];
   (such as the generic antenna) reads 3 dB below one co-polarized element; a calibration sets the UT antenna of the TR
 - **Choice**: a terminal takes the highest value of its nodes; ties go to the lowest index. A Tx node without a
   propagation link (co-located) has -Inf; a terminal without any link gets node 1
-- **Pairing**: `layout.pairing` holds pairs of site and terminal, so the Example links all sectors of the serving site
+- **Pairing**: `layout.pairing` holds pairs of site and terminal, so the Example links all sectors of the serving site;
+  for multi-connectivity, `layout.pairing` may list several sites per terminal, e.g. all sites within a margin of the
+  best value in `gain_dB`, and the channel functions then compute the links to all of them
 
 ## See also:
 - [[init_link_states]], [[generate_rays]] (link states and rays)

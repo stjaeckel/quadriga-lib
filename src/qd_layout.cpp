@@ -131,6 +131,12 @@ Class for a network layout: Tx and Rx nodes, antennas, frequencies and link stat
   band at the frequency of that band; a `qdant` line is read as stored. Until an antenna is evaluated (its entry of
   `antenna` holds no arrays, or an array without elements), its nodes use the generic antenna. Throws for a band without
   description and for an array spaced in wavelengths in a layout without frequencies
+- **Wrap-around**: a cluster of a few rings of sites is finite, so the cells at its edge lack the interferers that
+  surround them in a large network. With `wrap`, the cluster is repeated periodically by the lattice vectors, and each
+  link uses the copy (image) of its site that is nearest to the terminal, which the channel generation treats as a site
+  of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping; clause 7.5, step 1). Every terminal then has
+  neighbours on all sides, as in the middle of a network. One vector repeats the cluster along one direction, e.g. along
+  a road
 - **Wrap vectors**: two vectors form a reduced basis,
   $0 \le a_1 \cdot a_2 \le \min(\lvert a_1 \rvert^2, \lvert a_2 \rvert^2) / 2$, so that $\pm a_1$, $\pm a_2$ and
   $\pm(a_1 - a_2)$ are the nearest images
