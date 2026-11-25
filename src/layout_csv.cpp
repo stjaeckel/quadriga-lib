@@ -128,13 +128,13 @@ struct side_data
     bool has_pairing = false;
 };
 
-// Path of a QDANT file relative to the folder of the CSV file, as a normalised absolute path
+// Path of a QDANT file relative to the folder of the CSV file, as a normalised absolute path with '/' separators
 std::string qd_resolve_qdant(const std::string &csv_fn, const std::string &cell)
 {
     fs::path p(cell);
     if (p.is_relative())
         p = fs::path(csv_fn).parent_path() / p;
-    return fs::absolute(p).lexically_normal().string();
+    return fs::absolute(p).lexically_normal().generic_string();
 }
 
 // The antenna cells of one row; with 'check', they are validated against the antenna type
@@ -996,8 +996,8 @@ std::string qd_csv_stem(const std::string &fn)
     return s;
 }
 
-// A path as a normalised absolute path
-std::string qd_abs(const fs::path &p) { return fs::absolute(p).lexically_normal().string(); }
+// A path as a normalised absolute path with '/' separators
+std::string qd_abs(const fs::path &p) { return fs::absolute(p).lexically_normal().generic_string(); }
 
 // The antenna lines of the written files and the QDANT files that they need. Each band that is an evaluated array
 // without text becomes a 'qdant' line; the bands of one antenna go to one file, named after the first written CSV file

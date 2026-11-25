@@ -348,7 +348,7 @@ TEST_CASE("layout_csv_read - QDANT files are named relative to the CSV file")
     const std::string tx = dir.write("a/tx.csv", "name,x,y,z,antenna,qdant_file,qdant_id\nBS,0,0,25,qdant,../ants.qdant,2\nBS2,1,0,25,qdant,ants.qdant,\n");
     const std::string rx = dir.write("b/rx.csv", "name,x,y,z,antenna,qdant_file\nUT,0,0,1.5,qdant,ants.qdant\nUT2,0,0,1.5,qdant,\"../a/../ants.qdant\"\n");
     const quadriga_lib::layout L = quadriga_lib::layout_csv_read(tx, rx, {}, false);
-    const std::string cwd = std::filesystem::current_path().string() + "/";
+    const std::string cwd = std::filesystem::current_path().generic_string() + "/";
     const std::string root = cwd + dir.dir + "/";
     CHECK(L.antenna_cols == std::vector<std::string>{"antenna", "qdant_file", "qdant_id"});
     REQUIRE(L.antenna_args.size() == 4);
@@ -582,7 +582,7 @@ TEST_CASE("layout_csv_write - antennas, bands and shared values")
 
     // QDANT files are written relative to the folder of the CSV file
     quadriga_lib::layout L4 = qd_layout_build();
-    const std::string abs_file = std::filesystem::absolute(dir.path("q/ants.qdant")).lexically_normal().string();
+    const std::string abs_file = std::filesystem::absolute(dir.path("q/ants.qdant")).lexically_normal().generic_string();
     L4.antenna_cols = {"antenna", "qdant_file", "qdant_id"};
     L4.antenna_args = {{"qdant," + abs_file + ",2"}};
     L4.tx.i_antenna = {1, 1, 1};

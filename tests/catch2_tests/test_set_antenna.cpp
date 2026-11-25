@@ -47,7 +47,7 @@ ant_t measured(double az_3dB, double scale)
     return a;
 }
 
-std::string abs_path(const std::string &p) { return std::filesystem::absolute(p).lexically_normal().string(); }
+std::string abs_path(const std::string &p) { return std::filesystem::absolute(p).lexically_normal().generic_string(); }
 } // namespace
 
 TEST_CASE("set_antenna - the argument form gives the same array as generate_antenna")
