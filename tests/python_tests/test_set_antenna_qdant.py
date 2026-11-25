@@ -60,7 +60,7 @@ class test_case(unittest.TestCase):
     def test_optional_inputs(self):
         L, F = self.L, self.F
         ref, _ = quadriga_lib.arrayant.qdant_read(self.fn, 2)
-        L3 = quadriga_lib.layout.set_antenna_qdant(L, self.fn, qdant_id=2, rx_side=True, i_node=1)  # 0-based
+        L3 = quadriga_lib.layout.set_antenna_qdant(L, self.fn, qdant_id=2, rx=True, i_node=1)  # 0-based
         npt.assert_array_equal(L3["rx"]["i_antenna"], [0, 1])
         npt.assert_array_equal(L3["tx"]["i_antenna"], [0, 0])
         self.assertEqual(L3["antenna_args"], [["qdant," + F + ",2"]])
@@ -70,7 +70,7 @@ class test_case(unittest.TestCase):
         L5 = quadriga_lib.layout.set_antenna_qdant(L, self.fn, evaluate=False)
         self.assertEqual(L5["antenna_args"], [["qdant," + F + ",1"]])
         self.assertEqual(L5["antenna"], [])  # not evaluated
-        L6 = quadriga_lib.layout.set_antenna_qdant(L, self.fn, qdant_id=1, rx_side=None, i_node=None, evaluate=None)
+        L6 = quadriga_lib.layout.set_antenna_qdant(L, self.fn, qdant_id=1, rx=None, i_node=None, evaluate=None)
         self.assertEqual(L6["antenna_args"], [["qdant," + F + ",1"]])
 
     def test_errors(self):
@@ -86,7 +86,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.layout.set_antenna_qdant(L, self.fn, qdant_id=-1)
         with self.assertRaises(TypeError):
-            quadriga_lib.layout.set_antenna_qdant(L, self.fn, 2, True)  # rx_side is keyword-only
+            quadriga_lib.layout.set_antenna_qdant(L, self.fn, 2, True)  # rx is keyword-only
 
 
 if __name__ == "__main__":

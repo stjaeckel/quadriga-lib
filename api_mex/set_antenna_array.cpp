@@ -20,15 +20,15 @@ Set the antenna of layout nodes from an evaluated array
 
 ## Usage:
 ```
-layout_out = quadriga_lib.set_antenna_array( layout_in, array, rx_side, i_node, center_freq );
+layout_out = quadriga_lib.set_antenna_array( layout_in, array, rx, i_node, center_freq );
 ```
 
 ## Inputs:
 - **`layout_in`** — Layout struct, fields in [[layout_csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`array`** — Valid single-frequency array, 1x1 struct, fields as in [[generate_antenna]]
-- **`rx_side`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
+- **`rx`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
   `false`
-- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 1-based; `[]` = all of them; default: `[]`
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 1-based; `[]` = all of them; default: `[]`
 - **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
 
 ## Outputs:
@@ -62,11 +62,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::layout layout = qd_mex_struct2layout(prhs[0], true, "layout_in");
     qd_mex_check_struct(prhs[1], "array", true); // A multi-frequency array is not accepted
     const auto array = qd_mex_struct2arrayant(prhs[1], false, false, "array");   // The library validates the array
-    const bool rx_side = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "rx_side", false);
+    const bool rx = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "rx", false);
     const arma::uvec i_node = (nrhs < 4) ? arma::uvec() : qd_mex_get_index_Col<arma::uword>(prhs[3], "i_node"); // 1-based -> 0-based
     const double center_freq = (nrhs < 5) ? NAN : qd_mex_get_scalar<double>(prhs[4], "center_freq", NAN);
 
-    CALL_QD(quadriga_lib::set_antenna(layout, array, rx_side, i_node, center_freq));
+    CALL_QD(quadriga_lib::set_antenna(layout, array, rx, i_node, center_freq));
 
     plhs[0] = qd_mex_layout2struct(layout);
 }

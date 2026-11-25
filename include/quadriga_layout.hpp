@@ -129,7 +129,7 @@ namespace quadriga_lib
         layout &layout,                                                // Layout, updated in place
         const std::string &type,                                       // Antenna type of generate_antenna, or "none"
         const std::unordered_map<std::string, arma::mat> &args = {},   // Arguments by name, e.g. {"panel", {4, 4, 1, 2}}; flags 0 or 1
-        bool rx_side = false,                                          // false: Tx nodes, true: Rx nodes
+        bool rx = false,                                               // false: Tx nodes, true: Rx nodes
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN,                                      // Band in [Hz]; NaN = one antenna for all bands
         bool evaluate = true);                                         // true: generate all antennas that are not evaluated yet
@@ -138,7 +138,7 @@ namespace quadriga_lib
     void set_antenna(
         layout &layout,                                                // Layout, updated in place
         const arrayant<double> &array,                                 // Single-frequency array
-        bool rx_side = false,                                          // false: Tx nodes, true: Rx nodes
+        bool rx = false,                                               // false: Tx nodes, true: Rx nodes
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN);                                     // Band in [Hz]; NaN = the same array for all bands
 
@@ -147,7 +147,7 @@ namespace quadriga_lib
         layout &layout,                                                // Layout, updated in place
         const std::string &qdant_file,                                 // QDANT file, relative to the current folder or absolute
         arma::uword qdant_id = 1,                                      // 1-based entry of the file
-        bool rx_side = false,                                          // false: Tx nodes, true: Rx nodes
+        bool rx = false,                                               // false: Tx nodes, true: Rx nodes
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN,                                      // Band in [Hz]; NaN = one antenna for all bands
         bool evaluate = true);                                         // true: generate all antennas that are not evaluated yet

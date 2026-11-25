@@ -71,7 +71,7 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         L, panel = self.L, self.panel
-        L3 = quadriga_lib.layout.set_antenna(L, "3GPP", panel, rx_side=True, i_node=1)  # 0-based node 1 of the Rx side
+        L3 = quadriga_lib.layout.set_antenna(L, "3GPP", panel, rx=True, i_node=1)  # 0-based node 1 of the Rx side
         npt.assert_array_equal(L3["rx"]["i_antenna"], [0, 1])
         npt.assert_array_equal(L3["tx"]["i_antenna"], [0, 0])
         L4 = quadriga_lib.layout.set_antenna(L, "dipole", center_freq=2e9)  # one band: a line per band
@@ -90,14 +90,14 @@ class test_case(unittest.TestCase):
         L8 = quadriga_lib.layout.set_antenna(L, "ula", {"panel": [4, 1, 1, 1], "steer": [10, 5], "apply_weights": True}, evaluate=False)
         self.assertEqual(L8["antenna_args"], [['ula,"4,1,1,1","10,5",1']])  # a 1D steer is one row; bool as 1
         # None, other types and keywords
-        L9 = quadriga_lib.layout.set_antenna(L, "3GPP", args=panel, rx_side=None, i_node=np.array([0, 1], dtype=np.uint8),
+        L9 = quadriga_lib.layout.set_antenna(L, "3GPP", args=panel, rx=None, i_node=np.array([0, 1], dtype=np.uint8),
                                              center_freq=np.nan, evaluate=None)
         self.assertTrue(same(L9, quadriga_lib.layout.set_antenna(L, "3GPP", panel)))
         self.assertTrue(same(quadriga_lib.layout.set_antenna(L, "dipole", None), quadriga_lib.layout.set_antenna(L, "dipole")))
 
     def test_errors(self):
         L, panel = self.L, self.panel
-        with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # rx_side is keyword-only
+        with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # rx is keyword-only
             quadriga_lib.layout.set_antenna(L, "dipole", None, True)
         with self.assertRaises(TypeError):
             quadriga_lib.layout.set_antenna(L)

@@ -31,7 +31,7 @@ assertEqual( L2.antenna_args, { { [ 'qdant,', F, ',1' ] } } );
 assertEqual( size( L2.antenna{1} ), [ 1, 1 ] );                                 % one array for all bands
 assertTrue( isempty( L.antenna ) );                                             % the input stays unchanged
 
-%% Optional inputs: entry, rx_side with 1-based nodes, a band, no evaluation
+%% Optional inputs: entry, rx with 1-based nodes, a band, no evaluation
 L3 = quadriga_lib.set_antenna_qdant( L, fn_q, 2, true, 2 );
 assertEqual( L3.rx.i_antenna, uint32( [ 0; 1 ] ) );
 assertEqual( L3.tx.i_antenna, uint32( [ 0; 0 ] ) );

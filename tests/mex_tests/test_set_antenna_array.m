@@ -27,7 +27,7 @@ assertEqual( L2.antenna{1}.azimuth_grid, ant.azimuth_grid );
 assertEqual( L2.antenna_args, { cell( 0, 1 ) } );                               % no line: an evaluated array without description
 assertTrue( isempty( L.antenna ) );                                             % the input stays unchanged
 
-%% Optional inputs: rx_side with 1-based nodes, a band
+%% Optional inputs: rx with 1-based nodes, a band
 L3 = quadriga_lib.set_antenna_array( L, ant, true, 2 );
 assertEqual( L3.rx.i_antenna, uint32( [ 0; 1 ] ) );
 assertEqual( L3.tx.i_antenna, uint32( [ 0; 0 ] ) );

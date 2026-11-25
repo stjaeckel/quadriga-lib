@@ -21,7 +21,7 @@ Set the antenna of layout nodes from the arguments of generate_antenna
 
 ## Usage:
 ```
-layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx_side, i_node, center_freq, evaluate );
+layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center_freq, evaluate );
 ```
 
 ## Inputs:
@@ -34,9 +34,9 @@ layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx_side, i_node, c
   that the type does not use raises an error; `pattern` is not available (an array built with it is set with
   [[set_antenna_array]]); the field `center_freq` is the same as the argument; e.g.
   `struct( 'panel', [4 4 1 2], 'pol', 3 )`; default: `[]` (none)
-- **`rx_side`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
+- **`rx`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
   `false`
-- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 1-based; `[]` = all of them; default: `[]`
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 1-based; `[]` = all of them; default: `[]`
 - **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
 - **`evaluate`** — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none, the nodes of
   new antennas use the generic antenna until [[eval_antennas]] is called; default: `true`
@@ -81,12 +81,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::layout layout = qd_mex_struct2layout(prhs[0], true, "layout_in");
     const std::string type = qd_mex_get_string(prhs[1], "", "type");
     const auto args = (nrhs < 3) ? std::unordered_map<std::string, arma::mat>() : qd_mex_layout_args(prhs[2], "args");
-    const bool rx_side = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "rx_side", false);
+    const bool rx = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "rx", false);
     const arma::uvec i_node = (nrhs < 5) ? arma::uvec() : qd_mex_get_index_Col<arma::uword>(prhs[4], "i_node"); // 1-based -> 0-based
     const double center_freq = (nrhs < 6) ? NAN : qd_mex_get_scalar<double>(prhs[5], "center_freq", NAN);
     const bool evaluate = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "evaluate", true);
 
-    CALL_QD(quadriga_lib::set_antenna(layout, type, args, rx_side, i_node, center_freq, evaluate));
+    CALL_QD(quadriga_lib::set_antenna(layout, type, args, rx, i_node, center_freq, evaluate));
 
     plhs[0] = qd_mex_layout2struct(layout);
 }

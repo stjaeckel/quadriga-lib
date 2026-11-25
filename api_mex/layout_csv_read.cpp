@@ -49,7 +49,7 @@ vertical and horizontal polarization.
 **Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 
 - **Tx nodes**, **Rx nodes**: the two node structs of a layout, `layout.tx` and `layout.rx`. A function that works on
-  one of them takes the struct itself or `rx_side` (`false`: Tx nodes, `true`: Rx nodes)
+  one of them takes the struct itself or `rx` (`false`: Tx nodes, `true`: Rx nodes)
 - **Node**: one transmitter or receiver, identified by its `name` and `sector`, with one antenna and one track
 - **Site**: all Tx nodes of one name, e.g. the three sectors of a base station; they share position and scenario
 - **Terminal**: all Rx nodes of one name, e.g. the antenna panels of one device; they share their positions

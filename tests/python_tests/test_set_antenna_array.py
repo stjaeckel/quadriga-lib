@@ -70,23 +70,23 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         L, ant = self.L, self.ant
-        L3 = quadriga_lib.layout.set_antenna_array(L, ant, rx_side=True, i_node=1)  # 0-based
+        L3 = quadriga_lib.layout.set_antenna_array(L, ant, rx=True, i_node=1)  # 0-based
         npt.assert_array_equal(L3["rx"]["i_antenna"], [0, 1])
         npt.assert_array_equal(L3["tx"]["i_antenna"], [0, 0])
         L4 = quadriga_lib.layout.set_antenna_array(L, ant, center_freq=3.5e9)  # one band: the other is not set yet
         self.assertEqual(len(L4["antenna"][0]), 2)
         self.assertEqual(L4["antenna"][0][0]["e_theta_re"].size, 0)  # band 0 is not evaluated
         npt.assert_array_equal(L4["antenna"][0][1]["e_theta_re"], ant["e_theta_re"])
-        L4b = quadriga_lib.layout.set_antenna(L4, "dipole", rx_side=True)  # arrays and unset bands pass through unchanged
+        L4b = quadriga_lib.layout.set_antenna(L4, "dipole", rx=True)  # arrays and unset bands pass through unchanged
         self.assertTrue(same(L4b["antenna"][0], L4["antenna"][0]))
-        L5 = quadriga_lib.layout.set_antenna_array(L, ant, rx_side=None, i_node=np.array([0, 1], dtype=np.uint8), center_freq=np.nan)
+        L5 = quadriga_lib.layout.set_antenna_array(L, ant, rx=None, i_node=np.array([0, 1], dtype=np.uint8), center_freq=np.nan)
         self.assertTrue(same(L5, quadriga_lib.layout.set_antenna_array(L, ant)))
-        L6 = quadriga_lib.layout.set_antenna_array(layout_in=L, array=ant, rx_side=False, i_node=[0, 1])
+        L6 = quadriga_lib.layout.set_antenna_array(layout_in=L, array=ant, rx=False, i_node=[0, 1])
         self.assertTrue(same(L6, L5))
 
     def test_errors(self):
         L, ant = self.L, self.ant
-        with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # rx_side is keyword-only
+        with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # rx is keyword-only
             quadriga_lib.layout.set_antenna_array(L, ant, True)
         with self.assertRaises(TypeError):
             quadriga_lib.layout.set_antenna_array(L)

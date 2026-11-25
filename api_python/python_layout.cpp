@@ -90,7 +90,7 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("type"),
           py::arg("args") = py::none(),
           py::kw_only(),
-          py::arg("rx_side") = false,
+          py::arg("rx") = false,
           py::arg("i_node") = py::none(),
           py::arg("center_freq") = nan,
           py::arg("evaluate") = true);
@@ -99,7 +99,7 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("layout_in"),
           py::arg("array"),
           py::kw_only(),
-          py::arg("rx_side") = false,
+          py::arg("rx") = false,
           py::arg("i_node") = py::none(),
           py::arg("center_freq") = nan);
 
@@ -108,7 +108,7 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("qdant_file"),
           py::arg("qdant_id") = 1,
           py::kw_only(),
-          py::arg("rx_side") = false,
+          py::arg("rx") = false,
           py::arg("i_node") = py::none(),
           py::arg("center_freq") = nan,
           py::arg("evaluate") = true);

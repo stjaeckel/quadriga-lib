@@ -101,7 +101,7 @@ class test_case(unittest.TestCase):
     def test_qdant_export(self):
         # An array without a line is exported to a QDANT file next to the CSV file
         ant = quadriga_lib.arrayant.generate_antenna("omni", 10)
-        Lq = quadriga_lib.layout.set_antenna_array(self.L, ant, rx_side=True, i_node=1)
+        Lq = quadriga_lib.layout.set_antenna_array(self.L, ant, rx=True, i_node=1)
         quadriga_lib.layout.csv_write(self.fn_tx, self.fn_rx, Lq)
         self.assertTrue(os.path.exists(self.fn_q))
         Lb = self.read()

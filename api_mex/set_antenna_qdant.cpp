@@ -21,16 +21,16 @@ Set the antenna of layout nodes to an entry of a QDANT file
 
 ## Usage:
 ```
-layout_out = quadriga_lib.set_antenna_qdant( layout_in, qdant_file, qdant_id, rx_side, i_node, center_freq, evaluate );
+layout_out = quadriga_lib.set_antenna_qdant( layout_in, qdant_file, qdant_id, rx, i_node, center_freq, evaluate );
 ```
 
 ## Inputs:
 - **`layout_in`** — Layout struct, fields in [[layout_csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
 - **`qdant_id`** — 1-based entry of the file; default: 1
-- **`rx_side`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
+- **`rx`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
   `false`
-- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 1-based; `[]` = all of them; default: `[]`
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 1-based; `[]` = all of them; default: `[]`
 - **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
 - **`evaluate`** — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none; default:
   `true`
@@ -66,12 +66,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::layout layout = qd_mex_struct2layout(prhs[0], true, "layout_in");
     const std::string qdant_file = qd_mex_get_string(prhs[1], "", "qdant_file");
     const arma::uword qdant_id = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "qdant_id", 1); // A file ID, not converted
-    const bool rx_side = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "rx_side", false);
+    const bool rx = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "rx", false);
     const arma::uvec i_node = (nrhs < 5) ? arma::uvec() : qd_mex_get_index_Col<arma::uword>(prhs[4], "i_node"); // 1-based -> 0-based
     const double center_freq = (nrhs < 6) ? NAN : qd_mex_get_scalar<double>(prhs[5], "center_freq", NAN);
     const bool evaluate = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "evaluate", true);
 
-    CALL_QD(quadriga_lib::set_antenna_qdant(layout, qdant_file, qdant_id, rx_side, i_node, center_freq, evaluate));
+    CALL_QD(quadriga_lib::set_antenna_qdant(layout, qdant_file, qdant_id, rx, i_node, center_freq, evaluate));
 
     plhs[0] = qd_mex_layout2struct(layout);
 }

@@ -19,7 +19,7 @@ Set the antenna of layout nodes from the arguments of generate_antenna
 
 ## Usage:
 ```
-layout_out = quadriga_lib.layout.set_antenna( layout_in, type, args, *, rx_side, i_node, center_freq, evaluate )
+layout_out = quadriga_lib.layout.set_antenna( layout_in, type, args, *, rx, i_node, center_freq, evaluate )
 ```
 
 ## Inputs:
@@ -32,9 +32,9 @@ layout_out = quadriga_lib.layout.set_antenna( layout_in, type, args, *, rx_side,
   key that the type does not use raises an error; `pattern` is not available (an array built with it is set with
   [[set_antenna_array]]); the key `center_freq` is the same as the argument; e.g. `{"panel": [4, 4, 1, 2], "pol": 3}`;
   default: None (none)
-- **`rx_side`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
+- **`rx`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
   default: `False`
-- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; int or `(n,)`; `None`: all of them;
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; int or `(n,)`; `None`: all of them;
   default: `None`
 - **`center_freq`** — Band in [Hz], positive; NaN: one antenna for all bands; default: NaN
 - **`evaluate`** — `True`: generate all antennas of the layout that are not evaluated yet; `False`: none, the nodes of
@@ -73,7 +73,7 @@ MD!*/
 py::dict set_antenna(const py::dict &layout_in,
                      const std::string &type,
                      py::handle args,
-                     py::handle rx_side,
+                     py::handle rx,
                      py::handle i_node,
                      double center_freq,
                      py::handle evaluate)
@@ -82,7 +82,7 @@ py::dict set_antenna(const py::dict &layout_in,
     const auto args_m = qd_pl_args(args, "args");
     const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
 
-    quadriga_lib::set_antenna(lay, type, args_m, qd_python_flag(rx_side, false, "rx_side"), i_node_a, center_freq,
+    quadriga_lib::set_antenna(lay, type, args_m, qd_python_flag(rx, false, "rx"), i_node_a, center_freq,
                               qd_python_flag(evaluate, true, "evaluate"));
     return qd_python_layout2dict(lay);
 }
@@ -97,15 +97,15 @@ Set the antenna of layout nodes from an evaluated array
 
 ## Usage:
 ```
-layout_out = quadriga_lib.layout.set_antenna_array( layout_in, array, *, rx_side, i_node, center_freq )
+layout_out = quadriga_lib.layout.set_antenna_array( layout_in, array, *, rx, i_node, center_freq )
 ```
 
 ## Inputs:
 - **`layout_in`** — Layout dict, keys in [[layout.csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`array`** — Valid single-frequency array, dict as in [[generate_antenna]]
-- **`rx_side`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
+- **`rx`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
   default: `False`
-- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; int or `(n,)`; `None`: all of them;
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; int or `(n,)`; `None`: all of them;
   default: `None`
 - **`center_freq`** — Band in [Hz], positive; NaN: one antenna for all bands; default: NaN
 
@@ -117,7 +117,7 @@ layout_out = quadriga_lib.layout.set_antenna_array( layout_in, array, *, rx_side
 import quadriga_lib as qd
 layout, _, _ = qd.layout.csv_read( "tx.csv", "rx.csv" )
 array, _ = qd.arrayant.qdant_read( "handset.qdant" )
-layout = qd.layout.set_antenna_array( layout, array, rx_side=True )
+layout = qd.layout.set_antenna_array( layout, array, rx=True )
 ```
 
 ## Notes:
@@ -133,7 +133,7 @@ layout = qd.layout.set_antenna_array( layout, array, rx_side=True )
 MD!*/
 py::dict set_antenna_array(const py::dict &layout_in,
                            const py::dict &array,
-                           py::handle rx_side,
+                           py::handle rx,
                            py::handle i_node,
                            double center_freq)
 {
@@ -141,7 +141,7 @@ py::dict set_antenna_array(const py::dict &layout_in,
     const auto array_a = qd_pl_dict2arrayant(array, true, "array"); // The library validates the array
     const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
 
-    quadriga_lib::set_antenna(lay, array_a, qd_python_flag(rx_side, false, "rx_side"), i_node_a, center_freq);
+    quadriga_lib::set_antenna(lay, array_a, qd_python_flag(rx, false, "rx"), i_node_a, center_freq);
     return qd_python_layout2dict(lay);
 }
 
@@ -156,16 +156,16 @@ Set the antenna of layout nodes to an entry of a QDANT file
 
 ## Usage:
 ```
-layout_out = quadriga_lib.layout.set_antenna_qdant( layout_in, qdant_file, qdant_id, *, rx_side, i_node, center_freq, evaluate )
+layout_out = quadriga_lib.layout.set_antenna_qdant( layout_in, qdant_file, qdant_id, *, rx, i_node, center_freq, evaluate )
 ```
 
 ## Inputs:
 - **`layout_in`** — Layout dict, keys in [[layout.csv_read]]; its antenna lists must fit its nodes and frequencies
 - **`qdant_file`** — Existing QDANT file, str or path-like, absolute or relative to the current folder
 - **`qdant_id`** — 1-based entry of the file; int; default: 1
-- **`rx_side`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
+- **`rx`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
   default: `False`
-- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; int or `(n,)`; `None`: all of them;
+- **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; int or `(n,)`; `None`: all of them;
   default: `None`
 - **`center_freq`** — Band in [Hz], positive; NaN: one antenna for all bands; default: NaN
 - **`evaluate`** — `True`: generate all antennas of the layout that are not evaluated yet; `False`: none; default:
@@ -178,7 +178,7 @@ layout_out = quadriga_lib.layout.set_antenna_qdant( layout_in, qdant_file, qdant
 ```
 import quadriga_lib as qd
 layout, _, _ = qd.layout.csv_read( "tx.csv", "rx.csv" )
-layout = qd.layout.set_antenna_qdant( layout, "measured/handset.qdant", 2, rx_side=True )
+layout = qd.layout.set_antenna_qdant( layout, "measured/handset.qdant", 2, rx=True )
 ```
 
 ## Notes:
@@ -195,7 +195,7 @@ MD!*/
 py::dict set_antenna_qdant(const py::dict &layout_in,
                            py::handle qdant_file,
                            arma::uword qdant_id,
-                           py::handle rx_side,
+                           py::handle rx,
                            py::handle i_node,
                            double center_freq,
                            py::handle evaluate)
@@ -204,7 +204,7 @@ py::dict set_antenna_qdant(const py::dict &layout_in,
     const std::string fn = qd_python_path(qdant_file, "qdant_file");
     const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
 
-    quadriga_lib::set_antenna_qdant(lay, fn, qdant_id, qd_python_flag(rx_side, false, "rx_side"), i_node_a, center_freq,
+    quadriga_lib::set_antenna_qdant(lay, fn, qdant_id, qd_python_flag(rx, false, "rx"), i_node_a, center_freq,
                                     qd_python_flag(evaluate, true, "evaluate"));
     return qd_python_layout2dict(lay);
 }

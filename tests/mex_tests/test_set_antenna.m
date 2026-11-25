@@ -28,7 +28,7 @@ assertEqual( size( L2.antenna{1}(2).element_pos ), [ 3, 8 ] );
 assertEqual( L.tx.i_antenna, uint32( [ 0; 0 ] ) );                              % the input stays unchanged
 assertTrue( isempty( L.antenna ) );
 
-%% Optional inputs: rx_side and 1-based nodes, a band, evaluate
+%% Optional inputs: rx and 1-based nodes, a band, evaluate
 L3 = quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ), true, 2 );
 assertEqual( L3.rx.i_antenna, uint32( [ 0; 1 ] ) );
 assertEqual( L3.tx.i_antenna, uint32( [ 0; 0 ] ) );

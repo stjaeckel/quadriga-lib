@@ -81,7 +81,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 **Network layouts and mobility**
 
 - `layout`: the nodes of a radio network and how they move, in two tables, the Tx nodes (BS, AP) and the Rx nodes (UT, STA), with their antennas, the link states of one realisation and the lattice of the wrap-around; the two [layout CSV files](formats.html#layout_csv) hold the same tables.
-- Tx nodes, Rx nodes: the two node tables of a layout, `layout.tx` and `layout.rx`; a function that works on one of them takes the table or `rx_side` (`false`: Tx nodes, `true`: Rx nodes).
+- Tx nodes, Rx nodes: the two node tables of a layout, `layout.tx` and `layout.rx`; a function that works on one of them takes the table or `rx` (`false`: Tx nodes, `true`: Rx nodes).
 - Node: one transmitter or receiver of a layout, identified by its `name` and `sector`, with one antenna and one track. Site: all Tx nodes with one name (its sectors share position and scenario). Terminal: all Rx nodes with one name, e.g. the panels of one device.
 - Row: a position with orientation and the values that apply from it on; the rows of a node are consecutive, the first at `offset`. Snapshot: one sample of the channel in time and space; without snapshot times, each row of a node is one snapshot.
 - Track: a node with several rows, which moves along its positions. Point drop: a node with one row, which stays at its position or moves along its `direction` with its `speed`.
@@ -89,7 +89,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Propagation link: one site, one terminal and one segment (with the wrap image of the site), with its LOS and indoor state, conf file and seeds, stored in `layout.links`. Channel link: one Tx node and one Rx node of a propagation link (and one frequency); the sectors of a site share the rays of their propagation link.
 - Band: one simulation frequency of `center_freq` of a layout; the antenna of a node has one description for all bands or one per band.
 - Scenario family, conf name: a family (`UMa`, `InH`, ...) selects the conf file of a link from its LOS and indoor state; a conf name (e.g. `UMa_NLOS_O2I`, or a user conf file) names one file and fixes the state.
-- Wrap image: the site displaced by lattice vectors `wrap` of the layout; each link uses the image of the site that is nearest to the terminal (`image` = 0: the site itself).
+- Wrap image: the site displaced by lattice vectors `wrap` of the layout; each link uses the image of the site that is nearest to the first position of the terminal, kept for the whole track (`image` = 0: the site itself).
 - `i_antenna`: 1-based index into the antenna lists of a layout, 0 = the generic antenna with two co-located isotropic elements of vertical and horizontal polarization.
 - Angles: degrees in the CSV files and in the tuples typed by hand (`bs`, `ut` of `generate_layout`, the arguments of `generate_antenna` in `set_antenna`), radians in all class members, `orientation` and `direction`.
 

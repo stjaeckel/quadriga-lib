@@ -62,7 +62,7 @@ elements with vertical and horizontal polarization.
 **Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 
 - **Tx nodes**, **Rx nodes**: the two node tables of a layout, `layout.tx` and `layout.rx`. A function that works on one
-  of them takes the table itself or `rx_side` (`false`: Tx nodes, `true`: Rx nodes)
+  of them takes the table itself or `rx` (`false`: Tx nodes, `true`: Rx nodes)
 - **Node**: one transmitter or receiver, identified by its `name` and `sector`, with one antenna and one track
 - **Site**: all Tx nodes of one name, e.g. the three sectors of a base station; they share position and scenario
 - **Terminal**: all Rx nodes of one name, e.g. the antenna panels of one device; they share their positions
@@ -1323,7 +1323,7 @@ std::vector<std::string> qd_who(const quadriga_lib::layout &L, const std::vector
 // (lines without arrays) share one entry, an antenna with arrays stays shared by the nodes that shared it, entries are
 // numbered in order of first use (Tx nodes first), and unused entries disappear. eval_mode: 0 = no evaluation, 1 = the
 // entries that had arrays before or hold the given array, 2 = all entries not evaluated yet
-void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const qd_ant *given, bool rx_side,
+void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const qd_ant *given, bool rx,
                     const quadriga_lib::uint_list &i_node, double freq, int eval_mode)
 {
     std::string msg = qd_check_lists(L);
@@ -1331,12 +1331,12 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         throw std::invalid_argument("Input 'layout' is not valid: " + msg);
     if (!std::isnan(freq) && !(std::isfinite(freq) && freq > 0.0))
         throw std::invalid_argument("Input 'center_freq' must be positive and finite, or NaN.");
-    const size_t n_node = (size_t)(rx_side ? L.rx : L.tx).n_node();
+    const size_t n_node = (size_t)(rx ? L.rx : L.tx).n_node();
     std::vector<char> picked(n_node, i_node.vec().is_empty() ? 1 : 0);
     for (arma::uword v : i_node.vec())
     {
         if (v >= n_node)
-            throw std::invalid_argument("Input 'i_node' has an index outside the nodes of the " + std::string(rx_side ? "Rx" : "Tx") + " side.");
+            throw std::invalid_argument("Input 'i_node' has an index outside the nodes of the " + std::string(rx ? "Rx" : "Tx") + " side.");
         picked[(size_t)v] = 1;
     }
 
@@ -1488,7 +1488,7 @@ void qd_set_antenna(quadriga_lib::layout &L, const antenna_cells *cells, const q
         for (arma::uword n = 0; n < old.n_elem; ++n)
         {
             const arma::u32 a = old[n];
-            const bool pick = (s == 1) == rx_side && picked[n];
+            const bool pick = (s == 1) == rx && picked[n];
             const std::string origin = pick ? (band < 0 ? "n" : "c" + std::to_string(a)) : "o" + std::to_string(a);
             const auto it = done.find(origin);
             if (it != done.end())
@@ -1587,7 +1587,7 @@ void quadriga_lib::set_antenna(
     quadriga_lib::layout &layout,
     const std::string &type,
     const std::unordered_map<std::string, arma::mat> &args = {},
-    bool rx_side = false,
+    bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN,
     bool evaluate = true);
@@ -1595,7 +1595,7 @@ void quadriga_lib::set_antenna(
 void quadriga_lib::set_antenna(
     quadriga_lib::layout &layout,
     const arrayant<double> &array,
-    bool rx_side = false,
+    bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN);
 ```
@@ -1610,8 +1610,8 @@ void quadriga_lib::set_antenna(
   that the type does not use throws; `pattern` is not available (an array built with it is set with the second form);
   `center_freq` here is the same as the argument
 - **`array`** — Valid single-frequency array
-- **`rx_side`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
-- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; empty: all of them
+- **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
+- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
 - **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
 - **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none,
   the nodes of new antennas use the generic antenna until `layout.eval_antennas()` is called
@@ -1644,7 +1644,7 @@ quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0
 MD!*/
 
 void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &type, const std::unordered_map<std::string, arma::mat> &args,
-                               bool rx_side, const uint_list &i_node, double center_freq, bool evaluate)
+                               bool rx, const uint_list &i_node, double center_freq, bool evaluate)
 {
     const unsigned mask = antenna_type_mask(type);
     if (mask == 0 || mask == t_qdant)
@@ -1707,15 +1707,15 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &
     }
     if (mask == t_none && !std::isnan(freq))
         throw std::invalid_argument("Input 'center_freq': the antenna type 'none' applies to all bands.");
-    qd_set_antenna(layout, mask == t_none ? nullptr : &cells, nullptr, rx_side, i_node, freq, evaluate ? 2 : 0);
+    qd_set_antenna(layout, mask == t_none ? nullptr : &cells, nullptr, rx, i_node, freq, evaluate ? 2 : 0);
 }
 
-void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const arrayant<double> &array, bool rx_side, const uint_list &i_node, double center_freq)
+void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const arrayant<double> &array, bool rx, const uint_list &i_node, double center_freq)
 {
     const std::string msg = array.is_valid();
     if (!msg.empty())
         throw std::invalid_argument("Input 'array' is not valid: " + msg);
-    qd_set_antenna(layout, nullptr, &array, rx_side, i_node, center_freq, 1);
+    qd_set_antenna(layout, nullptr, &array, rx, i_node, center_freq, 1);
 }
 
 /*!MD
@@ -1734,7 +1734,7 @@ void quadriga_lib::set_antenna_qdant(
     quadriga_lib::layout &layout,
     const std::string &qdant_file,
     arma::uword qdant_id = 1,
-    bool rx_side = false,
+    bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN,
     bool evaluate = true);
@@ -1744,8 +1744,8 @@ void quadriga_lib::set_antenna_qdant(
 - **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
 - **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
 - **`qdant_id`** *(optional)* — 1-based entry of the file
-- **`rx_side`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
-- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; empty: all of them
+- **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
+- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
 - **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
 - **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none
 
@@ -1765,7 +1765,7 @@ quadriga_lib::set_antenna_qdant(L, "measured/handset.qdant", 2, true);
 - [[qdant_read]] (reads the entries of a QDANT file)
 MD!*/
 
-void quadriga_lib::set_antenna_qdant(quadriga_lib::layout &layout, const std::string &qdant_file, arma::uword qdant_id, bool rx_side,
+void quadriga_lib::set_antenna_qdant(quadriga_lib::layout &layout, const std::string &qdant_file, arma::uword qdant_id, bool rx,
                                      const uint_list &i_node, double center_freq, bool evaluate)
 {
     if (qdant_file.empty())
@@ -1781,5 +1781,5 @@ void quadriga_lib::set_antenna_qdant(quadriga_lib::layout &layout, const std::st
     cells[c_antenna - cf] = "qdant";
     cells[c_qdant_file - cf] = std::filesystem::absolute(qdant_file).lexically_normal().generic_string();
     cells[c_qdant_id - cf] = std::to_string(qdant_id);
-    qd_set_antenna(layout, &cells, nullptr, rx_side, i_node, center_freq, evaluate ? 2 : 0);
+    qd_set_antenna(layout, &cells, nullptr, rx, i_node, center_freq, evaluate ? 2 : 0);
 }
