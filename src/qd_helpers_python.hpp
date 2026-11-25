@@ -1147,36 +1147,75 @@ static inline arma::Cube<dtype> qd_python_numpy2arma_Cube(py::array_t<dtype> &&i
     return qd_python_numpy2arma_Cube(array, false, false);
 }
 
-// Integer input given in another dtype (int64 or float array, list, scalar): read as double and checked, so that a
-// negative, fractional or non-finite entry cannot wrap or truncate silently. Every entry must be an integer from the
-// lowest value of dtype to min(largest value, 2^53), else std::invalid_argument naming the input.
-// - Returns the Fortran-ordered double array; qd_python_check_integers writes the converted values to 'out'
-static inline py::array_t<double> qd_python_integers_as_double(const py::handle &obj)
+// Integer input given in another dtype (int64 or float array, list, scalar): checked, so that a negative, fractional or
+// non-finite entry cannot wrap or truncate silently. Every entry must be an integer from the lowest to the largest value
+// of dtype, else std::invalid_argument naming the input.
+// - Integer sources (Python integers, int and uint arrays, also beyond 2^53) are compared and converted exactly; float
+//   sources are exact integers in double. Python integers beyond the 64-bit range are out of range.
+// - 'alloc(n)' gives the memory for n values (Fortran order) of dtype; the shape of the input is returned
+template <typename dtype>
+static inline std::string qd_python_integer_range(const std::string &var_name)
 {
-    auto src = py::array_t<double, py::array::f_style | py::array::forcecast>::ensure(obj);
-    if (!src)
-        throw py::error_already_set();
-    return py::array_t<double>(src);
+    return std::string("Input '") + var_name + "' must contain integers from " +
+           std::to_string((long long)std::numeric_limits<dtype>::lowest()) + " to " +
+           (std::is_signed_v<dtype> ? std::to_string((long long)std::numeric_limits<dtype>::max())
+                                    : std::to_string((unsigned long long)std::numeric_limits<dtype>::max())) + ".";
 }
 
-template <typename dtype>
-static inline void qd_python_check_integers(const double *in, arma::uword n, dtype *out, const std::string &var_name)
+template <typename dtype, typename S, typename Alloc>
+static inline std::array<size_t, 9> qd_python_integers_write(const py::array_t<S, py::array::f_style | py::array::forcecast> &src_f,
+                                                             Alloc alloc, const std::string &var_name)
 {
-    const double lo = (double)std::numeric_limits<dtype>::lowest();
-    const double hi = std::min((double)std::numeric_limits<dtype>::max(), 9007199254740992.0);
-    for (arma::uword i = 0; i < n; ++i)
+    const py::array_t<S> src(src_f);
+    const auto shape = qd_python_get_shape(src, true);
+    const S *in = src.data();
+    dtype *out = alloc((arma::uword)src.size());
+    const std::string range = qd_python_integer_range<dtype>(var_name);
+    for (size_t i = 0; i < (size_t)src.size(); ++i)
     {
-        const double v = in[i];
-        if (!(v >= lo && v <= hi) || (double)(dtype)v != v) // NaN fails the range test; the cast is in range
-            throw std::invalid_argument((var_name.empty() ? std::string("Integer input") : "Input '" + var_name + "'") +
-                                        " must contain integers from " + std::to_string((long long)lo) + " to " +
-                                        std::to_string((unsigned long long)hi) + ".");
+        const S v = in[i];
+        bool ok;
+        if constexpr (std::is_floating_point_v<S>) // NaN fails; the bounds are exact powers of two or exact integers
+            ok = v >= (S)std::numeric_limits<dtype>::lowest() && v < (S)std::numeric_limits<dtype>::max() + (S)1 && std::floor(v) == v;
+        else if constexpr (std::is_signed_v<S> && std::is_signed_v<dtype>)
+            ok = v >= (S)std::numeric_limits<dtype>::lowest() && v <= (S)std::numeric_limits<dtype>::max();
+        else if constexpr (std::is_signed_v<S>) // unsigned target
+            ok = v >= 0 && (unsigned long long)v <= (unsigned long long)std::numeric_limits<dtype>::max();
+        else if constexpr (std::is_signed_v<dtype>) // unsigned source, signed target
+            ok = v <= (unsigned long long)std::numeric_limits<dtype>::max();
+        else
+            ok = v <= (unsigned long long)std::numeric_limits<dtype>::max();
+        if (!ok)
+            throw std::invalid_argument(range);
         out[i] = (dtype)v;
     }
+    return shape;
+}
+
+template <typename dtype, typename Alloc>
+static inline std::array<size_t, 9> qd_python_integers_convert(const py::handle &obj, Alloc alloc, const std::string &var_name)
+{
+    constexpr int F = py::array::f_style | py::array::forcecast;
+    const py::array arr = py::array::ensure(obj); // Python integers: int64, uint64 above 2^63, else the object dtype
+    const char kind = arr ? arr.dtype().kind() : 'f';
+    if (kind == 'i' || kind == 'b' || kind == 'u' || kind == 'O')
+    {
+        if (kind != 'u')
+            if (auto s = py::array_t<long long, F>::ensure(arr))
+                return qd_python_integers_write<dtype, long long>(s, alloc, var_name);
+        if (kind != 'i' && kind != 'b')
+            if (auto u = py::array_t<unsigned long long, F>::ensure(arr))
+                return qd_python_integers_write<dtype, unsigned long long>(u, alloc, var_name);
+        throw std::invalid_argument(qd_python_integer_range<dtype>(var_name)); // an integer beyond 64 bits
+    }
+    auto src = py::array_t<double, F>::ensure(obj);
+    if (!src)
+        throw py::error_already_set();
+    return qd_python_integers_write<dtype, double>(src, alloc, var_name);
 }
 
 // py::handle overloads: None gives an empty object; only an ndarray of dtype (the caller's own array) can be aliased
-// - Integer dtypes: other inputs are checked by qd_python_check_integers; var_name names the input in its error
+// - Integer dtypes: other inputs are checked by qd_python_integers_convert; var_name names the input in its error
 template <typename dtype>
 static inline arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool view = false, bool strict = false,
                                                  const std::string &var_name = "")
@@ -1192,9 +1231,8 @@ static inline arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, b
         throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
     if constexpr (std::is_integral_v<dtype>)
     {
-        const auto src = qd_python_integers_as_double(obj);
-        arma::Col<dtype> out((arma::uword)src.size(), arma::fill::none);
-        qd_python_check_integers(src.data(), out.n_elem, out.memptr(), var_name);
+        arma::Col<dtype> out;
+        qd_python_integers_convert<dtype>(obj, [&](arma::uword n) { out.set_size(n); return out.memptr(); }, var_name);
         return out;
     }
     else
@@ -1216,10 +1254,9 @@ static inline arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, b
         throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
     if constexpr (std::is_integral_v<dtype>)
     {
-        const auto src = qd_python_integers_as_double(obj);
-        const auto shape = qd_python_get_shape(src, true);
-        arma::Mat<dtype> out(shape[0], shape[1] * shape[2], arma::fill::none);
-        qd_python_check_integers(src.data(), out.n_elem, out.memptr(), var_name);
+        arma::Mat<dtype> out;
+        const auto shape = qd_python_integers_convert<dtype>(obj, [&](arma::uword n) { out.set_size(n, 1); return out.memptr(); }, var_name);
+        out.reshape(shape[0], shape[1] * shape[2]);
         return out;
     }
     else
@@ -1241,10 +1278,9 @@ static inline arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj,
         throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
     if constexpr (std::is_integral_v<dtype>)
     {
-        const auto src = qd_python_integers_as_double(obj);
-        const auto shape = qd_python_get_shape(src, true);
-        arma::Cube<dtype> out(shape[0], shape[1], shape[2], arma::fill::none);
-        qd_python_check_integers(src.data(), out.n_elem, out.memptr(), var_name);
+        arma::Cube<dtype> out;
+        const auto shape = qd_python_integers_convert<dtype>(obj, [&](arma::uword n) { out.set_size(n, 1, 1); return out.memptr(); }, var_name);
+        out.reshape(shape[0], shape[1], shape[2]);
         return out;
     }
     else

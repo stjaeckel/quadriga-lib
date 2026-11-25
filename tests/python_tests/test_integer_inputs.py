@@ -36,6 +36,18 @@ class test_case(unittest.TestCase):
         _, mtl = quadriga_lib.RTtools.subdivide_triangles(1, self.tri, np.array([2**40], dtype=np.int64))
         npt.assert_array_equal(mtl, [2**40])
 
+    def test_large_integers_are_exact(self):
+        # Python integers above 2^53 reach a 64-bit target unchanged (no conversion through double)
+        big = [2**53 + 1, 2**60 + 3, 2**62 - 1, 0]
+        for source in (big, tuple(big), np.array(big, dtype=np.int64), np.array(big, dtype=np.uint64)):
+            _, mtl = quadriga_lib.RTtools.subdivide_triangles(1, np.tile(self.tri, (4, 1)), source)
+            npt.assert_array_equal(mtl, big)
+        for bad, value in (([2**64], "18446744073709551615"), ([-1], "from 0"), ([2**63, 2**64 + 1], "18446744073709551615")):
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.RTtools.subdivide_triangles(1, self.tri, bad)
+            self.assertIn("mtl_ind", str(ctx.exception))
+            self.assertIn(value, str(ctx.exception))  # the range of the target in the message
+
     def test_invalid_values(self):
         # uint64 input (copy_element) and uint32 input (sub_mesh_ind of triangle_mesh_aabb)
         for bad in (np.array([-1]), np.array([1.9]), [1.9], [-1], np.array([np.nan]), np.array([np.inf])):
