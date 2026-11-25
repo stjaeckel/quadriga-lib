@@ -214,6 +214,54 @@ namespace quadriga_lib
         bool per_cell = true,                   // true: n_ut per cell; false: n_ut in total
         arma::sword seed = -1);                 // Seed, -1 = layout.seed if set, else the system random device
 
+    // ---- Channels from a layout ----
+
+    // Channel coefficients of a layout in one call: link states, rays and channels
+    // - Uses layout.links if it is filled; else draws the link states on a local copy and leaves the layout unchanged
+    // - One channel per Tx node, Rx node and frequency of the linked pairs: Tx node fastest, then Rx node, then frequency
+    std::vector<channel<double>> get_channels_layout(
+        const layout &layout,                                // Layout with frequencies; antennas evaluated or the generic antenna
+        const arma::vec &times = {},                         // Snapshot times in [s], [n_snap]; empty = one snapshot per row
+        const std::string &output = "taps",                  // "taps" or "rays"
+        const std::string &method = "",                      // "38.901", "38.901_MF" or "quadriga"; "" = method of layout.links, else "38.901"
+        arma::umat *index = nullptr,                         // Optional output: Tx node, Rx node and frequency index of each channel, 0-based, [3, n_channel]
+        const std::string &mobility = "auto",                // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
+        double overlap = 0.5,                                // Overlap of consecutive segments, 0 to 1
+        arma::sword seed = -1,                               // Master seed if layout.links is empty; -1 = layout.seed, else the system random device
+        const std::vector<std::string> &config_dirs = {});   // Folders of user conf files, searched before the shipped folder; unused with filled links
+
+    // Stage 1: draw the discrete state of the propagation links (LOS, indoor state, scenario, wrap image, seeds)
+    // - Writes layout.links and the master seed used into layout.seed; a failed call leaves the layout unchanged
+    void init_link_states(
+        layout &layout,                                      // Layout, links and seed updated in place
+        const std::string &method = "38.901",                // "38.901", "38.901_MF" or "quadriga"
+        const arma::vec &o2i_low = {},                       // Share of the low-loss building model, [1]; empty = family value
+        bool pol_variability = false,                        // Polarization power variability (TR 38.901 clause 7.6.16); TR methods only
+        double anchor_freq = 2.0e9,                          // Anchor frequency of "38.901_MF" in [Hz]
+        const std::string &sos_preset = "",                  // SOS preset of the GBSM sets; "" = Exp256 for the TR methods, Comb256 for quadriga
+        arma::sword seed = -1,                               // Master seed; -1 = layout.seed, else the system random device
+        const std::vector<std::string> &config_dirs = {});   // Folders of user conf files, searched before the shipped folder
+
+    // Stage 2: rays of propagation links at the start of their segment
+    // - Returns [n_out][n_freq] objects for the TR methods (one frequency each), [n_out][1] for quadriga
+    std::vector<std::vector<gbsm_rays>> generate_rays(
+        const layout &layout,                                // Layout with links from init_link_states
+        const uint_list &i_link = {},                        // Propagation links, 0-based, [n_out]; empty = all
+        bool scatterers = false);                            // Solve the scatterers (needed for drift); always done for quadriga
+
+    // Stage 3: channels of the channel links of the given propagation links
+    // - Applies the antennas, the motion along the tracks and the link gain to the rays
+    std::vector<channel<double>> get_gbsm_channels(
+        const layout &layout,                                // Layout with links from init_link_states
+        const std::vector<std::vector<gbsm_rays>> &rays,     // Rays from generate_rays, possibly edited, [n_out][1 or n_freq]
+        const uint_list &i_link = {},                        // The propagation links of 'rays', 0-based, [n_out]; empty = all
+        const arma::vec &times = {},                         // Snapshot times in [s], [n_snap]; empty = one snapshot per row
+        const std::string &output = "taps",                  // "taps" or "rays"
+        arma::umat *index = nullptr,                         // Optional output: Tx node, Rx node and frequency index of each channel, 0-based, [3, n_channel]
+        const std::string &mobility = "auto",                // "phase", "drift" or "auto"; "drift" needs rays with scatterers
+        bool oxygen = false,                                 // Oxygen absorption (TR 38.901 clause 7.6.1)
+        bool use_absolute_delays = false,                    // Include the LOS delay in all delays
+        double overlap = 0.5);                               // Overlap of consecutive segments, 0 to 1
 }
 
 #endif

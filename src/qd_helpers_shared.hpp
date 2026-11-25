@@ -51,7 +51,8 @@
 
 // Runs f(i) for the items i = 0 ... n - 1 of a batch, in parallel if 'parallel' is set (dynamic schedule). With a
 // type S other than void, f(i, s) gets a scratch object S &s per thread, reused for its items. An error of an item is
-// rethrown after the loop with the prefix "<prefix> <id>: " of the lowest failing item (id = i, or id[i] if given),
+// rethrown after the loop with the prefix "<prefix> <id>: " of the lowest failing item (id = i, or id[i] if given; no prefix
+// if 'prefix' is nullptr),
 // as std::invalid_argument if it was one, else as std::runtime_error; the serial loop stops at the first error.
 // std::exception_ptr is not used: it needs a libstdc++ symbol version that the libstdc++ bundled with older MATLAB
 // releases lacks, so the MEX files would not load there.
@@ -97,7 +98,8 @@ static inline void qd_batch_loop(size_t n, bool parallel, const char *prefix, F 
     }
     if (i_err == n_i)
         return;
-    msg = std::string(prefix) + " " + std::to_string(id ? (*id)[(arma::uword)i_err] : (arma::uword)i_err) + ": " + msg;
+    if (prefix != nullptr)
+        msg = std::string(prefix) + " " + std::to_string(id ? (*id)[(arma::uword)i_err] : (arma::uword)i_err) + ": " + msg;
     if (invalid_arg)
         throw std::invalid_argument(msg);
     throw std::runtime_error(msg);

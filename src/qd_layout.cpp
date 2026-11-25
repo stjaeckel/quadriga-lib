@@ -56,6 +56,8 @@ A **layout** describes the nodes of a radio network and how they move: where eac
 **Bands.** A row with `center_freq` and no position adds a frequency, and optionally an antenna for it, to its node. The frequencies of the Tx side (else of the Rx side) are the simulation frequencies `center_freq` of the layout. A node without bands has all of them with one antenna description; a node with bands defines all of them. An empty antenna in a band repeats the antenna of the first band.
 
 **Unknown columns** are kept as text in `extra_names` and `extra` and written back unchanged.
+
+**Channels from a layout.** The channel coefficients are computed in three stages. [[init_link_states]] draws the discrete state of each *propagation link*, one site and one terminal: its wrap image, scenario and conf file, LOS and indoor state and seeds, stored in `layout.links`. [[generate_rays]] runs the chain of the section "Geometry-based stochastic model" for chosen links and returns their rays. [[get_gbsm_channels]] applies the antennas, the motion along the tracks and the link gain, for each *channel link*, one Tx node and one Rx node; the sectors of a site share the rays of their propagation link. [[get_channels_layout]] runs all three stages. All random values are addressed: they follow from the seeds, a stream key and the position, so that the evaluation order, the batches and the thread count do not change them, and only the discrete states are stored. `layout.links` holds a hash of the layout members that determine the links (positions, names, sectors, frequencies, site seeds, scenarios, the O2I columns, clutter, scenario overrides, wrap vectors and whether a site moves); stages 2 and 3 throw when it no longer matches, and `layout.links.reset()` discards the links. The links hold the master seed they were drawn with, so a copy of `layout.links` can be restored after another realisation. Editing `los` or `indoor` of the links between stage 1 and stage 2 forces a state; orientations, antennas and `pairing` may change without new links.
 SECTION_DESC!*/
 
 /*!MD
@@ -77,7 +79,7 @@ Class for a network layout: Tx and Rx nodes, antennas, frequencies and link stat
 | `std::vector<std::string> antenna_cols` | `[n_col]` | Names of the antenna columns of the CSV files |
 | `std::vector<std::vector<std::string>> antenna_args` | `[n_antenna][0, 1 or n_freq]` | CSV lines of the antenna columns: one line for all bands or one per band; no line or an empty line = an evaluated array without description; a line without antenna type = a band that is not set yet |
 | `std::vector<std::vector<arrayant<double>>> antenna` | `[n_antenna][0, 1 or n_freq]` | Evaluated arrays, one for all bands or one per band; an entry without arrays or an array without elements is not evaluated, its nodes use the generic antenna; empty = not evaluated |
-| `arma::mat wrap` | `[2, 1]` or `[2, 2]` | Lattice vectors in [m], one per column; empty = none |
+| `arma::mat wrap` | `[2, 1]` or `[2, 2]` | Lattice vectors in [m], one per column; two vectors form a reduced basis, 0 <= a1·a2 <= min(a1·a1, a2·a2) / 2, so that ±a1, ±a2 and ±(a1 − a2) are the nearest images; empty = none |
 | `arma::umat pairing` | `[2, n_pair]` | Tx site index and Rx terminal index of the linked pairs, 0-based; empty = all pairs |
 
 ## Member functions:<br>
@@ -85,7 +87,7 @@ Class for a network layout: Tx and Rx nodes, antennas, frequencies and link stat
 | -------- | ----------- |
 | `.n_antenna()` | Number of antennas: length of `antenna_args`, or of `antenna` if there are no arguments |
 | `.eval_antennas(center_freq)` | Generates the arrays of `antenna` that are not evaluated yet from `antenna_args`; a frequency list in [Hz] (optional) replaces `center_freq` and regenerates all lines; throws for a band without description and for an array spaced in wavelengths without a frequency |
-| `.is_valid()` | `std::string`: empty if the object is valid, else an error message; checks all members of both sides and `links`, the sizes and ranges, equal positions and shared values of the nodes of one site or terminal, the antenna lists (a node with a band that is not set is reported), the frequencies, `wrap` and `pairing` |
+| `.is_valid()` | `std::string`: empty if the object is valid, else an error message; checks all members of both sides and `links`, the sizes and ranges, equal positions, motion (`speed`, `time`, `direction`) and shared values of the nodes of one site or terminal, the antenna lists (a node with a band that is not set is reported), the frequencies, `wrap` and `pairing` |
 
 ## See also:
 - [[layout_nodes]] (one side of a layout)
@@ -698,6 +700,13 @@ std::string qd_check_groups(const quadriga_lib::layout_nodes &N, bool is_site)
         {
             if (N.pos(0, oa + r) != N.pos(0, ob + r) || N.pos(1, oa + r) != N.pos(1, ob + r) || N.pos(2, oa + r) != N.pos(2, ob + r))
                 return who + "must have equal positions in each row.";
+            // The first node stands for the motion of all nodes with its name
+            const bool diff_speed = !N.speed.is_empty() && N.speed[oa + r] != N.speed[ob + r];
+            const bool diff_time = !N.time.is_empty() && !qd_layout::same_value(N.time[oa + r], N.time[ob + r]);
+            const bool diff_dir = !N.direction.is_empty() && (!qd_layout::same_value(N.direction(0, oa + r), N.direction(0, ob + r)) ||
+                                                              !qd_layout::same_value(N.direction(1, oa + r), N.direction(1, ob + r)));
+            if (diff_speed || diff_time || diff_dir)
+                return who + "must have equal 'speed', 'time' and 'direction' in each row.";
             const bool diff_scenario = !N.scenario.empty() && N.scenario[oa + r] != N.scenario[ob + r];
             const bool diff_indoor = !N.indoor.is_empty() && N.indoor[oa + r] != N.indoor[ob + r];
             const bool diff_floor = !N.floor.is_empty() && N.floor[oa + r] != N.floor[ob + r];
@@ -862,6 +871,11 @@ std::string quadriga_lib::layout::is_valid() const
             const double b = std::hypot(wrap(0, 1), wrap(1, 1)), det = wrap(0, 0) * wrap(1, 1) - wrap(1, 0) * wrap(0, 1);
             if (!(std::abs(det) > 1.0e-9 * a * b))
                 return "Member 'wrap' must have linearly independent columns.";
+            // A reduced basis: then +-a1, +-a2 and +-(a1 - a2) are the nearest lattice points, the wrap images of the links
+            const double dot = wrap(0, 0) * wrap(0, 1) + wrap(1, 0) * wrap(1, 1), m = std::min(a * a, b * b);
+            if (dot < -1.0e-3 * m || dot > 0.5 * m * (1.0 + 1.0e-3))
+                return "Member 'wrap' must have columns a1, a2 with 0 <= a1.a2 <= min(|a1|^2, |a2|^2) / 2, so that +-a1, +-a2 and +-(a1 - a2) are the "
+                       "nearest images: replace a2 by -a2 if a1.a2 < 0, or by a2 - a1 if a1.a2 is too large.";
         }
     }
     if (!pairing.is_empty())

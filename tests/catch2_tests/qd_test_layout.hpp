@@ -21,6 +21,9 @@
 // qd_layout_sites:   the sites of a side (names, first (x, y), node indices)
 // qd_layout_images:  the wrap images of a layout in the documented order, [2, n_img]
 // qd_layout_nearest: nearest site and wrap image of a point, brute force
+// qd_layout_points:  point drops with names, sectors and positions
+// qd_layout_par:     a par_data entry of a channel by name
+// qd_layout_diff_rays: first difference between two gbsm_rays objects
 
 #ifndef QD_TEST_LAYOUT_HPP
 #define QD_TEST_LAYOUT_HPP
@@ -33,6 +36,8 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <any>
+#include <stdexcept>
 #include <vector>
 
 struct qd_layout_files
@@ -352,6 +357,58 @@ static inline double qd_layout_nearest(const qd_layout_site_list &S, const arma:
                 best = d, site = s, image = k;
         }
     return best;
+}
+
+
+// Nodes "name" with sectors at the positions [3, n_row]: one row per node, or all rows for one node; orientation 0 and
+// heading 'heading' [n_row] (empty = 0); no other member
+static inline quadriga_lib::layout_nodes qd_layout_points(const std::vector<std::string> &name, const std::vector<unsigned> &sector,
+                                                          const arma::mat &pos, const arma::vec &heading = {})
+{
+    quadriga_lib::layout_nodes N;
+    const arma::uword n = (arma::uword)name.size();
+    N.name = name;
+    N.sector.set_size(n), N.i_antenna.zeros(n), N.offset.set_size(n);
+    for (arma::uword i = 0; i < n; ++i)
+        N.sector[i] = sector[i], N.offset[i] = i;
+    N.pos = pos;
+    N.orientation.zeros(3, pos.n_cols);
+    if (!heading.is_empty())
+        N.orientation.row(2) = heading.t();
+    return N;
+}
+
+// Value of a 'par_data' entry of a channel by its name
+template <class T>
+static inline T qd_layout_par(const quadriga_lib::channel<double> &c, const std::string &name)
+{
+    for (size_t i = 0; i < c.par_names.size(); ++i)
+        if (c.par_names[i] == name)
+            return std::any_cast<T>(c.par_data[i]);
+    throw std::runtime_error("No par_data entry '" + name + "'.");
+}
+
+// First difference of two ray objects ("" = equal); numbers within 'tol' times the largest magnitude of the member
+static inline std::string qd_layout_diff_rays(const quadriga_lib::gbsm_rays &a, const quadriga_lib::gbsm_rays &b, double tol = 0.0)
+{
+    if (a.method != b.method)
+        return "method";
+    if (!qd_layout_same_data(a.tx_pos, b.tx_pos, tol) || !qd_layout_same_data(a.rx_pos, b.rx_pos, tol))
+        return "positions";
+    if (!qd_layout_same_data(a.center_freq, b.center_freq, tol))
+        return "center_freq";
+    if (!qd_layout_same_data(a.delay, b.delay, tol) || !qd_layout_same_data(a.power, b.power, tol))
+        return "delay or power";
+    if (!qd_layout_same_data(a.aod, b.aod, tol) || !qd_layout_same_data(a.eod, b.eod, tol) ||
+        !qd_layout_same_data(a.aoa, b.aoa, tol) || !qd_layout_same_data(a.eoa, b.eoa, tol))
+        return "angles";
+    if (!qd_layout_same_data(a.polmat, b.polmat, tol))
+        return "polmat";
+    if (!qd_layout_same_int(a.path_type, b.path_type) || !qd_layout_same_int(a.tap, b.tap))
+        return "path_type or tap";
+    if (!qd_layout_same_data(a.fbs_pos, b.fbs_pos, tol) || !qd_layout_same_data(a.lbs_pos, b.lbs_pos, tol))
+        return "scatterers";
+    return "";
 }
 
 #endif
