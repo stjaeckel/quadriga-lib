@@ -77,6 +77,20 @@ class test_case(unittest.TestCase):
         H7 = quadriga_lib.layout.drop_terminals(layout_in=H, n_ut=4, bounds=bounds, per_cell=False, seed=2)  # by keyword
         self.assertTrue(same(H7, H1))
 
+    def test_cell(self):
+        # The micro sites of M.2412 Dense Urban config 3 have no cells of their own (uint32, 0)
+        D = quadriga_lib.layout.generate_layout("M.2412_DenseUrban", 0, options={"config": 3}, seed=4)
+        npt.assert_array_equal(D["tx"]["cell"], np.r_[np.ones(57), np.zeros(171)])
+        self.assertEqual(D["tx"]["cell"].dtype, np.uint32)
+        D1 = quadriga_lib.layout.drop_terminals(D, 1, seed=4)
+        self.assertEqual(D1["rx"]["pos"].shape, (3, 228))  # 4 UTs in each of the 57 macro cells
+        self.assertTrue(same(D1["tx"], D["tx"]))
+        D["tx"]["cell"] = np.zeros(228, dtype=np.uint32)
+        with self.assertRaisesRegex(ValueError, "Input 'layout' has no site with 'cell' = 1."):
+            quadriga_lib.layout.drop_terminals(D, 1)
+        D["tx"]["cell"] = None  # empty: all sites have cells
+        self.assertEqual(quadriga_lib.layout.drop_terminals(D, 1, seed=4)["rx"]["pos"].shape, (3, 228))
+
     def test_errors(self):
         H = self.H
         with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # bounds is keyword-only

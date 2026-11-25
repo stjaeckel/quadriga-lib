@@ -64,7 +64,7 @@ enum col_id : int
 {
     c_name, c_sector, c_x, c_y, c_z, c_time, c_bank, c_tilt, c_heading, c_direction_az, c_direction_el, c_speed,
     c_scenario, c_indoor, c_floor, c_d2d_in, c_d_clutter, c_r_clutter, c_h_clutter, c_scenpar, c_wrap, c_seed,
-    c_layout_seed, c_pairing, c_relative,
+    c_layout_seed, c_cell, c_pairing, c_relative,
     c_center_freq, c_antenna, c_qdant_file, c_qdant_id,
 #define QD_LAYOUT_X(name, kind, types) c_##name,
     QD_LAYOUT_ANTENNA_ARGS(QD_LAYOUT_X)

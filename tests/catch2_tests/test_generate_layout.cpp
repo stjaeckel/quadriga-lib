@@ -1056,14 +1056,48 @@ TEST_CASE("generate_layout - M.2412 Dense Urban micro layer")
         CHECK(Q.tx.n_node() == 228);
     }
 
-    // drop_terminals on the layout as returned (no scenario): every TRxP is a cell, here with exactly one UT
+    // The micro sites have no cells of their own: 'cell' is 1 for the macro and 0 for the micro TRxPs
+    REQUIRE(L.tx.cell.n_elem == 228);
+    CHECK(arma::all(L.tx.cell.head(57) == 1));
+    CHECK(arma::all(L.tx.cell.tail(171) == 0));
+    CHECK(M.tx.cell.is_empty());
+
+    // drop_terminals on the layout: as in generate_layout, a macro TRxP cell receives n_ut UTs for its own and for each
+    // of its micro TRxPs. Without scenarios, ut entry 1 is the minimum distance to all sites (as in generate_layout with
+    // the same entry); with UMa on the macro and UMi on the micro sites, the rules of generate_layout: 35 m from the
+    // macro sites and 10 m from the micro sites, both to d2D-out for building UTs
     auto D2 = gen("M.2412_DenseUrban", 0, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}});
-    quadriga_lib::drop_terminals(D2, 1, {}, {}, {}, {}, true, 4);
-    REQUIRE(D2.rx.n_node() == 228);
-    auto c2 = count_cells(D2);
-    CHECK(c2.back() == 0);
-    c2.pop_back();
-    CHECK(std::all_of(c2.begin(), c2.end(), [](arma::uword v) { return v == 1; }));
+    auto D3 = D2;
+    D3.tx.scenario.assign(228, "UMi");
+    std::fill(D3.tx.scenario.begin(), D3.tx.scenario.begin() + 57, "UMa");
+    quadriga_lib::drop_terminals(D2, 1, {}, {NaN, 20.0}, {}, {}, true, 4);
+    quadriga_lib::drop_terminals(D3, 1, {}, {}, {}, {}, true, 4);
+    const auto G2 = gen("M.2412_DenseUrban", 1, {}, {}, {}, {}, {NaN, 20.0}, {}, {{"config", {3.0}}});
+    for (const quadriga_lib::layout *X : std::vector<const quadriga_lib::layout *>{&D2, &D3, &G2})
+    {
+        REQUIRE(X->rx.n_node() == 228);
+        std::vector<int> n_in(58, 0);
+        ok = true;
+        for (arma::uword i = 0; i < 228; ++i)
+        {
+            const long long n = cell_oracle(M, SM, I, X->rx.pos(0, i), X->rx.pos(1, i));
+            ++n_in[n < 0 ? 57 : (size_t)n];
+            const bool b = !X->rx.indoor.is_empty() && (X->rx.indoor[i] == 1 || X->rx.indoor[i] == 3);
+            const double din = X == &D3 && b ? X->rx.d2d_in[i] : 0.0;
+            for (arma::uword s = 0; s < 190; ++s)
+                for (arma::uword k = 0; k < IL.n_cols; ++k)
+                    ok = ok && std::hypot(X->rx.pos(0, i) - S.xy(0, s) - IL(0, k), X->rx.pos(1, i) - S.xy(1, s) - IL(1, k)) - din >=
+                                   (X != &D3 ? 20.0 : (s < 19 ? 35.0 : 10.0)) - 1.0e-9;
+        }
+        CHECK(ok);
+        CHECK(n_in[57] == 0);
+        CHECK(std::all_of(n_in.begin(), n_in.end() - 1, [](int v) { return v == 4; }));
+    }
+    CHECK(D3.rx.indoor.n_elem == 228);
+    // In total: n_ut UTs over the macro cells
+    auto D4 = D2;
+    quadriga_lib::drop_terminals(D4, 50, {}, {}, {}, {}, false, 4);
+    CHECK(D4.rx.n_node() == 50);
 
     // Option h_micro
     const auto H = gen("M.2412_DenseUrban", 0, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}, {"h_micro", {6.0}}});

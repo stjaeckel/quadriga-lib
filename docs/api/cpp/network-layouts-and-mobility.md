@@ -46,6 +46,7 @@ A **layout** describes the nodes of a radio network and how they move: where eac
 | `indoor`, `floor`, `d2d_in` | | Indoor state (-1 or empty: draw, 0 outdoor, 1 building, 2 car, 3 residential building), floor from 1 (-1: from z), indoor 2D distance in m (NaN: draw); they change only where `scenario` or `indoor` changes |
 | `d_clutter`, `r_clutter`, `h_clutter`, `scenpar.<key>` | | Tx side: clutter inputs and overrides of scenario parameters, equal for all sectors of a site |
 | `seed`, `layout_seed`, `wrap` | | Tx side: seed of the site, seed of the layout, lattice vectors in m (`"ax,ay;bx,by"`) |
+| `cell` | | Tx side: 0 = the site has no drop cells of its own (see [drop_terminals](#drop_terminals)), default 1; equal for all sectors of a site |
 | `pairing` | | Rx side: names of the Tx sites linked to the terminal, empty: all |
 | `relative` | | 1: the orientation is relative to the direction of motion |
 | `center_freq`, `antenna`, `qdant_file`, `qdant_id` and the inputs of [generate_antenna](antennas-transducers-and-patterns.md#generate_antenna) | | Antenna columns, see below |
@@ -171,6 +172,7 @@ Not in: MATLAB, Python
 | `std::unordered_map<std::string, arma::vec> scenpar_override` | each `[n_node]` | Overrides of scenario parameters by key, NaN = none |
 | `arma::s64_vec seed` | `[n_node]` | Seed of the site, -1 = derived from the seed of the layout; empty = all -1 |
 | `arma::u32_vec relative` | `[n_node]` | 1 = orientation relative to the direction of motion; empty = all 0 |
+| `arma::u32_vec cell` | `[n_node]` | Tx side: 1 = the site has drop cells, 0 = none of its own ([drop_terminals](#drop_terminals)); equal for all sectors of a site; empty = all 1 |
 | `std::vector<std::string> extra_names` | `[n_extra]` | Names of unknown CSV columns |
 | `std::vector<std::vector<std::string>> extra` | `[n_extra][n_row]` | Their cells as text |
 
@@ -239,8 +241,8 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#drop_terminals) · [Pyt
 
 - Cells: the Voronoi regions of the sites (the Tx nodes of one name, at the position of their first row), with the wrap images when `layout.wrap` is set. A site with several sectors is split into wedges by the nearest sector heading (±60° around each boresight for three sectors at equal spacing)
 - Drop area: with two wrap vectors, the wrapped cluster, i.e. the points nearest to image 0 of a site among the images 0, ±a1, ±a2 and ±(a1 − a2); else `bounds`, which is then required. Given bounds limit the drop in both cases
-- The drop of [generate_layout](#generate_layout) applies in the cells of each site, with the rules of the scenario family in its `scenario` (minimum distance, heights and floors, speeds, O2I states). Sites without a family (no scenario, a conf name): height 1.5 m, no minimum distance, speed 0, no O2I state; their UTs get `indoor` -1, `floor` -1 and `d2d_in` NaN when other UTs have states
-- Every site is a cell, also the micro sites of `M.2412_DenseUrban` config 3 (whose own drop counts them with their macro TRxP). A site closer than twice the minimum distance to another one can leave a cell too little room, e.g. micro sites with the scenario `UMa` or `UMi` set; such a cell throws
+- The drop of [generate_layout](#generate_layout) applies in the cells of each site, with the rules of the scenario family in its `scenario` (minimum distance, heights and floors, speeds, O2I states). Sites without a family (no scenario, a conf name): height 1.5 m, no minimum distance, speed 0, no O2I state; their UTs get `indoor` -1, `floor` -1 and `d2d_in` NaN when other UTs have states. A site without a family has no minimum distance unless `ut` entry 1 gives one, and the distance kept from a site with `cell` = 0 follows that site's own family
+- Sites with `cell` = 0, e.g. the micro sites of `M.2412_DenseUrban` config 3, form no cells: with `per_cell`, each of their Tx nodes adds `n_ut` UTs to the cell that holds its position, as the drop of [generate_layout](#generate_layout) does (there 4 `n_ut` per macro TRxP cell), and the UTs keep the minimum distance of the site's family (`ut` entry 1 if given) from them. A site closer than twice the minimum distance to another one can leave a cell too little room; such a cell throws
 - The Rx side is replaced by the UTs `UT1`, `UT2`, ... (ordered by cell with `per_cell`) with the generic antenna; `pairing` and `links` are emptied. The Tx side, the antenna lists and `layout.seed` stay. A failed call leaves the layout unchanged
 - Random streams: the positions use the key `drop`, the heading and direction of a UT `ut|<name>`, its floor `floor|<family>|<name>`, the O2I fields `<purpose>|<family>`; the base of all is the seed of the call
 
@@ -323,9 +325,10 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#generate_layout) · [Py
   - The InF presets set `scenpar_override` `DS_VS` (V/S of the hall) and `absTOA_Lmax` (its largest dimension) on the Tx rows, the TR 38.901 InH presets `absTOA_Lmax` (the largest of length, width and the office height 3 m)
 - ITU-R M.2412 presets (Report M.2412-0, section 8.3 and Table 5), geometry and drop only; option `config` 1, 2, 3 for configurations A, B, C (default 1); mechanical tilt 0; minimum distance and O2I fields of the TR 38.901 model that the Report maps the environment to. `d2d_in` is the TR 38.901 minimum of two uniforms (library choice; the Report's model A at or below 6 GHz uses one uniform). The building-loss shares of Table 5 (20 % high, 80 % low loss) are set with `o2i_low = 0.8` of [init_link_states](#init_link_states), not by the preset:
   - `M.2412_InH`: as `38.901_InH_Open` with hUT 1.5 m, without scenario and `scenpar_override`
-  - `M.2412_DenseUrban`: as `38.901_UMa` with ISD 200 m; 80 % in buildings with floors, 20 % in cars at 30 km/h. Config 3 adds 3 micro sites per macro TRxP, uniform in its cell, one TRxP each, `h_micro` high (option, 10 m), at least 35 m from the macro sites and 20 m from each other; they form no cells: a macro TRxP cell receives `n_ut` UTs for itself and for each of its micro TRxPs, at least 10 m from the micro sites, over the whole macro layer (Table 5 b: within a cluster)
+  - `M.2412_DenseUrban`: as `38.901_UMa` with ISD 200 m; 80 % in buildings with floors, 20 % in cars at 30 km/h. Config 3 adds 3 micro sites per macro TRxP, uniform in its cell, one TRxP each, `h_micro` high (option, 10 m), at least 35 m from the macro sites and 20 m from each other; they form no cells (`cell` = 0): a macro TRxP cell receives `n_ut` UTs for itself and for each of its micro TRxPs, at least 10 m from the micro sites, over the whole macro layer (Table 5 b: within a cluster)
   - `M.2412_Rural`: as `38.901_RMa`, hUT 1.5 m; configs 1 and 2: 50 % in buildings, 50 % in cars at 120 km/h; config 3: ISD 6000 m, 40 % in buildings, 40 % outdoors, 20 % in cars at 30 km/h
   - `M.2412_UrbanMacro`: hBS 25 m, hUT 1.5 m; option `service` 1 (mMTC, default): ISD 500 m (config 1) or 1732 m (config 2), 80 % in buildings, 3 km/h; 2 (URLLC, configs 1 and 2): ISD 500 m, 20 % in buildings, outdoors 30 km/h
+  - The M.2412 layouts carry no scenario, so a re-drop with [drop_terminals](#drop_terminals) reproduces the distances of the preset only with `ut` entry 1 (e.g. 35 m) or with the scenario `UMa` on the macro rows and `UMi` on the micro rows
 - TR 37.885 presets (Table A-1, clause 6.1.2, option A), roads and vehicles, no BSs; `n_ut` must be 0, the vehicles follow from the gaps:
   - `37.885_Urban`: road grid of `spacing` 433 × 250 m in an `area` of 1299 × 750 m, centred, 2 lanes per direction of 3.5 m, sidewalks 3 m, 60 km/h
   - `37.885_Highway`: `area` length 2000 m along x, 3 lanes per direction of 4 m, 140 km/h, `wrap` along the road

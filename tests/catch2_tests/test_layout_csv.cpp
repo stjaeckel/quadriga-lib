@@ -500,6 +500,36 @@ TEST_CASE("layout_csv_read - seeds, pairing, wrap and scenario parameters")
     CHECK(has(err("name,x,y,z,scenpar.DS_VS\nA,0,0,0,x\n", ""), "line 2, column 'scenpar.DS_VS' is not numeric"));
 }
 
+TEST_CASE("layout_csv_read - the cell column")
+{
+    // A Fixed Tx column: empty = 1; equal for the sectors of a site; written only if a site has 0
+    qd_layout_files dir("read_cell");
+    const std::string tx = "name,sector,x,y,z,cell\nA,0,0,0,25,\nA,1,,,,\nB,0,100,0,10,0\nC,0,200,0,10,1\n";
+    const quadriga_lib::layout L = read_text(dir, tx, "");
+    CHECK(arma::all(L.tx.cell == arma::u32_vec{1, 1, 0, 1}));
+    CHECK(L.is_valid() == "");
+    CHECK(read_text(dir, "name,x,y,z,cell\nA,0,0,0,1\n", "").tx.cell.is_empty()); // All 1 = empty
+
+    quadriga_lib::layout_csv_write(dir.path("w.csv"), "", L);
+    const std::string w = dir.read("w.csv");
+    CHECK(has(w, "name,sector,x,y,z,cell\n"));
+    CHECK(has(w, "\nB,0,100,0,10,0\nC,0,200,0,10,\n"));
+    CHECK(arma::all(quadriga_lib::layout_csv_read(dir.path("w.csv"), "", {}, false).tx.cell == L.tx.cell));
+    quadriga_lib::layout_csv_write(dir.path("w.csv"), "", L, false); // Every cell written
+    CHECK(has(dir.read("w.csv"), ",cell"));
+    CHECK(arma::all(quadriga_lib::layout_csv_read(dir.path("w.csv"), "", {}, false).tx.cell == L.tx.cell));
+    quadriga_lib::layout M = L;
+    M.tx.cell.reset();
+    quadriga_lib::layout_csv_write(dir.path("w.csv"), "", M);
+    CHECK(!has(dir.read("w.csv"), "cell"));
+
+    auto err = [&](const std::string &t, const std::string &r) { return qd_layout_throws([&] { read_text(dir, t, r); }); };
+    CHECK(has(err("", "name,x,y,z,cell\nU,0,0,0,1\n"), "the column 'cell' is only used in the Tx file"));
+    CHECK(has(err("name,x,y,z,cell\nA,0,0,0,2\n", ""), "line 2, column 'cell'"));
+    CHECK(has(err("name,x,y,z,cell\nA,0,0,0,0\nA,1,0,0,1\n", ""), "differs from the first row of the node"));
+    CHECK(has(err("name,sector,x,y,z,cell\nA,0,0,0,0,0\nA,1,0,0,0,1\n", ""), "must have equal 'cell'"));
+}
+
 // ---- Writer ----
 
 TEST_CASE("layout_csv_write - the file text")
@@ -856,6 +886,11 @@ TEST_CASE("is_valid - input validation")
     CHECK(has(msg([](LL &L) { L.tx.clutter.set_size(3, 2); }), "'clutter'"));
     CHECK(has(msg([](LL &L) { L.tx.scenpar_override["DS_VS"] = arma::vec{1.0}; }), "'DS_VS'"));
     CHECK(has(msg([](LL &L) { L.tx.seed = {1, 2}; }), "'seed'"));
+    CHECK(has(msg([](LL &L) { L.tx.cell = {1, 1}; }), "'cell'"));
+    CHECK(has(msg([](LL &L) { L.tx.cell = {1, 1, 2}; }), "Member 'cell' must be 0 or 1."));
+    CHECK(has(msg([](LL &L) { L.tx.cell = {1, 0, 1}; }), "tx: Nodes 'BS1' (sectors 0 and 1): must have equal 'cell'."));
+    CHECK(has(msg([](LL &L) { L.rx.cell = {1, 1}; }), "rx: Member 'cell' is a member of the Tx side and must be empty."));
+    CHECK(msg([](LL &L) { L.tx.cell = {0, 0, 1}; }) == "");
     CHECK(has(msg([](LL &L) { L.tx.extra_names = {"a"}; }), "'extra_names' and 'extra'"));
     CHECK(has(msg([](LL &L) { L.tx.extra_names = {"a"}; L.tx.extra = {{"1"}}; }), "one cell per row"));
     // Offsets and values

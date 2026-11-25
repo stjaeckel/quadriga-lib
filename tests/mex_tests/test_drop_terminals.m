@@ -21,6 +21,18 @@ assertTrue( isempty( L.rx.pos ) );
 Lg = quadriga_lib.generate_layout( '38.901_UMa', 2, [], [ 1, NaN, 3 ], [], [], [], [], [], true, 9 );
 assertTrue( isequaln( L1, Lg ) );
 
+%% The member tx.cell: the micro sites of M.2412 Dense Urban config 3 have no cells of their own (uint32, 0)
+D = quadriga_lib.generate_layout( 'M.2412_DenseUrban', 0, [], [], [], [], [], [], struct( 'config', 3 ), true, 4 );
+assertEqual( D.tx.cell, uint32( [ ones( 57, 1 ); zeros( 171, 1 ) ] ) );
+D1 = quadriga_lib.drop_terminals( D, 1, [], [], [], [], true, 4 );
+assertEqual( size( D1.rx.pos ), [ 3, 228 ] );                                   % 4 UTs in each of the 57 macro cells
+assertEqual( D1.tx, D.tx );
+D.tx.cell = [];                                                                 % empty: all sites have cells
+D2 = quadriga_lib.drop_terminals( D, 1, [], [], [], [], true, 4 );
+assertEqual( size( D2.rx.pos ), [ 3, 228 ] );
+D.tx.cell = uint32( zeros( 228, 1 ) );
+assert_throws( @() quadriga_lib.drop_terminals( D, 1 ), 'Input ''layout'' has no site with ''cell'' = 1.' );
+
 %% Optional inputs: bounds, ut, per_cell and seed
 H = quadriga_lib.generate_layout( '38.901_InH_Open', 0, [], [], [], [], [], [], [], true, 5 );
 H1 = quadriga_lib.drop_terminals( H, 4, [ -60, 60, -25, 25 ], [], [], [], false, 2 );

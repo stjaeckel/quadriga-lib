@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// drop_terminals: the UT drop into the cells of any Tx side.
+// drop_terminals: the UT drop into the cells of any Tx side, also with sites that have no cells of their own.
 //
 // Oracles: the cell of each UT by brute force (the nearest site over the sites and wrap images, then the sector wedge
 // written out per site in the test); the areas of the cells by counting the points of a fine grid, for the shares of a
@@ -313,4 +313,62 @@ TEST_CASE("drop_terminals - rules from the scenarios of the sites")
     }
     CHECK(ok);
     CHECK(L.is_valid() == "");
+}
+
+TEST_CASE("drop_terminals - a site with cell = 0 has no cells")
+{
+    // BS2 at (230, 40) has no cell: its position lies in a cell of another site, which receives n_ut UTs for itself and
+    // n_ut for BS2; no UT is closer to BS2 than the minimum distance of its family (UMi: 10 m, TR 38.901 Table 7.2-1),
+    // or than ut entry 1 if given. The other sites have no scenario
+    auto L = hand_built();
+    L.tx.cell = {1, 1, 1, 0, 1, 1, 1, 1, 1};
+    L.tx.scenario = {"", "", "", "UMi", "", "", "", "", ""};
+    auto min_to_bs2 = [](const quadriga_lib::layout &X)
+    {
+        double d = arma::datum::inf;
+        for (arma::uword i = 0; i < X.rx.n_node(); ++i)
+            d = std::min(d, std::hypot(X.rx.pos(0, i) - 230.0, X.rx.pos(1, i) - 40.0));
+        return d;
+    };
+    auto A = L;
+    quadriga_lib::drop_terminals(A, 3, BOUNDS, {}, {}, {}, true, 6);
+    REQUIRE(A.rx.n_node() == 27); // 8 cells of 3 UTs and 3 more for BS2
+    CHECK(min_to_bs2(A) >= 10.0 - 1.0e-9);
+    // The cell that holds BS2: the nearest of the other sites, BS1 at (0, 0) (233 m; BS3 at 60, 210: 240 m), in the wedge
+    // of its sector 0 (30 deg; the azimuth of BS2 seen from BS1 is 9.9 deg)
+    std::vector<arma::uword> n_in(9, 0);
+    for (arma::uword i = 0; i < 27; ++i)
+    {
+        double best = arma::datum::inf;
+        arma::uword s_best = 0;
+        const double sx[] = {0.0, 60.0, -150.0}, sy[] = {0.0, 210.0, 120.0};
+        for (arma::uword s = 0; s < 3; ++s)
+        {
+            const double d = std::hypot(A.rx.pos(0, i) - sx[s], A.rx.pos(1, i) - sy[s]);
+            if (d < best)
+                best = d, s_best = s;
+        }
+        const double az = std::atan2(A.rx.pos(1, i) - sy[s_best], A.rx.pos(0, i) - sx[s_best]);
+        arma::uword n = 0;
+        if (s_best == 0)
+            n = std::abs(qd_layout_wrap(az - 30.0 * D)) < 60.0 * D ? 0 : (std::abs(qd_layout_wrap(az - 150.0 * D)) < 60.0 * D ? 1 : 2);
+        else if (s_best == 1)
+            n = std::abs(qd_layout_wrap(az)) < 90.0 * D ? 4 : 5;
+        else
+            n = std::abs(qd_layout_wrap(az)) < 60.0 * D ? 6 : (std::abs(qd_layout_wrap(az - 120.0 * D)) < 60.0 * D ? 7 : 8);
+        ++n_in[n];
+    }
+    CHECK(n_in == std::vector<arma::uword>{6, 3, 3, 0, 3, 3, 3, 3, 3});
+
+    // ut entry 1 applies to all sites; in total: n_ut UTs
+    auto B = L;
+    quadriga_lib::drop_terminals(B, 40, BOUNDS, {NaN, 30.0}, {}, {}, false, 6);
+    CHECK(B.rx.n_node() == 40);
+    CHECK(min_to_bs2(B) >= 30.0 - 1.0e-9);
+
+    // No site with a cell
+    auto C = L;
+    C.tx.cell.zeros();
+    CHECK(has(qd_layout_throws([&] { quadriga_lib::drop_terminals(C, 1, BOUNDS); }), "Input 'layout' has no site with 'cell' = 1."));
+    CHECK(qd_layout_throws([&] { quadriga_lib::drop_terminals(C, 0, BOUNDS); }).empty());
 }

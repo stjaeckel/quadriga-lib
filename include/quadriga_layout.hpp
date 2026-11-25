@@ -40,6 +40,7 @@ namespace quadriga_lib
         std::unordered_map<std::string, arma::vec> scenpar_override; // Scenario parameter overrides by key, NaN = none, each [n_node]
         arma::s64_vec seed;                               // Site seed, -1 = derived from the layout seed, [n_node]; empty = all -1
         arma::u32_vec relative;                           // 1 = orientation relative to the direction of motion, [n_node]; empty = all 0
+        arma::u32_vec cell;                               // Tx side: 1 = the site has drop cells, 0 = none of its own, [n_node]; empty = all 1
         std::vector<std::string> extra_names;             // Names of unknown columns that were kept, [n_extra]
         std::vector<std::vector<std::string>> extra;      // Their cells as text, [n_extra][n_row]
 
@@ -214,6 +215,7 @@ namespace quadriga_lib
     // Drop UTs into the cells of the Tx side of a layout, replacing the Rx side
     // - Cells are the Voronoi regions of the sites (with the wrap images), split into wedges around the sector headings
     // - The scenario family of each site gives the rules of the drop in its cells, as in generate_layout
+    // - Sites with cell = 0 form no cells; with per_cell, each of their nodes adds n_ut UTs to the cell that holds it
     void drop_terminals(
         layout &layout,                         // Layout, updated in place: Rx side replaced, pairing and links emptied
         arma::uword n_ut,                       // UTs per cell (per_cell) or in total

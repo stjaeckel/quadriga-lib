@@ -173,6 +173,7 @@ namespace quadriga_lib
         std::unordered_map<std::string, arma::vec> scenpar_override; // Scenario parameter overrides by key, NaN = none, each [n_node]
         arma::s64_vec seed;                 // Site seed, -1 = derived from layout.seed, [n_node]; empty = all -1
         arma::u32_vec relative;             // 1 = orientation relative to the motion, [n_node]; empty = all 0
+        arma::u32_vec cell;                 // Tx side: 1 = the site has drop cells, 0 = none of its own, [n_node]; empty = all 1
         std::vector<std::string> extra_names;        // Names of kept columns, [n_extra]
         std::vector<std::vector<std::string>> extra; // Their raw cells, [n_extra][n_row]
 
@@ -326,6 +327,7 @@ All columns are defined in one central table in `src/qd_layout.cpp`, with name, 
 | `wrap` | Fixed, Tx side | matrix | m | `"ax,ay;bx,by"` or `"ax,ay"`, one vector per cell row; all non-empty cells equal |
 | `seed` | Fixed, Tx side | integer | | Seed of the site; empty = derived from the layout seed and the site name |
 | `layout_seed` | Fixed, Tx side | integer | | `layout.seed`; all non-empty cells equal; the writer puts it on the first Tx row |
+| `cell` | Fixed, Tx side | integer | | 0 = the site has no drop cells of its own (`drop_terminals`; the micro sites of `M.2412_DenseUrban` config 3); default 1; equal for all sectors of a site; not part of the link hash |
 | `pairing` | Fixed, Rx side | list | | Names of the Tx sites linked to this terminal; empty = all (`layout.pairing`) |
 | `relative` | Fixed | integer | | 1 = orientation relative to the direction of motion (section 6.1); default 0 |
 | `antenna` | Fixed | text | | `generate_antenna` type, or `qdant` |
@@ -567,6 +569,8 @@ void drop_terminals(
 ```
 
 It applies the drop of section 7.4 to any Tx side. Cells are the Voronoi regions of the sites, split into 120° wedges for three-sector sites. With wrap vectors, the wrapped cluster bounds the drop; without them, `bounds` does. Hand-placed BS layouts have no wrap vectors, so `bounds` is needed in most custom uses and is a direct argument. It is not called `area`, which in `generate_layout` means the size of a hall.
+
+Added in the implementation: sites with `cell` = 0 form no cells; each of their nodes adds `n_ut` UTs to the cell that holds it (4 `n_ut` per macro cell in M.2412 Dense Urban config C, as the generator drops), and the UTs keep the minimum distance of the site's own family, or `ut` entry 1. A site without a family has no minimum distance unless `ut` entry 1 gives one.
 
 ### 7.3 Hexagonal geometry
 

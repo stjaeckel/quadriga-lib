@@ -578,6 +578,56 @@ quadriga_lib::layout_nodes qd_drop(const quadriga_lib::layout_nodes &tx, const s
     return R;
 }
 
+// The drop into the cells of the sites with 'cell' = 1 of a Tx side (valid); 'rules' per Tx node. The nodes of the other
+// sites form no cells: the UTs keep the minimum distance pd[i] from them (to d2D-out with the d2D-out rule of the cell),
+// and with 'per_cell' each counts as one more TRxP of the cell that holds its first position
+quadriga_lib::layout_nodes qd_drop_sites(const quadriga_lib::layout_nodes &tx, const std::vector<qd_rules> &rules, const std::vector<double> &pd,
+                                         const arma::mat &wrap, const arma::vec &bounds, const qd_ut_values &o, arma::uword n_ut, bool per_cell,
+                                         arma::sword seed)
+{
+    std::vector<arma::uword> keep;
+    for (arma::uword i = 0; i < tx.n_node(); ++i)
+        if (tx.cell.is_empty() || tx.cell[i] == 1)
+            keep.push_back(i);
+    if (keep.empty())
+        throw std::invalid_argument("Input 'layout' has no site with 'cell' = 1.");
+
+    // The nodes with cells, one row each: the first row of the node
+    const arma::uword m = (arma::uword)keep.size();
+    quadriga_lib::layout_nodes T;
+    T.name.resize(m), T.sector.set_size(m), T.i_antenna.zeros(m), T.offset = arma::regspace<arma::uvec>(0, m - 1);
+    T.pos.set_size(3, m), T.orientation.set_size(3, m);
+    for (arma::uword k = 0; k < m; ++k)
+    {
+        const arma::uword i = keep[k], r = tx.offset[i];
+        T.name[k] = tx.name[i], T.sector[k] = tx.sector[i];
+        T.pos.col(k) = tx.pos.col(r), T.orientation.col(k) = tx.orientation.col(r);
+    }
+    size_t n_site = 0;
+    const std::vector<size_t> site = qd_layout::site_of_node(T, &n_site);
+    std::vector<qd_rules> R(n_site);
+    for (arma::uword k = 0; k < m; ++k)
+        R[site[k]] = rules[keep[k]];
+
+    qd_cells C = qd_make_cells(T, site, n_site, wrap, bounds);
+    std::vector<arma::uword> weight;
+    if (m < tx.n_node())
+    {
+        weight.assign(m, 1);
+        for (arma::uword i = 0; i < tx.n_node(); ++i)
+            if (tx.cell[i] != 1)
+            {
+                const arma::uword r = tx.offset[i];
+                C.px.push_back(tx.pos(0, r)), C.py.push_back(tx.pos(1, r)), C.pd.push_back(pd[i]);
+                double d = 0.0;
+                const long long c = C.cell(tx.pos(0, r), tx.pos(1, r), d);
+                if (c >= 0)
+                    ++weight[(size_t)c];
+            }
+    }
+    return qd_drop(T, site, C, R, o, n_ut, per_cell, seed, weight);
+}
+
 // ---- Presets ----
 
 struct qd_preset;
@@ -593,10 +643,8 @@ struct qd_geometry_args
 // What a builder returns besides the layout
 struct qd_build_out
 {
-    arma::vec bounds;            // Bounds of the drop [x_min, x_max, y_min, y_max]; empty = the wrapped cluster
-    arma::uword n_cell_node = 0; // The first Tx nodes that form the cells of the drop; 0 = all
-    std::vector<double> pd;      // The other Tx nodes (sites without cells, one node each): minimum distance of the UTs in [m]
-    std::vector<arma::uword> pcell; // and the cell (Tx node) that holds each; it counts as one more TRxP of that cell
+    arma::vec bounds;   // Bounds of the drop [x_min, x_max, y_min, y_max]; empty = the wrapped cluster
+    double pd = qd_nan; // Minimum distance of the UTs to the sites with 'cell' = 0 in [m]
 };
 
 // A builder writes the Tx side and the wrap vectors of a layout (roads: also the Rx side)
@@ -917,11 +965,9 @@ void qd_build_dense_urban(const qd_preset &p, const qd_geometry_args &a, quadrig
         T.pos(0, i) = M[j].x, T.pos(1, i) = M[j].y, T.pos(2, i) = h_micro;
         T.orientation(0, i) = 0.0, T.orientation(1, i) = 0.0, T.orientation(2, i) = 0.0;
     }
-    out.n_cell_node = n0;
-    out.pd.assign(M.size(), d_min_micro);
-    out.pcell.resize(M.size());
-    for (size_t j = 0; j < M.size(); ++j)
-        out.pcell[j] = M[j].cell;
+    T.cell.ones(nn);
+    T.cell.tail(nn - n0).zeros();
+    out.pd = d_min_micro;
 }
 
 // Roads of TR 37.885 Annex A with vehicles, no BSs. Highway: a straight road along x, centred at the origin, wrapped
@@ -1174,9 +1220,10 @@ Network layout from a preset: BS sites and a drop of UTs
   - The InF presets set `scenpar_override` `DS_VS` (V/S of the hall) and `absTOA_Lmax` (its largest dimension) on the Tx rows, the TR 38.901 InH presets `absTOA_Lmax` (the largest of length, width and the office height 3 m)
 - ITU-R M.2412 presets (Report M.2412-0, section 8.3 and Table 5), geometry and drop only; option `config` 1, 2, 3 for configurations A, B, C (default 1); mechanical tilt 0; minimum distance and O2I fields of the TR 38.901 model that the Report maps the environment to. `d2d_in` is the TR 38.901 minimum of two uniforms (library choice; the Report's model A at or below 6 GHz uses one uniform). The building-loss shares of Table 5 (20 % high, 80 % low loss) are set with `o2i_low = 0.8` of [[init_link_states]], not by the preset:
   - `M.2412_InH`: as `38.901_InH_Open` with hUT 1.5 m, without scenario and `scenpar_override`
-  - `M.2412_DenseUrban`: as `38.901_UMa` with ISD 200 m; 80 % in buildings with floors, 20 % in cars at 30 km/h. Config 3 adds 3 micro sites per macro TRxP, uniform in its cell, one TRxP each, `h_micro` high (option, 10 m), at least 35 m from the macro sites and 20 m from each other; they form no cells: a macro TRxP cell receives `n_ut` UTs for itself and for each of its micro TRxPs, at least 10 m from the micro sites, over the whole macro layer (Table 5 b: within a cluster)
+  - `M.2412_DenseUrban`: as `38.901_UMa` with ISD 200 m; 80 % in buildings with floors, 20 % in cars at 30 km/h. Config 3 adds 3 micro sites per macro TRxP, uniform in its cell, one TRxP each, `h_micro` high (option, 10 m), at least 35 m from the macro sites and 20 m from each other; they form no cells (`cell` = 0): a macro TRxP cell receives `n_ut` UTs for itself and for each of its micro TRxPs, at least 10 m from the micro sites, over the whole macro layer (Table 5 b: within a cluster)
   - `M.2412_Rural`: as `38.901_RMa`, hUT 1.5 m; configs 1 and 2: 50 % in buildings, 50 % in cars at 120 km/h; config 3: ISD 6000 m, 40 % in buildings, 40 % outdoors, 20 % in cars at 30 km/h
   - `M.2412_UrbanMacro`: hBS 25 m, hUT 1.5 m; option `service` 1 (mMTC, default): ISD 500 m (config 1) or 1732 m (config 2), 80 % in buildings, 3 km/h; 2 (URLLC, configs 1 and 2): ISD 500 m, 20 % in buildings, outdoors 30 km/h
+  - The M.2412 layouts carry no scenario, so a re-drop with [[drop_terminals]] reproduces the distances of the preset only with `ut` entry 1 (e.g. 35 m) or with the scenario `UMa` on the macro rows and `UMi` on the micro rows
 - TR 37.885 presets (Table A-1, clause 6.1.2, option A), roads and vehicles, no BSs; `n_ut` must be 0, the vehicles follow from the gaps:
   - `37.885_Urban`: road grid of `spacing` 433 × 250 m in an `area` of 1299 × 750 m, centred, 2 lanes per direction of 3.5 m, sidewalks 3 m, 60 km/h
   - `37.885_Highway`: `area` length 2000 m along x, 3 lanes per direction of 4 m, 140 km/h, `wrap` along the road
@@ -1267,38 +1314,12 @@ quadriga_lib::layout quadriga_lib::generate_layout(const std::string &type, arma
         return L;
     qd_check_n_ut(n_ut, L.tx.n_node(), per_cell);
 
-    // The Tx nodes that form the cells; the others are sites without cells, each counted as a TRxP of its cell
-    const arma::uword n_cell = out.n_cell_node == 0 ? L.tx.n_node() : out.n_cell_node;
-    layout_nodes T;
-    if (n_cell < L.tx.n_node())
-    {
-        T.name.assign(L.tx.name.begin(), L.tx.name.begin() + (long long)n_cell);
-        T.sector = L.tx.sector.head(n_cell), T.i_antenna = L.tx.i_antenna.head(n_cell), T.offset = L.tx.offset.head(n_cell);
-        T.pos = L.tx.pos.head_cols(n_cell), T.orientation = L.tx.orientation.head_cols(n_cell);
-    }
-    const layout_nodes &cells = n_cell < L.tx.n_node() ? T : L.tx;
-    size_t n_site = 0;
-    const std::vector<size_t> site = qd_layout::site_of_node(cells, &n_site);
-    std::vector<qd_rules> rules(n_site, qd_rules_of(p.drop, p.family));
+    // The micro sites ('cell' = 0) keep their minimum distance, ut entry 1 if given
+    std::vector<qd_rules> rules(L.tx.n_node(), qd_rules_of(p.drop, p.family));
     const qd_ut_values o = qd_apply_args(rules, ut, indoor, rest, by);
-
     if (n_ut > 0)
-    {
-        qd_cells C = qd_make_cells(cells, site, n_site, L.wrap, out.bounds);
-        std::vector<arma::uword> weight;
-        if (n_cell < L.tx.n_node())
-        {
-            weight.assign(n_cell, 1);
-            for (arma::uword j = 0; j < (arma::uword)out.pd.size(); ++j)
-            {
-                const arma::uword r = L.tx.offset[n_cell + j];
-                C.px.push_back(L.tx.pos(0, r)), C.py.push_back(L.tx.pos(1, r));
-                C.pd.push_back(std::isnan(o.d_min) ? out.pd[j] : o.d_min);
-                ++weight[out.pcell[j]];
-            }
-        }
-        L.rx = qd_drop(cells, site, C, rules, o, n_ut, per_cell, L.seed, weight);
-    }
+        L.rx = qd_drop_sites(L.tx, rules, std::vector<double>(L.tx.n_node(), std::isnan(o.d_min) ? out.pd : o.d_min), L.wrap, out.bounds, o,
+                             n_ut, per_cell, L.seed);
     return L;
 }
 
@@ -1308,8 +1329,8 @@ Drop UTs into the cells of the Tx side of a layout
 
 - Cells: the Voronoi regions of the sites (the Tx nodes of one name, at the position of their first row), with the wrap images when `layout.wrap` is set. A site with several sectors is split into wedges by the nearest sector heading (±60° around each boresight for three sectors at equal spacing)
 - Drop area: with two wrap vectors, the wrapped cluster, i.e. the points nearest to image 0 of a site among the images 0, ±a1, ±a2 and ±(a1 − a2); else `bounds`, which is then required. Given bounds limit the drop in both cases
-- The drop of [[generate_layout]] applies in the cells of each site, with the rules of the scenario family in its `scenario` (minimum distance, heights and floors, speeds, O2I states). Sites without a family (no scenario, a conf name): height 1.5 m, no minimum distance, speed 0, no O2I state; their UTs get `indoor` -1, `floor` -1 and `d2d_in` NaN when other UTs have states
-- Every site is a cell, also the micro sites of `M.2412_DenseUrban` config 3 (whose own drop counts them with their macro TRxP). A site closer than twice the minimum distance to another one can leave a cell too little room, e.g. micro sites with the scenario `UMa` or `UMi` set; such a cell throws
+- The drop of [[generate_layout]] applies in the cells of each site, with the rules of the scenario family in its `scenario` (minimum distance, heights and floors, speeds, O2I states). Sites without a family (no scenario, a conf name): height 1.5 m, no minimum distance, speed 0, no O2I state; their UTs get `indoor` -1, `floor` -1 and `d2d_in` NaN when other UTs have states. A site without a family has no minimum distance unless `ut` entry 1 gives one, and the distance kept from a site with `cell` = 0 follows that site's own family
+- Sites with `cell` = 0, e.g. the micro sites of `M.2412_DenseUrban` config 3, form no cells: with `per_cell`, each of their Tx nodes adds `n_ut` UTs to the cell that holds its position, as the drop of [[generate_layout]] does (there 4 `n_ut` per macro TRxP cell), and the UTs keep the minimum distance of the site's family (`ut` entry 1 if given) from them. A site closer than twice the minimum distance to another one can leave a cell too little room; such a cell throws
 - The Rx side is replaced by the UTs `UT1`, `UT2`, ... (ordered by cell with `per_cell`) with the generic antenna; `pairing` and `links` are emptied. The Tx side, the antenna lists and `layout.seed` stay. A failed call leaves the layout unchanged
 - Random streams: the positions use the key `drop`, the heading and direction of a UT `ut|<name>`, its floor `floor|<family>|<name>`, the O2I fields `<purpose>|<family>`; the base of all is the seed of the call
 
@@ -1354,18 +1375,20 @@ void quadriga_lib::drop_terminals(layout &layout, arma::uword n_ut, const arma::
         throw std::invalid_argument("Input 'seed' must be >= -1.");
     qd_check_n_ut(n_ut, layout.tx.n_node(), per_cell);
 
-    size_t n_site = 0;
-    const std::vector<size_t> site = qd_layout::site_of_node(layout.tx, &n_site);
-    std::vector<qd_rules> rules(n_site, qd_rules_of_scenario(""));
+    const arma::uword n_node = layout.tx.n_node();
+    std::vector<qd_rules> rules(n_node, qd_rules_of_scenario(""));
     if (!layout.tx.scenario.empty())
-        for (arma::uword i = 0; i < layout.tx.n_node(); ++i)
-            rules[site[i]] = qd_rules_of_scenario(layout.tx.scenario[layout.tx.offset[i]]);
+        for (arma::uword i = 0; i < n_node; ++i)
+            rules[i] = qd_rules_of_scenario(layout.tx.scenario[layout.tx.offset[i]]);
     const qd_ut_values o = qd_apply_args(rules, ut, indoor, options, "the scenarios of the layout");
+    std::vector<double> pd(n_node); // Sites without cells: the minimum distance of their family
+    for (arma::uword i = 0; i < n_node; ++i)
+        pd[i] = rules[i].v.d_min;
 
     const arma::sword s = seed >= 0 ? seed : qd_resolve_seed(layout.seed);
     layout_nodes R;
     if (n_ut > 0)
-        R = qd_drop(layout.tx, site, qd_make_cells(layout.tx, site, n_site, layout.wrap, bounds), rules, o, n_ut, per_cell, s);
+        R = qd_drop_sites(layout.tx, rules, pd, layout.wrap, bounds, o, n_ut, per_cell, s);
     layout.rx = std::move(R);
     layout.pairing.reset();
     layout.links.reset();

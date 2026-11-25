@@ -356,7 +356,7 @@ side_data qd_read_side(const std::string &fn, bool is_tx, std::vector<std::strin
                     throw std::runtime_error(T.where(R_n[k], col) + " differs from the first row of the node" + who + ".");
             out[n] = value;
         };
-        for (int id : {c_d_clutter, c_r_clutter, c_h_clutter, c_relative})
+        for (int id : {c_d_clutter, c_r_clutter, c_h_clutter, c_cell, c_relative})
             if (ci[id] != (int)npos)
                 fixed((size_t)ci[id], F.v[id], column_of(id).dflt, [&](size_t r) { return cell_number(T, r, (size_t)ci[id], id); });
         if (ci[c_seed] != (int)npos)
@@ -810,6 +810,7 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
     add_if(c_wrap, is_tx && !L.wrap.is_empty());
     add_if(c_seed, qd_has_value(F.seed, -1LL));
     add_if(c_layout_seed, is_tx && L.seed != -1);
+    add_if(c_cell, is_tx && qd_has_value(F.v[c_cell], 1.0));
     add_if(c_pairing, !is_tx && !L.pairing.is_empty());
     add_if(c_relative, qd_has_value(F.v[c_relative], 0.0));
     for (int id = c_center_freq; id < n_col; ++id)
@@ -923,7 +924,8 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
                         continue;
                     cellt = id == c_wrap ? qd_csv::format_matrix(L.wrap.t()) : std::to_string((long long)L.seed);
                 }
-                else if (id == -1 || id == c_d_clutter || id == c_r_clutter || id == c_h_clutter || id == c_seed || id == c_pairing || id == c_relative)
+                else if (id == -1 || id == c_d_clutter || id == c_r_clutter || id == c_h_clutter || id == c_seed || id == c_cell || id == c_pairing ||
+                         id == c_relative)
                 {
                     // Fixed values: on the first row (on all rows if not compact); the default only for an extra sector
                     if (compact && k > 0)

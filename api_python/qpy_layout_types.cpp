@@ -149,7 +149,7 @@ static inline py::object qd_pl_wr(const std::string &x) { return py::str(x); }
 #define QD_PL_NODES(X)                                                                                                 \
     X(name, 0) X(sector, 0) X(i_antenna, 0) X(offset, 0) X(pos, 0) X(orientation, 0) X(direction, 0) X(speed, 0)       \
     X(time, 0) X(scenario, 0) X(indoor, 0) X(floor, 0) X(d2d_in, 0) X(clutter, 0) X(scenpar_override, 1) X(seed, 0)    \
-    X(relative, 0) X(extra_names, 0) X(extra, 1)
+    X(relative, 0) X(cell, 0) X(extra_names, 0) X(extra, 1)
 #define QD_PL_LINKS(X)                                                                                                 \
     X(i_tx, 0) X(i_rx, 0) X(i_segment, 0) X(image, 0) X(i_conf, 0) X(conf_names, 0) X(los, 0) X(indoor, 0)             \
     X(floor_id, 0) X(d2d_in, 0) X(o2i_rnd, 0) X(o2i_model, 0) X(gbsm_seed, 0) X(seed, 1) X(method, 0) X(sos_preset, 0) \

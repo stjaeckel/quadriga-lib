@@ -149,7 +149,7 @@ inline void qd_mex_layout_put(mxArray *, const char *, const T &, std::integral_
 #define QD_ML_NODES(X)                                                                                                    \
     X(name, 0) X(sector, 0) X(i_antenna, 0) X(offset, 1) X(pos, 0) X(orientation, 0) X(direction, 0) X(speed, 0) X(time, 0) \
     X(scenario, 0) X(indoor, 0) X(floor, 0) X(d2d_in, 0) X(clutter, 0) X(scenpar_override, 2) X(seed, 0) X(relative, 0)     \
-    X(extra_names, 0) X(extra, 2)
+    X(cell, 0) X(extra_names, 0) X(extra, 2)
 #define QD_ML_LINKS(X)                                                                                                    \
     X(i_tx, 1) X(i_rx, 1) X(i_segment, 1) X(image, 0) X(i_conf, 1) X(conf_names, 0) X(los, 0) X(indoor, 0) X(floor_id, 0)   \
     X(d2d_in, 0) X(o2i_rnd, 0) X(o2i_model, 1) X(gbsm_seed, 0) X(seed, 2) X(method, 0) X(sos_preset, 0) X(anchor_freq, 2)    \

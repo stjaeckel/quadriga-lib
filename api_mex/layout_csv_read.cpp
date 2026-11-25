@@ -34,6 +34,7 @@ A **layout** describes the nodes of a radio network and how they move: where eac
 | `indoor`, `floor`, `d2d_in` | | Indoor state (-1 or empty: draw, 0 outdoor, 1 building, 2 car, 3 residential building), floor from 1 (-1: from z), indoor 2D distance in m (NaN: draw); they change only where `scenario` or `indoor` changes |
 | `d_clutter`, `r_clutter`, `h_clutter`, `scenpar.<key>` | | Tx side: clutter inputs and overrides of scenario parameters, equal for all sectors of a site |
 | `seed`, `layout_seed`, `wrap` | | Tx side: seed of the site, seed of the layout, lattice vectors in m (`"ax,ay;bx,by"`) |
+| `cell` | | Tx side: 0 = the site has no drop cells of its own (see [[drop_terminals]]), default 1; equal for all sectors of a site |
 | `pairing` | | Rx side: names of the Tx sites linked to the terminal, empty: all |
 | `relative` | | 1: the orientation is relative to the direction of motion |
 | `center_freq`, `antenna`, `qdant_file`, `qdant_id` and the inputs of [[generate_antenna]] | | Antenna columns, see below |
@@ -101,6 +102,7 @@ Read the Tx and Rx CSV files of a layout
   | `scenpar_override` | Overrides of scenario parameters, one field per key, NaN = none | Struct of `[n_node, 1]` |
   | `tx.seed`, `rx.seed` | Seed of the site, -1 = derived from the layout seed; empty = all -1 | int64, `[n_node, 1]` |
   | `relative` | 1 = orientation relative to the direction of motion; empty = all 0 | uint32, `[n_node, 1]` |
+  | `tx.cell` | 1 = the site has drop cells, 0 = none of its own ([[drop_terminals]]); empty = all 1 | uint32, `[n_node, 1]` |
   | `extra_names`, `extra` | Names of unknown CSV columns and their cells as text | Cell `[n_extra, 1]` of cells `[n_row, 1]` |
   | `links.i_tx`, `i_rx`, `i_segment` | Site, terminal and segment of each propagation link | uint32, `[n_link, 1]` |
   | `image` | Wrap-around image of the site, 0 = the real site | uint32, `[n_link, 1]` |

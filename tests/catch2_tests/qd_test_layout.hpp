@@ -160,6 +160,8 @@ static inline std::string qd_layout_diff_nodes(const quadriga_lib::layout_nodes 
         return "seed";
     if (!qd_layout_same_int(a.relative, b.relative))
         return "relative";
+    if (!qd_layout_same_int(a.cell, b.cell))
+        return "cell";
     if (a.extra_names != b.extra_names || a.extra != b.extra)
         return "extra";
     return "";

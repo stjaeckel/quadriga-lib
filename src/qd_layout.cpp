@@ -49,6 +49,7 @@ A **layout** describes the nodes of a radio network and how they move: where eac
 | `indoor`, `floor`, `d2d_in` | | Indoor state (-1 or empty: draw, 0 outdoor, 1 building, 2 car, 3 residential building), floor from 1 (-1: from z), indoor 2D distance in m (NaN: draw); they change only where `scenario` or `indoor` changes |
 | `d_clutter`, `r_clutter`, `h_clutter`, `scenpar.<key>` | | Tx side: clutter inputs and overrides of scenario parameters, equal for all sectors of a site |
 | `seed`, `layout_seed`, `wrap` | | Tx side: seed of the site, seed of the layout, lattice vectors in m (`"ax,ay;bx,by"`) |
+| `cell` | | Tx side: 0 = the site has no drop cells of its own (see [[drop_terminals]]), default 1; equal for all sectors of a site |
 | `pairing` | | Rx side: names of the Tx sites linked to the terminal, empty: all |
 | `relative` | | 1: the orientation is relative to the direction of motion |
 | `center_freq`, `antenna`, `qdant_file`, `qdant_id` and the inputs of [[generate_antenna]] | | Antenna columns, see below |
@@ -127,6 +128,7 @@ One side of a layout: nodes with their rows, in flat arrays
 | `std::unordered_map<std::string, arma::vec> scenpar_override` | each `[n_node]` | Overrides of scenario parameters by key, NaN = none |
 | `arma::s64_vec seed` | `[n_node]` | Seed of the site, -1 = derived from the seed of the layout; empty = all -1 |
 | `arma::u32_vec relative` | `[n_node]` | 1 = orientation relative to the direction of motion; empty = all 0 |
+| `arma::u32_vec cell` | `[n_node]` | Tx side: 1 = the site has drop cells, 0 = none of its own ([[drop_terminals]]); equal for all sectors of a site; empty = all 1 |
 | `std::vector<std::string> extra_names` | `[n_extra]` | Names of unknown CSV columns |
 | `std::vector<std::vector<std::string>> extra` | `[n_extra][n_row]` | Their cells as text |
 
@@ -177,6 +179,7 @@ static const column table[n_col] = {
     {"wrap", col_class::fixed, col_kind::matrix, col_side::tx, 1.0, nan, -inf, inf, 0},
     {"seed", col_class::fixed, col_kind::integer, col_side::tx, 1.0, -1.0, -1.0, inf, 0},
     {"layout_seed", col_class::fixed, col_kind::integer, col_side::tx, 1.0, -1.0, -1.0, inf, 0},
+    {"cell", col_class::fixed, col_kind::integer, col_side::tx, 1.0, 1.0, 0.0, 1.0, 0},
     {"pairing", col_class::fixed, col_kind::names, col_side::rx, 1.0, 0.0, -inf, inf, 0},
     {"relative", col_class::fixed, col_kind::integer, col_side::both, 1.0, 0.0, 0.0, 1.0, 0},
     // Antenna columns; the types are the groups of generate_antenna that use the input
@@ -439,6 +442,8 @@ flat flatten(const quadriga_lib::layout_nodes &N)
         F.seed.assign(N.seed.begin(), N.seed.end());
     if (N.relative.n_elem == F.n_node && F.n_node != 0)
         F.v[c_relative].assign(N.relative.begin(), N.relative.end());
+    if (N.cell.n_elem == F.n_node && F.n_node != 0)
+        F.v[c_cell].assign(N.cell.begin(), N.cell.end());
     F.extra_names = N.extra_names;
     F.extra = N.extra;
     return F;
@@ -516,6 +521,8 @@ quadriga_lib::layout_nodes unflatten(const flat &F)
         N.seed = arma::s64_vec(std::vector<long long>(F.seed));
     if (given(c_relative, n))
         N.relative = arma::conv_to<arma::u32_vec>::from(to_vec(c_relative));
+    if (given(c_cell, n))
+        N.cell = arma::conv_to<arma::u32_vec>::from(to_vec(c_cell));
     N.extra_names = F.extra_names;
     N.extra = F.extra;
     return N;
@@ -554,8 +561,8 @@ std::string quadriga_lib::layout_nodes::is_valid() const
     for (const auto &kv : scenpar_override)
         if (kv.second.n_elem != nn)
             return "Member 'scenpar_override' must have one entry per node for the key '" + kv.first + "'.";
-    if ((!seed.is_empty() && seed.n_elem != nn) || (!relative.is_empty() && relative.n_elem != nn))
-        return "Members 'seed' and 'relative' must be empty or have one entry per node.";
+    if ((!seed.is_empty() && seed.n_elem != nn) || (!relative.is_empty() && relative.n_elem != nn) || (!cell.is_empty() && cell.n_elem != nn))
+        return "Members 'seed', 'relative' and 'cell' must be empty or have one entry per node.";
     if (extra.size() != extra_names.size())
         return "Members 'extra_names' and 'extra' must have the same length.";
     for (const auto &col : extra)
@@ -626,6 +633,9 @@ std::string quadriga_lib::layout_nodes::is_valid() const
     for (arma::uword i = 0; i < relative.n_elem; ++i)
         if (relative[i] > 1)
             return "Member 'relative' must be 0 or 1.";
+    for (arma::uword i = 0; i < cell.n_elem; ++i)
+        if (cell[i] > 1)
+            return "Member 'cell' must be 0 or 1.";
 
     // Per node
     for (arma::uword i = 0; i < nn; ++i)
@@ -728,6 +738,8 @@ std::string qd_check_groups(const quadriga_lib::layout_nodes &N, bool is_site)
                     return who + "must have equal 'scenpar_override' for the key '" + kv.first + "'.";
             if (!N.seed.is_empty() && N.seed[a] != N.seed[i])
                 return who + "must have equal 'seed'.";
+            if (!N.cell.is_empty() && N.cell[a] != N.cell[i])
+                return who + "must have equal 'cell'.";
         }
     }
     return "";
@@ -745,6 +757,8 @@ std::string quadriga_lib::layout::is_valid() const
     msg = links.is_valid();
     if (!msg.empty())
         return "links: " + msg;
+    if (!rx.cell.is_empty())
+        return "rx: Member 'cell' is a member of the Tx side and must be empty.";
     if (!(msg = qd_check_groups(tx, true)).empty())
         return "tx: " + msg;
     if (!(msg = qd_check_groups(rx, false)).empty())
