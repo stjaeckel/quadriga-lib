@@ -103,7 +103,7 @@ Doc sections, for now: everything declared in `include/quadriga_layout.hpp`, i.e
 | `sample_track` | Returns positions and orientations of one node at the snapshot times | Turns rows, speed and direction into snapshots; used by the channel functions and NG |
 | `set_orientation` | Sets orientations from the motion, or to a fixed value | Antennas that follow a track or point one way |
 | `set_antenna` | Assigns an antenna to nodes, by `generate_antenna` arguments or as an evaluated array | Antennas for generated or hand-built layouts, also from measurements |
-| `set_antenna_qdant` | Assigns an entry of a QDANT file to nodes, stored as a `qdant` line (added in the implementation) | Measured patterns that the CSV files reference instead of copying |
+| `set_antenna_qdant` | Assigns an entry of a QDANT file to nodes, stored as a `qdant` line (added in the implementation; later merged into `set_antenna`: a `type` ending in `.qdant`) | Measured patterns that the CSV files reference instead of copying |
 
 **Channel generation from a layout** (same section; `crossfade_segments` in "Channel functions"):
 
@@ -437,7 +437,7 @@ void set_antenna(
     layout &layout,
     const std::string &type,                                       // Antenna type, as generate_antenna
     const std::unordered_map<std::string, arma::mat> &args = {},   // generate_antenna arguments by name, e.g. {"panel", {4, 4, 1, 2}}; flags as 0 or 1
-    bool rx_side = false,                                          // false: Tx side, true: Rx side
+    bool rx = false,                                               // false: Tx side, true: Rx side
     const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of that side
     double center_freq = NAN,                                      // Band in [Hz]; NaN = one antenna for all bands (section 4.5)
     bool evaluate = true);                                         // true: generate all antennas not yet evaluated
@@ -446,7 +446,7 @@ void set_antenna(
 void set_antenna(
     layout &layout,
     const arrayant<double> &array,          // Single-frequency array
-    bool rx_side = false,
+    bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN);              // Band in [Hz]; NaN = the same array for all bands
 ```
@@ -454,7 +454,7 @@ void set_antenna(
 - The first form takes the arguments of `generate_antenna` by name, and its documentation refers to `generate_antenna` for their meaning. Names are checked against the central column table, which is also the CSV column definition, so a new `generate_antenna` argument is one table entry and no signature change. An unknown name, or one the type does not use, throws. Values are numbers or matrices (rows of `steer` and `beams` as in `generate_antenna`), so no CSV quoting appears in user code. `res` and `center_freq` of `generate_antenna` are also accepted in the map; `center_freq` there and the argument must not both be given. `pattern` is not available here; an array built from a pattern uses the second form.
 - `generate_antenna` itself is unchanged; it gets no text outputs.
 - The second form stores the array with an empty text entry; `layout_csv_write` exports it to the QDANT file (section 5.2).
-- Added in the implementation: `set_antenna_qdant(layout, qdant_file, qdant_id = 1, rx_side, i_node, center_freq, evaluate)` stores a `qdant` line with the normalised absolute path, with the band and copy-on-write rules of the first form; `layout_csv_write` writes it as a reference relative to the CSV file and exports no copy. A missing or unreadable file throws `std::runtime_error`.
+- Added in the implementation: `set_antenna_qdant(layout, qdant_file, qdant_id = 1, rx_side, i_node, center_freq, evaluate)` stores a `qdant` line with the normalised absolute path, with the band and copy-on-write rules of the first form; `layout_csv_write` writes it as a reference relative to the CSV file and exports no copy. A missing or unreadable file throws `std::runtime_error`. Later merged into `set_antenna`: a `type` ending in `.qdant` selects the file and `{"id", k}` in `args` the entry; `rx_side` is now `rx`.
 - With a `center_freq`, the call sets one band of the nodes' antenna. A node gets a new antenna entry for this (copy on write), so other nodes that shared the old entry are not affected. Until all bands are set, `is_valid` reports the node as incomplete. Frequencies not in `layout.center_freq` are added to it. A per-band call on a node whose single line covers all bands first turns that line into explicit lines for all bands, then replaces band `center_freq`.
 - Arguments that the type does not use throw, as in `generate_antenna`. With `evaluate = false`, or after `layout_csv_read` with `eval_antennas = false`, the channel functions use `xpol` until `eval_antennas` is called.
 
@@ -551,7 +551,7 @@ Rules:
 - Tuples may be shorter than documented. An entry `NaN` takes the preset value; integer entries such as those of `grid` must be whole numbers. A value that the preset does not use throws, as `generate_antenna` does.
 - `options` keys are listed per preset; an unknown key throws.
 - Extension rules: a value used by several families is appended to its tuple; a value used by one family goes into `options`; a new argument only for a group shared by several families, appended at the end; a new preset is one row in the central table plus a builder if its geometry is new.
-- Tx site names are `BS1`, `BS2`, ...; UT names `UT1`, `UT2`, ... The output has no antennas, so channel functions use `xpol` until `set_antenna` assigns one. `layout.center_freq` stays empty; the user sets it.
+- Tx site names are `BS1`, `BS2`, ...; UT names `UT1`, `UT2`, ... The output has no antennas, so channel functions use `xpol` until `set_antenna` assigns one. `layout.center_freq` is the `center_freq` argument (empty: not set).
 - The drop is deterministic for a given seed and independent of the thread count.
 
 ### 7.2 `drop_terminals`
@@ -709,7 +709,7 @@ std::vector<channel<double>> get_gbsm_channels(
 
 `get_gbsm_channels` returns channels only for channel links whose propagation links are all present in `i_link`. `get_channels_layout` uses `layout.links` if it is filled. Otherwise it draws the link states on a local copy and leaves the layout unchanged. It runs the steps in batches whose size bounds the memory, and concatenates the results in canonical order. Its advanced settings stay at their defaults; other settings need the manual path. `n_cluster` (TR 7.6.15) is not exposed. The steps are called stage 1, 2 and 3 below.
 
-Call rules: `init_link_states` throws on an empty `layout.center_freq`; `generate_layout` leaves it empty, and the user sets it. `generate_rays`, `get_gbsm_channels`, `attach_terminals` and `export_rays_qrt` throw `"Call 'init_link_states' first."` on empty links. In `get_channels_layout`, `config_dirs` is ignored when the links are filled, because `layout.links.conf_files` holds the resolved paths, and scatterers are requested whenever the resolved mobility is `drift`.
+Call rules: `init_link_states` throws on an empty `layout.center_freq`; `generate_layout` sets it from its `center_freq` argument, else the user sets it. `generate_rays`, `get_gbsm_channels`, `attach_terminals` and `export_rays_qrt` throw `"Call 'init_link_states' first."` on empty links. In `get_channels_layout`, `config_dirs` is ignored when the links are filled, because `layout.links.conf_files` holds the resolved paths, and scatterers are requested whenever the resolved mobility is `drift`.
 
 **Working below the manual path.** The GBSM functions stay public and independent of the layout. A user obtains the SOS phases of a link with `gbsm_init_phases(scenpar, "lsf", layout.links.gbsm_seed(i_link), -1, preset, ...)` and can feed them into `gbsm_draw` and the following functions. With `quadriga`, the bias removal additionally needs the positions of all links of the group. Rays produced this way can go into `get_gbsm_channels`. Its link gain is computed from `gbsm_seed`, so a user who draws with another seed sets `layout.links.gbsm_seed` to it.
 
@@ -861,7 +861,7 @@ All public functions of section 2.1 get MEX and Python wrappers following the SP
 - **In/out arguments** follow the SPEC split into `_in` and `_out`: `layout_out = set_antenna(layout_in, ...)`, `layout_out = drop_terminals(layout_in, ...)`, `layout_out = init_link_states(layout_in, ...)`, `layout_out = eval_antennas(layout_in, center_freq)`, `nodes_out = generate_track(nodes_in, ...)`, `nodes_out = set_orientation(nodes_in, ...)`.
 - `set_antenna` takes the argument map as a dict in Python (`qd.layout.set_antenna(layout, "3GPP", {"panel": [4, 4, 1, 2]})`) and as a struct in MATLAB (`struct('panel', [4 4 1 2])`); a small conversion of dict or struct to the map is written once. In Python, `args` of `set_antenna` and `n_ut` of `generate_layout` are positional optionals and are added to `POSITIONAL_OPTIONAL` in `tests/python_tests/test_keyword_only.py`. The array form is a separate name in the wrappers, `set_antenna_array`, because Python and MATLAB do not overload by type.
 - Conf folders: the wrappers of `get_channels_layout` and `init_link_states` append the shipped folder they find at run time to `config_dirs` (section 2.3).
-- Python submodules follow the doc sections. `layout`: `qd.layout.csv_read`, `csv_write`, `generate_layout`, `drop_terminals`, `generate_track`, `sample_track`, `set_orientation`, `set_antenna`, `set_antenna_array`, `set_antenna_qdant`, `eval_antennas`, `get_channels_layout`, `init_link_states`, `generate_rays`, `get_gbsm_channels`, `attach_terminals`, `export_rays_qrt`. `channel`: `qd.channel.crossfade_segments`. MATLAB uses the C++ names in `quadriga_lib`. Doc headings follow the SPEC: bare names (`# generate_layout`, `# crossfade_segments`), and `# layout.csv_read`, `# layout.csv_write` for the two names that lose the prefix `layout_`. WP12 adds `[families]` entries in `docs_builder/content/api_matching.toml` for `set_antenna_array` and `eval_antennas`; bare headings need no `[python_names]` entries.
+- Python submodules follow the doc sections. `layout`: `qd.layout.csv_read`, `csv_write`, `generate_layout`, `drop_terminals`, `generate_track`, `sample_track`, `set_orientation`, `set_antenna`, `set_antenna_array`, `eval_antennas`, `get_channels_layout`, `init_link_states`, `generate_rays`, `get_gbsm_channels`, `attach_terminals`, `export_rays_qrt`. `channel`: `qd.channel.crossfade_segments`. MATLAB uses the C++ names in `quadriga_lib`. Doc headings follow the SPEC: bare names (`# generate_layout`, `# crossfade_segments`), and `# layout.csv_read`, `# layout.csv_write` for the two names that lose the prefix `layout_`. WP12 adds `[families]` entries in `docs_builder/content/api_matching.toml` for `set_antenna_array` and `eval_antennas`; bare headings need no `[python_names]` entries.
 - SPEC updates in the same work: the tuple exception in `md/SPEC_CPP_API.md` ("Declarations") includes the `generate_layout` tuples, `grid` included (it stays `arma::vec`, because 0 rings is a valid value and `uint_list` has no "not given" value); in `md/SPEC_PYTHON_API.md` the submodule list includes `layout` (section "Network layouts and mobility"), and the prefix list includes `layout_` in `layout`.
 
 ## 10. QuaDRiGa-NG mapping
@@ -1043,7 +1043,7 @@ The layout system was implemented in thirteen work packages (section 11), each w
 ### 14.2 Decisions on the open questions
 
 - Q1 (a scenario cannot return to none along a track): (a) the writer throws; the antenna half was solved by `antenna = none`.
-- Q2 (reference a QDANT file by name): (b), the separate function `set_antenna_qdant`; in Python `qdant_id` is a positional optional argument.
+- Q2 (reference a QDANT file by name): (b), the separate function `set_antenna_qdant`; in Python `qdant_id` is a positional optional argument. Later merged into `set_antenna` (a `type` ending in `.qdant`).
 - Q3 (default 1° grid: reading large arrays takes seconds and gigabytes): (a) for now, with a sentence in the `layout_csv_read` documentation; a rework (element pattern and array factor at the path angles) is tracked in issue #99.
 - Q4 (wavelength-spaced array without any frequency in the files): (a), the reader throws.
 - Q5 (InH `absTOA_Lmax`): (b), the InH presets write it, as the InF presets do.
