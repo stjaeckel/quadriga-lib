@@ -475,7 +475,7 @@ TEST_CASE("export_rays_qrt - input validation")
         CHECK(msg(M) == "Call 'init_link_states' first.");
         M = L;
         M.rx.pos(0, 5) += 1.0;
-        CHECK(msg(M) == "The layout has changed since 'init_link_states': call it again, or 'links.reset()' to discard the links.");
+        CHECK(msg(M) == "The layout has changed since 'init_link_states': call 'init_link_states' again.");
     }
     SECTION("frequencies")
     {

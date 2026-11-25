@@ -231,7 +231,7 @@ class qd_pipe
             throw std::invalid_argument("Member 'links' of 'layout' is not valid: " + msg);
         qd_check_sizes(L);
         if (check_hash && qd_links_hash(L) != K.layout_hash)
-            throw std::invalid_argument("The layout has changed since 'init_link_states': call it again, or 'links.reset()' to discard the links.");
+            throw std::invalid_argument("The layout has changed since 'init_link_states': call 'init_link_states' again.");
         qd_check_method(K.method);
         qd = K.method == "quadriga", mf = K.method == "38.901_MF";
         n_freq = L.center_freq.n_elem;
@@ -703,8 +703,7 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                           {
                               const bool in = i_row[s] >= a && i_row[s] < b;
                               if (in && found && own1[j] != s)
-                                  throw std::invalid_argument("Terminal '" + L.rx.name[nr] + "': the snapshots of segment " + std::to_string(k) +
-                                                              " are not consecutive; a track with several segments needs increasing 'times'.");
+                                  throw std::invalid_argument("Terminal '" + L.rx.name[nr] + "': the snapshots of a segment are not consecutive; a track with several segments needs increasing 'times'.");
                               if (in)
                                   own0[j] = found ? own0[j] : s, own1[j] = s + 1, found = true;
                           }
@@ -1321,7 +1320,7 @@ arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::strin
     const arma::uword n_freq = P.n_freq, n_link = K.n_link(), n_tx = layout.tx.n_node(), n_rx = layout.rx.n_node();
     const size_t n_term = P.S.n_term, n_site = P.S.n_site;
     if (i_freq >= n_freq)
-        throw std::invalid_argument("Input 'i_freq' must be below the number of frequencies of the layout (" + std::to_string(n_freq) + ").");
+        throw std::invalid_argument("Input 'i_freq' must select one of the " + std::to_string(n_freq) + " frequencies of the layout.");
     if (rsrp)
     {
         if (rays.size() != n_link)
@@ -1347,7 +1346,7 @@ arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::strin
     {
         atx[i] = qd_array(layout, layout.tx, "Tx", i, i_freq, xpol);
         if (tx_port >= atx[i]->n_ports())
-            throw std::invalid_argument("Input 'tx_port' must be below the number of ports (" + std::to_string(atx[i]->n_ports()) + ") of the antenna of Tx node '" +
+            throw std::invalid_argument("Input 'tx_port' must select one of the " + std::to_string(atx[i]->n_ports()) + " ports of the antenna of Tx node '" +
                                         layout.tx.name[i] + "' (sector " + std::to_string(layout.tx.sector[i]) + ").");
     }
     for (arma::uword i = 0; i < n_rx; ++i)

@@ -302,7 +302,7 @@ TEST_CASE("init_link_states - input validation")
         quadriga_lib::layout L = ok();
         L.rx = qd_layout_points({"UT1"}, {0}, arma::mat{{10.0, 0.0}, {100.0, 0.0}, {1.5, 25.0}});
         L.rx.scenario = {"UMa", "UMa_NLOS"};
-        thr(L, "38.901", {}, false, 2e9, "", -1, "Terminal 'UT1': segment 1 starts at the position of site 'BS1'; a segment start needs a LOS path of non-zero length.");
+        thr(L, "38.901", {}, false, 2e9, "", -1, "Terminal 'UT1': a later segment starts at the position of site 'BS1'; a segment start needs a LOS path of non-zero length.");
         L.rx = qd_layout_points({"UT1"}, {0}, arma::mat{{10.0, 20.0, 30.0}, {100.0, 100.0, 100.0}, {1.5, 1.5, 1.5}});
         L.rx.indoor = {1, 1, 3};
         L.rx.d2d_in = {5.0, 5.0, 8.0};
@@ -755,7 +755,7 @@ TEST_CASE("generate_rays - input validation")
     quadriga_lib::layout M = L;
     M.rx.pos(0, 0) += 1.0;
     CHECK(qd_layout_throws([&] { quadriga_lib::generate_rays(M); }) ==
-          "The layout has changed since 'init_link_states': call it again, or 'links.reset()' to discard the links.");
+          "The layout has changed since 'init_link_states': call 'init_link_states' again.");
     M = L;
     M.links.los[0] = 2;
     CHECK(qd_layout_throws([&] { quadriga_lib::generate_rays(M); }) == "Member 'links' of 'layout' is not valid: Member 'los' must be 0 or 1.");
@@ -1355,7 +1355,7 @@ TEST_CASE("get_gbsm_channels - the cross-fade of a track with two segments is co
     CHECK(C0[0].n_snap() == 6);
     const arma::vec back = {0.0, 1.0, 8.0, 2.0};
     CHECK(qd_layout_throws([&] { quadriga_lib::get_gbsm_channels(L, rays, {}, back, "rays"); }) ==
-          "Terminal 'N0': the snapshots of segment 0 are not consecutive; a track with several segments needs increasing 'times'.");
+          "Terminal 'N0': the snapshots of a segment are not consecutive; a track with several segments needs increasing 'times'.");
 }
 
 TEST_CASE("attach_terminals - a track with segments is attached by its first segment")

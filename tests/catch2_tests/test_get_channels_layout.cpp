@@ -73,7 +73,7 @@ std::vector<quadriga_lib::channel<double>> manual(quadriga_lib::layout L, const 
     return quadriga_lib::get_gbsm_channels(L, quadriga_lib::generate_rays(L), {}, times, "taps", index);
 }
 
-const std::string stale = "The layout has changed since 'init_link_states': call it again, or 'links.reset()' to discard the links.";
+const std::string stale = "The layout has changed since 'init_link_states': call 'init_link_states' again.";
 } // namespace
 
 TEST_CASE("get_channels_layout - input validation")

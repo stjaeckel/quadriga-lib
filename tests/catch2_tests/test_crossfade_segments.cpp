@@ -395,8 +395,8 @@ TEST_CASE("crossfade_segments - input validation")
         CHECK(msg({}, arma::uvec{}) == "Input 'segments' must not be empty.");
         ch_t bad = B;
         bad.coeff_im.pop_back();
-        CHECK(msg({A, bad}, arma::uvec{0, 6}).rfind("Input 'segments' entry 1 is not valid: ", 0) == 0);
-        CHECK(msg({ch_t()}, arma::uvec{0}) == "Input 'segments' entry 0 must have snapshots with channel coefficients.");
+        CHECK(msg({A, bad}, arma::uvec{0, 6}).rfind("Entry 1: 'segments' is not valid: ", 0) == 0);
+        CHECK(msg({ch_t()}, arma::uvec{0}) == "Entry 0: 'segments' must have snapshots with channel coefficients.");
         ch_t ports = B;
         for (auto &x : ports.coeff_re)
             x = x.rows(0, 0);
@@ -409,21 +409,21 @@ TEST_CASE("crossfade_segments - input validation")
         CHECK(msg({A, freq}, arma::uvec{0, 6}) == "All entries of 'segments' must have the same 'center_freq' with at most one value.");
         ch_t tap = B;
         tap.par_data[0] = arma::u32_vec{0, 6};
-        CHECK(msg({A, tap}, arma::uvec{0, 6}) == "Input 'segments' entry 1: the par_data entry 'tap' must have one value per path in every snapshot.");
+        CHECK(msg({A, tap}, arma::uvec{0, 6}) == "Entry 1: the par_data entry 'tap' of 'segments' must have one value per path in every snapshot.");
         tap.par_data[0] = arma::vec{0.0, 6.0};
-        CHECK(msg({A, tap}, arma::uvec{0, 6}) == "Input 'segments' entry 1: the par_data entry 'tap' must be an arma::u32_vec.");
+        CHECK(msg({A, tap}, arma::uvec{0, 6}) == "Entry 1: the par_data entry 'tap' of 'segments' must be an arma::u32_vec.");
         ch_t var = seg_new(12, false);
         var.par_names.clear(), var.par_data.clear();
         var.coeff_re[3] = var.coeff_re[3].slices(0, 1), var.coeff_im[3] = var.coeff_im[3].slices(0, 1), var.delay[3] = var.delay[3].slices(0, 1);
-        CHECK(msg({seg_old(8, false), var}, arma::uvec{0, 6}) == "Input 'segments' entry 1: channels without path gains (taps) need the same number of taps in every snapshot.");
+        CHECK(msg({seg_old(8, false), var}, arma::uvec{0, 6}) == "Entry 1: 'segments' without path gains (taps) need the same number of taps in every snapshot.");
     }
     SECTION("n_overlap")
     {
-        CHECK(msg({A, B}, arma::uvec{0}) == "Input 'n_overlap' must have one entry per segment, and entry 0 must be 0.");
-        CHECK(msg({A, B}, arma::uvec{1, 6}) == "Input 'n_overlap' must have one entry per segment, and entry 0 must be 0.");
-        CHECK(msg({A, B}, arma::uvec{0, 9}) == "Entry 1 of 'n_overlap' must be at most the snapshots of segment 0 after its own shared ones (8).");
-        CHECK(msg({A, cut(B, 0, 4)}, arma::uvec{0, 6}) == "Entry 1 of 'n_overlap' must be at most the snapshots of segment 1.");
-        CHECK(msg({A, B, A}, arma::uvec{0, 8, 5}) == "Entry 2 of 'n_overlap' must be at most the snapshots of segment 1 after its own shared ones (4).");
+        CHECK(msg({A, B}, arma::uvec{0}) == "Input 'n_overlap' must have one entry per segment.");
+        CHECK(msg({A, B}, arma::uvec{1, 6}) == "The first entry of 'n_overlap' must be 0.");
+        CHECK(msg({A, B}, arma::uvec{0, 9}) == "Entry 1: 'n_overlap' must be at most the snapshots of the preceding segment after its own shared ones (8).");
+        CHECK(msg({A, cut(B, 0, 4)}, arma::uvec{0, 6}) == "Entry 1: 'n_overlap' must be at most the snapshots of its own segment.");
+        CHECK(msg({A, B, A}, arma::uvec{0, 8, 5}) == "Entry 2: 'n_overlap' must be at most the snapshots of the preceding segment after its own shared ones (4).");
     }
     SECTION("overlap")
     {

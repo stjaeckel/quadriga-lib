@@ -558,8 +558,8 @@ TEST_CASE("attach_terminals - input validation")
     SECTION("rule, frequency and port")
     {
         CHECK(msg(L, "RSRP", {}, 0, 0) == "Input 'rule' must be 'large_scale' or 'rsrp'.");
-        CHECK(msg(L, "large_scale", {}, 2, 0) == "Input 'i_freq' must be below the number of frequencies of the layout (2).");
-        CHECK(msg(L, "large_scale", {}, 0, 2) == "Input 'tx_port' must be below the number of ports (2) of the antenna of Tx node 'BS1' (sector 0).");
+        CHECK(msg(L, "large_scale", {}, 2, 0) == "Input 'i_freq' must select one of the 2 frequencies of the layout.");
+        CHECK(msg(L, "large_scale", {}, 0, 2) == "Input 'tx_port' must select one of the 2 ports of the antenna of Tx node 'BS1' (sector 0).");
     }
     SECTION("rays")
     {
@@ -579,7 +579,7 @@ TEST_CASE("attach_terminals - input validation")
         CHECK(msg(M, "large_scale", {}, 0, 0) == "Call 'init_link_states' first.");
         M = L;
         M.rx.pos(0, 0) += 1.0;
-        CHECK(msg(M, "large_scale", {}, 0, 0) == "The layout has changed since 'init_link_states': call it again, or 'links.reset()' to discard the links.");
+        CHECK(msg(M, "large_scale", {}, 0, 0) == "The layout has changed since 'init_link_states': call 'init_link_states' again.");
         M = L;
         M.tx = quadriga_lib::layout_nodes(); // a default side: no nodes
         M.rx.scenario = {"UMa", "UMa"};

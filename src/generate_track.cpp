@@ -111,7 +111,7 @@ void check_structure(const quadriga_lib::layout_nodes &nodes, bool all_offsets =
             throw std::invalid_argument(bad + "the members 'extra' do not fit.");
     for (arma::uword i = all_offsets ? 0 : i_node; i < (all_offsets ? nn : std::min(nn, i_node + 2)); ++i)
         if ((i == 0 && nodes.offset[0] != 0) || (i > 0 && nodes.offset[i] <= nodes.offset[i - 1]) || nodes.offset[i] >= nr)
-            throw std::invalid_argument(bad + "the member 'offset' must start at 0, increase and stay below the number of rows.");
+            throw std::invalid_argument(bad + "the member 'offset' must start at the first row, increase and stay within the rows.");
 }
 
 // Start of the messages about one node

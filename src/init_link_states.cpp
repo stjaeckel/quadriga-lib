@@ -120,7 +120,7 @@ void qd_init_links(const quadriga_lib::layout &L, const std::string &method, con
                 {
                     if (k == 0)
                         break;
-                    throw std::invalid_argument("Terminal '" + L.rx.name[S.term_nodes[t][0]] + "': segment " + std::to_string(k) + " starts at the position of site '" +
+                    throw std::invalid_argument("Terminal '" + L.rx.name[S.term_nodes[t][0]] + "': a later segment starts at the position of site '" +
                                                 L.tx.name[S.site_nodes[s][0]] + "'; a segment start needs a LOS path of non-zero length.");
                 }
                 l_tx.push_back(s), l_rx.push_back(t), l_img.push_back(best), l_d2d.push_back(d), l_row.push_back(rr), l_seg.push_back(k);

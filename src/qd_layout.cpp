@@ -575,7 +575,7 @@ std::string quadriga_lib::layout_nodes::is_valid() const
         return "Member 'pos' has rows but there are no nodes.";
     for (arma::uword i = 0; i < nn; ++i)
         if ((i == 0 && offset[0] != 0) || (i > 0 && offset[i] <= offset[i - 1]) || offset[i] >= nr)
-            return "Member 'offset' must start at 0, increase strictly and stay below the number of rows.";
+            return "Member 'offset' must start at the first row, increase strictly and stay within the rows.";
     if (!pos.is_finite())
         return "Member 'pos' must be finite.";
     if (!orientation.is_finite())
@@ -1480,7 +1480,7 @@ void qd_layout::eval_antennas(quadriga_lib::layout &L, const arma::vec &center_f
                 double f = 0.0;
                 const std::string cell = lines[b].empty() ? std::string() : parse_antenna_line(lines[b], S.cols)[0];
                 if (!lines[b].empty() && (qd_csv::parse_number(cell, f) != qd_csv::number_status::ok || !same_freq(f, center_freq_new[b])))
-                    throw std::invalid_argument("Input 'center_freq': entry " + std::to_string(b) + " does not match; " + who[i] +
+                    throw std::invalid_argument("Entry " + std::to_string(b) + ": Input 'center_freq' does not match; " + who[i] +
                                                 ": the antenna has the band '" + cell + "'.");
             }
         }

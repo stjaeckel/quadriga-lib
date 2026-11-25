@@ -36,7 +36,7 @@ channel<double> quadriga_lib::crossfade_segments(
 
 ## Inputs:
 - **`segments`** — Channels of one link in track order, valid, with coefficients, equal `n_rx`, `n_tx`, form and `center_freq` (at most one value); `[n_segment]`
-- **`n_overlap`** — Snapshots shared with the preceding segment, entry 0 is 0, at most the snapshots of segment `k − 1` after its own shared ones; `[n_segment]`
+- **`n_overlap`** — Snapshots shared with the preceding segment, the first entry is 0, at most the snapshots of the preceding segment after its own shared ones; `[n_segment]`
 - **`overlap`** *(optional)* — Part of the shared snapshots used for the ramp, in [0, 1]
 
 ## Returns:
@@ -67,7 +67,7 @@ const arma::u32_vec *qd_xf_par(const qd_ch &c, const char *name, arma::uword k)
         {
             const arma::u32_vec *v = std::any_cast<arma::u32_vec>(&c.par_data[i]);
             if (v == nullptr)
-                throw std::invalid_argument("Input 'segments' entry " + std::to_string(k) + ": the par_data entry '" + name + "' must be an arma::u32_vec.");
+                throw std::invalid_argument("Entry " + std::to_string(k) + ": the par_data entry '" + name + "' of 'segments' must be an arma::u32_vec.");
             return v;
         }
     return nullptr;
@@ -88,7 +88,7 @@ qd_xf_seg qd_xf_classify(const qd_ch &c, arma::uword k, bool taps)
     g.tagged = true;
     for (const arma::cube &x : c.coeff_re)
         if (x.n_slices != tap->n_elem)
-            throw std::invalid_argument("Input 'segments' entry " + std::to_string(k) + ": the par_data entry 'tap' must have one value per path in every snapshot.");
+            throw std::invalid_argument("Entry " + std::to_string(k) + ": the par_data entry 'tap' of 'segments' must have one value per path in every snapshot.");
     arma::uword n3 = 0;
     bool sub3 = false;
     for (arma::uword p = 0; p < n; ++p)
@@ -273,8 +273,10 @@ quadriga_lib::channel<double> quadriga_lib::crossfade_segments(const std::vector
     const arma::uword n_seg = (arma::uword)segments.size();
     if (n_seg == 0)
         throw std::invalid_argument("Input 'segments' must not be empty.");
-    if (n_overlap.n_elem != n_seg || n_overlap[0] != 0)
-        throw std::invalid_argument("Input 'n_overlap' must have one entry per segment, and entry 0 must be 0.");
+    if (n_overlap.n_elem != n_seg)
+        throw std::invalid_argument("Input 'n_overlap' must have one entry per segment.");
+    if (n_overlap[0] != 0)
+        throw std::invalid_argument("The first entry of 'n_overlap' must be 0.");
     if (!(overlap >= 0.0 && overlap <= 1.0))
         throw std::invalid_argument("Input 'overlap' must be in [0, 1].");
     for (arma::uword k = 0; k < n_seg; ++k)
@@ -282,9 +284,9 @@ quadriga_lib::channel<double> quadriga_lib::crossfade_segments(const std::vector
         const qd_ch &c = segments[k];
         const std::string msg = c.is_valid();
         if (!msg.empty())
-            throw std::invalid_argument("Input 'segments' entry " + std::to_string(k) + " is not valid: " + msg);
+            throw std::invalid_argument("Entry " + std::to_string(k) + ": 'segments' is not valid: " + msg);
         if (c.n_snap() == 0 || c.coeff_re.empty())
-            throw std::invalid_argument("Input 'segments' entry " + std::to_string(k) + " must have snapshots with channel coefficients.");
+            throw std::invalid_argument("Entry " + std::to_string(k) + ": 'segments' must have snapshots with channel coefficients.");
         const qd_ch &c0 = segments[0];
         if (c.n_rx() != c0.n_rx() || c.n_tx() != c0.n_tx())
             throw std::invalid_argument("All entries of 'segments' must have the same number of Rx and Tx ports.");
@@ -293,10 +295,9 @@ quadriga_lib::channel<double> quadriga_lib::crossfade_segments(const std::vector
         if (c.center_freq.n_elem > 1 || c.center_freq.n_elem != c0.center_freq.n_elem || (c.center_freq.n_elem == 1 && c.center_freq[0] != c0.center_freq[0]))
             throw std::invalid_argument("All entries of 'segments' must have the same 'center_freq' with at most one value.");
         if (k > 0 && n_overlap[k] > segments[k - 1].n_snap() - n_overlap[k - 1])
-            throw std::invalid_argument("Entry " + std::to_string(k) + " of 'n_overlap' must be at most the snapshots of segment " + std::to_string(k - 1) +
-                                        " after its own shared ones (" + std::to_string(segments[k - 1].n_snap() - n_overlap[k - 1]) + ").");
+            throw std::invalid_argument("Entry " + std::to_string(k) + ": 'n_overlap' must be at most the snapshots of the preceding segment after its own shared ones (" + std::to_string(segments[k - 1].n_snap() - n_overlap[k - 1]) + ").");
         if (n_overlap[k] > c.n_snap())
-            throw std::invalid_argument("Entry " + std::to_string(k) + " of 'n_overlap' must be at most the snapshots of segment " + std::to_string(k) + ".");
+            throw std::invalid_argument("Entry " + std::to_string(k) + ": 'n_overlap' must be at most the snapshots of its own segment.");
     }
     const bool rays = !segments[0].path_gain.empty(), taps = !rays;
     std::vector<qd_xf_seg> info(n_seg);
@@ -305,7 +306,7 @@ quadriga_lib::channel<double> quadriga_lib::crossfade_segments(const std::vector
         if (taps)
             for (const arma::cube &x : segments[k].coeff_re)
                 if (x.n_slices != segments[k].coeff_re[0].n_slices)
-                    throw std::invalid_argument("Input 'segments' entry " + std::to_string(k) + ": channels without path gains (taps) need the same number of taps in every snapshot.");
+                    throw std::invalid_argument("Entry " + std::to_string(k) + ": 'segments' without path gains (taps) need the same number of taps in every snapshot.");
         info[k] = qd_xf_classify(segments[k], k, taps);
     }
 

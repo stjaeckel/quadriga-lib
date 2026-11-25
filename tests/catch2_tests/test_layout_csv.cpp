@@ -859,9 +859,9 @@ TEST_CASE("is_valid - input validation")
     CHECK(has(msg([](LL &L) { L.tx.extra_names = {"a"}; }), "'extra_names' and 'extra'"));
     CHECK(has(msg([](LL &L) { L.tx.extra_names = {"a"}; L.tx.extra = {{"1"}}; }), "one cell per row"));
     // Offsets and values
-    CHECK(has(msg([](LL &L) { L.rx.offset = {1, 3}; }), "'offset' must start at 0"));
-    CHECK(has(msg([](LL &L) { L.rx.offset = {0, 0}; }), "'offset' must start at 0"));
-    CHECK(has(msg([](LL &L) { L.rx.offset = {0, 4}; }), "'offset' must start at 0"));
+    CHECK(has(msg([](LL &L) { L.rx.offset = {1, 3}; }), "'offset' must start at the first row"));
+    CHECK(has(msg([](LL &L) { L.rx.offset = {0, 0}; }), "'offset' must start at the first row"));
+    CHECK(has(msg([](LL &L) { L.rx.offset = {0, 4}; }), "'offset' must start at the first row"));
     CHECK(has(msg([](LL &L) { L.rx.pos(1, 1) = NaN; }), "'pos' must be finite"));
     CHECK(has(msg([](LL &L) { L.rx.orientation(0, 2) = arma::datum::inf; }), "'orientation' must be finite"));
     CHECK(has(msg([](LL &L) { L.tx.name[1] = ""; }), "1 to 255 bytes"));
