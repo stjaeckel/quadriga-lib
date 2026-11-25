@@ -17,6 +17,10 @@
 //                    matrices [3, n]; orientation 0, no other member
 // qd_layout_rot:     3x3 rotation matrix of (bank, tilt, heading) in [rad] (library helper calc_rotation_matrix)
 // qd_layout_wrap:    angle in [rad] wrapped to [-pi, pi]
+// qd_layout_oracle_seed: seed of a layout stream from its base seed and key (64-bit FNV-1a, as documented)
+// qd_layout_sites:   the sites of a side (names, first (x, y), node indices)
+// qd_layout_images:  the wrap images of a layout in the documented order, [2, n_img]
+// qd_layout_nearest: nearest site and wrap image of a point, brute force
 
 #ifndef QD_TEST_LAYOUT_HPP
 #define QD_TEST_LAYOUT_HPP
@@ -282,6 +286,72 @@ static inline quadriga_lib::layout qd_layout_build()
     R.speed = {0.0, 0.0, 0.0, 1.5};
     R.direction = arma::mat{{arma::datum::nan, 0.0}, {arma::datum::nan, 0.0}, {arma::datum::nan, 0.0}, {120.0 * d, 0.0}}.t();
     return L;
+}
+
+// Seed of the layout stream 'key' for a base seed: the documented 64-bit FNV-1a hash of the 8 bytes of the base seed
+// (least significant first) and the key, with the sign bit cleared
+static inline long long qd_layout_oracle_seed(long long base, const std::string &key)
+{
+    unsigned long long h = 14695981039346656037ULL;
+    for (int i = 0; i < 8; ++i)
+        h = (h ^ (((unsigned long long)base >> (8 * i)) & 0xFFULL)) * 1099511628211ULL;
+    for (unsigned char c : key)
+        h = (h ^ c) * 1099511628211ULL;
+    return (long long)(h & 0x7FFFFFFFFFFFFFFFULL);
+}
+
+// The sites of one side: names in order of first appearance, (x, y) of the first row of their first node, node indices
+struct qd_layout_site_list
+{
+    std::vector<std::string> name;
+    arma::mat xy; // [2, n_site]
+    std::vector<std::vector<arma::uword>> nodes;
+};
+
+static inline qd_layout_site_list qd_layout_sites(const quadriga_lib::layout_nodes &N)
+{
+    qd_layout_site_list S;
+    for (arma::uword i = 0; i < (arma::uword)N.name.size(); ++i)
+    {
+        const auto it = std::find(S.name.begin(), S.name.end(), N.name[i]);
+        if (it != S.name.end())
+        {
+            S.nodes[(size_t)(it - S.name.begin())].push_back(i);
+            continue;
+        }
+        S.name.push_back(N.name[i]);
+        S.nodes.push_back({i});
+        S.xy.resize(2, S.name.size());
+        S.xy(0, S.name.size() - 1) = N.pos(0, N.offset[i]);
+        S.xy(1, S.name.size() - 1) = N.pos(1, N.offset[i]);
+    }
+    return S;
+}
+
+// The wrap images of a layout: 0, +a1, -a1, +a2, -a2, +(a1 - a2), -(a1 - a2); with one vector 0, +a1, -a1; [2, n_img]
+static inline arma::mat qd_layout_images(const arma::mat &wrap)
+{
+    arma::mat I(2, 1, arma::fill::zeros);
+    if (wrap.n_cols >= 1)
+        I = arma::join_rows(I, wrap.col(0), -wrap.col(0));
+    if (wrap.n_cols == 2)
+        I = arma::join_rows(I, arma::join_rows(wrap.col(1), -wrap.col(1), wrap.col(0) - wrap.col(1), wrap.col(1) - wrap.col(0)));
+    return I;
+}
+
+// Nearest site and image of the point (x, y), brute force over all sites and images; returns the 2D distance
+static inline double qd_layout_nearest(const qd_layout_site_list &S, const arma::mat &images, double x, double y, arma::uword &site,
+                                       arma::uword &image)
+{
+    double best = arma::datum::inf;
+    for (arma::uword s = 0; s < S.xy.n_cols; ++s)
+        for (arma::uword k = 0; k < images.n_cols; ++k)
+        {
+            const double d = std::hypot(x - S.xy(0, s) - images(0, k), y - S.xy(1, s) - images(1, k));
+            if (d < best)
+                best = d, site = s, image = k;
+        }
+    return best;
 }
 
 #endif

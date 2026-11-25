@@ -178,6 +178,39 @@ namespace quadriga_lib
         const uint_list &i_node = {},        // Node indices, 0-based; empty = all nodes
         bool force = false);                 // false: from the motion of tracks plus 'orientation' as offset; true: 'orientation' on all rows
 
+    // ---- Layout generators ----
+
+    // A network layout from a preset: BS sites (hexagonal grid with wrap-around, or indoor grid) and a drop of UTs
+    // - Presets of 3GPP TR 38.901: "38.901_UMi", "38.901_UMa", "38.901_RMa", "38.901_SMa", "38.901_InH_Open",
+    //   "38.901_InH_Mixed", "38.901_InF_SL", "38.901_InF_DL", "38.901_InF_SH", "38.901_InF_DH", "38.901_InF_HH"
+    // - Tuple entries that are NaN or omitted take the preset value; an entry the preset does not use throws
+    // - UTs are point drops with orientation, speed and direction; O2I presets also get indoor, floor and d2d_in
+    layout generate_layout(
+        const std::string &type,                // Preset
+        arma::uword n_ut = 0,                   // UTs per cell (per_cell) or in total; 0 = no UTs
+        const arma::vec &spacing = {},          // [d_x, d_y] in [m]; hexagonal: d_x = ISD
+        const arma::vec &grid = {},             // [n_x, n_y, n_sector]; hexagonal: n_x = rings (0 = one site), n_y unused
+        const arma::vec &area = {},             // [length, width, height] of the hall or floor in [m]
+        const arma::vec &bs = {},               // [height, tilt, sector azimuth offset] in [m], [deg], [deg]
+        const arma::vec &ut = {},               // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg]
+        const arma::vec &indoor = {},           // [indoor ratio, min floors, max floors, floor height in [m]]
+        const std::unordered_map<std::string, std::vector<double>> &options = {}, // Scenario-specific values, e.g. {"p_residential", {0.8}}
+        bool per_cell = true,                   // true: n_ut per cell; false: n_ut in total
+        arma::sword seed = -1);                 // Seed of the drop, -1 = system random device; stored as layout.seed
+
+    // Drop UTs into the cells of the Tx side of a layout, replacing the Rx side
+    // - Cells are the Voronoi regions of the sites (with the wrap images), split into wedges around the sector headings
+    // - The scenario family of each site gives the rules of the drop in its cells, as in generate_layout
+    void drop_terminals(
+        layout &layout,                         // Layout, updated in place: Rx side replaced, pairing and links emptied
+        arma::uword n_ut,                       // UTs per cell (per_cell) or in total
+        const arma::vec &bounds = {},           // [x_min, x_max, y_min, y_max] in [m]; required without two wrap vectors
+        const arma::vec &ut = {},               // As in generate_layout
+        const arma::vec &indoor = {},           // As in generate_layout
+        const std::unordered_map<std::string, std::vector<double>> &options = {}, // As in generate_layout
+        bool per_cell = true,                   // true: n_ut per cell; false: n_ut in total
+        arma::sword seed = -1);                 // Seed, -1 = layout.seed if set, else the system random device
+
 }
 
 #endif

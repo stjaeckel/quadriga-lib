@@ -8,7 +8,8 @@
 // every cell) and read again, and all members that the files hold must be the same (angles within their 15 digits).
 // The antennas are not evaluated: arbitrary panel sizes would make single runs slow or exhaust the memory. Every node of a
 // layout that reads is also sampled with sample_track, with a fixed list of times and without times (offsets, sizes and the
-// row times of tracks of any shape).
+// row times of tracks of any shape), and UTs are dropped into the cells of its Tx side with drop_terminals (sites, sectors,
+// wrap vectors and scenarios of any shape); the result must be valid.
 
 #include "fuzz_target.hpp"
 #include "quadriga_layout.hpp"
@@ -62,6 +63,28 @@ static void sample_all(const quadriga_lib::layout_nodes &N)
         }
 }
 
+// Drops two UTs per cell and three in total into the bounds around the Tx sites (up to 50 nodes)
+static void drop_all(const quadriga_lib::layout &L)
+{
+    if (L.tx.n_node() == 0 || L.tx.n_node() > 50)
+        return;
+    const arma::mat xy = L.tx.pos.rows(0, 1);
+    const arma::vec bounds = {xy.row(0).min() - 50.0, xy.row(0).max() + 50.0, xy.row(1).min() - 50.0, xy.row(1).max() + 50.0};
+    for (bool per_cell : {true, false})
+    {
+        quadriga_lib::layout M = L;
+        bool ok = false;
+        fz::clean([&]
+                  {
+            quadriga_lib::drop_terminals(M, per_cell ? 2 : 3, bounds, {}, {}, {}, per_cell, 1);
+            ok = true; });
+        if (!ok)
+            continue; // E.g. no room in a cell, or wrap vectors that are not valid
+        if (M.rx.n_node() != (per_cell ? 2 * L.tx.n_node() : 3) || !M.is_valid().empty())
+            std::abort(); // Wrong number of UTs, or a layout that is not valid
+    }
+}
+
 static void check(const std::string &fn_tx, const std::string &fn_rx, const arma::vec &freq)
 {
     quadriga_lib::layout L;
@@ -77,6 +100,7 @@ static void check(const std::string &fn_tx, const std::string &fn_rx, const arma
         std::abort(); // The reader returned a layout that is not valid
     sample_all(L.tx);
     sample_all(L.rx);
+    drop_all(L);
 
     const std::string tx = fz::work_dir().string() + "/out_tx.csv", rx = fz::work_dir().string() + "/out_rx.csv";
     for (bool compact : {true, false})

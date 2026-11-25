@@ -164,6 +164,86 @@ std::vector<size_t> site_of_node(const quadriga_lib::layout_nodes &nodes, size_t
 // True if two numbers are equal, with NaN equal to NaN
 inline bool same_value(double a, double b) { return a == b || (a != a && b != b); }
 
+// ---- Scenario families and the O2I draws (generate_layout.cpp) ----
+
+// One scenario family of TR 38.901: its conf names (file stems without the prefix "3GPP_38.901_v19_"; "" = none), the
+// model of los_probability, the building O2I models of o2i_loss with their weights, the maximum indoor 2D distance and
+// the share of building UTs when the indoor state is drawn. A family without O2I has no O2I confs, models or share
+struct family
+{
+    std::string name;                     // Family, e.g. "UMa"
+    std::string los_conf, nlos_conf;      // Confs of LOS and NLOS links of outdoor and car UTs; InF_HH has no NLOS
+    std::string los_o2i_conf, nlos_o2i_conf; // Confs of building UTs; "" = no O2I
+    std::string los_model;                // Model of los_probability
+    std::vector<std::string> o2i_models;  // Building O2I models of o2i_loss; empty = no O2I
+    std::vector<double> o2i_weights;      // Their probabilities, [n_model]
+    double d2d_in_max;                    // Maximum indoor 2D distance in [m]; SMa: residential buildings; 0 = no O2I
+    double d2d_in_max_commercial;         // SMa: commercial buildings; else equal to d2d_in_max
+    double building_share;                // Share of building UTs of a drawn indoor state; 0 = no O2I
+    double p_residential;                 // SMa: share of residential among the building UTs; 0 = no building classes
+    bool car;                             // true: the other UTs are in cars (o2i_loss model "car"); false: outdoors
+};
+
+// The table of the families, and the entry of a family name (nullptr if the name is no family)
+const std::vector<family> &families();
+const family *find_family(const std::string &name);
+
+// The random streams of the O2I state of a terminal; the purpose names in the stream keys are "io", "o2i_class",
+// "o2i_model", "d2din1", "d2din2" and "o2i_dev". Reading of the three 50 m fields (TR 38.901 clause 7.6.3.3 has an indoor
+// state field and a building-type field): "io" decides building or not, the other UTs are outdoors or in cars as the
+// family says (no separate building-or-car field, which would repeat "io" where all non-building UTs are in cars);
+// "o2i_class" decides residential or commercial in SMa; "o2i_model" is the building type, i.e. the O2I model
+enum o2i_stream : int
+{
+    s_io,        // Indoor state: building UT if the value is below the share of building UTs
+    s_o2i_class, // SMa: residential building if the value is below p_residential, else commercial
+    s_o2i_model, // O2I model: column 0 of the input 'rnd' of o2i_loss
+    s_d2din1,    // The two uniform variables of the indoor distance: columns 1 and 2 of 'rnd'
+    s_d2din2,
+    s_o2i_dev    // Deviation of the penetration loss, Normal(0, 1): column 3 of 'rnd'
+};
+
+// One spatially correlated O2I field of a family at the first positions 'xy' of terminals, [n, 2] in [m] (TR 38.901
+// clauses 7.6.3.1 and 7.6.3.3, all-correlated): sos_rand (sos_randn for s_o2i_dev) with the preset Exp256, seeded with
+// qd_layout_seed_hash(base_seed, "<purpose>|<family>"), with the decorrelation distance 50 m (s_io, s_o2i_class,
+// s_o2i_model), 25 m (s_d2din1, s_d2din2) or 10 m (s_o2i_dev). Returns the values, [n]
+arma::vec o2i_field(arma::sword base_seed, const std::string &family, int stream, const arma::mat &xy);
+
+// The input 'rnd' of o2i_loss of terminals at 'xy' [n, 2]: the fields s_o2i_model, s_d2din1, s_d2din2, s_o2i_dev as
+// columns, [n, 4]
+arma::mat o2i_rnd(arma::sword base_seed, const std::string &family, const arma::mat &xy);
+
+// Indoor 2D distance of a building UT from the columns 1 and 2 of 'rnd', as o2i_loss gives it for its building models
+// (TR 38.901 clause 7.4.3.1: the minimum of two uniform variables in [0, d2d_in_max])
+inline double d2d_in_of(double u1, double u2, double d2d_in_max) { return std::min(u1, u2) * d2d_in_max; }
+
+// Small portable generator for the streams of one UT (SplitMix64): the state starts at the stream seed; each draw adds
+// 0x9E3779B97F4A7C15 to the state, mixes it (xor-shift 30, times 0xBF58476D1CE4E5B9, xor-shift 27, times
+// 0x94D049BB133111EB, xor-shift 31) and gives the upper 53 bits divided by 2^53, a uniform value in [0, 1). Seeding is
+// free, unlike std::mt19937_64, which matters with one stream per UT
+struct hash_rng
+{
+    unsigned long long s;
+    explicit hash_rng(arma::sword seed) : s((unsigned long long)seed) {}
+    double uniform()
+    {
+        unsigned long long z = (s += 0x9E3779B97F4A7C15ULL);
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        z ^= z >> 31;
+        return (double)(z >> 11) * (1.0 / 9007199254740992.0);
+    }
+};
+
+// Floor of a generated UT, drawn without spatial correlation from the stream "floor|<family>|<terminal>" (hash_rng with
+// that seed, two uniform draws u1, u2): the building has N_fl = n_min + floor(u1 (n_max - n_min + 1)) floors and the UT
+// is on floor 1 + floor(u2 N_fl), i.e. N_fl ~ U{n_min ... n_max} and n_fl ~ U{1 ... N_fl} as in TR 36.873 Table 6-1;
+// n_min = n_max = N gives U{1 ... N}
+int draw_floor(arma::sword base_seed, const std::string &family, const std::string &terminal, int n_min, int n_max);
+
+// Floor of a UT from its height when 'floor' is -1: max(round((z - 1.5) / 3) + 1, 1), the inverse of hUT = 3 (n_fl - 1) + 1.5
+inline int floor_from_z(double z) { return std::max((int)std::floor((z - 1.5) / 3.0 + 0.5) + 1, 1); }
+
 } // namespace qd_layout
 
 // Seed of one random stream of a layout: the 64-bit FNV-1a hash of the 8 bytes of the base seed (least significant byte
