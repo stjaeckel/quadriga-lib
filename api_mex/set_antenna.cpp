@@ -30,9 +30,9 @@ layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center
   without `args`)
 - **`args`** — Struct with the arguments of [[generate_antenna]] as fields, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
-  vectors or matrices (`steer`, `beams` row by row as there), `separate_beams` and `apply_weights` as 0 or 1; a field
-  that the type does not use raises an error; `pattern` is not available (an array built with it is set with
-  [[set_antenna_array]]); the field `center_freq` is the same as the argument; e.g.
+  vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
+  0 or 1; a field that the type does not use raises an error; `pattern` is not available (an array built with it is set
+  with [[set_antenna_array]]); the field `center_freq` is the same as the argument; e.g.
   `struct( 'panel', [4 4 1 2], 'pol', 3 )`; default: `[]` (none)
 - **`rx`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
   `false`

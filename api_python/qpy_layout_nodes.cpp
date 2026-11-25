@@ -28,10 +28,10 @@ layout_out = quadriga_lib.layout.set_antenna( layout_in, type, args, *, rx, i_no
   bands, without `args`)
 - **`args`** — Dict with the arguments of [[generate_antenna]] as keys, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
-  vectors or matrices (`steer`, `beams` row by row as there), `separate_beams` and `apply_weights` as bool or 0 or 1; a
-  key that the type does not use raises an error; `pattern` is not available (an array built with it is set with
-  [[set_antenna_array]]); the key `center_freq` is the same as the argument; e.g. `{"panel": [4, 4, 1, 2], "pol": 3}`;
-  default: None (none)
+  vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
+  bool or 0 or 1; a key that the type does not use raises an error; `pattern` is not available (an array built with it
+  is set with [[set_antenna_array]]); the key `center_freq` is the same as the argument; e.g.
+  `{"panel": [4, 4, 1, 2], "pol": 3}`; default: None (none)
 - **`rx`** — `False`: set the antenna of Tx nodes (`layout_in["tx"]`); `True`: of Rx nodes (`layout_in["rx"]`);
   default: `False`
 - **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; int or `(n,)`; `None`: all of them;

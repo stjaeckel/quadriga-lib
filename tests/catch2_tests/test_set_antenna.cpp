@@ -105,6 +105,50 @@ TEST_CASE("set_antenna - the argument form gives the same array as generate_ante
     CHECK(qd_layout_diff_array(M.antenna[0][0], quadriga_lib::generate_antenna<double>("dipole", 45.0, 6e9), gen_tol) == "");
 }
 
+TEST_CASE("set_antenna - a beams cell lists one beam per ';'-part")
+{
+    // generate_antenna takes 'beams' as [2 or 3, n_beams]; the antenna line and the CSV cell hold one beam (az, el[, w])
+    // per ';'-part, the transpose, so that 'beams' reads as 'steer' (one panel per part)
+    qd_layout_files dir("set_antenna_beams");
+    const arma::mat beams = {{0.0, 30.0}, {0.0, 10.0}, {1.0, 0.5}}; // Beam 1 at (0, 0) with weight 1, beam 2 at (30, 10) with 0.5
+    const ant_t ref = quadriga_lib::generate_antenna<double>("multibeam", 45.0, 3.5e9, {}, {2, 2}, {}, {}, {}, {}, beams);
+    quadriga_lib::layout L = qd_layout_build();
+    L.center_freq = {3.5e9};
+    quadriga_lib::set_antenna(L, "multibeam", args_t{{"res", {45.0}}, {"panel", {2.0, 2.0}}, {"beams", beams}}, false, {0});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"multibeam,45,\"2,2\",\"0,0,1;30,10,0.5\""}});
+    REQUIRE(L.antenna.size() == 1);
+    CHECK(qd_layout_diff_array(L.antenna[0][0], ref, gen_tol) == "");
+
+    // A vector in the argument map is one beam
+    quadriga_lib::layout V = qd_layout_build();
+    V.center_freq = {3.5e9};
+    quadriga_lib::set_antenna(V, "multibeam", args_t{{"res", {45.0}}, {"beams", {30.0, 10.0}}}, true, {1});
+    CHECK(V.antenna_args == std::vector<std::vector<std::string>>{{"multibeam,45,\"30,10\""}});
+    REQUIRE(V.antenna.size() == 1);
+    CHECK(qd_layout_diff_array(V.antenna[0][0], quadriga_lib::generate_antenna<double>("multibeam", 45.0, 3.5e9, {}, {}, {}, {}, {}, {}, arma::mat(arma::vec{30.0, 10.0})), gen_tol) == "");
+
+    // Written and read: the cell holds the transposed form and reads back to the same array
+    quadriga_lib::layout_csv_write(dir.path("tx.csv"), "", L);
+    CHECK(has(dir.read("tx.csv"), ",\"0,0,1;30,10,0.5\"\n"));
+    const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx.csv"), "", {3.5e9});
+    REQUIRE(L2.antenna.size() == 1);
+    REQUIRE(L2.antenna[0].size() == 1);
+    CHECK(qd_layout_diff_array(L2.antenna[0][0], ref, gen_tol) == "");
+
+    // A file typed by hand: two beams given by azimuth and elevation
+    dir.write("hand.csv", "name,x,y,z,antenna,res,panel,beams\nBS,0,0,10,multibeam,45,\"2,2\",\"0,0;30,10\"\n");
+    const quadriga_lib::layout H = quadriga_lib::layout_csv_read(dir.path("hand.csv"), "", {3.5e9});
+    REQUIRE(H.antenna.size() == 1);
+    REQUIRE(H.antenna[0].size() == 1);
+    const ant_t ref2 = quadriga_lib::generate_antenna<double>("multibeam", 45.0, 3.5e9, {}, {2, 2}, {}, {}, {}, {}, arma::mat{{0.0, 30.0}, {0.0, 10.0}});
+    CHECK(qd_layout_diff_array(H.antenna[0][0], ref2, gen_tol) == "");
+
+    // A beam of another length
+    dir.write("bad.csv", "name,x,y,z,antenna,beams\nBS,0,0,10,multibeam,\"0,0,1,1;30,10,1,1\"\n");
+    CHECK(has(qd_layout_throws([&] { quadriga_lib::layout_csv_read(dir.path("bad.csv"), "", {3.5e9}); }), "column 'beams' must have 2 or 3 entries per beam"));
+    CHECK(has(qd_layout_throws([&] { quadriga_lib::set_antenna(V, "multibeam", args_t{{"beams", arma::mat(4, 2, arma::fill::zeros)}}); }), "'beams' must be a matrix with 2 or 3 rows"));
+}
+
 TEST_CASE("set_antenna - one line for all bands is generated per band")
 {
     quadriga_lib::layout L = qd_layout_build();

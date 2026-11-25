@@ -391,7 +391,8 @@ static void qd_check_antenna_cell(const qd_csv::table &T, size_t r, size_t c, in
                 throw std::runtime_error(T.where(r, c) + " must have non-negative integer entries.");
         break;
     case col_kind::matrix:
-        T.get_matrix(r, c);
+        if (const arma::uword n = T.get_matrix(r, c).n_cols; id == c_beams && n != 2 && n != 3)
+            throw std::runtime_error(T.where(r, c) + " must have 2 or 3 entries per beam ('" + std::string(T.cell(r, c)) + "').");
         break;
     default:
         break;
@@ -1090,9 +1091,10 @@ qd_ant qd_generate(const std::string &line, const std::vector<std::string> &cols
     auto num = [&](int id) { return has(id) ? T.get_double(0, (size_t)ci[id]) : NAN; };
     auto vec = [&](int id) { return has(id) ? arma::vec(T.get_list(0, (size_t)ci[id])) : arma::vec(); };
     auto mat = [&](int id) { return has(id) ? T.get_matrix(0, (size_t)ci[id]) : arma::mat(); };
+    const arma::mat beams = mat(c_beams).t(); // One beam per ';'-part of the cell
     const arma::vec panel = vec(c_panel), pol = vec(c_pol), ports = vec(c_ports), locations = vec(c_locations);
     return quadriga_lib::generate_antenna<double>(type, num(c_res), freq, vec(c_element), panel, vec(c_spacing), pol, ports,
-                                                  mat(c_steer), mat(c_beams), vec(c_device_size), locations, qd_ant(),
+                                                  mat(c_steer), beams, vec(c_device_size), locations, qd_ant(),
                                                   has(c_separate_beams) && num(c_separate_beams) != 0.0,
                                                   has(c_apply_weights) && num(c_apply_weights) != 0.0);
 }
@@ -1606,9 +1608,9 @@ void quadriga_lib::set_antenna(
   without `args`)
 - **`args`** *(optional)* — Arguments of [[generate_antenna]] by name, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
-  vectors or matrices (`steer`, `beams` row by row as there), `separate_beams` and `apply_weights` as 0 or 1; a name
-  that the type does not use throws; `pattern` is not available (an array built with it is set with the second form);
-  `center_freq` here is the same as the argument
+  vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
+  0 or 1; a name that the type does not use throws; `pattern` is not available (an array built with it is set with the
+  second form); `center_freq` here is the same as the argument
 - **`array`** — Valid single-frequency array
 - **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
 - **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
@@ -1692,8 +1694,10 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &
                 fail("0 or 1");
             cell = v[0] == 1.0 ? "1" : "0";
             break;
-        case col_kind::matrix:
-            cell = qd_csv::format_matrix(v);
+        case col_kind::matrix: // 'beams' [2 or 3, n_beams] is written with one beam per ';'-part; a vector is one beam
+            if (id == c_beams && (v.is_vec() ? v.n_elem : v.n_rows) != 2 && (v.is_vec() ? v.n_elem : v.n_rows) != 3)
+                fail("a matrix with 2 or 3 rows, or a vector of 2 or 3 values");
+            cell = id == c_beams ? qd_csv::format_matrix(v.is_vec() ? arma::mat(arma::vectorise(v)).t() : v.t()) : qd_csv::format_matrix(v);
             break;
         default: // Lists
             if (!v.is_vec())
