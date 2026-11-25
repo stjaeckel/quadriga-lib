@@ -12,12 +12,13 @@ SECTION!*/
 
 /*!MD
 # SET_ANTENNA
-Set the antenna of layout nodes from the arguments of generate_antenna
+Set the antenna of layout nodes from the arguments of generate_antenna or from a QDANT file
 
-- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]]; [[set_antenna_array]] sets an
-  array, e.g. a measured pattern read with [[qdant_read]]
+- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file;
+  [[set_antenna_array]] sets an array, e.g. a measured pattern read with [[qdant_read]]
 - Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
-- Stores the arguments as an antenna description, which [[layout_csv_write]] writes as antenna columns
+- Stores an antenna description, which [[layout_csv_write]] writes as antenna columns (a QDANT file as a reference,
+  without a copy)
 
 ## Usage:
 ```
@@ -26,14 +27,16 @@ layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center
 
 ## Inputs:
 - **`layout_in`** — Layout struct, fields in [[layout_csv_read]]; its antenna lists must fit its nodes and frequencies
-- **`type`** — Antenna type of [[generate_antenna]], e.g. `'3GPP'`, `'dipole'`, or `'none'` (no antenna, for all bands,
-  without `args`)
+- **`type`** — Antenna type of [[generate_antenna]], e.g. `'3GPP'`, `'dipole'`; a QDANT file, i.e. a name ending in
+  `.qdant` (any case), absolute or relative to the current folder; or `'none'` (no antenna, for all bands, without
+  `args`)
 - **`args`** — Struct with the arguments of [[generate_antenna]] as fields, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
   vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
   0 or 1; a field that the type does not use raises an error; `pattern` is not available (an array built with it is set
   with [[set_antenna_array]]); the field `center_freq` is the same as the argument; e.g.
-  `struct( 'panel', [4 4 1 2], 'pol', 3 )`; default: `[]` (none)
+  `struct( 'panel', [4 4 1 2], 'pol', 3 )`. For a QDANT file only `id`, the 1-based entry of the file (default 1).
+  Default: `[]` (none)
 - **`rx`** — `false`: set the antenna of Tx nodes (`layout_in.tx`); `true`: of Rx nodes (`layout_in.rx`); default:
   `false`
 - **`i_node`** — Indices of the Tx nodes or Rx nodes chosen by `rx`, 1-based; `[]` = all of them; default: `[]`
@@ -48,6 +51,7 @@ layout_out = quadriga_lib.set_antenna( layout_in, type, args, rx, i_node, center
 ```
 layout = quadriga_lib.layout_csv_read( 'tx.csv', 'rx.csv' );
 layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2], 'pol', 3 ), false, [], 3.5e9 );
+layout = quadriga_lib.set_antenna( layout, 'measured/handset.qdant', struct( 'id', 2 ), true );
 ```
 
 ## Notes:
@@ -61,14 +65,17 @@ layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2], '
   nodes first), and entries that no node uses are removed, so `i_antenna` of other nodes can change
 - **Deferred evaluation**: an array spaced in wavelengths (`ula`, `3GPP`, `multibeam` with several element positions) in
   a layout without frequencies is generated only when a frequency is set; its nodes use the generic antenna meanwhile
+- **QDANT file**: stored as a normalised absolute path; [[layout_csv_write]] writes it relative to the CSV file. The
+  array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file raises an error;
+  without evaluation, an entry that the file does not have raises an error when the antennas are evaluated
 - The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
 
 ## See also:
 - [[generate_antenna]] (the meaning of the arguments)
+- [[qdant_read]] (reads the entries of a QDANT file)
 - [[eval_antennas]] (generates the antennas)
 - [[layout_csv_write]] (writes the descriptions and exports the arrays)
 - [[set_antenna_array]] (sets an array)
-- [[set_antenna_qdant]] (sets an entry of a QDANT file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

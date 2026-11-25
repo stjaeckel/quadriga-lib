@@ -123,11 +123,12 @@ namespace quadriga_lib
 
     // Set the antenna of nodes from the arguments of generate_antenna; the layout stores them as an antenna line
     // - Argument names as in generate_antenna; a name that the type does not use throws
+    // - A type ending in ".qdant" is a QDANT file, stored as a reference; 'args' may then only hold the 1-based entry "id"
     // - With a center_freq, only that band is set, in a new antenna entry if others share the old one; a frequency
     //   that is not in layout.center_freq is added
     void set_antenna(
         layout &layout,                                                // Layout, updated in place
-        const std::string &type,                                       // Antenna type of generate_antenna, or "none"
+        const std::string &type,                                       // Antenna type of generate_antenna, a QDANT file, or "none"
         const std::unordered_map<std::string, arma::mat> &args = {},   // Arguments by name, e.g. {"panel", {4, 4, 1, 2}}; flags 0 or 1
         bool rx = false,                                               // false: Tx nodes, true: Rx nodes
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
@@ -141,16 +142,6 @@ namespace quadriga_lib
         bool rx = false,                                               // false: Tx nodes, true: Rx nodes
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN);                                     // Band in [Hz]; NaN = the same array for all bands
-
-    // Set the antenna of nodes to an entry of a QDANT file; the layout stores a 'qdant' antenna line that refers to the file
-    void set_antenna_qdant(
-        layout &layout,                                                // Layout, updated in place
-        const std::string &qdant_file,                                 // QDANT file, relative to the current folder or absolute
-        arma::uword qdant_id = 1,                                      // 1-based entry of the file
-        bool rx = false,                                               // false: Tx nodes, true: Rx nodes
-        const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
-        double center_freq = NAN,                                      // Band in [Hz]; NaN = one antenna for all bands
-        bool evaluate = true);                                         // true: generate all antennas that are not evaluated yet
 
     // ---- Tracks: sampling, generation and orientation ----
 

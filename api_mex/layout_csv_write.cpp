@@ -37,8 +37,8 @@ quadriga_lib.layout_csv_write( fn_tx, fn_rx, layout, compact );
   what cannot be written are described in [Writing](formats.html#layout-csv-writing)
 - **QDANT files**: one file `<stem>_<k>.qdant` per antenna without description, with one entry per band. Files of this
   name pattern next to a written CSV file that the new files do not refer to are deleted. The arrays must be evaluated:
-  a layout whose `antenna` does not hold them raises an error. An antenna set with [[set_antenna_qdant]] is written as a
-  reference to its file, not exported
+  a layout whose `antenna` does not hold them raises an error. An antenna set from a QDANT file ([[set_antenna]]) is
+  written as a reference to its file, not exported
 
 ## See also:
 - [[layout_csv_read]] (reads a layout)

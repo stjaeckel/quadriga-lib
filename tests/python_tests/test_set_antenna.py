@@ -4,7 +4,7 @@
 
 # Python interface test for quadriga_lib.layout.set_antenna.
 # Scope: argument and output handling, index base, defaults, in/out split, error paths.
-# The antenna lists are tested in the Catch2 suite (test_qd_layout.cpp).
+# The antenna lists are tested in the Catch2 suite (test_set_antenna.cpp).
 # Physics validation lives in the Catch2 suite.
 
 import sys
@@ -94,6 +94,37 @@ class test_case(unittest.TestCase):
                                              center_freq=np.nan, evaluate=None)
         self.assertTrue(same(L9, quadriga_lib.layout.set_antenna(L, "3GPP", panel)))
         self.assertTrue(same(quadriga_lib.layout.set_antenna(L, "dipole", None), quadriga_lib.layout.set_antenna(L, "dipole")))
+
+    def test_qdant_file(self):
+        L = self.L
+        fn = os.path.join(self.tmp.name, "meas.qdant")
+        quadriga_lib.arrayant.qdant_write(fn, quadriga_lib.arrayant.generate_antenna("omni", 30), 1)
+        quadriga_lib.arrayant.qdant_write(fn, quadriga_lib.arrayant.generate_antenna("dipole", 30), 2)
+        F = pathlib.Path(os.path.abspath(fn)).as_posix()
+        ref, _ = quadriga_lib.arrayant.qdant_read(fn, 2)
+        L2 = quadriga_lib.layout.set_antenna(L, fn)  # entry 1 for all bands of the Tx nodes
+        npt.assert_array_equal(L2["tx"]["i_antenna"], [1, 1])
+        self.assertEqual(L2["antenna_cols"], ["antenna", "qdant_file", "qdant_id"])
+        self.assertEqual(L2["antenna_args"], [["qdant," + F + ",1"]])
+        self.assertEqual(len(L2["antenna"][0]), 1)  # one array for all bands
+        self.assertTrue(same(quadriga_lib.layout.set_antenna(L, pathlib.Path(fn)), L2))  # a path-like file name
+        L3 = quadriga_lib.layout.set_antenna(L, fn, {"id": 2}, rx=True, i_node=1)  # 0-based node 1 of the Rx side
+        npt.assert_array_equal(L3["rx"]["i_antenna"], [0, 1])
+        self.assertEqual(L3["antenna_args"], [["qdant," + F + ",2"]])
+        npt.assert_array_equal(L3["antenna"][0][0]["e_theta_re"], ref["e_theta_re"])
+        L4 = quadriga_lib.layout.set_antenna(L, fn, {"id": 2}, center_freq=3.5e9)  # the other band is not set yet
+        self.assertEqual(L4["antenna_args"], [["2000000000,,,", "3500000000,qdant," + F + ",2"]])
+        L5 = quadriga_lib.layout.set_antenna(L, fn, evaluate=False)
+        self.assertEqual(L5["antenna_args"], L2["antenna_args"])
+        self.assertEqual(L5["antenna"], [])  # not evaluated
+        with self.assertRaisesRegex(RuntimeError, "QDANT file .* does not exist or is not a file"):
+            quadriga_lib.layout.set_antenna(L, os.path.join(self.tmp.name, "none.qdant"))
+        with self.assertRaisesRegex(ValueError, "'id' must be an integer between 1"):
+            quadriga_lib.layout.set_antenna(L, fn, {"id": 0})
+        with self.assertRaisesRegex(ValueError, "a QDANT file takes only 'id'"):
+            quadriga_lib.layout.set_antenna(L, fn, {"res": 30})
+        with self.assertRaisesRegex(ValueError, "QDANT file"):  # an entry that the file does not have
+            quadriga_lib.layout.set_antenna(L, fn, {"id": 3})
 
     def test_errors(self):
         L, panel = self.L, self.panel

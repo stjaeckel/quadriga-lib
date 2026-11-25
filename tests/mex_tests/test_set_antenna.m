@@ -4,17 +4,21 @@
 
 function test_set_antenna
 % MEX interface test for quadriga_lib.set_antenna.
-% Scope: argument and output handling, 1-based node indices, the argument struct, the antenna lists of the layout, error paths.
+% Scope: argument and output handling, 1-based node indices, the argument struct, a QDANT file, the antenna lists of the layout,
+% error paths.
 % The renumbering of the antennas, the bands and the evaluation rules are tested in the Catch2 suite (test_set_antenna.cpp).
 
-%% Setup: 2 Tx sites and 2 Rx terminals without antennas, two bands
+%% Setup: 2 Tx sites and 2 Rx terminals without antennas, two bands; a QDANT file with two entries
 fn_tx = 'test_set_antenna_tx.csv';
 fn_rx = 'test_set_antenna_rx.csv';
-cleanup = onCleanup( @() delete_files( { fn_tx, fn_rx } ) ); %#ok<NASGU>
+fn_q = 'test_set_antenna.qdant';
+cleanup = onCleanup( @() delete_files( { fn_tx, fn_rx, fn_q } ) ); %#ok<NASGU>
 write_text( fn_tx, 'name,x,y,z\nA,0,0,25\nB,500,0,25\n' );
 write_text( fn_rx, 'name,x,y,z\nU1,10,20,1.5\nU2,30,40,1.5\n' );
 L = quadriga_lib.layout_csv_read( fn_tx, fn_rx, [ 2e9, 3.5e9 ] );
 assertEqual( L.tx.i_antenna, uint32( [ 0; 0 ] ) );
+quadriga_lib.qdant_write( fn_q, quadriga_lib.generate_antenna( 'omni', 30 ), 1 );
+quadriga_lib.qdant_write( fn_q, quadriga_lib.generate_antenna( 'dipole', 30 ), 2 );
 
 %% Basic call: a 3GPP panel of 2 x 2 x 1 x 2 elements for all Tx nodes
 L2 = quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ) );
@@ -46,6 +50,24 @@ assertEqual( L6.tx.i_antenna, uint32( [ 0; 1 ] ) );
 L7 = quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', single( [ 2; 2; 1; 2 ] ), 'center_freq', 3.5e9 ) );   % the band in args
 assertEqual( L7.antenna_args, { { '2000000000,,'; '3500000000,3GPP,"2,2,1,2"' } } );   % the other band is not set
 
+%% A QDANT file: entry 1 by default, the entry in args, a band, no evaluation
+F = strrep( fullfile( pwd, fn_q ), '\', '/' );                                  % normalised absolute path
+r2 = quadriga_lib.qdant_read( fn_q, 2 );
+Q1 = quadriga_lib.set_antenna( L, fn_q );
+assertEqual( Q1.tx.i_antenna, uint32( [ 1; 1 ] ) );
+assertEqual( Q1.antenna_cols, { 'antenna'; 'qdant_file'; 'qdant_id' } );
+assertEqual( Q1.antenna_args, { { [ 'qdant,', F, ',1' ] } } );
+assertEqual( size( Q1.antenna{1} ), [ 1, 1 ] );                                 % one array for all bands
+Q2 = quadriga_lib.set_antenna( L, fn_q, struct( 'id', uint8( 2 ) ), true, 2 );
+assertEqual( Q2.rx.i_antenna, uint32( [ 0; 1 ] ) );
+assertEqual( Q2.antenna_args, { { [ 'qdant,', F, ',2' ] } } );
+assertEqual( Q2.antenna{1}.e_theta_re, r2.e_theta_re );
+Q3 = quadriga_lib.set_antenna( L, fn_q, struct( 'id', 2 ), false, [], 3.5e9 ); % one band: the other band is not set yet
+assertEqual( Q3.antenna_args, { { '2000000000,,,'; [ '3500000000,qdant,', F, ',2' ] } } );
+Q4 = quadriga_lib.set_antenna( L, fn_q, [], false, [], NaN, false );
+assertEqual( Q4.antenna_args, Q1.antenna_args );
+assertTrue( isempty( Q4.antenna ) );                                            % not evaluated
+
 %% Outputs: none
 quadriga_lib.set_antenna( L, '3GPP', struct( 'panel', [ 2, 2, 1, 2 ] ) );
 assertTrue( isequaln( ans, L2 ) );
@@ -65,6 +87,9 @@ assert_throws( @() quadriga_lib.set_antenna( L, 'dipole', [], false, 3 ), 'Input
 assert_throws( @() quadriga_lib.set_antenna( L, '3GPP', struct( 'foo', 1 ) ), 'Input ''args'' has the unknown argument ''foo''.' );               % C++
 assert_throws( @() quadriga_lib.set_antenna( L, 'dipole', struct( 'panel', [ 2, 2, 1, 2 ] ) ), 'is not used by the antenna type ''dipole''' );   % C++
 assert_throws( @() quadriga_lib.set_antenna( L, 'nope' ), 'Input ''type'' must be an antenna type of generate_antenna' );                       % C++
+assert_throws( @() quadriga_lib.set_antenna( L, 'no_such_file.qdant' ), 'QDANT file ''no_such_file.qdant'' does not exist or is not a file.' );   % C++
+assert_throws( @() quadriga_lib.set_antenna( L, fn_q, struct( 'id', 0 ) ), 'Input ''args'': ''id'' must be an integer between 1 and 2147483647.' );   % C++
+assert_throws( @() quadriga_lib.set_antenna( L, fn_q, struct( 'res', 30 ) ), 'Input ''args'': a QDANT file takes only ''id'' (''res'').' );   % C++
 
 end
 

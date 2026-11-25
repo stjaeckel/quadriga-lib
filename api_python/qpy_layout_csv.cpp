@@ -36,9 +36,8 @@ store them in files, move the nodes along tracks and compute the channels of all
 
 1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [[layout.csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes
-2. Set the frequencies `layout["center_freq"]` and the antennas ([[set_antenna]], [[set_antenna_array]],
-   [[set_antenna_qdant]]); [[eval_antennas]] generates the antennas that are not evaluated yet, or all of them for new
-   frequencies
+2. Set the frequencies `layout["center_freq"]` and the antennas ([[set_antenna]], [[set_antenna_array]]);
+   [[eval_antennas]] generates the antennas that are not evaluated yet, or all of them for new frequencies
 3. Optionally, move the nodes: [[generate_track]] creates tracks, [[set_orientation]] turns the antennas along the
    motion, [[sample_track]] gives the positions at given times
 4. Compute the channels with [[get_channels_layout]]
@@ -49,11 +48,11 @@ the geometry-based stochastic model (GBSM), and [[get_gbsm_channels]] applies th
 gain. Between the stages, link states and rays can be inspected or edited, [[attach_terminals]] selects the serving cell
 of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
-**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]],
-[[set_antenna_array]] from an array, [[set_antenna_qdant]] from an entry of a QDANT file; in the CSV files, antenna
-columns describe it. [[eval_antennas]] generates the arrays from the descriptions. A node has one antenna for all bands
-or one per band. A node without an antenna uses the generic antenna: two co-located isotropic elements with vertical and
-horizontal polarization.
+**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]] or from an
+entry of a QDANT file, [[set_antenna_array]] from an array; in the CSV files, antenna columns describe it.
+[[eval_antennas]] generates the arrays from the descriptions. A node has one antenna for all bands or one per band. A
+node without an antenna uses the generic antenna: two co-located isotropic elements with vertical and horizontal
+polarization.
 
 **Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 
@@ -222,8 +221,8 @@ quadriga_lib.layout.csv_write( fn_tx, fn_rx, layout, *, compact )
   what cannot be written are described in [Writing](formats.html#layout-csv-writing)
 - **QDANT files**: one file `<stem>_<k>.qdant` per antenna without description, with one entry per band. Files of this
   name pattern next to a written CSV file that the new files do not refer to are deleted. The arrays must be evaluated:
-  a layout whose `antenna` does not hold them raises an error. An antenna set with [[set_antenna_qdant]] is written as a
-  reference to its file, not exported
+  a layout whose `antenna` does not hold them raises an error. An antenna set from a QDANT file ([[set_antenna]]) is
+  written as a reference to its file, not exported
 
 ## See also:
 - [[layout.csv_read]] (reads a layout)

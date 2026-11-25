@@ -51,7 +51,6 @@ POSITIONAL_OPTIONAL = {
     "gbsm.scenpar_validate": ("scenpar_in",),
     "layout.generate_layout": ("n_ut",),
     "layout.set_antenna": ("args",),
-    "layout.set_antenna_qdant": ("qdant_id",),
     "sos.preset": ("dist_decorr",),
     "sos.val": ("pos_b",),
     "sos.rand": ("pos_b",),

@@ -8,6 +8,7 @@
 #include "qd_helpers_shared.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
@@ -43,7 +44,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 
 1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [[layout_csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes
-2. Set the frequencies `layout.center_freq` and the antennas ([[set_antenna]], [[set_antenna_qdant]])
+2. Set the frequencies `layout.center_freq` and the antennas ([[set_antenna]])
 3. Optionally, move the nodes: [[generate_track]] creates tracks, [[set_orientation]] turns the antennas along the
    motion, [[sample_track]] gives the positions at given times
 4. Compute the channels with [[get_channels_layout]]
@@ -54,10 +55,10 @@ the geometry-based stochastic model (GBSM), and [[get_gbsm_channels]] applies th
 gain. Between the stages, link states and rays can be inspected or edited, [[attach_terminals]] selects the serving cell
 of each terminal, and [[export_rays_qrt]] stores the rays in a QRT file.
 
-**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]] or from an
-array, [[set_antenna_qdant]] from an entry of a QDANT file; in the CSV files, antenna columns describe it. A node has
-one antenna for all bands or one per band. A node without an antenna uses the generic antenna: two co-located isotropic
-elements with vertical and horizontal polarization.
+**Antennas.** Each node has one antenna. [[set_antenna]] sets it from the arguments of [[generate_antenna]], from an
+entry of a QDANT file or from an array; in the CSV files, antenna columns describe it. A node has one antenna for all
+bands or one per band. A node without an antenna uses the generic antenna: two co-located isotropic elements with
+vertical and horizontal polarization.
 
 **Terms** (full list in the [Glossary](cpp_api.html#glossary)):
 
@@ -141,7 +142,7 @@ Class for a network layout: Tx and Rx nodes, antennas, frequencies and link stat
 - [[layout_nodes]] (the Tx nodes and the Rx nodes)
 - [[layout_links]] (link states)
 - [[layout_csv_read]], [[layout_csv_write]] (load and store a layout)
-- [[set_antenna]], [[set_antenna_qdant]] (set the antennas of nodes)
+- [[set_antenna]] (sets the antennas of nodes)
 MD!*/
 
 /*!MD
@@ -1575,13 +1576,13 @@ void quadriga_lib::layout::eval_antennas(const arma::vec &center_freq_new)
 
 /*!MD
 # set_antenna
-Set the antenna of layout nodes from the arguments of generate_antenna or from an evaluated array
+Set the antenna of layout nodes from the arguments of generate_antenna, from a QDANT file or from an evaluated array
 
-- Sets the antenna of Tx nodes or Rx nodes, from the arguments of [[generate_antenna]] (first form) or from an array
-  (second form), e.g. a measured pattern read with [[qdant_read]]
+- Sets the antenna of Tx nodes or Rx nodes from the arguments of [[generate_antenna]] or from an entry of a QDANT file
+  (first form), or from an array (second form), e.g. a measured pattern read with [[qdant_read]]
 - Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
-- The first form stores the arguments as an antenna description, which [[layout_csv_write]] writes as antenna columns;
-  the second form stores the array, which the writer exports to a QDANT file
+- The first form stores an antenna description, which [[layout_csv_write]] writes as antenna columns (a QDANT file as a
+  reference, without a copy); the second form stores the array, which the writer exports to a QDANT file
 
 ## Declarations:
 ```
@@ -1604,13 +1605,14 @@ void quadriga_lib::set_antenna(
 
 ## Inputs:
 - **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
-- **`type`** — Antenna type of [[generate_antenna]], e.g. `3GPP`, `dipole`, or `none` (no antenna, for all bands,
-  without `args`)
+- **`type`** — Antenna type of [[generate_antenna]], e.g. `3GPP`, `dipole`; a QDANT file, i.e. a name ending in `.qdant`
+  (any case), absolute or relative to the current folder; or `none` (no antenna, for all bands, without `args`)
 - **`args`** *(optional)* — Arguments of [[generate_antenna]] by name, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
   vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
   0 or 1; a name that the type does not use throws; `pattern` is not available (an array built with it is set with the
-  second form); `center_freq` here is the same as the argument
+  second form); `center_freq` here is the same as the argument. For a QDANT file only `id`, the 1-based entry of the
+  file (default 1)
 - **`array`** — Valid single-frequency array
 - **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
 - **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
@@ -1622,6 +1624,7 @@ void quadriga_lib::set_antenna(
 ```
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_antenna(L, "3GPP", {{"panel", {4, 4, 1, 2}}, {"pol", {3}}}, false, {}, 3.5e9);
+quadriga_lib::set_antenna(L, "measured/handset.qdant", {{"id", {2}}}, true);
 quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0], true);
 ```
 
@@ -1636,21 +1639,51 @@ quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0
   nodes first), and entries that no node uses are removed, so `i_antenna` of other nodes can change
 - **Deferred evaluation**: an array spaced in wavelengths (`ula`, `3GPP`, `multibeam` with several element positions) in
   a layout without frequencies is generated only when a frequency is set; its nodes use the generic antenna meanwhile
+- **QDANT file**: stored as a normalised absolute path; [[layout_csv_write]] writes it relative to the CSV file. The
+  array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file throws
+  `std::runtime_error`; without evaluation, an entry that the file does not have throws when the antennas are evaluated
 - A failed call leaves the layout unchanged
 
 ## See also:
 - [[generate_antenna]] (the meaning of the arguments)
+- [[qdant_read]] (reads the entries of a QDANT file)
 - [[layout]] (the antenna lists and the member function `eval_antennas`)
 - [[layout_csv_write]] (writes the lines and exports the arrays)
-- [[set_antenna_qdant]] (sets an entry of a QDANT file)
 MD!*/
 
 void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const std::string &type, const std::unordered_map<std::string, arma::mat> &args,
                                bool rx, const uint_list &i_node, double center_freq, bool evaluate)
 {
+    // A file name ending in ".qdant" selects the QDANT type with that file
+    std::string suffix = type.size() > 6 ? type.substr(type.size() - 6) : std::string();
+    std::transform(suffix.begin(), suffix.end(), suffix.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+    if (suffix == ".qdant")
+    {
+        arma::uword id = 1;
+        for (const auto &kv : args)
+        {
+            if (kv.first != "id")
+                throw std::invalid_argument("Input 'args': a QDANT file takes only 'id' ('" + kv.first + "').");
+            const arma::mat &v = kv.second;
+            if (v.n_elem != 1 || !(v[0] >= 1.0 && v[0] <= 2147483647.0 && std::floor(v[0]) == v[0]))
+                throw std::invalid_argument("Input 'args': 'id' must be an integer between 1 and 2147483647.");
+            id = (arma::uword)v[0];
+        }
+        std::error_code ec;
+        if (!std::filesystem::is_regular_file(type, ec))
+            throw std::runtime_error("QDANT file '" + type + "' does not exist or is not a file.");
+        if (!std::ifstream(type, std::ios::binary).good())
+            throw std::runtime_error("QDANT file '" + type + "' cannot be read.");
+        antenna_cells cells; // The cells that layout_csv_read composes for this file
+        cells[c_antenna - cf] = "qdant";
+        cells[c_qdant_file - cf] = std::filesystem::absolute(type).lexically_normal().generic_string();
+        cells[c_qdant_id - cf] = std::to_string(id);
+        qd_set_antenna(layout, &cells, nullptr, rx, i_node, center_freq, evaluate ? 2 : 0);
+        return;
+    }
     const unsigned mask = antenna_type_mask(type);
     if (mask == 0 || mask == t_qdant)
-        throw std::invalid_argument("Input 'type' must be an antenna type of generate_antenna or 'none' ('" + type + "').");
+        throw std::invalid_argument("Input 'type' must be an antenna type of generate_antenna, a QDANT file or 'none' ('" + type + "').");
     antenna_cells cells;
     cells[c_antenna - cf] = type;
     double freq = center_freq;
@@ -1720,70 +1753,4 @@ void quadriga_lib::set_antenna(quadriga_lib::layout &layout, const arrayant<doub
     if (!msg.empty())
         throw std::invalid_argument("Input 'array' is not valid: " + msg);
     qd_set_antenna(layout, nullptr, &array, rx, i_node, center_freq, 1);
-}
-
-/*!MD
-# set_antenna_qdant
-Set the antenna of layout nodes to an entry of a QDANT file
-
-- Sets the antenna of Tx nodes or Rx nodes to an array stored in a QDANT file, e.g. a measured or simulated pattern
-- The layout refers to the file: [[layout_csv_write]] writes the reference (the columns `antenna` = `qdant`,
-  `qdant_file`, `qdant_id`), relative to the CSV file, and exports no copy of the array
-- The array is used as stored, not rescaled to the frequency of a band; the rules for bands and the antenna lists are
-  those of [[set_antenna]]
-
-## Declaration:
-```
-void quadriga_lib::set_antenna_qdant(
-    quadriga_lib::layout &layout,
-    const std::string &qdant_file,
-    arma::uword qdant_id = 1,
-    bool rx = false,
-    const uint_list &i_node = {},
-    double center_freq = NAN,
-    bool evaluate = true);
-```
-
-## Inputs:
-- **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
-- **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
-- **`qdant_id`** *(optional)* — 1-based entry of the file
-- **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
-- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
-- **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
-- **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none
-
-## Example:
-```
-quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
-quadriga_lib::set_antenna_qdant(L, "measured/handset.qdant", 2, true);
-```
-
-## Notes:
-- **Path**: the file is stored as a normalised absolute path
-- **Errors**: a missing or unreadable file throws `std::runtime_error`; without evaluation, an entry that the file does
-  not have throws when the antennas are evaluated. A failed call leaves the layout unchanged
-
-## See also:
-- [[set_antenna]] (sets the antenna from the arguments of generate_antenna or from an array)
-- [[qdant_read]] (reads the entries of a QDANT file)
-MD!*/
-
-void quadriga_lib::set_antenna_qdant(quadriga_lib::layout &layout, const std::string &qdant_file, arma::uword qdant_id, bool rx,
-                                     const uint_list &i_node, double center_freq, bool evaluate)
-{
-    if (qdant_file.empty())
-        throw std::invalid_argument("Input 'qdant_file' must not be empty.");
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(qdant_file, ec))
-        throw std::runtime_error("QDANT file '" + qdant_file + "' does not exist or is not a file.");
-    if (!std::ifstream(qdant_file, std::ios::binary).good())
-        throw std::runtime_error("QDANT file '" + qdant_file + "' cannot be read.");
-    if (qdant_id == 0 || qdant_id > 2147483647)
-        throw std::invalid_argument("Input 'qdant_id' must be between 1 and 2147483647.");
-    antenna_cells cells; // The cells that layout_csv_read composes for this file
-    cells[c_antenna - cf] = "qdant";
-    cells[c_qdant_file - cf] = std::filesystem::absolute(qdant_file).lexically_normal().generic_string();
-    cells[c_qdant_id - cf] = std::to_string(qdant_id);
-    qd_set_antenna(layout, &cells, nullptr, rx, i_node, center_freq, evaluate ? 2 : 0);
 }
