@@ -330,7 +330,7 @@ All columns are defined in one central table in `src/qd_layout.cpp`, with name, 
 | `cell` | Fixed, Tx side | integer | | 0 = the site has no drop cells of its own (`drop_terminals`; the micro sites of `M.2412_DenseUrban` config 3); default 1; equal for all sectors of a site; not part of the link hash |
 | `pairing` | Fixed, Rx side | list | | Names of the Tx sites linked to this terminal; empty = all (`layout.pairing`) |
 | `relative` | Fixed | integer | | 1 = orientation relative to the direction of motion (section 6.1); default 0 |
-| `antenna` | Fixed | text | | `generate_antenna` type, or `qdant` |
+| `antenna` | Fixed | text | | `generate_antenna` type, `qdant`, or `none` (no antenna, `i_antenna` 0; added in the implementation, so that an extra sector without antenna can be written) |
 | `qdant_file`, `qdant_id` | Fixed | text, integer | | For `antenna = qdant`: QDANT file relative to the CSV file, and its 1-based entry (default 1) |
 | `res`, `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `separate_beams`, `apply_weights`, `device_size`, `locations` | Fixed | list or matrix | as `generate_antenna` | Arguments of `generate_antenna` |
 
@@ -791,7 +791,7 @@ With `Exp256` and no bias removal, results do not depend on the batch. For `quad
 
 1. For each channel link and frequency: sample both nodes with `sample_track` over the requested `times`. Rays of a link are taken as entry `i_freq` with `gbsm_single_link_channel` frequency index 0 when there are `n_freq` entries (TR methods), and as entry 0 with frequency index `i_freq` when there is one (`quadriga`); `attach_terminals` uses the same rule. A one-row node is expanded to the snapshot count of the other; two multi-row nodes without `times` need equal row counts. The array is the node's antenna, or `xpol` (section 3).
 2. Link gain per snapshot: `−PL − O2I + 10 lg(SF)`. The `lsf` phases are recomputed from the group seed. `gbsm_draw` (`lsf`) gives the values at the segment start and at moved positions, `path_loss` uses `rnd_he` **held** at its segment-start value (otherwise the loss steps along the track), then `lsp_generate`, `o2i_loss` for building and car UTs with the stored model, the fixed distance columns and the deviation column at the moved position for building UTs (car UTs keep the value drawn at the first row of the terminal: TR 38.901 eq. 7.4-4 draws the car loss per UT; changed in the implementation), and `kf_ratio`, as in the section description of `src/qd_scenpar.cpp`. A node that does not move needs one evaluation only.
-3. `gbsm_single_link_channel` with the Tx position shifted by the link's image offset, per segment, with absolute delays internally when the link has several segments, so that merged segments share one delay reference. The result is converted to the requested delay form.
+3. `gbsm_single_link_channel` with the Tx position shifted by the link's image offset, per segment. As implemented: in `drift` with absolute delays internally, so that merged segments share one delay reference; in `phase` each segment in the requested delay form, relative to its own LOS, because absolute delays shifted the paths of the old segment by the change of the LOS distance (found in review).
 4. Tracks with several segments: the channels of consecutive segments are joined by `crossfade_segments`. A segment other than the first also covers the snapshots of the preceding segment, as in NG's `get_subtrack`, and its rays refer to the first position of the segment.
 5. Output in canonical order: `i_tx_node` varies fastest, then `i_rx_node`, then `i_freq` slowest, with only the paired links. `channel::name` is `<tx name>:<sector>_<rx name>:<sector>`, without the sector when the node's sector column is all 0. The `index` output gives the position in a 3D grid for HDF5 storage.
 
@@ -848,7 +848,7 @@ It is a port of `qd_channel.merge` and `merge_coeff` of QuaDRiGa-NG, renamed aft
 - **LOS:** one LOS path is kept. Its phase, delay and path members come from one source segment, the new one unless its LOS power is 0, then the old one. Its coefficient is scaled so that `|h|² = (1 − w) |h_old|² + w |h_new|²`, using the path gain for rays and the tap power for taps. This deliberately deviates from NG, which mixes the two LOS coefficients linearly: in phase mobility the two segments evaluate the LOS with planar expansions about different reference points, so their phases differ and a coherent mix would fade in the ramp.
 - **GR:** the same rule as LOS if both segments have a GR path; otherwise a `sqrt` ramp of the one that exists.
 
-LOS and GR are identified by the `path_type` entry in `par_data` (0 LOS, 1 GR, 2 NLOS, per path or per tap; added in the implementation), which `gbsm_single_link_channel` writes for both output forms next to `tap`; without it, by the `tap` entry (LOS 0, GR 3 if one ray holds it and there are no taps 4 and 5), which misclassifies the first NLOS cluster when GR is off and a cluster has one ray. Delays are consistent because stage 3 uses absolute delays internally. The output holds `name`, `center_freq`, positions, orientations, `coeff_re`, `coeff_im` and `delay`, equal `n_rx` and `n_tx`, and valid `is_valid()`. For rays, the path-level members (`path_gain` scaled by the weight, `path_length`, `polmat` scaled by the square root of the weight, `path_angles`, `fbs_pos`, `lbs_pos`) are carried for every kept ray, because each ray keeps its geometry. For taps they are not carried, because a matched tap has no single geometry. `par_data` is not carried. The NG faults of section 10.3 are fixed in the port. It is in the section "Channel functions", and in Python `qd.channel.crossfade_segments`.
+LOS and GR are identified by the `path_type` entry in `par_data` (0 LOS, 1 GR, 2 NLOS, per path or per tap; added in the implementation), which `gbsm_single_link_channel` writes for both output forms next to `tap`; without it, by the `tap` entry (LOS 0, GR 3 if one ray holds it and there are no taps 4 and 5), which misclassifies the first NLOS cluster when GR is off and a cluster has one ray. Delays: see stage 3, step 3. The output holds `name`, `center_freq`, positions, orientations, `coeff_re`, `coeff_im` and `delay`, equal `n_rx` and `n_tx`, and valid `is_valid()`. For rays, the path-level members (`path_gain` scaled by the weight, `path_length`, `polmat` scaled by the square root of the weight, `path_angles`, `fbs_pos`, `lbs_pos`) are carried for every kept ray, because each ray keeps its geometry. For taps they are not carried, because a matched tap has no single geometry. `par_data` is not carried. The NG faults of section 10.3 are fixed in the port. It is in the section "Channel functions", and in Python `qd.channel.crossfade_segments`.
 
 ## 9. Wrappers
 
@@ -1019,3 +1019,51 @@ Decided in the fourth round: the QRT export is `export_rays_qrt`; the segment jo
 A third, optional links file for forced link states can be added later without changing the two main files: one row per forced propagation link with the columns `tx`, `rx`, `segment` and the forced values (`los`, `indoor`), keyed by names, applied by `init_link_states` after the draw, and checked against the layout's names and segments.
 
 Open for later work, not blocking: wideband antenna arrays (`set_antenna_mf`, D6), speakers (`set_speaker`), band masks per node, the QRT format's missing fields, and a TR shortcut such as `get_channels_38901`.
+
+## 14. Implementation record
+
+The layout system was implemented in thirteen work packages (section 11), each with an implementation and an independent review, followed by a round of follow-up items. This section records what differs from the plan above, how the open questions were decided, and the problems met.
+
+### 14.1 Deviations from the plan
+
+- CSV parsing uses `strtod` on checked text instead of stream extraction (about 3x faster, locale independent); the writer also quotes cells that start with `#` or a byte-order mark.
+- Node names must not contain a comma, semicolon, quote or line break, or start or end with a blank, so that every readable layout can be written; seeds are read and written as 64-bit integers, because values above 2^53 were damaged through `double`.
+- `set_antenna` does not fold per-band lines and re-encodes the antenna table canonically after each call, because folding made the result depend on the call history; `i_antenna` of untouched nodes can change (documented).
+- The antenna type `none` was added, so that an extra sector without antenna next to a sector 0 with one can be written.
+- The seed hash moved from WP5 to WP4, because `generate_track` needs it; `length` = 0 of `generate_track` means the type default, so a zero-length linear track cannot be expressed.
+- The drop rules live in the preset table (needed for the M.2412 presets); the drop is serial (21 ms for 5700 UTs), so its OpenMP regions were removed. Library values where the TR or the Report give none (minimum distances of the M.2412 presets, mechanical tilt 0, micro-site spacing, right-hand traffic) are documented as such.
+- Dense Urban config C drops 4 `n_ut` per macro sector cell and keeps 10 m from the micro sites instead of giving the micro sites cells of their own; the indoor distance of the M.2412 presets is the TR 38.901 minimum of two uniforms.
+- Stages 2 and 3 do not re-run `layout.is_valid` (690 ms per million rows); size checks and the members outside the link hash are checked instead. One O2I state per terminal, from the first linked site with O2I.
+- Rays of a layout are generated in batches of sites up to 256 links, which bounds the memory (510 MB to 168 MB in the measured case) and also shortens the QRT export.
+- Phase mobility computes each segment in the requested delay form; only `drift` keeps absolute delays (stage 3, step 3).
+- Taps of `crossfade_segments` keep NG's matching and fade order, with the fade times set by power share so that old and new taps hold `1 − w` and `w` of their mean power over the ramp; measured within 0.12 to 0.73 dB per snapshot of the power rule. Rays follow the rule exactly.
+- The MATLAB and Python wrappers of `crossfade_segments` take the per-path data as an extra input `par` (the wrapper channel structs carry no `par_data`), as `gbsm_single_link_channel` returns it.
+- Follow-up items: `set_antenna_qdant`; the `cell` column; `absTOA_Lmax` for the InH presets; the car loss held per vehicle; the `path_type` entry; one sentence on the memory of large arrays in the `layout_csv_read` documentation.
+
+### 14.2 Decisions on the open questions
+
+- Q1 (a scenario cannot return to none along a track): (a) the writer throws; the antenna half was solved by `antenna = none`.
+- Q2 (reference a QDANT file by name): (b), the separate function `set_antenna_qdant`; in Python `qdant_id` is a positional optional argument.
+- Q3 (default 1° grid: reading large arrays takes seconds and gigabytes): (a) for now, with a sentence in the `layout_csv_read` documentation; a rework (element pattern and array factor at the path angles) is tracked in issue #99.
+- Q4 (wavelength-spaced array without any frequency in the files): (a), the reader throws.
+- Q5 (InH `absTOA_Lmax`): (b), the InH presets write it, as the InF presets do.
+- Q6 (indoor share below nominal at ISD 200 m): (a), kept and documented; the spatial correlation of the indoor state is the more specific requirement.
+- Q7 (`drop_terminals` on Dense Urban config C with scenarios set): (b), the per-site `cell` column; a site without a family keeps no minimum distance unless `ut` entry 1 gives one.
+- Q8 (car loss varying along a drive): (b), the deviation of a car UT is held at the first row of the terminal.
+- Q9 (`i_conf` and `gbsm_seed` as inputs): (a), kept as outputs.
+- Q10 (GR identification when GR is off): (b), the explicit `path_type` entry, with the tap rule as fallback.
+- Q11 (tap cross-fade: NG matching or a union as for rays): (a) for now; a study of the alternatives is under way.
+- Q12 (`par` as an extra wrapper input of `crossfade_segments`): (a) for now.
+- Q13 (wrapper helpers parse the layout header through `quadriga_lib.hpp`): (a), the cost is small.
+
+### 14.3 Problems met
+
+- Phase-mobility delays: with absolute delays inside a segment join, the paths of the old segment were shifted by the change of the LOS distance (the LOS ended up at −32 to −329 ns); fixed by computing each segment in its own delay form.
+- A one-snapshot O2I spike (+7.2 dB) at the first row of a later indoor segment, because the loss deviation was drawn at the segment start instead of following the field from the first row of the terminal; fixed.
+- The d2D-out rule for building UTs (TR 36.873 Table 6-1, note 1) rejects indoor UTs near a site more often, so the indoor share falls below nominal at small ISD (measured 0.794 for UMi and 0.787 and 0.757 for Dense Urban configs A and C, all at ISD 200 m and nominal 0.8; 0.801 for UMa at ISD 500 m).
+- OpenMP regions after serial work cost 3 to 9 ms under the default wait policy against 0.06 ms with the passive policy; size limits of parallel regions were set so that they are safe under both, and earlier limits measured with the default policy may deserve a re-check.
+- Large panels on the default 1° grid: a 16 × 16 × 1 × 4 panel holds about 2 GB of patterns per band, so reading such a layout takes seconds and several GB (Q3).
+- `drop_terminals` on Dense Urban config C failed with "no room" once scenarios were set, because the micro sites cut the macro cells below the minimum distance (Q7).
+- The GR heuristic of the segment join misclassifies the first NLOS cluster when GR is off and a cluster has one ray (Q10).
+- NG faults found in the port: `merge` read the Tx position for the Tx orientation (fixed in the port); `merge_coeff` compares the LOS delay with itself, so NG keeps the old LOS delay while mixing (section 10.3).
+- A wrap basis whose seven images are not the nearest ones gave wrong cells and link images; `is_valid` now requires a reduced basis.
