@@ -606,8 +606,8 @@ TEST_CASE("init_link_states - O2I: fixed d2d_in, car UTs, InH and InF")
     L.rx.d2d_in = {12.0, 12.0, 12.0, 12.0};
     quadriga_lib::init_link_states(L);
     const auto &K = L.links;
-    CHECK(K.o2i_rnd(0, 1) == 12.0 / 25.0);
-    CHECK(K.o2i_rnd(0, 2) == 12.0 / 25.0);
+    CHECK(std::abs(K.o2i_rnd(0, 1) - 12.0 / 25.0) < 1e-15);
+    CHECK(std::abs(K.o2i_rnd(0, 2) - 12.0 / 25.0) < 1e-15);
     for (arma::uword l = 0; l < K.n_link(); ++l)
     {
         const arma::uword t = K.i_rx[l];

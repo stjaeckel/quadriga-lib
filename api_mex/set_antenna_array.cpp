@@ -4,7 +4,7 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "qd_mex_layout.hpp"
+#include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
 Network layouts and mobility

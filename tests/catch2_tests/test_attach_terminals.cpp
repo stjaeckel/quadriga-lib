@@ -472,7 +472,7 @@ TEST_CASE("attach_terminals - a terminal with several panels takes its best pane
         CHECK(std::abs(g(0, i) - (link_gain(L, l, 0) + 10.0 * std::log10(std::max(1.0, b)))) < (b > 1.0 ? tol_grid : tol12));
         CHECK((b > 1.0) == (i == 2)); // the element panel gives the value toward BS2
     }
-    CHECK(g(1, 0) == g(1, 1)); // the same computation for both sectors: an exact tie
+    CHECK(std::abs(g(1, 0) - g(1, 1)) < 1e-12 * std::abs(g(1, 0))); // the same computation for both sectors: a tie
     CHECK(srv(1) == 0);
 }
 

@@ -429,8 +429,10 @@ if(BUILD_MATLAB)
         set(MEX_COMPAT_SHIM ${CMAKE_SOURCE_DIR}/src/mex_compat_shim.cpp)
     endif()
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
+    # MEX build commands do not track their includes, hence the glob; MEX files also depend on the library, so
+    # core-only headers rebuild them whatever their name
     file(GLOB QD_HELPER_HEADERS "${CMAKE_SOURCE_DIR}/src/qd_helpers_*.hpp")
-    file(GLOB QD_MEX_HEADERS "${CMAKE_SOURCE_DIR}/api_mex/*.hpp")
+    list(FILTER QD_HELPER_HEADERS EXCLUDE REGEX "/qd_helpers_python[^/]*\\.hpp$")
     set(MEX_MATLAB_TARGETS "")
 
     foreach(mex_src ${API_MEX_FILES})
@@ -440,7 +442,6 @@ if(BUILD_MATLAB)
         set(mex_deps ${mex_src})
         list(APPEND mex_deps quadriga_static ${MEX_COMPAT_SHIM})
         list(APPEND mex_deps ${QD_HELPER_HEADERS})
-        list(APPEND mex_deps ${QD_MEX_HEADERS})
         list(APPEND mex_deps ${MATLAB_MEX_DIR}/.stamp)
 
         if(MSVC)
@@ -491,8 +492,10 @@ if(BUILD_OCTAVE)
 
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
+    # MEX build commands do not track their includes, hence the glob; MEX files also depend on the library, so
+    # core-only headers rebuild them whatever their name
     file(GLOB QD_HELPER_HEADERS "${CMAKE_SOURCE_DIR}/src/qd_helpers_*.hpp")
-    file(GLOB QD_MEX_HEADERS "${CMAKE_SOURCE_DIR}/api_mex/*.hpp")
+    list(FILTER QD_HELPER_HEADERS EXCLUDE REGEX "/qd_helpers_python[^/]*\\.hpp$")
     set(MEX_OCTAVE_TARGETS "")
 
     foreach(mex_src ${API_MEX_FILES})
@@ -502,7 +505,6 @@ if(BUILD_OCTAVE)
         set(mex_deps ${mex_src})
         list(APPEND mex_deps ${QUADRIGA_LINK_TARGET})
         list(APPEND mex_deps ${QD_HELPER_HEADERS})
-        list(APPEND mex_deps ${QD_MEX_HEADERS})
 
         if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
             set(QD_MEX_EXTRA_LIBS "")
@@ -586,7 +588,9 @@ if (BUILD_PYTHON)
     else()
         set_target_properties(quadriga_py PROPERTIES INSTALL_RPATH "$ORIGIN" BUILD_RPATH "$ORIGIN")
     endif()
+    # The Python units depend on the helper headers except the MEX ones, which they do not include
     file(GLOB PYTHON_INCLUDED_FILES "api_python/*.cpp" "src/qd_helpers_*.hpp")
+    list(FILTER PYTHON_INCLUDED_FILES EXCLUDE REGEX "/qd_helpers_mex[^/]*\\.hpp$")
     set_source_files_properties(${PYTHON_SOURCES} PROPERTIES OBJECT_DEPENDS "${PYTHON_INCLUDED_FILES}")
     message(STATUS "Building Python module: quadriga_lib${PYTHON_EXTENSION_SUFFIX}")
 endif()

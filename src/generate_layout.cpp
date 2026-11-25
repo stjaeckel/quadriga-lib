@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_layout.hpp"
-#include "qd_layout_internal.hpp"
+#include "qd_helpers_layout.hpp"
 #include "qd_helpers_shared.hpp"
 #include "quadriga_sos.hpp"
 
@@ -21,77 +21,6 @@
 /*!SECTION
 Network layouts and mobility
 SECTION!*/
-
-// ---- Family table and O2I draws (declared in qd_layout_internal.hpp) ----
-
-const std::vector<qd_layout::family> &qd_layout::families()
-{
-    // Conf names of the shipped files. LOS models of TR 38.901 Table 7.4.2-1. Building O2I models of clause 7.4.3.1: UMa
-    // and UMi low and high loss with the weights of Table 7.8-1 (50 %, 50 %), RMa only the low-loss model (clause
-    // 7.4.3.1), SMa the low-loss A model (Table 7.8-1A). Maximum d2D-in of clause 7.4.3.1: 25 m for UMa, UMi and SMa
-    // commercial buildings, 10 m for RMa and SMa residential buildings. Building shares of a drawn state: Table 7.2-1 (80 %
-    // indoor, the others outdoors), Table 7.2-3 (50 % indoor, 50 % in cars), Table 7.2-5 (80 % indoor, outdoor UTs in cars;
-    // 90 % of the buildings residential)
-    static const std::vector<family> T = {
-        {"UMi", "UMi_LOS", "UMi_NLOS", "UMi_LOS_O2I", "UMi_NLOS_O2I", "38.901_UMi", {"low", "high"}, {0.5, 0.5}, 25.0, 25.0, 0.8, 0.0, false},
-        {"UMa", "UMa_LOS", "UMa_NLOS", "UMa_LOS_O2I", "UMa_NLOS_O2I", "38.901_UMa", {"low", "high"}, {0.5, 0.5}, 25.0, 25.0, 0.8, 0.0, false},
-        {"RMa", "RMa_LOS", "RMa_NLOS", "RMa_LOS_O2I", "RMa_NLOS_O2I", "38.901_RMa", {"low"}, {1.0}, 10.0, 10.0, 0.5, 0.0, true},
-        {"SMa", "SMa_LOS", "SMa_NLOS", "SMa_LOS_O2I", "SMa_NLOS_O2I", "38.901_SMa", {"low_A"}, {1.0}, 10.0, 25.0, 0.8, 0.9, true},
-        {"InH_Open", "Indoor_LOS", "Indoor_NLOS", "", "", "38.901_InH_Open", {}, {}, 0.0, 0.0, 0.0, 0.0, false},
-        {"InH_Mixed", "Indoor_LOS", "Indoor_NLOS", "", "", "38.901_InH_Mixed", {}, {}, 0.0, 0.0, 0.0, 0.0, false},
-        {"InF_SL", "InF_LOS", "InF_NLOS_SL", "", "", "38.901_InF_SL", {}, {}, 0.0, 0.0, 0.0, 0.0, false},
-        {"InF_DL", "InF_LOS", "InF_NLOS_DL", "", "", "38.901_InF_DL", {}, {}, 0.0, 0.0, 0.0, 0.0, false},
-        {"InF_SH", "InF_LOS", "InF_NLOS_SH", "", "", "38.901_InF_SH", {}, {}, 0.0, 0.0, 0.0, 0.0, false},
-        {"InF_DH", "InF_LOS", "InF_NLOS_DH", "", "", "38.901_InF_DH", {}, {}, 0.0, 0.0, 0.0, 0.0, false},
-        {"InF_HH", "InF_LOS", "", "", "", "38.901_InF_HH", {}, {}, 0.0, 0.0, 0.0, 0.0, false}}; // InF-HH is 100 % LOS (Table 7.2-4)
-    return T;
-}
-
-const qd_layout::family *qd_layout::find_family(const std::string &name)
-{
-    for (const family &f : families())
-        if (f.name == name)
-            return &f;
-    return nullptr;
-}
-
-arma::vec qd_layout::o2i_field(arma::sword base_seed, const std::string &family, int stream, const arma::mat &xy)
-{
-    // "io": building or not (the others outdoors or in cars, by family); "o2i_class": SMa residential or commercial;
-    // "o2i_model": building type (O2I model); see the comment at o2i_stream
-    static const char *purpose[] = {"io", "o2i_class", "o2i_model", "d2din1", "d2din2", "o2i_dev"};
-    // Decorrelation distances (TR 38.901 clause 7.6.3.3): indoor state 50 m (Table 7.6.3.1-2), building type 50 m (also
-    // for the class residential or commercial), the uniform variables of the indoor distance 25 m, the deviation of the
-    // penetration loss 10 m
-    static const double dist[] = {50.0, 50.0, 50.0, 25.0, 25.0, 10.0};
-    if (stream < s_io || stream > s_o2i_dev)
-        throw std::invalid_argument("Input 'stream' is not an O2I stream.");
-    if (xy.n_rows == 0)
-        return arma::vec();
-    const arma::sword seed = qd_layout_seed_hash(base_seed, std::string(purpose[stream]) + "|" + family);
-    arma::mat val;
-    if (stream == s_o2i_dev)
-        quadriga_lib::sos_randn<double>(arma::vec{dist[stream]}, xy, val, arma::mat(), arma::vec(), "Exp256", seed);
-    else
-        quadriga_lib::sos_rand<double>(arma::vec{dist[stream]}, xy, val, arma::mat(), arma::vec(), "Exp256", seed);
-    return val.col(0);
-}
-
-arma::mat qd_layout::o2i_rnd(arma::sword base_seed, const std::string &family, const arma::mat &xy)
-{
-    arma::mat rnd(xy.n_rows, 4);
-    for (int s = s_o2i_model; s <= s_o2i_dev; ++s)
-        rnd.col((arma::uword)(s - s_o2i_model)) = o2i_field(base_seed, family, s, xy);
-    return rnd;
-}
-
-int qd_layout::draw_floor(arma::sword base_seed, const std::string &family, const std::string &terminal, int n_min, int n_max)
-{
-    hash_rng rng(qd_layout_seed_hash(base_seed, "floor|" + family + "|" + terminal));
-    const double u1 = rng.uniform(), u2 = rng.uniform();
-    const int n_fl = std::min(n_min + (int)std::floor(u1 * (double)(n_max - n_min + 1)), n_max);
-    return std::min(1 + (int)std::floor(u2 * (double)n_fl), n_fl);
-}
 
 namespace
 {

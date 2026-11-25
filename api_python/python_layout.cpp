@@ -9,7 +9,6 @@
 
 namespace py = pybind11;
 
-#include "qpy_layout_types.cpp"
 #include "qpy_layout_csv.cpp"
 #include "qpy_layout_generate.cpp"
 #include "qpy_layout_mobility.cpp"

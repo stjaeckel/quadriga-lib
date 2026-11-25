@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_layout.hpp"
-#include "qd_layout_internal.hpp"
+#include "qd_helpers_layout.hpp"
 #include "qd_helpers_shared.hpp"
 
 #include <algorithm>

@@ -3,14 +3,17 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_layout.hpp"
-#include "qd_layout_internal.hpp"
+#include "qd_helpers_layout.hpp"
 #include "qd_helpers_shared.hpp"
+#include "quadriga_sos.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <iterator>
 #include <map>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -110,7 +113,705 @@ std::string quadriga_lib::layout_links::is_valid() const
     return "";
 }
 
-// ---- Pipeline helpers ----
+// ---- Pipeline helpers of stage 1 and of stages 2 and 3 ----
+
+// A scenario family of the table in qd_helpers_layout.hpp
+using qd_family = qd_layout::family;
+
+static const std::string qd_v19 = "3GPP_38.901_v19_"; // Prefix of the shipped TR 38.901 conf files
+
+// The sites of the Tx side and the terminals of the Rx side: index of each node, the nodes of each
+struct qd_sides
+{
+    std::vector<size_t> site_of_tx, term_of_rx;
+    size_t n_site = 0, n_term = 0;
+    std::vector<std::vector<arma::uword>> site_nodes, term_nodes;
+};
+
+// The sites and terminals of a layout
+static qd_sides qd_make_sides(const quadriga_lib::layout &L)
+{
+    qd_sides S;
+    S.site_of_tx = qd_layout::site_of_node(L.tx, &S.n_site);
+    S.term_of_rx = qd_layout::site_of_node(L.rx, &S.n_term);
+    S.site_nodes.resize(S.n_site), S.term_nodes.resize(S.n_term);
+    for (size_t i = 0; i < S.site_of_tx.size(); ++i)
+        S.site_nodes[S.site_of_tx[i]].push_back((arma::uword)i);
+    for (size_t i = 0; i < S.term_of_rx.size(); ++i)
+        S.term_nodes[S.term_of_rx[i]].push_back((arma::uword)i);
+    return S;
+}
+
+// Rx rows at which the segments of terminal t start (indices into the rows of the Rx side): the first row and each row
+// whose scenario or indoor state differs from the row before it, on the first node of the terminal
+static std::vector<arma::uword> qd_segment_starts(const quadriga_lib::layout &L, const qd_sides &S, size_t t)
+{
+    const arma::uword i = S.term_nodes[t][0], r0 = L.rx.offset[i], n = L.rx.n_row(i);
+    std::vector<arma::uword> v = {r0};
+    for (arma::uword r = r0 + 1; r < r0 + n; ++r)
+        if ((!L.rx.scenario.empty() && L.rx.scenario[r] != L.rx.scenario[r - 1]) || (!L.rx.indoor.is_empty() && L.rx.indoor[r] != L.rx.indoor[r - 1]))
+            v.push_back(r);
+    return v;
+}
+
+// Moving site: more than one row or a speed (dual mobility of the GBSM functions); all nodes of a site have equal motion
+static bool qd_site_moves(const quadriga_lib::layout_nodes &N, arma::uword i_node)
+{
+    const arma::uword first = N.offset[i_node], n = N.n_row(i_node);
+    if (n > 1)
+        return true;
+    return !N.speed.is_empty() && N.speed[first] != 0.0;
+}
+
+// Time of row r of node i as sample_track gives it: its 'time', else the arc length over the speed from the first row
+// (a point drop: 0); false for a track with neither
+static bool qd_row_time(const quadriga_lib::layout_nodes &N, arma::uword i, arma::uword r, double &t)
+{
+    const arma::uword first = N.offset[i], n = N.n_row(i);
+    if (!N.time.is_empty() && !std::isnan(N.time[first]))
+        return t = N.time[r], true;
+    bool timed = n == 1;
+    for (arma::uword k = first; k < first + n && !N.speed.is_empty(); ++k)
+        timed = timed || N.speed[k] != 0.0;
+    t = 0.0;
+    for (arma::uword k = first; k < r; ++k)
+    {
+        const double len = arma::norm(N.pos.col(k + 1) - N.pos.col(k)), v = N.speed.is_empty() ? 0.0 : N.speed[k];
+        t += (len > 0.0 && v > 0.0) ? len / v : 0.0;
+    }
+    return timed;
+}
+
+// Position of Tx node i_tx paired with Rx row r of node i_rx (the start of a segment), without the wrap image: a static
+// node its row; a moving one sampled at the time of the row if both nodes have times, else (the pairing of snapshots
+// without times) the Tx row with the index of r in its node, the last one for a shorter Tx track; [3]
+static arma::vec qd_tx_at(const quadriga_lib::layout &L, arma::uword i_tx, arma::uword i_rx, arma::uword r)
+{
+    const arma::uword ft = L.tx.offset[i_tx], nt = L.tx.n_row(i_tx);
+    if (!qd_site_moves(L.tx, i_tx))
+        return L.tx.pos.col(ft);
+    double t = 0.0, t_tx = 0.0;
+    if (qd_row_time(L.rx, i_rx, r, t) && qd_row_time(L.tx, i_tx, ft, t_tx))
+    {
+        arma::mat p, o;
+        quadriga_lib::sample_track(L.tx, i_tx, arma::vec{t}, p, o);
+        return p.col(0);
+    }
+    return L.tx.pos.col(ft + std::min(r - L.rx.offset[i_rx], nt - 1));
+}
+
+// The wrap images: 0, +a1, -a1, +a2, -a2, +(a1 - a2), -(a1 - a2); one vector: 0, +a1, -a1; [2, n_img]
+static arma::mat qd_images(const arma::mat &wrap)
+{
+    arma::mat I(2, 1, arma::fill::zeros);
+    if (wrap.n_cols >= 1)
+        I = arma::join_rows(I, wrap.col(0), -wrap.col(0));
+    if (wrap.n_cols == 2)
+        I = arma::join_rows(I, arma::join_rows(wrap.col(1), -wrap.col(1), wrap.col(0) - wrap.col(1), wrap.col(1) - wrap.col(0)));
+    return I;
+}
+
+// A scenario name resolved: a family (states drawn), a conf of the family table (states fixed), or a user conf
+struct qd_scen
+{
+    const qd_family *fam = nullptr; // Family; nullptr for a user conf
+    std::string name;               // The name in the layout
+    int los = -1, building = -1;    // Fixed by an exact name, -1 = drawn
+    std::string exact() const       // The conf of an exact name
+    {
+        if (los < 0)
+            return "";
+        return building ? (los ? fam->los_o2i_conf : fam->nlos_o2i_conf) : (los ? fam->los_conf : fam->nlos_conf);
+    }
+    bool has_o2i() const { return fam != nullptr && fam->d2d_in_max > 0.0; }
+};
+
+// A family, or a conf name of the family table (with or without the prefix of the shipped files), else a user conf. A
+// conf that several families list (Indoor_LOS, InF_LOS) belongs to 'prefer' if that lists it, else to the first
+static qd_scen qd_resolve(const std::string &name, const qd_family *prefer)
+{
+    qd_scen s;
+    s.name = name;
+    if ((s.fam = qd_layout::find_family(name)) != nullptr)
+        return s;
+    const std::string n = name.compare(0, qd_v19.size(), qd_v19) == 0 ? name.substr(qd_v19.size()) : name;
+    auto lists = [&](const qd_family &f)
+    {
+        const std::string *c[4] = {&f.los_conf, &f.nlos_conf, &f.los_o2i_conf, &f.nlos_o2i_conf};
+        for (int k = 0; k < 4; ++k)
+            if (!c[k]->empty() && *c[k] == n)
+            {
+                s.fam = &f, s.los = (k % 2 == 0) ? 1 : 0, s.building = k / 2;
+                return true;
+            }
+        return false;
+    };
+    if (prefer != nullptr && lists(*prefer))
+        return s;
+    for (const qd_family &f : qd_layout::families())
+        if (lists(f))
+            return s;
+    s.fam = nullptr;
+    return s;
+}
+
+// The conf of a link: a user conf, the conf of an exact name, or from the family with the LOS and indoor state
+static std::string qd_conf_of(const qd_scen &s, unsigned los, int indoor)
+{
+    if (s.fam == nullptr)
+        return s.name;
+    if (s.los >= 0)
+        return s.exact();
+    const bool building = (indoor == 1 || indoor == 3) && s.has_o2i();
+    return building ? (los ? s.fam->los_o2i_conf : s.fam->nlos_o2i_conf) : (los ? s.fam->los_conf : s.fam->nlos_conf);
+}
+
+// The resolved scenario of the link of site s and terminal t at the Rx row r_seg: the value of the terminal, else that
+// of the site ("" = none); an exact name prefers the family of the site's scenario. Cached by name and family
+struct qd_scenarios
+{
+    std::map<std::pair<std::string, const qd_family *>, qd_scen> cache;
+    const qd_scen &get(const std::string &name, const qd_family *prefer)
+    {
+        auto it = cache.find({name, prefer});
+        if (it == cache.end())
+            it = cache.emplace(std::make_pair(name, prefer), qd_resolve(name, prefer)).first;
+        return it->second;
+    }
+    const qd_scen &of(const quadriga_lib::layout &L, const qd_sides &S, size_t s, arma::uword r_seg, bool *from_rx = nullptr)
+    {
+        static const std::string none;
+        const std::string &tx = L.tx.scenario.empty() ? none : L.tx.scenario[L.tx.offset[S.site_nodes[s][0]]];
+        const std::string &rx = L.rx.scenario.empty() ? none : L.rx.scenario[r_seg];
+        if (from_rx != nullptr)
+            *from_rx = !rx.empty();
+        const qd_family *site_family = tx.empty() ? nullptr : get(tx, nullptr).fam;
+        return get(rx.empty() ? tx : rx, site_family);
+    }
+};
+
+
+// The base seed of the streams of a site: its seed, else the master seed
+static arma::sword qd_site_base(const quadriga_lib::layout_nodes &tx, arma::uword i_node, arma::sword master)
+{
+    return (!tx.seed.is_empty() && tx.seed[i_node] != -1) ? (arma::sword)tx.seed[i_node] : master;
+}
+
+// The O2I family of each terminal: the family of the first of its links (in site order) whose scenario is a family
+// with O2I; nullptr = none. All links of a terminal share its O2I state (TR 38.901 clause 7.6.3.3)
+static std::vector<const qd_family *> qd_term_families(const std::vector<qd_scen> &scen, const arma::u32_vec &i_rx, size_t n_term)
+{
+    std::vector<const qd_family *> F(n_term, nullptr);
+    for (arma::uword l = 0; l < i_rx.n_elem; ++l)
+        if (F[i_rx[l]] == nullptr && scen[l].has_o2i())
+            F[i_rx[l]] = scen[l].fam;
+    return F;
+}
+
+// Maximum indoor distance of a building state of a family (SMa: residential 3, commercial 1)
+static double qd_d2d_in_max(const qd_family &f, int indoor) { return indoor == 1 ? f.d2d_in_max_commercial : f.d2d_in_max; }
+
+// Floor of a building UT at Rx row r: the floor column, else from the height
+static int qd_floor(const quadriga_lib::layout_nodes &rx, arma::uword r)
+{
+    const int fl = rx.floor.is_empty() ? -1 : rx.floor[r];
+    return fl >= 1 ? fl : qd_layout::floor_from_z(rx.pos(2, r));
+}
+
+// Floor index and indoor 2D distance of a link in the indoor state 'io' of a terminal of family f (nullptr = no O2I):
+// building UTs on their floor at the distance of the columns c1, c2 of the O2I inputs, as o2i_loss gives it; others on
+// floor 0 at 0 m. Used for the drawn states in stage 1 and for edited states in stages 2 and 3
+static void qd_o2i_geometry(const qd_family *f, int io, double c1, double c2, int floor, arma::u32 &floor_id, double &d2d_in)
+{
+    const bool building = f != nullptr && (io == 1 || io == 3);
+    floor_id = building ? (arma::u32)(floor - 1) : 0;
+    d2d_in = building ? qd_layout::d2d_in_of(c1, c2, qd_d2d_in_max(*f, io)) : 0.0;
+}
+
+// Byte-wise 64-bit FNV-1a
+struct qd_fnv
+{
+    unsigned long long h = 14695981039346656037ULL;
+    void bytes(const void *p, size_t n)
+    {
+        const unsigned char *c = (const unsigned char *)p;
+        for (size_t i = 0; i < n; ++i)
+            h = (h ^ c[i]) * 1099511628211ULL;
+    }
+    void u64(unsigned long long v) { bytes(&v, sizeof(v)); }
+    void dbl(double v)
+    {
+        if (v == 0.0)
+            v = 0.0; // -0 and 0 are equal
+        if (std::isnan(v))
+            v = std::numeric_limits<double>::quiet_NaN();
+        bytes(&v, sizeof(v));
+    }
+    void str(const std::string &s) { u64(s.size()), bytes(s.data(), s.size()); }
+};
+
+// Hash of the members of a layout that determine its links; empty optional members hash as their default values. The
+// layout seed is not part of it: the links hold the master seed they were drawn with, so a stored copy of the links
+// stays usable after another realisation
+static unsigned long long qd_links_hash(const quadriga_lib::layout &L)
+{
+    qd_fnv H;
+    H.u64(L.center_freq.n_elem);
+    for (double f : L.center_freq)
+        H.dbl(f);
+    H.u64(L.wrap.n_rows), H.u64(L.wrap.n_cols);
+    for (double w : L.wrap)
+        H.dbl(w);
+    for (const quadriga_lib::layout_nodes *N : {&L.tx, &L.rx})
+    {
+        const arma::uword nn = N->n_node(), nr = N->pos.n_cols;
+        H.u64(nn), H.u64(nr);
+        for (arma::uword i = 0; i < nn; ++i)
+        {
+            H.str(N->name[i]), H.u64(N->sector[i]), H.u64(N->offset[i]);
+            H.u64(N->seed.is_empty() ? (unsigned long long)-1 : (unsigned long long)N->seed[i]);
+            for (arma::uword k = 0; k < 3; ++k)
+                H.dbl(N->clutter.is_empty() ? arma::datum::nan : N->clutter(k, i));
+            if (N == &L.tx)
+                H.u64(qd_site_moves(*N, i) ? 1 : 0);
+        }
+        for (arma::uword r = 0; r < nr; ++r)
+        {
+            H.dbl(N->pos(0, r)), H.dbl(N->pos(1, r)), H.dbl(N->pos(2, r));
+            H.str(N->scenario.empty() ? std::string() : N->scenario[r]);
+            H.u64(N->indoor.is_empty() ? (unsigned long long)-1 : (unsigned long long)N->indoor[r]);
+            H.u64(N->floor.is_empty() ? (unsigned long long)-1 : (unsigned long long)N->floor[r]);
+            H.dbl(N->d2d_in.is_empty() ? arma::datum::nan : N->d2d_in[r]);
+        }
+        std::vector<std::string> keys;
+        for (const auto &kv : N->scenpar_override)
+            keys.push_back(kv.first);
+        std::sort(keys.begin(), keys.end());
+        for (const std::string &k : keys)
+        {
+            H.str(k);
+            for (double v : N->scenpar_override.at(k))
+                H.dbl(v);
+        }
+    }
+    return H.h;
+}
+
+// Throws unless 'method' is one of the methods of the channel pipeline
+static void qd_check_method(const std::string &method)
+{
+    if (method != "38.901" && method != "38.901_MF" && method != "quadriga")
+        throw std::invalid_argument("Input 'method' must be '38.901', '38.901_MF' or 'quadriga'.");
+}
+
+// ---- Stage 1: link states ----
+
+namespace
+{
+// Number as short text for messages
+std::string qd_num(double x)
+{
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%g", x);
+    return buf;
+}
+
+// Weights of the building models of a family, with the share of the low-loss model if given (families with "low"
+// and "high"; the others have one building model)
+arma::vec qd_o2i_weights(const qd_family &f, const arma::vec &o2i_low)
+{
+    arma::vec w(f.o2i_weights);
+    if (!o2i_low.is_empty() && f.o2i_models.size() == 2 && f.o2i_models[0] == "low" && f.o2i_models[1] == "high")
+        w = {o2i_low[0], 1.0 - o2i_low[0]};
+    return w;
+}
+} // namespace
+
+// Stage 1 into 'K' without changing the layout; get_channels_layout draws local links with it
+static void qd_init_links(const quadriga_lib::layout &L, const std::string &method, const arma::vec &o2i_low, bool pol_variability,
+                          double anchor_freq, const std::string &sos_preset, arma::sword seed, const std::vector<std::string> &config_dirs,
+                          quadriga_lib::layout_links &K)
+{
+    // Arguments
+    qd_check_method(method);
+    if (o2i_low.n_elem > 1 || (o2i_low.n_elem == 1 && !(o2i_low[0] >= 0.0 && o2i_low[0] <= 1.0)))
+        throw std::invalid_argument("Input 'o2i_low' must be empty or one value in [0, 1].");
+    if (pol_variability && method == "quadriga")
+        throw std::invalid_argument("Input 'pol_variability' applies to the TR methods only.");
+    if (!(anchor_freq > 0.0) || !std::isfinite(anchor_freq))
+        throw std::invalid_argument("Input 'anchor_freq' must be positive and finite.");
+    const std::string preset = !sos_preset.empty() ? sos_preset : (method == "quadriga" ? "Comb256" : "Exp256");
+    try
+    {
+        quadriga_lib::sos_preset<double>(preset);
+    }
+    catch (const std::exception &)
+    {
+        throw std::invalid_argument("Input 'sos_preset' is not a known preset ('" + preset + "').");
+    }
+    if (seed < -1)
+        throw std::invalid_argument("Input 'seed' must be >= -1.");
+
+    // The layout; its old links are replaced, so their state does not matter
+    std::string msg = L.is_valid();
+    if (msg.compare(0, 7, "links: ") == 0)
+    {
+        quadriga_lib::layout C = L;
+        C.links.reset();
+        msg = C.is_valid();
+    }
+    if (!msg.empty())
+        throw std::invalid_argument("Input 'layout' is not valid: " + msg);
+    if (L.center_freq.is_empty())
+        throw std::invalid_argument("Member 'center_freq' of 'layout' must not be empty; set the simulation frequencies.");
+
+    // Master seed
+    arma::sword master = seed != -1 ? seed : L.seed;
+    if (master == -1)
+    {
+        std::random_device rd;
+        master = (arma::sword)((((unsigned long long)rd() << 32) ^ (unsigned long long)rd()) & 0x7FFFFFFFFFFFFFFFULL);
+    }
+
+    const qd_sides S = qd_make_sides(L);
+    const arma::mat img = qd_images(L.wrap);
+    const arma::uword n_img = img.n_cols;
+
+    // Segments of the tracks: a change of scenario or indoor state starts one
+    std::vector<std::vector<arma::uword>> seg(S.n_term);
+    for (size_t t = 0; t < S.n_term; ++t)
+        seg[t] = qd_segment_starts(L, S, t);
+
+    // Pairs farther apart than 1e-4 m at the first row, terminal-major, then site, then segment; the image with the
+    // shortest 2D distance at the first row, kept for all segments; distances to the site at the time of each segment start
+    std::vector<arma::uword> l_tx, l_rx, l_img, l_row, l_seg;
+    std::vector<double> l_d2d;
+    for (size_t t = 0; t < S.n_term; ++t)
+        for (size_t s = 0; s < S.n_site; ++s)
+        {
+            arma::uword best = 0;
+            for (arma::uword k = 0; k < seg[t].size(); ++k)
+            {
+                const arma::uword rr = seg[t][k];
+                const arma::vec p = qd_tx_at(L, S.site_nodes[s][0], S.term_nodes[t][0], rr); // a moving site at the time of the row
+                const double dx = L.rx.pos(0, rr) - p[0], dy = L.rx.pos(1, rr) - p[1], dz = L.rx.pos(2, rr) - p[2];
+                double d = arma::datum::inf;
+                if (k == 0)
+                    for (arma::uword m = 0; m < n_img; ++m)
+                    {
+                        const double e = std::hypot(dx - img(0, m), dy - img(1, m));
+                        if (e < d)
+                            d = e, best = m;
+                    }
+                else
+                    d = std::hypot(dx - img(0, best), dy - img(1, best));
+                if (std::sqrt(d * d + dz * dz) <= 1.0e-4)
+                {
+                    if (k == 0)
+                        break;
+                    throw std::invalid_argument("Terminal '" + L.rx.name[S.term_nodes[t][0]] + "': a later segment starts at the position of site '" +
+                                                L.tx.name[S.site_nodes[s][0]] + "'; a segment start needs a LOS path of non-zero length.");
+                }
+                l_tx.push_back(s), l_rx.push_back(t), l_img.push_back(best), l_d2d.push_back(d), l_row.push_back(rr), l_seg.push_back(k);
+            }
+        }
+    const arma::uword n_link = (arma::uword)l_tx.size();
+
+    // Scenarios of the links
+    qd_scenarios SC;
+    std::vector<qd_scen> scen(n_link);
+    std::vector<char> scen_from_rx(n_link, 0);
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        bool from_rx = false;
+        scen[l] = SC.of(L, S, l_tx[l], l_row[l], &from_rx);
+        scen_from_rx[l] = from_rx;
+        if (scen[l].name.empty())
+            throw std::invalid_argument("No scenario for site '" + L.tx.name[S.site_nodes[l_tx[l]][0]] + "' and terminal '" +
+                                        L.rx.name[S.term_nodes[l_rx[l]][0]] + "': set 'scenario' on the Tx or the Rx side.");
+    }
+
+    // Conf names: all confs of each family in use, user confs; resolved to files
+    std::vector<std::string> conf_names;
+    std::vector<char> is_user;
+    auto add_conf = [&](const std::string &c, bool user)
+    {
+        if (!c.empty() && std::find(conf_names.begin(), conf_names.end(), c) == conf_names.end())
+            conf_names.push_back(c), is_user.push_back(user);
+    };
+    for (const qd_scen &s : scen)
+        if (s.fam == nullptr)
+            add_conf(s.name, true);
+        else
+            for (const std::string *c : {&s.fam->los_conf, &s.fam->nlos_conf, &s.fam->los_o2i_conf, &s.fam->nlos_o2i_conf})
+                add_conf(*c, false);
+    std::vector<std::string> file_names, file_dirs;
+    const std::vector<std::string> stems = quadriga_lib::conf_file_list(config_dirs, &file_names, &file_dirs, false, true);
+    std::vector<std::string> conf_files(conf_names.size());
+    for (size_t c = 0; c < conf_names.size(); ++c)
+    {
+        const std::string stem = is_user[c] ? conf_names[c] : qd_v19 + conf_names[c];
+        const auto it = std::find(stems.begin(), stems.end(), stem);
+        if (it == stems.end())
+        {
+            // A name of the layout that is no conf file: name the node it came from
+            for (arma::uword l = 0; l < n_link; ++l)
+                if (scen[l].fam == nullptr && scen[l].name == conf_names[c])
+                {
+                    const std::string who = scen_from_rx[l] ? "Terminal '" + L.rx.name[S.term_nodes[l_rx[l]][0]] + "'" : "Site '" + L.tx.name[S.site_nodes[l_tx[l]][0]] + "'";
+                    throw std::invalid_argument(who + ": scenario '" + conf_names[c] +
+                                                "' is neither a scenario family nor a conf file in 'config_dirs' or the shipped folder.");
+                }
+            throw std::runtime_error("The conf file '" + stem + ".conf' of the library is missing.");
+        }
+        const size_t j = (size_t)(it - stems.begin());
+        const std::string &dir = file_dirs[j];
+        conf_files[c] = dir.empty() ? file_names[j] : (dir.back() == '/' || dir.back() == '\\' ? dir : dir + "/") + file_names[j];
+    }
+    auto conf_index = [&](const std::string &c) { return (arma::uword)(std::find(conf_names.begin(), conf_names.end(), c) - conf_names.begin()); };
+
+    // O2I state per terminal, from the fields of its O2I family at its first position. The O2I inputs, the model and the
+    // floor are stored for every terminal of a family with O2I, whatever its state, so that an edited state finds them
+    const std::vector<const qd_family *> term_fam = qd_term_families(scen, arma::conv_to<arma::u32_vec>::from(l_rx), S.n_term);
+    std::vector<std::vector<int>> t_indoor(S.n_term), t_floor(S.n_term); // Per terminal and segment
+    for (size_t t = 0; t < S.n_term; ++t)
+        t_indoor[t].assign(seg[t].size(), 0), t_floor[t].assign(seg[t].size(), 1);
+    arma::mat o2i_rnd(S.n_term, 4, arma::fill::zeros);
+    arma::u32_vec o2i_model(S.n_term, arma::fill::zeros);
+    std::vector<std::vector<int>> t_fixed(S.n_term); // Building state of a segment fixed by an exact name, and the name
+    std::vector<std::vector<std::string>> t_fixed_name(S.n_term);
+    for (size_t t = 0; t < S.n_term; ++t)
+        t_fixed[t].assign(seg[t].size(), -1), t_fixed_name[t].resize(seg[t].size());
+    for (arma::uword l = 0; l < n_link; ++l)
+        if (scen[l].fam == term_fam[l_rx[l]] && scen[l].los >= 0 && t_fixed[l_rx[l]][l_seg[l]] < 0)
+            t_fixed[l_rx[l]][l_seg[l]] = scen[l].building, t_fixed_name[l_rx[l]][l_seg[l]] = scen[l].name;
+    for (const qd_family &f : qd_layout::families())
+    {
+        std::vector<size_t> T;
+        for (size_t t = 0; t < S.n_term; ++t)
+            if (term_fam[t] == &f)
+                T.push_back(t);
+        if (T.empty())
+            continue;
+        arma::mat xy(T.size(), 2);
+        for (size_t k = 0; k < T.size(); ++k)
+        {
+            const arma::uword r = seg[T[k]][0];
+            xy(k, 0) = L.rx.pos(0, r), xy(k, 1) = L.rx.pos(1, r);
+        }
+        const arma::vec u_io = qd_layout::o2i_field(master, f.name, qd_layout::s_io, xy);
+        const arma::vec u_class = f.p_residential > 0.0 ? qd_layout::o2i_field(master, f.name, qd_layout::s_o2i_class, xy) : arma::vec();
+        arma::mat rnd = qd_layout::o2i_rnd(master, f.name, xy);
+        for (size_t k = 0; k < T.size(); ++k)
+        {
+            const size_t t = T[k];
+            const arma::uword i = S.term_nodes[t][0];
+            const int drawn_cls = u_class.is_empty() ? 1 : (u_class[k] < f.p_residential ? 3 : 1); // Building class of a drawn state
+            double d_fixed = arma::datum::nan; // A fixed d2d_in: one value for all segment starts of the terminal
+            int d_cls = -1;
+            for (size_t m = 0; m < seg[t].size(); ++m)
+            {
+                const arma::uword r = seg[t][m];
+                const int fixed = L.rx.indoor.is_empty() ? -1 : L.rx.indoor[r];
+                const int b = t_fixed[t][m];
+                if ((b == 1 && (fixed == 0 || fixed == 2)) || (b == 0 && (fixed == 1 || fixed == 3)))
+                    throw std::invalid_argument("Terminal '" + L.rx.name[i] + "': the conf '" + t_fixed_name[t][m] + "' fixes " +
+                                                (b == 1 ? "a building" : "an outdoor") + " state, but 'indoor' is " + std::to_string(fixed) + ".");
+                const int cls = (fixed == 1 || fixed == 3) ? fixed : drawn_cls;
+                int state = fixed;
+                if (b == 1 && fixed < 0)
+                    state = cls;
+                else if (b == 0 && fixed < 0)
+                    state = f.car ? 2 : 0;
+                else if (fixed < 0)
+                    state = u_io[k] < f.building_share ? cls : (f.car ? 2 : 0);
+                t_indoor[t][m] = state;
+                t_floor[t][m] = qd_floor(L.rx, r);
+                const double dmax = qd_d2d_in_max(f, cls), d = L.rx.d2d_in.is_empty() ? arma::datum::nan : L.rx.d2d_in[r];
+                if (!std::isnan(d) && (state == 1 || state == 3) && d > dmax)
+                    throw std::invalid_argument("Terminal '" + L.rx.name[i] + "': 'd2d_in' of " + qd_num(d) + " m is above the maximum indoor distance " +
+                                                qd_num(dmax) + " m of the family '" + f.name + "'.");
+                if (!std::isnan(d) && !std::isnan(d_fixed) && d != d_fixed)
+                    throw std::invalid_argument("Terminal '" + L.rx.name[i] + "': 'd2d_in' is " + qd_num(d_fixed) + " m and " + qd_num(d) +
+                                                " m at the starts of its segments; a terminal has one indoor distance.");
+                if (!std::isnan(d) && std::isnan(d_fixed))
+                    d_fixed = d, d_cls = cls;
+            }
+            const double dmax = qd_d2d_in_max(f, d_cls);
+            if (!std::isnan(d_fixed) && d_fixed <= dmax)
+                rnd(k, 1) = rnd(k, 2) = dmax > 0.0 ? d_fixed / dmax : 0.0;
+            o2i_rnd.row(t) = rnd.row(k);
+        }
+        arma::uvec mi; // The building model of each terminal, from column 0
+        quadriga_lib::o2i_loss(arma::vec{L.center_freq[0]}, rnd, f.o2i_models, qd_o2i_weights(f, o2i_low), f.d2d_in_max, nullptr, &mi);
+        for (size_t k = 0; k < T.size(); ++k)
+            o2i_model[T[k]] = (arma::u32)mi[k];
+    }
+
+    // States of the links
+    K.reset();
+    K.i_tx.set_size(n_link), K.i_rx.set_size(n_link), K.i_segment.set_size(n_link), K.image.set_size(n_link), K.i_conf.set_size(n_link);
+    K.los.set_size(n_link), K.indoor.set_size(n_link), K.floor_id.set_size(n_link), K.d2d_in.set_size(n_link), K.gbsm_seed.set_size(n_link);
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        const size_t t = l_rx[l];
+        const arma::uword m = l_seg[l];
+        K.i_tx[l] = (arma::u32)l_tx[l], K.i_rx[l] = (arma::u32)t, K.i_segment[l] = (arma::u32)m, K.image[l] = (arma::u32)l_img[l];
+        const qd_family *f = scen[l].has_o2i() ? term_fam[t] : nullptr;
+        K.indoor[l] = f != nullptr ? t_indoor[t][m] : 0;
+        qd_o2i_geometry(f, K.indoor[l], o2i_rnd(t, 1), o2i_rnd(t, 2), t_floor[t][m], K.floor_id[l], K.d2d_in[l]);
+    }
+
+    // LOS states: fixed by name, always LOS (InF-HH), or drawn per site, image and family
+    std::map<std::tuple<size_t, arma::uword, const qd_family *>, std::vector<arma::uword>> draw;
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        const qd_scen &s = scen[l];
+        if (s.fam == nullptr)
+            K.los[l] = 0; // A user conf is used in either state
+        else if (s.los >= 0)
+            K.los[l] = (arma::u32)s.los;
+        else if (s.fam->nlos_conf.empty())
+            K.los[l] = 1;
+        else
+            draw[{l_tx[l], l_img[l], s.fam}].push_back(l);
+    }
+    std::map<const qd_family *, double> lambda;
+    for (const auto &kv : draw)
+    {
+        const size_t s = std::get<0>(kv.first);
+        const arma::uword k = std::get<1>(kv.first), i_node = S.site_nodes[s][0], rt = L.tx.offset[i_node];
+        const qd_family *f = std::get<2>(kv.first);
+        if (lambda.find(f) == lambda.end())
+            lambda[f] = quadriga_lib::conf_file_read(conf_files[conf_index(f->nlos_conf)]).at("LOS_state_lambda");
+        const double dcl = L.tx.clutter.is_empty() ? arma::datum::nan : L.tx.clutter(0, i_node);
+        const double rcl = L.tx.clutter.is_empty() ? arma::datum::nan : L.tx.clutter(1, i_node);
+        const double hcl = L.tx.clutter.is_empty() ? arma::datum::nan : L.tx.clutter(2, i_node);
+        const bool inf = f->name.compare(0, 3, "InF") == 0;
+        double lam = (inf && dcl > 0.0) ? 0.5 * dcl : lambda[f]; // TR 38.901 Table 7.6.3.1-2: d_clutter / 2
+        const auto ov = L.tx.scenpar_override.find("LOS_state_lambda");
+        if (ov != L.tx.scenpar_override.end() && !std::isnan(ov->second[i_node]))
+            lam = ov->second[i_node];
+        const std::vector<arma::uword> &ls = kv.second;
+        const arma::uword n = (arma::uword)ls.size();
+        arma::mat xy(n, 2);
+        arma::vec d_out(n), h_ut(n);
+        for (arma::uword j = 0; j < n; ++j)
+        {
+            const arma::uword r = l_row[ls[j]];
+            xy(j, 0) = L.rx.pos(0, r), xy(j, 1) = L.rx.pos(1, r), h_ut(j) = L.rx.pos(2, r);
+            d_out(j) = std::max(l_d2d[ls[j]] - K.d2d_in[ls[j]], 0.0);
+        }
+        const arma::vec p = quadriga_lib::los_probability(f->los_model, d_out, arma::vec{L.tx.pos(2, rt)}, h_ut, dcl, rcl, hcl);
+        const std::string key = "los|" + L.tx.name[i_node] + "|" + std::to_string(k) + "|" + f->name;
+        arma::mat u;
+        quadriga_lib::sos_rand<double>(arma::vec{lam}, xy, u, arma::mat(), arma::vec(), "Exp256",
+                                       qd_layout_seed_hash(qd_site_base(L.tx, i_node, master), key));
+        for (arma::uword j = 0; j < n; ++j)
+            K.los[ls[j]] = u(j, 0) < p(j) ? 1 : 0;
+    }
+
+    // Confs and seeds
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        const std::string c = qd_conf_of(scen[l], K.los[l], K.indoor[l]);
+        K.i_conf[l] = conf_index(c);
+        const arma::uword i_node = S.site_nodes[l_tx[l]][0];
+        K.gbsm_seed[l] = qd_layout_seed_hash(qd_site_base(L.tx, i_node, master), "gbsm|" + L.tx.name[i_node] + "|" + std::to_string(l_img[l]) + "|" + c);
+    }
+    K.conf_names = conf_names, K.conf_files = conf_files;
+    K.o2i_rnd = o2i_rnd, K.o2i_model = o2i_model;
+    K.seed = master, K.method = method, K.sos_preset = preset, K.anchor_freq = anchor_freq, K.pol_variability = pol_variability;
+    K.layout_hash = qd_links_hash(L);
+}
+
+/*!MD
+# init_link_states
+Draw the discrete state of the propagation links of a layout (stage 1 of the channel pipeline)
+
+- Draws for each propagation link (one site, one terminal, one segment) the state that the later stages need: the wrap
+  image, the scenario and conf file, the LOS and indoor state and the seeds, stored in `layout.links` ([[layout_links]])
+- The states follow from the seeds and the positions, so adding a terminal does not change the states of the others
+- `layout.pairing` does not limit the links; it selects at the output of the channel functions
+
+## Declaration:
+```
+void quadriga_lib::init_link_states(
+    layout &layout,
+    const std::string &method = "38.901",
+    const arma::vec &o2i_low = {},
+    bool pol_variability = false,
+    double anchor_freq = 2.0e9,
+    const std::string &sos_preset = "",
+    arma::sword seed = -1,
+    const std::vector<std::string> &config_dirs = {});
+```
+
+## Inputs:
+- **`layout`** — Layout, valid, with `center_freq`; `layout.links` and `layout.seed` are written, the rest is unchanged
+- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` (TR 38.901 clause 7.6.5.1) or `"quadriga"`, see
+  [[generate_rays]]
+- **`o2i_low`** *(optional)* — Share of the low-loss model among the building UTs of UMa and UMi, in [0, 1]; omitted:
+  the share of TR 38.901 Table 7.8-1 (0.5); the other families have one building model; `[1]`
+- **`pol_variability`** *(optional)* — Polarization power variability of TR 38.901 clause 7.6.16; TR methods only
+- **`anchor_freq`** *(optional)* — Anchor frequency of `"38.901_MF"` in [Hz]
+- **`sos_preset`** *(optional)* — SOS preset of the GBSM random sets, see [[sos_preset]]; omitted: `Exp256` (TR
+  methods), `Comb256` (`"quadriga"`)
+- **`seed`** *(optional)* — Master seed, >= -1; -1 = `layout.seed`, if that is -1 one draw of the system random device.
+  The seed used is written to `layout.seed`
+- **`config_dirs`** *(optional)* — Folders of user conf files, searched before the shipped folder
+
+## Notes:
+- **Links**: one per site, terminal and segment, for pairs farther apart than 1e-4 m at the first row, terminal-major
+  (all sites of terminal 0 first). Co-located pairs have no link; a later segment that starts at the site throws. A
+  layout without any pair farther apart gives links without entries, and the later stages return empty results
+- **Scenario** of a link: the value of the terminal, else that of the site. A scenario family (e.g. `UMa`) draws the LOS
+  and indoor state, a conf name of the family table (e.g. `UMa_NLOS_O2I`, also with the prefix `3GPP_38.901_v19_`) fixes
+  them, and any other name is a user conf file, used in either state without O2I loss. A conf that several families list
+  (`Indoor_LOS`, `InF_LOS`) belongs to the family of the site if that lists it, else to the first. Conf files are found
+  with [[conf_file_list]], the folders of `config_dirs` first
+- **Wrap image**: the image of the site (`layout.wrap`) with the shortest 2D distance to the first position of the
+  terminal, ties to the lowest index in the order 0, $+a_1$, $-a_1$, $+a_2$, $-a_2$, $+(a_1 - a_2)$, $-(a_1 - a_2)$; all
+  distances of the link use this virtual site position
+- **O2I state** per terminal, from spatially correlated fields at its first position (TR 38.901 clause 7.6.3.3):
+  building UTs with the share of TR 38.901 Table 7.2-1 (0.8 in UMa and UMi), Table 7.2-3 (0.5 in RMa) and Table 7.8-1A
+  (0.8 in SMa), the other UTs outdoors or, in RMa and SMa, in cars; residential or commercial building in SMa (0.9); the
+  O2I model and `d2d_in` as in [[o2i_loss]]. The values `indoor`, `floor` and `d2d_in` of the Rx nodes fix them; an
+  exact conf name that contradicts a fixed `indoor` throws
+- **One O2I state per terminal** (TR 38.901: all the links from a UT have the same indoor/outdoor state): a terminal
+  linked to sites of several families has the state of the first family with O2I in site order, and an exact name on a
+  site fixes it for the links to all sites; InH and InF have none
+- **LOS state** per link: a uniform field per site, image and family at the first position of the segment, at the
+  `LOS_state_lambda` of the NLOS conf (InF with `d_clutter`: `d_clutter / 2`), below [[los_probability]] at
+  $d_\mathrm{2D,out} = \max(d_\mathrm{2D} - d_\mathrm{2D,in}, 0)$; InF-HH is always LOS
+- **Segments**: on the Rx nodes, a row whose `scenario` or `indoor` differs from the row before it starts a segment (an
+  empty `scenario` differs from an explicit one). A segment has its own propagation links (order: terminal, site,
+  segment), LOS state, indoor state, conf and seed, drawn at its first row, with the distances to a moving site at the
+  time of the segment start. The wrap image and the O2I random values (`o2i_rnd`, `o2i_model`, a drawn indoor state) are
+  those of the first row of the track; a fixed `d2d_in` must be equal at all segment starts. A segment keeps its LOS
+  state along its length, so long tracks need explicit segments
+- **Random values**: [[sos_rand]] with the preset `Exp256`; each field has its own seed, hashed from the site seed (else
+  the layout seed) and a key of its purpose, site, image and family or conf. `gbsm_seed` is the seed of
+  [[gbsm_init_phases]]
+- **Frequencies**: the TR methods draw the cluster and ray sets of frequency `k` with the index `k` into
+  `layout.center_freq`, so a frequency inserted below another changes the rays of the higher bands
+
+## See also:
+- [[layout_links]] (the link states)
+- [[generate_rays]], [[get_channels_from_rays]] (stages 2 and 3)
+- [[get_channels_layout]] (all stages in one call)
+MD!*/
+
+void quadriga_lib::init_link_states(layout &layout, const std::string &method, const arma::vec &o2i_low, bool pol_variability, double anchor_freq,
+                                    const std::string &sos_preset, arma::sword seed, const std::vector<std::string> &config_dirs)
+{
+    layout_links K;
+    qd_init_links(layout, method, o2i_low, pol_variability, anchor_freq, sos_preset, seed, config_dirs, K);
+    layout.seed = K.seed;
+    layout.links = std::move(K);
+}
+
+// ---- Pipeline helpers of stages 2 and 3 ----
 
 namespace
 {

@@ -4,24 +4,8 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "qd_helpers_mex.hpp"
+#include "qd_helpers_mex_types.hpp"
 #include "qd_helpers_gbsm.hpp"
-
-// Folder of the shipped conf files, found next to the package folder that 'which' reports, so that a moved
-// installation finds it: +quadriga_lib/../config (installed), +quadriga_lib/../data/config (source tree)
-static std::string qd_mex_conf_dir()
-{
-    mxArray *name = mxCreateString("quadriga_lib.conf_file_list"), *path = nullptr;
-    std::string file;
-    if (mexCallMATLAB(1, &path, 1, &name, "which") == 0 && path != nullptr)
-    {
-        if (char *s = mxArrayToString(path))
-            file = s, mxFree(s);
-        mxDestroyArray(path);
-    }
-    mxDestroyArray(name);
-    return qd_conf_shipped_dir(file, {"../config", "../data/config"});
-}
 
 /*!SECTION
 Geometry-based stochastic model

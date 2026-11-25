@@ -327,4 +327,8 @@ struct qd_qrt_no_unlock
     qd_qrt_no_unlock() {}
 };
 
+// Folder of the shipped conf files, for the conf-folder helpers of the MEX and Python types headers; declared in
+// qd_helpers_gbsm.hpp with defaults (code in qd_scenpar.cpp), repeated here without them so that no include is needed
+std::string qd_conf_shipped_dir(const std::string &file, const std::vector<std::string> &rel);
+
 #endif

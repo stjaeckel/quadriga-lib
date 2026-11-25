@@ -5,24 +5,6 @@
 #include "qd_helpers_python_types.hpp"
 #include "qd_helpers_gbsm.hpp"
 
-// Folder of the shipped conf files, found at run time relative to the module folder: ../data/config (local lib/ build),
-// ../share/quadriga-lib/config (CMake install), ../../../share/quadriga-lib/config (POSIX site-packages, e.g. venv,
-// --user, dist-packages), ../../share/quadriga-lib/config (Windows); the folder compiled into the library if the module
-// path is unknown or none holds the files
-std::string qd_python_conf_dir()
-{
-    std::string file;
-    try
-    {
-        file = py::module_::import("quadriga_lib").attr("__file__").cast<std::string>();
-    }
-    catch (const py::error_already_set &)
-    {
-    }
-    return qd_conf_shipped_dir(file, {"../data/config", "../share/quadriga-lib/config",
-                                      "../../../share/quadriga-lib/config", "../../share/quadriga-lib/config"});
-}
-
 /*!SECTION
 Geometry-based stochastic model
 SECTION!*/

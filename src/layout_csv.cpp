@@ -3,12 +3,13 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_layout.hpp"
-#include "qd_layout_internal.hpp"
+#include "qd_helpers_layout.hpp"
 #include "qd_csv.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cerrno>
 #include <clocale>
 #include <cmath>
 #include <cstdio>
@@ -118,6 +119,179 @@ void quadriga_lib::layout_csv_write(
 - [[layout_csv_read]] (reads a layout)
 - [[layout]] (the class that is written)
 MD!*/
+
+// ---- One side of a layout in the form of the column table ----
+
+namespace qd_layout
+{
+namespace
+{
+// One side of a layout in the form of the table; an empty array is an omitted column
+struct flat
+{
+    size_t n_node = 0, n_row = 0;
+    std::vector<std::string> name;                  // [n_node]
+    std::vector<size_t> offset;                     // [n_node]
+    std::vector<double> v[n_col];                   // Numbers in class units: per row (per-row and held columns), per node (others)
+    std::vector<long long> seed;                    // Seeds of the sites, per node (exact, not a double)
+    std::vector<std::string> txt[n_col];            // Text columns: scenario per row, pairing per node
+    std::map<std::string, std::vector<double>> scenpar; // Scenario parameter columns by key, per node
+    std::vector<std::string> extra_names;           // Unknown columns, [n_extra]
+    std::vector<std::vector<std::string>> extra;    // Their cells, [n_extra][n_row]
+};
+
+// Integer of a cell as a 64-bit number (seeds), at least the minimum of the column 'id'
+long long cell_int64(const qd_csv::table &T, size_t row, size_t col, int id)
+{
+    const std::string text(T.cell(row, col)); // The cell is trimmed; strtoll needs the end of the text
+    char *end = nullptr;
+    errno = 0;
+    const long long v = std::strtoll(text.c_str(), &end, 10);
+    if (text.empty() || end != text.c_str() + text.size() || text.find_first_of(" \t") != std::string::npos)
+        throw std::runtime_error(T.where(row, col) + " must be an integer ('" + text + "').");
+    if (errno == ERANGE || v < (long long)table[id].lo)
+        throw std::runtime_error(T.where(row, col) + " is outside the allowed range ('" + text + "').");
+    return v;
+}
+
+// Member mapping of the table; 'unflatten' leaves a member empty when its column holds only default values (the
+// meaning of the empty member) and does not set 'i_antenna'
+flat flatten(const quadriga_lib::layout_nodes &N)
+{
+    flat F;
+    F.n_node = N.name.size(), F.n_row = N.pos.n_cols;
+    F.name = N.name;
+    F.offset.assign(N.offset.begin(), N.offset.end());
+
+    auto per_node = [&](int id, size_t n) { F.v[id].assign(n, table[id].dflt); };
+    per_node(c_sector, F.n_node);
+    for (size_t i = 0; i < F.n_node && i < N.sector.n_elem; ++i)
+        F.v[c_sector][i] = (double)N.sector[i];
+
+    const size_t R = F.n_row;
+    for (int id : {c_x, c_y, c_z})
+        F.v[id].resize(R);
+    for (int id : {c_bank, c_tilt, c_heading})
+        F.v[id].resize(R);
+    for (size_t r = 0; r < R; ++r)
+    {
+        for (int k = 0; k < 3; ++k)
+        {
+            F.v[c_x + k][r] = N.pos(k, r);
+            F.v[c_bank + k][r] = N.orientation.n_cols == R && N.orientation.n_rows == 3 ? N.orientation(k, r) : 0.0;
+        }
+    }
+    if (N.direction.n_cols == R && N.direction.n_rows == 2 && R != 0)
+    {
+        F.v[c_direction_az].resize(R), F.v[c_direction_el].resize(R);
+        for (size_t r = 0; r < R; ++r)
+            F.v[c_direction_az][r] = N.direction(0, r), F.v[c_direction_el][r] = N.direction(1, r);
+    }
+    auto copy_vec = [&](int id, const arma::vec &x) { if (x.n_elem == R && R != 0) F.v[id].assign(x.begin(), x.end()); };
+    copy_vec(c_speed, N.speed), copy_vec(c_time, N.time), copy_vec(c_d2d_in, N.d2d_in);
+    if (N.indoor.n_elem == R && R != 0)
+        F.v[c_indoor].assign(N.indoor.begin(), N.indoor.end());
+    if (N.floor.n_elem == R && R != 0)
+        F.v[c_floor].assign(N.floor.begin(), N.floor.end());
+    if (N.scenario.size() == R && R != 0)
+        F.txt[c_scenario] = N.scenario;
+
+    if (N.clutter.n_cols == F.n_node && N.clutter.n_rows == 3 && F.n_node != 0)
+        for (int k = 0; k < 3; ++k)
+            F.v[c_d_clutter + k].assign(N.clutter.row(k).begin(), N.clutter.row(k).end());
+    for (const auto &kv : N.scenpar_override)
+        F.scenpar[kv.first].assign(kv.second.begin(), kv.second.end());
+    if (N.seed.n_elem == F.n_node && F.n_node != 0)
+        F.seed.assign(N.seed.begin(), N.seed.end());
+    if (N.relative.n_elem == F.n_node && F.n_node != 0)
+        F.v[c_relative].assign(N.relative.begin(), N.relative.end());
+    if (N.cell.n_elem == F.n_node && F.n_node != 0)
+        F.v[c_cell].assign(N.cell.begin(), N.cell.end());
+    F.extra_names = N.extra_names;
+    F.extra = N.extra;
+    return F;
+}
+
+// True if the array has a value other than the default
+bool has_value(const std::vector<double> &v, double dflt)
+{
+    for (double x : v)
+        if (!same_value(x, dflt))
+            return true;
+    return false;
+}
+
+quadriga_lib::layout_nodes unflatten(const flat &F)
+{
+    quadriga_lib::layout_nodes N;
+    const size_t n = F.n_node, R = F.n_row;
+    N.name = F.name;
+    N.sector.set_size(n), N.i_antenna.zeros(n), N.offset.set_size(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+        N.sector[i] = F.v[c_sector].size() == n ? (unsigned)F.v[c_sector][i] : 0u;
+        N.offset[i] = F.offset[i];
+    }
+    N.pos.set_size(3, R), N.orientation.set_size(3, R);
+    for (size_t r = 0; r < R; ++r)
+        for (int k = 0; k < 3; ++k)
+        {
+            N.pos(k, r) = F.v[c_x + k].size() == R ? F.v[c_x + k][r] : 0.0;
+            N.orientation(k, r) = F.v[c_bank + k].size() == R ? F.v[c_bank + k][r] : 0.0;
+        }
+
+    auto given = [&](int id, size_t len) { return F.v[id].size() == len && len != 0 && has_value(F.v[id], table[id].dflt); };
+    auto to_vec = [&](int id) { return arma::vec(std::vector<double>(F.v[id])); };
+
+    // Direction: stored only if some azimuth is given
+    if (F.v[c_direction_az].size() == R && R != 0 && has_value(F.v[c_direction_az], nan))
+    {
+        N.direction.set_size(2, R);
+        for (size_t r = 0; r < R; ++r)
+        {
+            N.direction(0, r) = F.v[c_direction_az][r];
+            N.direction(1, r) = F.v[c_direction_el].size() == R ? F.v[c_direction_el][r] : 0.0;
+        }
+    }
+    if (given(c_speed, R))
+        N.speed = to_vec(c_speed);
+    if (given(c_time, R))
+        N.time = to_vec(c_time);
+    if (given(c_d2d_in, R))
+        N.d2d_in = to_vec(c_d2d_in);
+    if (given(c_indoor, R))
+        N.indoor = arma::conv_to<arma::s32_vec>::from(to_vec(c_indoor));
+    if (given(c_floor, R))
+        N.floor = arma::conv_to<arma::s32_vec>::from(to_vec(c_floor));
+    if (F.txt[c_scenario].size() == R && R != 0 &&
+        std::any_of(F.txt[c_scenario].begin(), F.txt[c_scenario].end(), [](const std::string &s) { return !s.empty(); }))
+        N.scenario = F.txt[c_scenario];
+
+    bool clutter = false;
+    for (int k = 0; k < 3; ++k)
+        clutter = clutter || given(c_d_clutter + k, n);
+    if (clutter)
+    {
+        N.clutter.set_size(3, n);
+        for (int k = 0; k < 3; ++k)
+            for (size_t i = 0; i < n; ++i)
+                N.clutter(k, i) = F.v[c_d_clutter + k].size() == n ? F.v[c_d_clutter + k][i] : nan;
+    }
+    for (const auto &kv : F.scenpar)
+        if (kv.second.size() == n && has_value(kv.second, nan))
+            N.scenpar_override[kv.first] = arma::vec(std::vector<double>(kv.second));
+    if (std::any_of(F.seed.begin(), F.seed.end(), [](long long s) { return s != -1; }) && F.seed.size() == n)
+        N.seed = arma::s64_vec(std::vector<long long>(F.seed));
+    if (given(c_relative, n))
+        N.relative = arma::conv_to<arma::u32_vec>::from(to_vec(c_relative));
+    if (given(c_cell, n))
+        N.cell = arma::conv_to<arma::u32_vec>::from(to_vec(c_cell));
+    N.extra_names = F.extra_names;
+    N.extra = F.extra;
+    return N;
+}
+} // namespace
+} // namespace qd_layout
 
 using namespace qd_layout;
 namespace fs = std::filesystem;

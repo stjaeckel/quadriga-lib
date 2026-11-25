@@ -6,8 +6,8 @@
 //
 // Purpose
 // - Shared by the files that parse CSV (the material table in obj_file.cpp, the scenario parameter file reader for
-//   its number syntax). The name does not match qd_helpers_*: CMake makes those headers a dependency of every MEX file
-//   and of the Python module, which do not parse CSV.
+//   its number syntax, the layout CSV files). A self-contained format layer with its own tests (test_qd_csv.cpp) that
+//   several sections use, so it has a header of its own, as qd_hdf5.hpp, instead of a place in a qd_helpers_* header.
 //
 // Syntax
 // - The first line that is neither blank nor a comment is the header. Lines whose first non-blank character is '#'

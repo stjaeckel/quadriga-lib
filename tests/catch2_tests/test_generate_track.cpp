@@ -14,7 +14,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "qd_layout_internal.hpp"
+#include "qd_helpers_layout.hpp"
 #include "qd_test_layout.hpp"
 #include "quadriga_layout.hpp"
 
