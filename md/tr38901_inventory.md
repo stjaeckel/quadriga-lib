@@ -135,7 +135,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 | General material mix, wood | 7.4.3.1, eq. 7.4-3, Table 7.4.3-1 | Partial | `o2i_loss` (`src/o2i_loss.cpp:71`) | Only the fixed mixes of Table 7.4.3-2; no user-defined mix, wood unused. |
 | Indoor 2D distance | 7.4.3.1 | Yes | `o2i_loss` (`:176`); conf `O2I_d2D_in_max` | min(U1, U2)·d_max: 25 m (UMa, UMi, SMa), 10 m (RMa). SMa residential buildings (10 m) need a second call; the SMa files hold the commercial 25 m. |
 | Backward-compatible O2I below 6 GHz | 7.4.3.1, Table 7.4.3-3 | Yes | `o2i_loss` model `legacy_6GHz` (`:181`) | PL_tw = 20 dB, σ_P = 0; σ_SF = 7 dB from the UMa/UMi O2I files. Test `test_o2i_loss.cpp:115`. |
-| Car penetration loss | 7.4.3.2, eq. 7.4-4 | Yes | `o2i_loss` models `car`, `car_metal` (`:187`) | N(9, 5²) dB, metallised windows μ = 20 dB. Test `test_o2i_loss.cpp:141`. |
+| Car penetration loss | 7.4.3.2, eq. 7.4-4 | Yes | `o2i_loss` models `car`, `car_metal` (`:187`) | N(9, 5²) dB, metallised windows μ = 20 dB. Test `test_o2i_loss.cpp:141`. In a layout the value is drawn once per car UT and holds along its track (`get_gbsm_channels`; building UTs follow the deviation field). |
 
 #### 3.4.4 Autocorrelation of shadow fading (7.4.4)
 

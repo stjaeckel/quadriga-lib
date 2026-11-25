@@ -2,9 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Tests of get_channels_layout, the one call from a layout to channel coefficients, and of the rules that tie the
-// stages together: the manual path (init_link_states, generate_rays, get_gbsm_channels) as oracle of the one call, the
-// stale-link hash, edited link states, pairing, dual mobility, per-band antennas and layouts read back from CSV files.
+// Tests of get_channels_layout, the one call from a layout to channel coefficients, of the O2I loss of the link gain
+// of get_gbsm_channels along a track, and of the rules that tie the stages together: the manual path
+// (init_link_states, generate_rays, get_gbsm_channels) as oracle of the one call, the stale-link hash, edited link
+// states, pairing, dual mobility, per-band antennas and layouts read back from CSV files.
 // Oracles: the manual path; the exact names of the conf files (an edited LOS state equals the state fixed by name);
 // the Doppler phase -2 pi (v_rx - v_tx) t / lambda of a LOS path between two ends that move along the LOS direction.
 // Fixtures: qd_test_layout.hpp.
@@ -377,4 +378,57 @@ TEST_CASE("get_channels_layout - batches keep the segments of a track together")
     quadriga_lib::init_link_states(L);
     REQUIRE(L.links.n_link() == 258);
     CHECK(diff(quadriga_lib::get_channels_layout(L), manual(L)) == "");
+}
+
+TEST_CASE("get_gbsm_channels - the O2I loss of a car is drawn per vehicle")
+{
+    // A UT on a 200 m track (21 rows 10 m apart along x, 1 m/s) from (100, 20, 1.5), BS at (0, 0, 25), UMa. A car UT
+    // (indoor 2) has the links and rays of the same UT outdoors (the outdoor conf, TR 38.901 clause 7.4.3.2), so the
+    // power ratio of the two channels at each snapshot is the car loss alone: one value per UT (TR 38.901 eq. 7.4-4),
+    // here constant along the track, while the path loss changes. A building UT (indoor 1) with the low-loss and with the
+    // high-loss model (Table 7.4.3-2: sigma_P 4.4 dB and 6.5 dB) has a power ratio that follows the deviation at each
+    // snapshot, which varies along the track (correlation distance 10 m of the O2I fields)
+    quadriga_lib::layout L;
+    L.tx = qd_layout_points({"BS1"}, {0}, arma::mat(arma::vec{0.0, 0.0, 25.0}));
+    L.tx.scenario = {"UMa"};
+    L.tx.scenpar_override["NumClusters"] = {5.0}, L.tx.scenpar_override["NumSubPaths"] = {4.0}, L.tx.scenpar_override["NumClusters_min"] = {0.0};
+    arma::mat R(3, 21);
+    for (arma::uword i = 0; i < 21; ++i)
+        R(0, i) = 100.0 + 10.0 * (double)i, R(1, i) = 20.0, R(2, i) = 1.5;
+    L.rx = qd_layout_nodes_from({R});
+    L.rx.speed.ones(21);
+    L.center_freq = {3.5e9};
+    L.seed = 31;
+    auto power_dB = [](const quadriga_lib::layout &X)
+    {
+        quadriga_lib::layout Y = X;
+        const auto C = quadriga_lib::get_gbsm_channels(Y, quadriga_lib::generate_rays(Y));
+        REQUIRE(C.size() == 1);
+        REQUIRE(C[0].n_snap() == 21);
+        arma::vec p(21);
+        for (arma::uword s = 0; s < 21; ++s)
+            p[s] = 10.0 * std::log10(arma::accu(arma::square(C[0].coeff_re[s]) + arma::square(C[0].coeff_im[s])));
+        return p;
+    };
+    auto with_state = [&](int indoor)
+    {
+        quadriga_lib::layout X = L;
+        X.rx.indoor.set_size(21);
+        X.rx.indoor.fill(indoor);
+        quadriga_lib::init_link_states(X);
+        return X;
+    };
+
+    const quadriga_lib::layout O = with_state(0), V = with_state(2);
+    REQUIRE(O.links.n_link() == 1);
+    REQUIRE(V.links.conf_names == O.links.conf_names);
+    REQUIRE(arma::all(V.links.gbsm_seed == O.links.gbsm_seed));
+    const arma::vec p_out = power_dB(O), car = p_out - power_dB(V);
+    CHECK(car.max() - car.min() < 1.0e-9);
+    CHECK(std::abs(p_out[0] - p_out[20]) > 3.0); // The path loss changes along the track
+
+    quadriga_lib::layout B_low = with_state(1), B_high = B_low;
+    B_low.links.o2i_model = {0}, B_high.links.o2i_model = {1};
+    const arma::vec building = power_dB(B_low) - power_dB(B_high);
+    CHECK(building.max() - building.min() > 1.0);
 }
