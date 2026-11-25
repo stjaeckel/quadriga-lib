@@ -9,8 +9,11 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <clocale>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -82,8 +85,8 @@ MD!*/
 Write a layout to the Tx and Rx CSV files
 
 - Writes the Tx nodes to the Tx file and the Rx nodes to the Rx file in the
-  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within 15 significant
-  digits, except for `name` and `links`, which are not stored
+  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within the written digits
+  (9 significant digits, positions 1 µm, times 1 ns), except for `name` and `links`, which are not stored
 - Antennas without a description, e.g. a measured array set with the array form of [[set_antenna]], are written to QDANT
   files next to the CSV file
 - A failed call leaves the existing files unchanged
@@ -727,11 +730,81 @@ quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, con
 
 namespace
 {
-// Cell text of a number in the units of the file
+// Text of a value rounded to 9 significant digits, in the number format of the layout files (format_value)
+std::string qd_fmt9(double v) { return format_value(v, 9); }
+
+// Text of a value with a fixed absolute resolution of 10^-decimals and at least 9 significant digits, in plain digits:
+// positions in [m] with 6 decimals (1 um), times in [s] with 9 (1 ns), e.g. "5400000.123456"
+std::string qd_fmt_fixed(double v, int decimals)
+{
+    if (!std::isfinite(v))
+        return qd_csv::format_number(v);
+    if (v == 0.0)
+        return "0";
+    const int x = (int)std::floor(std::log10(std::abs(v)));
+    const int d = std::min(std::max(decimals, 8 - x), 40); // 9 significant digits for small values
+    char buf[400];
+    std::snprintf(buf, sizeof(buf), "%.*f", d, v);
+    std::string s = buf;
+    const char *point = std::localeconv()->decimal_point; // snprintf writes the decimal point of the C locale
+    if (!(point[0] == '.' && point[1] == '\0'))
+    {
+        const size_t pos = s.find(point);
+        if (pos != std::string::npos)
+            s.replace(pos, std::strlen(point), ".");
+    }
+    if (s.find('.') != std::string::npos)
+    {
+        while (s.back() == '0')
+            s.pop_back();
+        if (s.back() == '.')
+            s.pop_back();
+    }
+    return s == "-0" ? "0" : s;
+}
+
+// The numbers of a cell of an antenna line that need more than 9 digits, written with 9; the rest of the text is kept
+std::string qd_fmt9_text(const std::string &cell)
+{
+    std::string out;
+    size_t pos = 0;
+    while (pos <= cell.size())
+    {
+        const size_t end = std::min(cell.find_first_of(",;", pos), cell.size());
+        const std::string t = cell.substr(pos, end - pos);
+        double v = 0.0, w = 0.0;
+        const std::string f = qd_csv::parse_number(t, v) == qd_csv::number_status::ok ? qd_fmt9(v) : t;
+        out += f != t && qd_csv::parse_number(f, w) == qd_csv::number_status::ok && w != v ? f : t;
+        if (end >= cell.size())
+            break;
+        out += cell[end];
+        pos = end + 1;
+    }
+    return out;
+}
+
+// Lattice vectors in [m] with a resolution of 1 um: matrix rows joined by ';', the values of a row by ','
+std::string qd_fmt_wrap(const arma::mat &M)
+{
+    std::string s;
+    for (arma::uword r = 0; r < M.n_rows; ++r)
+        for (arma::uword c = 0; c < M.n_cols; ++c)
+            s += (c == 0 ? (r == 0 ? "" : ";") : ",") + qd_fmt_fixed(M(r, c), 6);
+    return s;
+}
+
+// Cell text of a number in the units of the file: integers exact, positions with 1 um, times with 1 ns, other values
+// with 9 significant digits
 std::string qd_fmt(double v, int id)
 {
-    const double scale = column_of(id).scale;
-    return scale == 1.0 ? qd_csv::format_number(v) : qd_csv::format_number(v / scale, 15, 15);
+    const column &C = column_of(id);
+    if (C.kind == col_kind::integer || C.kind == col_kind::flag)
+        return qd_csv::format_number(v);
+    if (id == c_x || id == c_y || id == c_z)
+        return qd_fmt_fixed(v, 6);
+    if (id == c_time)
+        return qd_fmt_fixed(v, 9);
+    return qd_fmt9(C.scale == 1.0 ? v : v / C.scale);
 }
 
 // An absolute path relative to the folder of the CSV file 'fn' (by the text of the paths); other paths are kept
@@ -895,6 +968,14 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
         for (size_t j = 0; j < line_h.size(); ++j)
             if (line_h[j] != (size_t)-1)
                 row[line_h[j]] = line[j];
+        for (size_t j = 0; j < line_h.size(); ++j) // Numbers with more than 9 digits; text, integers and ids stay exact
+        {
+            if (line_h[j] == (size_t)-1 || line[j].empty() || ant_cols_all[j] < 0)
+                continue;
+            const col_kind k = column_of(ant_cols_all[j]).kind;
+            if (k == col_kind::number || k == col_kind::list || k == col_kind::matrix)
+                row[line_h[j]] = qd_fmt9_text(line[j]);
+        }
         if (h_of_id[c_qdant_file] != (size_t)-1)
             row[h_of_id[c_qdant_file]] = qd_relative_path(row[h_of_id[c_qdant_file]], fn);
     };
@@ -934,14 +1015,14 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
                     if (F.v[id].empty())
                         continue;
                     const double cur = F.v[id][o + k], prev = k > 0 ? F.v[id][o + k - 1] : column_of(id).dflt;
-                    if (full || !same_value(cur, prev))
+                    if (full || qd_fmt(cur, id) != qd_fmt(prev, id)) // The text: values may differ beyond the written digits
                         cellt = qd_fmt(cur, id);
                 }
                 else if (id == c_wrap || id == c_layout_seed)
                 {
                     if (compact && !(n == 0 && k == 0))
                         continue;
-                    cellt = id == c_wrap ? qd_csv::format_matrix(L.wrap.t()) : std::to_string((long long)L.seed);
+                    cellt = id == c_wrap ? qd_fmt_wrap(arma::mat(L.wrap.t())) : std::to_string((long long)L.seed);
                 }
                 else if (id == -1 || id == c_d_clutter || id == c_r_clutter || id == c_h_clutter || id == c_seed || id == c_cell || id == c_pairing ||
                          id == c_relative)
@@ -958,7 +1039,7 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
                         const std::vector<double> &v = id == -1 ? F.scenpar.at(scenpar_keys[header_arg[h]]) : F.v[id];
                         const double dflt = id == -1 ? std::numeric_limits<double>::quiet_NaN() : column_of(id).dflt;
                         if (full || !same_value(v[n], dflt))
-                            cellt = id == -1 ? qd_csv::format_number(v[n]) : qd_fmt(v[n], id);
+                            cellt = id == -1 ? qd_fmt9(v[n]) : qd_fmt(v[n], id);
                     }
                 }
             }
@@ -968,7 +1049,7 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
             if (write_none[n] && (k == 0 || !compact))
                 row[h_of_id[c_antenna]] = "none";
             if (declare && n == 0 && (k == 0 || !compact) && h_of_id[c_center_freq] != (size_t)-1)
-                row[h_of_id[c_center_freq]] = qd_csv::format_number(L.center_freq[0]);
+                row[h_of_id[c_center_freq]] = qd_fmt9(L.center_freq[0]);
             emit();
         }
 
@@ -991,7 +1072,7 @@ std::string qd_compose_side(const quadriga_lib::layout &L, bool is_tx, const std
             for (arma::uword b = 1; b < L.center_freq.n_elem; ++b)
             {
                 band_row();
-                row[h_of_id[c_center_freq]] = qd_csv::format_number(L.center_freq[b]);
+                row[h_of_id[c_center_freq]] = qd_fmt9(L.center_freq[b]);
                 emit();
             }
     }
@@ -1121,7 +1202,7 @@ qd_export qd_plan_export(const quadriga_lib::layout &L, const std::string fn[2])
             new_line p{a, bands[j], one, antenna_cells()};
             p.cells[c_type] = "qdant", p.cells[c_file] = path, p.cells[c_id] = std::to_string(j + 1);
             if (!one)
-                p.cells[0] = qd_csv::format_number(L.center_freq[bands[j]]);
+                p.cells[0] = qd_fmt9(L.center_freq[bands[j]]);
             pending.push_back(p);
         }
     }

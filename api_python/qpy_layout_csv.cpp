@@ -199,7 +199,7 @@ py::tuple layout_csv_read(const py::handle &fn_tx,
 Write a layout to the Tx and Rx CSV files
 
 - Writes the Tx nodes to the Tx file and the Rx nodes to the Rx file in the
-  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within 15 significant
+  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within 9 significant
   digits, except for `name` and `links`, which are not stored
 - Antennas without a description, e.g. a measured array set with [[set_antenna_array]], are written to QDANT files next
   to the CSV file

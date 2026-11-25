@@ -786,10 +786,10 @@ TEST_CASE("generate_layout - seeds and determinism")
     const auto I = gen("38.901_InF_SH", 1);
     quadriga_lib::layout_csv_write(F.path("tx.csv"), F.path("rx.csv"), A);
     const auto A2 = quadriga_lib::layout_csv_read(F.path("tx.csv"), F.path("rx.csv"), {}, false);
-    CHECK(qd_layout_diff(A, A2, 1.0e-9) == "");
+    CHECK(qd_layout_diff(A, A2, 1.0e-8) == ""); // The writer keeps 9 significant digits
     quadriga_lib::layout_csv_write(F.path("tx.csv"), F.path("rx.csv"), I);
     const auto I2 = quadriga_lib::layout_csv_read(F.path("tx.csv"), F.path("rx.csv"), {}, false);
-    CHECK(qd_layout_diff(I, I2, 1.0e-9) == "");
+    CHECK(qd_layout_diff(I, I2, 1.0e-8) == "");
 }
 
 TEST_CASE("generate_layout - ITU-R M.2412 presets")

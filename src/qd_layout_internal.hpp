@@ -168,6 +168,11 @@ std::vector<size_t> site_of_node(const quadriga_lib::layout_nodes &nodes, size_t
 // True if two numbers are equal, with NaN equal to NaN
 inline bool same_value(double a, double b) { return a == b || (a != a && b != b); }
 
+// Number text of the layout files and antenna lines: plain digits from 1e-3 to below 1e6, else engineering notation
+// with an exponent that is a multiple of 3 ("3.5e9", "28e9", "250e-6"), zero as "0", NaN and Inf as in qd_csv;
+// digits = 0: the shortest text that reads back to the same double, else rounded to that many significant digits
+std::string format_value(double v, int digits = 0);
+
 // ---- Scenario families and the O2I draws (generate_layout.cpp) ----
 
 // One scenario family of TR 38.901: its conf names (file stems without the prefix "3GPP_38.901_v19_"; "" = none), the

@@ -7,7 +7,9 @@
 // qd_layout_files:   a folder (below the test's current folder) that is removed with the object; 'path' gives a file in
 //                    it, 'write' writes a text file and returns its path
 // qd_layout_throws:  message of the std::exception that a call throws, "" if it does not throw
-// qd_layout_diff:    first difference between two layouts (empty string if equal); numbers within 'tol'
+// qd_layout_diff:    first difference between two layouts (empty string if equal); numbers within 'tol' relative to
+//                    their magnitude, absolute below 1, positions and wrap vectors within 'tol_pos' and times within
+//                    'tol_time' (after a round trip through a file: 1e-8, 0.5e-6 m and 0.5e-9 s)
 // qd_layout_build:   Tx: site "BS1" with sectors 0 and 1 (one position, orientations 0 and 120 deg), site "BS2" with
 //                    one row; Rx: terminal "UT1" with a three-row track, "UT2" a point drop with speed and direction
 // qd_layout_diff_array: first difference between two antenna arrays; numbers within 'tol' times the largest magnitude
@@ -88,6 +90,19 @@ static inline bool qd_layout_same_mat(const arma::mat &a, const arma::mat &b, do
     if (a.n_rows != b.n_rows || a.n_cols != b.n_cols)
         return false;
     for (arma::uword i = 0; i < a.n_elem; ++i)
+        if (!(a[i] == b[i] || (std::isnan(a[i]) && std::isnan(b[i])) || std::abs(a[i] - b[i]) <= tol * std::max({1.0, std::abs(a[i]), std::abs(b[i])})))
+            return false;
+    return true;
+}
+
+// Equal within an absolute tolerance; NaN equals NaN
+static inline bool qd_layout_same_abs(const arma::mat &a, const arma::mat &b, double tol)
+{
+    if (a.n_elem == 0 && b.n_elem == 0)
+        return true;
+    if (a.n_rows != b.n_rows || a.n_cols != b.n_cols)
+        return false;
+    for (arma::uword i = 0; i < a.n_elem; ++i)
         if (!(a[i] == b[i] || (std::isnan(a[i]) && std::isnan(b[i])) || std::abs(a[i] - b[i]) <= tol))
             return false;
     return true;
@@ -100,10 +115,10 @@ static inline bool qd_layout_same_int(const T &a, const T &b)
 }
 
 // Members of a side that the CSV files hold
-// Angles after a round trip through a file: the file holds 15 significant digits of the angle in degrees, so the
-// relative error of the value is at most 0.5e-14 (leading digit 1), here twice that as margin, plus 4 ulp for the two
-// conversions between radian and degree. The relative bound holds for any angle, also for 359.123456789012345 degrees.
-static inline bool qd_layout_same_angle(const arma::mat &a, const arma::mat &b)
+// Angles: equal within 'tol' relative (a file holds 9 significant digits of the angle in degrees: tol = 1e-8, twice the
+// largest rounding error 0.5e-8 at leading digit 1), and at least within 1e-14 relative plus 4 ulp for the two
+// conversions between radian and degree. The relative bound holds for any angle, also for 359.123456789 degrees.
+static inline bool qd_layout_same_angle(const arma::mat &a, const arma::mat &b, double tol = 0.0)
 {
     if (a.n_elem == 0 && b.n_elem == 0)
         return true;
@@ -112,13 +127,14 @@ static inline bool qd_layout_same_angle(const arma::mat &a, const arma::mat &b)
     for (arma::uword i = 0; i < a.n_elem; ++i)
     {
         const double m = std::max(std::abs(a[i]), std::abs(b[i]));
-        if (!(a[i] == b[i] || (std::isnan(a[i]) && std::isnan(b[i])) || std::abs(a[i] - b[i]) <= (1.0e-14 + 4.0 * 2.220446049250313e-16) * m))
+        if (!(a[i] == b[i] || (std::isnan(a[i]) && std::isnan(b[i])) || std::abs(a[i] - b[i]) <= std::max(tol, 1.0e-14 + 4.0 * 2.220446049250313e-16) * m))
             return false;
     }
     return true;
 }
 
-static inline std::string qd_layout_diff_nodes(const quadriga_lib::layout_nodes &a, const quadriga_lib::layout_nodes &b, double tol = 0.0)
+static inline std::string qd_layout_diff_nodes(const quadriga_lib::layout_nodes &a, const quadriga_lib::layout_nodes &b, double tol = 0.0,
+                                               double tol_pos = 0.0, double tol_time = 0.0)
 {
     if (a.name != b.name)
         return "name";
@@ -128,15 +144,15 @@ static inline std::string qd_layout_diff_nodes(const quadriga_lib::layout_nodes 
         return "i_antenna";
     if (!qd_layout_same_int(a.offset, b.offset))
         return "offset";
-    if (!qd_layout_same_mat(a.pos, b.pos, tol))
+    if (!qd_layout_same_abs(a.pos, b.pos, tol_pos))
         return "pos";
-    if (!qd_layout_same_angle(a.orientation, b.orientation))
+    if (!qd_layout_same_angle(a.orientation, b.orientation, tol))
         return "orientation";
-    if (!qd_layout_same_angle(a.direction, b.direction))
+    if (!qd_layout_same_angle(a.direction, b.direction, tol))
         return "direction";
     if (!qd_layout_same_mat(a.speed, b.speed, tol))
         return "speed";
-    if (!qd_layout_same_mat(a.time, b.time, tol))
+    if (!qd_layout_same_abs(a.time, b.time, tol_time))
         return "time";
     if (a.scenario != b.scenario)
         return "scenario";
@@ -168,23 +184,24 @@ static inline std::string qd_layout_diff_nodes(const quadriga_lib::layout_nodes 
 }
 
 // First difference of the members that the CSV files hold ("" = equal); not compared: name and links
-static inline std::string qd_layout_diff(const quadriga_lib::layout &a, const quadriga_lib::layout &b, double tol = 0.0)
+static inline std::string qd_layout_diff(const quadriga_lib::layout &a, const quadriga_lib::layout &b, double tol = 0.0, double tol_pos = 0.0,
+                                         double tol_time = 0.0)
 {
-    std::string s = qd_layout_diff_nodes(a.tx, b.tx, tol);
+    std::string s = qd_layout_diff_nodes(a.tx, b.tx, tol, tol_pos, tol_time);
     if (!s.empty())
         return "tx." + s;
-    s = qd_layout_diff_nodes(a.rx, b.rx, tol);
+    s = qd_layout_diff_nodes(a.rx, b.rx, tol, tol_pos, tol_time);
     if (!s.empty())
         return "rx." + s;
     if (a.seed != b.seed)
         return "seed";
-    if (!qd_layout_same_mat(a.center_freq, b.center_freq, 0.0))
+    if (!qd_layout_same_mat(a.center_freq, b.center_freq, tol))
         return "center_freq";
     if (a.antenna_cols != b.antenna_cols)
         return "antenna_cols";
     if (a.antenna_args != b.antenna_args)
         return "antenna_args";
-    if (!qd_layout_same_mat(a.wrap, b.wrap, tol))
+    if (!qd_layout_same_abs(a.wrap, b.wrap, tol_pos))
         return "wrap";
     if (!qd_layout_same_int(a.pairing, b.pairing))
         return "pairing";

@@ -15,8 +15,8 @@ SECTION!*/
 Write a layout to the Tx and Rx CSV files
 
 - Writes the Tx nodes to the Tx file and the Rx nodes to the Rx file in the
-  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within 15 significant
-  digits, except for `name` and `links`, which are not stored
+  [Layout CSV format](formats.html#layout_csv); reading the files back gives the same layout within the written digits
+  (9 significant digits, positions 1 µm, times 1 ns), except for `name` and `links`, which are not stored
 - Antennas without a description, e.g. a measured array set with [[set_antenna_array]], are written to QDANT files next
   to the CSV file
 - A failed call leaves the existing files unchanged

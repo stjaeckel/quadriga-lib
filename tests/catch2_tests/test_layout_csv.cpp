@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -559,6 +560,122 @@ TEST_CASE("layout_csv_write - the file text")
     CHECK(dir.read("rx.csv") == "name,x,y,z\n");
 }
 
+TEST_CASE("layout_csv_write - numbers have at most 9 significant digits")
+{
+    // Values with digits beyond the 9th are written rounded to 9 digits in the shortest form; integers, seeds and ids
+    // are exact. Read back, values agree within 9 significant digits (relative 1e-8), angles in degrees likewise;
+    // positions keep at least 9 digits and 1 um.
+    qd_layout_files dir("csv_write_digits");
+    quadriga_lib::layout L = qd_layout_build();
+    L.center_freq = {3.7500000001e9};
+    L.tx.pos(0, 0) = L.tx.pos(0, 1) = 1.0 / 3.0; // Both sectors of BS1
+    L.rx.pos(1, 0) = 12345.678901234;
+    L.tx.orientation(2, 0) = 0.1234567890123; // 7.07355295625... degrees
+    L.tx.seed = {123456789012345, 123456789012345, 7};
+    L.tx.scenpar_override["DS_mu"] = {0.1 + 0.2, 0.1 + 0.2, -7.25};
+    L.rx.floor = {2147483647, 2147483647, 2147483647, -1};
+    L.rx.indoor = {1, 1, 1, 0};
+    REQUIRE(L.is_valid() == "");
+    quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L);
+    const std::string tx = dir.read("tx.csv"), rx = dir.read("rx.csv");
+    CHECK(has(tx, ",3.75e9\n")); // Engineering notation from 1e6 on
+    CHECK(has(tx, "\nBS1,0,0.333333333,"));
+    CHECK(has(tx, ",7.07355296,"));
+    CHECK(has(tx, ",123456789012345"));
+    CHECK(has(tx, ",0.3,123456789012345,"));
+    CHECK(has(tx, ",-7.25,7,"));
+    CHECK(has(rx, ",12345.678901,")); // A position: 1 um
+    CHECK(has(rx, ",2147483647"));
+
+    const quadriga_lib::layout R = quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false);
+    auto rel = [](double a, double b) { return std::abs(a - b) <= 1.0e-8 * std::max(std::abs(a), std::abs(b)); };
+    CHECK(rel(R.center_freq[0], L.center_freq[0]));
+    CHECK(rel(R.tx.pos(0, 0), L.tx.pos(0, 0)));
+    CHECK(std::abs(R.rx.pos(1, 0) - L.rx.pos(1, 0)) <= 0.5e-6);
+    CHECK(rel(R.tx.orientation(2, 0), L.tx.orientation(2, 0)));
+    CHECK(rel(R.tx.scenpar_override.at("DS_mu")[0], 0.3));
+    CHECK(R.tx.seed[0] == 123456789012345);
+    CHECK(R.rx.floor[0] == 2147483647);
+}
+
+TEST_CASE("layout_csv_write - compact files of computed tracks are stable")
+{
+    // Computed headings differ beyond the written digits from row to row (9 significant digits; positions 1 um); the
+    // compact form leaves a held cell empty when its text repeats, so that write, read and write give the same text
+    qd_layout_files dir("csv_write_stable");
+    auto L = quadriga_lib::generate_layout("38.901_UMa", 1, {3.5e9}, {}, {0.0}, {}, {}, {}, {}, {}, true, 11);
+    REQUIRE(L.rx.n_node() == 3);
+    quadriga_lib::generate_track(L.rx, {0, 1, 2}, "street", 60.0, 5.0, {}, 0.5, {}, 3);
+    quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L);
+    const std::string tx = dir.read("tx.csv"), rx = dir.read("rx.csv");
+    const auto L2 = quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false);
+    CHECK(qd_layout_diff(L, L2, 1.0e-8, 0.5e-6, 0.5e-9) == "");
+    quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L2);
+    CHECK(dir.read("tx.csv") == tx);
+    CHECK(dir.read("rx.csv") == rx);
+    // Along a straight street the heading repeats: most rows leave the heading cell empty
+    const auto R = quadriga_lib::layout_csv_read("", dir.path("rx.csv"), {}, false);
+    size_t n_rows = 0, n_empty = 0;
+    std::istringstream is(rx);
+    std::string line, head;
+    std::getline(is, head);
+    size_t h = 0, k = 0;
+    for (size_t p = 0; p < head.size(); ++p)
+        if (head.compare(p, 7, "heading") == 0 && (p == 0 || head[p - 1] == ','))
+            h = k;
+        else if (head[p] == ',')
+            ++k;
+    while (std::getline(is, line))
+    {
+        size_t c = 0, p = 0;
+        for (; c < h; ++c)
+            p = line.find(',', p) + 1;
+        ++n_rows;
+        n_empty += line[p] == ',' ? 1 : 0;
+    }
+    CHECK(n_rows == R.rx.n_row());
+    CHECK(n_empty > n_rows / 2);
+}
+
+TEST_CASE("layout_csv_write - number format and the resolution of positions and times")
+{
+    // Values: plain digits from 1e-3 to below 1e6, else engineering notation (exponent a multiple of 3), zero as 0.
+    // Positions and wrap vectors in m: the decimals for 1 um and at least 9 significant digits, plain also for map
+    // coordinates; times: 1 ns. Read back, positions agree within 0.5 um and times within 0.5 ns.
+    qd_layout_files dir("csv_write_format");
+    quadriga_lib::layout L = qd_layout_build();
+    L.center_freq = {1.5e6, 28e9};
+    L.rx.pos(1, 0) = 5.4e6 + 0.1234564, L.rx.pos(1, 1) = 1.0e7 + 0.9876543, L.rx.pos(1, 2) = 1.0e7 + 1.5;
+    L.rx.pos(0, 3) = 1.23456789012e-4;
+    L.rx.time = {0.0, 1.0000000012345, 2.25, NaN};
+    L.rx.speed = {0.0, 0.0, 0.0, 2.5e-6};
+    L.rx.d2d_in = {0.00025, 0.00025, 0.00025, 0.5};
+    L.rx.indoor = {1, 1, 1, 1};
+    L.wrap = arma::mat(arma::vec{1299.03810567666, 2250.0});
+    REQUIRE(L.is_valid() == "");
+    quadriga_lib::layout_csv_write(dir.path("tx.csv"), dir.path("rx.csv"), L);
+    const std::string tx = dir.read("tx.csv"), rx = dir.read("rx.csv");
+    INFO(tx << rx);
+    CHECK(has(tx, ",1.5e6\n"));
+    CHECK(has(tx, ",28e9\n"));
+    CHECK(has(tx, ",\"1299.038106,2250\","));
+    CHECK(has(rx, "\nUT1,100,5400000.123456,1.5,0,"));
+    CHECK(has(rx, "\nUT1,101,10000000.987654,1.5,1.000000001,"));
+    CHECK(has(rx, "\nUT1,101,10000001.5,1.5,2.25,"));
+    CHECK(has(rx, "\nUT2,0.000123456789,70,1.5,NaN,"));
+    CHECK(has(rx, ",2.5e-6,"));
+    CHECK(has(rx, ",250e-6\n"));
+    CHECK(has(rx, ",0.5\n"));
+
+    const quadriga_lib::layout R = quadriga_lib::layout_csv_read(dir.path("tx.csv"), dir.path("rx.csv"), {}, false);
+    CHECK(arma::abs(R.rx.pos - L.rx.pos).max() <= 0.5e-6);
+    CHECK(arma::abs(R.wrap - L.wrap).max() <= 0.5e-6);
+    CHECK(std::abs(R.rx.time[1] - L.rx.time[1]) <= 0.5e-9);
+    CHECK(std::abs(R.rx.pos(0, 3) - L.rx.pos(0, 3)) <= 1.0e-8 * L.rx.pos(0, 3)); // 9 significant digits
+    CHECK(R.rx.speed[3] == 2.5e-6);
+    CHECK(R.center_freq[1] == 28e9);
+}
+
 TEST_CASE("layout_csv_write - antennas, bands and shared values")
 {
     qd_layout_files dir("write_ant");
@@ -582,8 +699,8 @@ TEST_CASE("layout_csv_write - antennas, bands and shared values")
 
     // The frequencies are declared on the first Tx node; the extra sector has all its cells (the antenna of sector 0 too)
     CHECK(dir.read("tx.csv") == "name,sector,x,y,z,tilt,heading,d_clutter,h_clutter,scenpar.DS_VS,wrap,seed,layout_seed,center_freq,antenna,panel,note\n"
-                                "BS1,0,10,10,25,,30,5,3,0.2,\"100,0;0,200\",7,5,3500000000,3gpp,\"4,4,1,2\",\"a,b\"\n"
-                                "BS1,0,,,,,,,,,,,,28000000000,,,\n"
+                                "BS1,0,10,10,25,,30,5,3,0.2,\"100,0;0,200\",7,5,3.5e9,3gpp,\"4,4,1,2\",\"a,b\"\n"
+                                "BS1,0,,,,,,,,,,,,28e9,,,\n"
                                 "BS1,1,10,10,25,10,150,5,3,0.2,,7,,,3gpp,\"4,4,1,2\",\n"
                                 "BS2,0,-300,50,30,,270,,,,,,,,,,x\n");
     CHECK(dir.read("rx.csv") == "name,x,y,z,heading,direction_az,speed,scenario,relative,antenna\n"
@@ -678,7 +795,7 @@ TEST_CASE("layout_csv_read - read, write and read again")
         REQUIRE(L.is_valid() == "");
         quadriga_lib::layout_csv_write(dir.path("tx_w.csv"), dir.path("rx_w.csv"), L, compact);
         const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("tx_w.csv"), dir.path("rx_w.csv"), {}, false);
-        CHECK(qd_layout_diff(L, L2) == "");
+        CHECK(qd_layout_diff(L, L2, 1.0e-8, 0.5e-6, 0.5e-9) == ""); // 9 significant digits, 1 um, 1 ns
         // The second cycle gives the same text
         const std::string text_tx = dir.read("tx_w.csv"), text_rx = dir.read("rx_w.csv");
         quadriga_lib::layout_csv_write(dir.path("tx_w.csv"), dir.path("rx_w.csv"), L2, compact);
