@@ -274,6 +274,15 @@ namespace quadriga_lib
         arma::mat *gain_dB = nullptr,                            // Optional output: coupling gain or RSRP in [dB], [n_rx_terminal, n_tx_node]
         arma::uword i_freq = 0,                                  // Frequency index into layout.center_freq, 0-based
         arma::uword tx_port = 0);                                // Port of the Tx antennas, 0-based
+
+    // Write the rays of a layout with their link gain to a QRT file; returns the x-y shift of the local coordinates in [m], [2]
+    // - One origin per site, one destination per terminal, one CIR per row of the terminal; the file holds local
+    //   positions, the caller adds the shift back
+    // - Evaluate with qrt_file_read, gbsm_rays_from_paths and gbsm_single_link_channel (link gain 0)
+    arma::vec export_rays_qrt(
+        const std::string &fn,                                   // QRT file, replaced if it exists
+        const layout &layout,                                    // Layout with links from init_link_states; static sites, no wrap-around
+        const std::vector<std::vector<gbsm_rays>> &rays = {});   // Rays of all links from generate_rays, [n_link][1]; empty = generated in batches
 }
 
 #endif
