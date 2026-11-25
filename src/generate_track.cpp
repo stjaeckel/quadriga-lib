@@ -114,6 +114,73 @@ void check_structure(const quadriga_lib::layout_nodes &nodes, bool all_offsets =
             throw std::invalid_argument(bad + "the member 'offset' must start at the first row, increase and stay within the rows.");
 }
 
+// Appends one node with one row at 'start' (empty = origin) and the default values; 'name' empty: the next free name,
+// i.e. the prefix that all names share before their number (e.g. "UT"), else "N", with the next number
+void append_node(quadriga_lib::layout_nodes &N, const std::string &name_in, const arma::vec &start)
+{
+    if (!start.is_empty() && (start.n_elem != 3 || !start.is_finite()))
+        throw std::invalid_argument("Input 'start' must be empty or [x, y, z] with finite values.");
+    std::string name = name_in;
+    if (name.empty())
+    {
+        std::string prefix;
+        bool common = !N.name.empty();
+        for (const std::string &nm : N.name)
+        {
+            size_t p = nm.size();
+            while (p > 0 && std::isdigit((unsigned char)nm[p - 1]))
+                --p;
+            if (p == 0 || p == nm.size() || (!prefix.empty() && nm.compare(0, p, prefix) != 0) || (!prefix.empty() && p != prefix.size()))
+            {
+                common = false;
+                break;
+            }
+            prefix = nm.substr(0, p);
+        }
+        if (!common)
+            prefix = "N";
+        unsigned long long n = 0;
+        for (const std::string &nm : N.name)
+            if (nm.size() > prefix.size() && nm.size() <= prefix.size() + 18 && nm.compare(0, prefix.size(), prefix) == 0 &&
+                nm.find_first_not_of("0123456789", prefix.size()) == std::string::npos)
+                n = std::max(n, std::stoull(nm.substr(prefix.size())));
+        name = prefix + std::to_string(n + 1);
+    }
+    else if (std::find(N.name.begin(), N.name.end(), name) != N.name.end())
+        throw std::invalid_argument("Input 'name' is the name of an existing node ('" + name + "').");
+    quadriga_lib::layout_nodes one; // The rules of the names
+    one.name = {name}, one.sector = {0}, one.i_antenna = {0}, one.offset = {0}, one.pos.zeros(3, 1), one.orientation.zeros(3, 1);
+    const std::string msg = one.is_valid();
+    if (!msg.empty())
+        throw std::invalid_argument("Input 'name': " + msg);
+
+    const arma::uword nn = N.n_node(), nr = N.n_row();
+    const double nan = arma::datum::nan;
+    N.name.push_back(name);
+    N.sector.resize(nn + 1), N.sector[nn] = 0;
+    N.i_antenna.resize(nn + 1), N.i_antenna[nn] = 0;
+    N.offset.resize(nn + 1), N.offset[nn] = nr;
+    N.pos.insert_cols(nr, start.is_empty() ? arma::vec(3, arma::fill::zeros) : start);
+    N.orientation.insert_cols(nr, arma::vec(3, arma::fill::zeros));
+    if (!N.direction.is_empty())
+        N.direction.insert_cols(nr, arma::vec{nan, 0.0});
+    auto grow = [](auto &v, auto x)
+    {
+        if (!v.is_empty())
+            v.resize(v.n_elem + 1), v[v.n_elem - 1] = x;
+    };
+    grow(N.speed, 0.0), grow(N.time, nan), grow(N.indoor, -1), grow(N.floor, -1), grow(N.d2d_in, nan);
+    grow(N.seed, (arma::sword)-1), grow(N.relative, 0u), grow(N.cell, 1u);
+    if (!N.scenario.empty())
+        N.scenario.push_back("");
+    for (auto &col : N.extra)
+        col.push_back("");
+    if (!N.clutter.is_empty())
+        N.clutter.insert_cols(nn, arma::vec(3, arma::fill::value(nan)));
+    for (auto &kv : N.scenpar_override)
+        grow(kv.second, nan);
+}
+
 // Start of the messages about one node
 std::string who(const quadriga_lib::layout_nodes &nodes, arma::uword i)
 {
@@ -594,7 +661,7 @@ double option_value(const std::string &key, const std::vector<double> &v, double
 
 /*!MD
 # generate_track
-Replace the rows of nodes by a generated track or a point drop
+Replace the rows of nodes by a generated track or a point drop, or append a node with one
 
 - Gives nodes a straight, circular or street-like track, or makes them point drops with a speed and a direction, the
   short-term mobility of 3GPP TR 38.901
@@ -602,6 +669,7 @@ Replace the rows of nodes by a generated track or a point drop
   starts at the first position of the node and is horizontal at the height of the first row
 - The antennas look along the motion, as [[set_orientation]] turns them; [[sample_track]] gives the positions at
   snapshot times
+- An empty `i_node` appends a new node at `start` and gives it the track (see Notes)
 
 ## Declaration:
 ```
@@ -614,12 +682,14 @@ void quadriga_lib::generate_track(
     const arma::vec &direction = {},
     double spacing = NAN,
     const std::unordered_map<std::string, std::vector<double>> &options = {},
-    arma::sword seed = -1);
+    arma::sword seed = -1,
+    const std::string &name = "",
+    const arma::vec &start = {});
 ```
 
 ## Inputs:
 - **`nodes`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`), updated in place
-- **`i_node`** — Node indices, 0-based, not empty
+- **`i_node`** — Node indices, 0-based; empty: append a new node
 - **`type`** — Type of the track, not case sensitive:
   - `point`: a point drop with `speed` and a horizontal `direction`; the rows after the first are removed; `length` is
     not used
@@ -639,11 +709,14 @@ void quadriga_lib::generate_track(
   `street_length_std` = 83 (all in [m], >= 0; with a std of 0, mu must be >= min and > 0), `curve_radius` = 10 [m],
   `turn_probability` = 0.5 (in [0, 1]); other keys, and these keys for the other types, throw
 - **`seed`** *(optional)* — Seed, >= 0 for reproducible draws; -1 = system random device; below -1 throws
+- **`name`** *(optional)* — Name of the new node (empty `i_node` only); empty: the next free name
+- **`start`** *(optional)* — First position `[x, y, z]` of the new node in [m] (empty `i_node` only); empty: the origin
 
 ## Example:
 ```
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("", "rx.csv");
 quadriga_lib::generate_track(L.rx, {0}, "street", 500.0, 10.0, {}, NAN, {{"turn_probability", {0.3}}}, 42);
+quadriga_lib::generate_track(L.rx, {}, "linear", 100.0, 1.5, {0.0}, NAN, {}, 42, "walker", {10.0, 20.0, 1.5});
 ```
 
 ## Notes:
@@ -664,6 +737,11 @@ quadriga_lib::generate_track(L.rx, {0}, "street", 500.0, 10.0, {}, NAN, {{"turn_
   the extra columns take the values of the first row; `time` is cleared
 - **Reproducibility**: a seed >= 0 gives the same track on all platforms. Each name (all its nodes) has its own random
   stream, so the track does not depend on the other nodes or the order in `i_node`
+- **Append mode**: with an empty `i_node`, a new node is appended with one row at `start` and the default values (sector
+  0, the generic antenna, orientation 0, speed 0, no scenario), and gets the track; a track type therefore needs
+  `speed`. Its index is `nodes.n_node() - 1` after the call. The default name is the common prefix of the names before
+  their number with the next number (`UT3` after `UT1`, `UT2`), else `N<n>`. `name` or `start` with a non-empty `i_node`
+  throws
 - A failed call leaves `nodes` unchanged
 
 ## See also:
@@ -674,9 +752,20 @@ MD!*/
 
 void quadriga_lib::generate_track(layout_nodes &nodes, const uint_list &i_node, const std::string &type_in, double length, double speed,
                                   const arma::vec &direction, double spacing,
-                                  const std::unordered_map<std::string, std::vector<double>> &options, arma::sword seed)
+                                  const std::unordered_map<std::string, std::vector<double>> &options, arma::sword seed,
+                                  const std::string &name, const arma::vec &start)
 {
     check_structure(nodes);
+    if (!i_node.vec().is_empty() && (!name.empty() || !start.is_empty()))
+        throw std::invalid_argument("Inputs 'name' and 'start' are used only when 'i_node' is empty.");
+    if (i_node.vec().is_empty()) // Append mode: a new node, then its track; a failed call leaves 'nodes' unchanged
+    {
+        layout_nodes N = nodes;
+        append_node(N, name, start);
+        generate_track(N, N.n_node() - 1, type_in, length, speed, direction, spacing, options, seed);
+        nodes = std::move(N);
+        return;
+    }
 
     std::string type = type_in;
     std::transform(type.begin(), type.end(), type.begin(), [](unsigned char c) { return (char)std::tolower(c); });

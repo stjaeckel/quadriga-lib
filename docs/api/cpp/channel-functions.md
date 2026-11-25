@@ -12,7 +12,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
 | [channel_calc_effective_path_gain](#channel_calc_effective_path_gain) | Calculate the effective path gain per snapshot in linear scale |
 | [channel_export_obj_file](#channel_export_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
-| [crossfade_segments](#crossfade_segments) | Joins the channels of consecutive segments of one link by a power cross-fade |
+| [crossfade_segments](#crossfade_segments) | Join the channels of consecutive segments of one link by a power cross-fade |
 | [hdf5_create_file](#hdf5_create_file) | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_channel_vec](#hdf5_read_channel_vec) | Read the channels of several slots of an HDF5 file |
@@ -469,13 +469,14 @@ void quadriga_lib::channel_export_obj_file(
 ---
 <a id="crossfade_segments"></a>
 ## crossfade_segments
-Joins the channels of consecutive segments of one link by a power cross-fade
+Join the channels of consecutive segments of one link by a power cross-fade
 
 Also in: [MATLAB](../mex/channel-functions.md#crossfade_segments) · [Python](../python/channel-functions.md#crossfade_segments)
 
 - Joins the channels of the segments of one link, e.g. of a track whose scenario changes, into one channel; consecutive
   segments share snapshots, over which the paths of the old segment fade out and those of the new one fade in
-- [get_gbsm_channels](network-layouts-and-mobility.md#get_gbsm_channels) joins the segments of tracks with this function; it is a port of the channel merger of QuaDRiGa
+- [get_channels_from_rays](network-layouts-and-mobility.md#get_channels_from_rays) joins the segments of tracks with this function; it is a port of the channel merger of
+  QuaDRiGa
 
 ### Declaration:
 ```cpp
@@ -519,7 +520,7 @@ channel<double> quadriga_lib::crossfade_segments(
   carried
 
 ### See also:
-- [get_gbsm_channels](network-layouts-and-mobility.md#get_gbsm_channels) (joins the segments of tracks with this function)
+- [get_channels_from_rays](network-layouts-and-mobility.md#get_channels_from_rays) (joins the segments of tracks with this function)
 - [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) (channels of one segment)
 
 ---

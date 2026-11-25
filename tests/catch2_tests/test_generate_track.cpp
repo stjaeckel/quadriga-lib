@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// generate_track, set_orientation and the seed hash of the layout streams.
+// generate_track (also appending a node), set_orientation and the seed hash of the layout streams.
 //
 // Oracles: public test vectors of the 64-bit FNV-1a hash; closed forms for the geometry of linear and circular tracks
 // (end point, centre, radius, sense of rotation, closure); the heading of a track from the steps between its positions
@@ -146,7 +146,6 @@ TEST_CASE("generate_track - input validation")
         fails("type", [&] { generate_track(N, {0}, "", 10.0, 1.0); });
         fails("i_node", [&] { generate_track(N, {2}, "linear", 10.0, 1.0); });
         fails("i_node", [&] { generate_track(N, {0, 7}, "linear", 10.0, 1.0); });
-        fails("i_node", [&] { generate_track(N, quadriga_lib::uint_list(), "linear", 10.0, 1.0); });
         auto M = N;
         M.orientation.zeros(3, 2);
         CHECK(has(qd_layout_throws([&] { generate_track(M, {0}, "linear", 10.0, 1.0); }), "nodes"));
@@ -726,6 +725,65 @@ TEST_CASE("generate_track - street tracks, statistics and seeds")
         CHECK(N.is_valid().empty());
         CHECK(arma::all(N.pos.col(0) == arma::vec{1.0, 2.0, 3.0}));
     }
+}
+
+TEST_CASE("generate_track - an empty i_node appends a node")
+{
+    quadriga_lib::layout L = qd_layout_build();
+    quadriga_lib::layout_nodes N = L.rx; // UT1 (3 rows), UT2 (1 row)
+    const quadriga_lib::layout_nodes N0 = N;
+
+    // A linear track for a new node at the origin, named after the existing names
+    quadriga_lib::generate_track(N, {}, "linear", 10.0, 2.0, {0.0}, NaN, {}, 1);
+    REQUIRE(N.n_node() == 3);
+    const arma::uword k = N.n_node() - 1; // The index of the new node
+    CHECK(N.name[k] == "UT3");
+    CHECK(N.sector[k] == 0);
+    CHECK(N.i_antenna[k] == 0);
+    CHECK(N.offset[k] == 4);
+    REQUIRE(N.n_row(k) == 2);
+    CHECK(arma::approx_equal(N.pos.cols(4, 5), arma::mat{{0.0, 10.0}, {0.0, 0.0}, {0.0, 0.0}}, "absdiff", 1e-12));
+    CHECK(arma::approx_equal(N.speed.subvec(4, 5), arma::vec{2.0, 2.0}, "absdiff", 0.0));
+    CHECK(arma::approx_equal(N.pos.cols(0, 3), N0.pos, "absdiff", 0.0)); // The other nodes stay
+    CHECK(qd_layout_same_angle(N.direction.cols(0, 3), N0.direction));
+    CHECK(N.is_valid() == "");
+
+    // A point drop with a name and a start position
+    quadriga_lib::generate_track(N, {}, "point", 0.0, 1.5, {1.0}, NaN, {}, 1, "car", {5.0, 6.0, 1.5});
+    REQUIRE(N.n_node() == 4);
+    CHECK(N.name[3] == "car");
+    CHECK(arma::approx_equal(N.pos.col(6), arma::vec{5.0, 6.0, 1.5}, "absdiff", 0.0));
+    CHECK(N.speed[6] == 1.5);
+    CHECK(std::abs(N.direction(0, 6) - 1.0) < 1e-12);
+    CHECK(N.is_valid() == "");
+
+    // Names: the next number of a common prefix, else N<n>
+    quadriga_lib::layout_nodes T = L.tx; // BS1 (2 sectors), BS2
+    quadriga_lib::generate_track(T, {}, "point", 0.0, 0.0, {0.0});
+    CHECK(T.name.back() == "BS3");
+    quadriga_lib::generate_track(N, {}, "point", 0.0, 0.0, {0.0}); // UT1, UT2, UT3, car
+    CHECK(N.name.back() == "N1");
+    quadriga_lib::layout_nodes E;
+    quadriga_lib::generate_track(E, {}, "point", 0.0, 0.0, {0.0});
+    quadriga_lib::generate_track(E, {}, "point", 0.0, 0.0, {0.0});
+    CHECK(E.name == std::vector<std::string>{"N1", "N2"});
+    CHECK(E.is_valid() == "");
+
+    // Errors leave the nodes unchanged
+    auto msg = [&](const quadriga_lib::uint_list &i, const std::string &type, double speed, const std::string &name, const arma::vec &start)
+    {
+        quadriga_lib::layout_nodes M = N0;
+        const std::string m = qd_layout_throws([&] { quadriga_lib::generate_track(M, i, type, 0.0, speed, {0.0}, NaN, {}, 1, name, start); });
+        CHECK(qd_layout_diff_nodes(M, N0) == "");
+        return m;
+    };
+    CHECK(msg({0}, "point", 1.0, "car", {}) == "Inputs 'name' and 'start' are used only when 'i_node' is empty.");
+    CHECK(msg({0}, "point", 1.0, "", {1.0, 2.0, 3.0}) == "Inputs 'name' and 'start' are used only when 'i_node' is empty.");
+    CHECK(msg({}, "point", 1.0, "UT2", {}) == "Input 'name' is the name of an existing node ('UT2').");
+    CHECK(msg({}, "point", 1.0, "", {1.0, 2.0}) == "Input 'start' must be empty or [x, y, z] with finite values.");
+    CHECK(msg({}, "point", 1.0, "", {1.0, 2.0, NaN}) == "Input 'start' must be empty or [x, y, z] with finite values.");
+    CHECK(has(msg({}, "point", 1.0, "a,b", {}), "Input 'name'"));
+    CHECK(has(msg({}, "linear", NaN, "", {}), "speed")); // A track needs a speed: the new row has none
 }
 
 TEST_CASE("generate_track - mounted antennas")

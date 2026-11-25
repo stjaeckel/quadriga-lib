@@ -26,7 +26,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-site-s
 | [polmat_update](#polmat_update) | Thread a polarization transfer (Jones) matrix along a ray path |
 | [ray_commit](#ray_commit) | Commit the paths of a launch configuration that reach a receiver |
 | [ray_init](#ray_init) | Seed a sphere of rays from a point source |
-| [ray_mesh_interact](#ray_mesh_interact) | Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
+| [ray_mesh_interact](#ray_mesh_interact) | Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
 | [ray_point_intersect](#ray_point_intersect) | Calculate intersections of ray beams with points in 3D space |
 | [ray_progress](#ray_progress) | Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays |
 | [ray_state_update](#ray_state_update) | Per-ray medium state machine with closed-form thin-slab (Fabry-Pérot) resolution |
@@ -1224,7 +1224,7 @@ arma::uword ray_init(
 ---
 <a id="ray_mesh_interact"></a>
 ## ray_mesh_interact
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
+Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 Also in: [MATLAB](../mex/site-specific-simulation-tools.md#ray_mesh_interact) · Not in: Python
 

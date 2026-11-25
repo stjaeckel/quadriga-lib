@@ -104,12 +104,22 @@ class test_case(unittest.TestCase):
         out = quadriga_lib.layout.generate_track(nodes_in=nodes, i_node=1, type="linear", length=10, speed=2, direction=0.5)
         self.assertEqual(out["pos"].shape, (3, 5))
 
+    def test_append(self):
+        nodes = self.nodes
+        ap = quadriga_lib.layout.generate_track(nodes, None, "linear", length=10, speed=2, direction=0)  # a new node
+        self.assertEqual(ap["name"], ["UT1", "UT2", "UT2", "UT3"])
+        npt.assert_array_equal(ap["offset"], [0, 1, 2, 3])
+        npt.assert_allclose(ap["pos"][:, 3:], [[0, 10], [0, 0], [0, 0]], atol=1e-12, rtol=0)
+        an = quadriga_lib.layout.generate_track(nodes, [], "point", speed=1, direction=0, name="car", start=[5, 6, 1.5])
+        self.assertEqual(an["name"][3], "car")
+        npt.assert_array_equal(an["pos"][:, 3], [5, 6, 1.5])
+        with self.assertRaisesRegex(ValueError, "Inputs 'name' and 'start' are used only when 'i_node' is empty"):  # C++
+            quadriga_lib.layout.generate_track(nodes, 0, "point", speed=1, name="car")
+
     def test_errors(self):
         nodes = self.nodes
         with self.assertRaisesRegex(TypeError, "incompatible function arguments"):  # length is keyword-only
             quadriga_lib.layout.generate_track(nodes, 0, "linear", 10)
-        with self.assertRaises(TypeError):
-            quadriga_lib.layout.generate_track(nodes, None, "linear")
         with self.assertRaises(TypeError):
             quadriga_lib.layout.generate_track(1, 0, "linear")
         with self.assertRaisesRegex(ValueError, "Input 'i_node'"):  # negative index

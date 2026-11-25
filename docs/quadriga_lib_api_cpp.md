@@ -85,7 +85,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 **Network layouts and mobility**
 
 - `layout`: the nodes of a radio network and how they move, in two tables, the Tx nodes (BS, AP) and the Rx nodes (UT, STA), with their antennas, the link states of one realisation and the lattice of the wrap-around; the two [layout CSV files](formats/layout_csv.md) hold the same tables.
-- Tx nodes, Rx nodes: the two node tables of a layout, `layout.tx` and `layout.rx`; a function that works on one of them takes the table or `rx_side` (`false`: Tx nodes, `true`: Rx nodes).
+- Tx nodes, Rx nodes: the two node tables of a layout, `layout.tx` and `layout.rx`; a function that works on one of them takes the table or `rx` (`false`: Tx nodes, `true`: Rx nodes).
 - Node: one transmitter or receiver of a layout, identified by its `name` and `sector`, with one antenna and one track. Site: all Tx nodes with one name (its sectors share position and scenario). Terminal: all Rx nodes with one name, e.g. the panels of one device.
 - Row: a position with orientation and the values that apply from it on; the rows of a node are consecutive, the first at `offset`. Snapshot: one sample of the channel in time and space; without snapshot times, each row of a node is one snapshot.
 - Track: a node with several rows, which moves along its positions. Point drop: a node with one row, which stays at its position or moves along its `direction` with its `speed`.
@@ -93,7 +93,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Propagation link: one site, one terminal and one segment (with the wrap image of the site), with its LOS and indoor state, conf file and seeds, stored in `layout.links`. Channel link: one Tx node and one Rx node of a propagation link (and one frequency); the sectors of a site share the rays of their propagation link.
 - Band: one simulation frequency of `center_freq` of a layout; the antenna of a node has one description for all bands or one per band.
 - Scenario family, conf name: a family (`UMa`, `InH`, ...) selects the conf file of a link from its LOS and indoor state; a conf name (e.g. `UMa_NLOS_O2I`, or a user conf file) names one file and fixes the state.
-- Wrap image: the site displaced by lattice vectors `wrap` of the layout; each link uses the image of the site that is nearest to the terminal (`image` = 0: the site itself).
+- Wrap image: the site displaced by lattice vectors `wrap` of the layout; each link uses the image of the site that is nearest to the first position of the terminal, kept for the whole track (`image` = 0: the site itself).
 - `i_antenna`: 1-based index into the antenna lists of a layout, 0 = the generic antenna with two co-located isotropic elements of vertical and horizontal polarization.
 - Angles: degrees in the CSV files and in the tuples typed by hand (`bs`, `ut` of `generate_layout`, the arguments of `generate_antenna` in `set_antenna`), radians in all class members, `orientation` and `direction`.
 
@@ -132,7 +132,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | Compute the baseband frequency response of multiple MIMO channels |
 | [channel_calc_effective_path_gain](#channel_calc_effective_path_gain) | Channel functions | Calculate the effective path gain per snapshot in linear scale |
 | [channel_export_obj_file](#channel_export_obj_file) | Channel functions | Export propagation paths to a Wavefront OBJ file for 3D visualization |
-| [crossfade_segments](#crossfade_segments) | Channel functions | Joins the channels of consecutive segments of one link by a power cross-fade |
+| [crossfade_segments](#crossfade_segments) | Channel functions | Join the channels of consecutive segments of one link by a power cross-fade |
 | [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_channel_vec](#hdf5_read_channel_vec) | Channel functions | Read the channels of several slots of an HDF5 file |
@@ -161,7 +161,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [acdf](#acdf) | Channel statistics | Calculate the empirical averaged cumulative distribution function (CDF) |
 | [calc_angular_spread](#calc_angular_spread) | Channel statistics | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
 | [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | Calculate the Rician K-Factor from channel impulse response data |
 | [gbsm_rays](#gbsm_rays) | Geometry-based stochastic model | Class for the ray data of one link (geometry-based stochastic model) |
 | [conf_file_list](#conf_file_list) | Geometry-based stochastic model | List the scenarios defined by the conf files in a set of directories |
@@ -189,9 +189,9 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [fast_sincos](#fast_sincos) | Math functions | Compute elementwise approximate sine and/or cosine of a vector |
 | [fast_slerp](#fast_slerp) | Math functions | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
 | [interp_2D](#interp_2D) | Math functions | Perform linear interpolation (1D or 2D) on multiple data sets |
-| [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) | Miscellaneous / Tools | Checks whether AVX2 kernels can be used |
-| [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) | Miscellaneous / Tools | Checks whether CUDA kernels can be used |
-| [quadriga_lib_version](#quadriga_lib_version) | Miscellaneous / Tools | Returns the quadriga-lib version number |
+| [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) | Miscellaneous / Tools | Check whether AVX2 kernels can be used |
+| [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) | Miscellaneous / Tools | Check whether CUDA kernels can be used |
+| [quadriga_lib_version](#quadriga_lib_version) | Miscellaneous / Tools | Version number of quadriga-lib |
 | [layout](#layout) | Network layouts and mobility | Class for a network layout: Tx and Rx nodes, antennas, frequencies and link states |
 | [layout_links](#layout_links) | Network layouts and mobility | State of the propagation links of one realisation of a layout |
 | [layout_nodes](#layout_nodes) | Network layouts and mobility | The Tx nodes or the Rx nodes of a layout, as a table of flat arrays |
@@ -200,15 +200,14 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [export_rays_qrt](#export_rays_qrt) | Network layouts and mobility | Write the rays of a layout with their link gain to a QRT file |
 | [generate_layout](#generate_layout) | Network layouts and mobility | Network layout from a preset: BS sites and a drop of UTs |
 | [generate_rays](#generate_rays) | Network layouts and mobility | Rays of the propagation links of a layout (stage 2 of the channel pipeline) |
-| [generate_track](#generate_track) | Network layouts and mobility | Replace the rows of nodes by a generated track or a point drop |
+| [generate_track](#generate_track) | Network layouts and mobility | Replace the rows of nodes by a generated track or a point drop, or append a node with one |
+| [get_channels_from_rays](#get_channels_from_rays) | Network layouts and mobility | Channel coefficients of a layout from given rays (stage 3 of the channel pipeline) |
 | [get_channels_layout](#get_channels_layout) | Network layouts and mobility | Channel coefficients of a layout in one call |
-| [get_gbsm_channels](#get_gbsm_channels) | Network layouts and mobility | Channel coefficients of a layout from given rays (stage 3 of the channel pipeline) |
 | [init_link_states](#init_link_states) | Network layouts and mobility | Draw the discrete state of the propagation links of a layout (stage 1 of the channel pipeline) |
 | [layout_csv_read](#layout_csv_read) | Network layouts and mobility | Read the Tx and Rx CSV files of a layout |
 | [layout_csv_write](#layout_csv_write) | Network layouts and mobility | Write a layout to the Tx and Rx CSV files |
 | [sample_track](#sample_track) | Network layouts and mobility | Positions and orientations of a node at snapshot times |
-| [set_antenna](#set_antenna) | Network layouts and mobility | Set the antenna of layout nodes from the arguments of generate_antenna or from an evaluated array |
-| [set_antenna_qdant](#set_antenna_qdant) | Network layouts and mobility | Set the antenna of layout nodes to an entry of a QDANT file |
+| [set_antenna](#set_antenna) | Network layouts and mobility | Set the antenna of layout nodes from the arguments of generate_antenna, a QDANT file, an array, or by index |
 | [set_orientation](#set_orientation) | Network layouts and mobility | Set the orientation of nodes from their motion, or to a given value |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
 | [colormap](#colormap) | Site-specific simulation tools | Generate a colormap matrix with RGB values |
@@ -232,7 +231,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [polmat_update](#polmat_update) | Site-specific simulation tools | Thread a polarization transfer (Jones) matrix along a ray path |
 | [ray_commit](#ray_commit) | Site-specific simulation tools | Commit the paths of a launch configuration that reach a receiver |
 | [ray_init](#ray_init) | Site-specific simulation tools | Seed a sphere of rays from a point source |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
 | [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | Calculate intersections of ray beams with points in 3D space |
 | [ray_progress](#ray_progress) | Site-specific simulation tools | Advance a ray set by one interaction, spawning reflected, transmitted, and subdivided rays |
 | [ray_state_update](#ray_state_update) | Site-specific simulation tools | Per-ray medium state machine with closed-form thin-slab (Fabry-Pérot) resolution |
@@ -1828,13 +1827,14 @@ void quadriga_lib::channel_export_obj_file(
 ---
 <a id="crossfade_segments"></a>
 ## crossfade_segments
-Joins the channels of consecutive segments of one link by a power cross-fade
+Join the channels of consecutive segments of one link by a power cross-fade
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#crossfade_segments) · [Python](quadriga_lib_api_python.md#crossfade_segments)
 
 - Joins the channels of the segments of one link, e.g. of a track whose scenario changes, into one channel; consecutive
   segments share snapshots, over which the paths of the old segment fade out and those of the new one fade in
-- [get_gbsm_channels](#get_gbsm_channels) joins the segments of tracks with this function; it is a port of the channel merger of QuaDRiGa
+- [get_channels_from_rays](#get_channels_from_rays) joins the segments of tracks with this function; it is a port of the channel merger of
+  QuaDRiGa
 
 ### Declaration:
 ```cpp
@@ -1878,7 +1878,7 @@ channel<double> quadriga_lib::crossfade_segments(
   carried
 
 ### See also:
-- [get_gbsm_channels](#get_gbsm_channels) (joins the segments of tracks with this function)
+- [get_channels_from_rays](#get_channels_from_rays) (joins the segments of tracks with this function)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channels of one segment)
 
 ---
@@ -3563,7 +3563,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
 ---
 <a id="calc_delay_spread"></a>
 ## calc_delay_spread
-Calculates RMS delay spread from per-CIR delays and linear-scale powers
+RMS delay spread from per-CIR delays and linear-scale powers
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread) · [Python](quadriga_lib_api_python.md#calc_delay_spread)
 
@@ -5273,7 +5273,7 @@ quadriga_lib::interp_1D(x, input, x_new, output);
 ---
 <a id="quadriga_lib_has_AVX2"></a>
 ## quadriga_lib_has_AVX2
-Checks whether AVX2 kernels can be used
+Check whether AVX2 kernels can be used
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#version) · [Python](quadriga_lib_api_python.md#version)
 
@@ -5291,7 +5291,7 @@ bool quadriga_lib::quadriga_lib_has_AVX2();
 ---
 <a id="quadriga_lib_has_CUDA"></a>
 ## quadriga_lib_has_CUDA
-Checks whether CUDA kernels can be used
+Check whether CUDA kernels can be used
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#version) · [Python](quadriga_lib_api_python.md#version)
 
@@ -5308,7 +5308,7 @@ bool quadriga_lib::quadriga_lib_has_CUDA();
 ---
 <a id="quadriga_lib_version"></a>
 ## quadriga_lib_version
-Returns the quadriga-lib version number
+Version number of quadriga-lib
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#version) · [Python](quadriga_lib_api_python.md#version)
 
@@ -5346,26 +5346,26 @@ store them in files, move the nodes along tracks and compute the channels of all
 
 1. Create a layout: [generate_layout](#generate_layout) from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [layout_csv_read](#layout_csv_read) from two CSV files; [drop_terminals](#drop_terminals) drops new UTs into the cells of the Tx nodes
-2. Set the frequencies `layout.center_freq` and the antennas ([set_antenna](#set_antenna), [set_antenna_qdant](#set_antenna_qdant))
+2. Set the frequencies `layout.center_freq` (or give them to [generate_layout](#generate_layout)) and the antennas ([set_antenna](#set_antenna))
 3. Optionally, move the nodes: [generate_track](#generate_track) creates tracks, [set_orientation](#set_orientation) turns the antennas along the
    motion, [sample_track](#sample_track) gives the positions at given times
 4. Compute the channels with [get_channels_layout](#get_channels_layout)
 5. Store the layout with [layout_csv_write](#layout_csv_write)
 
 For more control, step 4 runs in three stages: [init_link_states](#init_link_states) draws the link states, [generate_rays](#generate_rays) the rays of
-the geometry-based stochastic model (GBSM), and [get_gbsm_channels](#get_gbsm_channels) applies the antennas, the motion and the link
+the geometry-based stochastic model (GBSM), and [get_channels_from_rays](#get_channels_from_rays) applies the antennas, the motion and the link
 gain. Between the stages, link states and rays can be inspected or edited, [attach_terminals](#attach_terminals) selects the serving cell
 of each terminal, and [export_rays_qrt](#export_rays_qrt) stores the rays in a QRT file.
 
-**Antennas.** Each node has one antenna. [set_antenna](#set_antenna) sets it from the arguments of [generate_antenna](#generate_antenna) or from an
-array, [set_antenna_qdant](#set_antenna_qdant) from an entry of a QDANT file; in the CSV files, antenna columns describe it. A node has
-one antenna for all bands or one per band. A node without an antenna uses the generic antenna: two co-located isotropic
-elements with vertical and horizontal polarization.
+**Antennas.** Each node has one antenna. [set_antenna](#set_antenna) sets it from the arguments of [generate_antenna](#generate_antenna), from an
+entry of a QDANT file, from an array or by the index of an antenna that the layout already has; in the CSV files,
+antenna columns describe it. A node has one antenna for all bands or one per band. A node without an antenna uses the
+generic antenna: two co-located isotropic elements with vertical and horizontal polarization.
 
 **Terms** (full list in the [Glossary](#glossary)):
 
 - **Tx nodes**, **Rx nodes**: the two node tables of a layout, `layout.tx` and `layout.rx`. A function that works on one
-  of them takes the table itself or `rx_side` (`false`: Tx nodes, `true`: Rx nodes)
+  of them takes the table itself or `rx` (`false`: Tx nodes, `true`: Rx nodes)
 - **Node**: one transmitter or receiver, identified by its `name` and `sector`, with one antenna and one track
 - **Site**: all Tx nodes of one name, e.g. the three sectors of a base station; they share position and scenario
 - **Terminal**: all Rx nodes of one name, e.g. the antenna panels of one device; they share their positions
@@ -5383,7 +5383,7 @@ elements with vertical and horizontal polarization.
 - **Scenario**: a family (e.g. `UMa`), which draws the LOS and indoor state of each link, or a conf name (e.g.
   `UMa_NLOS`), which fixes them
 - **Wrap-around**: copies of the sites, displaced by the lattice vectors `layout.wrap`, so that a cluster of cells tiles
-  the plane; each link uses the copy (*image*) nearest to the terminal
+  the plane; each link uses the copy (*image*) nearest to the first position of the terminal, kept for the whole track
 - **Orientation**: bank, tilt and heading of the antenna; a positive tilt points down. **Direction**: azimuth and
   elevation of the motion of a point drop
 
@@ -5435,6 +5435,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#eval_antennas) · [Python](quadriga_li
   band at the frequency of that band; a `qdant` line is read as stored. Until an antenna is evaluated (its entry of
   `antenna` holds no arrays, or an array without elements), its nodes use the generic antenna. Throws for a band without
   description and for an array spaced in wavelengths in a layout without frequencies
+- **Wrap-around**: a cluster of a few rings of sites is finite, so the cells at its edge lack the interferers that
+  surround them in a large network. With `wrap`, the cluster is repeated periodically by the lattice vectors, and each
+  link uses the copy (image) of its site nearest to the first position of the terminal, kept for the whole track, which
+  the channel generation treats as a site of its own (TR 38.901 Table 7.8-1: geographical distance based wrapping;
+  clause 7.5, step 1). Every terminal then has neighbours on all sides, as in the middle of a network. One vector
+  repeats the cluster along one direction, e.g. along a road
 - **Wrap vectors**: two vectors form a reduced basis,
   $0 \le a_1 \cdot a_2 \le \min(\lvert a_1 \rvert^2, \lvert a_2 \rvert^2) / 2$, so that $\pm a_1$, $\pm a_2$ and
   $\pm(a_1 - a_2)$ are the nearest images
@@ -5446,7 +5452,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#eval_antennas) · [Python](quadriga_li
 - [layout_nodes](#layout_nodes) (the Tx nodes and the Rx nodes)
 - [layout_links](#layout_links) (link states)
 - [layout_csv_read](#layout_csv_read), [layout_csv_write](#layout_csv_write) (load and store a layout)
-- [set_antenna](#set_antenna), [set_antenna_qdant](#set_antenna_qdant) (set the antennas of nodes)
+- [set_antenna](#set_antenna) (sets the antennas of nodes)
 
 ---
 <a id="layout_links"></a>
@@ -5565,6 +5571,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#attach_terminals) · [Python](quadriga
   highest RSRP (`"rsrp"`), with its site and the gains of all nodes
 - Use it to link each terminal to its serving site in `layout.pairing` (see Example), so that the channel functions
   compute only the serving links
+- One call attaches at one frequency, `layout.center_freq[i_freq]`, the first band by default; this suits offloading
+  scenarios, where the higher bands serve as data pipes. The result is one serving Tx node per terminal
 
 ### Declaration:
 ```cpp
@@ -5594,8 +5602,7 @@ arma::uvec quadriga_lib::attach_terminals(
 
 ### Example:
 ```cpp
-quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1);
-L.center_freq = {3.5e9};
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1, {3.5e9});
 quadriga_lib::init_link_states(L);
 arma::uvec site;
 quadriga_lib::attach_terminals(L, "large_scale", {}, &site);
@@ -5604,10 +5611,10 @@ L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, site.n_el
 
 ### Notes:
 - **Evaluation**: at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first
-  segment, the wrap image and the antennas as in [get_gbsm_channels](#get_gbsm_channels); `layout.pairing` is ignored
-- **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [get_gbsm_channels](#get_gbsm_channels) plus the gain of one unit-gain LOS
-  path through both antennas (port weights, element positions, orientations), as [get_channels_planar](#get_channels_planar) gives it; no
-  rays
+  segment, the wrap image and the antennas as in [get_channels_from_rays](#get_channels_from_rays); `layout.pairing` is ignored
+- **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [get_channels_from_rays](#get_channels_from_rays) plus the gain of one
+  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [get_channels_planar](#get_channels_planar)
+  gives it; no rays
 - **`"rsrp"`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of $\lvert h \rvert^2$ over the rays of
   [gbsm_single_link_channel](#gbsm_single_link_channel) (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
 - **Ports**: both rules take $\lvert h \rvert^2$ of Tx port `tx_port` and average it over the Rx ports, so a
@@ -5615,11 +5622,13 @@ L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, site.n_el
   antenna of the TR
 - **Choice**: a terminal takes the highest value of its nodes; ties go to the lowest index. A Tx node without a
   propagation link (co-located) has -Inf; a terminal without any link gets node 0
-- **Pairing**: `layout.pairing` holds pairs of site and terminal, so the Example links all sectors of the serving site
+- **Pairing**: `layout.pairing` holds pairs of site and terminal, so the Example links all sectors of the serving site;
+  for multi-connectivity, `layout.pairing` may list several sites per terminal, e.g. all sites within a margin of the
+  best value in `gain_dB`, and the channel functions then compute the links to all of them
 
 ### See also:
 - [init_link_states](#init_link_states), [generate_rays](#generate_rays) (link states and rays)
-- [get_gbsm_channels](#get_gbsm_channels) (channels of the linked pairs)
+- [get_channels_from_rays](#get_channels_from_rays) (channels of the linked pairs)
 
 ---
 <a id="drop_terminals"></a>
@@ -5631,8 +5640,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#drop_terminals) · [Python](quadriga_l
 - Replaces the Rx nodes by new UTs `UT1`, `UT2`, ..., dropped uniformly into the cells of the sites with the rules of
   the scenario of each site (minimum distance, height, speed, indoor state), as [generate_layout](#generate_layout) drops them
 - Use it to drop UTs for any set of Tx nodes, e.g. sites read from a CSV file or edited after [generate_layout](#generate_layout)
-- The Tx nodes, the antenna lists and `layout.seed` stay; `pairing` and `links` are emptied, and the new UTs have the
-  generic antenna
+- The Tx nodes, the antenna lists and `layout.seed` stay; `pairing` and `links` are emptied. The new UTs get the antenna
+  that all old Rx nodes shared (`i_antenna`, with its bands), else the generic antenna
 
 ### Declaration:
 ```cpp
@@ -5716,8 +5725,8 @@ arma::vec quadriga_lib::export_rays_qrt(
   site) and the site name; a destination per terminal with its name and one CIR per row, with the orientation of the
   first node of the terminal (its nodes share their positions)
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
-  link gain and the K-factor ratio of [get_gbsm_channels](#get_gbsm_channels) at the row, [ssf_paths](#ssf_paths) with `"drift"`,
-  [qrt_paths_from_scatterers](#qrt_paths_from_scatterers). A CIR read back gives the channel of [get_gbsm_channels](#get_gbsm_channels) (`output = "rays"`,
+  link gain and the K-factor ratio of [get_channels_from_rays](#get_channels_from_rays) at the row, [ssf_paths](#ssf_paths) with `"drift"`,
+  [qrt_paths_from_scatterers](#qrt_paths_from_scatterers). A CIR read back gives the channel of [get_channels_from_rays](#get_channels_from_rays) (`output = "rays"`,
   `mobility = "drift"`) at the row within float32 accuracy
 - **Reading back**: [gbsm_rays_from_paths](#gbsm_rays_from_paths) with the method of the links and the `n_interact` of the file as
   `path_type`, then [gbsm_single_link_channel](#gbsm_single_link_channel) with link gain 0 and mobility `"drift"`
@@ -5729,7 +5738,7 @@ arma::vec quadriga_lib::export_rays_qrt(
 - The file is written to `fn + ".part"` and renamed at the end; a failed call leaves an existing file unchanged
 
 ### See also:
-- [generate_rays](#generate_rays), [get_gbsm_channels](#get_gbsm_channels) (the rays and the link gain)
+- [generate_rays](#generate_rays), [get_channels_from_rays](#get_channels_from_rays) (the rays and the link gain)
 - [qrt_file_read](#qrt_file_read), [gbsm_rays_from_paths](#gbsm_rays_from_paths), [gbsm_single_link_channel](#gbsm_single_link_channel) (evaluation of the file)
 - [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) (the stored paths)
 
@@ -5743,7 +5752,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_layout) · [Python](quadriga_
 - Creates a standard evaluation layout with the values of its tables: the hexagonal and indoor layouts of 3GPP TR
   38.901, the test environments of ITU-R M.2412 and the road layouts of 3GPP TR 37.885
 - The result has the sites `BS1`, `BS2`, ... with one Tx node per sector and the UTs `UT1`, `UT2`, ... as point drops;
-  set the frequencies and the antennas next ([set_antenna](#set_antenna)), until then the nodes use the generic antenna
+  set the antennas next ([set_antenna](#set_antenna)), until then the nodes use the generic antenna
 - The other inputs change single values of the preset: an entry of a tuple that is NaN or omitted keeps the value of the
   preset; an entry or option that the preset does not use throws
 
@@ -5752,6 +5761,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_layout) · [Python](quadriga_
 quadriga_lib::layout quadriga_lib::generate_layout(
     const std::string &type,
     arma::uword n_ut = 0,
+    const arma::vec &center_freq = {},
     const arma::vec &spacing = {},
     const arma::vec &grid = {},
     const arma::vec &area = {},
@@ -5774,6 +5784,8 @@ quadriga_lib::layout quadriga_lib::generate_layout(
   | `M.2412_InH`, `M.2412_DenseUrban`, `M.2412_Rural`, `M.2412_UrbanMacro` | Test environments of Report ITU-R M.2412-0 (see Notes) |
   | `37.885_Urban`, `37.885_Highway` | Roads and vehicles of TR 37.885, no BSs (see Notes) |
 - **`n_ut`** *(optional)* — UTs per cell (`per_cell`) or in total, at most 1e7 in total; 0 = no UTs
+- **`center_freq`** *(optional)* — Simulation frequencies (bands) in [Hz], finite, positive and strictly ascending,
+  stored as `layout.center_freq`; empty: not set
 - **`spacing`** *(optional)* — `[d_x, d_y]` in [m], > 0: the ISD of a hexagonal preset (`d_y` not used), the spacing of
   the indoor grid or of the urban road grid
 - **`grid`** *(optional)* — `[n_x, n_y, n_sector]`, whole numbers: rings of a hexagonal preset (0 to 50, 0 = one site;
@@ -5801,7 +5813,7 @@ quadriga_lib::layout quadriga_lib::generate_layout(
 
 ### Example:
 ```cpp
-quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 10, {}, {}, {}, {}, {NAN, NAN, NAN, 0.0, 90.0}, {}, {}, true, 42);
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 10, {3.5e9}, {}, {}, {}, {}, {NAN, NAN, NAN, 0.0, 90.0}, {}, {}, true, 42);
 quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
 ```
 
@@ -5809,7 +5821,10 @@ quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
 - **Hexagonal presets** (2 rings, 3 sectors, wrap-around): site $(q, r)$ with
   $\max(\lvert q \rvert, \lvert r \rvert, \lvert q + r \rvert) \le n$ for $n$ rings is at $x = \sqrt{3}\, q d / 2$,
   $y = (q / 2 + r)\, d$ with the ISD $d$, ordered by ring and then by azimuth in (-30°, 330°]. The wrap vectors
-  $a_1 = (\sqrt{3}\, n d / 2, \ (3 n / 2 + 1)\, d)$ and $a_2$, $a_1$ turned by 60°, make the cluster tile the plane
+  $a_1 = (\sqrt{3}\, n d / 2, \ (3 n / 2 + 1)\, d)$ and $a_2$, $a_1$ turned by 60°, make the cluster tile the plane.
+  With the wrap-around, each link uses the copy of its site nearest to the first position of the terminal, kept for the
+  whole track, so that the cells at the edge get the interference of a large network (TR 38.901 Table 7.8-1; see the
+  Notes of [layout](#layout))
 - **`38.901_SMa`**: mechanical tilt 5° at ISD 1299 m and 2° at 1732 m (other ISDs: that of the nearer one); option
   `p_residential` (0.9)
 - **Indoor presets**: centred at the origin, one sector, no wrap-around; the BSs form a lattice centred in the hall,
@@ -5862,7 +5877,7 @@ quadriga_lib::set_antenna(L, "3gpp", {{"panel", {4, 4, 1, 2}}});
     correlated fields at the UT positions (TR 38.901 clause 7.6.3.3); `d2d_in` up to 25 m (UMi, UMa, SMa commercial) or
     10 m (RMa, SMa residential)
 - **Reproducibility**: the layout is a function of the seed and does not depend on the thread count; seed -1 draws a
-  seed, which is stored in `layout.seed`. `center_freq` is empty
+  seed, which is stored in `layout.seed`
 
 ### See also:
 - [drop_terminals](#drop_terminals) (the same drop for any set of Tx nodes)
@@ -5879,7 +5894,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_rays) · [Python](quadriga_li
 
 - Runs the chain of the section "Geometry-based stochastic model" for the chosen links, from the link states of
   [init_link_states](#init_link_states): large-scale parameters, clusters, rays and, on request, the scatterers
-- The rays have no antennas; [get_gbsm_channels](#get_gbsm_channels) applies them. Edit the rays in between to study a change of the
+- The rays have no antennas; [get_channels_from_rays](#get_channels_from_rays) applies them. Edit the rays in between to study a change of the
   propagation, or pass them to [attach_terminals](#attach_terminals) and [export_rays_qrt](#export_rays_qrt)
 - The rays of a link do not depend on the other requested links
 
@@ -5920,13 +5935,13 @@ std::vector<std::vector<gbsm_rays>> quadriga_lib::generate_rays(
   floor 0 at 0 m
 
 ### See also:
-- [init_link_states](#init_link_states) (stage 1), [get_gbsm_channels](#get_gbsm_channels) (stage 3)
+- [init_link_states](#init_link_states) (stage 1), [get_channels_from_rays](#get_channels_from_rays) (stage 3)
 - [gbsm_rays](#gbsm_rays) (the ray data)
 
 ---
 <a id="generate_track"></a>
 ## generate_track
-Replace the rows of nodes by a generated track or a point drop
+Replace the rows of nodes by a generated track or a point drop, or append a node with one
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#generate_track) · [Python](quadriga_lib_api_python.md#generate_track)
 
@@ -5936,6 +5951,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_track) · [Python](quadriga_l
   starts at the first position of the node and is horizontal at the height of the first row
 - The antennas look along the motion, as [set_orientation](#set_orientation) turns them; [sample_track](#sample_track) gives the positions at
   snapshot times
+- An empty `i_node` appends a new node at `start` and gives it the track (see Notes)
 
 ### Declaration:
 ```cpp
@@ -5948,12 +5964,14 @@ void quadriga_lib::generate_track(
     const arma::vec &direction = {},
     double spacing = NAN,
     const std::unordered_map<std::string, std::vector<double>> &options = {},
-    arma::sword seed = -1);
+    arma::sword seed = -1,
+    const std::string &name = "",
+    const arma::vec &start = {});
 ```
 
 ### Inputs:
 - **`nodes`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`), updated in place
-- **`i_node`** — Node indices, 0-based, not empty
+- **`i_node`** — Node indices, 0-based; empty: append a new node
 - **`type`** — Type of the track, not case sensitive:
   - `point`: a point drop with `speed` and a horizontal `direction`; the rows after the first are removed; `length` is
     not used
@@ -5973,11 +5991,14 @@ void quadriga_lib::generate_track(
   `street_length_std` = 83 (all in [m], >= 0; with a std of 0, mu must be >= min and > 0), `curve_radius` = 10 [m],
   `turn_probability` = 0.5 (in [0, 1]); other keys, and these keys for the other types, throw
 - **`seed`** *(optional)* — Seed, >= 0 for reproducible draws; -1 = system random device; below -1 throws
+- **`name`** *(optional)* — Name of the new node (empty `i_node` only); empty: the next free name
+- **`start`** *(optional)* — First position `[x, y, z]` of the new node in [m] (empty `i_node` only); empty: the origin
 
 ### Example:
 ```cpp
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("", "rx.csv");
 quadriga_lib::generate_track(L.rx, {0}, "street", 500.0, 10.0, {}, NAN, {{"turn_probability", {0.3}}}, 42);
+quadriga_lib::generate_track(L.rx, {}, "linear", 100.0, 1.5, {0.0}, NAN, {}, 42, "walker", {10.0, 20.0, 1.5});
 ```
 
 ### Notes:
@@ -5998,6 +6019,11 @@ quadriga_lib::generate_track(L.rx, {0}, "street", 500.0, 10.0, {}, NAN, {{"turn_
   the extra columns take the values of the first row; `time` is cleared
 - **Reproducibility**: a seed >= 0 gives the same track on all platforms. Each name (all its nodes) has its own random
   stream, so the track does not depend on the other nodes or the order in `i_node`
+- **Append mode**: with an empty `i_node`, a new node is appended with one row at `start` and the default values (sector
+  0, the generic antenna, orientation 0, speed 0, no scenario), and gets the track; a track type therefore needs
+  `speed`. Its index is `nodes.n_node() - 1` after the call. The default name is the common prefix of the names before
+  their number with the next number (`UT3` after `UT1`, `UT2`), else `N<n>`. `name` or `start` with a non-empty `i_node`
+  throws
 - A failed call leaves `nodes` unchanged
 
 ### See also:
@@ -6006,84 +6032,22 @@ quadriga_lib::generate_track(L.rx, {0}, "street", 500.0, 10.0, {}, NAN, {{"turn_
 - [layout](#layout) (the members of a node)
 
 ---
-<a id="get_channels_layout"></a>
-## get_channels_layout
-Channel coefficients of a layout in one call
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_layout) · [Python](quadriga_lib_api_python.md#get_channels_layout)
-
-- Computes one channel per Tx node, Rx node and frequency, for the pairs in `layout.pairing` (empty: all pairs)
-- Runs the stages [init_link_states](#init_link_states), [generate_rays](#generate_rays) and [get_gbsm_channels](#get_gbsm_channels) with their default settings; the
-  results are those of the stages called one by one
-- Without link states in `layout.links`, draws them for this call only and leaves the layout unchanged; with link
-  states, uses them, also when they were edited
-
-### Declaration:
-```cpp
-std::vector<channel<double>> quadriga_lib::get_channels_layout(
-    const layout &layout,
-    const arma::vec &times = {},
-    const std::string &output = "taps",
-    const std::string &method = "",
-    arma::umat *index = nullptr,
-    const std::string &mobility = "auto",
-    double overlap = 0.5,
-    arma::sword seed = -1,
-    const std::vector<std::string> &config_dirs = {});
-```
-
-### Inputs:
-- **`layout`** — Layout with `center_freq`; antennas as evaluated in `layout.antenna`, nodes without one use the generic
-  antenna (see [get_gbsm_channels](#get_gbsm_channels))
-- **`times`** *(optional)* — Snapshot times in [s]; omitted = one snapshot per row; `[n_snap]`
-- **`output`** *(optional)* — `"taps"` or `"rays"`
-- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` or `"quadriga"`; omitted = the method of filled links, else
-  `"38.901"`; another method than that of filled links throws
-- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"`
-- **`overlap`** *(optional)* — Overlap of consecutive segments, in [0, 1]
-- **`seed`** *(optional)* — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1
-- **`config_dirs`** *(optional)* — Folders of user conf files for empty links, searched before the shipped folder
-
-### Output:
-- **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
-
-### Returns:
-- Channels, Tx node fastest, then Rx node, then frequency; `[n_channel]`
-
-### Example:
-```cpp
-quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1);
-L.center_freq = {3.5e9};
-auto channels = quadriga_lib::get_channels_layout(L);
-```
-
-### Notes:
-- **Memory**: the links are processed in batches of at most 256 propagation links (the segments of a track in one
-  batch), so that the rays of one batch bound the memory; the results do not depend on the batches
-- **Link states**: `layout.links` holds none when `layout.links.method` is empty, e.g. after `layout.links.reset()`.
-  With link states, `seed` and `config_dirs` are not used. A layout without linked pairs gives an empty result
-- **Scatterers**: the mobility `"drift"` (also `"auto"` with `"quadriga"`) solves the scatterers
-
-### See also:
-- [init_link_states](#init_link_states), [generate_rays](#generate_rays), [get_gbsm_channels](#get_gbsm_channels) (the three stages)
-- [generate_layout](#generate_layout) (layouts of the TR scenarios)
-
----
-<a id="get_gbsm_channels"></a>
-## get_gbsm_channels
+<a id="get_channels_from_rays"></a>
+## get_channels_from_rays
 Channel coefficients of a layout from given rays (stage 3 of the channel pipeline)
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#get_gbsm_channels) · [Python](quadriga_lib_api_python.md#get_gbsm_channels)
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_from_rays) · [Python](quadriga_lib_api_python.md#get_channels_from_rays)
 
-- Applies the antennas of the nodes, the motion along their tracks and the link gain to the rays of [generate_rays](#generate_rays),
-  and returns one channel per Tx node, Rx node and frequency
+- Stage 3 alone, from given rays, e.g. for edited link states or rays; [get_channels_layout](#get_channels_layout) computes the channels
+  from the layout in one call. Applies the antennas of the nodes, the motion along their tracks and the link gain to the
+  rays of [generate_rays](#generate_rays), and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
 - Tracks with several segments are joined by [crossfade_segments](#crossfade_segments)
 
 ### Declaration:
 ```cpp
-std::vector<channel<double>> quadriga_lib::get_gbsm_channels(
+std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const layout &layout,
     const std::vector<std::vector<gbsm_rays>> &rays,
     const uint_list &i_link = {},
@@ -6145,6 +6109,71 @@ std::vector<channel<double>> quadriga_lib::get_gbsm_channels(
 ### See also:
 - [generate_rays](#generate_rays) (stage 2)
 - [get_channels_layout](#get_channels_layout) (all stages in one call)
+
+---
+<a id="get_channels_layout"></a>
+## get_channels_layout
+Channel coefficients of a layout in one call
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_layout) · [Python](quadriga_lib_api_python.md#get_channels_layout)
+
+- Computes the channels in one call from the layout: one channel per Tx node, Rx node and frequency, for the pairs in
+  `layout.pairing` (empty: all pairs); [get_channels_from_rays](#get_channels_from_rays) is the third stage alone, from given rays
+- Supports tracks (with times or speeds), point drops that move with their speed, tracks of several segments, joined by
+  the cross-fade of [crossfade_segments](#crossfade_segments), and both output forms, `"taps"` and `"rays"`
+- Runs the stages [init_link_states](#init_link_states), [generate_rays](#generate_rays) and [get_channels_from_rays](#get_channels_from_rays) with their default settings;
+  the results are those of the stages called one by one
+- Without link states in `layout.links`, draws them for this call only and leaves the layout unchanged; with link
+  states, uses them, also when they were edited
+
+### Declaration:
+```cpp
+std::vector<channel<double>> quadriga_lib::get_channels_layout(
+    const layout &layout,
+    const arma::vec &times = {},
+    const std::string &output = "taps",
+    const std::string &method = "",
+    arma::umat *index = nullptr,
+    const std::string &mobility = "auto",
+    double overlap = 0.5,
+    arma::sword seed = -1,
+    const std::vector<std::string> &config_dirs = {});
+```
+
+### Inputs:
+- **`layout`** — Layout with `center_freq`; antennas as evaluated in `layout.antenna`, nodes without one use the generic
+  antenna (see [get_channels_from_rays](#get_channels_from_rays))
+- **`times`** *(optional)* — Snapshot times in [s]; omitted = one snapshot per row; `[n_snap]`
+- **`output`** *(optional)* — `"taps"` or `"rays"`
+- **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` or `"quadriga"`; omitted = the method of filled links, else
+  `"38.901"`; another method than that of filled links throws
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"`
+- **`overlap`** *(optional)* — Overlap of consecutive segments, in [0, 1]
+- **`seed`** *(optional)* — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1
+- **`config_dirs`** *(optional)* — Folders of user conf files for empty links, searched before the shipped folder
+
+### Output:
+- **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
+
+### Returns:
+- Channels, Tx node fastest, then Rx node, then frequency; `[n_channel]`
+
+### Example:
+```cpp
+quadriga_lib::layout L = quadriga_lib::generate_layout("38.901_UMa", 1, {3.5e9});
+auto channels = quadriga_lib::get_channels_layout(L);
+```
+
+### Notes:
+- **Memory**: the links are processed in batches of at most 256 propagation links (the segments of a track in one
+  batch), so that the rays of one batch bound the memory; the results do not depend on the batches
+- **Link states**: `layout.links` holds none when `layout.links.method` is empty, e.g. after `layout.links.reset()`.
+  With link states, `seed` and `config_dirs` are not used. A layout without linked pairs gives an empty result
+- **Scatterers**: the mobility `"drift"` (also `"auto"` with `"quadriga"`) solves the scatterers
+
+### See also:
+- [init_link_states](#init_link_states), [generate_rays](#generate_rays), [get_channels_from_rays](#get_channels_from_rays) (the three stages)
+- [generate_layout](#generate_layout) (layouts of the TR scenarios)
 
 ---
 <a id="init_link_states"></a>
@@ -6222,7 +6251,7 @@ void quadriga_lib::init_link_states(
 
 ### See also:
 - [layout_links](#layout_links) (the link states)
-- [generate_rays](#generate_rays), [get_gbsm_channels](#get_gbsm_channels) (stages 2 and 3)
+- [generate_rays](#generate_rays), [get_channels_from_rays](#get_channels_from_rays) (stages 2 and 3)
 - [get_channels_layout](#get_channels_layout) (all stages in one call)
 
 ---
@@ -6285,8 +6314,8 @@ Write a layout to the Tx and Rx CSV files
 Also in: [MATLAB](quadriga_lib_api_mex.md#layout_csv_write) · [Python](quadriga_lib_api_python.md#layout.csv_write)
 
 - Writes the Tx nodes to the Tx file and the Rx nodes to the Rx file in the
-  [Layout CSV format](formats/layout_csv.md); reading the files back gives the same layout within 15 significant
-  digits, except for `name` and `links`, which are not stored
+  [Layout CSV format](formats/layout_csv.md); reading the files back gives the same layout within the written digits
+  (9 significant digits, positions 1 µm, times 1 ns), except for `name` and `links`, which are not stored
 - Antennas without a description, e.g. a measured array set with the array form of [set_antenna](#set_antenna), are written to QDANT
   files next to the CSV file
 - A failed call leaves the existing files unchanged
@@ -6311,7 +6340,7 @@ void quadriga_lib::layout_csv_write(
   what cannot be written are described in [Writing](formats/layout_csv.md#layout-csv-writing)
 - **QDANT files**: one file `<stem>_<k>.qdant` per antenna without description, with one entry per band. Files of this
   name pattern next to a written CSV file that the new files do not refer to are deleted. The arrays must be evaluated:
-  a layout whose `antenna` does not hold them throws. An antenna set with [set_antenna_qdant](#set_antenna_qdant) is written as a
+  a layout whose `antenna` does not hold them throws. An antenna set from a QDANT file ([set_antenna](#set_antenna)) is written as a
   reference to its file, not exported
 
 ### See also:
@@ -6326,7 +6355,7 @@ Positions and orientations of a node at snapshot times
 Also in: [MATLAB](quadriga_lib_api_mex.md#sample_track) · [Python](quadriga_lib_api_python.md#sample_track)
 
 - Returns the position and the orientation of one node at each snapshot time, for point drops and tracks;
-  [get_gbsm_channels](#get_gbsm_channels) samples both ends of each link this way
+  [get_channels_from_rays](#get_channels_from_rays) samples both ends of each link this way
 - Without `times`, each row of the node is one snapshot
 - The orientation includes the rotation of mounted antennas (`relative = 1`), so it is the orientation in the GCS
 
@@ -6387,15 +6416,16 @@ quadriga_lib::sample_track(L.rx, 0, arma::linspace(0.0, 1.0, 11), pos, ori);
 ---
 <a id="set_antenna"></a>
 ## set_antenna
-Set the antenna of layout nodes from the arguments of generate_antenna or from an evaluated array
+Set the antenna of layout nodes from the arguments of generate_antenna, a QDANT file, an array, or by index
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#set_antenna) · [Python](quadriga_lib_api_python.md#set_antenna)
 
-- Sets the antenna of Tx nodes or Rx nodes, from the arguments of [generate_antenna](#generate_antenna) (first form) or from an array
-  (second form), e.g. a measured pattern read with [qdant_read](#qdant_read)
+- Sets the antenna of Tx nodes or Rx nodes from the arguments of [generate_antenna](#generate_antenna) or from an entry of a QDANT file
+  (first form), from an array (second form), e.g. a measured pattern read with [qdant_read](#qdant_read), or to antennas that the
+  layout already has, by their index (third form)
 - Without `center_freq`, the antenna applies to all bands; with `center_freq`, it is the antenna of that band
-- The first form stores the arguments as an antenna description, which [layout_csv_write](#layout_csv_write) writes as antenna columns;
-  the second form stores the array, which the writer exports to a QDANT file
+- The first form stores an antenna description, which [layout_csv_write](#layout_csv_write) writes as antenna columns (a QDANT file as a
+  reference, without a copy); the second form stores the array, which the writer exports to a QDANT file
 
 ### Declarations:
 ```cpp
@@ -6403,7 +6433,7 @@ void quadriga_lib::set_antenna(
     quadriga_lib::layout &layout,
     const std::string &type,
     const std::unordered_map<std::string, arma::mat> &args = {},
-    bool rx_side = false,
+    bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN,
     bool evaluate = true);
@@ -6411,24 +6441,35 @@ void quadriga_lib::set_antenna(
 void quadriga_lib::set_antenna(
     quadriga_lib::layout &layout,
     const arrayant<double> &array,
-    bool rx_side = false,
+    bool rx = false,
+    const uint_list &i_node = {},
+    double center_freq = NAN);
+
+void quadriga_lib::set_antenna(
+    quadriga_lib::layout &layout,
+    const uint_list &i_antenna,
+    bool rx = false,
     const uint_list &i_node = {},
     double center_freq = NAN);
 ```
 
 ### Inputs:
 - **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
-- **`type`** — Antenna type of [generate_antenna](#generate_antenna), e.g. `3GPP`, `dipole`, or `none` (no antenna, for all bands,
-  without `args`)
+- **`type`** — Antenna type of [generate_antenna](#generate_antenna), e.g. `3GPP`, `dipole`; a QDANT file, i.e. a name ending in `.qdant`
+  (any case), absolute or relative to the current folder; or `none` (no antenna, for all bands, without `args`)
 - **`args`** *(optional)* — Arguments of [generate_antenna](#generate_antenna) by name, with the meaning given there: `res`,
   `center_freq`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `device_size`, `locations` as numbers,
-  vectors or matrices (`steer`, `beams` row by row as there), `separate_beams` and `apply_weights` as 0 or 1; a name
-  that the type does not use throws; `pattern` is not available (an array built with it is set with the second form);
-  `center_freq` here is the same as the argument
+  vectors or matrices in the shapes given there (a `beams` vector is one beam), `separate_beams` and `apply_weights` as
+  0 or 1; a name that the type does not use throws; `pattern` is not available (an array built with it is set with the
+  second form); `center_freq` here is the same as the argument. For a QDANT file only `id`, the 1-based entry of the
+  file (default 1)
 - **`array`** — Valid single-frequency array
-- **`rx_side`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
-- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; empty: all of them
-- **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
+- **`i_antenna`** — Antenna entries of the layout, 1-based as `i_antenna` of the nodes, 0 = generic antenna; one value
+  for all picked nodes or one per node in the order of `i_node`; empty: 0
+- **`rx`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
+- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx`, 0-based; empty: all of them
+- **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands. Third form: a band of the
+  layout, which the nodes take from the given entries
 - **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none,
   the nodes of new antennas use the generic antenna until `layout.eval_antennas()` is called
 
@@ -6436,7 +6477,9 @@ void quadriga_lib::set_antenna(
 ```cpp
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_antenna(L, "3GPP", {{"panel", {4, 4, 1, 2}}, {"pol", {3}}}, false, {}, 3.5e9);
+quadriga_lib::set_antenna(L, "measured/handset.qdant", {{"id", {2}}}, true);
 quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0], true);
+quadriga_lib::set_antenna(L, arma::uvec{2}, true, {0, 1});
 ```
 
 ### Notes:
@@ -6450,62 +6493,21 @@ quadriga_lib::set_antenna(L, quadriga_lib::qdant_read<double>("handset.qdant")[0
   nodes first), and entries that no node uses are removed, so `i_antenna` of other nodes can change
 - **Deferred evaluation**: an array spaced in wavelengths (`ula`, `3GPP`, `multibeam` with several element positions) in
   a layout without frequencies is generated only when a frequency is set; its nodes use the generic antenna meanwhile
+- **QDANT file**: stored as a normalised absolute path; [layout_csv_write](#layout_csv_write) writes it relative to the CSV file. The
+  array is used as stored, not rescaled to the frequency of a band. A missing or unreadable file throws
+  `std::runtime_error`; without evaluation, an entry that the file does not have throws when the antennas are evaluated
+- **Index form**: with `center_freq`, that band of the antenna of each node becomes the band of its entry, copied as in
+  the other forms; the generic antenna (0) applies to all bands only. A node listed twice in `i_node` with different
+  entries throws. In C++, a brace list such as `{2}` also builds a `std::string` and makes the call ambiguous, and so
+  does a literal `0` or `{}` with only two arguments; pass a number, a variable, an `arma::uvec` or a `uint_list`, e.g.
+  `uint_list(0)` or `arma::uvec{0}` to reset nodes to the generic antenna
 - A failed call leaves the layout unchanged
 
 ### See also:
 - [generate_antenna](#generate_antenna) (the meaning of the arguments)
+- [qdant_read](#qdant_read) (reads the entries of a QDANT file)
 - [layout](#layout) (the antenna lists and the member function `eval_antennas`)
 - [layout_csv_write](#layout_csv_write) (writes the lines and exports the arrays)
-- [set_antenna_qdant](#set_antenna_qdant) (sets an entry of a QDANT file)
-
----
-<a id="set_antenna_qdant"></a>
-## set_antenna_qdant
-Set the antenna of layout nodes to an entry of a QDANT file
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#set_antenna_qdant) · [Python](quadriga_lib_api_python.md#set_antenna_qdant)
-
-- Sets the antenna of Tx nodes or Rx nodes to an array stored in a QDANT file, e.g. a measured or simulated pattern
-- The layout refers to the file: [layout_csv_write](#layout_csv_write) writes the reference (the columns `antenna` = `qdant`,
-  `qdant_file`, `qdant_id`), relative to the CSV file, and exports no copy of the array
-- The array is used as stored, not rescaled to the frequency of a band; the rules for bands and the antenna lists are
-  those of [set_antenna](#set_antenna)
-
-### Declaration:
-```cpp
-void quadriga_lib::set_antenna_qdant(
-    quadriga_lib::layout &layout,
-    const std::string &qdant_file,
-    arma::uword qdant_id = 1,
-    bool rx_side = false,
-    const uint_list &i_node = {},
-    double center_freq = NAN,
-    bool evaluate = true);
-```
-
-### Inputs:
-- **`layout`** — Layout, updated in place; its antenna lists must fit its nodes and frequencies
-- **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
-- **`qdant_id`** *(optional)* — 1-based entry of the file
-- **`rx_side`** *(optional)* — `false`: set the antenna of Tx nodes (`layout.tx`); `true`: of Rx nodes (`layout.rx`)
-- **`i_node`** *(optional)* — Indices of the Tx nodes or Rx nodes chosen by `rx_side`, 0-based; empty: all of them
-- **`center_freq`** *(optional)* — Band in [Hz], positive; NaN: one antenna for all bands
-- **`evaluate`** *(optional)* — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none
-
-### Example:
-```cpp
-quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
-quadriga_lib::set_antenna_qdant(L, "measured/handset.qdant", 2, true);
-```
-
-### Notes:
-- **Path**: the file is stored as a normalised absolute path
-- **Errors**: a missing or unreadable file throws `std::runtime_error`; without evaluation, an entry that the file does
-  not have throws when the antennas are evaluated. A failed call leaves the layout unchanged
-
-### See also:
-- [set_antenna](#set_antenna) (sets the antenna from the arguments of generate_antenna or from an array)
-- [qdant_read](#qdant_read) (reads the entries of a QDANT file)
 
 ---
 <a id="set_orientation"></a>
@@ -7748,7 +7750,7 @@ arma::uword ray_init(
 ---
 <a id="ray_mesh_interact"></a>
 ## ray_mesh_interact
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
+Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#ray_mesh_interact) · Not in: Python
 

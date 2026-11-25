@@ -169,18 +169,21 @@ namespace quadriga_lib
 
     // Replace the rows of nodes by a generated track or by a point drop
     // - Each node keeps its first position; the call applies to all nodes with the name of a given node (sectors, panels)
+    // - An empty i_node appends one new node with 'name' at 'start' and gives it the track; its index is n_node() - 1
     // - 'point' keeps one row with speed and an explicit horizontal direction; the other types are tracks of equal speed whose
     //   orientation follows the motion (as set_orientation with force = false does), without direction and time
     void generate_track(
         layout_nodes &nodes,                 // Nodes, updated in place
-        const uint_list &i_node,             // Node indices, 0-based
+        const uint_list &i_node,             // Node indices, 0-based; empty = append a new node
         const std::string &type,             // "point", "linear", "circular" or "street"
         double length = 0.0,                 // Length in [m]; 0 = type default; "point": unused
         double speed = NAN,                  // Speed in [m/s]; NaN = keep the speed of the first row if valid
         const arma::vec &direction = {},     // Start direction (azimuth) in [rad], [1] or one per index in i_node; empty = uniform random
         double spacing = NAN,                // Point spacing in [m]; NaN = type default
         const std::unordered_map<std::string, std::vector<double>> &options = {}, // Options of the type, e.g. {"turn_probability", {0.3}}
-        arma::sword seed = -1);              // Seed of the random draws, -1 = system random device
+        arma::sword seed = -1,               // Seed of the random draws, -1 = system random device
+        const std::string &name = "",        // Empty i_node: name of the new node; "" = the next free name
+        const arma::vec &start = {});        // Empty i_node: first position [x, y, z] of the new node in [m]; empty = origin
 
     // Set the orientation of nodes from their motion, or to a given value
     void set_orientation(

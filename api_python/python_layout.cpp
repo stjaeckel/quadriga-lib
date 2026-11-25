@@ -64,7 +64,7 @@ void quadriga_lib_layout(py::module_ &m)
 
     m.def("generate_track", &generate_track,
           py::arg("nodes_in"),
-          py::arg("i_node").none(false),
+          py::arg("i_node"),
           py::arg("type"),
           py::kw_only(),
           py::arg("length") = 0.0,
@@ -72,7 +72,9 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("direction") = py::none(),
           py::arg("spacing") = nan,
           py::arg("options") = py::none(),
-          py::arg("seed") = -1);
+          py::arg("seed") = -1,
+          py::arg("name") = "",
+          py::arg("start") = py::none());
 
     m.def("sample_track", &sample_track,
           py::arg("nodes"),

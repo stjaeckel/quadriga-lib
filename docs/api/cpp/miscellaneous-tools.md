@@ -4,14 +4,14 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-miscel
 
 | Function | Summary |
 | --- | --- |
-| [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) | Checks whether AVX2 kernels can be used |
-| [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) | Checks whether CUDA kernels can be used |
-| [quadriga_lib_version](#quadriga_lib_version) | Returns the quadriga-lib version number |
+| [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) | Check whether AVX2 kernels can be used |
+| [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) | Check whether CUDA kernels can be used |
+| [quadriga_lib_version](#quadriga_lib_version) | Version number of quadriga-lib |
 
 ---
 <a id="quadriga_lib_has_AVX2"></a>
 ## quadriga_lib_has_AVX2
-Checks whether AVX2 kernels can be used
+Check whether AVX2 kernels can be used
 
 Also in: [MATLAB](../mex/miscellaneous-tools.md#version) · [Python](../python/miscellaneous-tools.md#version)
 
@@ -29,7 +29,7 @@ bool quadriga_lib::quadriga_lib_has_AVX2();
 ---
 <a id="quadriga_lib_has_CUDA"></a>
 ## quadriga_lib_has_CUDA
-Checks whether CUDA kernels can be used
+Check whether CUDA kernels can be used
 
 Also in: [MATLAB](../mex/miscellaneous-tools.md#version) · [Python](../python/miscellaneous-tools.md#version)
 
@@ -46,7 +46,7 @@ bool quadriga_lib::quadriga_lib_has_CUDA();
 ---
 <a id="quadriga_lib_version"></a>
 ## quadriga_lib_version
-Returns the quadriga-lib version number
+Version number of quadriga-lib
 
 Also in: [MATLAB](../mex/miscellaneous-tools.md#version) · [Python](../python/miscellaneous-tools.md#version)
 

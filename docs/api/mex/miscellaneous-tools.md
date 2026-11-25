@@ -4,13 +4,13 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-miscel
 
 | Function | Summary |
 | --- | --- |
-| [version](#version) | Returns the quadriga-lib version number |
+| [version](#version) | Version number of quadriga-lib |
 | [write_png](#write_png) | Write a data matrix to a color-coded PNG file |
 
 ---
 <a id="version"></a>
 ## version
-Returns the quadriga-lib version number
+Version number of quadriga-lib
 
 Also in: [C++](../cpp/miscellaneous-tools.md#quadriga_lib_version) · [Python](../python/miscellaneous-tools.md#version)
 

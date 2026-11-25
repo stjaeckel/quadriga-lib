@@ -62,18 +62,28 @@ assertEqual( two.offset, uint64( [ 1; 3; 5 ] ) );
 assertElementsAlmostEqual( two.pos(:, 2), [ 10; 0; 1.5 ], 'absolute', 1e-12 );
 assertElementsAlmostEqual( two.speed(1:2), [ 3; 3 ], 'absolute', 0 );           % speed = [] : the speed of the first row
 
+%% Append mode: i_node = [] appends a node with the next free name at the origin, or with a name and a start position
+ap = quadriga_lib.generate_track( nodes, [], 'linear', 10, 2, 0 );
+assertEqual( ap.name', { 'UT1', 'UT2', 'UT2', 'UT3' } );
+assertEqual( ap.offset, uint64( [ 1; 2; 3; 4 ] ) );                            % 1-based: the new node has rows 4 and 5
+assertElementsAlmostEqual( ap.pos(:, 4:5), [ 0, 10; 0, 0; 0, 0 ], 'absolute', 1e-12 );
+an = quadriga_lib.generate_track( nodes, [], 'point', 0, 1, 0, NaN, [], 1, 'car', [ 5, 6, 1.5 ] );
+assertEqual( an.name{4}, 'car' );
+assertEqual( an.pos(:, 4), [ 5; 6; 1.5 ] );
+
 %% Outputs: none
 quadriga_lib.generate_track( nodes, 2, 'linear', 10, 2, 0.5 );
 assertEqual( ans, out );
 
 %% Errors
 assert_throws( @() quadriga_lib.generate_track( nodes, 1 ), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.generate_track( nodes, 1, 'linear', 1, 1, 0, 1, [], 1, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.generate_track( nodes, 1, 'linear', 1, 1, 0, 1, [], 1, '', [], 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out2( nodes, 1, 'linear' ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.generate_track( 1, 1, 'linear' ), 'Input ''nodes_in'' must be a 1x1 struct.' );
 assert_throws( @() quadriga_lib.generate_track( nodes, 0, 'linear' ), 'Entries in ''i_node'' cannot be 0 (1-based index).' );
 assert_throws( @() quadriga_lib.generate_track( nodes, 1, 'linear', 1, 1, 0, 1, [], -2 ), 'Input ''seed'' must be -1 or a non-negative integer.' );
 assert_throws( @() quadriga_lib.generate_track( nodes, 4, 'linear', 10, 1, 0 ), 'Input ''i_node'' is out of range.' );                  % C++
+assert_throws( @() quadriga_lib.generate_track( nodes, 1, 'point', 0, 1, 0, NaN, [], 1, 'car' ), 'Inputs ''name'' and ''start'' are used only when ''i_node'' is empty.' );   % C++
 assert_throws( @() quadriga_lib.generate_track( nodes, 1, 'spiral', 10, 1, 0 ), 'spiral' );                                % C++
 assert_throws( @() quadriga_lib.generate_track( nodes, 1, 'linear', 10, 1, 0, NaN, struct( 'foo', 1 ) ), 'foo' );          % C++
 

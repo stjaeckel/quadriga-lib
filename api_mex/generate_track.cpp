@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # GENERATE_TRACK
-Replace the rows of nodes by a generated track or a point drop
+Replace the rows of nodes by a generated track or a point drop, or append a node with one
 
 - Gives nodes a straight, circular or street-like track, or makes them point drops with a speed and a direction, the
   short-term mobility of 3GPP TR 38.901
@@ -20,16 +20,17 @@ Replace the rows of nodes by a generated track or a point drop
   starts at the first position of the node and is horizontal at the height of the first row
 - The antennas look along the motion, as [[set_orientation]] turns them; [[sample_track]] gives the positions at
   snapshot times
+- An empty `i_node` appends a new node at `start` and gives it the track (see Notes)
 
 ## Usage:
 ```
 nodes_out = quadriga_lib.generate_track( nodes_in, i_node, type, length, speed, direction, spacing, ...
-    options, seed );
+    options, seed, name, start );
 ```
 
 ## Inputs:
 - **`nodes_in`** — The Tx nodes or the Rx nodes of a layout (`layout.tx` or `layout.rx`); fields in [[layout_csv_read]]
-- **`i_node`** — Node indices, 1-based, not empty
+- **`i_node`** — Node indices, 1-based; `[]` = append a new node
 - **`type`** — Type of the track, not case sensitive:
   - `point`: a point drop with `speed` and a horizontal `direction`; the rows after the first are removed; `length` is
     not used
@@ -50,6 +51,8 @@ nodes_out = quadriga_lib.generate_track( nodes_in, i_node, type, length, speed, 
   `turn_probability` = 0.5 (in [0, 1]); other fields, and these fields for the other types, raise an error; default:
   `[]`
 - **`seed`** — Seed, >= 0 for reproducible draws; -1 = system random device; below -1 raises an error; default: -1
+- **`name`** — Name of the new node (`i_node = []` only); `''` = the next free name; default: `''`
+- **`start`** — First position `[x, y, z]` of the new node in [m] (`i_node = []` only); `[]` = the origin; default: `[]`
 
 ## Outputs:
 - **`nodes_out`** — The nodes with the generated rows
@@ -58,6 +61,7 @@ nodes_out = quadriga_lib.generate_track( nodes_in, i_node, type, length, speed, 
 ```
 layout = quadriga_lib.layout_csv_read( '', 'rx.csv' );
 layout.rx = quadriga_lib.generate_track( layout.rx, 1, 'street', 500, 10, [], NaN, struct( 'turn_probability', 0.3 ), 42 );
+layout.rx = quadriga_lib.generate_track( layout.rx, [], 'linear', 100, 1.5, 0, NaN, [], 42, 'walker', [10, 20, 1.5] );
 ```
 
 ## Notes:
@@ -78,6 +82,11 @@ layout.rx = quadriga_lib.generate_track( layout.rx, 1, 'street', 500, 10, [], Na
   the extra columns take the values of the first row; `time` is cleared
 - **Reproducibility**: a seed >= 0 gives the same track on all platforms. Each name (all its nodes) has its own random
   stream, so the track does not depend on the other nodes or the order in `i_node`
+- **Append mode**: with an empty `i_node`, a new node is appended with one row at `start` and the default values (sector
+  0, the generic antenna, orientation 0, speed 0, no scenario), and gets the track; a track type therefore needs
+  `speed`. It is the last node of `nodes_out`. The default name is the common prefix of the names before their number
+  with the next number (`UT3` after `UT1`, `UT2`), else `N<n>`. `name` or `start` with a non-empty `i_node` raises an
+  error
 - The C++ in/out argument `nodes` is split into `nodes_in` / `nodes_out`, so that the input stays unchanged
 
 ## See also:
@@ -87,7 +96,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 3 || nrhs > 9)
+    if (nrhs < 3 || nrhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -101,8 +110,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double spacing = (nrhs < 7) ? NAN : qd_mex_get_scalar<double>(prhs[6], "spacing", NAN);
     const auto options = (nrhs < 8) ? std::unordered_map<std::string, std::vector<double>>() : qd_mex_layout_options(prhs[7], "options");
     const arma::sword seed = (nrhs < 9) ? -1 : (arma::sword)qd_mex_get_seed(prhs[8], "seed");
+    const std::string name = (nrhs < 10) ? std::string() : qd_mex_get_string(prhs[9], "", "name");
+    const arma::vec start = (nrhs < 11) ? arma::vec() : qd_mex_get_Col<double>(prhs[10], false, "start");
 
-    CALL_QD(quadriga_lib::generate_track(nodes, i_node, type, length, speed, direction, spacing, options, seed));
+    CALL_QD(quadriga_lib::generate_track(nodes, i_node, type, length, speed, direction, spacing, options, seed, name, start));
 
     plhs[0] = qd_mex_nodes2struct(nodes);
 }

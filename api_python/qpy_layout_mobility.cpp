@@ -10,7 +10,7 @@ SECTION!*/
 
 /*!MD
 # generate_track
-Replace the rows of nodes by a generated track or a point drop
+Replace the rows of nodes by a generated track or a point drop, or append a node with one
 
 - Gives nodes a straight, circular or street-like track, or makes them point drops with a speed and a direction, the
   short-term mobility of 3GPP TR 38.901
@@ -18,17 +18,18 @@ Replace the rows of nodes by a generated track or a point drop
   starts at the first position of the node and is horizontal at the height of the first row
 - The antennas look along the motion, as [[set_orientation]] turns them; [[sample_track]] gives the positions at
   snapshot times
+- An empty `i_node` appends a new node at `start` and gives it the track (see Notes)
 
 ## Usage:
 ```
 nodes_out = quadriga_lib.layout.generate_track( nodes_in, i_node, type, *, length, speed, direction, spacing, \
-    options, seed )
+    options, seed, name, start )
 ```
 
 ## Inputs:
 - **`nodes_in`** — The Tx nodes or the Rx nodes of a layout (`layout["tx"]` or `layout["rx"]`); dict, keys in
   [[layout.csv_read]]
-- **`i_node`** — Node indices, 0-based, not empty; int or `(n,)`
+- **`i_node`** — Node indices, 0-based; int or `(n,)`; `None` or empty: append a new node
 - **`type`** — Type of the track, str, not case sensitive:
   - `point`: a point drop with `speed` and a horizontal `direction`; the rows after the first are removed; `length` is
     not used
@@ -48,6 +49,9 @@ nodes_out = quadriga_lib.layout.generate_track( nodes_in, i_node, type, *, lengt
   `street_length_std` = 83 (all in [m], >= 0; with a std of 0, mu must be >= min and > 0), `curve_radius` = 10 [m],
   `turn_probability` = 0.5 (in [0, 1]); other keys, and these keys for the other types, raise an error; default: `None`
 - **`seed`** — Seed, >= 0 for reproducible draws; -1 = system random device; below -1 raises an error; default: -1
+- **`name`** — Name of the new node (empty `i_node` only), str; `""` = the next free name; default: `""`
+- **`start`** — First position `[x, y, z]` of the new node in [m] (empty `i_node` only); `(3,)`; `None` = the origin;
+  default: `None`
 
 ## Outputs:
 - **`nodes_out`** — The nodes with the generated rows; dict
@@ -58,6 +62,8 @@ import quadriga_lib as qd
 layout, _, _ = qd.layout.csv_read( "", "rx.csv" )
 layout["rx"] = qd.layout.generate_track( layout["rx"], 0, "street", length=500, speed=10, \
     options={"turn_probability": 0.3}, seed=42 )
+layout["rx"] = qd.layout.generate_track( layout["rx"], None, "linear", length=100, speed=1.5, direction=0, \
+    seed=42, name="walker", start=[10, 20, 1.5] )
 ```
 
 ## Notes:
@@ -78,6 +84,11 @@ layout["rx"] = qd.layout.generate_track( layout["rx"], 0, "street", length=500, 
   the extra columns take the values of the first row; `time` is cleared
 - **Reproducibility**: a seed >= 0 gives the same track on all platforms. Each name (all its nodes) has its own random
   stream, so the track does not depend on the other nodes or the order in `i_node`
+- **Append mode**: with an empty `i_node`, a new node is appended with one row at `start` and the default values (sector
+  0, the generic antenna, orientation 0, speed 0, no scenario), and gets the track; a track type therefore needs
+  `speed`. It is the last node of `nodes_out`. The default name is the common prefix of the names before their number
+  with the next number (`UT3` after `UT1`, `UT2`), else `N<n>`. `name` or `start` with a non-empty `i_node` raises a
+  `ValueError`
 - **`nodes_in` / `nodes_out`**: the C++ in/out argument `nodes` is split, so that the input stays unchanged
 
 ## See also:
@@ -93,14 +104,19 @@ py::dict generate_track(const py::dict &nodes_in,
                         py::handle direction,
                         double spacing,
                         py::handle options,
-                        long long seed)
+                        long long seed,
+                        const std::string &name,
+                        py::handle start)
 {
     auto nodes = qd_python_dict2nodes(nodes_in, false, "nodes_in");
     const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
     const auto direction_a = qd_python_numpy2arma_Col<double>(direction, true);
     const auto options_m = qd_pl_options(options, "options");
 
-    quadriga_lib::generate_track(nodes, i_node_a, type, length, speed, direction_a, spacing, options_m, (arma::sword)seed);
+    const auto start_a = qd_python_numpy2arma_Col<double>(start, true);
+
+    quadriga_lib::generate_track(nodes, i_node_a, type, length, speed, direction_a, spacing, options_m, (arma::sword)seed, name,
+                                 start_a);
     return qd_python_nodes2dict(nodes);
 }
 

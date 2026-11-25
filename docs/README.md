@@ -32,7 +32,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 17 functions
 - [C++: Math functions](api/cpp/math-functions.md): 9 functions
 - [C++: Miscellaneous / Tools](api/cpp/miscellaneous-tools.md): 3 functions
-- [C++: Network layouts and mobility](api/cpp/network-layouts-and-mobility.md): 18 functions
+- [C++: Network layouts and mobility](api/cpp/network-layouts-and-mobility.md): 17 functions
 - [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 35 functions
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](api/mex/general-usage-notes.md)
@@ -43,7 +43,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 16 functions
 - [MATLAB / Octave: Math functions](api/mex/math-functions.md): 5 functions
 - [MATLAB / Octave: Miscellaneous / Tools](api/mex/miscellaneous-tools.md): 2 functions
-- [MATLAB / Octave: Network layouts and mobility](api/mex/network-layouts-and-mobility.md): 17 functions
+- [MATLAB / Octave: Network layouts and mobility](api/mex/network-layouts-and-mobility.md): 16 functions
 - [MATLAB / Octave: Site-specific simulation tools](api/mex/site-specific-simulation-tools.md): 17 functions
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](api/python/general-usage-notes.md)
@@ -54,7 +54,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 16 functions
 - [Python: Math functions](api/python/math-functions.md): 5 functions
 - [Python: Miscellaneous / Tools](api/python/miscellaneous-tools.md): 3 functions
-- [Python: Network layouts and mobility](api/python/network-layouts-and-mobility.md): 17 functions
+- [Python: Network layouts and mobility](api/python/network-layouts-and-mobility.md): 16 functions
 - [Python: Site-specific simulation tools](api/python/site-specific-simulation-tools.md): 16 functions
 - [Python: Sum-of-sinusoids random number generator](api/python/sum-of-sinusoids-random-number-generator.md): 14 functions
 

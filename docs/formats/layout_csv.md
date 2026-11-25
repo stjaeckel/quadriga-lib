@@ -104,7 +104,7 @@ What an empty cell means depends on the class of the column:
 | `scenpar.<key>` | Fixed, Tx file | as the key | Overrides one scenario parameter for the links of the site, e.g. `scenpar.DS_VS` |
 | `seed` | Fixed, Tx file | | Seed of the site, >= -1; -1 (default): derived from the layout seed and the site name |
 | `layout_seed` | Fixed, Tx file | | Seed of the layout, >= -1; all cells equal |
-| `wrap` | Fixed, Tx file | m | Lattice vectors of the wrap-around, one per matrix row: `"ax,ay"` or `"ax,ay;bx,by"`; all cells equal |
+| `wrap` | Fixed, Tx file | m | Lattice vectors of the wrap-around (the site cluster is repeated by them, and each link uses the copy of its site nearest to the first position of the terminal, kept for the whole track; see the class `layout`), one per matrix row: `"ax,ay"` or `"ax,ay;bx,by"`; all cells equal |
 | `cell` | Fixed, Tx file | | 0: the site has no drop cells of its own (see `drop_terminals`); default 1 |
 | `pairing` | Fixed, Rx file | | Names of the sites linked to the terminal, as a list; empty: all sites |
 | `relative` | Fixed | | 1: the orientation is relative to the direction of motion (an antenna mounted on a vehicle); default 0 |
@@ -119,8 +119,8 @@ What an empty cell means depends on the class of the column:
 ## Antennas
 
 - `antenna` sets the type: a type of `generate_antenna` (`omni`, `xpol`, `dipole`, `3GPP`, `multibeam`, `3GPP-UT`, ...), `qdant` for an array read from a QDANT file, or `none` for no antenna. A node without antenna cells uses the generic antenna, two co-located isotropic elements with vertical and horizontal polarization.
-- The other inputs of `generate_antenna` are columns of the same name and meaning: `res`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `separate_beams` and `apply_weights` (0 or 1), `device_size`, `locations`. An empty cell takes the default of `generate_antenna`. A column that the type does not take is an error; `pattern` has no column.
-- Tuples are list cells (`panel` `"4,4,1,2"`). `steer` and `beams` are matrix cells with the rows of the matrix that `generate_antenna` takes: `steer` `"12,0"` is one row (tilt, pan), `beams` `"0,30;0,10"` two beams with azimuths 0° and 30° and elevations 0° and 10°.
+- The other inputs of `generate_antenna` are columns of the same name and meaning: `res`, `element`, `panel`, `spacing`, `pol`, `ports`, `steer`, `beams`, `separate_beams` and `apply_weights` (0 or 1), `device_size`, `locations`. An empty cell takes the default of `generate_antenna`. A value in a column that the node's antenna type does not use is an error; leave that cell empty. `pattern` has no column.
+- Tuples are list cells (`panel` `"4,4,1,2"`). `steer` and `beams` are matrix cells with one panel or one beam per `;`-part: `steer` `"12,0;6,0"` gives two panels their (tilt, pan), `beams` `"0,0;30,10"` two beams at (azimuth, elevation) 0°, 0° and 30°, 10°, with an optional weight as third entry (`"0,0,1;30,10,0.5"`). A `beams` cell is thus the transpose of the `[2 or 3, n_beams]` matrix of `generate_antenna`; the argument map of `set_antenna` takes that matrix, and a vector there is one beam.
 - `qdant`: `qdant_file` is the file, absolute or relative to the folder of the CSV file, `qdant_id` the 1-based entry (default 1). The array is used as stored, for all bands.
 - An extra sector without antenna cells has the antenna of sector 0; `none` gives it no antenna.
 - Nodes with equal antenna cells share one antenna of the layout.
@@ -152,12 +152,13 @@ BS2,,,,28e9,,
 
 - Angles are converted from degrees to radians.
 - A relative `qdant_file` is resolved against the folder of the CSV file.
-- The reader checks every rule of this page and the validity of the layout. It stops with an error that names the file, the line and the column, e.g. for a value outside its range, an antenna column that the type does not take, a `pairing` that names an unknown site or a site twice, or a terminal whose empty `pairing` cell leaves it without a site farther than 1e-4 m.
+- The reader checks every rule of this page and the validity of the layout. It stops with an error that names the file, the line and the column, e.g. for a value outside its range, a value in an antenna column that the node's antenna type does not use, a `pairing` that names an unknown site or a site twice, or a terminal whose empty `pairing` cell leaves it without a site farther than 1e-4 m.
 
 <a id="layout-csv-writing"></a>
 ## Writing
 
-- Only columns with values other than the default are written, in the order of the [Columns](#layout-csv-columns) table, unknown columns last. Angles are in degrees; numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same value. Reading the files back gives the same layout within these digits, except for its name and link states, which the files do not hold.
+- Only columns with values other than the default are written, in the order of the [Columns](#layout-csv-columns) table, unknown columns last. Angles are in degrees. Numbers have this format: values with at most 9 significant digits, in plain digits from 1e-3 to below 1e6 (`25`, `1732`, `0.5`) and in engineering notation otherwise, with an exponent that is a multiple of 3 (`3.5e9`, `28e9`, `1.5e6`, `250e-6`), zero as `0`; positions (`x`, `y`, `z`) and the lattice vectors `wrap` in plain digits with the decimals for a resolution of 1 µm and at least 9 significant digits (`5400000.123456`), `time` likewise with 1 ns; integers (sector, indoor state, floor, flags), seeds and ids exact. In antenna cells, the text of the antenna description is kept, and only numbers that need more digits are written with 9. Reading the files back gives the same layout within these digits (values within a relative 5e-9, angles in degrees, positions within 0.5 µm, times within 0.5 ns), except for its name and link states, which the files do not hold.
+- Antenna descriptions whose numbers agree within 9 significant digits are written alike, so they become one antenna entry of the layout after a round trip.
 - In the compact form, cells that the reader would fill in (held values repeated from the previous row, fixed values after the first row) are left empty. An extra sector is written with all its cells in its first row.
 - Antennas are written as antenna cells; a `qdant_file` is written relative to the folder of the CSV file. If no antenna cells carry the bands, the first node declares them: `center_freq` on its first row and a band row for each further band.
 - An antenna that is an array without antenna cells (e.g. a measured pattern) is written to a QDANT file next to the CSV file, `<stem>_<k>.qdant`, with `<stem>` the name of the CSV file without `.csv` and k = 1, 2, ... (names that `qdant` cells of the layout use are skipped), one file per antenna with one entry per band, and referred to by `qdant` cells. Files `<stem>_<k>.qdant` next to a written CSV file that the new files do not refer to are deleted; files of other names are never touched.

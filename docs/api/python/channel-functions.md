@@ -7,13 +7,13 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-cha
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [channel.export_obj_file](#channel.export_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
-| [crossfade_segments](#crossfade_segments) | Joins the channels of consecutive segments of one link by a power cross-fade |
+| [crossfade_segments](#crossfade_segments) | Join the channels of consecutive segments of one link by a power cross-fade |
 | [hdf5_create_file](#hdf5_create_file) | Create a new HDF5 channel file with a custom storage layout |
-| [hdf5_read_channel](#hdf5_read_channel) | Reads channel data from HDF5 files |
+| [hdf5_read_channel](#hdf5_read_channel) | Read channel data from HDF5 files |
 | [hdf5_read_dset](#hdf5_read_dset) | Read a single unstructured dataset from an HDF5 file |
 | [hdf5_read_dset_names](#hdf5_read_dset_names) | Read the names of unstructured datasets from an HDF5 file |
 | [hdf5_read_layout](#hdf5_read_layout) | Read the storage layout of channel data inside an HDF5 file |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Reshapes the storage layout inside an existing HDF5 file |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Reshape the storage layout inside an existing HDF5 file |
 | [hdf5_write_channel](#hdf5_write_channel) | Write one or more channel objects to an HDF5 file |
 | [hdf5_write_dset](#hdf5_write_dset) | Write a single unstructured dataset to an HDF5 file |
 | [qrt_file_parse](#qrt_file_parse) | Read metadata from a QRT file |
@@ -146,13 +146,14 @@ quadriga_lib.channel.export_obj_file( fn, chan, *, max_paths, gain_max_dB, gain_
 ---
 <a id="crossfade_segments"></a>
 ## crossfade_segments
-Joins the channels of consecutive segments of one link by a power cross-fade
+Join the channels of consecutive segments of one link by a power cross-fade
 
 Also in: [C++](../cpp/channel-functions.md#crossfade_segments) · [MATLAB](../mex/channel-functions.md#crossfade_segments)
 
 - Joins the channels of the segments of one link, e.g. of a track whose scenario changes, into one channel; consecutive
   segments share snapshots, over which the paths of the old segment fade out and those of the new one fade in
-- [get_gbsm_channels](network-layouts-and-mobility.md#get_gbsm_channels) joins the segments of tracks with this function; it is a port of the channel merger of QuaDRiGa
+- [get_channels_from_rays](network-layouts-and-mobility.md#get_channels_from_rays) joins the segments of tracks with this function; it is a port of the channel merger of
+  QuaDRiGa
 
 ### Usage:
 ```python
@@ -199,7 +200,7 @@ channel = quadriga_lib.channel.crossfade_segments( segments, n_overlap, *, overl
   [hdf5_write_channel](#hdf5_write_channel), with the entries of each segment as [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) returns them
 
 ### See also:
-- [get_gbsm_channels](network-layouts-and-mobility.md#get_gbsm_channels) (joins the segments of tracks with this function)
+- [get_channels_from_rays](network-layouts-and-mobility.md#get_channels_from_rays) (joins the segments of tracks with this function)
 - [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) (channels of one segment)
 
 ---
@@ -236,7 +237,7 @@ quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ---
 <a id="hdf5_read_channel"></a>
 ## hdf5_read_channel
-Reads channel data from HDF5 files
+Read channel data from HDF5 files
 
 Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [MATLAB](../mex/channel-functions.md#hdf5_read_channel)
 
@@ -400,7 +401,7 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ---
 <a id="hdf5_reshape_layout"></a>
 ## hdf5_reshape_layout
-Reshapes the storage layout inside an existing HDF5 file
+Reshape the storage layout inside an existing HDF5 file
 
 Also in: [C++](../cpp/channel-functions.md#hdf5_reshape_layout) · [MATLAB](../mex/channel-functions.md#hdf5_reshape_layout)
 

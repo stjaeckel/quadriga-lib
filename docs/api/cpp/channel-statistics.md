@@ -7,7 +7,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [acdf](#acdf) | Calculate the empirical averaged cumulative distribution function (CDF) |
 | [calc_angular_spread](#calc_angular_spread) | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
 | [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
-| [calc_delay_spread](#calc_delay_spread) | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
+| [calc_delay_spread](#calc_delay_spread) | RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Calculate the Rician K-Factor from channel impulse response data |
 
 ---
@@ -176,7 +176,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
 ---
 <a id="calc_delay_spread"></a>
 ## calc_delay_spread
-Calculates RMS delay spread from per-CIR delays and linear-scale powers
+RMS delay spread from per-CIR delays and linear-scale powers
 
 Also in: [MATLAB](../mex/channel-statistics.md#calc_delay_spread) · [Python](../python/channel-statistics.md#calc_delay_spread)
 

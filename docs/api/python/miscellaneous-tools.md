@@ -4,14 +4,14 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-mis
 
 | Function | Summary |
 | --- | --- |
-| [components](#components) | Returns the version numbers of all quadriga-lib sub-components |
-| [version](#version) | Returns the quadriga-lib version number |
+| [components](#components) | Version numbers of all quadriga-lib sub-components |
+| [version](#version) | Version number of quadriga-lib |
 | [write_png](#write_png) | Write data to a PNG file |
 
 ---
 <a id="components"></a>
 ## components
-Returns the version numbers of all quadriga-lib sub-components
+Version numbers of all quadriga-lib sub-components
 
 Not in: C++, MATLAB
 
@@ -23,7 +23,7 @@ components = quadriga_lib.components()
 ---
 <a id="version"></a>
 ## version
-Returns the quadriga-lib version number
+Version number of quadriga-lib
 
 Also in: [C++](../cpp/miscellaneous-tools.md#quadriga_lib_version) · [MATLAB](../mex/miscellaneous-tools.md#version)
 

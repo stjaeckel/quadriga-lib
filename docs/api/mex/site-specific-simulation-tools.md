@@ -15,7 +15,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-site-s
 | [point_cloud_aabb](#point_cloud_aabb) | Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud |
 | [point_cloud_segmentation](#point_cloud_segmentation) | Reorganize a point cloud into spatial sub-clouds for efficient processing |
 | [point_inside_mesh](#point_inside_mesh) | Test whether 3D points are inside a triangle mesh using raycasting |
-| [ray_mesh_interact](#ray_mesh_interact) | Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
+| [ray_mesh_interact](#ray_mesh_interact) | Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
 | [ray_point_intersect](#ray_point_intersect) | Calculate intersections of ray beams with points in 3D space |
 | [ray_triangle_intersect](#ray_triangle_intersect) | Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm |
 | [subdivide_triangles](#subdivide_triangles) | Subdivide triangles into smaller triangles |
@@ -489,7 +489,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 ---
 <a id="ray_mesh_interact"></a>
 ## ray_mesh_interact
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
+Calculate reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · Not in: Python
 
