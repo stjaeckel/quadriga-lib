@@ -122,6 +122,20 @@ double share_bound(double p, double n, double A) { return 5.0 * std::sqrt(p * (1
 // Area of a hexagonal cluster
 double hex_area(double n_site, double isd) { return n_site * std::sqrt(3.0) / 2.0 * isd * isd; }
 
+// Lower end of the building share p after the minimum-distance rule to d2D-out: a building UT can only be rejected
+// where d2D - d2D-in < d_min is possible, the fraction a of the area where outdoor UTs are accepted, and a rejected UT
+// is redrawn with its position and state. The accepted building mass is at least p (1 - a), the outdoor mass is 1 - p,
+// so the share lies in [p (1 - a) / (1 - p a), p]
+double share_low(double p, double a) { return p * (1.0 - a) / (1.0 - p * a); }
+
+// The fraction a of share_low for one hexagonal site with ISD 'isd' (inradius above d_min + d2d_in_max): the annulus
+// [d_min, d_min + d2d_in_max) over the hexagon minus the disk of radius d_min
+double annulus_share(double isd, double d_min, double din)
+{
+    const double pi = arma::datum::pi, r = d_min + din;
+    return pi * (r * r - d_min * d_min) / (std::sqrt(3.0) / 2.0 * isd * isd - pi * d_min * d_min);
+}
+
 double share_of(const quadriga_lib::layout &L, int state)
 {
     double n = 0.0;
@@ -194,6 +208,52 @@ TEST_CASE("generate_layout - input validation")
         CHECK(has(G("38.901_SMa", {}, {0.0}, {}, {}, {}, {}, {{"abc", {1.0}}}), "unknown"));
         CHECK(has(G("38.901_SMa", {}, {0.0}, {}, {}, {}, {}, {{"p_residential", {0.5, 0.5}}}), "'p_residential'"));
         CHECK(has(G("38.901_SMa", {}, {0.0}, {}, {}, {}, {}, {{"p_residential", {1.5}}}), "'p_residential'"));
+    }
+    SECTION("ITU-R M.2412 options")
+    {
+        CHECK(G("M.2412_UrbanMacro", {}, {}, {}, {}, {}, {}, {{"config", {2.0}}, {"service", {1.0}}}) == "");
+        CHECK(has(G("M.2412_InH", {}, {}, {}, {}, {}, {}, {{"config", {4.0}}}), "'config'"));
+        CHECK(has(G("M.2412_InH", {}, {}, {}, {}, {}, {}, {{"config", {1.5}}}), "'config'"));
+        CHECK(has(G("M.2412_InH", {}, {}, {}, {}, {}, {}, {{"config", {1.0, 2.0}}}), "'config'"));
+        CHECK(has(G("M.2412_UrbanMacro", {}, {}, {}, {}, {}, {}, {{"config", {3.0}}}), "'config'"));
+        CHECK(has(G("M.2412_UrbanMacro", {}, {}, {}, {}, {}, {}, {{"service", {3.0}}}), "'service'"));
+        CHECK(has(G("M.2412_Rural", {}, {}, {}, {}, {}, {}, {{"service", {1.0}}}), "'service'"));
+        CHECK(has(G("M.2412_DenseUrban", {}, {}, {}, {}, {}, {}, {{"h_micro", {10.0}}}), "'h_micro'"));
+        CHECK(has(G("M.2412_DenseUrban", {}, {}, {}, {}, {}, {}, {{"config", {3.0}}, {"h_micro", {NaN}}}), "'h_micro'"));
+        CHECK(has(G("M.2412_DenseUrban", {}, {}, {}, {}, {}, {}, {{"config", {3.0}}, {"h_micro", {0.0}}}), "'h_micro'"));
+        CHECK(has(G("M.2412_DenseUrban", {}, {}, {}, {}, {}, {}, {{"config", {3.0}}, {"h_micro", {-5.0}}}), "'h_micro'"));
+        CHECK(has(G("38.901_UMa", {}, {1.0}, {}, {}, {}, {}, {{"config", {1.0}}}), "'config'"));
+        CHECK(has(G("M.2412_InH", {}, {}, {}, {}, {}, {}, {{"lane_width", {3.0}}}), "'lane_width'"));
+        CHECK(has(G("M.2412_InH", {}, {}, {}, {}, {}, {}, {{"xyz", {3.0}}}), "unknown"));
+        CHECK(has(G("M.2412_InH", {}, {}, {}, {}, {}, {0.5}), "'indoor ratio'"));
+        CHECK(has(G("M.2412_UrbanMacro", {}, {}, {}, {}, {}, {NaN, 4.0}), "'min floors'"));
+    }
+    SECTION("TR 37.885 roads")
+    {
+        auto V = [](const std::string &type, arma::uword n_ut, const arma::vec &spacing = {}, const arma::vec &grid = {}, const arma::vec &area = {},
+                    const arma::vec &bs = {}, const arma::vec &ut = {}, const arma::vec &indoor = {}, const opts &o = {})
+        { return qd_layout_throws([&] { quadriga_lib::generate_layout(type, n_ut, spacing, grid, area, bs, ut, indoor, o, true, 1); }); };
+        CHECK(V("37.885_Highway", 0) == "");
+        CHECK(V("37.885_Urban", 0, {433.0, 250.0}, {}, {1299.0, 750.0}, {}, {1.5, NaN, 10.0, 0.0, 0.0, 0.0}, {}, {{"p_truck", {0.5}}}) == "");
+        CHECK(has(V("37.885_Highway", 1), "'n_ut'"));
+        CHECK(has(V("37.885_Urban", 5), "'n_ut'"));
+        CHECK(has(V("37.885_Highway", 0, {100.0}), "'d_x'"));
+        CHECK(has(V("37.885_Urban", 0, {}, {1.0}), "'n_x'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {2000.0, 30.0}), "'width'"));
+        CHECK(has(V("37.885_Urban", 0, {}, {}, {NaN, NaN, 5.0}), "'height'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {25.0}), "'bs'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {NaN, 10.0}), "'min distance'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {NaN, NaN, -1.0}), "'speed'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {0.5}), "'indoor ratio'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {0.0}), "'length'"));
+        CHECK(has(V("37.885_Urban", 0, {15.0, 250.0}), "(20 m wide")); // Narrower than the street (20 m)
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"p_truck", {1.5}}}), "'p_truck'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"n_lane", {0.0}}}), "'n_lane'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"n_lane", {1.5}}}), "'n_lane'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"lane_width", {0.0}}}), "'lane_width'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"config", {1.0}}}), "'config'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"p_residential", {0.5}}}), "'p_residential'"));
+        CHECK(has(V("37.885_Highway", 0, {}, {}, {1.0e9}), "vehicles")); // More than 10^7 vehicles
     }
     SECTION("seed")
     {
@@ -550,8 +610,10 @@ TEST_CASE("generate_layout - minimum distance, O2I states and floors")
     CHECK(dist);
     CHECK(heights);
     CHECK(n_in_near == 0);
-    // Indoor share 0.8 (Table 7.2-1)
-    CHECK(std::abs((double)n_in / 420.0 - 0.8) < share_bound(0.8, 420.0, hex_area(7.0, 500.0)));
+    // Indoor share 0.8 (Table 7.2-1), lowered by the d2D-out rule (share_low)
+    const double b_in = share_bound(0.8, 420.0, hex_area(7.0, 500.0));
+    CHECK((double)n_in / 420.0 > share_low(0.8, annulus_share(500.0, 35.0, 25.0)) - b_in);
+    CHECK((double)n_in / 420.0 < 0.8 + b_in);
 
     // Floor statistics of the building UTs (drawn per UT, independent): mean 3.5 with variance 3.58 / n; floors >= 5 with
     // probability (1/5)(1/5 + 2/6 + 3/7 + 4/8) = 0.2924
@@ -716,6 +778,507 @@ TEST_CASE("generate_layout - seeds and determinism")
     quadriga_lib::layout_csv_write(F.path("tx.csv"), F.path("rx.csv"), I);
     const auto I2 = quadriga_lib::layout_csv_read(F.path("tx.csv"), F.path("rx.csv"), {}, false);
     CHECK(qd_layout_diff(I, I2, 1.0e-9) == "");
+}
+
+TEST_CASE("generate_layout - ITU-R M.2412 presets")
+{
+    // Report ITU-R M.2412-0, Table 5: b) Dense Urban-eMBB, configs A and B (macro ISD 200 m, hBS 25 m; 80 % indoor, 20 %
+    // outdoor in cars; 3 km/h indoors, 30 km/h in cars; hUT 1.5 m outdoors, 3 (n_fl - 1) + 1.5 indoors with
+    // n_fl ~ U(1, N_fl), N_fl ~ U(4, 8)); c) Rural-eMBB (hBS 35 m, hUT 1.5 m; configs A and B: ISD 1732 m, 50 % indoor,
+    // 50 % in cars at 120 km/h; config C: ISD 6000 m, 40 % indoor, 40 % pedestrian, 20 % in cars at 30 km/h; indoor and
+    // pedestrian 3 km/h); d) Urban Macro-mMTC (ISD 500 m in config A, 1732 m in config B; hBS 25 m; 80 % indoor, 20 %
+    // outdoor, 3 km/h; hUT 1.5 m); e) Urban Macro-URLLC (configs A and B: ISD 500 m, hBS 25 m; 80 % outdoor at 30 km/h,
+    // 20 % indoor at 3 km/h; hUT 1.5 m). Section 8.3: 19 sites with 3 TRxPs, wrap-around. Annex 1 Table A1-1 maps the
+    // environments to the UMa and RMa models; the drop uses their O2I fields and indoor distances (Annex 1 Tables A1-7
+    // and A1-8: the minimum of two uniforms up to 25 m UMa, 10 m RMa). The Report gives no minimum distance: the library
+    // takes the TR 38.901 value of
+    // the mapped scenario (Tables 7.2-1, 7.2-3: 35 m; UMa: to d2D-out for indoor UTs, TR 36.873 Table 6-1, note 1)
+    struct row
+    {
+        const char *preset;
+        double config, service, isd, h_bs, p_in, p_car, v_in, v_ped, v_car;
+        bool floors;
+        const char *fam;
+        double din;
+        bool d_out;
+    };
+    const row rows[] = {{"M.2412_DenseUrban", 1.0, NaN, 200.0, 25.0, 0.8, 0.2, 3.0, NaN, 30.0, true, "UMa", 25.0, true},
+                        {"M.2412_DenseUrban", 2.0, NaN, 200.0, 25.0, 0.8, 0.2, 3.0, NaN, 30.0, true, "UMa", 25.0, true},
+                        {"M.2412_Rural", 1.0, NaN, 1732.0, 35.0, 0.5, 0.5, 3.0, NaN, 120.0, false, "RMa", 10.0, false},
+                        {"M.2412_Rural", 2.0, NaN, 1732.0, 35.0, 0.5, 0.5, 3.0, NaN, 120.0, false, "RMa", 10.0, false},
+                        {"M.2412_Rural", 3.0, NaN, 6000.0, 35.0, 0.4, 0.2, 3.0, 3.0, 30.0, false, "RMa", 10.0, false},
+                        {"M.2412_UrbanMacro", 1.0, 1.0, 500.0, 25.0, 0.8, 0.0, 3.0, 3.0, NaN, false, "UMa", 25.0, true},
+                        {"M.2412_UrbanMacro", 2.0, 1.0, 1732.0, 25.0, 0.8, 0.0, 3.0, 3.0, NaN, false, "UMa", 25.0, true},
+                        {"M.2412_UrbanMacro", 1.0, 2.0, 500.0, 25.0, 0.2, 0.0, 3.0, 30.0, NaN, false, "UMa", 25.0, true},
+                        {"M.2412_UrbanMacro", 2.0, 2.0, 500.0, 25.0, 0.2, 0.0, 3.0, 30.0, NaN, false, "UMa", 25.0, true}};
+    for (const auto &p : rows)
+    {
+        INFO(p.preset << " config " << p.config << " service " << p.service);
+        opts o = {{"config", {p.config}}};
+        if (!std::isnan(p.service))
+            o["service"] = std::vector<double>(1, p.service);
+        const auto L = gen(p.preset, 2, {}, {}, {}, {}, {}, {}, o);
+        const auto S = qd_layout_sites(L.tx);
+        REQUIRE(S.name.size() == 19);
+        REQUIRE(L.tx.n_node() == 57);
+        double dmin = arma::datum::inf;
+        for (arma::uword j = 1; j < 19; ++j)
+            dmin = std::min(dmin, std::hypot(S.xy(0, j) - S.xy(0, 0), S.xy(1, j) - S.xy(1, 0)));
+        CHECK(std::abs(dmin - p.isd) < 1.0e-9);
+        bool ok = true;
+        for (arma::uword i = 0; i < 57; ++i)
+            ok = ok && L.tx.pos(2, i) == p.h_bs && L.tx.orientation(1, i) == 0.0 &&
+                 std::abs(qd_layout_wrap(L.tx.orientation(2, i) - (30.0 + 120.0 * (double)(i % 3)) * D)) < 1.0e-12;
+        CHECK(ok);
+        CHECK(L.tx.scenario.empty()); // The user sets the scenario
+        CHECK(L.wrap.n_cols == 2);
+        CHECK(L.is_valid() == "");
+
+        // UT states from the O2I fields of the mapped model at the documented seeds: building if U < p_in, in a car if
+        // U < p_in + p_car, else outdoors
+        REQUIRE(L.rx.n_node() == 114);
+        REQUIRE(L.rx.indoor.n_elem == 114);
+        const std::string fam = p.fam;
+        const arma::vec io = field(L, "io|" + fam, 50.0), u1 = field(L, "d2din1|" + fam, 25.0), u2 = field(L, "d2din2|" + fam, 25.0);
+        const arma::vec d = site_distance(L);
+        ok = true;
+        for (arma::uword i = 0; i < 114; ++i)
+        {
+            const int s = io[i] < p.p_in ? 1 : io[i] < p.p_in + p.p_car ? 2 : 0;
+            const double din = s == 1 ? std::min(u1[i], u2[i]) * p.din : 0.0;
+            ok = ok && L.rx.indoor[i] == s && std::abs(L.rx.d2d_in[i] - din) < 1.0e-12;
+            ok = ok && std::abs(L.rx.speed[i] - (s == 1 ? p.v_in : s == 2 ? p.v_car : p.v_ped) * KMH) < 1.0e-12;
+            ok = ok && d[i] - (p.d_out ? din : 0.0) >= 35.0 - 1.0e-9;
+            const int f = L.rx.floor[i];
+            if (p.floors && s == 1)
+                ok = ok && f >= 1 && f <= 8 && std::abs(L.rx.pos(2, i) - (3.0 * (f - 1) + 1.5)) < 1.0e-12;
+            else
+                ok = ok && f == 1 && L.rx.pos(2, i) == 1.5;
+        }
+        CHECK(ok);
+    }
+
+    // Shares with 10 UTs per TRxP (570 UTs): Rural config C and URLLC
+    const auto R = gen("M.2412_Rural", 10, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}});
+    CHECK(std::abs(share_of(R, 1) - 0.4) < share_bound(0.4, 570.0, hex_area(19.0, 6000.0)));
+    CHECK(std::abs(share_of(R, 2) - 0.2) < share_bound(0.2, 570.0, hex_area(19.0, 6000.0)));
+    CHECK(std::abs(share_of(R, 0) - 0.4) < share_bound(0.4, 570.0, hex_area(19.0, 6000.0)));
+    // URLLC and Dense Urban config A: the d2D-out rule lowers the building share (share_low); RMa has no such rule
+    const auto U = gen("M.2412_UrbanMacro", 10, {}, {}, {}, {}, {}, {}, {{"service", {2.0}}});
+    const double b_u = share_bound(0.2, 570.0, hex_area(19.0, 500.0));
+    CHECK(share_of(U, 1) > share_low(0.2, annulus_share(500.0, 35.0, 25.0)) - b_u);
+    CHECK(share_of(U, 1) < 0.2 + b_u);
+    CHECK(share_of(U, 2) == 0.0);
+    const auto DA = gen("M.2412_DenseUrban", 10);
+    const double b_d = share_bound(0.8, 570.0, hex_area(19.0, 200.0));
+    CHECK(share_of(DA, 1) > share_low(0.8, annulus_share(200.0, 35.0, 25.0)) - b_d);
+    CHECK(share_of(DA, 1) < 0.8 + b_d);
+    CHECK(std::abs(share_of(DA, 1) + share_of(DA, 2) - 1.0) < 1.0e-12);
+
+    // Defaults: config A (1), service mMTC (1)
+    auto first_isd = [](const quadriga_lib::layout &L) { return std::hypot(L.tx.pos(0, 3) - L.tx.pos(0, 0), L.tx.pos(1, 3) - L.tx.pos(1, 0)); };
+    CHECK(std::abs(first_isd(gen("M.2412_UrbanMacro", 0)) - 500.0) < 1.0e-9);
+    CHECK(std::abs(first_isd(gen("M.2412_UrbanMacro", 0, {}, {}, {}, {}, {}, {}, {{"config", {2.0}}})) - 1732.0) < 1.0e-9);
+    CHECK(std::abs(first_isd(gen("M.2412_Rural", 0)) - 1732.0) < 1.0e-9);
+    CHECK(gen("M.2412_DenseUrban", 0).tx.n_node() == 57);
+
+    // Indoor Hotspot-eMBB (Table 5 a), section 8.3.1, Figure 1): one floor of 120 m x 50 m, 12 BSs at 20 m spacing, 10 m
+    // from the short and 15 m from the long walls, i.e. x = -50:20:50, y = +-10 m; hBS 3 m, hUT 1.5 m, 100 % indoor at
+    // 3 km/h; the configurations differ only in frequency
+    for (double c : {1.0, 2.0, 3.0})
+    {
+        INFO("InH config " << c);
+        const auto H = gen("M.2412_InH", 2, {}, {}, {}, {}, {}, {}, {{"config", {c}}});
+        REQUIRE(H.tx.n_node() == 12);
+        std::set<std::pair<long, long>> want, got;
+        for (int i = 0; i < 6; ++i)
+            for (int j = 0; j < 2; ++j)
+                want.insert({std::lround(1000.0 * (-50.0 + 20.0 * i)), std::lround(1000.0 * (-10.0 + 20.0 * j))});
+        bool ok = true;
+        for (arma::uword i = 0; i < 12; ++i)
+        {
+            got.insert({std::lround(1000.0 * H.tx.pos(0, i)), std::lround(1000.0 * H.tx.pos(1, i))});
+            ok = ok && H.tx.pos(2, i) == 3.0 && H.tx.name[i] == "BS" + std::to_string(i + 1);
+        }
+        CHECK(ok);
+        CHECK(got == want);
+        CHECK(H.tx.scenario.empty());
+        CHECK(H.wrap.n_elem == 0);
+        CHECK(H.tx.scenpar_override.empty());
+        REQUIRE(H.rx.n_node() == 24);
+        ok = true;
+        for (arma::uword i = 0; i < 24; ++i)
+            ok = ok && std::abs(H.rx.pos(0, i)) <= 60.0 && std::abs(H.rx.pos(1, i)) <= 25.0 && H.rx.pos(2, i) == 1.5 &&
+                 std::abs(H.rx.speed[i] - 3.0 * KMH) < 1.0e-12;
+        CHECK(ok);
+        CHECK(H.rx.indoor.n_elem == 0);
+        CHECK(H.is_valid() == "");
+    }
+}
+
+TEST_CASE("generate_layout - M.2412 Dense Urban micro layer")
+{
+    // Report ITU-R M.2412-0 section 8.3.2: 3 micro sites randomly dropped in each macro TRxP area (config C only);
+    // Table 5 b): micro sites 10 m high, 10 UEs per TRxP, uniform. The library drops the micro sites uniformly in the
+    // macro TRxP cell, each with one TRxP, at least 35 m from the macro sites (the UMa minimum distance) and 20 m from each
+    // other (twice the UMi minimum distance, TR 38.901 Table 7.2-1). The micro sites form no cells: a macro TRxP cell
+    // gets n_ut UTs for its own and for each of its micro TRxPs, and the UTs keep 10 m from the micro sites (to d2D-out
+    // indoors)
+    const auto L = gen("M.2412_DenseUrban", 1, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}});
+    const auto S = qd_layout_sites(L.tx);
+    REQUIRE(S.name.size() == 19 + 171);
+    REQUIRE(L.tx.n_node() == 57 + 171);
+    CHECK(L.is_valid() == "");
+    CHECK(L.tx.scenario.empty());
+
+    // Macro TRxP cells of the macro layer alone, by brute force
+    const auto M = gen("M.2412_DenseUrban", 0);
+    const auto SM = qd_layout_sites(M.tx);
+    const arma::mat I = qd_layout_images(M.wrap);
+    std::vector<int> per_cell(57, 0);
+    bool ok = true, order = true;
+    for (arma::uword j = 0; j < 171; ++j)
+    {
+        const arma::uword n = 57 + j, r = L.tx.offset[n];
+        ok = ok && L.tx.name[n] == "BS" + std::to_string(20 + j) && L.tx.sector[n] == 0 && L.tx.pos(2, r) == 10.0 &&
+             L.tx.orientation(0, r) == 0.0 && L.tx.orientation(1, r) == 0.0 && L.tx.orientation(2, r) == 0.0;
+        const long long c = cell_oracle(M, SM, I, L.tx.pos(0, r), L.tx.pos(1, r));
+        ok = ok && c >= 0;
+        if (c >= 0)
+            ++per_cell[(size_t)c], order = order && (arma::uword)c == j / 3;
+    }
+    CHECK(ok);
+    CHECK(order);
+    CHECK(std::all_of(per_cell.begin(), per_cell.end(), [](int v) { return v == 3; }));
+    // The macro layer is that of configs A and B
+    CHECK(arma::approx_equal(L.tx.pos.cols(0, 56), M.tx.pos, "absdiff", 1.0e-12));
+
+    // Distance of each micro site to the nearest image of every other site
+    const arma::mat IL = qd_layout_images(L.wrap);
+    double to_macro = arma::datum::inf, to_micro = arma::datum::inf;
+    for (arma::uword a = 19; a < 190; ++a)
+        for (arma::uword b = 0; b < 190; ++b)
+            for (arma::uword k = 0; k < IL.n_cols; ++k)
+                if (a != b || k != 0)
+                {
+                    const double d = std::hypot(S.xy(0, a) - S.xy(0, b) - IL(0, k), S.xy(1, a) - S.xy(1, b) - IL(1, k));
+                    (b < 19 ? to_macro : to_micro) = std::min(b < 19 ? to_macro : to_micro, d);
+                }
+    CHECK(to_macro >= 35.0 - 1.0e-9);
+    CHECK(to_micro >= 20.0 - 1.0e-9);
+
+    // UTs: one per TRxP, i.e. 4 in each macro TRxP cell; 35 m from the macro sites and 10 m from the micro sites (indoors
+    // to d2D-out)
+    REQUIRE(L.rx.n_node() == 228);
+    std::vector<int> in_cell(58, 0);
+    for (arma::uword i = 0; i < 228; ++i)
+    {
+        const long long n = cell_oracle(M, SM, I, L.rx.pos(0, i), L.rx.pos(1, i));
+        ++in_cell[n < 0 ? 57 : (size_t)n];
+    }
+    CHECK(in_cell[57] == 0);
+    CHECK(std::all_of(in_cell.begin(), in_cell.end() - 1, [](int v) { return v == 4; }));
+    ok = true;
+    for (arma::uword i = 0; i < 228; ++i)
+    {
+        const double din = L.rx.indoor[i] == 1 ? L.rx.d2d_in[i] : 0.0;
+        for (arma::uword b = 0; b < 190; ++b)
+            for (arma::uword k = 0; k < IL.n_cols; ++k)
+                ok = ok && std::hypot(L.rx.pos(0, i) - S.xy(0, b) - IL(0, k), L.rx.pos(1, i) - S.xy(1, b) - IL(1, k)) - din >= (b < 19 ? 35.0 : 10.0) - 1.0e-9;
+    }
+    CHECK(ok);
+    // In total: 50 UTs over the macro cells
+    CHECK(gen("M.2412_DenseUrban", 50, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}}, false).rx.n_node() == 50);
+
+    // UT states (Table 5 b): 80 % in buildings with floors 3 (n_fl - 1) + 1.5, N_fl ~ U(4, 8), at 3 km/h; 20 % in cars at
+    // 30 km/h and 1.5 m. 600 UTs in total, uniform over the cluster. The d2D-out rule lowers the building share
+    // (share_low); its area fraction a is counted on a 10 m grid over the cluster: E = points >= 35 m from the macro and
+    // >= 10 m from the micro sites (all images), R = points of E within 35 + 25 m of a macro or 10 + 25 m of a micro site
+    const auto P = gen("M.2412_DenseUrban", 600, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}}, false, 3);
+    REQUIRE(P.rx.n_node() == 600);
+    const auto SP = qd_layout_sites(P.tx);
+    double nE = 0.0, nR = 0.0;
+    for (double x = -700.0; x <= 700.0; x += 10.0)
+        for (double y = -700.0; y <= 700.0; y += 10.0)
+        {
+            double d_mac = arma::datum::inf, d_mic = arma::datum::inf; // Squared distances
+            arma::uword best_k = 0;
+            for (arma::uword b = 0; b < 190; ++b)
+                for (arma::uword k = 0; k < IL.n_cols; ++k)
+                {
+                    const double dx = x - SP.xy(0, b) - IL(0, k), dy = y - SP.xy(1, b) - IL(1, k), d = dx * dx + dy * dy;
+                    if (b < 19 && d < d_mac)
+                        d_mac = d, best_k = k;
+                    if (b >= 19)
+                        d_mic = std::min(d_mic, d);
+                }
+            if (best_k != 0 || d_mac < 35.0 * 35.0 || d_mic < 10.0 * 10.0) // Outside the cluster or no UT at all
+                continue;
+            nE += 1.0;
+            nR += d_mac < 60.0 * 60.0 || d_mic < 35.0 * 35.0 ? 1.0 : 0.0;
+        }
+    const double b_p = share_bound(0.8, 600.0, hex_area(19.0, 200.0)), p_in = share_of(P, 1);
+    CHECK(p_in > share_low(0.8, nR / nE) - b_p);
+    CHECK(p_in < 0.8 + b_p);
+    CHECK(std::abs(p_in + share_of(P, 2) - 1.0) < 1.0e-12); // All other UTs in cars
+    ok = true;
+    for (arma::uword i = 0; i < 600; ++i)
+    {
+        const int st = P.rx.indoor[i], f = P.rx.floor[i];
+        ok = ok && std::abs(P.rx.speed[i] - (st == 1 ? 3.0 : 30.0) * KMH) < 1.0e-12;
+        if (st == 1)
+            ok = ok && f >= 1 && f <= 8 && std::abs(P.rx.pos(2, i) - (3.0 * (f - 1) + 1.5)) < 1.0e-12 && P.rx.d2d_in[i] <= 25.0;
+        else
+            ok = ok && st == 2 && f == 1 && P.rx.pos(2, i) == 1.5 && P.rx.d2d_in[i] == 0.0;
+    }
+    CHECK(ok);
+
+    // Seeds: equal seeds give equal layouts, other seeds other micro sites
+    CHECK(qd_layout_diff(L, gen("M.2412_DenseUrban", 1, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}})) == "");
+    CHECK(!arma::approx_equal(L.tx.pos, gen("M.2412_DenseUrban", 1, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}}, true, 8).tx.pos, "absdiff", 1.0));
+
+    // A small ISD: the cells of 100 m hold their sites (a cell whose sites block each other is placed again)
+    for (arma::sword sd = 1; sd <= 2; ++sd)
+    {
+        const auto Q = gen("M.2412_DenseUrban", 0, {100.0}, {}, {}, {}, {}, {}, {{"config", {3.0}}}, true, sd);
+        CHECK(Q.tx.n_node() == 228);
+    }
+
+    // drop_terminals on the layout as returned (no scenario): every TRxP is a cell, here with exactly one UT
+    auto D2 = gen("M.2412_DenseUrban", 0, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}});
+    quadriga_lib::drop_terminals(D2, 1, {}, {}, {}, {}, true, 4);
+    REQUIRE(D2.rx.n_node() == 228);
+    auto c2 = count_cells(D2);
+    CHECK(c2.back() == 0);
+    c2.pop_back();
+    CHECK(std::all_of(c2.begin(), c2.end(), [](arma::uword v) { return v == 1; }));
+
+    // Option h_micro
+    const auto H = gen("M.2412_DenseUrban", 0, {}, {}, {}, {}, {}, {}, {{"config", {3.0}}, {"h_micro", {6.0}}});
+    CHECK(arma::all(H.tx.pos.row(2).cols(57, 227) == 6.0));
+    CHECK(arma::all(H.tx.pos.row(2).cols(0, 56) == 25.0));
+}
+
+namespace
+{
+// Vehicle length from the antenna height: TR 37.885 clause 6.1.2, type 2 (5 m, antenna 1.6 m), type 3 (13 m, 3 m)
+double vehicle_length(double h) { return h == 3.0 ? 13.0 : 5.0; }
+
+// The vehicles of a road layout by lane: key (lane coordinate in mm, direction in mdeg), value (position along the
+// lane in the direction of travel, length), sorted by position
+std::map<std::pair<long, long>, std::vector<std::pair<double, double>>> lanes_of(const quadriga_lib::layout &L)
+{
+    std::map<std::pair<long, long>, std::vector<std::pair<double, double>>> M;
+    for (arma::uword i = 0; i < L.rx.n_node(); ++i)
+    {
+        const double az = L.rx.direction(0, i), c = std::cos(az), s = std::sin(az);
+        const bool along_x = std::abs(c) > 0.5;
+        const double lane = along_x ? L.rx.pos(1, i) : L.rx.pos(0, i);
+        const double u = along_x ? L.rx.pos(0, i) * (c > 0.0 ? 1.0 : -1.0) : L.rx.pos(1, i) * (s > 0.0 ? 1.0 : -1.0);
+        M[{std::lround(1000.0 * lane), std::lround(1000.0 * az / D)}].push_back({u, vehicle_length(L.rx.pos(2, i))});
+    }
+    for (auto &kv : M)
+        std::sort(kv.second.begin(), kv.second.end());
+    return M;
+}
+
+// Bumper-to-bumper gaps of the vehicles of a lane; 'loop' > 0: the lane is a loop of this length (the last gap closes it)
+std::vector<double> gaps_of(const std::vector<std::pair<double, double>> &v, double loop)
+{
+    std::vector<double> g;
+    for (size_t k = 1; k < v.size(); ++k)
+        g.push_back(v[k].first - v[k - 1].first - 0.5 * (v[k].second + v[k - 1].second));
+    if (loop > 0.0 && v.size() > 1)
+        g.push_back(v[0].first + loop - v.back().first - 0.5 * (v[0].second + v.back().second));
+    return g;
+}
+} // namespace
+
+TEST_CASE("generate_layout - TR 37.885 road layouts")
+{
+    // TR 37.885 Table A-1: highway with 3 lanes per direction, lane width 4 m, length >= 2000 m, wrap-around; urban grid
+    // with 2 lanes per direction, lane width 3.5 m, 3 m sidewalk, road grid 433 m x 250 m, area at least 1299 m x 750 m.
+    // Clause 6.1.2: bumper-to-bumper gap max(2 m, Exp(mean = speed x 2 s)); option A: 100 % type 2 (5 m long, antenna at
+    // 1.6 m), highway 140 km/h, urban 60 km/h. No BSs. Lanes: right-hand traffic (the TR does not say)
+    auto L = gen("37.885_Highway", 0);
+    CHECK(L.tx.n_node() == 0);
+    CHECK(L.tx.scenario.empty());
+    REQUIRE(L.wrap.n_rows == 2);
+    REQUIRE(L.wrap.n_cols == 1);
+    CHECK(L.wrap(0, 0) == 2000.0);
+    CHECK(L.wrap(1, 0) == 0.0);
+    CHECK(L.is_valid() == "");
+    const arma::uword n = L.rx.n_node();
+    REQUIRE(n > 100);
+    bool ok = true;
+    for (arma::uword i = 0; i < n; ++i)
+    {
+        const double y = L.rx.pos(1, i), az = L.rx.direction(0, i);
+        const bool lane = std::abs(std::abs(y) - 2.0) < 1.0e-12 || std::abs(std::abs(y) - 6.0) < 1.0e-12 || std::abs(std::abs(y) - 10.0) < 1.0e-12;
+        ok = ok && lane && std::abs(qd_layout_wrap(az - (y < 0.0 ? 0.0 : arma::datum::pi))) < 1.0e-12;
+        ok = ok && L.rx.name[i] == "UT" + std::to_string(i + 1) && L.rx.pos(2, i) == 1.6 && std::abs(L.rx.pos(0, i)) <= 1000.0;
+        ok = ok && std::abs(L.rx.speed[i] - 140.0 * KMH) < 1.0e-12 && L.rx.direction(1, i) == 0.0;
+        ok = ok && L.rx.orientation(0, i) == 0.0 && L.rx.orientation(1, i) == 0.0 && std::abs(qd_layout_wrap(L.rx.orientation(2, i) - az)) < 1.0e-12;
+    }
+    CHECK(ok);
+    CHECK(L.rx.indoor.n_elem == 0);
+    auto lanes = lanes_of(L);
+    CHECK(lanes.size() == 6);
+    double g_min = arma::datum::inf;
+    for (const auto &kv : lanes)
+        for (double g : gaps_of(kv.second, 2000.0))
+            g_min = std::min(g_min, g);
+    CHECK(g_min >= 2.0 - 1.0e-9);
+
+    // Speed 0: every gap is 2 m, so the vehicles follow at 7 m (gap plus length); a 2000 m loop holds 285 of them per lane
+    // (7 n <= 2000), the gap that closes the loop is 2000 - 284 x 7 - 5 = 7 m, at a random place of the loop
+    L = gen("37.885_Highway", 0, {}, {}, {}, {}, {NaN, NaN, 0.0});
+    lanes = lanes_of(L);
+    REQUIRE(lanes.size() == 6);
+    for (const auto &kv : lanes)
+    {
+        CHECK(kv.second.size() == 285);
+        const auto g = gaps_of(kv.second, 2000.0);
+        CHECK(std::count_if(g.begin(), g.end(), [](double v) { return std::abs(v - 2.0) < 1.0e-9; }) == 284);
+        CHECK(std::count_if(g.begin(), g.end(), [](double v) { return std::abs(v - 7.0) < 1.0e-9; }) == 1);
+    }
+    CHECK(arma::all(L.rx.speed == 0.0));
+    // Trucks only: 15 m steps, 133 per lane (15 n <= 2000), antenna at 3 m
+    L = gen("37.885_Highway", 0, {}, {}, {}, {}, {NaN, NaN, 0.0}, {}, {{"p_truck", {1.0}}});
+    lanes = lanes_of(L);
+    for (const auto &kv : lanes)
+        CHECK(kv.second.size() == 133);
+    CHECK(arma::all(L.rx.pos.row(2) == 3.0));
+
+    // Gap statistics on a 20 km highway: E[max(2, X)] = 2 + m exp(-2 / m) and E[max(2, X)^2] = 4 (1 - e) + e (4 + 4 m +
+    // 2 m^2) with e = exp(-2 / m), m = 140 km/h x 2 s; P(gap = 2 m) = 1 - e. The mean within four standard deviations of
+    // its own sample, P(gap = 2 m) within five of the binomial; the gap across x = +-L/2 is left out, the one gap per lane
+    // that closes the loop (shorter, at a random place) stays in and is negligible against the bound
+    L = gen("37.885_Highway", 0, {}, {}, {20000.0}, {}, {}, {}, {{"p_truck", {0.3}}});
+    CHECK(L.wrap(0, 0) == 20000.0);
+    lanes = lanes_of(L);
+    std::vector<double> all;
+    for (const auto &kv : lanes)
+    {
+        const auto g = gaps_of(kv.second, 0.0);
+        all.insert(all.end(), g.begin(), g.end());
+    }
+    const double m = 140.0 * KMH * 2.0, e = std::exp(-2.0 / m), ng = (double)all.size();
+    const double mu = 2.0 + m * e, var = 4.0 * (1.0 - e) + e * (4.0 + 4.0 * m + 2.0 * m * m) - mu * mu;
+    REQUIRE(ng > 1000.0);
+    double mean = 0.0, n2 = 0.0, sq = 0.0;
+    for (double g : all)
+        mean += g / ng, n2 += std::abs(g - 2.0) < 1.0e-9 ? 1.0 : 0.0;
+    for (double g : all)
+        sq += (g - mean) * (g - mean) / (ng - 1.0);
+    CHECK(std::abs(sq - var) < 0.2 * var);
+    CHECK(std::abs(mean - mu) < 4.0 * std::sqrt(sq / ng));
+    CHECK(std::abs(n2 / ng - (1.0 - e)) < 5.0 * std::sqrt((1.0 - e) * e / ng));
+    CHECK(*std::min_element(all.begin(), all.end()) >= 2.0 - 1.0e-9);
+    // Truck share 0.3, per vehicle
+    const double nv = (double)L.rx.n_node(), nt = (double)arma::accu(L.rx.pos.row(2) == 3.0);
+    CHECK(std::abs(nt / nv - 0.3) < 5.0 * std::sqrt(0.21 / nv));
+
+    // Options: 2 lanes per direction of 3 m: y = +-1.5, +-4.5
+    L = gen("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {{"lane_width", {3.0}}, {"n_lane", {2.0}}});
+    std::set<long> ys;
+    for (arma::uword i = 0; i < L.rx.n_node(); ++i)
+        ys.insert(std::lround(1000.0 * L.rx.pos(1, i)));
+    CHECK(ys == std::set<long>{-4500, -1500, 1500, 4500});
+
+    // Urban grid: streets at x = -433, 0, 433 and y = -250, 0, 250 (the road grid centred in the area); lanes 1.75 m and
+    // 5.25 m from the centre line; eastbound and northbound on the right side; 60 km/h; vehicles inside the area
+    L = gen("37.885_Urban", 0);
+    CHECK(L.tx.n_node() == 0);
+    CHECK(L.wrap.n_elem == 0);
+    CHECK(L.is_valid() == "");
+    std::set<std::pair<long, long>> want;
+    for (double c : {-433.0, 0.0, 433.0})
+        for (double o : {1.75, 5.25})
+            want.insert({std::lround(1000.0 * (c + o)), 90000}), want.insert({std::lround(1000.0 * (c - o)), -90000});
+    for (double c : {-250.0, 0.0, 250.0})
+        for (double o : {1.75, 5.25})
+            want.insert({std::lround(1000.0 * (c - o)), 0}), want.insert({std::lround(1000.0 * (c + o)), 180000});
+    lanes = lanes_of(L);
+    std::set<std::pair<long, long>> got;
+    for (const auto &kv : lanes)
+        got.insert({kv.first.first, std::abs(kv.first.second) == 180000 ? 180000 : kv.first.second});
+    CHECK(got == want);
+    ok = true;
+    for (arma::uword i = 0; i < L.rx.n_node(); ++i)
+        ok = ok && std::abs(L.rx.speed[i] - 60.0 * KMH) < 1.0e-12 && L.rx.pos(2, i) == 1.6 && std::abs(L.rx.pos(0, i)) <= 649.5 - 2.5 + 1.0e-9 &&
+             std::abs(L.rx.pos(1, i)) <= 375.0 - 2.5 + 1.0e-9;
+    CHECK(ok);
+    for (const auto &kv : lanes)
+        for (double g : gaps_of(kv.second, 0.0))
+            CHECK(g >= 2.0 - 1.0e-9);
+
+    // Speed 0 on the urban grid: 7 m steps; the free length at the two ends of a lane is below two steps
+    L = gen("37.885_Urban", 0, {}, {}, {}, {}, {NaN, NaN, 0.0});
+    for (const auto &kv : lanes_of(L))
+    {
+        const double len = std::abs(kv.first.second) == 90000 ? 750.0 : 1299.0;
+        const auto &v = kv.second;
+        const auto g = gaps_of(v, 0.0);
+        CHECK(std::count_if(g.begin(), g.end(), [](double x) { return std::abs(x - 2.0) < 1.0e-9; }) == (long)g.size());
+        const double free = (v.front().first - 2.5 + len / 2.0) + (len / 2.0 - v.back().first - 2.5);
+        CHECK(free >= -1.0e-9);
+        CHECK(free < 14.0);
+    }
+
+    // Spacing and area: 2 x 2 streets at +-250 m and +-150 m; one lane per direction of 3 m
+    L = gen("37.885_Urban", 0, {500.0, 300.0}, {}, {1000.0, 600.0}, {}, {}, {}, {{"n_lane", {1.0}}, {"lane_width", {3.0}}});
+    std::set<std::pair<long, long>> want2;
+    for (double c : {-250.0, 250.0})
+        want2.insert({std::lround(1000.0 * (c + 1.5)), 90000}), want2.insert({std::lround(1000.0 * (c - 1.5)), -90000});
+    for (double c : {-150.0, 150.0})
+        want2.insert({std::lround(1000.0 * (c - 1.5)), 0}), want2.insert({std::lround(1000.0 * (c + 1.5)), 180000});
+    got.clear();
+    for (const auto &kv : lanes_of(L))
+        got.insert({kv.first.first, std::abs(kv.first.second) == 180000 ? 180000 : kv.first.second});
+    CHECK(got == want2);
+
+    // Determinism
+    CHECK(qd_layout_diff(gen("37.885_Urban", 0, {}, {}, {}, {}, {}, {}, {}, true, 5), gen("37.885_Urban", 0, {}, {}, {}, {}, {}, {}, {}, true, 5)) == "");
+    CHECK(qd_layout_diff(gen("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {}, true, 5), gen("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {}, true, 5)) == "");
+    const auto H5 = gen("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {}, true, 5), H6 = gen("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {}, true, 6);
+    CHECK((H5.rx.n_node() != H6.rx.n_node() || !arma::approx_equal(H5.rx.pos, H6.rx.pos, "absdiff", 1.0)));
+}
+
+TEST_CASE("generate_layout - TR 37.885 vehicles are stationary along the lanes")
+{
+    // A stationary process has the same mean density everywhere on the lane, also at its start and, on the highway, at the
+    // wrap seam. Counts over many seeds in bins at the ends of the lanes against the mean density of the same layouts;
+    // the counts of a renewal process with gaps of coefficient of variation below 1 vary less than Poisson counts, so four
+    // Poisson standard deviations bound them. Highway 2000 m at 140 km/h (mean step 82.8 m), 200 seeds, 100 m bins at both
+    // ends of the loop (the seam); urban grid at 60 km/h (mean step 38 m), 100 seeds, 50 m bins at both ends of each lane,
+    // by the rear at the start and by the front at the end (a vehicle lies on its lane)
+    double n_all = 0.0, n_first = 0.0, n_last = 0.0;
+    for (arma::sword sd = 1; sd <= 200; ++sd)
+    {
+        const auto L = gen("37.885_Highway", 0, {}, {}, {}, {}, {}, {}, {}, true, sd);
+        for (arma::uword i = 0; i < L.rx.n_node(); ++i)
+        {
+            const double u = L.rx.pos(0, i) * (std::cos(L.rx.direction(0, i)) > 0.0 ? 1.0 : -1.0) + 1000.0; // From the lane start
+            n_all += 1.0, n_first += u < 100.0 ? 1.0 : 0.0, n_last += u >= 1900.0 ? 1.0 : 0.0;
+        }
+    }
+    const double e_bin = n_all * 100.0 / 2000.0;
+    CHECK(std::abs(n_first - e_bin) < 4.0 * std::sqrt(e_bin));
+    CHECK(std::abs(n_last - e_bin) < 4.0 * std::sqrt(e_bin));
+
+    double e_end = 0.0, u_first = 0.0, u_last = 0.0;
+    for (arma::sword sd = 1; sd <= 100; ++sd)
+        for (const auto &kv : lanes_of(gen("37.885_Urban", 0, {}, {}, {}, {}, {}, {}, {}, true, sd)))
+        {
+            const double len = std::abs(kv.first.second) == 90000 ? 750.0 : 1299.0;
+            // Rears lie in [0, len - 5 m]: first bin by the rear, last bin by the front (position along the lane from its start)
+            e_end += (double)kv.second.size() * 50.0 / (len - 5.0);
+            for (const auto &v : kv.second)
+                u_first += v.first + len / 2.0 - 2.5 < 50.0 ? 1.0 : 0.0, u_last += v.first + len / 2.0 + 2.5 > len - 50.0 ? 1.0 : 0.0;
+        }
+    CHECK(std::abs(u_first - e_end) < 4.0 * std::sqrt(e_end));
+    CHECK(std::abs(u_last - e_end) < 4.0 * std::sqrt(e_end));
 }
 
 TEST_CASE("generate_layout - family table and O2I draws")

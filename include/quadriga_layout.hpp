@@ -180,9 +180,12 @@ namespace quadriga_lib
 
     // ---- Layout generators ----
 
-    // A network layout from a preset: BS sites (hexagonal grid with wrap-around, or indoor grid) and a drop of UTs
+    // A network layout from a preset: BS sites (hexagonal grid with wrap-around, or indoor grid) and a drop of UTs, or
+    // roads with vehicles
     // - Presets of 3GPP TR 38.901: "38.901_UMi", "38.901_UMa", "38.901_RMa", "38.901_SMa", "38.901_InH_Open",
     //   "38.901_InH_Mixed", "38.901_InF_SL", "38.901_InF_DL", "38.901_InF_SH", "38.901_InF_DH", "38.901_InF_HH"
+    // - Presets of ITU-R M.2412: "M.2412_InH", "M.2412_DenseUrban", "M.2412_Rural", "M.2412_UrbanMacro"
+    // - Presets of 3GPP TR 37.885: "37.885_Urban", "37.885_Highway" (n_ut must be 0)
     // - Tuple entries that are NaN or omitted take the preset value; an entry the preset does not use throws
     // - UTs are point drops with orientation, speed and direction; O2I presets also get indoor, floor and d2d_in
     layout generate_layout(
@@ -190,7 +193,7 @@ namespace quadriga_lib
         arma::uword n_ut = 0,                   // UTs per cell (per_cell) or in total; 0 = no UTs
         const arma::vec &spacing = {},          // [d_x, d_y] in [m]; hexagonal: d_x = ISD
         const arma::vec &grid = {},             // [n_x, n_y, n_sector]; hexagonal: n_x = rings (0 = one site), n_y unused
-        const arma::vec &area = {},             // [length, width, height] of the hall or floor in [m]
+        const arma::vec &area = {},             // [length, width, height] of the hall, floor or road area in [m]
         const arma::vec &bs = {},               // [height, tilt, sector azimuth offset] in [m], [deg], [deg]
         const arma::vec &ut = {},               // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg]
         const arma::vec &indoor = {},           // [indoor ratio, min floors, max floors, floor height in [m]]
