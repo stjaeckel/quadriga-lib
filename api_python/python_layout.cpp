@@ -103,6 +103,16 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("i_node") = py::none(),
           py::arg("center_freq") = nan);
 
+    m.def("set_antenna_qdant", &set_antenna_qdant,
+          py::arg("layout_in"),
+          py::arg("qdant_file"),
+          py::arg("qdant_id") = 1,
+          py::kw_only(),
+          py::arg("rx_side") = false,
+          py::arg("i_node") = py::none(),
+          py::arg("center_freq") = nan,
+          py::arg("evaluate") = true);
+
     m.def("eval_antennas", &eval_antennas,
           py::arg("layout_in"),
           py::kw_only(),

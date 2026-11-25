@@ -97,6 +97,7 @@ lang: en-US
 | [sample_track](#sample_track) | Network layouts and mobility | Positions and orientations of a node at snapshot times |
 | [set_antenna](#set_antenna) | Network layouts and mobility | Set the antenna of layout nodes from the arguments of generate_antenna |
 | [set_antenna_array](#set_antenna_array) | Network layouts and mobility | Set the antenna of layout nodes from an evaluated array |
+| [set_antenna_qdant](#set_antenna_qdant) | Network layouts and mobility | Set the antenna of layout nodes to an entry of a QDANT file |
 | [set_orientation](#set_orientation) | Network layouts and mobility | Set the orientation of nodes from their motion, or to a given value |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
 | [cube](#cube) | Site-specific simulation tools | Construct a triangulated cube mesh |
@@ -3510,7 +3511,7 @@ A **layout** describes the nodes of a radio network and how they move: where eac
 | `relative` | | 1: the orientation is relative to the direction of motion |
 | `center_freq`, `antenna`, `qdant_file`, `qdant_id` and the inputs of [generate_antenna](#generate_antenna) | | Antenna columns, see below |
 
-**Antennas.** The antenna columns of a node (type `antenna` as in [generate_antenna](#generate_antenna), or `qdant` with the file `qdant_file` relative to the CSV file and its 1-based entry `qdant_id`) are kept as one text line per antenna in `antenna_args`, with the names of the columns in `antenna_cols`. Nodes with equal lines share one entry of the lists, Tx nodes first, and `i_antenna` is the 1-based index of it, 0 for the generic antenna with two co-located isotropic elements of vertical and horizontal polarization. A column that the type does not use is an error. An extra sector without antenna cells has the antenna of sector 0; the type `none` (no other antenna cells) gives a node no antenna, e.g. an extra sector next to a sector 0 with one. [eval_antennas](#eval_antennas) generates the arrays `antenna` from the lines: a line without `center_freq` once per simulation frequency, so that an array spaced in wavelengths keeps its spacing in each band (co-located elements give one array for all bands), a line of a band at its frequency, a `qdant` line by reading its entry as stored. [set_antenna](#set_antenna) sets the antenna of nodes from the arguments of [generate_antenna](#generate_antenna) or from an evaluated array, which [layout_csv_write](#layout_csv_write) writes to a QDANT file next to the CSV file.
+**Antennas.** The antenna columns of a node (type `antenna` as in [generate_antenna](#generate_antenna), or `qdant` with the file `qdant_file` relative to the CSV file and its 1-based entry `qdant_id`) are kept as one text line per antenna in `antenna_args`, with the names of the columns in `antenna_cols`. Nodes with equal lines share one entry of the lists, Tx nodes first, and `i_antenna` is the 1-based index of it, 0 for the generic antenna with two co-located isotropic elements of vertical and horizontal polarization. A column that the type does not use is an error. An extra sector without antenna cells has the antenna of sector 0; the type `none` (no other antenna cells) gives a node no antenna, e.g. an extra sector next to a sector 0 with one. [eval_antennas](#eval_antennas) generates the arrays `antenna` from the lines: a line without `center_freq` once per simulation frequency, so that an array spaced in wavelengths keeps its spacing in each band (co-located elements give one array for all bands), a line of a band at its frequency, a `qdant` line by reading its entry as stored. [set_antenna](#set_antenna) sets the antenna of nodes from the arguments of [generate_antenna](#generate_antenna), [set_antenna_array](#set_antenna_array) from an evaluated array, which [layout_csv_write](#layout_csv_write) writes to a QDANT file next to the CSV file; [set_antenna_qdant](#set_antenna_qdant) sets an entry of a QDANT file, which the writer refers to.
 
 **Bands.** A row with `center_freq` and no position adds a frequency, and optionally an antenna for it, to its node. The frequencies of the Tx side (else of the Rx side) are the simulation frequencies `center_freq` of the layout. A node without bands has all of them with one antenna description; a node with bands defines all of them. An empty antenna in a band repeats the antenna of the first band.
 
@@ -4000,6 +4001,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#layout_csv_write) · [Python](quadriga_li
 - Antennas are written as their CSV lines, with each `qdant_file` relative to the folder of its CSV file. If no antenna line carries the frequencies of the layout, they are declared on the first node: `center_freq` on its first row and one band row per further frequency
 - All files are composed first and written to temporary files next to the targets; each target is replaced by a rename only after all files were composed and written, so an error in the layout, the composition or the writing leaves all files unchanged (a failing rename of the second file is not undone for the first)
 - Antenna bands that are evaluated arrays without a line (set with [set_antenna_array](#set_antenna_array)) are written to QDANT files next to the first written CSV file that uses the antenna, named `<stem>_<k>.qdant` (`<stem>` is the name of the CSV file without `.csv`, k = 1, 2, ... per CSV file, skipping names that `qdant` lines of the layout use), one file per antenna with one entry per exported band, and become `qdant` lines. Afterwards, the files `<stem>_<k>.qdant` next to a written CSV file that the new files do not reference are deleted; files of other names are never touched. These arrays must be evaluated: a layout whose `antenna` does not hold them raises an error
+- A band set with [set_antenna_qdant](#set_antenna_qdant) is a `qdant` line: it is written as a reference to its file, relative to the CSV file, and not exported
 - The `seed`, `layout_seed` and `wrap` of the layout are stored in the Tx file; a Tx file for a layout without Tx nodes that has them raises an error. Not expressible in the format and therefore rejected: a scenario that returns to none after a scenario was set, a terminal without a pair in `pairing` (an empty cell means all sites). An extra sector without antenna next to a sector 0 with one is written with the antenna `none`
 
 ### Usage:
@@ -4093,6 +4095,7 @@ layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2], '
 
 ### See also:
 - [set_antenna_array](#set_antenna_array) (sets an evaluated array)
+- [set_antenna_qdant](#set_antenna_qdant) (sets an entry of a QDANT file)
 - [generate_antenna](#generate_antenna) (the meaning of the arguments)
 - [layout_csv_write](#layout_csv_write) (writes the lines and exports the arrays)
 
@@ -4131,6 +4134,46 @@ layout = quadriga_lib.set_antenna_array( layout, quadriga_lib.qdant_read( 'hands
 ### See also:
 - [set_antenna](#set_antenna) (sets the antenna from the arguments of generate_antenna)
 - [qdant_read](#qdant_read) (reads an array from a QDANT file)
+
+---
+<a id="set_antenna_qdant"></a>
+## set_antenna_qdant
+Set the antenna of layout nodes to an entry of a QDANT file
+
+Also in: [C++](quadriga_lib_api_cpp.md#set_antenna_qdant) · [Python](quadriga_lib_api_python.md#set_antenna_qdant)
+
+- Stores a `qdant` antenna line with the file as normalised absolute path and the entry `qdant_id`, as [layout_csv_read](#layout_csv_read) composes it from the columns `antenna`, `qdant_file` and `qdant_id`; [layout_csv_write](#layout_csv_write) writes this line with the path relative to the CSV file and exports no copy of the array
+- The array is read as stored, for all bands; bands, the sharing of entries and the renumbering of `i_antenna` follow [set_antenna](#set_antenna)
+- A missing or unreadable file raises an error; without evaluation, an entry that the file does not have raises an error when the antennas are evaluated
+- The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
+
+### Usage:
+```matlab
+layout_out = quadriga_lib.set_antenna_qdant( layout_in, qdant_file, qdant_id, rx_side, i_node, center_freq, evaluate );
+```
+
+### Inputs:
+- **`layout_in`** — Layout struct, fields in [layout_csv_read](#layout_csv_read); its antenna lists must fit its nodes and frequencies
+- **`qdant_file`** — Existing QDANT file, absolute or relative to the current folder
+- **`qdant_id`** — 1-based entry of the file; default: 1
+- **`rx_side`** — `false`: nodes of `layout_in.tx`; `true`: nodes of `layout_in.rx`; default: `false`
+- **`i_node`** — Indices of the nodes of that side, 1-based; `[]` = all nodes of the side; default: `[]`
+- **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
+- **`evaluate`** — `true`: generate all antennas of the layout that are not evaluated yet; `false`: none; default: `true`
+
+### Outputs:
+- **`layout_out`** — The layout with the new antenna lists and `i_antenna`
+
+### Example:
+```matlab
+layout = quadriga_lib.layout_csv_read( 'tx.csv', 'rx.csv' );
+layout = quadriga_lib.set_antenna_qdant( layout, 'measured/handset.qdant', 2, true );
+```
+
+### See also:
+- [set_antenna](#set_antenna) (sets the antenna from the arguments of generate_antenna)
+- [set_antenna_array](#set_antenna_array) (sets an evaluated array)
+- [qdant_read](#qdant_read) (reads the entries of a QDANT file)
 
 ---
 <a id="set_orientation"></a>

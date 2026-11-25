@@ -141,6 +141,16 @@ namespace quadriga_lib
         const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
         double center_freq = NAN);                                     // Band in [Hz]; NaN = the same array for all bands
 
+    // Set the antenna of nodes to an entry of a QDANT file; the layout stores a 'qdant' antenna line that refers to the file
+    void set_antenna_qdant(
+        layout &layout,                                                // Layout, updated in place
+        const std::string &qdant_file,                                 // QDANT file, relative to the current folder or absolute
+        arma::uword qdant_id = 1,                                      // 1-based entry of the file
+        bool rx_side = false,                                          // false: Tx nodes, true: Rx nodes
+        const uint_list &i_node = {},                                  // Node indices, 0-based; empty = all nodes of the side
+        double center_freq = NAN,                                      // Band in [Hz]; NaN = one antenna for all bands
+        bool evaluate = true);                                         // true: generate all antennas that are not evaluated yet
+
     // ---- Tracks: sampling, generation and orientation ----
 
     // Positions and orientations of one node at the snapshot times

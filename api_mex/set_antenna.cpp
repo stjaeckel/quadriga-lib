@@ -47,6 +47,7 @@ layout = quadriga_lib.set_antenna( layout, '3GPP', struct( 'panel', [4 4 1 2], '
 
 ## See also:
 - [[set_antenna_array]] (sets an evaluated array)
+- [[set_antenna_qdant]] (sets an entry of a QDANT file)
 - [[generate_antenna]] (the meaning of the arguments)
 - [[layout_csv_write]] (writes the lines and exports the arrays)
 MD!*/

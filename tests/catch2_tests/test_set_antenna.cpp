@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// set_antenna (both forms), layout::eval_antennas, the evaluation of the antennas by layout_csv_read and the QDANT export
+// set_antenna (both forms), set_antenna_qdant, layout::eval_antennas, the evaluation of the antennas by layout_csv_read and the QDANT export
 // of layout_csv_write: arguments reach generate_antenna; one line for all bands is generated per band (an array spaced
 // in wavelengths keeps its spacing in each band, co-located elements give one array); per-band calls copy a shared
 // antenna, add frequencies and leave nodes incomplete until all bands are set; equal text is one antenna; columns are
@@ -810,4 +810,129 @@ TEST_CASE("layout_csv_read - the messages of the evaluation name file, line and 
     const std::string m2 = qd_layout_throws([&] { quadriga_lib::layout_csv_read("", dir.write("r.csv", "name,x,y,z,antenna,qdant_file\nU,0,0,0,omni,\nV,0,0,0,qdant,none.qdant\n")); });
     CHECK(has(m2, "r.csv, line 3 (Rx node 'V', sector 0): "));
     CHECK(has(m2, "none.qdant"));
+}
+
+TEST_CASE("set_antenna_qdant - an entry of a QDANT file is stored as a reference")
+{
+    qd_layout_files dir("set_antenna_qdant");
+    std::filesystem::create_directories(dir.path("ant"));
+    std::filesystem::create_directories(dir.path("out"));
+    const ant_t A = measured(50.0, 0.5), B = measured(30.0, 0.25);
+    quadriga_lib::qdant_write(dir.path("ant/meas.qdant"), std::vector<ant_t>{A, B});
+    const std::vector<ant_t> file = quadriga_lib::qdant_read<double>(dir.path("ant/meas.qdant"));
+    REQUIRE(file.size() == 2);
+    const std::string F = abs_path(dir.path("ant/meas.qdant"));
+
+    // All bands of one Rx node; the path is stored absolute and normalised
+    quadriga_lib::layout L = qd_layout_build();
+    L.center_freq = {3.5e9, 28e9};
+    quadriga_lib::set_antenna_qdant(L, dir.path("ant/../ant/meas.qdant"), 2, true, {1});
+    CHECK(L.antenna_cols == std::vector<std::string>{"antenna", "qdant_file", "qdant_id"});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"qdant," + F + ",2"}});
+    CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{0, 0, 0}));
+    CHECK(arma::all(L.rx.i_antenna == arma::u32_vec{0, 1}));
+    CHECK(L.is_valid() == "");
+    REQUIRE(L.antenna.size() == 1);
+    REQUIRE(L.antenna[0].size() == 1); // One array for all bands
+    CHECK(qd_layout_diff_array(L.antenna[0][0], file[1]) == "");
+
+    // The same antenna as the array form, and the same channels
+    quadriga_lib::layout M = qd_layout_build();
+    M.center_freq = L.center_freq;
+    quadriga_lib::set_antenna(M, file[1], true, {1});
+    for (quadriga_lib::layout *X : {&L, &M})
+    {
+        X->tx.scenario = {"UMa", "UMa", "UMa"};
+        X->tx.scenpar_override["NumClusters"] = {5.0, 5.0, 5.0};
+        X->tx.scenpar_override["NumSubPaths"] = {4.0, 4.0, 4.0};
+        X->tx.scenpar_override["NumClusters_min"] = {0.0, 0.0, 0.0};
+        X->rx.indoor = {0, 0, 0, 0};
+        X->seed = 4711;
+    }
+    const auto cL = quadriga_lib::get_channels_layout(L), cM = quadriga_lib::get_channels_layout(M);
+    REQUIRE(cL.size() == cM.size());
+    for (size_t c = 0; c < cL.size(); ++c)
+    {
+        REQUIRE(cL[c].coeff_re.size() == cM[c].coeff_re.size());
+        for (size_t s = 0; s < cL[c].coeff_re.size(); ++s)
+        {
+            CHECK(arma::approx_equal(cL[c].coeff_re[s], cM[c].coeff_re[s], "absdiff", 0.0));
+            CHECK(arma::approx_equal(cL[c].coeff_im[s], cM[c].coeff_im[s], "absdiff", 0.0));
+        }
+    }
+
+    // The writer refers to the file, relative to the CSV file, and exports nothing
+    quadriga_lib::layout_csv_write(dir.path("out/tx.csv"), dir.path("out/rx.csv"), L);
+    CHECK(qd_layout_folder(dir.path("out")) == std::vector<std::string>{"rx.csv", "tx.csv"});
+    CHECK(has(dir.read("out/rx.csv"), ",qdant,../ant/meas.qdant,2\n"));
+    const quadriga_lib::layout L2 = quadriga_lib::layout_csv_read(dir.path("out/tx.csv"), dir.path("out/rx.csv"));
+    CHECK(L2.antenna_args == L.antenna_args);
+    CHECK(arma::all(L2.rx.i_antenna == arma::u32_vec{0, 1}));
+    REQUIRE(L2.antenna.size() == 1);
+    REQUIRE(L2.antenna[0].size() == 1);
+    CHECK(qd_layout_diff_array(L2.antenna[0][0], file[1]) == "");
+}
+
+TEST_CASE("set_antenna_qdant - a per-band call copies a shared antenna")
+{
+    qd_layout_files dir("set_antenna_qdant_band");
+    const ant_t A = measured(50.0, 0.5), B = measured(30.0, 0.25);
+    quadriga_lib::qdant_write(dir.path("meas.qdant"), std::vector<ant_t>{A, B});
+    const std::vector<ant_t> file = quadriga_lib::qdant_read<double>(dir.path("meas.qdant"));
+    const std::string F = abs_path(dir.path("meas.qdant"));
+
+    quadriga_lib::layout L = qd_layout_build();
+    L.center_freq = {3.5e9, 28e9};
+    quadriga_lib::set_antenna_qdant(L, dir.path("meas.qdant")); // Entry 1, all Tx nodes, all bands
+    quadriga_lib::set_antenna_qdant(L, dir.path("meas.qdant"), 2, false, {0}, 28e9);
+    CHECK(L.antenna_cols == std::vector<std::string>{"center_freq", "antenna", "qdant_file", "qdant_id"});
+    CHECK(L.antenna_args == std::vector<std::vector<std::string>>{{"3500000000,qdant," + F + ",1", "28000000000,qdant," + F + ",2"}, {",qdant," + F + ",1"}});
+    CHECK(arma::all(L.tx.i_antenna == arma::u32_vec{1, 2, 2}));
+    CHECK(L.is_valid() == "");
+    REQUIRE(L.antenna.size() == 2);
+    REQUIRE(L.antenna[0].size() == 2);
+    CHECK(qd_layout_diff_array(L.antenna[0][0], file[0]) == "");
+    CHECK(qd_layout_diff_array(L.antenna[0][1], file[1]) == "");
+    REQUIRE(L.antenna[1].size() == 1);
+    CHECK(qd_layout_diff_array(L.antenna[1][0], file[0]) == "");
+
+    // A band of a node without antenna: the other band is not set yet
+    quadriga_lib::set_antenna_qdant(L, dir.path("meas.qdant"), 2, true, {0}, 3.5e9);
+    CHECK(L.antenna_args[2] == std::vector<std::string>{"3500000000,qdant," + F + ",2", "28000000000,,,"});
+    CHECK(has(L.is_valid(), "Node 'UT1' (sector 0)"));
+}
+
+TEST_CASE("set_antenna_qdant - input validation")
+{
+    qd_layout_files dir("set_antenna_qdant_input");
+    quadriga_lib::qdant_write(dir.path("meas.qdant"), std::vector<ant_t>{measured(50.0, 0.5), measured(30.0, 0.25)});
+    const quadriga_lib::layout base = qd_layout_build();
+    quadriga_lib::layout L = base;
+    REQUIRE(qd_layout_throws([&] { quadriga_lib::set_antenna_qdant(L, dir.path("meas.qdant"), 2, true, {1}, 2e9); }).empty());
+    auto msg = [&](const std::string &fn, arma::uword id, bool rx = false, const quadriga_lib::uint_list &i = {}, double f = NAN, bool eval = true)
+    {
+        quadriga_lib::layout M = base;
+        const std::string m = qd_layout_throws([&] { quadriga_lib::set_antenna_qdant(M, fn, id, rx, i, f, eval); });
+        CHECK(qd_layout_diff(M, base) == ""); // A failed call leaves the layout as it was
+        CHECK(M.antenna.empty());
+        return m;
+    };
+    CHECK(has(msg("", 1), "Input 'qdant_file' must not be empty."));
+    CHECK(msg(dir.path("none.qdant"), 1) == "QDANT file '" + dir.path("none.qdant") + "' does not exist or is not a file.");
+    CHECK(has(msg(dir.path("none.qdant"), 1, false, {}, NAN, false), "does not exist"));
+    CHECK(has(msg(dir.dir, 1), "is not a file"));
+    // File access is a std::runtime_error, a wrong argument a std::invalid_argument
+    quadriga_lib::layout P = base;
+    CHECK_THROWS_AS(quadriga_lib::set_antenna_qdant(P, dir.path("none.qdant")), std::runtime_error);
+    CHECK_THROWS_AS(quadriga_lib::set_antenna_qdant(P, dir.path("meas.qdant"), 0), std::invalid_argument);
+    CHECK(has(msg(dir.path("meas.qdant"), 0), "Input 'qdant_id'"));
+    CHECK(has(msg(dir.path("meas.qdant"), 3), "QDANT file '" + abs_path(dir.path("meas.qdant")) + "'"));
+    CHECK(has(msg(dir.path("meas.qdant"), 1, true, {2}), "Input 'i_node'"));
+    CHECK(has(msg(dir.path("meas.qdant"), 1, false, {}, -1.0), "Input 'center_freq'"));
+
+    // Without evaluation, an entry that the file does not have throws when the antennas are evaluated
+    quadriga_lib::layout N = base;
+    REQUIRE(qd_layout_throws([&] { quadriga_lib::set_antenna_qdant(N, dir.path("meas.qdant"), 3, true, {}, NAN, false); }).empty());
+    CHECK(N.antenna_args.size() == 1);
+    CHECK(has(qd_layout_throws([&] { N.eval_antennas(); }), "QDANT file"));
 }

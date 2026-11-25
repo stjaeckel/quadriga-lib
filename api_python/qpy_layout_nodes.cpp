@@ -46,6 +46,7 @@ layout = qd.layout.set_antenna( layout, "3GPP", {"panel": [4, 4, 1, 2], "pol": 3
 
 ## See also:
 - [[set_antenna_array]] (sets an evaluated array)
+- [[set_antenna_qdant]] (sets an entry of a QDANT file)
 - [[generate_antenna]] (the meaning of the arguments)
 - [[layout.csv_write]] (writes the lines and exports the arrays)
 MD!*/
@@ -112,6 +113,61 @@ py::dict set_antenna_array(const py::dict &layout_in,
     const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
 
     quadriga_lib::set_antenna(lay, array_a, qd_python_flag(rx_side, false, "rx_side"), i_node_a, center_freq);
+    return qd_python_layout2dict(lay);
+}
+
+/*!MD
+# set_antenna_qdant
+Set the antenna of layout nodes to an entry of a QDANT file
+
+- Stores a `qdant` antenna line with the file as normalised absolute path and the entry `qdant_id`, as [[layout.csv_read]] composes it from the columns `antenna`, `qdant_file` and `qdant_id`; [[layout.csv_write]] writes this line with the path relative to the CSV file and exports no copy of the array
+- The array is read as stored, for all bands; bands, the sharing of entries and the renumbering of `i_antenna` follow [[set_antenna]]
+- A missing or unreadable file raises an error; without evaluation, an entry that the file does not have raises an error when the antennas are evaluated
+- The C++ in/out argument `layout` is split into `layout_in` / `layout_out`, so that the input stays unchanged
+
+## Usage:
+```
+layout_out = quadriga_lib.layout.set_antenna_qdant( layout_in, qdant_file, qdant_id, *, rx_side, i_node, center_freq, evaluate )
+```
+
+## Inputs:
+- **`layout_in`** — Layout dict, keys in [[layout.csv_read]]; its antenna lists must fit its nodes and frequencies
+- **`qdant_file`** — str or path; existing QDANT file, absolute or relative to the current folder
+- **`qdant_id`** — int; 1-based entry of the file; default: 1
+- **`rx_side`** — `False`: nodes of `layout_in["tx"]`; `True`: nodes of `layout_in["rx"]`; default: `False`
+- **`i_node`** — Indices of the nodes of that side, 0-based; int or `(n,)`; `None` = all nodes of the side; default: `None`
+- **`center_freq`** — Band in [Hz], positive; NaN = one antenna for all bands; default: NaN
+- **`evaluate`** — `True`: generate all antennas of the layout that are not evaluated yet; `False`: none; default: `True`
+
+## Outputs:
+- **`layout_out`** — The layout with the new antenna lists and `i_antenna`
+
+## Example:
+```
+import quadriga_lib as qd
+layout, _, _ = qd.layout.csv_read( "tx.csv", "rx.csv" )
+layout = qd.layout.set_antenna_qdant( layout, "measured/handset.qdant", 2, rx_side=True )
+```
+
+## See also:
+- [[set_antenna]] (sets the antenna from the arguments of generate_antenna)
+- [[set_antenna_array]] (sets an evaluated array)
+- [[qdant_read]] (reads the entries of a QDANT file)
+MD!*/
+py::dict set_antenna_qdant(const py::dict &layout_in,
+                           py::handle qdant_file,
+                           arma::uword qdant_id,
+                           py::handle rx_side,
+                           py::handle i_node,
+                           double center_freq,
+                           py::handle evaluate)
+{
+    auto lay = qd_python_dict2layout(layout_in, false, "layout_in");
+    const std::string fn = qd_python_path(qdant_file, "qdant_file");
+    const auto i_node_a = qd_python_numpy2arma_Col<arma::uword>(i_node, true, false, "i_node");
+
+    quadriga_lib::set_antenna_qdant(lay, fn, qdant_id, qd_python_flag(rx_side, false, "rx_side"), i_node_a, center_freq,
+                                    qd_python_flag(evaluate, true, "evaluate"));
     return qd_python_layout2dict(lay);
 }
 
