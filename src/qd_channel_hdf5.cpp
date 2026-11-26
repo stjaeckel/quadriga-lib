@@ -23,20 +23,23 @@
 
 namespace h5 = qd::hdf5;
 
+// Length of the name of the group "par" of the unstructured datasets; a channel group keeps room for its link
+static constexpr size_t qHDF_par_name_length = 3;
+
 /*!SECTION
 Channel data and processing
 SECTION!*/
 
 // Internal helpers
-// - Channel files are HDF5 files of the format version 3 (dataset 'Version' = 3), written and read with the HDF5
-//   subset of qd_hdf5.hpp. This file holds the schema: the root datasets 'ChannelDims' (layout {nx, ny, nz, nw}),
-//   'Order' (channel ID per slot, 0 = empty) and 'ChannelRef' (object reference per slot to the channel group, 0 =
+// - Channel files are HDF5 files of the format version 4 (dataset 'version' = 4), written and read with the HDF5
+//   subset of qd_hdf5.hpp. This file holds the schema: the root datasets 'layout' (layout {nx, ny, nz, nw}),
+//   'channel_id' (channel ID per slot, 0 = empty) and 'channel_ref' (object reference per slot to the channel group, 0 =
 //   empty), one group 'channel_<id>' per written slot with ten attributes, the datasets of the structured data
-//   (directly in the channel group for one snapshot, in groups 'Snap_<i>' otherwise), and the group 'Data' for the
+//   (directly in the channel group for one snapshot, in groups 'snap_<i>' otherwise), and the group 'par' for the
 //   unstructured datasets in creation order.
-// - Readers locate a slot through 'ChannelRef' only. Writers append all new objects of a call as one block at the
+// - Readers locate a slot through 'channel_ref' only. Writers append all new objects of a call as one block at the
 //   end-of-file address and then update the file in place, in this order: superblock (new end of file), the root
-//   link of the new channel group, 'ChannelRef' and 'Order' of the slot, and (overwrite) the removal of the old link.
+//   link of the new channel group, 'channel_ref' and 'channel_id' of the slot, and (overwrite) the removal of the old link.
 //   Every intermediate state is a valid file. All inputs and all file structures a writer needs are checked before
 //   the first byte is written.
 // - Problems with the file (missing, cannot be opened, malformed, unsupported, failing writes) give std::runtime_error.
@@ -93,7 +96,7 @@ struct qHDF_file
     uint64_t eof = 0;                                     // End-of-file address of the superblock
     unsigned dims[4] = {0, 0, 0, 0};                      // Storage layout {nx, ny, nz, nw}
     uint64_t n_slot = 0;                                  // nx * ny * nz * nw
-    uint64_t dims_addr = 0, order_addr = 0, ref_addr = 0; // Data of 'ChannelDims', 'Order', 'ChannelRef'
+    uint64_t dims_addr = 0, order_addr = 0, ref_addr = 0; // Data of 'layout', 'channel_id', 'channel_ref'
     std::vector<std::pair<uint64_t, uint64_t>> index;     // Address and length of these three data ranges
     uint64_t bytes_read = 0;                              // Header and raw bytes read for the channel; at most 'eof'
 };
@@ -113,7 +116,7 @@ static void qHDF_check_chunks(const qHDF_file &h, const std::vector<std::pair<ui
                 h5::malformed("the storage index overlaps the object header at address " + std::to_string(c.first));
 }
 
-// Open a channel file: superblock, root chunk 0 with the links 'ChannelDims', 'Order', 'Version', 'ChannelRef' (each
+// Open a channel file: superblock, root chunk 0 with the links 'layout', 'channel_id', 'version', 'channel_ref' (each
 // exactly once), the version, and the storage index. With 'update', the file is opened for writing and the root
 // chunk must have exactly the structure written by the library (other links in the root would be lost). Returns
 // false if the file does not exist.
@@ -129,7 +132,7 @@ static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const ch
     h.eof = sb.eof;
     h.root = h5::read_chunk(h.f, sb.root, 0, h.eof);
 
-    const char *const names[4] = {"ChannelDims", "Order", "Version", "ChannelRef"};
+    const char *const names[4] = {"layout", "channel_id", "version", "channel_ref"};
     uint64_t target[4] = {0, 0, 0, 0};
     int count[4] = {0, 0, 0, 0};
     size_t position[4] = {0, 0, 0, 0}; // Message index of each link
@@ -171,14 +174,14 @@ static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const ch
 
     h5::dataset d = root_dataset(2);
     if (d.type != h5::uint32 || d.rank != 0)
-        h5::malformed("dataset 'Version' must be a scalar of type uint32");
+        h5::malformed("dataset 'version' must be a scalar of type uint32");
     uint8_t value[16];
     h5::read_raw(h.f, d, value);
-    if (h5::get_le(value, 4) != 3)
+    if (h5::get_le(value, 4) != 4)
         throw std::runtime_error("Unsupported channel file version " + std::to_string(h5::get_le(value, 4)) +
-                                 "; this version of quadriga-lib reads version 3 only.");
+                                 "; this version of quadriga-lib reads version 4 only.");
 
-    // Storage index: layout, then 'Order' and 'ChannelRef' with one contiguous entry per slot
+    // Storage index: layout, then 'channel_id' and 'channel_ref' with one contiguous entry per slot
     const std::runtime_error corrupted("Storage index in HDF file is corrupted.");
     d = root_dataset(0);
     if (d.type != h5::uint32 || d.rank != 1 || d.dims[0] != 4 || d.compact)
@@ -221,7 +224,7 @@ static long long qHDF_slot(const qHDF_file &h, unsigned ix, unsigned iy, unsigne
     return (long long)((((uint64_t)iw * h.dims[2] + iz) * h.dims[1] + iy) * h.dims[0] + ix);
 }
 
-// Address of the channel group of a slot ('ChannelRef'); 0 if the slot is empty or outside the layout
+// Address of the channel group of a slot ('channel_ref'); 0 if the slot is empty or outside the layout
 static uint64_t qHDF_channel_ref(qHDF_file &h, long long slot)
 {
     if (slot < 0)
@@ -287,7 +290,7 @@ static std::vector<const h5::link *> qHDF_creation_order(const h5::group &g)
     return links;
 }
 
-// The group 'Data' of the channel at a slot; false if the slot is empty or outside the layout or has no 'Data'
+// The group 'par' of the channel at a slot; false if the slot is empty or outside the layout or has no 'par'
 static bool qHDF_read_data_group(qHDF_file &h, unsigned ix, unsigned iy, unsigned iz, unsigned iw, qHDF_group &data)
 {
     const uint64_t ref = qHDF_channel_ref(h, qHDF_slot(h, ix, iy, iz, iw));
@@ -295,7 +298,7 @@ static bool qHDF_read_data_group(qHDF_file &h, unsigned ix, unsigned iy, unsigne
         return false;
     qHDF_group channel;
     qHDF_read_group(h, ref, channel);
-    const h5::link *l = channel.g.find("Data");
+    const h5::link *l = channel.g.find("par");
     if (l == nullptr)
         return false;
     qHDF_read_group(h, l->target, data);
@@ -376,15 +379,15 @@ struct qHDF_channel_attributes
                             {0.0f, 0.0f, 0.0f},      // tx_orientation
                             {0.0f, 0.0f, 0.0f}};     // rx_orientation
     char name[256] = {};                             // At most 255 bytes, NUL-terminated and NUL-padded
-    long long num_path = -1;                         // 'NumPath' of a one-snapshot channel with snapshot data
+    long long num_path = -1;                         // 'n_path' of a one-snapshot channel with snapshot data
 };
 
 using qHDF_links = std::vector<std::pair<std::string_view, uint64_t>>;
 
 // Names of the position and orientation attributes and datasets, in the order of qHDF_channel_attributes::position
-static const char *const qHDF_position_names[4] = {"tx_position", "rx_position", "tx_orientation", "rx_orientation"};
+static const char *const qHDF_position_names[4] = {"tx_pos", "rx_pos", "tx_orientation", "rx_orientation"};
 
-// Emit a group 'Data': the links to the unstructured datasets with the creation order 0, 1, ...
+// Emit a group 'par': the links to the unstructured datasets with the creation order 0, 1, ...
 static uint64_t qHDF_emit_data_group(h5::output &out, h5::header &hdr, const qHDF_links &links)
 {
     hdr.clear();
@@ -444,8 +447,8 @@ static inline void qHDF_write_patch(qHDF_file &h, const h5::patch &p)
     h.f.write(p.addr, p.bytes.data(), p.bytes.size());
 }
 
-// Emit the header of a channel group: link info, group info, the attributes, then the links ('Data' last if
-// 'data_addr' is not 0). Without 'Data', the header keeps room for the 'Data' link (hdf5_write_dset adds it later).
+// Emit the header of a channel group: link info, group info, the attributes, then the links ('par' last if
+// 'data_addr' is not 0). Without 'par', the header keeps room for the 'par' link (hdf5_write_dset adds it later).
 static uint64_t qHDF_emit_channel_group(h5::output &out, h5::header &hdr, const qHDF_channel_attributes &a,
                                         const qHDF_links &links, uint64_t data_addr)
 {
@@ -453,30 +456,30 @@ static uint64_t qHDF_emit_channel_group(h5::output &out, h5::header &hdr, const 
     hdr.clear();
     hdr.link_info(false);
     hdr.group_info();
-    hdr.attribute("NumSnap", h5::uint32, 0, nullptr, &a.n_snap);
-    hdr.attribute("NumTx", h5::uint32, 0, nullptr, &a.n_tx);
-    hdr.attribute("NumRx", h5::uint32, 0, nullptr, &a.n_rx);
-    hdr.attribute("Initial_position", h5::int32, 0, nullptr, &a.initial_position);
-    hdr.attribute("CenterFrequency", h5::float32, 0, nullptr, &a.center_freq);
+    hdr.attribute("n_snap", h5::uint32, 0, nullptr, &a.n_snap);
+    hdr.attribute("n_tx", h5::uint32, 0, nullptr, &a.n_tx);
+    hdr.attribute("n_rx", h5::uint32, 0, nullptr, &a.n_rx);
+    hdr.attribute("initial_position", h5::int32, 0, nullptr, &a.initial_position);
+    hdr.attribute("center_freq", h5::float32, 0, nullptr, &a.center_freq);
     for (int k = 0; k < 4; ++k)
         hdr.attribute(qHDF_position_names[k], h5::float32, 1, &three, a.position[k]);
-    hdr.attribute("Name", h5::string_type(256), 0, nullptr, a.name);
+    hdr.attribute("name", h5::string_type(256), 0, nullptr, a.name);
     if (a.num_path >= 0)
     {
         const uint32_t num_path = (uint32_t)a.num_path;
-        hdr.attribute("NumPath", h5::uint32, 0, nullptr, &num_path);
+        hdr.attribute("n_path", h5::uint32, 0, nullptr, &num_path);
     }
     for (const auto &l : links)
         hdr.link(l.first, l.second);
     if (data_addr != 0)
-        hdr.link("Data", data_addr);
-    const uint64_t addr = hdr.emit(out.buf, out.base, data_addr != 0 ? 0 : h5::link_message_size(4, false));
+        hdr.link("par", data_addr);
+    const uint64_t addr = hdr.emit(out.buf, out.base, data_addr != 0 ? 0 : h5::link_message_size(qHDF_par_name_length, false));
     out.flush_if_full();
     return addr;
 }
 
 // Complete the block of a new channel and update the file: the root link chunks and the channel group (with ID 'id')
-// are appended to 'out'; then the block is written and the superblock, the root link, 'ChannelRef' and 'Order' of the
+// are appended to 'out'; then the block is written and the superblock, the root link, 'channel_ref' and 'channel_id' of the
 // slot, and the removal of the link to the old channel group 'old' (if not 0) follow in this order
 static void qHDF_commit_channel(qHDF_file &h, h5::root_links &root, h5::output &out, h5::header &hdr, long long slot,
                                 uint32_t id, uint64_t old, const qHDF_channel_attributes &a, const qHDF_links &links,
@@ -547,7 +550,7 @@ void quadriga_lib::hdf5_create_file(const std::string &fn, unsigned nx, unsigned
         throw std::runtime_error("Cannot create file '" + fn + "'. It may be open in another program.");
 
     // Root chunk 0 with the links to the root datasets and room for the directory of the root links; the datasets
-    // follow it: 'ChannelDims', 'Version', 'Order' (all slots empty), 'ChannelRef' (null references)
+    // follow it: 'layout', 'version', 'channel_id' (all slots empty), 'channel_ref' (null references)
     h5::header root;
     uint64_t addr[4] = {0, 0, 0, 0};
     auto build_root = [&]()
@@ -555,16 +558,16 @@ void quadriga_lib::hdf5_create_file(const std::string &fn, unsigned nx, unsigned
         root.clear();
         root.link_info(false);
         root.group_info();
-        root.link("ChannelDims", addr[0]);
-        root.link("Order", addr[1]);
-        root.link("Version", addr[2]);
-        root.link("ChannelRef", addr[3]);
+        root.link("layout", addr[0]);
+        root.link("channel_id", addr[1]);
+        root.link("version", addr[2]);
+        root.link("channel_ref", addr[3]);
     };
     const size_t directory = h5::root_directory_entries * h5::continuation_size;
     build_root();
 
     h5::output out(f, h5::superblock_size + root.size(directory));
-    const unsigned channel_dims[4] = {nx, ny, nz, nw}, version = 3;
+    const unsigned channel_dims[4] = {nx, ny, nz, nw}, version = 4;
     uint64_t extent = 4;
     addr[0] = h5::emit_dataset(out, h5::uint32, 1, &extent, (const uint8_t *)channel_dims, 16, true);
     addr[2] = h5::emit_dataset(out, h5::uint32, 0, nullptr, (const uint8_t *)&version, 4);
@@ -625,8 +628,8 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(const std::string &fn, arma::u32_ve
 
 // Emit the structured data of a channel (checked by channel::is_valid) and set the attribute values
 // - Snapshot data: a field is written for every snapshot if it has one entry per snapshot, also for snapshots without
-//   paths (datasets with extent 0). Several snapshots: the datasets of snapshot i, then its group 'Snap_<i>' with the
-//   attribute 'NumPath'. One snapshot: the datasets go into the channel group, 'NumPath' becomes a channel attribute.
+//   paths (datasets with extent 0). Several snapshots: the datasets of snapshot i, then its group 'snap_<i>' with the
+//   attribute 'n_path'. One snapshot: the datasets go into the channel group, 'n_path' becomes a channel attribute.
 // - Positions, orientations and center frequency: one value is an attribute, one value per snapshot a dataset (the
 //   attribute keeps its default then); empty or other sizes keep the default
 // - Single precision: double input is converted
@@ -690,17 +693,17 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
         if (write_path_length)
             col("path_length", ch->path_length[i]);
         if (write_path_polarization)
-            mat("path_polarization", ch->polmat[i]);
+            mat("polmat", ch->polmat[i]);
         if (write_path_angles)
             mat("path_angles", ch->path_angles[i]);
         if (write_path_fbs_pos)
-            mat("path_fbs_pos", ch->fbs_pos[i]);
+            mat("fbs_pos", ch->fbs_pos[i]);
         if (write_path_lbs_pos)
-            mat("path_lbs_pos", ch->lbs_pos[i]);
+            mat("lbs_pos", ch->lbs_pos[i]);
         if (write_no_interact)
         {
             const uint64_t n = ch->n_interact[i].n_elem;
-            dst.push_back({"no_interact", h5::emit_dataset(out, h5::uint32, 1, &n, ch->n_interact[i].memptr(), 4 * n)});
+            dst.push_back({"n_interact", h5::emit_dataset(out, h5::uint32, 1, &n, ch->n_interact[i].memptr(), 4 * n)});
         }
         if (write_interact_coord)
             mat("interact_coord", ch->interact_coord[i]);
@@ -721,18 +724,18 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
             hdr.clear();
             hdr.link_info(false);
             hdr.group_info();
-            hdr.attribute("NumPath", h5::uint32, 0, nullptr, &num_path);
+            hdr.attribute("n_path", h5::uint32, 0, nullptr, &num_path);
             for (const auto &l : snap_links)
                 hdr.link(l.first, l.second);
             snap_addr.push_back(hdr.emit(out.buf, out.base, 0));
             out.flush_if_full();
-            snap_names.push_back("Snap_" + std::to_string(i));
+            snap_names.push_back("snap_" + std::to_string(i));
         }
     }
 
     // Values per snapshot
     if (n_snap > 1 && ch->center_freq.n_elem == n_snap)
-        links.push_back({"CenterFrequency", f32(1, n_snap, 1, 1, ch->center_freq.memptr())});
+        links.push_back({"center_freq", f32(1, n_snap, 1, 1, ch->center_freq.memptr())});
     for (int k = 0; k < 4; ++k)
         if (n_snap > 1 && positions[k]->n_rows == 3 && positions[k]->n_cols == n_snap)
             links.push_back({qHDF_position_names[k], f32(2, n_snap, 3, 1, positions[k]->memptr())});
@@ -857,7 +860,7 @@ static int qHDF_write_slot(const std::string &fn, const quadriga_lib::channel<dt
     const uint32_t id = qHDF_new_channel_id(root);
 
     // The new channel is written as one block at the end of the file: structured data, unstructured data and their
-    // group 'Data', the root link chunks, and the channel group
+    // group 'par', the root link chunks, and the channel group
     h5::output out(h.f, h.eof);
     h5::header hdr;
     qHDF_channel_attributes a;
@@ -1051,14 +1054,14 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
     };
 
     // Channel name (the bytes before the first NUL), number of snapshots, index of the reference position
-    if (const h5::attribute *a = g.find_attribute("Name"))
+    if (const h5::attribute *a = g.find_attribute("name"))
     {
         if (a->type != h5::string_type(256) || a->n_elem != 1)
-            h5::malformed("attribute 'Name' must be a fixed-length string of 256 bytes");
+            h5::malformed("attribute 'name' must be a fixed-length string of 256 bytes");
         c.name.assign((const char *)a->value, (size_t)(std::find(a->value, a->value + 256, 0) - a->value));
     }
-    const uint32_t n_snapshots = read_u32(g, "NumSnap", true);
-    if (const uint8_t *v = attribute(g, "Initial_position", h5::int32, 1, false))
+    const uint32_t n_snapshots = read_u32(g, "n_snap", true);
+    if (const uint8_t *v = attribute(g, "initial_position", h5::int32, 1, false))
         c.initial_position = (int)(int32_t)h5::get_le(v, 4);
     if (n_snapshots == 0) // Nothing to select: the slot keeps its unstructured data
         select = false;
@@ -1066,8 +1069,8 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         throw std::invalid_argument("Input 'i_snap' contains indices that exceed the number of snapshots (" +
                                     std::to_string(n_snapshots) + ").");
 
-    // Unstructured data: the datasets 'par_*' of the group 'Data' in creation order
-    if (const h5::link *data = g.find("Data"))
+    // Unstructured data: the datasets 'par_*' of the group 'par' in creation order
+    if (const h5::link *data = g.find("par"))
     {
         qHDF_group data_group;
         qHDF_read_group(h, data->target, data_group);
@@ -1082,7 +1085,7 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         return c;
 
     // Number of transmitters and receivers: sizes of the coefficient datasets
-    const uint32_t n_tx = read_u32(g, "NumTx", true), n_rx = read_u32(g, "NumRx", true);
+    const uint32_t n_tx = read_u32(g, "n_tx", true), n_rx = read_u32(g, "n_rx", true);
     const uint64_t n_snap = n_snapshots;
 
     // Dataset of a group with the element type 't' and the extents 'expected' (slowest first; h5::undef: not checked);
@@ -1132,12 +1135,12 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
     };
 
     // Center frequency in [Hz]: dataset of length [n_snap] or scalar attribute (NaN = not set, read back empty)
-    if (find_dataset(g, "CenterFrequency", h5::float32, {n_snap}))
+    if (find_dataset(g, "center_freq", h5::float32, {n_snap}))
     {
         c.center_freq.set_size((arma::uword)n_snap);
         read_float(c.center_freq.memptr());
     }
-    else if (const uint8_t *v = attribute(g, "CenterFrequency", h5::float32, 1, false))
+    else if (const uint8_t *v = attribute(g, "center_freq", h5::float32, 1, false))
     {
         float value;
         std::memcpy(&value, v, 4);
@@ -1161,8 +1164,8 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
             value.at(0) = (dtype)data[0], value.at(1) = (dtype)data[1], value.at(2) = (dtype)data[2];
         }
     };
-    read_position("tx_position", c.tx_pos, true);
-    read_position("rx_position", c.rx_pos, true);
+    read_position("tx_pos", c.tx_pos, true);
+    read_position("rx_pos", c.rx_pos, true);
     read_position("tx_orientation", c.tx_orientation, false);
     read_position("rx_orientation", c.rx_orientation, false);
 
@@ -1183,14 +1186,14 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
                 pos.push_back((size_t)(std::lower_bound(sel.begin(), sel.end(), k) - sel.begin()));
     }
 
-    // Snapshot data: in the channel group for one snapshot; otherwise in the groups 'Snap_0' ... 'Snap_<n_snap - 1>'
+    // Snapshot data: in the channel group for one snapshot; otherwise in the groups 'snap_0' ... 'snap_<n_snap - 1>'
     // (all of them or none). The links are collected (their number is bounded by the file) and sorted by index: with
     // n_snap links of indices below n_snap, the sorted indices are 0, 1, ... unless one is linked twice.
     std::vector<std::pair<uint64_t, uint64_t>> snaps; // Snapshot index and group address
     if (n_snap > 1)
     {
         for (const h5::link &l : g.links)
-            if (l.name.compare(0, 5, "Snap_") == 0)
+            if (l.name.compare(0, 5, "snap_") == 0)
             {
                 const long long i = h5::parse_decimal(l.name.substr(5));
                 if (i < 0 || (uint64_t)i >= n_snap)
@@ -1202,11 +1205,11 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         std::sort(snaps.begin(), snaps.end());
         for (size_t i = 0; i < snaps.size(); ++i)
             if (snaps[i].first != i)
-                h5::malformed("snapshot group 'Snap_" + std::to_string(snaps[i].first) + "' is linked twice");
+                h5::malformed("snapshot group 'snap_" + std::to_string(snaps[i].first) + "' is linked twice");
     }
 
-    const char *const fields[11] = {"coeff_re", "coeff_im", "delay", "path_gain", "path_length", "path_polarization",
-                                    "path_angles", "path_fbs_pos", "path_lbs_pos", "no_interact", "interact_coord"};
+    const char *const fields[11] = {"coeff_re", "coeff_im", "delay", "path_gain", "path_length", "polmat",
+                                    "path_angles", "fbs_pos", "lbs_pos", "n_interact", "interact_coord"};
     const size_t n_read = n_snap == 1 ? 1 : (snaps.empty() ? 0 : (select ? (size_t)sel.n_elem : snaps.size()));
     const auto snap_index = [&](size_t s) { return select ? (uint64_t)sel[s] : (uint64_t)s; };
     unsigned present_in_first = 0;
@@ -1228,13 +1231,13 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         if (s == 0)
             present_in_first = present;
         else if (present != present_in_first)
-            h5::malformed("snapshot group 'Snap_" + std::to_string(snap_index(s)) + "' has other datasets than 'Snap_" +
+            h5::malformed("snapshot group 'snap_" + std::to_string(snap_index(s)) + "' has other datasets than 'snap_" +
                           std::to_string(snap_index(0)) + "'");
         if (((present & 1u) != 0) != ((present & 2u) != 0))
             h5::malformed("datasets 'coeff_re' and 'coeff_im' must both be present");
 
         // Number of paths (missing if the snapshot holds no path data)
-        const uint64_t np = read_u32(*sg, "NumPath", false);
+        const uint64_t np = read_u32(*sg, "n_path", false);
         const arma::uword n_path = (arma::uword)np;
 
         // Channel coefficients, tensors of size [n_rx, n_tx, n_path]
@@ -1267,7 +1270,7 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         }
 
         // Polarization transfer function [8, n_path], angles [n_path, 4], scatterer positions [3, n_path]
-        if (find_dataset(*sg, "path_polarization", h5::float32, {np, 8}))
+        if (find_dataset(*sg, "polmat", h5::float32, {np, 8}))
         {
             c.polmat.emplace_back(8, n_path, arma::fill::none);
             read_float(c.polmat.back().memptr());
@@ -1277,19 +1280,19 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
             c.path_angles.emplace_back(n_path, 4, arma::fill::none);
             read_float(c.path_angles.back().memptr());
         }
-        if (find_dataset(*sg, "path_fbs_pos", h5::float32, {np, 3}))
+        if (find_dataset(*sg, "fbs_pos", h5::float32, {np, 3}))
         {
             c.fbs_pos.emplace_back(3, n_path, arma::fill::none);
             read_float(c.fbs_pos.back().memptr());
         }
-        if (find_dataset(*sg, "path_lbs_pos", h5::float32, {np, 3}))
+        if (find_dataset(*sg, "lbs_pos", h5::float32, {np, 3}))
         {
             c.lbs_pos.emplace_back(3, n_path, arma::fill::none);
             read_float(c.lbs_pos.back().memptr());
         }
 
         // Number of interaction points of a path with the environment, 0 = LOS, and their coordinates [3, sum]
-        if (find_dataset(*sg, "no_interact", h5::uint32, {np}))
+        if (find_dataset(*sg, "n_interact", h5::uint32, {np}))
         {
             arma::u32_vec n_interact(n_path, arma::fill::none);
             h5::read_raw(h.f, d, n_interact.memptr());
@@ -1600,7 +1603,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
     const uint64_t ref = qHDF_channel_ref(h, slot);
     h5::header hdr;
 
-    // Empty slot: a new channel group with the default attributes and a group 'Data' holding the dataset
+    // Empty slot: a new channel group with the default attributes and a group 'par' holding the dataset
     if (ref == 0)
     {
         h5::root_links root("channel_");
@@ -1614,12 +1617,12 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
         return;
     }
 
-    // Filled slot: the dataset is linked into the existing group 'Data', or into a new one that is linked into the
-    // channel group; 'Order' and 'ChannelRef' are unchanged
+    // Filled slot: the dataset is linked into the existing group 'par', or into a new one that is linked into the
+    // channel group; 'channel_id' and 'channel_ref' are unchanged
     h5::chain_links channel, data_group;
     channel.load(h.f, ref, h.eof);
     qHDF_check_chunks(h, channel.ranges());
-    const h5::link *data_link = channel.find("Data");
+    const h5::link *data_link = channel.find("par");
     if (data_link != nullptr)
     {
         data_group.load(h.f, data_link->target, h.eof);
@@ -1629,7 +1632,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
         data_group.check_insert(dset_name.size(), true);
     }
     else
-        channel.check_insert(4, false);
+        channel.check_insert(qHDF_par_name_length, false);
 
     h5::output out(h.f, h.eof);
     const uint64_t dset_addr = qHDF_emit_par(out, &data);
@@ -1637,7 +1640,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
     if (data_link != nullptr)
         patches = data_group.prepare_insert(dset_name, dset_addr, true, out.buf, out.base);
     else
-        patches = channel.prepare_insert("Data", qHDF_emit_data_group(out, hdr, {{dset_name, dset_addr}}), false, out.buf, out.base);
+        patches = channel.prepare_insert("par", qHDF_emit_data_group(out, hdr, {{dset_name, dset_addr}}), false, out.buf, out.base);
     out.flush();
     qHDF_write_superblock(h, out.addr());
     for (const h5::patch &p : patches)

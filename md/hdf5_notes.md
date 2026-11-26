@@ -1,5 +1,7 @@
 # HDF5 channel files without libhdf5 (file format version 3)
 
+**Version 4** renamed the objects to the names of the channel members and kept the structure: root `ChannelDims`, `Order`, `Version`, `ChannelRef` became `layout`, `channel_id`, `version`, `channel_ref`; `Data` became `par`, `Snap_<i>` `snap_<i>`; the attributes `Name`, `NumSnap`, `NumTx`, `NumRx`, `NumPath`, `Initial_position`, `CenterFrequency`, `tx_position`, `rx_position` became `name`, `n_snap`, `n_tx`, `n_rx`, `n_path`, `initial_position`, `center_freq`, `tx_pos`, `rx_pos`; the datasets `path_polarization`, `path_fbs_pos`, `path_lbs_pos`, `no_interact` became `polmat`, `fbs_pos`, `lbs_pos`, `n_interact`. Version 3 was never released; its files are rejected as unsupported. The rest of these notes describes version 3 with its names; the format page (`docs_builder/content/formats/hdf5_channel.md`) has the current tree.
+
 Maintainer notes on the native HDF5 I/O of quadriga-lib: what changed against quadriga-lib 0.12.4 (commit `83da42a1`, file format version 2, libhdf5), why, how the format and the code work, and what was measured. State: commit `c57df85` on top of `b96ca3c` (implementation) and `cd76d45` (extended tests). The code is the reference: byte layouts and constants in `src/qd_hdf5.hpp`, the schema and the public functions in `src/qd_channel_hdf5.cpp`. Byte layouts follow the *HDF5 File Format Specification Version 3.0* (The HDF Group); section names below are from that document.
 
 ## 1. Summary

@@ -13,17 +13,17 @@
 // This file is compiled only if CMake finds an HDF5 installation (version 1.12 or newer); see CMakeLists.txt.
 //
 // Oracle: the tree derived from the channel objects by the storage rules of the channel file format.
-//   /                    datasets ChannelDims (uint32 [4]), Order (uint32 [n_slot], channel ID per slot, 0 = empty)
-//                        and Version (uint32 scalar, 2 or 3); version 3 adds ChannelRef (one object reference per
-//                        slot: the group of the slot, a null reference for an empty slot)
-//   /channel_<id>        attributes Name (fixed-length string of 256 bytes, NUL-terminated and NUL-padded), NumSnap,
-//                        NumTx, NumRx (uint32), Initial_position (int32), CenterFrequency (float), tx_position,
-//                        rx_position (float [3], NaN if not set), tx_orientation, rx_orientation (float [3], zeros
+//   /                    datasets layout (uint32 [4]), channel_id (uint32 [n_slot], channel ID per slot, 0 = empty),
+//                        version (uint32 scalar, 4) and channel_ref (one object reference per slot: the group of the
+//                        slot, a null reference for an empty slot)
+//   /channel_<id>        attributes name (fixed-length string of 256 bytes, NUL-terminated and NUL-padded), n_snap,
+//                        n_tx, n_rx (uint32), initial_position (int32), center_freq (float), tx_pos,
+//                        rx_pos (float [3], NaN if not set), tx_orientation, rx_orientation (float [3], zeros
 //                        if not set). A value per snapshot is a float dataset of the same name; the attribute keeps
 //                        its default then. A channel without structured data keeps all defaults (and no name).
-//   snapshot data        in the channel group (one snapshot) or in groups Snap_<i>: attribute NumPath (uint32) and
+//   snapshot data        in the channel group (one snapshot) or in groups snap_<i>: attribute n_path (uint32) and
 //                        float datasets coeff_re, coeff_im, delay, path_gain, ... and uint32 n_interact
-//   /channel_<id>/Data   unstructured datasets par_<name> in creation order: the element type of the written object,
+//   /channel_<id>/par    unstructured datasets par_<name> in creation order: the element type of the written object,
 //                        a scalar dataspace for scalars, rank 1 for vectors (arma::Row too), rank 2 for matrices,
 //                        rank 3 for cubes; strings as fixed-length strings (an empty string as one NUL byte)
 // Extents are given in HDF5 order (slowest dimension first): an Armadillo object [rows, cols, slices] has the
@@ -127,24 +127,24 @@ namespace
         const float nan3[3] = {NAN, NAN, NAN}, zero3[3] = {0.0f, 0.0f, 0.0f};
 
         auto &a = t.attributes[g];
-        a["Name"] = fixed_string(structured ? c.name : "", 256);
-        a["NumSnap"] = raw(H5T_STD_U32LE, {}, &n_snap, 1);
-        a["NumTx"] = raw(H5T_STD_U32LE, {}, &n_tx, 1);
-        a["NumRx"] = raw(H5T_STD_U32LE, {}, &n_rx, 1);
-        a["Initial_position"] = raw(H5T_STD_I32LE, {}, &initial_position, 1);
+        a["name"] = fixed_string(structured ? c.name : "", 256);
+        a["n_snap"] = raw(H5T_STD_U32LE, {}, &n_snap, 1);
+        a["n_tx"] = raw(H5T_STD_U32LE, {}, &n_tx, 1);
+        a["n_rx"] = raw(H5T_STD_U32LE, {}, &n_rx, 1);
+        a["initial_position"] = raw(H5T_STD_I32LE, {}, &initial_position, 1);
 
         // One value: attribute; one value per snapshot: dataset (the attribute keeps its default)
-        a["CenterFrequency"] = c.center_freq.n_elem == 1 ? as_float(c.center_freq, {}) : raw(H5T_IEEE_F32LE, {}, nan3, 1);
+        a["center_freq"] = c.center_freq.n_elem == 1 ? as_float(c.center_freq, {}) : raw(H5T_IEEE_F32LE, {}, nan3, 1);
         if (c.center_freq.n_elem > 1)
-            t.add_dataset(g + "/CenterFrequency", as_float(c.center_freq, {n_snap}));
+            t.add_dataset(g + "/center_freq", as_float(c.center_freq, {n_snap}));
         auto position = [&](const arma::Mat<dtype> &x, const char *name, const float *default_value)
         {
             a[name] = x.n_cols == 1 ? as_float(x, {3}) : raw(H5T_IEEE_F32LE, {3}, default_value, 3);
             if (x.n_cols > 1)
                 t.add_dataset(g + "/" + name, as_float(x, {x.n_cols, 3}));
         };
-        position(c.tx_pos, "tx_position", nan3);
-        position(c.rx_pos, "rx_position", nan3);
+        position(c.tx_pos, "tx_pos", nan3);
+        position(c.rx_pos, "rx_pos", nan3);
         position(c.tx_orientation, "tx_orientation", zero3);
         position(c.rx_orientation, "rx_orientation", zero3);
 
@@ -157,9 +157,9 @@ namespace
         const arma::uvec n_path = c.n_path();
         for (size_t s = 0; s < ns && has_snapshot_data; ++s)
         {
-            const std::string sg = ns == 1 ? g : g + "/Snap_" + std::to_string(s);
+            const std::string sg = ns == 1 ? g : g + "/snap_" + std::to_string(s);
             const unsigned np = (unsigned)n_path(s);
-            t.attributes[sg]["NumPath"] = raw(H5T_STD_U32LE, {}, &np, 1);
+            t.attributes[sg]["n_path"] = raw(H5T_STD_U32LE, {}, &np, 1);
 
             auto cube = [&](const std::vector<arma::Cube<dtype>> &x, const char *name)
             {
@@ -181,22 +181,22 @@ namespace
             cube(c.delay, "delay");
             col(c.path_gain, "path_gain");
             col(c.path_length, "path_length");
-            mat(c.polmat, "path_polarization");
+            mat(c.polmat, "polmat");
             mat(c.path_angles, "path_angles");
-            mat(c.fbs_pos, "path_fbs_pos");
-            mat(c.lbs_pos, "path_lbs_pos");
+            mat(c.fbs_pos, "fbs_pos");
+            mat(c.lbs_pos, "lbs_pos");
             if (c.n_interact.size() == ns)
-                t.add_dataset(sg + "/no_interact", raw(H5T_STD_U32LE, {np}, c.n_interact[s].memptr(), np));
+                t.add_dataset(sg + "/n_interact", raw(H5T_STD_U32LE, {np}, c.n_interact[s].memptr(), np));
             mat(c.interact_coord, "interact_coord");
         }
 
         if (!c.par_names.empty())
         {
-            t.attributes[g + "/Data"];
+            t.attributes[g + "/par"];
             for (size_t i = 0; i < c.par_names.size(); ++i)
             {
-                t.add_dataset(g + "/Data/par_" + c.par_names[i], par_value(c.par_data[i]));
-                t.creation_order[g + "/Data"].push_back("par_" + c.par_names[i]);
+                t.add_dataset(g + "/par/par_" + c.par_names[i], par_value(c.par_data[i]));
+                t.creation_order[g + "/par"].push_back("par_" + c.par_names[i]);
             }
         }
     }
@@ -206,11 +206,11 @@ namespace
     {
         tree t;
         t.attributes["/"];
-        t.add_dataset("/ChannelDims", raw(H5T_STD_U32LE, {4}, layout.data(), 4));
-        t.add_dataset("/Order", raw(H5T_STD_U32LE, {order.size()}, order.data(), order.size()));
-        t.add_dataset("/Version", raw(H5T_STD_U32LE, {}, &version, 1));
-        if (version == 3) // Data checked by dereferencing
-            t.add_dataset("/ChannelRef", {H5T_STD_REF_OBJ, {order.size()}, {}});
+        t.add_dataset("/layout", raw(H5T_STD_U32LE, {4}, layout.data(), 4));
+        t.add_dataset("/channel_id", raw(H5T_STD_U32LE, {order.size()}, order.data(), order.size()));
+        t.add_dataset("/version", raw(H5T_STD_U32LE, {}, &version, 1));
+        if (version == 4) // Data checked by dereferencing
+            t.add_dataset("/channel_ref", {H5T_STD_REF_OBJ, {order.size()}, {}});
         return t;
     }
 
@@ -353,11 +353,11 @@ namespace
         }
     }
 
-    // Version 3 only: ChannelRef holds the group of each slot, a null reference for an empty slot
+    // channel_ref holds the group of each slot, a null reference for an empty slot
     void check_channel_ref(const std::string &fn, const std::vector<unsigned> &order)
     {
         id_guard file{H5Fopen(fn.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose};
-        id_guard dset{H5Dopen2(file, "ChannelRef", H5P_DEFAULT), H5Dclose};
+        id_guard dset{H5Dopen2(file, "channel_ref", H5P_DEFAULT), H5Dclose};
         REQUIRE(dset >= 0);
         std::vector<hobj_ref_t> refs(order.size());
         REQUIRE(H5Dread(dset, H5T_STD_REF_OBJ, H5S_ALL, H5S_ALL, H5P_DEFAULT, refs.data()) >= 0);
@@ -381,7 +381,7 @@ namespace
         }
     }
 
-    // The file version (2 or 3) and, for version 3, the channel references; then the whole tree
+    // The file version (4) and the channel references; then the whole tree
     template <typename Build>
     void check_file_with_version(const std::string &fn, const std::vector<unsigned> &layout,
                                  const std::vector<unsigned> &order, Build add_channels)
@@ -389,15 +389,15 @@ namespace
         unsigned version = 0;
         {
             id_guard file{H5Fopen(fn.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose};
-            id_guard dset{H5Dopen2(file, "Version", H5P_DEFAULT), H5Dclose};
+            id_guard dset{H5Dopen2(file, "version", H5P_DEFAULT), H5Dclose};
             REQUIRE(dset >= 0);
             REQUIRE(H5Dread(dset, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &version) >= 0);
         }
-        CHECK((version == 2 || version == 3));
+        CHECK(version == 4);
         tree t = root_tree(layout, order, version);
         add_channels(t);
         check_file(fn, t);
-        if (version == 3)
+        if (version == 4)
             check_channel_ref(fn, order);
     }
 
@@ -721,7 +721,7 @@ TEST_CASE("hdf5_write_channel - the HDF5 C library reads every intermediate stat
     std::vector<std::pair<size_t, size_t>> data; // [begin, end)
     {
         id_guard file{H5Fopen(fn_b.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose};
-        for (const char *name : {"ChannelRef", "Order"})
+        for (const char *name : {"channel_ref", "channel_id"})
         {
             id_guard dset{H5Dopen2(file, name, H5P_DEFAULT), H5Dclose};
             const size_t offset = (size_t)H5Dget_offset(dset);
@@ -810,7 +810,7 @@ TEST_CASE("hdf5_write_channel - the HDF5 C library finds 8000 root links through
         order[s] = next_id++;
     }
 
-    std::set<std::string> expected = {"ChannelDims", "ChannelRef", "Order", "Version"};
+    std::set<std::string> expected = {"layout", "channel_ref", "channel_id", "version"};
     for (unsigned id : order)
         expected.insert("channel_" + std::to_string(id));
     {
@@ -916,7 +916,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
     {
         reference_file(fn);
         modify(fn, [](hid_t file)
-               { add_vlen_string(file, "/channel_3/Data/par_vlen"); });
+               { add_vlen_string(file, "/channel_3/par/par_vlen"); });
         CHECK(names_of(0, 1) == std::vector<std::string>({"note", "values", "vlen"}));
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "vlen", 0, 1), std::runtime_error);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0, 1), std::runtime_error);
@@ -927,7 +927,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
     {
         reference_file(fn);
         modify(fn, [](hid_t file)
-               { add_vlen_string(file, "/channel_1/Data/par_vlen"); });
+               { add_vlen_string(file, "/channel_1/par/par_vlen"); });
         check_rejected({{"hdf5_read_channel", [&]()
                                  { quadriga_lib::hdf5_read_channel<double>(fn, 0, 0); }},
                                 {"hdf5_read_dset", [&]()
@@ -953,7 +953,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
     {
         reference_file(fn);
         modify(fn, [](hid_t file)
-               { REQUIRE(H5Ldelete(file, "/channel_3/Data/par_note", H5P_DEFAULT) >= 0); });
+               { REQUIRE(H5Ldelete(file, "/channel_3/par/par_note", H5P_DEFAULT) >= 0); });
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0, 1).par_names == std::vector<std::string>({"values"}));
         CHECK(!quadriga_lib::hdf5_read_dset(fn, "note", 0, 1).has_value());
         CHECK(names_of(0, 1) == std::vector<std::string>({"values"}));
@@ -961,7 +961,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
         CHECK(names_of(0, 1) == std::vector<std::string>({"values", "x"}));
         CHECK(std::any_cast<double>(quadriga_lib::hdf5_read_dset(fn, "x", 0, 1)) == 1.0);
         CHECK(tree_walk(fn) > 0);
-        CHECK(links_by_creation_order(fn, "/channel_3/Data") == std::vector<std::string>({"par_values", "par_x"}));
+        CHECK(links_by_creation_order(fn, "/channel_3/par") == std::vector<std::string>({"par_values", "par_x"}));
     }
     SECTION("a file written by the HDF5 C library with default settings (superblock version 0)")
     {

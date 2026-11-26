@@ -225,7 +225,7 @@ MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a ne
 
 ## Changes on main
 
-The HDF5 channel files use file format version 3. Files of version 2 (written by quadriga-lib 0.12.4 and earlier) are rejected. Convert them once with:
+The HDF5 channel files use file format version 4. Files of version 2 (written by quadriga-lib 0.12.4 and earlier) are rejected. Convert them once with:
 
 ```bash
 python tools/hdf5_convert_v2.py old.hdf5 new.hdf5

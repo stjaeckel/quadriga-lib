@@ -198,7 +198,7 @@ namespace
         return h5::read_object(f, addr, sb.eof);
     }
 
-    // Address of the object at 'path' ("channel_1/Snap_0/delay"; "" = root group), found through the links
+    // Address of the object at 'path' ("channel_1/snap_0/delay"; "" = root group), found through the links
     uint64_t locate(const std::string &fn, const std::string &path)
     {
         h5::file f;
@@ -340,7 +340,7 @@ namespace
             }
         if (!parent.empty())
             return;
-        const auto ref = contiguous_data(fn, "ChannelRef");
+        const auto ref = contiguous_data(fn, "channel_ref");
         bytes entries = load(fn);
         for (uint64_t i = 0; i < ref.second; ++i)
             if (h5::get_le(&entries[ref.first + 8 * i], 8) == old)
@@ -625,7 +625,7 @@ TEST_CASE("hdf5 - files with the consistency flag or bytes after the end of file
         auto c = minimal_channel(7.0);
         CHECK(quadriga_lib::hdf5_write_channel(fn, c, 3) == 0);
         const uint64_t new_eof = eof_of(fn);
-        const uint64_t ref3 = h5::get_le(&load(fn)[contiguous_data(fn, "ChannelRef").first + 24], 8);
+        const uint64_t ref3 = h5::get_le(&load(fn)[contiguous_data(fn, "channel_ref").first + 24], 8);
         CHECK(ref3 > eof); // The block starts at the old end-of-file address
         CHECK(ref3 < new_eof);
         CHECK(load(fn).size() == eof + 4096); // The block was smaller than the garbage
@@ -644,7 +644,7 @@ TEST_CASE("hdf5 - a damaged version or storage index and bad channel references 
 
     auto set_version = [&](unsigned v)
     {
-        edit_messages(fn, "Version", 0, [&](std::vector<message> &m)
+        edit_messages(fn, "version", 0, [&](std::vector<message> &m)
                       { h5::put_le(&m[find(m, h5::msg_layout)].data[4], v, 4); });
     };
     auto set_dims = [&](std::vector<unsigned> dims)
@@ -652,13 +652,13 @@ TEST_CASE("hdf5 - a damaged version or storage index and bad channel references 
         bytes b(16);
         for (int i = 0; i < 4; ++i)
             h5::put_le(&b[4 * i], dims[i], 4);
-        put(fn, contiguous_data(fn, "ChannelDims").first, b);
+        put(fn, contiguous_data(fn, "layout").first, b);
     };
     auto set_channel_ref = [&](unsigned slot, uint64_t target)
     {
         bytes b(8);
         h5::put_le(b.data(), target, 8);
-        put(fn, contiguous_data(fn, "ChannelRef").first + 8 * slot, b);
+        put(fn, contiguous_data(fn, "channel_ref").first + 8 * slot, b);
     };
     // Functions that read the channel group of slot 2 throw; the others work
     auto check_slot2_rejected = [&]()
@@ -674,17 +674,17 @@ TEST_CASE("hdf5 - a damaged version or storage index and bad channel references 
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0).n_path()(0) == 50);
     };
 
-    SECTION("version 2 and 4")
+    SECTION("version 3 and 5")
     {
-        set_version(2);
-        check_all_throw(fn, calls, "Unsupported channel file version 2; this version of quadriga-lib reads version 3 only.");
-        set_version(4);
-        check_all_throw(fn, calls, "Unsupported channel file version 4; this version of quadriga-lib reads version 3 only.");
+        set_version(3);
+        check_all_throw(fn, calls, "Unsupported channel file version 3; this version of quadriga-lib reads version 4 only.");
+        set_version(5);
+        check_all_throw(fn, calls, "Unsupported channel file version 5; this version of quadriga-lib reads version 4 only.");
     }
-    SECTION("root link 'Version' removed")
+    SECTION("root link 'version' removed")
     {
         edit_messages(fn, "", 0, [](std::vector<message> &m)
-                      { m.erase(m.begin() + find(m, h5::msg_link, "Version")); });
+                      { m.erase(m.begin() + find(m, h5::msg_link, "version")); });
         check_all_throw(fn, calls, unsupported_message);
     }
     SECTION("ChannelDims {3, 1, 1, 1} with 4 slots")
@@ -704,17 +704,17 @@ TEST_CASE("hdf5 - a damaged version or storage index and bad channel references 
     }
     SECTION("Order data beyond the end of file")
     {
-        edit_messages(fn, "Order", 0, [&](std::vector<message> &m)
+        edit_messages(fn, "channel_id", 0, [&](std::vector<message> &m)
                       { h5::put_le(&m[find(m, h5::msg_layout)].data[2], eof, 8); });
         check_all_throw(fn, calls);
     }
     SECTION("contiguous data at UNDEF with 16 bytes, and at 2^63 with 2^63 bytes")
     {
-        edit_messages(fn, "ChannelDims", 0, [](std::vector<message> &m)
+        edit_messages(fn, "layout", 0, [](std::vector<message> &m)
                       { h5::put_le(&m[find(m, h5::msg_layout)].data[2], h5::undef, 8); });
         check_all_throw(fn, calls);
         standard_file(fn);
-        edit_messages(fn, "Order", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_id", 0, [](std::vector<message> &m)
                       {
                           m[find(m, h5::msg_dataspace)] = dataspace_message({1ULL << 61}); // 2^63 bytes of uint32
                           bytes &layout = m[find(m, h5::msg_layout)].data;
@@ -734,7 +734,7 @@ TEST_CASE("hdf5 - a damaged version or storage index and bad channel references 
     }
     SECTION("ChannelRef into raw data")
     {
-        set_channel_ref(2, contiguous_data(fn, "channel_1/Data/par_big").first + 64);
+        set_channel_ref(2, contiguous_data(fn, "channel_1/par/par_big").first + 64);
         check_slot2_rejected();
     }
     SECTION("ChannelRef UNDEF")
@@ -770,7 +770,7 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1).n_snap() == 3);
         CHECK(load(fn) == before);
     };
-    // Readers of the unstructured dataset 'name' of slot 0 throw; name "" = the group 'Data' itself is damaged, so
+    // Readers of the unstructured dataset 'name' of slot 0 throw; name "" = the group 'par' itself is damaged, so
     // all its readers throw
     auto check_data_rejected = [&](const std::string &name)
     {
@@ -813,10 +813,10 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
         check_rejected();
     }
 
-    // The 20 bytes reserved at the end of the group 'Data' take a Continuation message
+    // The 20 bytes reserved at the end of the group 'par' take a Continuation message
     auto data_continuation = [&](uint64_t addr, uint64_t length)
     {
-        edit_messages(fn, "channel_1/Data", 0, [&](std::vector<message> &m)
+        edit_messages(fn, "channel_1/par", 0, [&](std::vector<message> &m)
                       { m.push_back(continuation_message(addr, length)); });
     };
     SECTION("continuation beyond the end of file")
@@ -826,7 +826,7 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
     }
     SECTION("continuation backwards to its own chunk")
     {
-        const uint64_t data = locate(fn, "channel_1/Data");
+        const uint64_t data = locate(fn, "channel_1/par");
         data_continuation(data, object_at(fn, data).chunks[0].length());
         check_data_rejected("");
     }
@@ -884,13 +884,13 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
                       { m[find(m, h5::msg_layout)].data[1] = 2; });
         check_rejected();
         standard_file(fn);
-        edit_messages(fn, "channel_1/Data/par_big", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_1/par/par_big", 0, [](std::vector<message> &m)
                       { m[find(m, h5::msg_layout)].data[1] = 2; });
         check_data_rejected("big");
     }
     SECTION("datatype int16")
     {
-        edit_messages(fn, "channel_1/Data/par_u", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_1/par/par_u", 0, [](std::vector<message> &m)
                       {
                           bytes &t = m[find(m, h5::msg_datatype)].data;
                           h5::put_le(&t[4], 2, 4);  // Size
@@ -899,7 +899,7 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
     }
     SECTION("datatype NUL-padded string")
     {
-        edit_messages(fn, "channel_1/Data/par_s", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_1/par/par_s", 0, [](std::vector<message> &m)
                       { m[find(m, h5::msg_datatype)].data[1] = 0x01; });
         check_data_rejected("s");
     }
@@ -965,12 +965,12 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
 
     SECTION("NumPath 50 -> 1")
     {
-        set_u32("channel_1", "NumPath", 1);
+        set_u32("channel_1", "n_path", 1);
         check_rejected(0);
     }
     SECTION("NumRx 4 -> 1")
     {
-        set_u32("channel_1", "NumRx", 1);
+        set_u32("channel_1", "n_rx", 1);
         check_rejected(0);
         // The extent check states both shapes, no dimension number
         CHECK_THROWS_WITH(quadriga_lib::hdf5_read_channel<double>(fn, 0),
@@ -1001,37 +1001,37 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
                           bytes b;
                           h5::header hdr;
                           const std::string name(300, 'x');
-                          hdr.attribute("Name", h5::string_type(300), 0, nullptr, name.data());
+                          hdr.attribute("name", h5::string_type(300), 0, nullptr, name.data());
                           hdr.emit(b, 0, 0);
                           h5::chunk c;
                           c.image = b;
                           h5::parse_chunk(c);
-                          m[find(m, h5::msg_attribute, "Name")] = messages_of(c)[1]; }); // After the Attribute Info
+                          m[find(m, h5::msg_attribute, "name")] = messages_of(c)[1]; }); // After the Attribute Info
         check_rejected(0);
     }
     SECTION("NumPath 2^30 with matching extents but the original data (no 64 GB allocation)")
     {
-        set_u32("channel_1", "NumPath", 1u << 30);
+        set_u32("channel_1", "n_path", 1u << 30);
         for (const char *name : {"coeff_re", "coeff_im", "delay"})
             set_dataspace(std::string("channel_1/") + name, {1ULL << 30, 2, 4});
         check_rejected(0);
     }
     SECTION("NumSnap 4e9 with one snapshot group (no allocation for 4e9 snapshots)")
     {
-        set_u32("channel_1", "NumSnap", 4000000000u);
+        set_u32("channel_1", "n_snap", 4000000000u);
         const uint64_t target = locate(fn, "channel_1");
         edit_messages(fn, "channel_1", 0, [&](std::vector<message> &m)
-                      { m.push_back(link_message("Snap_0", target)); });
+                      { m.push_back(link_message("snap_0", target)); });
         check_rejected(0);
     }
-    SECTION("Snap_1 missing in a 3-snapshot channel")
+    SECTION("snap_1 missing in a 3-snapshot channel")
     {
-        remove_link("channel_2", "Snap_1");
+        remove_link("channel_2", "snap_1");
         check_rejected(1);
     }
     SECTION("malformed snapshot group that is not selected: only the selected groups are read and checked")
     {
-        set_dataspace("channel_2/Snap_2/delay", {400});
+        set_dataspace("channel_2/snap_2/delay", {400});
         const arma::uvec i_ok = {1, 0}, i_bad = {2};
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, i_ok).n_snap() == 2);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, i_bad), std::runtime_error);
@@ -1039,18 +1039,18 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
     }
     SECTION("snapshot group names with a leading zero, beyond 2^32 - 1, with 25 digits")
     {
-        for (const std::string &name : {std::string("Snap_01"), std::string("Snap_4294967296"), "Snap_" + std::string(25, '1')})
+        for (const std::string &name : {std::string("snap_01"), std::string("snap_4294967296"), "snap_" + std::string(25, '1')})
         {
             INFO("name " << name);
             standard_file(fn);
-            rename_link("channel_2", "Snap_1", name);
+            rename_link("channel_2", "snap_1", name);
             check_rejected(1);
         }
     }
     SECTION("interact_coord with one row less than sum(n_interact)")
     {
         // Snapshot 0 has 3 paths with n_interact {0, 1, 2}: interact_coord [3, 3] is stored as {3, 3}
-        edit_messages(fn, "channel_2/Snap_0/interact_coord", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_2/snap_0/interact_coord", 0, [](std::vector<message> &m)
                       {
                           m[find(m, h5::msg_dataspace)] = dataspace_message({2, 3});
                           bytes &layout = m[find(m, h5::msg_layout)].data;
@@ -1061,7 +1061,7 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
     }
     SECTION("compact unstructured data size other than elements times element size")
     {
-        edit_messages(fn, "channel_1/Data/par_u", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_1/par/par_u", 0, [](std::vector<message> &m)
                       {
                           bytes &layout = m[find(m, h5::msg_layout)].data;
                           h5::put_le(&layout[2], 8, 2);
@@ -1069,16 +1069,16 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
         check_rejected(0);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "u", 0), std::runtime_error);
     }
-    SECTION("a link in 'Data' to a group")
+    SECTION("a link in 'par' to a group")
     {
-        redirect(fn, "channel_1/Data/par_x", locate(fn, "channel_1"));
+        redirect(fn, "channel_1/par/par_x", locate(fn, "channel_1"));
         check_rejected(0);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "x", 0), std::runtime_error);
         CHECK(std::any_cast<std::string>(quadriga_lib::hdf5_read_dset(fn, "s", 0)) == "abc");
     }
     SECTION("unstructured dataset of rank 4")
     {
-        set_dataspace("channel_1/Data/par_u", {1, 1, 1, 3});
+        set_dataspace("channel_1/par/par_u", {1, 1, 1, 3});
         check_rejected(0);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "u", 0), std::runtime_error);
     }
@@ -1112,9 +1112,9 @@ TEST_CASE("hdf5 - snapshot groups linked several times may not read more data th
             auto c1 = full_channel({2000});
             quadriga_lib::hdf5_write_channel(fn, c1, 1);
         }
-        const uint64_t snap0 = locate(fn, "channel_1/Snap_0");
-        redirect(fn, "channel_1/Snap_1", snap0);
-        redirect(fn, "channel_1/Snap_2", snap0);
+        const uint64_t snap0 = locate(fn, "channel_1/snap_0");
+        redirect(fn, "channel_1/snap_1", snap0);
+        redirect(fn, "channel_1/snap_2", snap0);
         QD_DIAG("\n# diag: shared snapshot groups\nsecond channel,end of file\n%d,%llu\n", (int)large_second_channel,
                 (unsigned long long)eof_of(fn));
     };
@@ -1143,7 +1143,7 @@ TEST_CASE("hdf5 - snapshot links to one empty snapshot group may not read more h
     quadriga_lib::hdf5_create_file(fn, 2);
     auto c = full_channel({0, 0});
     quadriga_lib::hdf5_write_channel(fn, c, 0);
-    const uint64_t snap0 = locate(fn, "channel_1/Snap_0");
+    const uint64_t snap0 = locate(fn, "channel_1/snap_0");
 
     auto add_channel = [&](uint32_t n_snap)
     {
@@ -1153,19 +1153,19 @@ TEST_CASE("hdf5 - snapshot links to one empty snapshot group may not read more h
         const uint32_t n_tx = 3, n_rx = 2; // As in the snapshot's coefficients
         const float pos[3] = {0.0f, 0.0f, 1.0f};
         const uint64_t three = 3;
-        hdr.attribute("NumSnap", h5::uint32, 0, nullptr, &n_snap);
-        hdr.attribute("NumTx", h5::uint32, 0, nullptr, &n_tx);
-        hdr.attribute("NumRx", h5::uint32, 0, nullptr, &n_rx);
-        hdr.attribute("tx_position", h5::float32, 1, &three, pos);
-        hdr.attribute("rx_position", h5::float32, 1, &three, pos);
+        hdr.attribute("n_snap", h5::uint32, 0, nullptr, &n_snap);
+        hdr.attribute("n_tx", h5::uint32, 0, nullptr, &n_tx);
+        hdr.attribute("n_rx", h5::uint32, 0, nullptr, &n_rx);
+        hdr.attribute("tx_pos", h5::float32, 1, &three, pos);
+        hdr.attribute("rx_pos", h5::float32, 1, &three, pos);
         for (uint32_t i = 0; i < n_snap; ++i)
-            hdr.link("Snap_" + std::to_string(i), snap0);
+            hdr.link("snap_" + std::to_string(i), snap0);
         bytes image;
         hdr.emit(image, eof_of(fn), 0);
         const uint64_t addr = append(fn, image);
         bytes entry(8);
         h5::put_le(entry.data(), addr, 8);
-        put(fn, contiguous_data(fn, "ChannelRef").first + 8, entry); // Slot 1
+        put(fn, contiguous_data(fn, "channel_ref").first + 8, entry); // Slot 1
     };
 
     // Compact data is part of its header and counted once: a dataset of 4000 bytes in a file of about 7 KB reads back
@@ -1207,7 +1207,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         quadriga_lib::hdf5_write_dset(fn, "c", x, 0);
         for (std::vector<uint64_t> dims : {std::vector<uint64_t>{1ULL << 29, 0, 0}, {0, 1ULL << 40, 1ULL << 40}, {1ULL << 40, 0}})
         {
-            set_dataspace("channel_1/Data/par_c", dims);
+            set_dataspace("channel_1/par/par_c", dims);
             CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "c", 0), std::runtime_error);
             CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::runtime_error);
         }
@@ -1230,7 +1230,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
             set_dataspace("channel_1/delay", {n, 0, 1});
             edit_messages(fn, "channel_1", 0, [&](std::vector<message> &m)
                           {
-                              bytes &data = m[find(m, h5::msg_attribute, "NumPath")].data;
+                              bytes &data = m[find(m, h5::msg_attribute, "n_path")].data;
                               h5::put_le(&data[data.size() - 4], n, 4); });
             CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::runtime_error);
         }
@@ -1248,7 +1248,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
             std::remove(fn.c_str());
             quadriga_lib::hdf5_create_file(fn, 4);
             quadriga_lib::hdf5_write_channel(fn, c, 0);
-            edit_messages(fn, "channel_1/no_interact", 0, [&](std::vector<message> &m)
+            edit_messages(fn, "channel_1/n_interact", 0, [&](std::vector<message> &m)
                           {
                               bytes &layout = m[find(m, h5::msg_layout)].data; // 03 00, size, compact data
                               REQUIRE(h5::get_le(&layout[2], 2) == 8);
@@ -1271,10 +1271,10 @@ TEST_CASE("hdf5 - index data that overlaps object headers is rejected before a w
 
     SECTION("root datasets: data inside root chunk 0 and inside another dataset header")
     {
-        // Layout of a new file with 4 slots: root chunk 0 [48, 501), ChannelDims header 501, Version 588, Order
-        // header 641 (data 712), ChannelRef header 728 (data 795)
-        for (std::pair<const char *, uint64_t> p : {std::pair<const char *, uint64_t>{"ChannelRef", 400}, {"ChannelDims", 712 - 16},
-                                                     {"Order", 724}, {"ChannelRef", 712}})
+        // Layout of a new file with 4 slots: root chunk 0 [48, 502), layout header 502, version 589, channel_id
+        // header 642 (data 713), channel_ref header 729 (data 796)
+        for (std::pair<const char *, uint64_t> p : {std::pair<const char *, uint64_t>{"channel_ref", 400}, {"layout", 713 - 16},
+                                                     {"channel_id", 725}, {"channel_ref", 713}})
         {
             INFO("data of " << p.first << " at " << p.second);
             std::remove(fn.c_str());
@@ -1289,7 +1289,7 @@ TEST_CASE("hdf5 - index data that overlaps object headers is rejected before a w
         auto c = minimal_channel(1.0);
         quadriga_lib::hdf5_write_channel(fn, c, 0);
         const region chunk = link_chunk(fn, 0);
-        set_data_address("Order", chunk.addr); // Order [chunk.addr, + 16): the slot IDs are bytes of the link chunk
+        set_data_address("channel_id", chunk.addr); // Order [chunk.addr, + 16): the slot IDs are bytes of the link chunk
         CHECK_NOTHROW(quadriga_lib::hdf5_read_channel<double>(fn, 0));
         const bytes before = load(fn);
         CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(fn, c, 1), std::runtime_error);
@@ -1330,7 +1330,7 @@ TEST_CASE("hdf5 - a file that exists but cannot be read is not replaced")
 TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures before changing the file")
 {
     // 48 slots: 0-44 minimal channels (IDs 1-45; root link chunk 0 holds IDs 1-41, link chunk 1 IDs 42-45), slot 1
-    // extended with a dataset (new group 'Data'), slot 46 created by hdf5_write_dset (ID 46), slot 47 empty
+    // extended with a dataset (new group 'par'), slot 46 created by hdf5_write_dset (ID 46), slot 47 empty
     const std::string fn = "test_hdf_rb_writers.hdf5", fn_w = "test_hdf_rb_writers_copy.hdf5";
     test_files files({fn, fn_w});
     quadriga_lib::hdf5_create_file(fn, 48);
@@ -1365,7 +1365,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
          { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write_channel(f, c, 44); },
          [](const std::string &f)
          { CHECK(value_of(f, 44) == 100.0); }},
-        {"hdf5_write_channel, overwrite of slot 1 (with 'Data')", [](const std::string &f)
+        {"hdf5_write_channel, overwrite of slot 1 (with 'par')", [](const std::string &f)
          { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write_channel(f, c, 1); },
          [](const std::string &f)
          { CHECK(value_of(f, 1) == 100.0); CHECK(dset_names(f, 1).empty()); }},
@@ -1373,11 +1373,11 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
          { quadriga_lib::hdf5_write_dset(f, "z", z, 47); },
          [](const std::string &f)
          { CHECK(std::any_cast<double>(quadriga_lib::hdf5_read_dset(f, "z", 47)) == 9.0); }},
-        {"hdf5_write_dset, slot 1 (append to 'Data')", [&](const std::string &f)
+        {"hdf5_write_dset, slot 1 (append to 'par')", [&](const std::string &f)
          { quadriga_lib::hdf5_write_dset(f, "z", z, 1); },
          [](const std::string &f)
          { CHECK(dset_names(f, 1) == std::vector<std::string>({"a", "z"})); }},
-        {"hdf5_write_dset, slot 2 (new 'Data')", [&](const std::string &f)
+        {"hdf5_write_dset, slot 2 (new 'par')", [&](const std::string &f)
          { quadriga_lib::hdf5_write_dset(f, "z", z, 2); },
          [](const std::string &f)
          { CHECK(dset_names(f, 2) == std::vector<std::string>({"z"})); CHECK(value_of(f, 2) == 3.0); }},
@@ -1412,7 +1412,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
     };
     const std::set<std::string> root_writers = {"hdf5_write_channel, empty slot", "hdf5_write_channel, overwrite of slot 0 (link chunk 0)",
                                                 "hdf5_write_channel, overwrite of slot 44 (last link chunk)",
-                                                "hdf5_write_channel, overwrite of slot 1 (with 'Data')", "hdf5_write_dset, empty slot"};
+                                                "hdf5_write_channel, overwrite of slot 1 (with 'par')", "hdf5_write_dset, empty slot"};
     std::set<std::string> all;
     for (const writer &w : writers)
         all.insert(w.name);
@@ -1431,23 +1431,23 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
         check_writers(root_writers);
         check_readers();
     }
-    SECTION("chunk of 'Data' with a flipped byte")
+    SECTION("chunk of 'par' with a flipped byte")
     {
-        edit_chunk(fn, locate(fn, "channel_2/Data"), 0, [](bytes &im, const h5::chunk &)
+        edit_chunk(fn, locate(fn, "channel_2/par"), 0, [](bytes &im, const h5::chunk &)
                    { im[20] ^= 0x01; }, false);
-        check_writers({"hdf5_write_dset, slot 1 (append to 'Data')"});
+        check_writers({"hdf5_write_dset, slot 1 (append to 'par')"});
         CHECK_THROWS_AS(dset_names(fn, 1), std::runtime_error);
     }
     SECTION("ChannelDims corrupted")
     {
         bytes b(16);
         h5::put_le(b.data(), 47, 4);
-        put(fn, contiguous_data(fn, "ChannelDims").first, b);
+        put(fn, contiguous_data(fn, "layout").first, b);
         check_writers(all, corrupted_message);
     }
     SECTION("a foreign link in root chunk 0 after the directory")
     {
-        const uint64_t target = locate(fn, "Order");
+        const uint64_t target = locate(fn, "channel_id");
         edit_messages(fn, "", 0, [&](std::vector<message> &m)
                       { m.push_back(link_message("foreign", target)); });
         check_writers(all, unsupported_message);
@@ -1497,7 +1497,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
             INFO("edit " << e.first);
             save(fn, good);
             edit_link_chunk(0, e.second);
-            check_writers({"hdf5_write_channel, overwrite of slot 0 (link chunk 0)", "hdf5_write_channel, overwrite of slot 1 (with 'Data')"},
+            check_writers({"hdf5_write_channel, overwrite of slot 0 (link chunk 0)", "hdf5_write_channel, overwrite of slot 1 (with 'par')"},
                           unsupported_message);
             check_readers();
         }
@@ -1513,34 +1513,34 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
         check_writers({});
         check_readers();
     }
-    SECTION("a channel group whose 'Data' link became a NIL message takes a new 'Data' link")
+    SECTION("a channel group whose 'par' link became a NIL message takes a new 'par' link")
     {
         edit_chunk(fn, locate(fn, "channel_46"), 0, [](bytes &im, const h5::chunk &c)
-                   { im[message_in(c, h5::msg_link, "Data").offset - 4] = h5::msg_nil; });
+                   { im[message_in(c, h5::msg_link, "par").offset - 4] = h5::msg_nil; });
         quadriga_lib::hdf5_write_dset(fn, "z", z, 46);
         CHECK(dset_names(fn, 46) == std::vector<std::string>({"z"}));
         CHECK(object_at(fn, locate(fn, "channel_46")).chunks[0].free_space == 0);
     }
-    SECTION("a channel group with 4 bytes of free space cannot take the 'Data' link")
+    SECTION("a channel group with 3 bytes of free space cannot take the 'par' link")
     {
         edit_messages(fn, "channel_46", 0, [](std::vector<message> &m)
-                      { m.erase(m.begin() + find(m, h5::msg_link, "Data")); });
+                      { m.erase(m.begin() + find(m, h5::msg_link, "par")); });
         shrink_chunk0(fn, "channel_46", 15);
-        REQUIRE(object_at(fn, locate(fn, "channel_46")).chunks[0].free_space == 4);
+        REQUIRE(object_at(fn, locate(fn, "channel_46")).chunks[0].free_space == 3);
         const bytes before = load(fn);
         CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", z, 46), std::runtime_error, MessageMatches(StartsWith(unsupported_message)));
         CHECK(load(fn) == before);
     }
-    SECTION("a group 'Data' with 10 bytes of free space or without creation order cannot take a link")
+    SECTION("a group 'par' with 10 bytes of free space or without creation order cannot take a link")
     {
         const bytes good = load(fn);
-        shrink_chunk0(fn, "channel_2/Data", 10);
+        shrink_chunk0(fn, "channel_2/par", 10);
         bytes before = load(fn);
         CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", z, 1), std::runtime_error, MessageMatches(StartsWith(unsupported_message)));
         CHECK(load(fn) == before);
 
         save(fn, good);
-        edit_messages(fn, "channel_2/Data", 0, [](std::vector<message> &m)
+        edit_messages(fn, "channel_2/par", 0, [](std::vector<message> &m)
                       {
                           bytes &info = m[find(m, h5::msg_link_info)].data;
                           info.erase(info.begin() + 2, info.begin() + 10);
@@ -1549,12 +1549,12 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
         CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", z, 1), std::runtime_error, MessageMatches(StartsWith(unsupported_message)));
         CHECK(load(fn) == before);
     }
-    SECTION("a chunk of 'Data' with two NIL messages is compacted when a link is added")
+    SECTION("a chunk of 'par' with two NIL messages is compacted when a link is added")
     {
         std::any b = 2.0, c = 3.0, d = 4.0;
         quadriga_lib::hdf5_write_dset(fn, "b", b, 1); // New chunk
         quadriga_lib::hdf5_write_dset(fn, "c", c, 1); // In the new chunk
-        const uint64_t data = locate(fn, "channel_2/Data");
+        const uint64_t data = locate(fn, "channel_2/par");
         REQUIRE(object_at(fn, data).chunks.size() == 2);
         edit_chunk(fn, data, 1, [](bytes &im, const h5::chunk &ch)
                    {
@@ -1583,7 +1583,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
 TEST_CASE("hdf5 - single-byte flips in headers and index data give std::runtime_error or a valid result")
 {
     // Slot 0: written, overwritten by a 3-snapshot channel with every field and 3 unstructured datasets, then extended
-    // by hdf5_write_dset (the group 'Data' grows a second chunk); slot 1: created by hdf5_write_dset
+    // by hdf5_write_dset (the group 'par' grows a second chunk); slot 1: created by hdf5_write_dset
     const std::string fn = "test_hdf_rb_flip.hdf5", fn_v = "test_hdf_rb_flip_variant.hdf5",
                       fn_w = "test_hdf_rb_flip_writer.hdf5";
     test_files files({fn, fn_v, fn_w});
@@ -1636,10 +1636,10 @@ TEST_CASE("hdf5 - single-byte flips in headers and index data give std::runtime_
     }
     REQUIRE(unread.size() == 1); // Snapshot 1 has no paths
     std::vector<region> index;
-    for (const char *name : {"ChannelDims", "Order", "ChannelRef"})
+    for (const char *name : {"layout", "channel_id", "channel_ref"})
     {
         const auto d = contiguous_data(fn, name);
-        index.push_back({d.first, d.second * (std::string(name) == "ChannelRef" ? 8 : 4)});
+        index.push_back({d.first, d.second * (std::string(name) == "channel_ref" ? 8 : 4)});
     }
 
     enum outcome
@@ -1834,7 +1834,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
     REQUIRE(link_chunk_ids(fn_a, 0).size() == 41);
     REQUIRE(link_chunk_ids(fn_a, 1).size() == 9);
 
-    const auto ref = contiguous_data(fn_a, "ChannelRef"), order = contiguous_data(fn_a, "Order");
+    const auto ref = contiguous_data(fn_a, "channel_ref"), order = contiguous_data(fn_a, "channel_id");
     std::any x = 7.0, y = 8.0;
 
     // The continuation of every state: an hdf5_write_channel to an empty and to a filled slot succeed and read back with
@@ -1905,7 +1905,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
         quadriga_lib::hdf5_write_channel(fn_b, c, 0);
         CHECK(link_chunk_ids(fn_b, 0) == std::vector<long long>({2, 3}));
         const bytes A = load(fn_a), B = load(fn_b);
-        const auto r = contiguous_data(fn_b, "ChannelRef"), o = contiguous_data(fn_b, "Order");
+        const auto r = contiguous_data(fn_b, "channel_ref"), o = contiguous_data(fn_b, "channel_id");
         interrupted_states(A, B, {block(A, B), superblock, link_chunk(fn_b, 0), {r.first, 8}, {o.first, 4}});
         arma::u32_vec id;
         quadriga_lib::hdf5_read_layout(fn_b, &id);
@@ -1944,7 +1944,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
                 continue_writing(i >= 2 ? 51 : 50);
         }
     }
-    SECTION("hdf5_write_dset on a filled slot without 'Data': block, superblock, channel group")
+    SECTION("hdf5_write_dset on a filled slot without 'par': block, superblock, channel group")
     {
         save(fn_b, load(fn_a));
         quadriga_lib::hdf5_write_dset(fn_b, "x", x, 1);
@@ -1965,11 +1965,11 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
     SECTION("hdf5_write_dset append: block, superblock, creation index in chunk 0, link in the last chunk")
     {
         quadriga_lib::hdf5_write_dset(fn_a, "a", x, 2);
-        quadriga_lib::hdf5_write_dset(fn_a, "b", x, 2); // 'Data' grows a second chunk
+        quadriga_lib::hdf5_write_dset(fn_a, "b", x, 2); // 'par' grows a second chunk
         save(fn_b, load(fn_a));
         quadriga_lib::hdf5_write_dset(fn_b, "c", y, 2);
         const bytes A = load(fn_a), B = load(fn_b);
-        const h5::object d = object_at(fn_b, locate(fn_b, "channel_3/Data"));
+        const h5::object d = object_at(fn_b, locate(fn_b, "channel_3/par"));
         REQUIRE(d.chunks.size() == 2);
         const auto states = interrupted_states(A, B, {block(A, B), superblock, {d.chunks[0].addr, d.chunks[0].length()}, {d.chunks[1].addr, d.chunks[1].length()}});
         for (size_t i = 0; i < states.size(); ++i)

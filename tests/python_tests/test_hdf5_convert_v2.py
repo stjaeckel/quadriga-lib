@@ -3,7 +3,7 @@
 # Part of quadriga-lib — see LICENSE for terms.
 
 # Test of tools/hdf5_convert_v2.py, the converter of channel files of version 2 (quadriga-lib 0.12.4 and earlier) to
-# version 3. The script runs as a subprocess, so the command line, exit codes and messages are tested. The inputs are
+# version 4. The script runs as a subprocess, so the command line, exit codes and messages are tested. The inputs are
 # the version-2 files in tests/data (written by tests/data/make_hdf5_v2_fixtures.py with quadriga-lib 0.12.4); the
 # oracle hdf5_v2_expected.npz holds what 0.12.4 returned for each of their slots. Every converted slot must read back
 # with hdf5_read_channel as the oracle says; the unstructured datasets are also compared with h5py.
@@ -84,9 +84,9 @@ class test_case(unittest.TestCase):
             fn = os.path.join(d, 'version.hdf5')
             channel.hdf5_create_file(fn, 1)
             with h5py.File(fn, 'r') as f:
-                version = int(f['Version'][()])
-        if version != 3:
-            raise RuntimeError('quadriga_lib at %s writes channel files of version %d, not 3'
+                version = int(f['version'][()])
+        if version != 4:
+            raise RuntimeError('quadriga_lib at %s writes channel files of version %d, not 4'
                                % (quadriga_lib.__file__, version))
         with np.load(os.path.join(data_dir, 'hdf5_v2_expected.npz'), allow_pickle=False) as z:
             cls.oracle = {k: z[k] for k in z.files}
@@ -165,17 +165,17 @@ class test_case(unittest.TestCase):
             dims = fi['ChannelDims'][()]
             for s in slots:
                 gi = fi['channel_%d' % fi['Order'][s]]
-                go = fo['channel_%d' % fo['Order'][s]]
+                go = fo['channel_%d' % fo['channel_id'][s]]
                 names = [n for n in (link_names(gi['Data']) if 'Data' in gi else []) if n not in skip]
                 self.assertEqual(channel.hdf5_read_dset_names(out, *slot_index(s, dims), prefix=''), names, s)
                 for n in names:
-                    a, b = stored_value(gi['Data'][n]), stored_value(go['Data'][n])
+                    a, b = stored_value(gi['Data'][n]), stored_value(go['par'][n])
                     self.assertEqual(type(a), type(b), n)
                     if isinstance(a, bytes):
                         self.assertEqual(a, b, n)
                     else:
                         self.assertEqual((a.dtype, a.shape, a.tobytes()), (b.dtype, b.shape, b.tobytes()), n)
-                self.assertEqual(gi.attrs.get('Initial_position'), go.attrs.get('Initial_position'), s)
+                self.assertEqual(gi.attrs.get('Initial_position'), go.attrs.get('initial_position'), s)
 
     def assert_layout(self, name, out, has_data=None):
         dims, occupied = channel.hdf5_read_layout(out)
@@ -187,7 +187,7 @@ class test_case(unittest.TestCase):
         name = 'hdf5_v2_written.hdf5'
         out, stdout, stderr = self.convert(name)
         self.assertEqual(stderr, '')
-        self.assertEqual(stdout, "Converted 8 channels from version 2 to version 3: '%s'\n" % out)
+        self.assertEqual(stdout, "Converted 8 channels from version 2 to version 4: '%s'\n" % out)
         self.assert_layout(name, out)
         for s in self.slots(name):
             self.assert_slot(out, name, s)
@@ -280,7 +280,7 @@ class test_case(unittest.TestCase):
 
     def test_rejected_inputs(self):
         d = self.dir
-        text, no_version, v7, v3, same, short, bad = (os.path.join(d, n) for n in (
+        text, no_version, v7, v4, same, short, bad = (os.path.join(d, n) for n in (
             'a.txt', 'b.hdf5', 'c.hdf5', 'd.hdf5', 'e.hdf5', 'f.hdf5', 'g.hdf5'))
         with open(text, 'w') as f:
             f.write('not HDF5')
@@ -289,7 +289,7 @@ class test_case(unittest.TestCase):
         shutil.copy(os.path.join(data_dir, 'hdf5_v2_written.hdf5'), v7)
         with h5py.File(v7, 'r+') as f:
             f['Version'][()] = 7
-        channel.hdf5_create_file(v3, 2)
+        channel.hdf5_create_file(v4, 2)
         for fn in (same, short, bad):
             shutil.copy(os.path.join(data_dir, 'hdf5_v2_written.hdf5'), fn)
         with h5py.File(short, 'r+') as f:
@@ -309,7 +309,7 @@ class test_case(unittest.TestCase):
                 ((no_version, out), "'%s' is not a quadriga-lib channel file (dataset 'Version' is missing)"
                  % no_version),
                 ((v7, out), "'%s' is a channel file of version 7; only version 2 can be converted" % v7),
-                ((v3, out), "'%s' is already a channel file of version 3; nothing to convert" % v3),
+                ((v4, out), "'%s' is already a channel file of version 4; nothing to convert" % v4),
                 ((short, out), "'%s': the storage index is corrupted (ChannelDims and Order do not match)" % short),
                 ((same, same), 'input and output are the same file; choose another output name'),
                 ((same, folder), "output '%s' is a directory" % folder),

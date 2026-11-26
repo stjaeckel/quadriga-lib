@@ -3,7 +3,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-"""Convert a quadriga-lib channel file of version 2 into a channel file of version 3.
+"""Convert a quadriga-lib channel file of version 2 into a channel file of version 4.
 
 Usage:  python tools/hdf5_convert_v2.py [--force] input.hdf5 output.hdf5
 
@@ -18,12 +18,12 @@ as (1, 1, 0); delays of shape (1, n_tx, n) or (n_rx, 1, n) of writers from 2023/
 pairs). The input is never changed. The output appears only when the conversion is complete;
 an existing output is replaced only with --force. MATLAB and Octave users run the script with Python as well.
 
-Requirements: Python 3.10 or newer, numpy, h5py 3.0 or newer, and a quadriga_lib Python module that writes version 3
+Requirements: Python 3.10 or newer, numpy, h5py 3.0 or newer, and a quadriga_lib Python module that writes version 4
 (any version newer than 0.12.4). The installed module is used; if there is none, the build in the folder ../lib next
 to this script (a source checkout after "make python"). PYTHONPATH=<folder with the module> selects another one.
 
 Limits: some items that only the C++ API with assume_valid = true (up to version 0.12.4) or edits with other HDF5
-tools can create have no place in version 3 and are skipped with a warning: an occupied slot without any channel data
+tools can create have no place in version 4 and are skipped with a warning: an occupied slot without any channel data
 (the slot is left empty), the name of a channel that has no structured data, the bytes of a name beyond 255, and
 unstructured datasets whose name has characters other than letters, digits and '_', whose type or rank (> 3) the
 library does not support, or which hold a string that is not valid UTF-8.
@@ -142,7 +142,7 @@ def read_slot(group):
     n_snap = int(attr(group, 'NumSnap'))
     if n_snap == 0:
         if chan['initial_position'] == 0 and name:
-            warnings.append("channel name '%s' is dropped: version 3 stores a name only together with channel data"
+            warnings.append("channel name '%s' is dropped: version 4 stores a name only together with channel data"
                             % name.decode('utf-8', 'replace'))
         return chan, par, extra, warnings
 
@@ -214,7 +214,7 @@ def main(argv):
     parser = argparse.ArgumentParser(prog=PROG, description=__doc__.split('\n')[0])
     parser.add_argument('--force', action='store_true', help='replace an existing output file')
     parser.add_argument('input', help='channel file of version 2 (read only)')
-    parser.add_argument('output', help='channel file of version 3 to create')
+    parser.add_argument('output', help='channel file of version 4 to create')
     args = parser.parse_args(argv)
     fn_in, fn_out = args.input, args.output
     say = lambda kind, text: print('%s: %s: %s' % (PROG, kind, text), file=sys.stderr)
@@ -239,12 +239,12 @@ def main(argv):
         except Exception as e:
             raise Failure("cannot open '%s': %s" % (fn_in, e))
         with src:
+            if isinstance(src.get('version'), h5py.Dataset) and int(src['version'][()]) == 4:
+                raise Failure("'%s' is already a channel file of version 4; nothing to convert" % fn_in)
             for name in ('Version', 'ChannelDims', 'Order'):
                 if not isinstance(src.get(name), h5py.Dataset):
                     raise Failure("'%s' is not a quadriga-lib channel file (dataset '%s' is missing)" % (fn_in, name))
             version = int(src['Version'][()])
-            if version == 3:
-                raise Failure("'%s' is already a channel file of version 3; nothing to convert" % fn_in)
             if version != 2:
                 raise Failure("'%s' is a channel file of version %d; only version 2 can be converted"
                               % (fn_in, version))
@@ -277,10 +277,10 @@ def main(argv):
             except Exception as e:
                 raise Failure("cannot create a temporary file next to '%s': %s" % (fn_out, e))
             with h5py.File(tmp, 'r') as f:
-                version = int(f['Version'][()])
-            if version != 3:
+                version = int(f['version'][()]) if 'version' in f else int(f['Version'][()])
+            if version != 4:
                 raise Failure('quadriga_lib at %s writes channel files of version %d; converting needs a quadriga-lib '
-                              'version newer than 0.12.4 (one that writes version 3); a newer module can be selected '
+                              'version newer than 0.12.4 (one that writes version 4); a newer module can be selected '
                               'with PYTHONPATH=<folder with the module>' % (quadriga_lib.__file__, version))
 
             n_chan, n_lost = 0, 0
@@ -319,7 +319,7 @@ def main(argv):
         if tmpdir:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
-    summary = 'Converted %d channels from version 2 to version 3: \'%s\'' % (n_chan, fn_out)
+    summary = 'Converted %d channels from version 2 to version 4: \'%s\'' % (n_chan, fn_out)
     if n_lost:
         print(summary + '; %d items were not converted (see the warnings)' % n_lost)
         return 3

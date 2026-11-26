@@ -117,10 +117,10 @@ namespace qd
         // A valid HDF5 file that uses structures outside the subset (written or modified by other tools)
         [[noreturn]] static inline void unsupported()
         {
-            throw std::runtime_error("Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it "
-                                     "wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and "
-                                     "files modified with other HDF5 tools are not supported. Version-2 files can be "
-                                     "converted with tools/hdf5_convert_v2.py.");
+            throw std::runtime_error("Unsupported HDF5 file: quadriga-lib reads only channel files of version 4 that it "
+                                     "wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2), by "
+                                     "development versions (version 3) and files modified with other HDF5 tools are not "
+                                     "supported. Version-2 files can be converted with tools/hdf5_convert_v2.py.");
         }
 
         // ---- Checksum ----
