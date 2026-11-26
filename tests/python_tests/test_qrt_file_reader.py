@@ -94,7 +94,7 @@ class test_case(unittest.TestCase):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
          aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
-            channel.qrt_file_read(FN_V4, [0], 0, uplink=False, normalize_polmat=1)
+            channel.qrt_file_read(FN_V4, [0], 0, uplink=False, normalize_polmat=True)
 
         npt.assert_allclose(center_freq[0], 3.75e9, rtol=1e-7)  # v4 stores GHz, converted to Hz in float
 
@@ -116,7 +116,7 @@ class test_case(unittest.TestCase):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_dl, lbs_dl, path_gain, path_length, M,
          aod, eod, aoa_dl, eoa_dl, path_coord, n_interact, coord, interact_type) = \
-            channel.qrt_file_read(FN_V4, [1], 1, uplink=False, normalize_polmat=1)
+            channel.qrt_file_read(FN_V4, [1], 1, uplink=False, normalize_polmat=True)
 
         npt.assert_allclose(tx_pos[:, 0], [-2.67888, 60.257, 2.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(tx_orientation[:, 0], [0.0, 0.0, np.pi], atol=1.5e-4, rtol=0)
@@ -129,7 +129,7 @@ class test_case(unittest.TestCase):
         (center_freq, tx_pos_ul, tx_ori_ul, rx_pos_ul, rx_ori_ul,
          fbs_ul, lbs_ul, path_gain, path_length, M,
          aod_ul, eod_ul, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
-            channel.qrt_file_read(FN_V4, [1], 1, uplink=True, normalize_polmat=1)
+            channel.qrt_file_read(FN_V4, [1], 1, uplink=True, normalize_polmat=True)
 
         # TX / RX swap between downlink and uplink
         npt.assert_allclose(tx_pos_ul[:, 0], rx_pos[:, 0], atol=1.5e-4, rtol=0)
@@ -156,7 +156,7 @@ class test_case(unittest.TestCase):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
          aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
-            channel.qrt_file_read(FN_V5, [1], 0, uplink=False, normalize_polmat=0)
+            channel.qrt_file_read(FN_V5, [1], 0, uplink=False, normalize_polmat=False)
 
         self.assertEqual(len(center_freq), 2)
         npt.assert_allclose(center_freq[0], 1.0e9, atol=1e-4, rtol=0)
@@ -171,7 +171,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(M0[:, 0, 1], [0.0866, 0, 0, 0, 0, 0, -0.0866, 0], atol=1.5e-4, rtol=0)
 
         # normalize_polmat = 1: M columns normalized to max power 1
-        res = channel.qrt_file_read(FN_V5, [1], 0, uplink=False, normalize_polmat=1)
+        res = channel.qrt_file_read(FN_V5, [1], 0, uplink=False, normalize_polmat=True)
         M0n = res[9][0]   # output index 9 = M (list), [0] = first snapshot
         npt.assert_allclose(M0n[:, 0, 1], [1, 0, 0, 0, 0, 0, -1, 0], atol=1.5e-4, rtol=0)
 
@@ -186,8 +186,8 @@ class test_case(unittest.TestCase):
             with open(fn, 'wb') as f:
                 f.write(data)
             parse_freq = channel.qrt_file_parse(fn)[8]
-            res_hz = channel.qrt_file_read(fn, [1], 0, uplink=False, normalize_polmat=0)
-        res_ghz = channel.qrt_file_read(FN_V5, [1], 0, uplink=False, normalize_polmat=0)
+            res_hz = channel.qrt_file_read(fn, [1], 0, uplink=False, normalize_polmat=False)
+        res_ghz = channel.qrt_file_read(FN_V5, [1], 0, uplink=False, normalize_polmat=False)
         npt.assert_allclose(parse_freq, [1.0e9, 1.5e9], rtol=1e-6, atol=0)
         npt.assert_allclose(res_hz[0], [1.0e9, 1.5e9], rtol=1e-6, atol=0)
         npt.assert_allclose(res_hz[7][0], res_ghz[7][0], rtol=1e-12, atol=0)
@@ -197,7 +197,7 @@ class test_case(unittest.TestCase):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
          aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
-            channel.qrt_file_read(FN_V4, [0, 1, 2], 0, uplink=False, normalize_polmat=1)
+            channel.qrt_file_read(FN_V4, [0, 1, 2], 0, uplink=False, normalize_polmat=True)
 
         # Scalar-per-snapshot outputs: (3, n_out) matrices
         self.assertEqual(tx_pos.shape, (3, 3))
@@ -220,8 +220,8 @@ class test_case(unittest.TestCase):
             self.assertEqual(coord[i].shape[1], int(np.sum(n_interact[i])))
 
         # Cross-check the cached multi-read against individual single-snapshot reads
-        r0 = channel.qrt_file_read(FN_V4, [0], 0, uplink=False, normalize_polmat=1)
-        r1 = channel.qrt_file_read(FN_V4, [1], 0, uplink=False, normalize_polmat=1)
+        r0 = channel.qrt_file_read(FN_V4, [0], 0, uplink=False, normalize_polmat=True)
+        r1 = channel.qrt_file_read(FN_V4, [1], 0, uplink=False, normalize_polmat=True)
 
         npt.assert_allclose(tx_pos[:, 0], r0[1][:, 0], atol=1e-6, rtol=0)
         npt.assert_allclose(tx_pos[:, 1], r1[1][:, 0], atol=1e-6, rtol=0)
@@ -273,6 +273,12 @@ class test_case(unittest.TestCase):
             channel.qrt_file_read(FN_V4, [1], uplink=2.5)
         self.assertIn("'uplink'", str(ctx.exception))
 
+        # normalize_polmat: None gives the default (True), a non-bool raises
+        npt.assert_array_equal(channel.qrt_file_read(FN_V4, [1], normalize_polmat=None)[7][0], ref[7][0])  # path_gain
+        with self.assertRaises(TypeError) as ctx:
+            channel.qrt_file_read(FN_V4, [1], normalize_polmat=2.5)
+        self.assertIn("'normalize_polmat'", str(ctx.exception))
+
         a = channel.qrt_file_parse(pathlib.Path(FN_V4))
         b = channel.qrt_file_parse(FN_V4)
         for x, y in zip(a, b):
@@ -282,11 +288,8 @@ class test_case(unittest.TestCase):
     def test_read_errors(self):
         # CIR index out of range, checked before any CIR is read
         with self.assertRaisesRegex(ValueError, "^Snapshot 1: Input 'i_cir' is out of range"):
-            channel.qrt_file_read(FN_V4, [0, 999], 0, uplink=False, normalize_polmat=1)
+            channel.qrt_file_read(FN_V4, [0, 999], 0, uplink=False, normalize_polmat=True)
 
-        # normalize_polmat other than 0 or 1
-        with self.assertRaisesRegex(ValueError, "'normalize_polmat' must be 0 or 1"):
-            channel.qrt_file_read(FN_V5, [0], 0, uplink=False, normalize_polmat=5)
 
     def test_chunks(self):
         # 40 snapshots are read in three chunks by the reader thread; each entry equals a single-snapshot read
@@ -364,8 +367,8 @@ class test_zero_cir(unittest.TestCase):
 
     # The documented keyword names are the registered ones
     def test_documented_keywords(self):
-        a = channel.qrt_file_read(fn=FN_V4, i_cir=[1, 0], i_orig=0, uplink=True, normalize_polmat=0)
-        b = channel.qrt_file_read(FN_V4, [1, 0], 0, uplink=True, normalize_polmat=0)
+        a = channel.qrt_file_read(fn=FN_V4, i_cir=[1, 0], i_orig=0, uplink=True, normalize_polmat=False)
+        b = channel.qrt_file_read(FN_V4, [1, 0], 0, uplink=True, normalize_polmat=False)
         self.assertEqual(len(a), 18)
         for x, y in zip(a[:5], b[:5]):
             npt.assert_array_equal(x, y)

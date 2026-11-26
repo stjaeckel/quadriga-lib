@@ -833,7 +833,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`i_cir`** — CIR indices, 0-based, below `n_cir`; `(n_out,)`; default: `None` (all CIRs of the file)
 - **`i_orig`** — Origin index, 0-based, below `n_orig`; int; default: 0
 - **`uplink`** — `False`: origin = Tx, destination = Rx; `True`: origin = Rx, destination = Tx; default: `False`
-- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, bool (see Notes); default: `True`
 
 ### Outputs:
 - **`center_freq`** — Frequencies in Hz; `(n_freq,)`
@@ -865,8 +865,8 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   matrix (version 6: the power of the coefficient):
   | `normalize_polmat` | `polmat` | `path_gain` |
   | ------------------ | -------- | ----------- |
-  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
-  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+  | `False` | As stored | $10^{-\mathrm{PL}/10}$ |
+  | `True` | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
 
 - **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
   `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.

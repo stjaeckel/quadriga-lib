@@ -105,9 +105,9 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
         arma::mat txp, rxp;
         std::vector<arma::mat> v_pg;
         std::vector<arma::vec> v_pl;
-        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, false, &cf, &txp, nullptr, &rxp, nullptr,
                                             nullptr, nullptr, &v_pg, &v_pl, nullptr,
-                                            nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+                                            nullptr, nullptr, nullptr, nullptr, nullptr);
         const arma::mat pg = v_pg[0];
         const arma::vec pl = v_pl[0];
 
@@ -176,9 +176,9 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
         arma::mat txp, rxp;
         std::vector<arma::mat> v_pg;
         std::vector<arma::vec> v_pl;
-        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, false, &cf, &txp, nullptr, &rxp, nullptr,
                                             nullptr, nullptr, &v_pg, &v_pl, nullptr,
-                                            nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+                                            nullptr, nullptr, nullptr, nullptr, nullptr);
         const arma::mat pg = v_pg[0];
         const arma::vec pl = v_pl[0];
 
@@ -216,9 +216,9 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
     auto excess_dB = [&](arma::uword ic) -> double
     {
         std::vector<arma::mat> pg;
-        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, {ic}, 0, false, false, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, nullptr, &pg, nullptr, nullptr,
-                                            nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+                                            nullptr, nullptr, nullptr, nullptr, nullptr);
         return -10.0 * std::log10(pg[0](0, 2) / pg[0](0, 0));
     };
     CHECK(std::abs(excess_dB(0) / excess_dB(2) - 8.0) < 1e-6);

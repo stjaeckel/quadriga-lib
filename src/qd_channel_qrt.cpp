@@ -365,7 +365,7 @@ void quadriga_lib::qrt_file_init(
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
-    const arma::u32_vec &cir_offset = {0},
+    const uint_list &cir_offset = {0},
     unsigned n_orig = 1,
     bool scalar_mode = false);
 ```
@@ -393,10 +393,11 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
                                  const arma::Mat<dtype> &cir_pos,
                                  const arma::Mat<dtype> &cir_orientation,
                                  const std::vector<std::string> &dest_names,
-                                 const arma::u32_vec &cir_offset,
+                                 const uint_list &cir_offset_in,
                                  unsigned n_orig,
                                  bool scalar_mode)
 {
+    const arma::uvec &cir_offset = cir_offset_in.vec();
     if (center_freq.n_elem == 0 || center_freq.n_elem > 127)
         throw std::invalid_argument("Input 'center_freq' must have 1 to 127 elements.");
     if (!center_freq.is_finite() || arma::any(center_freq <= dtype(0)))
@@ -488,7 +489,8 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
             wr_col(fileW, cir_orientation.colptr(2), n_cir);
     }
 
-    fileW.write((char *)cir_offset.memptr(), n_dest * sizeof(unsigned));
+    const arma::u32_vec cir_offset_u32 = arma::conv_to<arma::u32_vec>::from(cir_offset); // At most n_cir, checked above
+    fileW.write((char *)cir_offset_u32.memptr(), n_dest * sizeof(unsigned));
     for (unsigned i = 0; i < n_dest; ++i)
     {
         uint8_t len = (uint8_t)dest_names[i].size();
@@ -511,11 +513,11 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
 
 template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const arma::Col<float> &center_freq, const arma::Mat<float> &cir_pos,
                                                  const arma::Mat<float> &cir_orientation, const std::vector<std::string> &dest_names,
-                                                 const arma::u32_vec &cir_offset, unsigned n_orig, bool scalar_mode);
+                                                 const uint_list &cir_offset, unsigned n_orig, bool scalar_mode);
 
 template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const arma::Col<double> &center_freq, const arma::Mat<double> &cir_pos,
                                                   const arma::Mat<double> &cir_orientation, const std::vector<std::string> &dest_names,
-                                                  const arma::u32_vec &cir_offset, unsigned n_orig, bool scalar_mode);
+                                                  const uint_list &cir_offset, unsigned n_orig, bool scalar_mode);
 
 /*!MD
 # qrt_file_append
@@ -1093,6 +1095,7 @@ void quadriga_lib::qrt_file_read(
     const uint_list &i_cir = {},
     arma::uword i_orig = 0,
     bool uplink = false,
+    bool normalize_polmat = true,
     arma::Col<dtype> *center_freq = nullptr,
     arma::Mat<dtype> *tx_pos = nullptr,
     arma::Mat<dtype> *tx_orientation = nullptr,
@@ -1108,7 +1111,6 @@ void quadriga_lib::qrt_file_read(
     std::vector<arma::Col<dtype>> *aoa = nullptr,
     std::vector<arma::Col<dtype>> *eoa = nullptr,
     std::vector<std::vector<arma::Mat<dtype>>> *path_coord = nullptr,
-    int normalize_polmat = 1,
     std::vector<arma::u32_vec> *n_interact = nullptr,
     std::vector<arma::fmat> *coord = nullptr,
     std::vector<std::vector<uint8_t>> *interact_type = nullptr,
@@ -1121,7 +1123,7 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** *(optional)* — CIR indices, 0-based, below `n_cir`; empty = all CIRs of the file; `[n_out]`
 - **`i_orig`** *(optional)* — Origin index, 0-based, below `n_orig`
 - **`uplink`** *(optional)* — `false`: origin = Tx, destination = Rx; `true`: origin = Rx, destination = Tx
-- **`normalize_polmat`** *(optional)* — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes)
+- **`normalize_polmat`** *(optional)* — Scaling of `polmat` and `path_gain` (see Notes)
 - **`file`** *(optional)* — Open binary stream of the file, left open
 - **`cache`** *(optional)* — Metadata of the file from [[qrt_read_cache_init]]
 
@@ -1158,9 +1160,9 @@ std::vector<arma::vec> path_length;
 for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
 {
     arma::uvec i_cir = arma::regspace<arma::uvec>(i0, std::min(i0 + 256, (arma::uword)cache.n_cir) - 1);
-    quadriga_lib::qrt_file_read<double>("", i_cir, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, &path_gain, &path_length, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1,
-        nullptr, nullptr, nullptr, &stream, &cache);
+    quadriga_lib::qrt_file_read<double>("", i_cir, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, &path_gain, &path_length, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &stream, &cache);
     // ... use path_gain[k], path_length[k] of CIR i_cir[k]
 }
 ```
@@ -1174,8 +1176,8 @@ for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
   matrix (version 6: the power of the coefficient):<br><br>
   | `normalize_polmat` | `polmat` | `path_gain` |
   | ------------------ | -------- | ----------- |
-  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
-  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+  | `false` | As stored | $10^{-\mathrm{PL}/10}$ |
+  | `true` | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
 
 - **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
   `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
@@ -1199,7 +1201,7 @@ MD!*/
 // - Returns the size of the path block in bytes, 0 if no path data was read
 template <typename dtype>
 static size_t qrt_read_cir(std::ifstream &fileR, size_t file_size, const quadriga_lib::qrt_read_cache &c,
-                           arma::uword i_cir, arma::uword i_orig, bool uplink, int normalize_polmat,
+                           arma::uword i_cir, arma::uword i_orig, bool uplink, bool normalize_polmat,
                            const arma::vec &gain_at_1m, const arma::vec &alpha_dB_per_m,
                            dtype *tx_pos, dtype *tx_orientation, dtype *rx_pos, dtype *rx_orientation,
                            arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_gain,
@@ -1393,7 +1395,7 @@ static size_t qrt_read_cir(std::ifstream &fileR, size_t file_size, const quadrig
 
                 // column powers (V and H) - path gain = max column power
                 dtype gain = 1.0;
-                if (normalize_polmat == 1)
+                if (normalize_polmat)
                 {
                     const dtype p1 = r11 * r11 + i11 * i11 + r21 * r21 + i21 * i21;
                     const dtype p2 = r12 * r12 + i12 * i12 + r22 * r22 + i22 * i22;
@@ -1549,15 +1551,12 @@ void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_cir, arma:
                            std::vector<arma::Cube<dtype>> *polmat,
                            std::vector<arma::Col<dtype>> *aod, std::vector<arma::Col<dtype>> *eod,
                            std::vector<arma::Col<dtype>> *aoa, std::vector<arma::Col<dtype>> *eoa,
-                           std::vector<std::vector<arma::Mat<dtype>>> *path_coord, int normalize_polmat,
+                           std::vector<std::vector<arma::Mat<dtype>>> *path_coord, bool normalize_polmat,
                            std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
                            std::vector<std::vector<uint8_t>> *interact_type,
                            std::ifstream *file, const quadriga_lib::qrt_read_cache *cache,
                            size_t *bytes_read, size_t *repeat)
 {
-    if (normalize_polmat != 0 && normalize_polmat != 1)
-        throw std::invalid_argument("Input 'normalize_polmat' must be 0 or 1.");
-
     // Outputs must be distinct and must not be part of the cache (possible for dtype = float)
     if (cache)
         qd_check_alias_list<arma::Mat<dtype>>({center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation},
@@ -1689,7 +1688,7 @@ void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_cir, arma:
 }
 
 template <typename dtype>
-void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir_in, arma::uword i_orig, bool uplink,
+void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir_in, arma::uword i_orig, bool uplink, bool normalize_polmat,
                                  arma::Col<dtype> *center_freq, arma::Mat<dtype> *tx_pos, arma::Mat<dtype> *tx_orientation,
                                  arma::Mat<dtype> *rx_pos, arma::Mat<dtype> *rx_orientation,
                                  std::vector<arma::Mat<dtype>> *fbs_pos, std::vector<arma::Mat<dtype>> *lbs_pos,
@@ -1697,7 +1696,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir_i
                                  std::vector<arma::Cube<dtype>> *polmat,
                                  std::vector<arma::Col<dtype>> *aod, std::vector<arma::Col<dtype>> *eod,
                                  std::vector<arma::Col<dtype>> *aoa, std::vector<arma::Col<dtype>> *eoa,
-                                 std::vector<std::vector<arma::Mat<dtype>>> *path_coord, int normalize_polmat,
+                                 std::vector<std::vector<arma::Mat<dtype>>> *path_coord,
                                  std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
                                  std::vector<std::vector<uint8_t>> *interact_type,
                                  std::ifstream *file, const qrt_read_cache *cache)
@@ -1708,7 +1707,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir_i
                                  normalize_polmat, n_interact, coord, interact_type, file, cache, nullptr, nullptr);
 }
 
-template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir, arma::uword i_orig, bool uplink,
+template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir, arma::uword i_orig, bool uplink, bool normalize_polmat,
                                           arma::Col<float> *center_freq, arma::Mat<float> *tx_pos, arma::Mat<float> *tx_orientation,
                                           arma::Mat<float> *rx_pos, arma::Mat<float> *rx_orientation,
                                           std::vector<arma::Mat<float>> *fbs_pos, std::vector<arma::Mat<float>> *lbs_pos,
@@ -1716,12 +1715,12 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list
                                           std::vector<arma::Cube<float>> *polmat,
                                           std::vector<arma::Col<float>> *aod, std::vector<arma::Col<float>> *eod,
                                           std::vector<arma::Col<float>> *aoa, std::vector<arma::Col<float>> *eoa,
-                                          std::vector<std::vector<arma::Mat<float>>> *path_coord, int normalize_polmat,
+                                          std::vector<std::vector<arma::Mat<float>>> *path_coord,
                                           std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
                                           std::vector<std::vector<uint8_t>> *interact_type,
                                           std::ifstream *file, const qrt_read_cache *cache);
 
-template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir, arma::uword i_orig, bool uplink,
+template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list &i_cir, arma::uword i_orig, bool uplink, bool normalize_polmat,
                                           arma::Col<double> *center_freq, arma::Mat<double> *tx_pos, arma::Mat<double> *tx_orientation,
                                           arma::Mat<double> *rx_pos, arma::Mat<double> *rx_orientation,
                                           std::vector<arma::Mat<double>> *fbs_pos, std::vector<arma::Mat<double>> *lbs_pos,
@@ -1729,7 +1728,7 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, const uint_list
                                           std::vector<arma::Cube<double>> *polmat,
                                           std::vector<arma::Col<double>> *aod, std::vector<arma::Col<double>> *eod,
                                           std::vector<arma::Col<double>> *aoa, std::vector<arma::Col<double>> *eoa,
-                                          std::vector<std::vector<arma::Mat<double>>> *path_coord, int normalize_polmat,
+                                          std::vector<std::vector<arma::Mat<double>>> *path_coord,
                                           std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
                                           std::vector<std::vector<uint8_t>> *interact_type,
                                           std::ifstream *file, const qrt_read_cache *cache);
@@ -1742,7 +1741,7 @@ template void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_c
                                     std::vector<arma::Cube<double>> *polmat,
                                     std::vector<arma::Col<double>> *aod, std::vector<arma::Col<double>> *eod,
                                     std::vector<arma::Col<double>> *aoa, std::vector<arma::Col<double>> *eoa,
-                                    std::vector<std::vector<arma::Mat<double>>> *path_coord, int normalize_polmat,
+                                    std::vector<std::vector<arma::Mat<double>>> *path_coord, bool normalize_polmat,
                                     std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
                                     std::vector<std::vector<uint8_t>> *interact_type,
                                     std::ifstream *file, const quadriga_lib::qrt_read_cache *cache,
@@ -1945,7 +1944,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
   `fbs_pos`, `lbs_pos` (code 193, `n_sct` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only, files store the codes ([[qrt_file_read_raw]] returns 0)
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [[qrt_file_read]] (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
+  [[qrt_file_read]] (`uplink = false`, either `normalize_polmat`) returns sqrt(`path_gain`)·`polmat` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]], since
   [[qrt_file_read]] recomputes the lengths from the stored positions; not checked

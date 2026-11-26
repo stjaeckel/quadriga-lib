@@ -34,7 +34,7 @@ Read the paths of CIRs from a QRT file
 - **`i_cir`** — CIR indices, 1-based, at most `n_cir`; `[n_out, 1]`; default: `[]` (all CIRs of the file)
 - **`i_orig`** — Origin index, 1-based, at most `n_orig`; default: 1
 - **`uplink`** — `false`: origin = Tx, destination = Rx; `true`: origin = Rx, destination = Tx; default: `false`
-- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, logical (see Notes); default: `true`
 
 ## Outputs:
 - **`center_freq`** — Frequencies in Hz; `[n_freq, 1]`
@@ -67,8 +67,8 @@ Read the paths of CIRs from a QRT file
   matrix (version 6: the power of the coefficient):<br><br>
   | `normalize_polmat` | `polmat` | `path_gain` |
   | ------------------ | -------- | ----------- |
-  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
-  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+  | `false` | As stored | $10^{-\mathrm{PL}/10}$ |
+  | `true` | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
 
 - **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
   `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
@@ -96,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_cir"); // 1-based -> 0-based
     const arma::uword i_orig = (nrhs < 3) ? 0 : qd_mex_get_index(prhs[2], "i_orig"); // 1-based -> 0-based
     const bool uplink = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "uplink", false);
-    const int normalize_polmat = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_polmat", 1);
+    const bool normalize_polmat = (nrhs < 5) ? true : qd_mex_get_scalar<bool>(prhs[4], "normalize_polmat", true);
 
     // Reads in chunks: a reader thread reads the next chunk while this thread copies the previous one to MATLAB
     std::vector<arma::mat *> pos(4);

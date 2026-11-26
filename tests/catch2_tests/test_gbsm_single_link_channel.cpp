@@ -752,8 +752,8 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
         std::vector<arma::vec> v_pl;
         std::vector<arma::cube> v_M;
         std::vector<arma::u32_vec> v_ni;
-        quadriga_lib::qrt_file_read<double>(fn, {t}, 0, false, &cf, &T, nullptr, &R, nullptr, &v_fbs, &v_lbs, &v_pg,
-                                            &v_pl, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &v_ni);
+        quadriga_lib::qrt_file_read<double>(fn, {t}, 0, false, true, &cf, &T, nullptr, &R, nullptr, &v_fbs, &v_lbs, &v_pg,
+                                            &v_pl, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, &v_ni);
         const arma::mat fbs = v_fbs[0], lbs = v_lbs[0], pg = v_pg[0];
         const arma::vec pl = v_pl[0];
         const arma::cube M = v_M[0];

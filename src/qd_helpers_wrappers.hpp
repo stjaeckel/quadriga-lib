@@ -93,7 +93,7 @@ void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_cir, arma:
                            std::vector<arma::Cube<dtype>> *polmat,
                            std::vector<arma::Col<dtype>> *aod, std::vector<arma::Col<dtype>> *eod,
                            std::vector<arma::Col<dtype>> *aoa, std::vector<arma::Col<dtype>> *eoa,
-                           std::vector<std::vector<arma::Mat<dtype>>> *path_coord, int normalize_polmat,
+                           std::vector<std::vector<arma::Mat<dtype>>> *path_coord, bool normalize_polmat,
                            std::vector<arma::u32_vec> *n_interact, std::vector<arma::fmat> *coord,
                            std::vector<std::vector<uint8_t>> *interact_type,
                            std::ifstream *file, const quadriga_lib::qrt_read_cache *cache,
@@ -141,7 +141,8 @@ struct qd_qrt_chunk_state
     arma::uvec i_cir;
     arma::uword i_orig = 0, chunk_size = 1, n_chunk = 0;
     bool uplink = false;
-    int normalize_polmat = 1, n_req = 0;
+    bool normalize_polmat = true;
+    int n_req = 0;
 
     qd_qrt_chunk slot[2];
     std::mutex mtx;
@@ -193,7 +194,7 @@ struct qd_qrt_chunk_state
 // - Errors of the reader are rethrown on the calling thread after the reader has stopped
 template <typename Unlock, typename Init, typename Consume>
 static inline void qd_qrt_read_chunked(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
-                                       int normalize_polmat, int n_req, Init init, Consume consume, arma::uword chunk_size = 16)
+                                       bool normalize_polmat, int n_req, Init init, Consume consume, arma::uword chunk_size = 16)
 {
     auto st = std::make_shared<qd_qrt_chunk_state>();
     st->stream.open(fn, std::ios::in | std::ios::binary);

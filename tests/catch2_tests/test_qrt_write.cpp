@@ -191,11 +191,11 @@ TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
 
         arma::vec read_freq, read_freq_cached;
         std::vector<arma::mat> path_gain, path_gain_cached;
-        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &read_freq, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, &read_freq, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, &path_gain);
-        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &read_freq_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, &read_freq_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, &path_gain_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                            nullptr, nullptr, 1, nullptr, nullptr, nullptr, &stream, &cache);
+                                            nullptr, nullptr, nullptr, nullptr, nullptr, &stream, &cache);
         CHECK(arma::approx_equal(read_freq, expected_Hz, "reldiff", 1.0e-6));
         CHECK(arma::approx_equal(read_freq_cached, expected_Hz, "reldiff", 1.0e-6));
         CHECK(arma::approx_equal(path_gain_cached.at(0), path_gain.at(0), "absdiff", 0.0));
@@ -459,10 +459,10 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     std::vector<arma::Col<double>> path_length;
     std::vector<arma::Mat<double>> path_gain;
     std::vector<arma::u32_vec> n_interact;
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 1, false, nullptr, &tx_pos_out, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 1, false, false, nullptr, &tx_pos_out, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &path_gain,
                                         &path_length, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                        nullptr, 0, &n_interact, nullptr, nullptr);
+                                        nullptr, &n_interact, nullptr, nullptr);
     CHECK(n_interact.at(0).n_elem == 0);
     CHECK(path_length.at(0).n_elem == 0);
 
@@ -493,6 +493,17 @@ TEST_CASE("QRT Write - append throws when all slots are full")
     CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, {}, "C"),
                     std::runtime_error);
 
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("QRT Write - init takes the destination offsets as an index list")
+{
+    std::string fn = "tests/data/test_write_cir_offset.qrt";
+    quadriga_lib::qrt_file_init<double>(fn, arma::vec{3.75e9}, arma::mat(3, 3, arma::fill::zeros), arma::mat(),
+                                        {"A", "B"}, std::vector<int>{0, 2});
+    arma::uvec cir_offset;
+    quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, &cir_offset);
+    CHECK(arma::all(cir_offset == arma::uvec{0, 2}));
     std::remove(fn.c_str());
 }
 
@@ -660,8 +671,8 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         {
             arma::mat rx_pos, rx_ori;
             std::vector<arma::u32_vec> n_interact;
-            quadriga_lib::qrt_file_read<double>(fn, {c}, 0, false, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
-                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
+            quadriga_lib::qrt_file_read<double>(fn, {c}, 0, false, true, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
+                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &n_interact);
             CHECK(arma::approx_equal(rx_pos, cir_pos.row(c).t(), "absdiff", 0.0));
             CHECK(rx_ori(2) == (c == 1 ? 0.25 : 0.0));
             CHECK(n_interact.at(0).n_elem == (c == 0 ? 2u : c == 2 ? 1u : 0u));
@@ -691,10 +702,10 @@ TEST_CASE("QRT Write - uplink read returns the transposed M")
         {
             std::vector<arma::mat> v_pg_dl, v_pg_ul;
             std::vector<arma::cube> v_M_dl, v_M_ul;
-            quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &v_pg_dl, nullptr, &v_M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
-            quadriga_lib::qrt_file_read<double>(fn, {0}, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &v_pg_ul, nullptr, &v_M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
+            quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, normalize_polmat, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &v_pg_dl, nullptr, &v_M_dl, nullptr, nullptr, nullptr, nullptr, nullptr);
+            quadriga_lib::qrt_file_read<double>(fn, {0}, 0, true, normalize_polmat, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &v_pg_ul, nullptr, &v_M_ul, nullptr, nullptr, nullptr, nullptr, nullptr);
             const arma::mat pg_dl = v_pg_dl.at(0), pg_ul = v_pg_ul.at(0);
             const arma::cube M_dl = v_M_dl.at(0), M_ul = v_M_ul.at(0);
             REQUIRE(M_dl.n_rows == (scalar ? 2u : 8u));
@@ -765,7 +776,7 @@ TEST_CASE("QRT Write - origin position and orientation shapes")
     {
         INFO("origin " << i_orig);
         arma::fmat tx_pos(1, 7), tx_ori(1, 7); // any previous size: outputs are set to [3, 1]
-        quadriga_lib::qrt_file_read<float>(fn, {0}, i_orig, false, nullptr, &tx_pos, &tx_ori);
+        quadriga_lib::qrt_file_read<float>(fn, {0}, i_orig, false, true, nullptr, &tx_pos, &tx_ori);
         CHECK(arma::approx_equal(tx_pos, col_pos, "absdiff", 0.0f));
         CHECK(arma::approx_equal(tx_ori, i_orig < 2 ? col_ori : zeros, "absdiff", 0.0f));
     }

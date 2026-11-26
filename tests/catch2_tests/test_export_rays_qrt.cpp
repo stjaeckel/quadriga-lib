@@ -97,8 +97,8 @@ cir_t read_cir(const std::string &fn, arma::uword i_orig, arma::uword i_cir, con
     std::vector<arma::vec> pl;
     std::vector<arma::cube> M;
     std::vector<arma::u32_vec> ni;
-    quadriga_lib::qrt_file_read<double>(fn, {i_cir}, i_orig, false, &cf, &c.tx, &c.tx_o, &c.rx, &c.rx_o, &fbs, &lbs, &pg, &pl, &M, nullptr, nullptr,
-                                        nullptr, nullptr, nullptr, 1, &ni);
+    quadriga_lib::qrt_file_read<double>(fn, {i_cir}, i_orig, false, true, &cf, &c.tx, &c.tx_o, &c.rx, &c.rx_o, &fbs, &lbs, &pg, &pl, &M, nullptr, nullptr,
+                                        nullptr, nullptr, nullptr, &ni);
     c.n_path = pl[0].n_elem;
     for (arma::uword p = 0; p < c.n_path; ++p)
         c.e_len = std::max(c.e_len, 1e-7 * (arma::accu(arma::abs(c.tx)) + arma::accu(arma::abs(c.rx)) + arma::accu(arma::abs(fbs[0].col(p))) +
@@ -196,7 +196,7 @@ std::vector<arma::mat> file_data(const std::string &fn, arma::uword o)
     std::vector<arma::mat> fbs, lbs, pg;
     std::vector<arma::vec> pl;
     std::vector<arma::cube> M;
-    quadriga_lib::qrt_file_read<double>(fn, {}, o, false, nullptr, nullptr, nullptr, nullptr, nullptr, &fbs, &lbs, &pg, &pl, &M);
+    quadriga_lib::qrt_file_read<double>(fn, {}, o, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, &fbs, &lbs, &pg, &pl, &M);
     std::vector<arma::mat> out;
     for (size_t c = 0; c < fbs.size(); ++c)
         out.push_back(fbs[c]), out.push_back(lbs[c]), out.push_back(pg[c]), out.push_back(pl[c]), out.push_back(arma::vectorise(M[c]));
@@ -401,8 +401,8 @@ TEST_CASE("export_rays_qrt - given rays with or without scatterers give the file
     r[0][0].power *= 4.0;
     quadriga_lib::export_rays_qrt(b, L, r);
     std::vector<arma::mat> pa, pb;
-    quadriga_lib::qrt_file_read<double>(a, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pa);
-    quadriga_lib::qrt_file_read<double>(b, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pb);
+    quadriga_lib::qrt_file_read<double>(a, {0}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pa);
+    quadriga_lib::qrt_file_read<double>(b, {0}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pb);
     CHECK(arma::approx_equal(pb[0], 4.0 * pa[0], "reldiff", 1e-6));
 }
 
@@ -620,7 +620,7 @@ TEST_CASE("export_rays_qrt - the O2I loss has no step at the first row of an ind
     const std::string fn = F.path("a.qrt");
     quadriga_lib::export_rays_qrt(fn, L);
     std::vector<arma::mat> pg;
-    quadriga_lib::qrt_file_read<double>(fn, {99, 100, 101, 102, 103}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pg);
+    quadriga_lib::qrt_file_read<double>(fn, {99, 100, 101, 102, 103}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &pg);
     REQUIRE(pg.size() == 5);
     for (size_t i = 1; i + 1 < pg.size(); ++i)
         CHECK(std::abs(10.0 * std::log10(arma::accu(pg[i]) / arma::accu(pg[i + 1]))) < 3.0);

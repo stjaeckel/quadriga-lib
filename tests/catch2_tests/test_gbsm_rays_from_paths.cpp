@@ -241,8 +241,8 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
     std::vector<arma::vec> pl;
     std::vector<arma::cube> M;
     std::vector<arma::u32_vec> ni;
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &in.cf, &T, nullptr, &R, nullptr, &fbs, &lbs,
-                                        &pg, &pl, &M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &ni);
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, &in.cf, &T, nullptr, &R, nullptr, &fbs, &lbs,
+                                        &pg, &pl, &M, nullptr, nullptr, nullptr, nullptr, nullptr, &ni);
     in.T = T, in.R = R, in.fbs = fbs[0], in.lbs = lbs[0], in.pg = pg[0], in.pl = pl[0], in.M = M[0];
     const arma::u32_vec n_interact = ni[0];
     std::remove(fn.c_str());
@@ -319,8 +319,8 @@ TEST_CASE("gbsm_rays_from_paths - n_interact of qrt_file_read passes as path_typ
     std::vector<arma::vec> v_pl;
     std::vector<arma::cube> v_M;
     std::vector<arma::u32_vec> v_ni;
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, &cf, &T, nullptr, &R, nullptr, &v_fbs, &v_lbs, &v_pg, &v_pl,
-                                        &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &v_ni);
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, &cf, &T, nullptr, &R, nullptr, &v_fbs, &v_lbs, &v_pg, &v_pl,
+                                        &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, &v_ni);
     const arma::mat fbs = v_fbs[0], lbs = v_lbs[0], pg = v_pg[0];
     const arma::vec pl = v_pl[0];
     const arma::cube M = v_M[0];

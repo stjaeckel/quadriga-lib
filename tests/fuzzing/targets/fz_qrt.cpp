@@ -103,17 +103,17 @@ void fuzz_one(const uint8_t *data, size_t size)
                     {
                         std::ifstream f(fn, std::ios::binary);
                         auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);
-                        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &center_freq, &tx_pos,
+                        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, uplink ? 0 : 1, &center_freq, &tx_pos,
                                                             &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
                                                             &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
-                                                            &path_coord, uplink ? 0 : 1, &n_interact, &coord, &interact_type,
+                                                            &path_coord, &n_interact, &coord, &interact_type,
                                                             &f, &cache);
                     }
                     else
-                        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &center_freq, &tx_pos,
+                        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, uplink ? 0 : 1, &center_freq, &tx_pos,
                                                             &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
                                                             &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
-                                                            &path_coord, uplink ? 0 : 1, &n_interact, &coord, &interact_type); });
+                                                            &path_coord, &n_interact, &coord, &interact_type); });
         fz::clean([&] { quadriga_lib::qrt_file_read_raw(fn, i_orig); });
     }
 }

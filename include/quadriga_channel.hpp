@@ -456,7 +456,7 @@ namespace quadriga_lib
         const arma::Mat<dtype> &cir_pos,                     // CIR positions; [ n_cir, 3 ]
         const arma::Mat<dtype> &cir_orientation,             // CIR orientations; [ n_cir, 3 ]
         const std::vector<std::string> &dest_names = {"RX"}, // Receiver names; length [ n_rx ]
-        const arma::u32_vec &cir_offset = {0},               // CIR offset for each receiver; length [ n_rx ]
+        const uint_list &cir_offset = {0},                   // CIR offset for each receiver; length [ n_rx ]
         unsigned n_orig = 1,                                 // Number transmitters
         bool scalar_mode = false);                           // Flag for scalar layout
 
@@ -489,15 +489,16 @@ namespace quadriga_lib
 
     // Read ray-tracing data of a list of CIRs from a QRT file
     // - Per-CIR outputs are vectors with one entry per requested CIR, positions and orientations are [3, n_out]
-    // normalize_polmat options:
-    //  0 : polmat as in QRT file, path_gain is -FSPL
-    //  1 : polmat has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
+    // normalize_polmat:
+    //  false : polmat as in QRT file, path_gain is -FSPL
+    //  true  : polmat has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
     template <typename dtype = double>
     void qrt_file_read(
         const std::string &fn,                                            // Path to the QRT file
         const uint_list &i_cir = {},                                     // CIR indices, 0-based, [n_out]; empty = all CIRs
         arma::uword i_orig = 0,                                           // Origin index (for downlink Origin = TX)
         bool uplink = false,                                              // Reverse direction: origin = RX, destination = TX
+        bool normalize_polmat = true,                                     // Normalize polmat to a largest column power of 1
         arma::Col<dtype> *center_freq = nullptr,                          // Center frequency in [Hz], Size [n_freq]
         arma::Mat<dtype> *tx_pos = nullptr,                               // Transmitter positions in Cartesian coordinates in [m], [3, n_out]
         arma::Mat<dtype> *tx_orientation = nullptr,                       // Transmitter orientations (bank, tilt, heading) in [rad], [3, n_out]
@@ -513,7 +514,6 @@ namespace quadriga_lib
         std::vector<arma::Col<dtype>> *aoa = nullptr,                     // Arrival azimuth angles in [rad], [n_out] of [n_path]
         std::vector<arma::Col<dtype>> *eoa = nullptr,                     // Arrival elevation angles in [rad], [n_out] of [n_path]
         std::vector<std::vector<arma::Mat<dtype>>> *path_coord = nullptr, // Interaction coordinates, [n_out] of [n_path] of [3, n_interact + 2]
-        int normalize_polmat = 1,                                         // Normalize polmat options
         std::vector<arma::u32_vec> *n_interact = nullptr,                 // Number of mesh interactions per path, [n_out] of [n_path], 0=LOS
         std::vector<arma::fmat> *coord = nullptr,                         // Interaction coordinates, [n_out] of [3, sum(n_interact)]
         std::vector<std::vector<uint8_t>> *interact_type = nullptr,       // Interaction type codes, [n_out] of [sum(n_interact)]

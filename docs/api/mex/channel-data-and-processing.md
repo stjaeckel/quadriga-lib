@@ -832,7 +832,7 @@ Also in: [C++](../cpp/channel-data-and-processing.md#qrt_file_read) · [Python](
 - **`i_cir`** — CIR indices, 1-based, at most `n_cir`; `[n_out, 1]`; default: `[]` (all CIRs of the file)
 - **`i_orig`** — Origin index, 1-based, at most `n_orig`; default: 1
 - **`uplink`** — `false`: origin = Tx, destination = Rx; `true`: origin = Rx, destination = Tx; default: `false`
-- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, logical (see Notes); default: `true`
 
 ### Outputs:
 - **`center_freq`** — Frequencies in Hz; `[n_freq, 1]`
@@ -865,8 +865,8 @@ Also in: [C++](../cpp/channel-data-and-processing.md#qrt_file_read) · [Python](
   matrix (version 6: the power of the coefficient):
   | `normalize_polmat` | `polmat` | `path_gain` |
   | ------------------ | -------- | ----------- |
-  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
-  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+  | `false` | As stored | $10^{-\mathrm{PL}/10}$ |
+  | `true` | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
 
 - **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
   `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.

@@ -2311,7 +2311,7 @@ void quadriga_lib::qrt_file_init(
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
-    const arma::u32_vec &cir_offset = {0},
+    const uint_list &cir_offset = {0},
     unsigned n_orig = 1,
     bool scalar_mode = false);
 ```
@@ -2416,6 +2416,7 @@ void quadriga_lib::qrt_file_read(
     const uint_list &i_cir = {},
     arma::uword i_orig = 0,
     bool uplink = false,
+    bool normalize_polmat = true,
     arma::Col<dtype> *center_freq = nullptr,
     arma::Mat<dtype> *tx_pos = nullptr,
     arma::Mat<dtype> *tx_orientation = nullptr,
@@ -2431,7 +2432,6 @@ void quadriga_lib::qrt_file_read(
     std::vector<arma::Col<dtype>> *aoa = nullptr,
     std::vector<arma::Col<dtype>> *eoa = nullptr,
     std::vector<std::vector<arma::Mat<dtype>>> *path_coord = nullptr,
-    int normalize_polmat = 1,
     std::vector<arma::u32_vec> *n_interact = nullptr,
     std::vector<arma::fmat> *coord = nullptr,
     std::vector<std::vector<uint8_t>> *interact_type = nullptr,
@@ -2444,7 +2444,7 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** *(optional)* — CIR indices, 0-based, below `n_cir`; empty = all CIRs of the file; `[n_out]`
 - **`i_orig`** *(optional)* — Origin index, 0-based, below `n_orig`
 - **`uplink`** *(optional)* — `false`: origin = Tx, destination = Rx; `true`: origin = Rx, destination = Tx
-- **`normalize_polmat`** *(optional)* — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes)
+- **`normalize_polmat`** *(optional)* — Scaling of `polmat` and `path_gain` (see Notes)
 - **`file`** *(optional)* — Open binary stream of the file, left open
 - **`cache`** *(optional)* — Metadata of the file from [qrt_read_cache_init](#qrt_read_cache_init)
 
@@ -2481,9 +2481,9 @@ std::vector<arma::vec> path_length;
 for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
 {
     arma::uvec i_cir = arma::regspace<arma::uvec>(i0, std::min(i0 + 256, (arma::uword)cache.n_cir) - 1);
-    quadriga_lib::qrt_file_read<double>("", i_cir, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, &path_gain, &path_length, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1,
-        nullptr, nullptr, nullptr, &stream, &cache);
+    quadriga_lib::qrt_file_read<double>("", i_cir, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, &path_gain, &path_length, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &stream, &cache);
     // ... use path_gain[k], path_length[k] of CIR i_cir[k]
 }
 ```
@@ -2497,8 +2497,8 @@ for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
   matrix (version 6: the power of the coefficient):
   | `normalize_polmat` | `polmat` | `path_gain` |
   | ------------------ | -------- | ----------- |
-  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
-  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+  | `false` | As stored | $10^{-\mathrm{PL}/10}$ |
+  | `true` | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
 
 - **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
   `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
@@ -2567,7 +2567,7 @@ Not in: MATLAB, Python
   `fbs_pos`, `lbs_pos` (code 193, `n_sct` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only, files store the codes ([qrt_file_read_raw](#qrt_file_read_raw) returns 0)
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [qrt_file_read](#qrt_file_read) (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
+  [qrt_file_read](#qrt_file_read) (`uplink = false`, either `normalize_polmat`) returns sqrt(`path_gain`)·`polmat` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init), since
   [qrt_file_read](#qrt_file_read) recomputes the lengths from the stored positions; not checked
@@ -3794,14 +3794,14 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
-- Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `normalize_polmat = 1` (`uplink = true` gives the reverse
-  link; `normalize_polmat = 0` leaves only the free-space gain in `power`)
+- Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the
+  names and order of [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `normalize_polmat = true` (`uplink = true`
+  gives the reverse link; `normalize_polmat = false` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
-- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) pass the `n_interact` of [qrt_file_read](#qrt_file_read)
+- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
+  GR path needs `path_type`: for files of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) pass the `n_interact` of [qrt_file_read](#qrt_file_read)
   (interaction count = path type); for ray-traced files the user sets it (values > 2 throw)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 

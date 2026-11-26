@@ -135,9 +135,9 @@ TEST_CASE("QRT Reader")
             std::vector<arma::vec> v_pl, v_aod, v_eod, v_aoa, v_eoa;
             std::vector<arma::cube> v_M;
             std::vector<std::vector<arma::mat>> v_pc;
-            quadriga_lib::qrt_file_read<double>(fn, {i_cir}, i_orig, uplink, &center_freq, &tx_pos, &tx_orientation,
+            quadriga_lib::qrt_file_read<double>(fn, {i_cir}, i_orig, uplink, normalize_polmat, &center_freq, &tx_pos, &tx_orientation,
                                                 &rx_pos, &rx_orientation, &v_fbs, &v_lbs, &v_pg, &v_pl, &v_M,
-                                                &v_aod, &v_eod, &v_aoa, &v_eoa, &v_pc, normalize_polmat, nullptr, nullptr,
+                                                &v_aod, &v_eod, &v_aoa, &v_eoa, &v_pc, nullptr, nullptr,
                                                 nullptr, use_cache ? &stream : nullptr, use_cache ? &cache : nullptr);
             REQUIRE(v_fbs.size() == 1);
             fbs_pos = v_fbs[0], lbs_pos = v_lbs[0], path_gain = v_pg[0], path_length = v_pl[0], M = v_M[0];
@@ -371,9 +371,9 @@ TEST_CASE("QRT Reader v5")
     arma::vec center_freq;
 
     // CIR 1, normalize_polmat = 0: M as stored, one slice per frequency
-    quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, &center_freq, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, false, &center_freq, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &v_pg,
-                                        nullptr, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+                                        nullptr, &v_M, nullptr, nullptr, nullptr, nullptr, nullptr);
     arma::cube M = v_M.at(0);
     arma::mat path_gain = v_pg.at(0);
 
@@ -396,7 +396,7 @@ TEST_CASE("QRT Reader v5")
     CHECK(arma::approx_equal(B, T, "absdiff", 1.5e-4));
 
     // Default normalize_polmat = 1: the stronger column of M has power 1
-    quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, &center_freq, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, true, &center_freq, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &v_pg,
                                         nullptr, &v_M);
     M = v_M.at(0);
@@ -412,11 +412,11 @@ TEST_CASE("QRT Reader - angles without path length")
     std::string fn = "tests/data/test_v5.qrt";
 
     std::vector<arma::vec> aod1(1, arma::vec{12345.0}), eod1 = aod1, aoa1 = aod1, eoa1 = aod1; // stale input values
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, &aod1, &eod1, &aoa1, &eoa1);
 
     std::vector<arma::vec> aod2, eod2, aoa2, eoa2, path_length;
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, &path_length, nullptr, &aod2, &eod2, &aoa2, &eoa2);
 
     REQUIRE(path_length.at(0).n_elem > 0);
@@ -457,12 +457,12 @@ TEST_CASE("QRT Reader - angles with 0 paths")
 
     // CIR 1 has one path
     std::vector<arma::vec> aod1;
-    quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {1}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, &aod1);
     CHECK(aod1.at(0).n_elem == 1);
 
     std::vector<arma::vec> aod(1, arma::vec{1.0}), eod = aod, aoa = aod, eoa = aod, path_length = aod;
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, &aod, &eod, &aoa, &eoa);
     CHECK(aod.at(0).n_elem == 0);
     CHECK(eod.at(0).n_elem == 0);
@@ -470,7 +470,7 @@ TEST_CASE("QRT Reader - angles with 0 paths")
     CHECK(eoa.at(0).n_elem == 0);
 
     aod[0] = {1.0};
-    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, &path_length, nullptr, &aod, &eod, &aoa, &eoa);
     CHECK(path_length.at(0).n_elem == 0);
     CHECK(aod.at(0).n_elem == 0);
@@ -489,21 +489,21 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
         for (arma::uword i_cir : {big, big + 1ULL, (arma::uword)cache.n_cir})
         {
             arma::mat rx_pos;
-            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {i_cir}, 0, false, nullptr, nullptr, nullptr, &rx_pos),
+            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {i_cir}, 0, false, true, nullptr, nullptr, nullptr, &rx_pos),
                             std::invalid_argument);
-            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {i_cir}, 0, false, nullptr, nullptr, nullptr, &rx_pos,
+            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {i_cir}, 0, false, true, nullptr, nullptr, nullptr, &rx_pos,
                                                                 nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                                nullptr, nullptr, nullptr, nullptr, 1, nullptr, nullptr, nullptr, &f, &cache),
+                                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &f, &cache),
                             std::invalid_argument);
         }
         for (arma::uword i_orig : {big, (arma::uword)cache.n_orig})
         {
             arma::mat rx_pos;
-            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {0}, i_orig, false, nullptr, nullptr, nullptr, &rx_pos),
+            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {0}, i_orig, false, true, nullptr, nullptr, nullptr, &rx_pos),
                             std::invalid_argument);
-            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {0}, i_orig, false, nullptr, nullptr, nullptr, &rx_pos,
+            CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {0}, i_orig, false, true, nullptr, nullptr, nullptr, &rx_pos,
                                                                 nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                                nullptr, nullptr, nullptr, nullptr, 1, nullptr, nullptr, nullptr, &f, &cache),
+                                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &f, &cache),
                             std::invalid_argument);
         }
         if (cache.version != 4)
@@ -511,33 +511,6 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
             CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, big), std::invalid_argument);
             CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, big, &f, &cache), std::invalid_argument);
         }
-    }
-}
-
-TEST_CASE("QRT Reader - normalize_polmat must be 0 or 1")
-{
-    // Other values of normalize_polmat throw, with and without the cache
-    std::string fn = "tests/data/test_v5.qrt";
-    std::ifstream f(fn, std::ios::binary);
-    auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);
-    for (int nM : {-1, 2, 5})
-    {
-        std::vector<arma::cube> M;
-        CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                            nullptr, nullptr, nullptr, &M, nullptr, nullptr, nullptr, nullptr,
-                                                            nullptr, nM),
-                        std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                            nullptr, nullptr, nullptr, &M, nullptr, nullptr, nullptr, nullptr,
-                                                            nullptr, nM, nullptr, nullptr, nullptr, &f, &cache),
-                        std::invalid_argument);
-    }
-    for (int nM : {0, 1})
-    {
-        std::vector<arma::cube> M;
-        quadriga_lib::qrt_file_read<double>(fn, {0}, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                            nullptr, nullptr, nullptr, &M, nullptr, nullptr, nullptr, nullptr, nullptr, nM);
-        CHECK(M.at(0).n_cols > 0);
     }
 }
 
@@ -553,8 +526,8 @@ TEST_CASE("QRT Reader - outputs that alias other outputs or the cache")
     auto read = [&](arma::fmat *tx, arma::fmat *rx, fmats *fbs, fmats *lbs, fvecs *aoa, fmats *coord,
                     arma::fvec *fc = nullptr)
     {
-        quadriga_lib::qrt_file_read<float>(fn, {0}, 0, false, fc, tx, nullptr, rx, nullptr, fbs, lbs, nullptr, nullptr, nullptr,
-                                           nullptr, nullptr, aoa, nullptr, nullptr, 1, nullptr, coord, nullptr, &f, &cache);
+        quadriga_lib::qrt_file_read<float>(fn, {0}, 0, false, true, fc, tx, nullptr, rx, nullptr, fbs, lbs, nullptr, nullptr, nullptr,
+                                           nullptr, nullptr, aoa, nullptr, nullptr, nullptr, coord, nullptr, &f, &cache);
     };
     arma::fmat tx, rx;
     arma::fvec fc;
@@ -605,8 +578,8 @@ struct qrt_read_out
     void read(const std::string &fn, const arma::uvec &i_cir, arma::uword i_orig, bool uplink,
               std::ifstream *f = nullptr, const quadriga_lib::qrt_read_cache *cache = nullptr)
     {
-        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &cf, &tp, &to, &rp, &ro, &fbs, &lbs, &pg, &pl, &M,
-                                            &aod, &eod, &aoa, &eoa, &pc, 1, &ni, &co, &it, f, cache);
+        quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, true, &cf, &tp, &to, &rp, &ro, &fbs, &lbs, &pg, &pl, &M,
+                                            &aod, &eod, &aoa, &eoa, &pc, &ni, &co, &it, f, cache);
     }
 };
 

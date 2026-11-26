@@ -244,7 +244,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("i_orig") = 0,
           py::kw_only(),
           py::arg("uplink") = false,
-          py::arg("normalize_polmat") = 1);
+          py::arg("normalize_polmat") = true);
 
     m.def("calc_angular_spread", &calc_angular_spread,
           py::arg("az"),

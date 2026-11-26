@@ -98,7 +98,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`i_cir`** — CIR indices, 0-based, below `n_cir`; `(n_out,)`; default: `None` (all CIRs of the file)
 - **`i_orig`** — Origin index, 0-based, below `n_orig`; int; default: 0
 - **`uplink`** — `False`: origin = Tx, destination = Rx; `True`: origin = Rx, destination = Tx; default: `False`
-- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, bool (see Notes); default: `True`
 
 ## Outputs:
 - **`center_freq`** — Frequencies in Hz; `(n_freq,)`
@@ -130,8 +130,8 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   matrix (version 6: the power of the coefficient):<br><br>
   | `normalize_polmat` | `polmat` | `path_gain` |
   | ------------------ | -------- | ----------- |
-  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
-  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+  | `False` | As stored | $10^{-\mathrm{PL}/10}$ |
+  | `True` | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
 
 - **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
   `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
@@ -153,10 +153,11 @@ py::tuple qrt_file_read(const py::handle &fn,
                         py::handle i_cir,
                         arma::uword i_orig,
                         py::handle uplink,
-                        int normalize_polmat)
+                        py::handle normalize_polmat)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
     const bool uplink_b = qd_python_flag(uplink, false, "uplink");
+    const bool normalize_b = qd_python_flag(normalize_polmat, true, "normalize_polmat");
     const arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(i_cir, true, false, "i_cir"); // None or empty = all
 
     py::array_t<double> center_freq_py, tx_pos_py, tx_orientation_py, rx_pos_py, rx_orientation_py;
@@ -202,7 +203,7 @@ py::tuple qrt_file_read(const py::handle &fn,
         }
     };
 
-    qd_qrt_read_chunked<py::gil_scoped_release>(fn_s, i_cir_a, i_orig, uplink_b, normalize_polmat, 18, init, consume);
+    qd_qrt_read_chunked<py::gil_scoped_release>(fn_s, i_cir_a, i_orig, uplink_b, normalize_b, 18, init, consume);
 
     return py::make_tuple(center_freq_py, tx_pos_py, tx_orientation_py, rx_pos_py, rx_orientation_py,
                           fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, polmat_py,
