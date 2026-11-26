@@ -13,7 +13,7 @@ SECTION!*/
 
 /*!MD
 # QRT_FILE_READ
-Read ray-tracing CIR data from a QRT file
+Read the paths of CIRs from a QRT file
 
 - Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
   [[get_channels_spherical]] (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or
@@ -37,7 +37,7 @@ Read ray-tracing CIR data from a QRT file
 - **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
 
 ## Outputs:
-- **`center_freq`** — Frequencies in Hz (version 4: of origin `i_orig`); `[n_freq, 1]`
+- **`center_freq`** — Frequencies in Hz; `[n_freq, 1]`
 - **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `[3, n_out]`
 - **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientations (bank, tilt, heading) in rad; `[3, n_out]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m: the first and the last interaction
@@ -55,12 +55,12 @@ Read ray-tracing CIR data from a QRT file
   `[n_path, 1]`
 - **`coord`** — Interaction points of all paths, concatenated in path order; cell array `[n_out, 1]` of single
   `[3, sum(n_interact)]`
-- **`interact_type`** — Interaction type codes, concatenated like `coord`; cell array `[n_out, 1]` of uint8
-  `[sum(n_interact), 1]`; empty for version 4 files
+- **`interact_type`** — Interaction type codes (see [QRT file format: stored values](formats.html#qrt-stored-values)),
+  concatenated like `coord`; cell array `[n_out, 1]` of uint8 `[sum(n_interact), 1]`
 
 ## Notes:
 - **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
-  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  propagation loss of the path length $d$, for EM files (version 5) the free-space loss
   $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
   the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
   $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
@@ -75,11 +75,9 @@ Read ray-tracing CIR data from a QRT file
   `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
   codes describe that traversal
 - An origin slot that is not written yet gives zero positions and orientations and no paths
-- GBSM paths of [[export_rays_qrt]] carry the code 193 at their scatterers; their LOS and GR paths look like
-  ray-traced ones (no interaction, one reflection 129)
-- **Errors**: an index out of range, or a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is
-  truncated or corrupt (counts or offsets beyond the file, path blocks of different CIRs that overlap). A message about
-  one requested CIR starts with `Snapshot <k>: `, with `k` its position in `i_cir`
+- **Errors**: an index out of range, or a file that cannot be opened, is not a [QRT file](formats.html#qrt) of version 5
+  or 6, or is truncated or corrupt (counts or offsets beyond the file, path blocks of different CIRs that overlap). A
+  message about one requested CIR starts with `Snapshot <k>: `, with `k` its position in `i_cir`
 
 ## See also:
 - [[qrt_file_parse]] (metadata without path data)

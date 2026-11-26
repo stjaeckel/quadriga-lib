@@ -392,7 +392,8 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#export_rays_qrt) · [Py
 - Separates the ray generation from the antennas: [qrt_file_read](channel-data-and-processing.md#qrt_file_read), [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths) and
   [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) turn a CIR into channels for any arrays, orientations and positions, without the GBSM
   chain
-- Positions in the file are local; add the returned shift to the positions read back
+- Positions in the file are local (see [QRT file format: precision](../../formats/qrt.md#qrt-precision)); add the returned shift
+  to the positions read back
 
 ### Declaration:
 ```cpp
@@ -426,8 +427,8 @@ arma::vec quadriga_lib::export_rays_qrt(
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop
 - **Pairs**: only the pairs of `layout.pairing` (empty: all) are written; the other CIRs of an origin hold no paths
 - **Shift**: the centroid of the site and CIR positions in x and y is subtracted; z is unchanged
-- **Limits of the format**: no tap index and no ground permittivity, so a CIR gives rays, not the taps of the TR, and
-  moving a ground-reflection ray from a file throws
+- **Limits of the [QRT file format](../../formats/qrt.md)**: no tap index and no ground permittivity, so a CIR gives rays,
+  not the taps of the TR, and moving a ground-reflection ray from a file throws
 - The file is written to `fn + ".part"` and renamed at the end; a failed call leaves an existing file unchanged
 
 ### See also:

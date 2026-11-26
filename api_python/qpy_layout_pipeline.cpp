@@ -413,7 +413,8 @@ Write the rays of a layout with their link gain to a QRT file
 - Separates the ray generation from the antennas: [[qrt_file_read]], [[gbsm.rays_from_paths]] and
   [[gbsm.single_link_channel]] turn a CIR into channels for any arrays, orientations and positions, without the GBSM
   chain
-- Positions in the file are local; add the returned shift to the positions read back
+- Positions in the file are local (see [QRT file format: precision](formats.html#qrt-precision)); add the returned shift
+  to the positions read back
 
 ## Usage:
 ```
@@ -445,8 +446,8 @@ shift = quadriga_lib.layout.export_rays_qrt( fn, layout, *, rays )
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop
 - **Pairs**: only the pairs of `layout["pairing"]` (empty: all) are written; the other CIRs of an origin hold no paths
 - **Shift**: the centroid of the site and CIR positions in x and y is subtracted; z is unchanged
-- **Limits of the format**: no tap index and no ground permittivity, so a CIR gives rays, not the taps of the TR, and
-  moving a ground-reflection ray from a file raises an error
+- **Limits of the [QRT file format](formats.html#qrt)**: no tap index and no ground permittivity, so a CIR gives rays,
+  not the taps of the TR, and moving a ground-reflection ray from a file raises an error
 - The file is written to `fn + ".part"` and renamed at the end; a failed call leaves an existing file unchanged
 
 ## See also:

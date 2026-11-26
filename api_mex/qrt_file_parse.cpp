@@ -17,7 +17,8 @@ Read metadata from a QRT file
 - Reads the header of a QRT file: counts, names, frequencies, the positions and orientations of the CIRs and the
   origins, and the file version; no path data
 - A file without destinations reports one destination `RX` that owns all CIRs
-- Raises an error for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt
+- Raises an error for a file that cannot be opened, is not a [QRT file](formats.html#qrt) of version 5 or 6, or is
+  truncated or corrupt
 
 ## Usage:
 ```
@@ -37,10 +38,8 @@ Read metadata from a QRT file
   `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest, 1]`
 - **`orig_names`** — Origin names, empty for a slot not written yet; cell array of strings; `[n_orig, 1]`
 - **`dest_names`** — Destination names; cell array of strings; `[n_dest, 1]`
-- **`version`** — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar); int32
-- **`center_freq`** — Frequencies in Hz; single; `[n_freq, 1]`. Version 4 stores GHz and one frequency per origin, this
-  is the one of the first written origin (0 if none is written); version 5 files of earlier library versions store GHz
-  too, a version 5 list with all values below 1000 is read as GHz
+- **`version`** — File version: 5 (EM) or 6 (scalar); int32
+- **`center_freq`** — Frequencies in Hz; single; `[n_freq, 1]`
 - **`cir_pos`** — CIR positions in m; single; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations (bank, tilt, heading) in rad; single; `[n_cir, 3]`
 - **`orig_pos`** — Origin positions in m, zeros for a slot not written yet; single; `[n_orig, 3]`

@@ -61,13 +61,17 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 - **Origin**, **destination**: a QRT file holds the paths from each origin (a Tx position) to a list of CIR positions; a
   destination (a receiver) owns a run of consecutive CIR positions, e.g. a track
 
+**File formats.** [HDF5 channel files](formats.html#hdf5_channel) store channels with antennas, one per slot, in single
+precision; [QRT files](formats.html#qrt) store propagation paths from ray tracing or the GBSM before antennas are
+applied.
+
 **Functions by task:**
 
 | Task | Functions |
 | ---- | --------- |
 | Store and read channels | [[hdf5_create_file]], [[hdf5_write_channel]], [[hdf5_read_channel]], [[hdf5_read_layout]], [[hdf5_reshape_layout]] |
 | Store and read metadata | [[hdf5_write_dset]], [[hdf5_read_dset]], [[hdf5_read_dset_names]] |
-| Ray-tracing files | [[qrt_file_parse]], [[qrt_file_read]] |
+| Path files (QRT) | [[qrt_file_parse]], [[qrt_file_read]] |
 | Frequency response | [[freq_response]], [[freq_response_mf]] |
 | Process | [[quantize_delays]], [[crossfade_segments]] |
 | Statistics | [[calc_delay_spread]], [[calc_angular_spread]], [[calc_rician_k_factor]], [[calc_xpr]] |
@@ -75,8 +79,7 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 
 **Conventions.** Coefficients and delays of several snapshots are one array with the snapshot on the last dimension,
 as in the channel struct, or cell arrays with one array per snapshot ([[freq_response]]). Indices are 1-based, also the
-slot indices of the HDF5 files and the CIR and origin indices of the QRT files. HDF5 files store the structured channel
-data in single precision.
+slot indices of the HDF5 files and the CIR and origin indices of the QRT files.
 SECTION_DESC!*/
 
 /*!MD
@@ -136,7 +139,7 @@ Read channel objects from one or several slots of an HDF5 channel file
 - **Unstructured data**: the datasets of the slot with the prefix `par_`, in their stored class and shape
   ([[hdf5_read_dset]]); datasets of another prefix are not read
 - **Errors**: a missing file, an index outside the layout, an index in `i_snap` beyond the snapshots of a slot, or a
-  file that is not a quadriga-lib channel file; files changed by other HDF5 tools may be rejected
+  file that is not a channel file of the [HDF5 channel file format](formats.html#hdf5-compatibility)
 
 ## See also:
 - [[hdf5_read_layout]] (finds the occupied slots)

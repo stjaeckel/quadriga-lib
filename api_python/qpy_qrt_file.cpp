@@ -15,7 +15,8 @@ Read metadata from a QRT file
 - Reads the header of a QRT file: counts, names, frequencies, the positions and orientations of the CIRs and the
   origins, and the file version; no path data
 - A file without destinations reports one destination `RX` that owns all CIRs
-- Raises an error for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt
+- Raises an error for a file that cannot be opened, is not a [QRT file](formats.html#qrt) of version 5 or 6, or is
+  truncated or corrupt
 
 ## Usage:
 ```
@@ -35,10 +36,8 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
   `(n_dest,)`
 - **`orig_names`** — Origin names, empty for a slot not written yet; list of str of length `n_orig`
 - **`dest_names`** — Destination names; list of str of length `n_dest`
-- **`version`** — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar); int
-- **`center_freq`** — Frequencies in Hz; `(n_freq,)`. Version 4 stores GHz and one frequency per origin, this is the one
-  of the first written origin (0 if none is written); version 5 files of earlier library versions store GHz too, a
-  version 5 list with all values below 1000 is read as GHz
+- **`version`** — File version: 5 (EM) or 6 (scalar); int
+- **`center_freq`** — Frequencies in Hz; `(n_freq,)`
 - **`cir_pos`** — CIR positions in m; `(n_cir, 3)`
 - **`cir_orientation`** — CIR orientations (bank, tilt, heading) in rad; `(n_cir, 3)`
 - **`orig_pos`** — Origin positions in m, zeros for a slot not written yet; `(n_orig, 3)`
@@ -79,7 +78,7 @@ py::tuple qrt_file_parse(const py::handle &fn)
 
 /*!MD
 # qrt_file_read
-Read ray-tracing CIR data from a QRT file
+Read the paths of CIRs from a QRT file
 
 - Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
   [[channel.spherical]] (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or [[channel.planar]] (the
@@ -102,7 +101,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
 
 ## Outputs:
-- **`center_freq`** — Frequencies in Hz (version 4: of origin `i_orig`); `(n_freq,)`
+- **`center_freq`** — Frequencies in Hz; `(n_freq,)`
 - **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `(3, n_out)`
 - **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientations (bank, tilt, heading) in rad; `(3, n_out)`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m: the first and the last interaction
@@ -119,12 +118,12 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`n_interact`** — Number of interaction points of each path, 0 = LOS; list of `n_out` int64 arrays `(n_path,)`
 - **`coord`** — Interaction points of all paths, concatenated in path order; list of `n_out` arrays
   `(3, sum(n_interact))`
-- **`interact_type`** — Interaction type codes, concatenated like `coord`; list of `n_out` uint8 arrays
-  `(sum(n_interact),)`; empty for version 4 files
+- **`interact_type`** — Interaction type codes (see [QRT file format: stored values](formats.html#qrt-stored-values)),
+  concatenated like `coord`; list of `n_out` uint8 arrays `(sum(n_interact),)`
 
 ## Notes:
 - **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
-  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  propagation loss of the path length $d$, for EM files (version 5) the free-space loss
   $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
   the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
   $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
@@ -139,12 +138,10 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
   codes describe that traversal
 - An origin slot that is not written yet gives zero positions and orientations and no paths
-- GBSM paths of [[export_rays_qrt]] carry the code 193 at their scatterers; their LOS and GR paths look like
-  ray-traced ones (no interaction, one reflection 129)
-- **Errors**: an index out of range raises `ValueError`; a file that cannot be opened, is not a QRT file of version 4,
-  5 or 6, or is truncated or corrupt (counts or offsets beyond the file, path blocks of different CIRs that overlap)
-  raises `RuntimeError`. A message about one requested CIR starts with `Snapshot <k>: `, with `k` its position in
-  `i_cir`
+- **Errors**: an index out of range raises `ValueError`; a file that cannot be opened, is not a
+  [QRT file](formats.html#qrt) of version 5 or 6, or is truncated or corrupt (counts or offsets beyond the file, path
+  blocks of different CIRs that overlap) raises `RuntimeError`. A message about one requested CIR starts with
+  `Snapshot <k>: `, with `k` its position in `i_cir`
 
 ## See also:
 - [[qrt_file_parse]] (metadata without path data)

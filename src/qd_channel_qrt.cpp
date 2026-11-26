@@ -154,8 +154,8 @@ Read the metadata of a QRT file into a cache for repeated reads
   [[qrt_file_read_raw]] with this cache and an open stream read only the requested data, 2 seeks and 4 reads per CIR
 - Use it to read a file in parts, e.g. in chunks of CIRs or one origin after another (Example of [[qrt_file_read]])
 - The cache describes the file as it was read: create a new one after [[qrt_file_append]]
-- Throws `std::runtime_error` for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is
-  truncated or corrupt (counts or offsets beyond the file, two origins with one data block)
+- Throws `std::runtime_error` for a file that cannot be opened, is not a [QRT file](formats.html#qrt) of version 5 or 6,
+  or is truncated or corrupt (counts or offsets beyond the file, two origins with one data block)
 
 ## Declaration:
 ```
@@ -173,14 +173,13 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
 - The cache, a `quadriga_lib::qrt_read_cache` with the members:<br><br>
   | Member | Type | Description |
   | ------ | ---- | ----------- |
-  | `version` | `int` | File version, 4 to 6 |
+  | `version` | `int` | File version, 5 or 6 |
   | `n_orig`, `n_cir`, `n_dest`, `n_freq` | `unsigned` | Numbers of origin slots, CIRs, destinations (0 if the file lists none) and frequencies |
   | `freq` | `arma::fvec` | Frequencies in Hz as [[qrt_file_parse]] returns them; `[n_freq]` |
   | `cir_pos`, `cir_orientation` | `arma::fmat` | CIR positions in m and orientations in rad; `[n_cir, 3]` |
   | `orig_pos_all`, `orig_orientation` | `arma::fmat` | Origin positions in m and orientations in rad; `[n_orig, 3]` |
   | `orig_index` | `arma::u64_vec` | Byte offset of the data block of each origin, 0 = slot not written yet; `[n_orig]` |
   | `path_data_offset` | `arma::u64_vec` | Byte offset of the CIR index table of each origin, 0 = slot not written yet; `[n_orig]` |
-  | `orig_freq` | `arma::fvec` | Version 4: frequency of each origin in Hz, 0 = slot not written yet; `[n_orig]`; empty otherwise |
 
 ## See also:
 - [[qrt_file_read]] (reads CIRs with the cache)
@@ -355,8 +354,7 @@ Create a new QRT file and write its metadata header
 - Writes the header of a QRT file: the frequencies, the CIR positions and orientations, the destinations and `n_orig`
   empty origin slots; [[qrt_file_append]] then writes the paths of one origin per call
 - An EM file (version 5) stores a polarization transfer matrix per path and frequency, a scalar file (version 6, e.g.
-  acoustic) one complex coefficient
-- Values are stored as float32, the frequencies in Hz
+  acoustic) one complex coefficient (see [QRT file format](formats.html#qrt))
 - All inputs are checked before the file is opened, so an invalid input leaves an existing file unchanged
 
 ## Declaration:
@@ -526,8 +524,8 @@ Append the paths of one origin to an existing QRT file
 - Writes the paths of one origin (e.g. a Tx) into the next free origin slot of a file of [[qrt_file_init]], with the
   name, position and orientation of the origin
 - A path belongs to the CIR of its index `i_cir`; the paths of one CIR keep their order in `path_data`
-- The file stores the interaction points, coefficients and interaction type codes of each path; `length` and the
-  counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [[path]] are not stored
+- `length` and the counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [[path]] are not stored
+  (see [QRT file format: stored values](formats.html#qrt-stored-values))
 - All inputs are checked before anything is written; a file whose origin slots are all written throws
   `std::runtime_error`
 
@@ -779,8 +777,8 @@ Read metadata from a QRT file
 - All outputs are optional (`nullptr` skips one) and must be distinct objects; they are set after the whole header is
   read
 - A file without destinations reports one destination `RX` that owns all CIRs
-- Throws `std::runtime_error` for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is
-  truncated or corrupt
+- Throws `std::runtime_error` for a file that cannot be opened, is not a [QRT file](formats.html#qrt) of version 5 or 6,
+  or is truncated or corrupt
 
 ## Declaration:
 ```
@@ -816,10 +814,8 @@ void quadriga_lib::qrt_file_parse(
   `[n_dest]`
 - **`orig_names`** *(optional)* — Origin names, empty for a slot not written yet; `[n_orig]`
 - **`dest_names`** *(optional)* — Destination names; `[n_dest]`
-- **`version`** *(optional)* — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar)
-- **`center_freq`** *(optional)* — Frequencies in Hz; `[n_freq]`. Version 4 stores GHz and one frequency per origin,
-  this is the one of the first written origin (0 if none is written); version 5 files of earlier library versions store
-  GHz too, a version 5 list with all values below 1000 is read as GHz
+- **`version`** *(optional)* — File version: 5 (EM) or 6 (scalar)
+- **`center_freq`** *(optional)* — Frequencies in Hz; `[n_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in m; `[n_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations (bank, tilt, heading) in rad; `[n_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin positions in m, zeros for a slot not written yet; `[n_orig, 3]`
@@ -1067,7 +1063,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
 /*!MD
 # qrt_file_read
-Read ray-tracing CIR data from a QRT file
+Read the paths of CIRs from a QRT file
 
 - Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
   [[get_channels_spherical]] (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or
@@ -1119,7 +1115,7 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Metadata of the file from [[qrt_read_cache_init]]
 
 ## Outputs:
-- **`center_freq`** *(optional)* — Frequencies in Hz (version 4: of origin `i_orig`); `[n_freq]`
+- **`center_freq`** *(optional)* — Frequencies in Hz; `[n_freq]`
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in m; `[3, n_out]`
 - **`tx_orientation`**, **`rx_orientation`** *(optional)* — Tx and Rx orientations (bank, tilt, heading) in rad;
   `[3, n_out]`
@@ -1137,8 +1133,9 @@ void quadriga_lib::qrt_file_read(
 - **`n_interact`** *(optional)* — Number of interaction points of each path, 0 = LOS; `[n_out]` of `[n_path]`
 - **`coord`** *(optional)* — Interaction points of all paths, concatenated in path order; `[n_out]` of
   `[3, sum(n_interact)]`
-- **`interact_type`** *(optional)* — Interaction type codes ([[ray_state_update]]), concatenated like `coord`;
-  `[n_out]` of `[sum(n_interact)]`; empty for version 4 files
+- **`interact_type`** *(optional)* — Interaction type codes ([[ray_state_update]]; GBSM paths: see
+  [QRT file format: stored values](formats.html#qrt-stored-values)), concatenated like `coord`; `[n_out]` of
+  `[sum(n_interact)]`
 
 ## Example:
 ```
@@ -1159,7 +1156,7 @@ for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
 
 ## Notes:
 - **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
-  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  propagation loss of the path length $d$, for EM files (version 5) the free-space loss
   $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
   the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
   $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
@@ -1174,13 +1171,11 @@ for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
   `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
   codes describe that traversal
 - An origin slot that is not written yet gives zero positions and orientations and no paths
-- GBSM paths of [[qrt_paths_from_scatterers]] and [[export_rays_qrt]] carry the code 193 at their scatterers; their
-  LOS and GR paths look like ray-traced ones (no interaction, one reflection 129)
 - **Errors**: an index out of range throws `std::invalid_argument` before any output is changed. A file that cannot be
-  opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt (counts or offsets beyond the file, path
-  blocks of different CIRs that overlap; path data only when it is read) throws `std::runtime_error`, and outputs may
-  then be partly written. A message about one requested CIR starts with `Snapshot <k>: `, with `k` its position in
-  `i_cir`
+  opened, is not a [QRT file](formats.html#qrt) of version 5 or 6, or is truncated or corrupt (counts or offsets beyond
+  the file, path blocks of different CIRs that overlap; path data only when it is read) throws `std::runtime_error`, and
+  outputs may then be partly written. A message about one requested CIR starts with `Snapshot <k>: `, with `k` its
+  position in `i_cir`
 
 ## See also:
 - [[qrt_read_cache_init]] (cache for reading a file in parts)
@@ -1746,12 +1741,13 @@ template void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_c
 # qrt_file_read_raw
 Read the stored paths of one origin of a QRT file as path objects
 
-- Returns the paths that [[qrt_file_append]] wrote for origin `i_orig`, CIR by CIR, each with its CIR index `i_cir`,
-  interaction points, coefficients and interaction type codes; [[qrt_file_read]] returns the same data as CIR data
+- Returns the paths that [[qrt_file_append]] wrote for origin `i_orig` as [[path]] objects, CIR by CIR, each with its
+  CIR index `i_cir`, interaction points, coefficients and interaction type codes; [[qrt_file_read]] returns the same
+  data as CIR data
 - `length` and the counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [[path]] are not stored and stay 0
 - An origin slot that is not written yet gives an empty vector
 - To read many origins, pass an open stream and a cache of [[qrt_read_cache_init]], so that the header is read once
-- Throws `std::runtime_error` for version 4 files and for file errors as [[qrt_file_read]]
+- Throws `std::runtime_error` for file errors as [[qrt_file_read]]
 
 ## Declaration:
 ```
@@ -1942,8 +1938,8 @@ Path objects of one CIR from spherical path data, for qrt_file_append
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]], since
   [[qrt_file_read]] recomputes the lengths from the stored positions; not checked
-- Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
-  0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
+- Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); errors: see
+  [QRT file format: precision](formats.html#qrt-precision)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
 - Throws for a path of length 0 in float32 (e.g. LOS with `tx_pos` = `rx_pos`) and for values beyond float32
 

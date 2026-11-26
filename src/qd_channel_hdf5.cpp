@@ -509,8 +509,8 @@ Create a new HDF5 channel file with a given storage layout
   only the dimensions
 - [[hdf5_write_channel]] and [[hdf5_write_dset]] create a missing file themselves, with the layout that just holds their
   slots; this function sets any other one
-- The file is an HDF5 file (quadriga-lib channel format, version 3) that any HDF5 reader opens, e.g. h5py, MATLAB or
-  HDFView. Change it only with the functions of this section: files changed by other HDF5 tools may be rejected
+- Standard HDF5 readers open the file, see [HDF5 channel file format](formats.html#hdf5_channel); change it only with
+  the functions of this section
 
 ## Declaration:
 ```
@@ -1005,9 +1005,9 @@ std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel(
   empty orientations come back as `[3, 1]` zeros
 - **Unstructured data**: the datasets of the slot with the prefix `par_`, in the order they were written and in their
   stored type ([[hdf5_read_dset]] lists the types); datasets of another prefix are not read
-- **Errors**: a missing file, a file that is not a quadriga-lib channel file of version 3, or a malformed file (e.g. a
-  dataset whose size does not match the attributes of the channel, or a missing dataset) throws `std::runtime_error`;
-  files changed by other HDF5 tools may be rejected
+- **Errors**: a missing file, a file that is not a channel file of the
+  [supported format](formats.html#hdf5-compatibility), or a malformed file (e.g. a dataset whose size does not match
+  the attributes of the channel, or a missing dataset) throws `std::runtime_error`
 
 ## See also:
 - [[hdf5_read_layout]] (finds the occupied slots)
@@ -1451,6 +1451,16 @@ std::any quadriga_lib::hdf5_read_dset(
 ## Returns:
 - The dataset; an empty `std::any` if the slot is empty or outside the layout or has no such dataset
 
+## Example:
+```
+std::any data = quadriga_lib::hdf5_read_dset("channels.hdf5", "noise_figure", 2, 5);
+if (quadriga_lib::any_type_id(&data) == 21) // arma::Mat<double>
+{
+    arma::mat nf = std::any_cast<arma::mat>(data);
+    // ...
+}
+```
+
 ## See also:
 - [[hdf5_read_dset_names]] (lists the datasets of a slot)
 - [[hdf5_write_dset]] (writes a dataset)
@@ -1554,6 +1564,12 @@ void quadriga_lib::hdf5_write_dset(
   or `arma::Cube`
 - **`ix`**, **`iy`**, **`iz`**, **`iw`** *(optional)* — Slot index, 0-based; inside the layout of an existing file
 - **`prefix`** *(optional)* — Prefix of the dataset name
+
+## Example:
+```
+arma::mat nf = {{6.0, 7.0}, {6.5, 7.5}};
+quadriga_lib::hdf5_write_dset("channels.hdf5", "noise_figure", nf, 2, 5); // dataset par_noise_figure of slot (2, 5, 0, 0)
+```
 
 ## See also:
 - [[hdf5_read_dset]] (reads a dataset by name)

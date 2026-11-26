@@ -55,13 +55,17 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 - **Origin**, **destination**: a QRT file holds the paths from each origin (a Tx position) to a list of CIR positions; a
   destination (a receiver) owns a run of consecutive CIR positions, e.g. a track
 
+**File formats.** [HDF5 channel files](formats.html#hdf5_channel) store channels with antennas, one per slot, in single
+precision; [QRT files](formats.html#qrt) store propagation paths from ray tracing or the GBSM before antennas are
+applied.
+
 **Functions by task:**
 
 | Task | Functions |
 | ---- | --------- |
 | Store and read channels | [[hdf5_create_file]], [[hdf5_write_channel]], [[hdf5_read_channel]], [[hdf5_read_layout]], [[hdf5_reshape_layout]] |
 | Store and read metadata | [[hdf5_write_dset]], [[hdf5_read_dset]], [[hdf5_read_dset_names]] |
-| Ray-tracing files | [[qrt_file_init]], [[qrt_file_append]], [[qrt_paths_from_scatterers]], [[qrt_file_parse]], [[qrt_file_read]], [[qrt_file_read_raw]], [[qrt_read_cache_init]] |
+| Path files (QRT) | [[qrt_file_init]], [[qrt_file_append]], [[qrt_paths_from_scatterers]], [[qrt_file_parse]], [[qrt_file_read]], [[qrt_file_read_raw]], [[qrt_read_cache_init]] |
 | Frequency response | [[freq_response]], [[freq_response_mf]] |
 | Process | [[quantize_delays]], [[crossfade_segments]] |
 | Statistics | [[calc_channel_gain]], [[calc_delay_spread]], [[calc_angular_spread]], [[calc_rician_k_factor]], [[calc_xpr]] |
@@ -69,7 +73,7 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 
 **Conventions.** Coefficients and delays are given per snapshot as a `std::vector` of cubes. [[freq_response]],
 [[freq_response_mf]], [[hdf5_read_channel]] and [[hdf5_write_channel]] have vector forms, same-name overloads with one
-entry per snapshot or slot. HDF5 files store the structured channel data in single precision.
+entry per snapshot or slot.
 SECTION_DESC!*/
 
 /*!MD

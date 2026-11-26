@@ -63,20 +63,24 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 - **Origin**, **destination**: a QRT file holds the paths from each origin (a Tx position) to a list of CIR positions; a
   destination (a receiver) owns a run of consecutive CIR positions, e.g. a track
 
+**File formats.** [HDF5 channel files](formats.html#hdf5_channel) store channels with antennas, one per slot, in single
+precision; [QRT files](formats.html#qrt) store propagation paths from ray tracing or the GBSM before antennas are
+applied.
+
 **Functions by task:**
 
 | Task | Functions |
 | ---- | --------- |
 | Store and read channels | [[hdf5_create_file]], [[hdf5_write_channel]], [[hdf5_read_channel]], [[hdf5_read_layout]], [[hdf5_reshape_layout]] |
 | Store and read metadata | [[hdf5_write_dset]], [[hdf5_read_dset]], [[hdf5_read_dset_names]] |
-| Ray-tracing files | [[qrt_file_parse]], [[qrt_file_read]] |
+| Path files (QRT) | [[qrt_file_parse]], [[qrt_file_read]] |
 | Frequency response | [[freq_response]], [[freq_response_mf]] |
 | Process | [[quantize_delays]], [[crossfade_segments]] |
 | Statistics | [[calc_delay_spread]], [[calc_angular_spread]], [[calc_rician_k_factor]], [[calc_xpr]] |
 | Show | [[export_channel_obj]] |
 
 **Conventions.** Coefficients and delays of several snapshots are lists with one array per snapshot. Indices are
-0-based. HDF5 files store the structured channel data in single precision.
+0-based.
 SECTION_DESC!*/
 
 /*!MD
@@ -87,8 +91,8 @@ Create a new HDF5 channel file with a given storage layout
   only the dimensions
 - [[hdf5_write_channel]] and [[hdf5_write_dset]] create a missing file themselves, with the layout that just holds their
   slots; this function sets any other one
-- The file is an HDF5 file (quadriga-lib channel format, version 3) that any HDF5 reader opens, e.g. h5py, MATLAB or
-  HDFView. Change it only with the functions of this section: files changed by other HDF5 tools may be rejected
+- Standard HDF5 readers open the file, see [HDF5 channel file format](formats.html#hdf5_channel); change it only with
+  the functions of this section
 
 ## Usage:
 ```
@@ -168,7 +172,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
   `(3, 1)` zeros
 - **Unstructured data**: the datasets of the slot with the prefix `par_`; datasets of another prefix are not read
 - **Errors**: a missing file, an index outside the layout, an index in `i_snap` beyond the snapshots of a slot, or a
-  file that is not a quadriga-lib channel file; files changed by other HDF5 tools may be rejected
+  file that is not a channel file of the [HDF5 channel file format](formats.html#hdf5-compatibility)
 
 ## See also:
 - [[hdf5_read_layout]] (finds the occupied slots)

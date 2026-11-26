@@ -18,8 +18,8 @@ Create a new HDF5 channel file with a given storage layout
   only the dimensions
 - [[hdf5_write_channel]] and [[hdf5_write_dset]] create a missing file themselves, with the layout that just holds their
   slots; this function sets any other one
-- The file is an HDF5 file (quadriga-lib channel format, version 3) that any HDF5 reader opens, e.g. h5py, MATLAB or
-  HDFView. Change it only with the functions of this section: files changed by other HDF5 tools may be rejected
+- Standard HDF5 readers open the file, see [HDF5 channel file format](formats.html#hdf5_channel); change it only with
+  the functions of this section
 
 ## Usage:
 ```
