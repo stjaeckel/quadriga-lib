@@ -37,7 +37,8 @@ Channel coefficients of a layout in one call
 - **`method`** — `'38.901'`, `'38.901_MF'` or `'quadriga'`; `''` = the method of filled links, else `'38.901'`; another
   method than that of filled links raises an error; default: `''`
 - **`mobility`** — `'phase'`, `'drift'` or `'auto'`; default: `'auto'`
-- **`overlap`** — Overlap of consecutive segments, in [0, 1]; default: 0.5
+- **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]; default: 0.5
 - **`seed`** — Master seed for empty links, as in [[init_link_states]]; with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell
   array of strings; default: `{}`

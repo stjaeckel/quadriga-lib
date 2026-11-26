@@ -35,7 +35,8 @@ channels, index = quadriga_lib.layout.get_channels_layout( layout, *, times, out
 - **`method`** — `"38.901"`, `"38.901_MF"` or `"quadriga"`; `""` = the method of filled links, else `"38.901"`; another
   method than that of filled links raises an error; default: `""`
 - **`mobility`** — `"phase"`, `"drift"` or `"auto"`; default: `"auto"`
-- **`overlap`** — Overlap of consecutive segments, in [0, 1]; default: 0.5
+- **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]; default: 0.5
 - **`seed`** — Master seed for empty links, as in [[init_link_states]]; with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; str or list of
   str; default: None
@@ -254,7 +255,8 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
   rays of [[generate_rays]], and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout["pairing"]` (empty: all) are
   computed; the sectors of a site share the rays of their propagation link
-- Tracks with several segments are joined by [[crossfade_segments]]
+- Tracks with several segments are joined by the cross-fade of [[crossfade_segments]], over a ramp centred on the
+  first row of each new segment
 
 ## Usage:
 ```
@@ -275,8 +277,8 @@ channels, index = quadriga_lib.layout.get_channels_from_rays( layout, rays, *, i
   `"quadriga"`); default: `"auto"`
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `False`
-- **`overlap`** — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1], see
-  [[crossfade_segments]]; default: 0.5
+- **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]; default: 0.5
 - **`stack`** — Snapshot layout of the channels as in [[hdf5_read_channel]]; default: `False`
 
 ## Outputs:
@@ -440,7 +442,8 @@ shift = quadriga_lib.layout.export_rays_qrt( fn, layout, *, rays )
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
   link gain and the K-factor ratio of [[get_channels_from_rays]] at the row, [[ssf_paths]] with `"drift"` and the C++
   function `qrt_paths_from_scatterers`. A CIR read back gives the channel of [[get_channels_from_rays]]
-  (`output = "rays"`, `mobility = "drift"`) at the row within float32 accuracy
+  (`output = "rays"`, `mobility = "drift"`) at the row within float32 accuracy, outside the cross-fade ramps
+  between segments
 - **Reading back**: [[gbsm.rays_from_paths]] with the method of the links and the `n_interact` of the file as
   `path_type`, then [[gbsm.single_link_channel]] with link gain 0 and mobility `"drift"`
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop

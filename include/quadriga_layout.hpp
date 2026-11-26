@@ -242,7 +242,7 @@ namespace quadriga_lib
         const std::string &method = "",                      // "38.901", "38.901_MF" or "quadriga"; "" = method of layout.links, else "38.901"
         arma::umat *index = nullptr,                         // Optional output: Tx node, Rx node and frequency index of each channel, 0-based, [3, n_channel]
         const std::string &mobility = "auto",                // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
-        double overlap = 0.5,                                // Overlap of consecutive segments, 0 to 1
+        double overlap = 0.5,                                // Ramp length as part of the shorter segment, 0 to 1
         arma::sword seed = -1,                               // Master seed if layout.links is empty; -1 = layout.seed, else the system random device
         const std::vector<std::string> &config_dirs = {});   // Folders of user conf files, searched before the shipped folder; unused with filled links
 
@@ -277,7 +277,7 @@ namespace quadriga_lib
         const std::string &mobility = "auto",                // "phase", "drift" or "auto"; "drift" needs rays with scatterers
         bool oxygen = false,                                 // Oxygen absorption (TR 38.901 clause 7.6.1)
         bool use_absolute_delays = false,                    // Include the LOS delay in all delays
-        double overlap = 0.5);                               // Overlap of consecutive segments, 0 to 1
+        double overlap = 0.5);                               // Ramp length as part of the shorter segment, 0 to 1
 
     // Serving Tx node of each terminal by the large-scale gain or by RSRP; returns the Tx node per Rx terminal, 0-based, [n_rx_terminal]
     // - Evaluates all sites at the first position of each node and ignores layout.pairing; a terminal with several nodes

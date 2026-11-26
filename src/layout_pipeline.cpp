@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_layout.hpp"
+#include "qd_helpers_channel.hpp"
 #include "qd_helpers_layout.hpp"
 #include "qd_helpers_shared.hpp"
 #include "quadriga_sos.hpp"
@@ -1366,9 +1367,9 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
             throw std::invalid_argument("Input 'times' must be finite.");
 
     // The arrays of the nodes in use (serial: an antenna that is not evaluated may throw)
-    std::vector<quadriga_lib::arrayant<double>> xpol(n_freq);
+    std::vector<quadriga_lib::arrayant<double>> xpol(n_freq), omni(n_freq);
     for (arma::uword k = 0; k < n_freq; ++k)
-        xpol[k] = quadriga_lib::generate_antenna<double>("xpol", NAN, L.center_freq[k]);
+        xpol[k] = quadriga_lib::generate_antenna<double>("xpol", NAN, L.center_freq[k]), omni[k] = quadriga_lib::generate_antenna<double>("omni", NAN, L.center_freq[k]);
     std::vector<const quadriga_lib::arrayant<double> *> atx(L.tx.n_node() * n_freq, nullptr), arx(L.rx.n_node() * n_freq, nullptr);
     for (const qd_item &it : items)
         for (arma::uword k = 0; k < n_freq; ++k)
@@ -1382,7 +1383,7 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
     // Positions per propagation link over all snapshots, and the snapshots [own0, own1) of its segment
     const size_t n_sel = sel.size();
     std::vector<arma::mat> T(n_sel), R(n_sel), G(n_sel), KF(n_sel);
-    std::vector<arma::uword> own0(n_sel, 0), own1(n_sel, 0), first(n_sel, 0);
+    std::vector<arma::uword> own0(n_sel, 0), own1(n_sel, 0), first(n_sel, 0), last(n_sel, 0), n_lead(n_sel, 0);
     std::vector<char> used(n_sel, 0);
     for (const qd_item &it : items)
         for (arma::uword j : it.j)
@@ -1426,7 +1427,9 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                       }
                   });
 
-    // The segments of each channel link with snapshots: a segment also covers the snapshots of the preceding one
+    // The segments of each channel link with snapshots: the ramp between two segments has n_r = round(overlap n) snapshots,
+    // n the snapshots of the shorter one, centred on the first snapshot of the new segment (floor(n_r / 2) before it);
+    // each segment also covers the ramp snapshots of its neighbours, [first, last)
     for (const qd_item &it : items)
     {
         long long prev = -1;
@@ -1434,14 +1437,15 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
         {
             if (own1[j] == own0[j])
                 continue;
-            first[j] = own0[j];
+            first[j] = own0[j], last[j] = own1[j];
             if (prev >= 0)
             {
                 const arma::uword p = (arma::uword)prev;
                 if (own1[p] != own0[j]) // segments between them have no snapshots
                     throw std::invalid_argument("Channel '" + qd_node_name(L.tx, it.tx) + "_" + qd_node_name(L.rx, it.rx) +
                                                 "': the selected segments of a track and their snapshots must be consecutive.");
-                first[j] = own0[p];
+                const arma::uword n_r = (arma::uword)std::floor(overlap * (double)std::min(own1[p] - own0[p], own1[j] - own0[j]) + 0.5);
+                first[j] = own0[j] - n_r / 2, last[p] = own1[p] + (n_r - n_r / 2), n_lead[j] = n_r;
             }
             prev = (long long)j;
         }
@@ -1462,8 +1466,8 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                       if (!used[j] || own1[j] == own0[j])
                           return;
                       const arma::uword l = sel[j];
-                      if (first[j] != 0 || own1[j] != R[j].n_cols)
-                          T[j] = T[j].cols(first[j], own1[j] - 1), R[j] = R[j].cols(first[j], own1[j] - 1);
+                      if (first[j] != 0 || last[j] != R[j].n_cols)
+                          T[j] = T[j].cols(first[j], last[j] - 1), R[j] = R[j].cols(first[j], last[j] - 1);
                       auto fixed = [](const arma::mat &X)
                       {
                           for (arma::uword i = 1; i < X.n_cols; ++i)
@@ -1477,7 +1481,8 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                           P.link_gain(l, T[j], R[j], G[j], KF[j]);
                   });
 
-    // Channels; a channel link with several segments: one channel per segment, joined by crossfade_segments. "phase":
+    // Channels; a channel link with several segments: one channel per segment, joined by the cross-fade of
+    // crossfade_segments with the ray statistics of the ramps from isotropic arrays. "phase":
     // each segment with the requested delays (its paths relative to its own LOS); "drift": absolute delays, then minus
     // the LOS delay at the snapshot positions (equal to the per-segment form, and one reference for empty tap slots)
     const size_t n_item = items.size(), n_out = n_item * n_freq;
@@ -1496,20 +1501,48 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                                    for (arma::uword j : it.j)
                                        if (own1[j] > own0[j])
                                            chain.push_back(j);
-                                   const bool merge = chain.size() > 1;
-                                   std::vector<quadriga_lib::channel<double>> parts(chain.size());
+                                   const bool merge = chain.size() > 1, taps = output == "taps";
+                                   const size_t n_q = chain.size();
+                                   std::vector<quadriga_lib::channel<double>> parts(n_q), st(merge ? n_q : 0), st0(st.size());
                                    const quadriga_lib::gbsm_rays &ray0 = rays[chain[0]].size() == n_freq ? rays[chain[0]][k] : rays[chain[0]][0];
                                    const bool drift = mobility == "drift" || (mobility == "auto" && ray0.method == "quadriga");
-                                   for (size_t q = 0; q < chain.size(); ++q)
+                                   // Ray sets shared by all frequencies: the fade orders of frequency 0, so that the clusters fade in the
+                                   // same order in all bands
+                                   bool shared = merge && k != 0;
+                                   for (arma::uword j : chain)
+                                       shared = shared && rays[j].size() != n_freq;
+                                   arma::uvec n_ov(n_q, arma::fill::zeros), t0(n_q, arma::fill::zeros), t0o(n_q, arma::fill::zeros);
+                                   for (size_t q = 0; q < n_q; ++q)
                                    {
-                                       const arma::uword j = chain[q], a = first[j], b = own1[j] - 1;
+                                       const arma::uword j = chain[q], a = first[j], b = last[j] - 1;
                                        const arma::mat ot = otx.n_cols == 1 ? otx : otx.cols(a, b), orr = orx.n_cols == 1 ? orx : orx.cols(a, b);
                                        const auto &r = rays[j];
                                        const quadriga_lib::gbsm_rays &ray = r.size() == n_freq ? r[k] : r[0];
                                        const arma::uword i_freq = r.size() == n_freq ? 0 : k;
+                                       const bool abs_delays = use_absolute_delays || (merge && drift);
                                        parts[q] = quadriga_lib::gbsm_single_link_channel(*atx[it.tx * n_freq + k], *arx[it.rx * n_freq + k], ray, G[j].col(k), mobility,
-                                                                                         output, i_freq, T[j], R[j], ot, orr, KF[j].col(k), oxygen,
-                                                                                         use_absolute_delays || (merge && drift));
+                                                                                         output, i_freq, T[j], R[j], ot, orr, KF[j].col(k), oxygen, abs_delays);
+                                       if (!merge)
+                                           continue;
+                                       // Ray statistics of the ramp snapshots with isotropic arrays (path gains, delays and angles
+                                       // do not depend on the arrays), the same for both output forms, delays relative to the LOS unless
+                                       // requested: the first n_lead of the segment, the last n_lead of the next
+                                       const arma::uword S = b - a + 1, n_tr = q + 1 < n_q ? n_lead[chain[q + 1]] : 0;
+                                       n_ov[q] = q == 0 ? 0 : n_lead[j], t0[q] = n_ov[q], t0o[q] = n_ov[q];
+                                       arma::uvec idx(n_ov[q] + n_tr);
+                                       for (arma::uword i = 0; i < n_ov[q]; ++i)
+                                           idx[i] = i;
+                                       for (arma::uword i = 0; i < n_tr; ++i)
+                                           idx[n_ov[q] + i] = S - n_tr + i;
+                                       if (idx.is_empty())
+                                           continue;
+                                       auto pick = [&idx](const arma::mat &M) { return M.n_cols == 1 ? M : arma::mat(M.cols(idx)); };
+                                       auto pickv = [&idx](const arma::vec &v) { return v.n_elem <= 1 ? v : arma::vec(v.elem(idx)); };
+                                       st[q] = quadriga_lib::gbsm_single_link_channel(omni[k], omni[k], ray, pickv(G[j].col(k)), mobility, "rays", i_freq, pick(T[j]),
+                                                                                     pick(R[j]), pick(ot), pick(orr), pickv(KF[j].col(k)), oxygen, use_absolute_delays);
+                                       if (shared)
+                                           st0[q] = quadriga_lib::gbsm_single_link_channel(omni[0], omni[0], ray, pickv(G[j].col(0)), mobility, "rays", 0, pick(T[j]),
+                                                                                          pick(R[j]), pick(ot), pick(orr), pickv(KF[j].col(0)), oxygen, use_absolute_delays);
                                    }
                                    if (!merge)
                                    {
@@ -1517,10 +1550,10 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                                        out[c].name = name;
                                        return;
                                    }
-                                   arma::uvec n_ov(chain.size(), arma::fill::zeros);
-                                   for (size_t q = 1; q < chain.size(); ++q)
-                                       n_ov[q] = own1[chain[q - 1]] - own0[chain[q - 1]];
-                                   out[c] = quadriga_lib::crossfade_segments(parts, n_ov, overlap);
+                                   std::vector<const quadriga_lib::channel<double> *> pd(n_q), ps(n_q), po(n_q);
+                                   for (size_t q = 0; q < n_q; ++q)
+                                       pd[q] = &parts[q], ps[q] = &st[q], po[q] = &st0[q];
+                                   out[c] = qd_crossfade(pd, ps, shared ? &po : nullptr, t0, t0o, n_ov, taps);
                                    out[c].name = name;
                                    if (drift && !use_absolute_delays)
                                        for (arma::uword i = 0; i < out[c].n_snap(); ++i)
@@ -1819,7 +1852,8 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
   rays of [[generate_rays]], and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
-- Tracks with several segments are joined by [[crossfade_segments]]
+- Tracks with several segments are joined by the cross-fade of [[crossfade_segments]], over a ramp centred on the
+  first row of each new segment
 
 ## Declaration:
 ```
@@ -1849,8 +1883,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
   drift for `"quadriga"`)
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
-- **`overlap`** *(optional)* — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1],
-  see [[crossfade_segments]]
+- **`overlap`** *(optional)* — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]
 
 ## Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
@@ -1936,7 +1970,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
 - **`method`** *(optional)* — `"38.901"`, `"38.901_MF"` or `"quadriga"`; omitted = the method of filled links, else
   `"38.901"`; another method than that of filled links throws
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"`
-- **`overlap`** *(optional)* — Overlap of consecutive segments, in [0, 1]
+- **`overlap`** *(optional)* — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]
 - **`seed`** *(optional)* — Master seed for empty links, as in [[init_link_states]]; with filled links only -1
 - **`config_dirs`** *(optional)* — Folders of user conf files for empty links, searched before the shipped folder
 
@@ -2281,7 +2316,8 @@ arma::vec quadriga_lib::export_rays_qrt(
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
   link gain and the K-factor ratio of [[get_channels_from_rays]] at the row, [[ssf_paths]] with `"drift"`,
   [[qrt_paths_from_scatterers]]. A CIR read back gives the channel of [[get_channels_from_rays]] (`output = "rays"`,
-  `mobility = "drift"`) at the row within float32 accuracy
+  `mobility = "drift"`) at the row within float32 accuracy, outside the
+  cross-fade ramps between segments
 - **Reading back**: [[gbsm_rays_from_paths]] with the method of the links and the `n_interact` of the file as
   `path_type`, then [[gbsm_single_link_channel]] with link gain 0 and mobility `"drift"`
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop

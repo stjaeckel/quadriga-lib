@@ -65,13 +65,13 @@ namespace quadriga_lib
     template <typename dtype>
     arma::Col<dtype> calc_channel_gain(const channel<dtype> &chan);
 
-    // Join the channels of consecutive segments of one link by a power cross-fade
-    // - Segment k starts with n_overlap[k] snapshots that are also the last ones of segment k - 1
-    // - The last round(overlap * n_overlap[k]) shared snapshots are the ramp; overlap = 0 switches at the segment start
+    // Join the "rays" channels of consecutive segments of one link by a cross-fade
+    // - Segment k starts with the n_overlap[k] ramp snapshots, which are also the last ones of segment k - 1
+    // - Level interpolated in dB, clusters exchanged one after another (par_data entries path_type, tap, cluster)
     channel<double> crossfade_segments(
-        const std::vector<channel<double>> &segments, // Channels of one link in track order, [n_segment]
-        const arma::uvec &n_overlap,                  // Snapshots shared with the preceding segment, [n_segment]; entry 0 is 0
-        double overlap = 0.5);                        // Part of the shared snapshots used for the ramp, 0 to 1
+        const std::vector<channel<double>> &segments, // "rays" channels of one link in track order, [n_segment]
+        const arma::uvec &n_overlap = {},             // Ramp snapshots shared with the preceding segment, [n_segment]; empty: from the positions
+        const std::string &output = "taps");          // "taps" or "rays"
 
     // Write propagation paths to a Wavefront OBJ file
     // - e.g. for visualization in Blender

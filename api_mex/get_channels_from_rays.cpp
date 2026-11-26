@@ -19,7 +19,8 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
   rays of [[generate_rays]], and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
-- Tracks with several segments are joined by [[crossfade_segments]]
+- Tracks with several segments are joined by the cross-fade of [[crossfade_segments]], over a ramp centred on the
+  first row of each new segment
 
 ## Usage:
 ```
@@ -40,8 +41,8 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
   `'quadriga'`); default: `'auto'`
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1; default: `false`
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `false`
-- **`overlap`** — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1], see
-  [[crossfade_segments]]; default: 0.5
+- **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]; default: 0.5
 
 ## Outputs:
 - **`channels`** — Channels, struct array, fields in [[hdf5_read_channel]]; `[1, n_channel]`

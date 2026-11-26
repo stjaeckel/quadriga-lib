@@ -646,7 +646,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                 a.mob = mob, a.out = out, a.R = arma::mat{{120.0, 45.0, 1.5}, {120.2, 45.0, 1.5}, {120.4, 45.0, 1.5}}.t();
                 const chan_t c = a.run();
                 const arma::uword n_kept = r->n_ray() - 1, n_tap = gr ? 6 : 5;
-                std::vector<std::string> names = {"tap", "path_type"};
+                std::vector<std::string> names = {"tap", "path_type", "cluster"};
                 if (taps)
                     names.push_back("n_ray_tap");
                 if (drift && taps)
@@ -658,6 +658,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                 CHECK(c.par_names == names);
                 CHECK(par<arma::u32_vec>(c, "tap").n_elem == (taps ? n_tap : n_kept));
                 CHECK(par<arma::u32_vec>(c, "path_type").n_elem == (taps ? n_tap : n_kept));
+                CHECK(arma::all(par<arma::u32_vec>(c, "cluster") == par<arma::u32_vec>(c, "tap") / 3u));
                 if (taps)
                     CHECK(par<arma::u32_vec>(c, "n_ray_tap").n_elem == n_tap);
                 if (drift && taps)

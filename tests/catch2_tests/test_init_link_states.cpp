@@ -26,6 +26,7 @@
 #include "qd_test_layout.hpp"
 
 #include <cmath>
+#include <map>
 #include <complex>
 #include <filesystem>
 #include <string>
@@ -1281,10 +1282,10 @@ TEST_CASE("generate_rays - the rays of segment k refer to its first row")
 
 TEST_CASE("get_channels_from_rays - the cross-fade of a track with two segments is continuous in power")
 {
-    // One site, a track of 12 rows in steps of 1 m: rows 0-5 UMa_LOS, rows 6-11 UMa_NLOS. Oracle: the channel of each
-    // segment from gbsm_single_link_channel with the link gain and K-factor ratio of its first row (segment 1 also over
-    // rows 0-5), each with delays relative to its own LOS ("phase"), joined by crossfade_segments (a ramp of
-    // round(0.5 * 6) = 3 snapshots)
+    // One site, a track of 12 rows in steps of 1 m: rows 0-5 UMa_LOS, rows 6-11 UMa_NLOS. Oracle: the "rays" channel of
+    // each segment from gbsm_single_link_channel with the link gain and K-factor ratio of its first row, over its rows and
+    // those of the ramp (rows 5-7: floor(0.5 * 6 + 0.5) = 3 snapshots, one before row 6), each with delays relative to its
+    // own LOS ("phase"), joined by crossfade_segments; "taps" of the pipeline come from the taps of the segments
     quadriga_lib::layout L = two_sites(col3(100.0, 20.0, 1.5));
     L.tx = qd_layout_points({"BS1"}, {0}, col3(0.0, 0.0, 25.0));
     L.tx.scenario = {"UMa"};
@@ -1302,21 +1303,18 @@ TEST_CASE("get_channels_from_rays - the cross-fade of a track with two segments 
     const auto rays = quadriga_lib::generate_rays(L);
     const arma::mat t0 = col3(0.0, 0.0, 25.0), T = arma::repmat(t0, 1, 12), O(3, 1, arma::fill::zeros);
     const quadriga_lib::arrayant<double> xpol = quadriga_lib::generate_antenna<double>("xpol", NAN, 3.5e9);
-    std::vector<double> w;
-    for (arma::uword i = 1; i <= 3; ++i)
-        w.push_back(0.5 * (1.0 + std::sin(((double)i / 4.0 - 0.5) * 3.14159265358979323846)));
     for (const char *output : {"taps", "rays"})
     {
         std::vector<quadriga_lib::channel<double>> part(2);
         for (arma::uword k = 0; k < 2; ++k)
         {
-            const arma::uword a = 0, b = k == 0 ? 5 : 11, r0 = k == 0 ? 0 : 6;
+            const arma::uword a = k == 0 ? 0 : 5, b = k == 0 ? 7 : 11, r0 = k == 0 ? 0 : 6;
             arma::vec kf;
             const arma::vec g = gain("38.901", conf(k == 0 ? "UMa_LOS" : "UMa_NLOS"), K.gbsm_seed[k], t0, R.col(r0), T.cols(a, b), R.cols(a, b), 0.0, 0.0,
                                      L.center_freq, 0, "", {}, 25.0, 0, "", true, {}, &kf);
-            part[k] = quadriga_lib::gbsm_single_link_channel(xpol, xpol, rays[k][0], g, "auto", output, 0, T.cols(a, b), R.cols(a, b), O, O, kf);
+            part[k] = quadriga_lib::gbsm_single_link_channel(xpol, xpol, rays[k][0], g, "auto", "rays", 0, T.cols(a, b), R.cols(a, b), O, O, kf);
         }
-        const quadriga_lib::channel<double> X = quadriga_lib::crossfade_segments(part, arma::uvec{0, 6}, 0.5);
+        const quadriga_lib::channel<double> X = quadriga_lib::crossfade_segments(part, arma::uvec{0, 3}, output);
         const auto C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, output);
         REQUIRE(C.size() == 1);
         REQUIRE(C[0].n_snap() == 12);
@@ -1328,17 +1326,6 @@ TEST_CASE("get_channels_from_rays - the cross-fade of a track with two segments 
             CHECK(arma::approx_equal(C[0].coeff_im[s], X.coeff_im[s], "absdiff", 1e-8 * m));
             CHECK(arma::approx_equal(C[0].delay[s], X.delay[s], "absdiff", 1e-15));
         }
-        if (std::string(output) == "rays") // the total path gain follows the ramp between the two segments
-        {
-            auto pg = [](const quadriga_lib::channel<double> &c, arma::uword s) { return arma::accu(c.path_gain[s]); };
-            for (arma::uword s = 0; s < 12; ++s)
-            {
-                const double expect = s < 3 ? pg(part[0], s) : (s < 6 ? (1.0 - w[s - 3]) * pg(part[0], s) + w[s - 3] * pg(part[1], s) : pg(part[1], s));
-                CHECK(std::abs(pg(C[0], s) - expect) <= 1e-8 * expect);
-            }
-            CHECK(std::abs(10.0 * std::log10(pg(part[0], 5) / pg(part[1], 6))) > 1.0); // a hard switch would step
-        }
-
         // Snapshot times at the rows (speed 1 m/s) give the same channel; the one call gives that of the manual path
         const auto Ct = quadriga_lib::get_channels_from_rays(L, rays, {}, arma::regspace(0.0, 11.0), output);
         const auto C1 = quadriga_lib::get_channels_layout(L, {}, output);
@@ -1356,6 +1343,50 @@ TEST_CASE("get_channels_from_rays - the cross-fade of a track with two segments 
     const arma::vec back = {0.0, 1.0, 8.0, 2.0};
     CHECK(qd_layout_throws([&] { quadriga_lib::get_channels_from_rays(L, rays, {}, back, "rays"); }) ==
           "Terminal 'N0': the snapshots of a segment are not consecutive; a track with several segments needs increasing 'times'.");
+}
+
+TEST_CASE("get_channels_from_rays - the cross-fade is centred on the row of the state change at the dB-mean level")
+{
+    // The track of the test above: rows 0-5 UMa_LOS, rows 6-11 UMa_NLOS. The ramp has floor(0.5 * min(6, 6) + 0.5) = 3
+    // snapshots, centred on row 6 (rows 5, 6, 7 with w = 0.146, 0.5, 0.854); the level in the ramp is
+    // P_LOS^(1 - w) P_NLOS^w, P the summed path gain of each segment's channel at the row (oracle: gbsm_single_link_channel
+    // over all rows with the link gain and K-factor ratio of the segment's first row)
+    quadriga_lib::layout L = two_sites(col3(100.0, 20.0, 1.5));
+    L.tx = qd_layout_points({"BS1"}, {0}, col3(0.0, 0.0, 25.0));
+    L.tx.scenario = {"UMa"};
+    for (const auto &kv : small_sets)
+        L.tx.scenpar_override[kv.first] = arma::vec{kv.second};
+    arma::mat R(3, 12);
+    for (arma::uword i = 0; i < 12; ++i)
+        R(0, i) = 100.0 + (double)i, R(1, i) = 20.0, R(2, i) = 1.5;
+    L.rx = qd_layout_nodes_from({R});
+    L.rx.scenario = {"UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_LOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS", "UMa_NLOS"};
+    L.rx.speed = arma::vec(12, arma::fill::ones);
+    quadriga_lib::init_link_states(L);
+    const auto &K = L.links;
+    REQUIRE(K.n_link() == 2);
+    const auto rays = quadriga_lib::generate_rays(L);
+    const arma::mat t0 = col3(0.0, 0.0, 25.0), T = arma::repmat(t0, 1, 12), O(3, 1, arma::fill::zeros);
+    const quadriga_lib::arrayant<double> xpol = quadriga_lib::generate_antenna<double>("xpol", NAN, 3.5e9);
+    std::vector<quadriga_lib::channel<double>> part(2);
+    for (arma::uword k = 0; k < 2; ++k)
+    {
+        arma::vec kf;
+        const arma::vec g = gain("38.901", conf(k == 0 ? "UMa_LOS" : "UMa_NLOS"), K.gbsm_seed[k], t0, R.col(k == 0 ? 0 : 6), T, R, 0.0, 0.0,
+                                 L.center_freq, 0, "", {}, 25.0, 0, "", true, {}, &kf);
+        part[k] = quadriga_lib::gbsm_single_link_channel(xpol, xpol, rays[k][0], g, "auto", "rays", 0, T, R, O, O, kf);
+    }
+    const auto C = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "rays");
+    REQUIRE(C.size() == 1);
+    REQUIRE(C[0].n_snap() == 12);
+    auto pg = [](const quadriga_lib::channel<double> &c, arma::uword s) { return arma::accu(c.path_gain[s]); };
+    const double w[3] = {0.5 * (1.0 - std::sin(0.25 * 3.14159265358979323846)), 0.5, 0.5 * (1.0 + std::sin(0.25 * 3.14159265358979323846))};
+    for (arma::uword s = 0; s < 12; ++s)
+    {
+        const double expect = s < 5 ? pg(part[0], s) : (s > 7 ? pg(part[1], s) : std::pow(pg(part[0], s), 1.0 - w[s - 5]) * std::pow(pg(part[1], s), w[s - 5]));
+        INFO("row " << s);
+        CHECK(std::abs(pg(C[0], s) - expect) <= 1e-9 * expect);
+    }
 }
 
 TEST_CASE("attach_terminals - a track with segments is attached by its first segment")
@@ -1521,4 +1552,76 @@ TEST_CASE("generate_rays - with a moving site, segment k pairs its first row wit
     const arma::vec g = gain("38.901", conf("UMa_NLOS"), K.gbsm_seed[1], T.col(0), L.rx.pos.col(6), T, L.rx.pos.cols(6, 11), 0.0, 0.0, L.center_freq, 0, "", {}, 25.0,
                              0, "", true, {}, nullptr, true);
     CHECK(arma::approx_equal(qd_layout_par<arma::vec>(S[0], "link_gain_dB"), g, "absdiff", 1e-9));
+}
+
+TEST_CASE("get_channels_layout - shared ray sets fade their clusters in the same order in all bands")
+{
+    // "quadriga" (one ray set for all frequencies), 3.5 and 28 GHz, a track of 200 rows 0.5 m apart: UMa_NLOS, then
+    // UMa_NLOS_O2I (a level gap that depends on the frequency); ramp rows 75-124. "phase": a path keeps its delay, so the
+    // paths of the two bands match by delay. For the old paths of both bands, the last ramp row at which they are present
+    // has the same order in both bands. "drift" on a shorter track: "taps" and "rays" carry the same coefficient sum per
+    // element pair
+    auto track = [](arma::uword n, double step)
+    {
+        quadriga_lib::layout L;
+        L.tx = qd_layout_points({"BS1"}, {0}, col3(0.0, 0.0, 25.0));
+        L.tx.scenario = {"UMa"};
+        arma::mat R(3, n);
+        for (arma::uword i = 0; i < n; ++i)
+            R(0, i) = 100.0 + step * (double)i, R(1, i) = 20.0, R(2, i) = 1.5;
+        L.rx = qd_layout_nodes_from({R});
+        L.rx.scenario.assign(n, "UMa_NLOS");
+        for (arma::uword i = n / 2; i < n; ++i)
+            L.rx.scenario[i] = "UMa_NLOS_O2I";
+        L.rx.speed = arma::vec(n, arma::fill::ones);
+        L.center_freq = {3.5e9, 28e9};
+        L.seed = 4711;
+        return L;
+    };
+    {
+        const auto C = quadriga_lib::get_channels_layout(track(200, 0.5), {}, "rays", "quadriga", nullptr, "phase");
+        REQUIRE(C.size() == 2);
+        std::vector<std::map<double, arma::uword>> last(2); // delay of an old path -> last ramp row at which it is present
+        for (arma::uword k = 0; k < 2; ++k)
+        {
+            REQUIRE(C[k].n_snap() == 200);
+            for (arma::uword p = 0; p < C[k].delay[74].n_slices; ++p)
+                last[k][C[k].delay[74](0, 0, p)] = 74;
+            for (arma::uword s = 75; s < 125; ++s)
+                for (arma::uword p = 0; p < C[k].delay[s].n_slices; ++p)
+                {
+                    auto it = last[k].find(C[k].delay[s](0, 0, p));
+                    if (it != last[k].end())
+                        it->second = s;
+                }
+        }
+        std::vector<std::pair<arma::uword, arma::uword>> both;
+        for (const auto &kv : last[0])
+        {
+            const auto it = last[1].find(kv.first);
+            if (it != last[1].end())
+                both.push_back({kv.second, it->second});
+        }
+        REQUIRE(both.size() > 100);
+        arma::uword reversed = 0, faded = 0;
+        for (size_t i = 0; i < both.size(); ++i)
+        {
+            faded += both[i].first > 74 && both[i].first < 124 ? 1 : 0;
+            for (size_t j = 0; j < both.size(); ++j)
+                reversed += both[i].first < both[j].first && both[i].second > both[j].second ? 1 : 0;
+        }
+        CHECK(faded > 100);
+        CHECK(reversed == 0);
+    }
+    const quadriga_lib::layout L = track(40, 0.25);
+    const auto C = quadriga_lib::get_channels_layout(L, {}, "rays", "quadriga"), Ct = quadriga_lib::get_channels_layout(L, {}, "taps", "quadriga");
+    REQUIRE(Ct.size() == 2);
+    for (arma::uword k = 0; k < 2; ++k)
+        for (arma::uword s = 0; s < 40; ++s)
+        {
+            const arma::mat dr = arma::sum(Ct[k].coeff_re[s], 2) - arma::sum(C[k].coeff_re[s], 2), di = arma::sum(Ct[k].coeff_im[s], 2) - arma::sum(C[k].coeff_im[s], 2);
+            const double m = std::sqrt(arma::accu(arma::square(C[k].coeff_re[s]) + arma::square(C[k].coeff_im[s])));
+            CHECK(arma::abs(dr).max() <= 1e-12 * m);
+            CHECK(arma::abs(di).max() <= 1e-12 * m);
+        }
 }

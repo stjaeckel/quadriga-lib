@@ -25,7 +25,7 @@ CONF_DIR = os.path.join(current_dir, "../../data/config")
 TX = np.array([[0.0, 0.0, 10.0]]).T
 RX = np.array([[60.0, 10.0, 1.5]]).T
 FC = np.array([3.5e9, 28e9])
-PAR = ["tap", "path_type", "n_ray_tap", "fbs_pos", "lbs_pos", "gr_pos", "link_gain_dB", "b_med", "b_eff", "limit", "ratio",
+PAR = ["tap", "path_type", "cluster", "n_ray_tap", "fbs_pos", "lbs_pos", "gr_pos", "link_gain_dB", "b_med", "b_eff", "limit", "ratio",
        "ratio_total"]
 
 

@@ -46,7 +46,7 @@ shift = quadriga_lib.export_rays_qrt( fn, layout, rays );
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
   link gain and the K-factor ratio of [[get_channels_from_rays]] at the row, [[ssf_paths]] with `'drift'`. A CIR read
   back gives the channel of [[get_channels_from_rays]] (`output = 'rays'`, `mobility = 'drift'`) at the row within
-  float32 accuracy
+  float32 accuracy, outside the cross-fade ramps between segments
 - **Reading back**: [[gbsm_rays_from_paths]] with the method of the links and the `n_interact` of the file as
   `path_type`, then [[gbsm_single_link_channel]] with link gain 0 and mobility `'drift'`
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop

@@ -38,7 +38,7 @@ lang: en-US
 | [calc_delay_spread](#calc_delay_spread) | Channel data and processing | Calculate the RMS delay spread of each CIR from its path delays and powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Channel data and processing | Calculate the Rician K-factor of each CIR, the ratio of the LOS to the NLOS power |
 | [calc_xpr](#calc_xpr) | Channel data and processing | Calculate the cross-polarization ratio (XPR) of each CIR in the linear and the circular polarization basis |
-| [crossfade_segments](#crossfade_segments) | Channel data and processing | Join the channels of consecutive segments of one link by a power cross-fade |
+| [crossfade_segments](#crossfade_segments) | Channel data and processing | Join the channels of consecutive segments of one link by a cross-fade |
 | [export_channel_obj](#export_channel_obj) | Channel data and processing | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [freq_response](#freq_response) | Channel data and processing | Frequency response of a MIMO channel at the given subcarriers |
 | [freq_response_mf](#freq_response_mf) | Channel data and processing | Frequency response of a MIMO channel from coefficients sampled at several frequencies |
@@ -1111,55 +1111,63 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_xpr) · [Python](quadriga_lib_api_py
 ---
 <a id="crossfade_segments"></a>
 ## crossfade_segments
-Join the channels of consecutive segments of one link by a power cross-fade
+Join the channels of consecutive segments of one link by a cross-fade
 
 Also in: [C++](quadriga_lib_api_cpp.md#crossfade_segments) · [Python](quadriga_lib_api_python.md#crossfade_segments)
 
-- Joins the channels of the segments of one link, e.g. of a track whose scenario changes, into one channel; consecutive
-  segments share snapshots, over which the paths of the old segment fade out and those of the new one fade in
-- [get_channels_from_rays](#get_channels_from_rays) joins the segments of tracks with this function; it is a port of the channel merger of
-  QuaDRiGa
+- Joins the "rays" channels of the segments of one link, e.g. of a track whose scenario or indoor state changes, into
+  one channel; consecutive segments share the snapshots of a ramp, over which the clusters of the old segment are
+  exchanged for those of the new one
+- [get_channels_from_rays](#get_channels_from_rays) joins the segments of tracks with this function, the ramp centred on the row of the change
 
 ### Usage:
 ```matlab
-channel = quadriga_lib.crossfade_segments( segments, n_overlap, overlap, par );
+channel = quadriga_lib.crossfade_segments( segments, n_overlap, output, par );
 ```
 
 ### Inputs:
-- **`segments`** — Channels of one link in track order, valid, with coefficients, equal `n_rx`, `n_tx`, form and
-  `center_freq` (at most one value); struct array, fields in [hdf5_read_channel](#hdf5_read_channel); `[1, n_segment]`
-- **`n_overlap`** — Snapshots shared with the preceding segment, entry 1 is 0, at most the snapshots of the preceding
-  segment after its own shared ones; `[n_segment]`
-- **`overlap`** — Part of the shared snapshots used for the ramp, in [0, 1]; default: 0.5
-- **`par`** — Unstructured data of the segments with the fields `tap` (tap index per path or tap, uint32), `path_type`
-  (0 = LOS, 1 = GR, 2 = NLOS per path or tap, uint32, optional) and `n_ray_tap` (rays per tap, `'taps'` only); struct
-  array of the size of `segments` that has the field `tap` or `path_type` (other fields are ignored); `[]` = no tap
-  indices, all paths are NLOS; default: `[]`
+- **`segments`** — Channels of one link in track order, valid, with coefficients and path gains (`'rays'`), the same
+  number of paths in every snapshot, equal `n_rx`, `n_tx` and `center_freq` (at most one value); struct array, fields
+  in [hdf5_read_channel](#hdf5_read_channel); `[1, n_segment]`
+- **`n_overlap`** — Number of snapshots at the start of each segment that are also the last snapshots of the preceding
+  segment (computed at the same positions); they form the ramp. Entry 1 is 0, at most the snapshots of the preceding
+  segment after its own shared ones; `[]`: the snapshots whose Tx and Rx positions match (within 1 µm), an error where
+  the positions repeat (e.g. ends that do not move); `[n_segment]`; default: `[]`
+- **`output`** — `'taps'` (the paths summed per tap index) or `'rays'`; default: `'taps'`
+- **`par`** — Unstructured data of the segments with the fields `tap`, `path_type` and `cluster` (uint32, one value per
+  path, see Notes); struct array of the size of `segments` that has one of these fields (other fields are ignored);
+  `[]` = all paths NLOS, each its own cluster; default: `[]`
 
 ### Outputs:
 - **`channel`** — The joined channel, 1x1 struct, fields in [hdf5_read_channel](#hdf5_read_channel); `par` is not carried
 
 ### Notes:
-- **Snapshots**: segment $k$ starts with `n_overlap(k)` snapshots that are also the last ones of segment $k - 1$; the
-  output has $\sum_k (n_{\mathrm{snap},k} - n_{\mathrm{overlap},k})$ snapshots
-- **Ramp**: in the last $n_r = \mathrm{round}(\mathrm{overlap} \cdot n_{\mathrm{overlap},k})$ shared snapshots, the old
-  paths fade out with $1 - w_i$ and the new ones fade in with $w_i$, in power, with
-  $$w_i = \frac{1}{2} \left( 1 + \sin\left( \left( \frac{i}{n_r + 1} - \frac{1}{2} \right) \pi \right) \right), \quad i = 1, \dots, n_r$$
-  Before the ramp, the snapshots are those of the old segment
-- **LOS and GR** (types 0 and 1 of the entry `path_type` of `par`; without it, tap index 0 of the entry `tap` and tap
-  index 3 held by one ray, without index 4 or 5, as [ssf_rays](#ssf_rays) numbers them): one path with the data of the new
-  segment (of the old one where the new one has no power), scaled to
-  $\lvert h \rvert^2 = (1 - w) \lvert h_\mathrm{old} \rvert^2 + w \lvert h_\mathrm{new} \rvert^2$ by the path gain (rays) or the tap power (taps)
-- **Rays** (channels with `path_gain`): the NLOS paths of both segments side by side, with the amplitudes $\sqrt{1 - w}$
-  and $\sqrt{w}$; `path_length`, `path_angles`, `fbs_pos` and `lbs_pos` are kept where all segments have them
-- **Taps** (without `path_gain`, one tap count per segment): one set of tap slots for all snapshots (LOS, GR, NLOS); the
-  NLOS taps of the old segment hold $1 - w$ and those of the new segment $w$ of their mean power over the ramp; slots
-  without power hold zero coefficients and the smallest delay of the snapshot
-- **Other data**: delays as given (one reference for all segments); positions interpolated in the ramp, orientations
-  along the shorter way; `name` and `center_freq` of segment 1; `n_interact` and `interact_coord` are not carried
-- **Tap indices**: the C++ channels carry them in their `par_data`; in MATLAB they are the input `par`, as in
-  [hdf5_write_channel](#hdf5_write_channel): the entries `tap`, `path_type` and `n_ray_tap` of each segment, as returned by
-  [gbsm_single_link_channel](#gbsm_single_link_channel)
+- **Snapshots**: segment $k$ starts with the `n_overlap(k)` snapshots of the ramp, which are also the last ones of
+  segment $k - 1$; the output has $\sum_k (n_{\mathrm{snap},k} - n_{\mathrm{overlap},k})$ snapshots. Outside the
+  ramps the snapshots are those of one segment
+- **Paths**: fields of `par`: `path_type` gives the LOS and GR paths (without it, tap index 0 of `tap` and a tap index 3
+  held by one path, without index 4 or 5, as [ssf_rays](#ssf_rays) numbers them), `cluster` the clusters, whose paths fade
+  together (without it: the taps, without `tap`: each path)
+- **Level**: at ramp snapshot $i$ of $n_r$, with $P_a$, $P_b$ the summed path gains of the old and new segment,
+  $$G_i = P_{a,i}^{1 - w_i} P_{b,i}^{w_i}, \quad w_i = \frac{1}{2} \left( 1 + \sin\left( \left( \frac{i}{n_r + 1} - \frac{1}{2} \right) \pi \right) \right)$$
+- **Exchange**: both cluster sets are scaled to $G$; the clusters of the old segment fade out and those of the new one
+  in, one after another, each over a quarter of the exchange, in an order that keeps the delay and angular spreads close
+  to those of the superposition of both sets (a segment with more than 32 clusters keeps its cluster order). The
+  exchange takes the part of the ramp in which $G$ is within 10 dB of the weaker segment, so that no cluster exceeds its
+  own power by more than 10 dB
+- **LOS and GR**: one path each, with the data of the new segment (of the old one where the new one has no power),
+  scaled to $G_i \left( (1 - q_i) g_a / P_a + q_i g_b / P_b \right)$, $g$ the path gain of the path and $q_i$ the
+  exchanged share
+- **A segment without power** at a ramp snapshot: all paths of the transition fade with $1 - w$ (old) and $w$ (new)
+  in power
+- **Taps**: the weighted paths summed per tap index, one set of tap slots for all snapshots (LOS, GR, NLOS); a new tap
+  takes the slot of an old tap that has faded out before it enters. Slots without power hold zero coefficients and the
+  smallest delay of the snapshot. The delay of a tap is the mean of its paths' delays weighted by their path gains
+- **Other data**: delays as given (one reference for all segments); positions and orientations of the old segment;
+  `name` and `center_freq` of segment 1; `'rays'` keep `path_length`, `polmat`, `path_angles`, `fbs_pos` and
+  `lbs_pos` where all segments have them; `par`, `n_interact` and `interact_coord` are not carried
+- **`par`**: the C++ channels carry these entries in their `par_data`; in MATLAB they are the input `par`, as in
+  [hdf5_write_channel](#hdf5_write_channel), with the entries of each segment as [gbsm_single_link_channel](#gbsm_single_link_channel) returns them
 
 ### See also:
 - [get_channels_from_rays](#get_channels_from_rays) (joins the segments of tracks with this function)
@@ -2716,6 +2724,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 | --- | --- | --- |
 | `tap` | `[n_tap, 1]` or `[n_path, 1]` | Tap index per output tap or per path; uint32 |
 | `path_type` | `[n_tap, 1]` or `[n_path, 1]` | 0 = LOS, 1 = GR, 2 = NLOS per path; per tap the type of its rays, 2 if they differ; uint32 |
+| `cluster` | `[n_tap, 1]` or `[n_path, 1]` | Cluster per tap or path: tap index / 3, the slot of [ssf_rays](#ssf_rays) (0 = LOS, 1 = GR if enabled, then the NLOS clusters); uint32 |
 | `n_ray_tap` | `[n_tap, 1]` | Number of kept rays per tap; uint32; `'taps'` only |
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `'drift'` with `'taps'` only; single, the precision of path data in HDF5 files |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only; single |
@@ -3878,7 +3887,7 @@ shift = quadriga_lib.export_rays_qrt( fn, layout, rays );
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
   link gain and the K-factor ratio of [get_channels_from_rays](#get_channels_from_rays) at the row, [ssf_paths](#ssf_paths) with `'drift'`. A CIR read
   back gives the channel of [get_channels_from_rays](#get_channels_from_rays) (`output = 'rays'`, `mobility = 'drift'`) at the row within
-  float32 accuracy
+  float32 accuracy, outside the cross-fade ramps between segments
 - **Reading back**: [gbsm_rays_from_paths](#gbsm_rays_from_paths) with the method of the links and the `n_interact` of the file as
   `path_type`, then [gbsm_single_link_channel](#gbsm_single_link_channel) with link gain 0 and mobility `'drift'`
 - **Point drops with speed**: one CIR; the motion is applied at the evaluation, at the link gain of the drop
@@ -4169,7 +4178,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_from_rays) · [Python](quadr
   rays of [generate_rays](#generate_rays), and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
-- Tracks with several segments are joined by [crossfade_segments](#crossfade_segments)
+- Tracks with several segments are joined by the cross-fade of [crossfade_segments](#crossfade_segments), over a ramp centred on the
+  first row of each new segment
 
 ### Usage:
 ```matlab
@@ -4190,8 +4200,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_from_rays) · [Python](quadr
   `'quadriga'`); default: `'auto'`
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1; default: `false`
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `false`
-- **`overlap`** — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1], see
-  [crossfade_segments](#crossfade_segments); default: 0.5
+- **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [crossfade_segments](#crossfade_segments); default: 0.5
 
 ### Outputs:
 - **`channels`** — Channels, struct array, fields in [hdf5_read_channel](#hdf5_read_channel); `[1, n_channel]`
@@ -4255,7 +4265,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_layout) · [Python](quadriga
 - **`method`** — `'38.901'`, `'38.901_MF'` or `'quadriga'`; `''` = the method of filled links, else `'38.901'`; another
   method than that of filled links raises an error; default: `''`
 - **`mobility`** — `'phase'`, `'drift'` or `'auto'`; default: `'auto'`
-- **`overlap`** — Overlap of consecutive segments, in [0, 1]; default: 0.5
+- **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
+  centred on the first row of the new segment; 0 = a switch at that row, see [crossfade_segments](#crossfade_segments); default: 0.5
 - **`seed`** — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell
   array of strings; default: `{}`

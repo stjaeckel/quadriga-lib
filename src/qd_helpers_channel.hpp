@@ -514,4 +514,24 @@ static inline int qd_any_type_id(const std::any *a, unsigned long long *dims = n
     return id;
 }
 
+namespace quadriga_lib
+{
+    template <typename dtype>
+    class channel;
+}
+
+// Cross-fade of crossfade_segments with the ray statistics given apart from the channel data; defined in
+// crossfade_segments.cpp, used by the layout pipeline
+// - data: channels of the segments, "rays" (with path gains) or "taps", one path or tap count per segment, par_data
+//   entries path_type, tap, cluster as in crossfade_segments
+// - stats: "rays" channels with the same clusters, from which the levels, the cluster powers and the spreads are taken:
+//   snapshots [0, n_overlap[k]) of stats[k] are the ramp of transition k (from k - 1), [trail0[k], trail0[k] +
+//   n_overlap[k + 1]) that of transition k + 1
+// - order_stats: as stats with its own trail0 (order_trail0), used for the fade orders only; nullptr = stats
+// - taps: output "taps", else "rays" (data with path gains)
+quadriga_lib::channel<double> qd_crossfade(const std::vector<const quadriga_lib::channel<double> *> &data,
+                                           const std::vector<const quadriga_lib::channel<double> *> &stats,
+                                           const std::vector<const quadriga_lib::channel<double> *> *order_stats,
+                                           const arma::uvec &trail0, const arma::uvec &order_trail0, const arma::uvec &n_overlap, bool taps);
+
 #endif

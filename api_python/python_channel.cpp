@@ -39,9 +39,9 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("crossfade_segments", &crossfade_segments,
           py::arg("segments").none(false),
-          py::arg("n_overlap").none(false),
           py::kw_only(),
-          py::arg("overlap") = 0.5,
+          py::arg("n_overlap") = py::none(),
+          py::arg("output") = "taps",
           py::arg("par") = py::none(),
           py::arg("stack") = false);
 

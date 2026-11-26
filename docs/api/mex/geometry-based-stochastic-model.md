@@ -521,6 +521,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 | --- | --- | --- |
 | `tap` | `[n_tap, 1]` or `[n_path, 1]` | Tap index per output tap or per path; uint32 |
 | `path_type` | `[n_tap, 1]` or `[n_path, 1]` | 0 = LOS, 1 = GR, 2 = NLOS per path; per tap the type of its rays, 2 if they differ; uint32 |
+| `cluster` | `[n_tap, 1]` or `[n_path, 1]` | Cluster per tap or path: tap index / 3, the slot of [ssf_rays](#ssf_rays) (0 = LOS, 1 = GR if enabled, then the NLOS clusters); uint32 |
 | `n_ray_tap` | `[n_tap, 1]` | Number of kept rays per tap; uint32; `'taps'` only |
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `'drift'` with `'taps'` only; single, the precision of path data in HDF5 files |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only; single |

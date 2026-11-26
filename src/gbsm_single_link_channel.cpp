@@ -98,6 +98,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 | --- | --- | --- |
 | `tap` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
 | `path_type` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | 0 = LOS, 1 = GR, 2 = NLOS per path; per tap the type of its rays, 2 if they differ |
+| `cluster` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | Cluster per tap or path: tap index / 3, the slot of [[ssf_rays]] (0 = LOS, 1 = GR if enabled, then the NLOS clusters) |
 | `n_ray_tap` | `arma::u32_vec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `arma::fmat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
@@ -447,7 +448,8 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         }
     }
 
-    c.par_names = {"tap", "path_type"}, c.par_data = {taps ? tap_val : rr.tap, taps ? tap_type : rr.path_type};
+    const arma::u32_vec cluster = (taps ? tap_val : rr.tap) / 3u; // the slot of ssf_rays
+    c.par_names = {"tap", "path_type", "cluster"}, c.par_data = {taps ? tap_val : rr.tap, taps ? tap_type : rr.path_type, cluster};
     if (taps)
         c.par_names.push_back("n_ray_tap"), c.par_data.push_back(n_ray_tap);
     if (drift && taps)

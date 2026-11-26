@@ -39,11 +39,12 @@ assertEqual( size(chan.delay), [2, 1, n_tap] );
 assertEqual( chan.center_freq, fc(1) );
 assertEqual( chan.tx_pos, tx_pos );
 assertEqual( chan.rx_pos, rx_pos );
-assertEqual( fieldnames(par)', { 'tap', 'path_type', 'n_ray_tap', 'fbs_pos', 'lbs_pos', 'gr_pos', 'link_gain_dB', 'b_med', ...
+assertEqual( fieldnames(par)', { 'tap', 'path_type', 'cluster', 'n_ray_tap', 'fbs_pos', 'lbs_pos', 'gr_pos', 'link_gain_dB', 'b_med', ...
     'b_eff', 'limit', 'ratio', 'ratio_total' } );
 assertTrue( isa(par.tap, 'uint32') && isa(par.n_ray_tap, 'uint32') );
 assertEqual( par.tap, taps );                                                 % codes, not shifted
 assertEqual( par.tap(1:2), uint32( [0; 3] ) );
+assertEqual( par.cluster, idivide( par.tap, uint32( 3 ) ) );                  % the slot of ssf_rays
 assertTrue( isa(par.path_type, 'uint32') );
 assertEqual( par.path_type, uint32( [0; 1; 2 * ones(numel(taps) - 2, 1)] ) );   % LOS, GR, NLOS per tap
 assertEqual( par.link_gain_dB, -90 );
