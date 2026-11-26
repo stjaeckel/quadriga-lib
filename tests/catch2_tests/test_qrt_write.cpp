@@ -496,6 +496,37 @@ TEST_CASE("QRT Write - append throws when all slots are full")
     std::remove(fn.c_str());
 }
 
+TEST_CASE("QRT Write - append rejects an origin table without all three angles")
+{
+    // A file of another writer may store the origin table with fewer orientation columns (format byte below 7);
+    // append writes at the offsets of format 7, so it must refuse such a file
+    std::string fn = "tests/data/test_write_orig_fmt.qrt";
+    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{3.75e9f}, arma::fmat(1, 3, arma::fill::zeros), arma::fmat(),
+                                       {"RX"}, arma::u32_vec{0u}, 2, false);
+    {
+        // The origin table ends the file of qrt_file_init: format byte, 6 * n_orig floats, n_orig offsets
+        std::fstream f(fn, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+        const std::streamoff pos = (std::streamoff)f.tellp() - (1 + 2 * (6 * 4 + 8));
+        char fmt = 0;
+        f.seekg(pos);
+        f.read(&fmt, 1);
+        REQUIRE(fmt == 7);
+        fmt = 0;
+        f.seekp(pos);
+        f.write(&fmt, 1);
+    }
+    auto load = [&]()
+    {
+        std::ifstream f(fn, std::ios::binary);
+        return std::vector<char>(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    };
+    const std::vector<char> before = load();
+    std::vector<path> paths = {make_em_path(0, 1, 1, {5})};
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, paths, arma::fvec{0.0f, 0.0f, 0.0f}), std::runtime_error);
+    CHECK(load() == before);
+    std::remove(fn.c_str());
+}
+
 TEST_CASE("QRT Write - append validates path against file")
 {
     std::string fn = "tests/data/test_write_validate.qrt";

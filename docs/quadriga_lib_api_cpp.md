@@ -2260,7 +2260,8 @@ Not in: MATLAB, Python
 - A path belongs to the CIR of its index `i_cir`; the paths of one CIR keep their order in `path_data`
 - `length` and the counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [path](#path) are not stored
   (see [QRT file format: stored values](formats/qrt.md#qrt-stored-values))
-- All inputs are checked before anything is written; a file whose origin slots are all written throws
+- All inputs are checked before anything is written; a file whose origin slots are all written, or whose origin table
+  does not store all three angles (see [QRT file format: byte layout](formats/qrt.md#qrt-byte-layout)), throws
   `std::runtime_error`
 
 ### Declaration:

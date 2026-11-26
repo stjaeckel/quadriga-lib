@@ -526,7 +526,8 @@ Append the paths of one origin to an existing QRT file
 - A path belongs to the CIR of its index `i_cir`; the paths of one CIR keep their order in `path_data`
 - `length` and the counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [[path]] are not stored
   (see [QRT file format: stored values](formats.html#qrt-stored-values))
-- All inputs are checked before anything is written; a file whose origin slots are all written throws
+- All inputs are checked before anything is written; a file whose origin slots are all written, or whose origin table
+  does not store all three angles (see [QRT file format: byte layout](formats.html#qrt-byte-layout)), throws
   `std::runtime_error`
 
 ## Declaration:
@@ -620,6 +621,16 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
         if (!f)
             throw std::runtime_error("QRT file truncated or corrupt.");
         off = (size_t)f.tellg();
+    }
+    {
+        uint8_t orig_fmt = 0; // The offsets below assume all six origin columns, as qrt_file_init writes them
+        f.seekg((std::streamoff)off, std::ios::beg);
+        f.read((char *)&orig_fmt, sizeof(uint8_t));
+        if (!f)
+            throw std::runtime_error("QRT file truncated or corrupt.");
+        if (orig_fmt != 7)
+            throw std::runtime_error("QRT file stores the origin orientations in format " + std::to_string(orig_fmt) +
+                                     "; qrt_file_append extends only files with format 7 (all three angles).");
     }
     size_t orig_pos_base = off + 1;                                      // skip orig_fmt byte
     size_t orig_index_base = orig_pos_base + 6 * n_orig * sizeof(float); // after 6 columns
