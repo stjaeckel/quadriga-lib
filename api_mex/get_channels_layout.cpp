@@ -26,7 +26,7 @@ Channel coefficients of a layout in one call
 ## Usage:
 ```
 [ channels, index ] = quadriga_lib.get_channels_layout( layout, times, output, method, mobility, ...
-    overlap, seed, config_dirs );
+    overlap, seed, config_dirs, link_gain );
 ```
 
 ## Inputs:
@@ -42,6 +42,7 @@ Channel coefficients of a layout in one call
 - **`seed`** — Master seed for empty links, as in [[init_link_states]]; with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell
   array of strings; default: `{}`
+- **`link_gain`** — false: without the link gain, as in [[get_channels_from_rays]]; default: true
 
 ## Outputs:
 - **`channels`** — Channels, Tx node fastest, then Rx node, then frequency; struct array, fields in
@@ -69,7 +70,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 8)
+    if (nrhs < 1 || nrhs > 9)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -82,11 +83,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double overlap = (nrhs < 6) ? 0.5 : qd_mex_get_scalar<double>(prhs[5], "overlap", 0.5);
     const arma::sword seed = (nrhs < 7) ? -1 : (arma::sword)qd_mex_get_seed(prhs[6], "seed");
     const std::vector<std::string> config_dirs = qd_mex_layout_config_dirs((nrhs < 8) ? nullptr : prhs[7]);
+    const bool link_gain = (nrhs < 9) ? true : qd_mex_get_scalar<bool>(prhs[8], "link_gain", true);
 
     std::vector<quadriga_lib::channel<double>> channels;
     arma::umat index;
     arma::umat *p_index = (nlhs > 1) ? &index : nullptr;
-    CALL_QD(channels = quadriga_lib::get_channels_layout(layout, times, output, method, p_index, mobility, overlap, seed, config_dirs));
+    CALL_QD(channels = quadriga_lib::get_channels_layout(layout, times, output, method, p_index, mobility, overlap, seed, config_dirs, link_gain));
 
     plhs[0] = qd_mex_channel2struct(channels);
     if (nlhs > 1)

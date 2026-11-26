@@ -1354,7 +1354,7 @@ void qd_check_rays(const quadriga_lib::layout &L, const std::vector<std::vector<
 std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays,
                                                        const std::vector<arma::uword> &sel, const std::vector<qd_item> &items, const arma::vec &times,
                                                        const std::string &output, const std::string &mobility, bool oxygen, bool use_absolute_delays,
-                                                       double overlap)
+                                                       double overlap, bool link_gain)
 {
     const quadriga_lib::layout &L = P.L;
     const quadriga_lib::layout_links &K = P.K;
@@ -1479,6 +1479,8 @@ std::vector<quadriga_lib::channel<double>> qd_channels(qd_pipe &P, const std::ve
                           P.link_gain(l, T[j].col(0), R[j].col(0), G[j], KF[j]);
                       else
                           P.link_gain(l, T[j], R[j], G[j], KF[j]);
+                      if (!link_gain) // The K-factor ratio stays: it belongs to the rays, not to the link gain
+                          G[j].zeros();
                   });
 
     // Channels; a channel link with several segments: one channel per segment, joined by the cross-fade of
@@ -1867,7 +1869,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const std::string &mobility = "auto",
     bool oxygen = false,
     bool use_absolute_delays = false,
-    double overlap = 0.5);
+    double overlap = 0.5,
+    bool link_gain = true);
 ```
 
 ## Inputs:
@@ -1885,6 +1888,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
 - **`overlap`** *(optional)* — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
   centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]
+- **`link_gain`** *(optional)* — false: the link gain is left out (0 dB), so the coefficients have no path loss, O2I loss
+  and shadow fading; the K-factor ratio stays
 
 ## Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
@@ -1924,13 +1929,29 @@ MD!*/
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_from_rays(const layout &layout, const std::vector<std::vector<gbsm_rays>> &rays,
                                                                            const uint_list &i_link, const arma::vec &times, const std::string &output,
                                                                            arma::umat *index, const std::string &mobility, bool oxygen,
-                                                                           bool use_absolute_delays, double overlap)
+                                                                           bool use_absolute_delays, double overlap, bool link_gain)
 {
     qd_check_channel_args(output, mobility, overlap);
     qd_pipe P(layout, layout.links, true);
     const std::vector<arma::uword> sel = qd_selection(i_link, layout.links.n_link());
     const std::vector<qd_item> items = qd_items(P, sel);
-    std::vector<channel<double>> out = qd_channels(P, rays, sel, items, times, output, mobility, oxygen, use_absolute_delays, overlap);
+    std::vector<channel<double>> out = qd_channels(P, rays, sel, items, times, output, mobility, oxygen, use_absolute_delays, overlap, link_gain);
+    qd_index(items, P.n_freq, index);
+    return out;
+}
+
+std::vector<quadriga_lib::channel<double>> qd_layout::channels_of_nodes(const quadriga_lib::layout &L, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays,
+                                                                        const std::vector<arma::uword> &sel, const arma::uvec &tx_node, const arma::vec &times,
+                                                                        const std::string &output, bool link_gain, arma::umat *index)
+{
+    qd_check_channel_args(output, "auto", 0.5);
+    if (!tx_node.is_empty() && tx_node.n_elem != L.rx.n_node())
+        throw std::logic_error("channels_of_nodes: 'tx_node' needs one entry per Rx node.");
+    qd_pipe P(L, L.links, true);
+    std::vector<qd_item> items = qd_items(P, sel);
+    if (!tx_node.is_empty())
+        items.erase(std::remove_if(items.begin(), items.end(), [&](const qd_item &it) { return it.tx != tx_node[it.rx]; }), items.end());
+    std::vector<quadriga_lib::channel<double>> out = qd_channels(P, rays, sel, items, times, output, "auto", false, false, 0.5, link_gain);
     qd_index(items, P.n_freq, index);
     return out;
 }
@@ -1959,7 +1980,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
     const std::string &mobility = "auto",
     double overlap = 0.5,
     arma::sword seed = -1,
-    const std::vector<std::string> &config_dirs = {});
+    const std::vector<std::string> &config_dirs = {},
+    bool link_gain = true);
 ```
 
 ## Inputs:
@@ -1974,6 +1996,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
   centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]
 - **`seed`** *(optional)* — Master seed for empty links, as in [[init_link_states]]; with filled links only -1
 - **`config_dirs`** *(optional)* — Folders of user conf files for empty links, searched before the shipped folder
+- **`link_gain`** *(optional)* — false: without the link gain, as in [[get_channels_from_rays]]
 
 ## Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
@@ -2001,7 +2024,8 @@ MD!*/
 
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(const layout &layout, const arma::vec &times, const std::string &output,
                                                                              const std::string &method, arma::umat *index, const std::string &mobility,
-                                                                             double overlap, arma::sword seed, const std::vector<std::string> &config_dirs)
+                                                                             double overlap, arma::sword seed, const std::vector<std::string> &config_dirs,
+                                                                             bool link_gain)
 {
     qd_check_channel_args(output, mobility, overlap);
     if (!method.empty())
@@ -2072,7 +2096,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(con
             for (arma::uword &j : bi.back().j)
                 j -= (arma::uword)a;
         }
-        auto ch = qd_channels(P, P.rays(sel, scatterers), sel, bi, times, output, mobility, false, false, overlap);
+        auto ch = qd_channels(P, P.rays(sel, scatterers), sel, bi, times, output, mobility, false, false, overlap, link_gain);
         for (arma::uword k = 0; k < P.n_freq; ++k)
             for (size_t q = 0; q < bi.size(); ++q)
                 out[k * n_item + of_batch[b][q]] = std::move(ch[k * bi.size() + q]);

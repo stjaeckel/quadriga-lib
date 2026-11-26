@@ -25,7 +25,7 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
 ## Usage:
 ```
 [ channels, index ] = quadriga_lib.get_channels_from_rays( layout, rays, i_link, times, output, mobility, ...
-    oxygen, use_absolute_delays, overlap );
+    oxygen, use_absolute_delays, overlap, link_gain );
 ```
 
 ## Inputs:
@@ -43,6 +43,8 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `false`
 - **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
   centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]; default: 0.5
+- **`link_gain`** — false: the link gain is left out (0 dB), so the coefficients have no path loss, O2I loss and
+  shadow fading; the K-factor ratio stays; default: true
 
 ## Outputs:
 - **`channels`** — Channels, struct array, fields in [[hdf5_read_channel]]; `[1, n_channel]`
@@ -79,7 +81,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 2 || nrhs > 9)
+    if (nrhs < 2 || nrhs > 10)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -93,11 +95,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool oxygen = (nrhs < 7) ? false : qd_mex_get_scalar<bool>(prhs[6], "oxygen", false);
     const bool use_absolute_delays = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "use_absolute_delays", false);
     const double overlap = (nrhs < 9) ? 0.5 : qd_mex_get_scalar<double>(prhs[8], "overlap", 0.5);
+    const bool link_gain = (nrhs < 10) ? true : qd_mex_get_scalar<bool>(prhs[9], "link_gain", true);
 
     std::vector<quadriga_lib::channel<double>> channels;
     arma::umat index;
     arma::umat *p_index = (nlhs > 1) ? &index : nullptr;
-    CALL_QD(channels = quadriga_lib::get_channels_from_rays(layout, rays, i_link, times, output, p_index, mobility, oxygen, use_absolute_delays, overlap));
+    CALL_QD(channels = quadriga_lib::get_channels_from_rays(layout, rays, i_link, times, output, p_index, mobility, oxygen, use_absolute_delays, overlap, link_gain));
 
     plhs[0] = qd_mex_channel2struct(channels);
     if (nlhs > 1)

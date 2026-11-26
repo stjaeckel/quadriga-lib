@@ -5,7 +5,7 @@
 // Tests of get_channels_layout, the one call from a layout to channel coefficients, of the O2I loss of the link gain
 // of get_channels_from_rays along a track, and of the rules that tie the stages together: the manual path
 // (init_link_states, generate_rays, get_channels_from_rays) as oracle of the one call, the stale-link hash, edited link
-// states, pairing, dual mobility, per-band antennas and layouts read back from CSV files.
+// states, pairing, dual mobility, per-band antennas, layouts read back from CSV files and the link_gain switch.
 // Oracles: the manual path; the exact names of the conf files (an edited LOS state equals the state fixed by name);
 // the Doppler phase -2 pi (v_rx - v_tx) t / lambda of a LOS path between two ends that move along the LOS direction.
 // Fixtures: qd_test_layout.hpp.
@@ -431,4 +431,30 @@ TEST_CASE("get_channels_from_rays - the O2I loss of a car is drawn per vehicle")
     B_low.links.o2i_model = {0}, B_high.links.o2i_model = {1};
     const arma::vec building = power_dB(B_low) - power_dB(B_high);
     CHECK(building.max() - building.min() > 1.0);
+}
+
+TEST_CASE("get_channels_from_rays - link_gain false leaves out the link gain")
+{
+    // Oracle: the link gain is one factor 10^(G / 20) per snapshot on all coefficients of a channel, G from its par_data
+    quadriga_lib::layout L = small();
+    quadriga_lib::init_link_states(L);
+    const auto rays = quadriga_lib::generate_rays(L);
+    const auto on = quadriga_lib::get_channels_from_rays(L, rays);
+    const auto off = quadriga_lib::get_channels_from_rays(L, rays, {}, {}, "taps", nullptr, "auto", false, false, 0.5, false);
+    REQUIRE(on.size() == off.size());
+    for (size_t c = 0; c < on.size(); ++c)
+    {
+        const arma::vec g_on = qd_layout_par<arma::vec>(on[c], "link_gain_dB"), g_off = qd_layout_par<arma::vec>(off[c], "link_gain_dB");
+        CHECK(arma::all(g_on < -40.0));
+        CHECK(arma::all(g_off == 0.0));
+        for (size_t s = 0; s < on[c].coeff_re.size(); ++s)
+        {
+            const double a = std::pow(10.0, g_on[s] / 20.0);
+            CHECK(arma::approx_equal(off[c].coeff_re[s] * a, on[c].coeff_re[s], "absdiff", 1e-12 * arma::abs(on[c].coeff_re[s]).max()));
+            CHECK(arma::approx_equal(off[c].coeff_im[s] * a, on[c].coeff_im[s], "absdiff", 1e-12 * arma::abs(on[c].coeff_im[s]).max()));
+            CHECK(arma::approx_equal(off[c].delay[s], on[c].delay[s], "absdiff", 1e-18));
+        }
+    }
+    // The one call passes the switch on
+    CHECK(diff(quadriga_lib::get_channels_layout(L, {}, "taps", "", nullptr, "auto", 0.5, -1, {}, false), off) == "");
 }

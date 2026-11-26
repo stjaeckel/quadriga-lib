@@ -28,7 +28,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: General usage notes](api/cpp/general-usage-notes.md)
 - [C++: Antennas, transducers and patterns](api/cpp/antennas-transducers-and-patterns.md): 16 functions
 - [C++: Channel data and processing](api/cpp/channel-data-and-processing.md): 26 functions
-- [C++: Channel generators](api/cpp/channel-generators.md): 5 functions
+- [C++: Channel generators](api/cpp/channel-generators.md): 6 functions
 - [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 17 functions
 - [C++: Math functions](api/cpp/math-functions.md): 10 functions
 - [C++: Miscellaneous / Tools](api/cpp/miscellaneous-tools.md): 4 functions
@@ -38,7 +38,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: General usage notes](api/mex/general-usage-notes.md)
 - [MATLAB / Octave: Antennas, transducers and patterns](api/mex/antennas-transducers-and-patterns.md): 12 functions
 - [MATLAB / Octave: Channel data and processing](api/mex/channel-data-and-processing.md): 19 functions
-- [MATLAB / Octave: Channel generators](api/mex/channel-generators.md): 5 functions
+- [MATLAB / Octave: Channel generators](api/mex/channel-generators.md): 6 functions
 - [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 16 functions
 - [MATLAB / Octave: Math functions](api/mex/math-functions.md): 6 functions
 - [MATLAB / Octave: Miscellaneous / Tools](api/mex/miscellaneous-tools.md): 2 functions
@@ -48,7 +48,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Python: General usage notes](api/python/general-usage-notes.md)
 - [Python: Antennas, transducers and patterns](api/python/antennas-transducers-and-patterns.md): 12 functions
 - [Python: Channel data and processing](api/python/channel-data-and-processing.md): 19 functions
-- [Python: Channel generators](api/python/channel-generators.md): 5 functions
+- [Python: Channel generators](api/python/channel-generators.md): 6 functions
 - [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 16 functions
 - [Python: Math functions](api/python/math-functions.md): 6 functions
 - [Python: Miscellaneous / Tools](api/python/miscellaneous-tools.md): 3 functions

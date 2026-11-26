@@ -78,7 +78,7 @@ assertEqual( size( ch(1).coeff_re, 4 ), 3 );
 
 %% Errors
 assert_throws( @() quadriga_lib.get_channels_layout(), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.get_channels_layout( L, [], 'taps', '', 'auto', 0.5, 5, {}, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.get_channels_layout( L, [], 'taps', '', 'auto', 0.5, 5, {}, true, 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out3( L2 ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.get_channels_layout( 1 ), 'Input ''layout'' must be a 1x1 struct.' );
 assert_throws( @() quadriga_lib.get_channels_layout( L, [], 'taps', '', 'auto', 0.5, -2 ), 'Input ''seed'' must be -1 or a non-negative integer.' );

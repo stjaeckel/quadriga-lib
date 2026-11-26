@@ -24,7 +24,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 - The **link states** `layout.links` of one realisation: LOS and indoor state, scenario and seeds of each Tx-Rx pair
   ([[init_link_states]])
 
-**Typical workflow:**
+**Typical workflow** (for the channels of a TR 38.901 scenario in one call, see [[get_channels_tr38901]]):
 
 1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [[layout_csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes

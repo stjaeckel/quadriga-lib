@@ -58,6 +58,7 @@ lang: en-US
 | [get_channels_multifreq](#get_channels_multifreq) | Channel generators | Calculate MIMO channel coefficients and delays for spherical wave propagation at several frequencies |
 | [get_channels_planar](#get_channels_planar) | Channel generators | Calculate MIMO channel coefficients and delays for planar wave propagation |
 | [get_channels_spherical](#get_channels_spherical) | Channel generators | Calculate MIMO channel coefficients and delays for spherical wave propagation |
+| [get_channels_tr38901](#get_channels_tr38901) | Channel generators | Generate the channels of a TR 38.901 scenario in one call |
 | [conf_file_list](#conf_file_list) | Geometry-based stochastic model | List the scenarios defined by the conf files in a set of directories |
 | [conf_file_read](#conf_file_read) | Geometry-based stochastic model | Read and validate a QuaDRiGa scenario configuration file |
 | [conf_file_write](#conf_file_write) | Geometry-based stochastic model | Write a QuaDRiGa scenario configuration file |
@@ -1801,6 +1802,7 @@ given per port pair: `n_tx` and `n_rx` count the ports of the arrays, after thei
   path gains and polarization, for radio and acoustic waves
 - [get_channels_irs](#get_channels_irs): paths over an intelligent reflecting surface (IRS), from two path sets that meet at the IRS array
 - [get_channels_ieee_indoor](#get_channels_ieee_indoor): complete channels of the IEEE TGn, TGac, TGah and TGax indoor models
+- [get_channels_tr38901](#get_channels_tr38901): complete channels of a 3GPP TR 38.901 scenario (UMa, UMi, RMa, SMa, InH, InF) in one call
 
 The paths come from a ray tracer (e.g. [qrt_file_read](#qrt_file_read)), from the geometry-based stochastic model, or from the user.
 For complete channels of a network layout, see [get_channels_layout](#get_channels_layout).
@@ -2218,6 +2220,130 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 - [qrt_file_read](#qrt_file_read) (path data of many snapshots)
 - [freq_response](#freq_response) (frequency response of the coefficients)
 - [quantize_delays](#quantize_delays) (delays on a tap grid)
+
+---
+<a id="get_channels_tr38901"></a>
+## get_channels_tr38901
+Generate the channels of a TR 38.901 scenario in one call
+
+Also in: [C++](quadriga_lib_api_cpp.md#get_channels_tr38901) · [Python](quadriga_lib_api_python.md#channel.tr38901)
+
+- Channels between the UTs of a drop and the BSs of a 3GPP TR 38.901 scenario (UMa, UMi, RMa, SMa, InH, InF), with the
+  given BS and UT antenna arrays; by default one channel per UT and frequency, to its serving BS sector
+- The scenario sets the BS layout and the drop of the UTs as in TR 38.901 (table in Notes); optional inputs change
+  single values, the time evolution and which links are returned
+- Built on the layout functions ([generate_layout](#generate_layout), [init_link_states](#init_link_states), [attach_terminals](#attach_terminals), [generate_rays](#generate_rays),
+  [get_channels_from_rays](#get_channels_from_rays)); `layout` returns the simulated layout, to continue there
+
+### Usage:
+```matlab
+[ chan, gain_dB, layout, index ] = quadriga_lib.get_channels_tr38901( bs_array, ut_array, scenario, ...
+    center_freq, n_ut, seed, spacing, grid, area, bs, ut, indoor, time_grid, los, output, attach, links, ...
+    link_gain, uplink, o2i_low, config_dirs );
+```
+
+### Inputs:
+- **`bs_array`** — BS antenna array, struct, fields in [generate_antenna](#generate_antenna); every sector uses it, turned to the sector heading
+- **`ut_array`** — UT antenna array, struct, fields in [generate_antenna](#generate_antenna)
+- **`scenario`** — `'UMa'`, `'UMi'`, `'RMa'`, `'SMa'`, `'InH_Open'`, `'InH_Mixed'`, `'InF_SL'`, `'InF_DL'`,
+  `'InF_SH'`, `'InF_DH'` or `'InF_HH'`; also with the prefix `'38.901_'`
+- **`center_freq`** — Carrier frequencies in Hz, ascending; one set of channels per frequency; default: 3.5e9;
+  `[n_freq]`
+- **`n_ut`** — UTs per cell (per BS sector), >= 1; default: 1
+- **`seed`** — Seed of the random numbers: the same seed gives the same drop and channels; -1 = a random seed,
+  which `layout.seed` returns; default: -1
+
+Optional changes to the scenario layout (defaults in Notes). Give only the values to change; NaN keeps a default.
+[generate_layout](#generate_layout) describes all values:
+
+- **`spacing`** — Inter-site distance in m, e.g. `200`; indoor: BS spacing in x and y; default: `[]`
+- **`grid`** — Rings of sites around the centre site, e.g. `0` = one site, `2` = 19 sites; the
+  number of sectors as third value, e.g. `[0, NaN, 1]`; indoor: BSs in x and y; default: `[]`
+- **`area`** — Hall size in m, length, width, height (InH, InF); default: `[]`
+- **`bs`** — BS height in m, e.g. `30`; then the mechanical downtilt and an offset of the sector
+  headings in degrees; default: `[]`
+- **`ut`** — UT height and minimum distance to the BS in m, speed in m/s, e.g. `[NaN, NaN, 30 / 3.6]` =
+  all UTs at 30 km/h; then the orientation (bank, tilt, heading) in degrees; default: `[]`
+- **`indoor`** — Share of the UTs in buildings, e.g. `0.5` (UMa, UMi, RMa, SMa); then the range of floors
+  and the floor height; default: `[]`
+
+Simulation settings:
+
+- **`time_grid`** — `[T, dt]` in s: snapshots at 0, dt, 2 dt, … up to T, while the UTs move; `dt`
+  defaults to 1 ms, e.g. `0.1` = 101 snapshots over 100 ms; `[]` = one snapshot (static channel); default: `[]`
+- **`los`** — `'auto'`: LOS or NLOS as drawn from the LOS probability of the scenario; `'los'` or `'nlos'`: that state for
+  all links, also of the UTs in buildings and to the other sectors, so it can change the serving sector (`'InF_HH'` is
+  always LOS); default: `'auto'`
+- **`output`** — `'taps'`: the rays of a cluster combined into taps; `'rays'`: every ray as a path, with angles
+  and path gains; default: `'taps'`
+- **`attach`** — How the serving sector is chosen: `'large_scale'` (coupling gain) or `'rsrp'` (Notes); default: `'large_scale'`
+- **`links`** — Which links are returned: `'serving'`, the serving sector of each UT; `'site'`, all sectors of its
+  serving site; `'all'`, all BS sectors, e.g. for interference studies (Outputs); default: `'serving'`
+- **`link_gain`** — false: without path loss, building loss and shadow fading, so that the power is that of the
+  antennas and the small-scale fading; `gain_dB` and the serving sector still include them; default: true
+- **`uplink`** — true: the uplink, with the UT as Tx (Notes); default: false
+- **`o2i_low`** — Share of buildings with the low-loss model of the building penetration loss, in [0, 1];
+  NaN = the TR 38.901 value (50 % in UMa and UMi); not for InH, InF; default: NaN
+- **`config_dirs`** — Folders with own scenario files (`.conf`), searched before the shipped ones; default: `{}`
+
+### Outputs:
+- **`chan`** — Channels as struct array, fields in [hdf5_read_channel](#hdf5_read_channel); what taps and rays hold: [gbsm_single_link_channel](#gbsm_single_link_channel)
+  - `'serving'`: one channel per UT and frequency, all UTs at the first frequency, then at the next: `chan(i_ut + (i_freq - 1) * n_ut_total)`, 1-based
+  - `'site'`, `'all'`: one channel per BS sector, UT and frequency; the sectors of the first UT one after the other,
+    then those of the next UT, then the next frequency; `index` names the BS sector, UT and frequency of each channel
+  - UTs in drop order: the first `n_ut` were dropped in cell 1 (site BS1, sector 0), the next `n_ut` in cell 2, …;
+    the serving sector is the one with the highest gain, often not the cell of the drop. The name says it too, e.g.
+    `'BS5:0_UT11'` = site BS5, sector 0, UT 11
+  - Coefficients and delays `[n_ut_port, n_bs_port, n_tap, n_snap]` (downlink; `uplink` swaps the first two)
+- **`gain_dB`** — Coupling gain or RSRP in dB of each UT to each BS sector, e.g. for the SIR; `[n_ut_total, n_bs_node]`
+- **`layout`** — The simulated layout: BS and UT positions, link states, pairing; fields in [layout_csv_read](#layout_csv_read)
+- **`index`** — BS sector (node), UT and frequency of each channel, 1-based; uint64; `[3, n_channel]`
+
+### Example:
+```matlab
+bs = quadriga_lib.generate_antenna( '3gpp', 10, 3.5e9, [], [4, 4, 1, 1] );
+ut = quadriga_lib.generate_antenna( 'xpol' );
+chan = quadriga_lib.get_channels_tr38901( bs, ut, 'UMa', 3.5e9, 10, 1 );                          % 19 sites
+chan = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 10, 1, [], 0, [], [], [], [], 0.1 );   % one site, 100 ms
+```
+
+### Notes:
+- **Scenario defaults** (TR 38.901 Tables 7.2-1 to 7.2-5 and 7.8-7); the UTs are at 1.5 m (InH 1 m, InF_HH 3 m),
+  in buildings on their floor:
+
+  | Scenario | BS layout | BS height | UTs indoors | UT speed |
+  | --- | --- | --- | --- | --- |
+  | UMa | 19 sites × 3 sectors, ISD 500 m, wrap-around | 25 m | 80 % | 3 km/h |
+  | UMi | 19 sites × 3 sectors, ISD 200 m, wrap-around | 10 m | 80 % | 3 km/h |
+  | RMa | 19 sites × 3 sectors, ISD 1732 m, wrap-around | 35 m | 50 %, the others in cars | 3 km/h, cars 40 km/h |
+  | SMa | 19 sites × 3 sectors, ISD 1299 m, wrap-around | 35 m | 80 %, the others in cars | 3 km/h, cars 40 km/h |
+  | InH_Open, InH_Mixed | Hall 120 × 50 m, 12 BSs 20 m apart | 3 m | all | 3 km/h |
+  | InF_SL, InF_DH | Hall 120 × 60 × 10 m, 18 BSs 20 m apart | 1.5 m (SL), 8 m (DH) | all | 3 km/h |
+  | InF_DL, InF_SH, InF_HH | Hall 300 × 150 × 10 m, 18 BSs 50 m apart | 1.5 m (DL), 8 m (SH, HH) | all | 3 km/h |
+
+  `n_ut` UTs are dropped in each cell (`n_ut_total` = `n_ut` × the number of BS sectors); with the wrap-around, the
+  outer cells see the interference of a large network, also with one site
+- **Serving sector**: the BS sector with the highest coupling gain (`'large_scale'`, TR 38.901 Table 7.8-1) or RSRP
+  (`'rsrp'`, Table 7.8-2) at the first frequency, see [attach_terminals](#attach_terminals); `'rsrp'` and `links` = `'all'` generate
+  the rays of all links, the others only those to the serving sites
+- **Time evolution**: the UTs move from their drop position along their direction at their speed; delays and angles of
+  the clusters stay, the phases follow the motion (mobility `'phase'` of [get_channels_from_rays](#get_channels_from_rays))
+- **Several frequencies**: the clusters come from the same random values at all frequencies, scaled by the spreads of
+  each frequency (method `'38.901_MF'`, TR 38.901 clause 7.6.5)
+- **Uplink**: the transposed downlink (reciprocal channel, the same Doppler shift), with the two ends swapped in all
+  members and the name; `index` and `gain_dB` keep the downlink meaning. This is the uplink of a TDD system; for FDD,
+  add the uplink frequency to `center_freq`
+- **Memory**: about 90 kB per snapshot for the 57 UTs of the default UMa drop with 2 × 2 ports (16 to 25 taps);
+  `links` = `'all'` multiplies it by the number of BS sectors; `'site'` by the sectors per site (3)
+- The C++ outputs come after `chan` in their C++ order; the wrapper adds the folder of the shipped conf files to
+  `config_dirs`
+
+### See also:
+- [hdf5_read_channel](#hdf5_read_channel) (the fields of the channels)
+- [freq_response](#freq_response) (frequency response of the channels at given subcarriers)
+- [generate_layout](#generate_layout) (the scenario layouts and their inputs in full)
+- [get_channels_layout](#get_channels_layout) (channels of any layout)
+- [get_channels_ieee_indoor](#get_channels_ieee_indoor) (the IEEE indoor models)
 
 ---
 
@@ -3641,7 +3767,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 - The **link states** `layout.links` of one realisation: LOS and indoor state, scenario and seeds of each Tx-Rx pair
   ([init_link_states](#init_link_states))
 
-**Typical workflow:**
+**Typical workflow** (for the channels of a TR 38.901 scenario in one call, see [get_channels_tr38901](#get_channels_tr38901)):
 
 1. Create a layout: [generate_layout](#generate_layout) from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [layout_csv_read](#layout_csv_read) from two CSV files; [drop_terminals](#drop_terminals) drops new UTs into the cells of the Tx nodes
@@ -4184,7 +4310,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_from_rays) · [Python](quadr
 ### Usage:
 ```matlab
 [ channels, index ] = quadriga_lib.get_channels_from_rays( layout, rays, i_link, times, output, mobility, ...
-    oxygen, use_absolute_delays, overlap );
+    oxygen, use_absolute_delays, overlap, link_gain );
 ```
 
 ### Inputs:
@@ -4202,6 +4328,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_from_rays) · [Python](quadr
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `false`
 - **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
   centred on the first row of the new segment; 0 = a switch at that row, see [crossfade_segments](#crossfade_segments); default: 0.5
+- **`link_gain`** — false: the link gain is left out (0 dB), so the coefficients have no path loss, O2I loss and
+  shadow fading; the K-factor ratio stays; default: true
 
 ### Outputs:
 - **`channels`** — Channels, struct array, fields in [hdf5_read_channel](#hdf5_read_channel); `[1, n_channel]`
@@ -4254,7 +4382,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_layout) · [Python](quadriga
 ### Usage:
 ```matlab
 [ channels, index ] = quadriga_lib.get_channels_layout( layout, times, output, method, mobility, ...
-    overlap, seed, config_dirs );
+    overlap, seed, config_dirs, link_gain );
 ```
 
 ### Inputs:
@@ -4270,6 +4398,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_layout) · [Python](quadriga
 - **`seed`** — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell
   array of strings; default: `{}`
+- **`link_gain`** — false: without the link gain, as in [get_channels_from_rays](#get_channels_from_rays); default: true
 
 ### Outputs:
 - **`channels`** — Channels, Tx node fastest, then Rx node, then frequency; struct array, fields in

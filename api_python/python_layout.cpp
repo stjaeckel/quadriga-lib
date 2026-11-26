@@ -120,6 +120,7 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("overlap") = 0.5,
           py::arg("seed") = -1,
           py::arg("config_dirs") = py::none(),
+          py::arg("link_gain") = true,
           py::arg("stack") = false);
 
     m.def("init_link_states", &init_link_states,
@@ -150,6 +151,7 @@ void quadriga_lib_layout(py::module_ &m)
           py::arg("oxygen") = false,
           py::arg("use_absolute_delays") = false,
           py::arg("overlap") = 0.5,
+          py::arg("link_gain") = true,
           py::arg("stack") = false);
 
     m.def("attach_terminals", &attach_terminals,

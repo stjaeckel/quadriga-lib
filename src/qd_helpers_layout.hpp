@@ -356,6 +356,13 @@ static inline void check_antenna_cells(const qd_csv::table &T, size_t r, const i
 void eval_antennas(quadriga_lib::layout &L, const arma::vec &center_freq, const std::vector<std::string> *where_tx,
                    const std::vector<std::string> *where_rx);
 
+// get_channels_from_rays for one Tx node per Rx node (layout_pipeline.cpp): the channel links of the propagation links
+// 'sel' with their 'rays' whose Tx node is tx_node[rx node] (empty: all channel links); mobility "auto", overlap 0.5; Tx
+// node fastest, then Rx node, then frequency
+std::vector<quadriga_lib::channel<double>> channels_of_nodes(const quadriga_lib::layout &L, const std::vector<std::vector<quadriga_lib::gbsm_rays>> &rays,
+                                                             const std::vector<arma::uword> &sel, const arma::uvec &tx_node, const arma::vec &times,
+                                                             const std::string &output, bool link_gain, arma::umat *index);
+
 // True if two frequencies are equal within a relative 1e-6
 static inline bool same_freq(double a, double b) { return std::abs(a - b) <= 1.0e-6 * std::max(std::abs(a), std::abs(b)); }
 

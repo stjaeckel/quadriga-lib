@@ -43,6 +43,7 @@ POSITIONAL_OPTIONAL = {
     "channel.hdf5_write_channel": ("par", "ix", "iy", "iz", "iw"),
     "channel.hdf5_write_dset": ("ix", "iy", "iz", "iw"),
     "channel.ieee_indoor": ("center_freq",),
+    "channel.tr38901": ("center_freq",),
     "channel.irs": ("center_freq",),
     "channel.planar": ("center_freq",),
     "channel.spherical": ("center_freq",),

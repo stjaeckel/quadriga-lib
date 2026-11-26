@@ -85,6 +85,10 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         L2, rays = self.L2, self.rays
+        on = quadriga_lib.layout.get_channels_from_rays(L2, rays)[0]
+        off = quadriga_lib.layout.get_channels_from_rays(L2, rays, link_gain=False)[0]  # without path loss: far more power
+        self.assertGreater(np.sum(np.abs(off[0]["coeff"][0]) ** 2), 1e4 * np.sum(np.abs(on[0]["coeff"][0]) ** 2))
+        self.assertTrue(same(quadriga_lib.layout.get_channels_layout(L2, link_gain=False)[0], off))
         ch, index = quadriga_lib.layout.get_channels_from_rays(L2, rays[:2], i_link=[0, 1])  # terminal U1 with both sites
         self.assertEqual(len(ch), 4)
         npt.assert_array_equal(index, [[0, 1, 0, 1], [0, 0, 0, 0], [0, 0, 1, 1]])

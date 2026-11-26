@@ -35,7 +35,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 - The **link states** `layout.links` of one realisation: LOS and indoor state, scenario and seeds of each Tx-Rx pair
   ([layout_links](#layout_links))
 
-**Typical workflow:**
+**Typical workflow** (for the channels of a TR 38.901 scenario in one call, see [get_channels_tr38901](channel-generators.md#get_channels_tr38901)):
 
 1. Create a layout: [generate_layout](#generate_layout) from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [layout_csv_read](#layout_csv_read) from two CSV files; [drop_terminals](#drop_terminals) drops new UTs into the cells of the Tx nodes
@@ -753,7 +753,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const std::string &mobility = "auto",
     bool oxygen = false,
     bool use_absolute_delays = false,
-    double overlap = 0.5);
+    double overlap = 0.5,
+    bool link_gain = true);
 ```
 
 ### Inputs:
@@ -771,6 +772,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
 - **`overlap`** *(optional)* — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
   centred on the first row of the new segment; 0 = a switch at that row, see [crossfade_segments](channel-data-and-processing.md#crossfade_segments)
+- **`link_gain`** *(optional)* — false: the link gain is left out (0 dB), so the coefficients have no path loss, O2I loss
+  and shadow fading; the K-factor ratio stays
 
 ### Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
@@ -833,7 +836,8 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
     const std::string &mobility = "auto",
     double overlap = 0.5,
     arma::sword seed = -1,
-    const std::vector<std::string> &config_dirs = {});
+    const std::vector<std::string> &config_dirs = {},
+    bool link_gain = true);
 ```
 
 ### Inputs:
@@ -848,6 +852,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_layout(
   centred on the first row of the new segment; 0 = a switch at that row, see [crossfade_segments](channel-data-and-processing.md#crossfade_segments)
 - **`seed`** *(optional)* — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1
 - **`config_dirs`** *(optional)* — Folders of user conf files for empty links, searched before the shipped folder
+- **`link_gain`** *(optional)* — false: without the link gain, as in [get_channels_from_rays](#get_channels_from_rays)
 
 ### Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`

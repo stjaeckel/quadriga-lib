@@ -24,7 +24,7 @@ Channel coefficients of a layout in one call
 ## Usage:
 ```
 channels, index = quadriga_lib.layout.get_channels_layout( layout, *, times, output, method, mobility, overlap, \
-    seed, config_dirs, stack )
+    seed, config_dirs, link_gain, stack )
 ```
 
 ## Inputs:
@@ -40,6 +40,7 @@ channels, index = quadriga_lib.layout.get_channels_layout( layout, *, times, out
 - **`seed`** — Master seed for empty links, as in [[init_link_states]]; with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; str or list of
   str; default: None
+- **`link_gain`** — `False`: without the link gain, as in [[get_channels_from_rays]]; default: `True`
 - **`stack`** — Snapshot layout of the channels as in [[hdf5_read_channel]]; default: `False`
 
 ## Outputs:
@@ -74,16 +75,18 @@ py::tuple get_channels_layout(const py::dict &layout,
                               double overlap,
                               long long seed,
                               py::handle config_dirs,
+                              py::handle link_gain,
                               py::handle stack)
 {
     const auto lay = qd_python_dict2layout(layout, true, "layout");
     const auto times_a = qd_python_numpy2arma_Col<double>(times, true);
     const auto config_dirs_v = qd_pl_config_dirs(config_dirs);
+    const bool link_gain_b = qd_python_flag(link_gain, true, "link_gain");
     const bool stack_b = qd_python_flag(stack, false, "stack");
 
     arma::umat index;
     const auto chan = quadriga_lib::get_channels_layout(lay, times_a, output, method, &index, mobility, overlap,
-                                                        (arma::sword)seed, config_dirs_v);
+                                                        (arma::sword)seed, config_dirs_v, link_gain_b);
     return py::make_tuple(qd_python_channel2list(chan, false, stack_b), qd_python_copy2numpy<arma::uword, py::ssize_t>(&index));
 }
 
@@ -261,7 +264,7 @@ Channel coefficients of a layout from given rays (stage 3 of the channel pipelin
 ## Usage:
 ```
 channels, index = quadriga_lib.layout.get_channels_from_rays( layout, rays, *, i_link, times, output, mobility, oxygen, \
-    use_absolute_delays, overlap, stack )
+    use_absolute_delays, overlap, link_gain, stack )
 ```
 
 ## Inputs:
@@ -279,6 +282,8 @@ channels, index = quadriga_lib.layout.get_channels_from_rays( layout, rays, *, i
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `False`
 - **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
   centred on the first row of the new segment; 0 = a switch at that row, see [[crossfade_segments]]; default: 0.5
+- **`link_gain`** — `False`: the link gain is left out (0 dB), so the coefficients have no path loss, O2I loss and
+  shadow fading; the K-factor ratio stays; default: `True`
 - **`stack`** — Snapshot layout of the channels as in [[hdf5_read_channel]]; default: `False`
 
 ## Outputs:
@@ -322,6 +327,7 @@ py::tuple get_channels_from_rays(const py::dict &layout,
                             py::handle oxygen,
                             py::handle use_absolute_delays,
                             double overlap,
+                            py::handle link_gain,
                             py::handle stack)
 {
     const auto lay = qd_python_dict2layout(layout, true, "layout");
@@ -330,11 +336,12 @@ py::tuple get_channels_from_rays(const py::dict &layout,
     const auto times_a = qd_python_numpy2arma_Col<double>(times, true);
     const bool oxygen_b = qd_python_flag(oxygen, false, "oxygen");
     const bool use_absolute_delays_b = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
+    const bool link_gain_b = qd_python_flag(link_gain, true, "link_gain");
     const bool stack_b = qd_python_flag(stack, false, "stack");
 
     arma::umat index;
     const auto chan = quadriga_lib::get_channels_from_rays(lay, rays_v, i_link_a, times_a, output, &index, mobility, oxygen_b,
-                                                      use_absolute_delays_b, overlap);
+                                                      use_absolute_delays_b, overlap, link_gain_b);
     return py::make_tuple(qd_python_channel2list(chan, false, stack_b), qd_python_copy2numpy<arma::uword, py::ssize_t>(&index));
 }
 

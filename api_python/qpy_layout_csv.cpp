@@ -32,7 +32,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 - `antenna` is a list with one entry per antenna, each a list of arrayant dicts, one per band (the 4D multi-frequency
   dict of [[generate_antenna]] cannot hold per-band geometry); rays are lists of ray dicts, see [[ssf_rays]]
 
-**Typical workflow:**
+**Typical workflow** (for the channels of a TR 38.901 scenario in one call, see [[channel.tr38901]]):
 
 1. Create a layout: [[generate_layout]] from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [[layout.csv_read]] from two CSV files; [[drop_terminals]] drops new UTs into the cells of the Tx nodes

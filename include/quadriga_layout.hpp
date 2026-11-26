@@ -244,7 +244,8 @@ namespace quadriga_lib
         const std::string &mobility = "auto",                // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
         double overlap = 0.5,                                // Ramp length as part of the shorter segment, 0 to 1
         arma::sword seed = -1,                               // Master seed if layout.links is empty; -1 = layout.seed, else the system random device
-        const std::vector<std::string> &config_dirs = {});   // Folders of user conf files, searched before the shipped folder; unused with filled links
+        const std::vector<std::string> &config_dirs = {},    // Folders of user conf files, searched before the shipped folder; unused with filled links
+        bool link_gain = true);                              // false: no path loss, O2I loss and shadow fading in the coefficients
 
     // Stage 1: draw the discrete state of the propagation links (LOS, indoor state, scenario, wrap image, seeds)
     // - Writes layout.links and the master seed used into layout.seed; a failed call leaves the layout unchanged
@@ -277,7 +278,8 @@ namespace quadriga_lib
         const std::string &mobility = "auto",                // "phase", "drift" or "auto"; "drift" needs rays with scatterers
         bool oxygen = false,                                 // Oxygen absorption (TR 38.901 clause 7.6.1)
         bool use_absolute_delays = false,                    // Include the LOS delay in all delays
-        double overlap = 0.5);                               // Ramp length as part of the shorter segment, 0 to 1
+        double overlap = 0.5,                                // Ramp length as part of the shorter segment, 0 to 1
+        bool link_gain = true);                              // false: no path loss, O2I loss and shadow fading in the coefficients
 
     // Serving Tx node of each terminal by the large-scale gain or by RSRP; returns the Tx node per Rx terminal, 0-based, [n_rx_terminal]
     // - Evaluates all sites at the first position of each node and ignores layout.pairing; a terminal with several nodes
@@ -299,6 +301,37 @@ namespace quadriga_lib
         const std::string &fn,                                   // QRT file, replaced if it exists
         const layout &layout,                                    // Layout with links from init_link_states; static sites, no wrap-around
         const std::vector<std::vector<gbsm_rays>> &rays = {});   // Rays of all links from generate_rays, [n_link][1]; empty = generated in batches
+
+    // ---- TR 38.901 channel generator ----
+
+    // Channels of a TR 38.901 scenario in one call: a preset layout, the given arrays and the serving link of each UT
+    // - One channel per UT and frequency (or per BS sector, UT and frequency); the serving sector as by attach_terminals
+    // - The layout tuples are those of generate_layout; layout_out returns the layout with its links, for the manual path
+    std::vector<channel<double>> get_channels_tr38901(
+        const arrayant<double> &bs_array,                    // BS array, used by all sectors
+        const arrayant<double> &ut_array,                    // UT array
+        const std::string &scenario,                         // Family "UMa", "UMi", "RMa", "SMa", "InH_Open", "InH_Mixed", "InF_SL", ...; also as preset name "38.901_UMa"
+        const arma::vec &center_freq = {3.5e9},              // Frequencies in [Hz], [n_freq]; more than one: method "38.901_MF"
+        arma::uword n_ut = 1,                                // UTs per cell
+        arma::sword seed = -1,                               // Seed of the drop and the channels; -1 = system random device
+        const arma::vec &spacing = {},                       // [d_x, d_y] in [m]; hexagonal: d_x = ISD (generate_layout)
+        const arma::vec &grid = {},                          // [n_x, n_y, n_sector]; hexagonal: n_x = rings (generate_layout)
+        const arma::vec &area = {},                          // [length, width, height] of the hall in [m] (generate_layout)
+        const arma::vec &bs = {},                            // [height, tilt, sector azimuth offset] in [m], [deg], [deg] (generate_layout)
+        const arma::vec &ut = {},                            // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg] (generate_layout)
+        const arma::vec &indoor = {},                        // [indoor ratio, min floors, max floors, floor height in [m]] (generate_layout)
+        const arma::vec &time_grid = {},                     // [observation_time, update_interval] in [s]; empty = one snapshot; one entry: interval 1 ms
+        const std::string &los = "auto",                     // "auto", "los" or "nlos"
+        const std::string &output = "taps",                  // "taps" or "rays"
+        const std::string &attach = "large_scale",           // Serving sector by "large_scale" or "rsrp"
+        const std::string &links = "serving",                // Links returned: "serving" (sector), "site" (its sectors) or "all"
+        bool link_gain = true,                               // false: no path loss, O2I loss and shadow fading in the coefficients
+        bool uplink = false,                                 // Return the uplink, with the UT as Tx
+        double o2i_low = NAN,                                // Share of the low-loss building model, 0 to 1; NaN = family value
+        const std::vector<std::string> &config_dirs = {},    // Folders of user conf files, searched before the shipped folder
+        arma::mat *gain_dB = nullptr,                        // Optional output: coupling gain or RSRP in [dB], [n_ut_total, n_bs_node]
+        layout *layout_out = nullptr,                        // Optional output: the layout with links and pairing
+        arma::umat *index = nullptr);                        // Optional output: BS node, UT and frequency of each channel, 0-based, [3, n_channel]
 }
 
 #endif

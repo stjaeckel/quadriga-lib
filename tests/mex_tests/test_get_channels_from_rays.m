@@ -61,6 +61,9 @@ dist = sqrt( 100^2 + 23.5^2 );
 assertElementsAlmostEqual( cha(1).delay(1, 1, 1), dist / 299792458, 'absolute', 1e-15 );
 chv = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, false, 0.2 );   % overlap
 assertEqual( size( chv ), [ 1, 8 ] );
+chg = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, false, 0.5, false );   % without link gain: far more power
+assertTrue( sum( chg(1).coeff_re(:).^2 + chg(1).coeff_im(:).^2 ) > 1e4 * sum( ch2(1).coeff_re(:).^2 + ch2(1).coeff_im(:).^2 ) );
+assertTrue( isequaln( quadriga_lib.get_channels_layout( L2, [], 'taps', '', 'auto', 0.5, -1, {}, false ), chg ) );
 L2p = L2;
 L2p.pairing = [ 2; 1 ];                                                         % only the pair (site B, terminal U1): 1-based
 [ ch, index ] = quadriga_lib.get_channels_from_rays( L2p, rays );
@@ -92,7 +95,7 @@ assertEqual( size( ch ), [ 1, 8 ] );
 
 %% Errors
 assert_throws( @() quadriga_lib.get_channels_from_rays( L2 ), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, false, 0.5, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, false, 0.5, true, 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out3( L2, rays ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.get_channels_from_rays( 1, rays ), 'Input ''layout'' must be a 1x1 struct.' );
 assert_throws( @() quadriga_lib.get_channels_from_rays( L2, 5 ), 'Input ''rays'' must be a cell array of struct arrays.' );

@@ -14,6 +14,7 @@ version = ["quadriga_lib_version", "quadriga_lib_has_AVX2", "quadriga_lib_has_CU
 
 [python_names]
 "channel.ieee_indoor" = "get_channels_ieee_indoor"
+"channel.tr38901" = "get_channels_tr38901"
 "channel.irs" = "get_channels_irs"
 "channel.multifreq" = "get_channels_multifreq"
 "channel.planar" = "get_channels_planar"

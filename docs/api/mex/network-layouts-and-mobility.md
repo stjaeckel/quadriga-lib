@@ -34,7 +34,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 - The **link states** `layout.links` of one realisation: LOS and indoor state, scenario and seeds of each Tx-Rx pair
   ([init_link_states](#init_link_states))
 
-**Typical workflow:**
+**Typical workflow** (for the channels of a TR 38.901 scenario in one call, see [get_channels_tr38901](channel-generators.md#get_channels_tr38901)):
 
 1. Create a layout: [generate_layout](#generate_layout) from a preset of 3GPP TR 38.901, ITU-R M.2412 or 3GPP TR 37.885, or
    [layout_csv_read](#layout_csv_read) from two CSV files; [drop_terminals](#drop_terminals) drops new UTs into the cells of the Tx nodes
@@ -577,7 +577,7 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#get_channels_from_rays) ·
 ### Usage:
 ```matlab
 [ channels, index ] = quadriga_lib.get_channels_from_rays( layout, rays, i_link, times, output, mobility, ...
-    oxygen, use_absolute_delays, overlap );
+    oxygen, use_absolute_delays, overlap, link_gain );
 ```
 
 ### Inputs:
@@ -595,6 +595,8 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#get_channels_from_rays) ·
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `false`
 - **`overlap`** — Length of the cross-fade ramp between consecutive segments as a part of the shorter one, in [0, 1],
   centred on the first row of the new segment; 0 = a switch at that row, see [crossfade_segments](channel-data-and-processing.md#crossfade_segments); default: 0.5
+- **`link_gain`** — false: the link gain is left out (0 dB), so the coefficients have no path loss, O2I loss and
+  shadow fading; the K-factor ratio stays; default: true
 
 ### Outputs:
 - **`channels`** — Channels, struct array, fields in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel); `[1, n_channel]`
@@ -647,7 +649,7 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#get_channels_layout) · [P
 ### Usage:
 ```matlab
 [ channels, index ] = quadriga_lib.get_channels_layout( layout, times, output, method, mobility, ...
-    overlap, seed, config_dirs );
+    overlap, seed, config_dirs, link_gain );
 ```
 
 ### Inputs:
@@ -663,6 +665,7 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#get_channels_layout) · [P
 - **`seed`** — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; string or cell
   array of strings; default: `{}`
+- **`link_gain`** — false: without the link gain, as in [get_channels_from_rays](#get_channels_from_rays); default: true
 
 ### Outputs:
 - **`channels`** — Channels, Tx node fastest, then Rx node, then frequency; struct array, fields in

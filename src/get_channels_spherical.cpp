@@ -63,6 +63,7 @@ given per port pair: `n_tx` and `n_rx` count the ports of the arrays, after thei
   path gains and polarization, for radio and acoustic waves
 - [[get_channels_irs]]: paths over an intelligent reflecting surface (IRS), from two path sets that meet at the IRS array
 - [[get_channels_ieee_indoor]]: complete channels of the IEEE TGn, TGac, TGah and TGax indoor models
+- [[get_channels_tr38901]]: complete channels of a 3GPP TR 38.901 scenario (UMa, UMi, RMa, SMa, InH, InF) in one call
 
 The paths come from a ray tracer (e.g. [[qrt_file_read]]), from the geometry-based stochastic model, or from the user.
 For complete channels of a network layout, see [[get_channels_layout]].<br><br>
