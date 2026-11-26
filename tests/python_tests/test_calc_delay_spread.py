@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Tests of quadriga_lib.tools.calc_delay_spread: values for known CIRs, threshold, granularity, error paths.
+# Tests of quadriga_lib.channel.calc_delay_spread: values for known CIRs, threshold, granularity, error paths.
 
 import sys
 import os
@@ -25,7 +25,7 @@ class TestCalcDelaySpread(unittest.TestCase):
         delays = [np.array([0.0, 1e-6, 2e-6])]
         powers = [np.array([1.0, 0.5, 0.25])]
 
-        ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers)
+        ds, mean_delay = quadriga_lib.channel.calc_delay_spread(delays, powers)
 
         self.assertEqual(ds.shape, (1,))
         self.assertEqual(mean_delay.shape, (1,))
@@ -43,7 +43,7 @@ class TestCalcDelaySpread(unittest.TestCase):
         delays = [np.array([5e-6])]
         powers = [np.array([1.0])]
 
-        ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers)
+        ds, mean_delay = quadriga_lib.channel.calc_delay_spread(delays, powers)
 
         npt.assert_allclose(ds[0], 0.0, atol=1e-20, rtol=0)
         npt.assert_allclose(mean_delay[0], 5e-6, atol=1e-20, rtol=0)
@@ -53,7 +53,7 @@ class TestCalcDelaySpread(unittest.TestCase):
         delays = [np.array([0.0, 2e-6])]
         powers = [np.array([1.0, 1.0])]
 
-        ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers)
+        ds, mean_delay = quadriga_lib.channel.calc_delay_spread(delays, powers)
 
         npt.assert_allclose(mean_delay[0], 1e-6, atol=1e-14, rtol=0)
         npt.assert_allclose(ds[0], 1e-6, atol=1e-14, rtol=0)
@@ -63,7 +63,7 @@ class TestCalcDelaySpread(unittest.TestCase):
         delays = [np.array([0.0, 1e-6]), np.array([0.0, 1e-6, 2e-6])]
         powers = [np.array([1.0, 1.0]), np.array([1.0, 1.0, 1.0])]
 
-        ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers)
+        ds, mean_delay = quadriga_lib.channel.calc_delay_spread(delays, powers)
 
         self.assertEqual(ds.shape, (2,))
         self.assertEqual(mean_delay.shape, (2,))
@@ -82,10 +82,10 @@ class TestCalcDelaySpread(unittest.TestCase):
         powers = [np.array([1.0, 0.001, 0.5])]
 
         # 20 dB threshold -> path at -30 dB excluded
-        ds_20, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold_dB=20.0)
+        ds_20, _ = quadriga_lib.channel.calc_delay_spread(delays, powers, threshold_dB=20.0)
 
         # 100 dB threshold -> all paths included
-        ds_all, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold_dB=100.0)
+        ds_all, _ = quadriga_lib.channel.calc_delay_spread(delays, powers, threshold_dB=100.0)
 
         self.assertGreater(ds_all[0], ds_20[0])
 
@@ -94,8 +94,8 @@ class TestCalcDelaySpread(unittest.TestCase):
         delays = [np.array([100e-9, 110e-9, 1000e-9])]
         powers = [np.array([1.0, 1.0, 1.0])]
 
-        ds_no_gran, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, granularity=0.0)
-        ds_gran, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, granularity=50e-9)
+        ds_no_gran, _ = quadriga_lib.channel.calc_delay_spread(delays, powers, granularity=0.0)
+        ds_gran, _ = quadriga_lib.channel.calc_delay_spread(delays, powers, granularity=50e-9)
 
         self.assertGreater(ds_no_gran[0], 0.0)
         self.assertGreater(ds_gran[0], 0.0)
@@ -103,12 +103,12 @@ class TestCalcDelaySpread(unittest.TestCase):
     def test_input_validation_empty(self):
         """Empty input raises error"""
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_delay_spread([], [np.array([1.0])])
+            quadriga_lib.channel.calc_delay_spread([], [np.array([1.0])])
 
     def test_input_validation_mismatched_sizes(self):
         """Mismatched delays/powers sizes raises error"""
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_delay_spread(
+            quadriga_lib.channel.calc_delay_spread(
                 [np.array([0.0]), np.array([1e-6])],
                 [np.array([1.0])]
             )
@@ -116,7 +116,7 @@ class TestCalcDelaySpread(unittest.TestCase):
     def test_input_validation_mismatched_path_counts(self):
         """Mismatched path counts within a CIR raises error"""
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_delay_spread(
+            quadriga_lib.channel.calc_delay_spread(
                 [np.array([0.0, 1e-6])],
                 [np.array([1.0])]
             )
@@ -126,7 +126,7 @@ class TestCalcDelaySpread(unittest.TestCase):
         delays = [np.array([0.0, 50e-9, 500e-9, 550e-9])]
         powers = [np.array([1.0, 1.0, 1.0, 1.0])]
 
-        ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers, granularity=100e-9)
+        ds, mean_delay = quadriga_lib.channel.calc_delay_spread(delays, powers, granularity=100e-9)
 
         self.assertGreater(mean_delay[0], 0.0)
         self.assertGreater(ds[0], 0.0)

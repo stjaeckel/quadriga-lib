@@ -5,19 +5,17 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_READ_DSET
-Read a single unstructured dataset from an HDF5 file
+Read an unstructured dataset from a slot of an HDF5 channel file
 
-- Reads a user-defined dataset stored under `prefix + name` (e.g. `"par_carrier_frequency"`)
-- Type and shape of the returned data are determined by the dataset's HDF5 dataspace
-- Returns an empty `[]` matrix if the dataset does not exist at the requested slot
-- Errors if the file does not exist or is not a quadriga-lib channel file
-- Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element 
-  types: single, double, int32, uint32, int64, uint64
+- Reads the dataset `prefix + name` of slot `(ix, iy, iz, iw)`, e.g. `par_carrier_frequency`
+- The class and shape follow the stored dataset: char for a string; single, double, int32, uint32, int64 or uint64
+  for a scalar, a column vector `[n, 1]` (a 1D dataset), a matrix or a 3D array; a row vector written by
+  [[hdf5_write_dset]] comes back as `[1, n]`
 
 ## Usage:
 ```
@@ -25,20 +23,17 @@ dset = quadriga_lib.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix );
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; string
-- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; string
-- **`ix`** — 1-based slot index along dimension X; scalar; default: 1
-- **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
-- **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
-- **`iw`** — 1-based slot index along dimension W; scalar; default: 1
-- **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; `''` looks up `name` as given; default (omitted or `[]`): `'par_'`
+- **`fn`** — File name of an existing channel file
+- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot index along x, y, z and w, 1-based; default: 1
+- **`prefix`** — Prefix of the dataset name; `''` reads `name` as given; default: `'par_'`
 
 ## Output:
-- **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; empty `[]` if the dataset is missing
+- **`dset`** — The dataset; `[]` if the slot is empty or outside the layout or has no such dataset
 
 ## See also:
-- [[hdf5_read_dset_names]] (for reading names of already written datasets)
-- [[hdf5_write_dset]] (for writing individual unstructured datasets)
+- [[hdf5_read_dset_names]] (lists the datasets of a slot)
+- [[hdf5_write_dset]] (writes a dataset)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

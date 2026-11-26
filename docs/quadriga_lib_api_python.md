@@ -34,31 +34,30 @@ lang: en-US
 | [qdant_read](#qdant_read) | Antennas, transducers and patterns | Read arrayant objects from a QDANT file |
 | [qdant_write](#qdant_write) | Antennas, transducers and patterns | Write arrayant data to a QDANT (XML) file |
 | [rotate_pattern](#rotate_pattern) | Antennas, transducers and patterns | Rotate the patterns of an antenna array using Euler rotations |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
-| [channel.export_obj_file](#channel.export_obj_file) | Channel functions | Export propagation paths to a Wavefront OBJ file for 3D visualization |
-| [crossfade_segments](#crossfade_segments) | Channel functions | Join the channels of consecutive segments of one link by a power cross-fade |
-| [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a custom storage layout |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | Read channel data from HDF5 files |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | Read a single unstructured dataset from an HDF5 file |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | Read the names of unstructured datasets from an HDF5 file |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | Read the storage layout of channel data inside an HDF5 file |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | Reshape the storage layout inside an existing HDF5 file |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | Write one or more channel objects to an HDF5 file |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | Write a single unstructured dataset to an HDF5 file |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | Read metadata from a QRT file |
-| [qrt_file_read](#qrt_file_read) | Channel functions | Read ray-tracing CIR data from a QRT file |
-| [quantize_delays](#quantize_delays) | Channel functions | Map path delays to a fixed tap grid using two-tap power-weighted interpolation |
-| [channel.ieee_indoor](#channel.ieee_indoor) | Channel generation functions | Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models |
-| [channel.irs](#channel.irs) | Channel generation functions | Calculate MIMO channel coefficients for IRS-assisted communication |
-| [channel.multifreq](#channel.multifreq) | Channel generation functions | Compute channel coefficients for spherical waves across multiple frequencies |
-| [channel.planar](#channel.planar) | Channel generation functions | Calculate MIMO channel coefficients for planar wave paths |
-| [channel.spherical](#channel.spherical) | Channel generation functions | Calculate MIMO channel coefficients and delays for spherical wave propagation |
-| [acdf](#acdf) | Channel statistics | Calculate the empirical averaged cumulative distribution function (CDF) |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | RMS delay spread from per-CIR delays and linear-scale powers |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | Calculate the Rician K-Factor from channel impulse response data |
+| [calc_angular_spread](#calc_angular_spread) | Channel data and processing | Calculate the RMS azimuth and elevation angular spreads of each CIR, optionally around the mean direction of its paths |
+| [calc_delay_spread](#calc_delay_spread) | Channel data and processing | Calculate the RMS delay spread of each CIR from its path delays and powers |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel data and processing | Calculate the Rician K-factor of each CIR, the ratio of the LOS to the NLOS power |
+| [calc_xpr](#calc_xpr) | Channel data and processing | Calculate the cross-polarization ratio (XPR) of each CIR in the linear and the circular polarization basis |
+| [crossfade_segments](#crossfade_segments) | Channel data and processing | Join the channels of consecutive segments of one link by a power cross-fade |
+| [export_channel_obj](#export_channel_obj) | Channel data and processing | Export propagation paths to a Wavefront OBJ file for 3D visualization |
+| [freq_response](#freq_response) | Channel data and processing | Frequency response of a MIMO channel at the given subcarriers |
+| [freq_response_mf](#freq_response_mf) | Channel data and processing | Frequency response of a MIMO channel from coefficients sampled at several frequencies |
+| [hdf5_create_file](#hdf5_create_file) | Channel data and processing | Create a new HDF5 channel file with a given storage layout |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel data and processing | Read channel objects from one or several slots of an HDF5 channel file |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel data and processing | Read an unstructured dataset from a slot of an HDF5 channel file |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel data and processing | Read the names of the unstructured datasets of a slot of an HDF5 channel file |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel data and processing | Read the storage layout of an HDF5 channel file |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel data and processing | Reshape the storage layout of an existing HDF5 channel file |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel data and processing | Write channel objects to one or several slots of an HDF5 channel file |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel data and processing | Write an unstructured dataset to a slot of an HDF5 channel file |
+| [qrt_file_parse](#qrt_file_parse) | Channel data and processing | Read metadata from a QRT file |
+| [qrt_file_read](#qrt_file_read) | Channel data and processing | Read ray-tracing CIR data from a QRT file |
+| [quantize_delays](#quantize_delays) | Channel data and processing | Map the path delays to a tap grid by two-tap interpolation |
+| [channel.ieee_indoor](#channel.ieee_indoor) | Channel generators | Generate indoor MIMO channels of the IEEE TGn, TGac, TGah and TGax models |
+| [channel.irs](#channel.irs) | Channel generators | Calculate MIMO channel coefficients and delays for paths over an intelligent reflecting surface |
+| [channel.multifreq](#channel.multifreq) | Channel generators | Calculate MIMO channel coefficients and delays for spherical wave propagation at several frequencies |
+| [channel.planar](#channel.planar) | Channel generators | Calculate MIMO channel coefficients and delays for planar wave propagation |
+| [channel.spherical](#channel.spherical) | Channel generators | Calculate MIMO channel coefficients and delays for spherical wave propagation |
 | [conf_file_list](#conf_file_list) | Geometry-based stochastic model | List the scenarios defined by the conf files in a set of directories |
 | [conf_file_read](#conf_file_read) | Geometry-based stochastic model | Read and validate a QuaDRiGa scenario configuration file |
 | [conf_file_write](#conf_file_write) | Geometry-based stochastic model | Write a QuaDRiGa scenario configuration file |
@@ -75,6 +74,7 @@ lang: en-US
 | [ssf_paths](#ssf_paths) | Geometry-based stochastic model | Antenna-free paths of one link at one position |
 | [ssf_rays](#ssf_rays) | Geometry-based stochastic model | Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16) |
 | [ssf_scatterers](#ssf_scatterers) | Geometry-based stochastic model | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
+| [acdf](#acdf) | Math functions | Empirical cumulative distribution functions (CDF) of several data sets, their average and quantile statistics |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | Calculate rotation matrices from Euler angles |
 | [fast_cart2geo](#fast_cart2geo) | Math functions | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
 | [fast_geo2cart](#fast_geo2cart) | Math functions | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
@@ -393,7 +393,7 @@ quadriga_lib.arrayant.export_pattern_obj( fn, arrayant, *, directivity_range_dB,
 
 ### See also:
 - [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (the same pattern as numbers)
-- [channel.export_obj_file](#channel.export_obj_file) (exports propagation paths to an OBJ file)
+- [export_channel_obj](#export_channel_obj) (exports propagation paths to an OBJ file)
 
 ---
 <a id="generate_antenna"></a>
@@ -888,131 +888,265 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, orientation, *, u
 
 ---
 
-<a id="sec-channel-functions"></a>
-# Channel functions
+<a id="sec-channel-data-and-processing"></a>
+# Channel data and processing
+
+A **channel** describes the propagation between a transmit and a receive antenna array: for each snapshot, a set of
+propagation paths, each with a complex coefficient per antenna pair and a delay. The functions of this section store
+channels in files, turn them into frequency responses, prepare them for link-level simulation, compute their statistics
+and show the paths in 3D. The channels themselves come from the functions of section "Channel generators" or from
+[get_channels_layout](#get_channels_layout).
+
+**What a channel holds** (a dict, keys in [hdf5_read_channel](#hdf5_read_channel)):
+
+- The positions and orientations of the transmitter and the receiver, per snapshot or fixed
+- The complex **coefficients** `coeff` and the **delays** `delay` of each snapshot, `(n_rx, n_tx, n_path)`
+- Optionally, antenna-independent path data: path gain, path length, polarization transfer matrix, angles, scatterer
+  positions and the interaction points of ray-traced paths
+- Unstructured metadata: named values of any type
+
+**In Python:**
+
+- The functions are in the submodule `quadriga_lib.channel`, e.g. `quadriga_lib.channel.hdf5_read_channel`
+- A channel is a dict with the member names of the C++ class `channel`, with one complex `coeff` for `coeff_re` and
+  `coeff_im`; several channels are a list of dicts. A member with one entry per snapshot is a list of arrays, one per
+  snapshot, or, with `stack = True` of [hdf5_read_channel](#hdf5_read_channel), one array with the snapshot on the last axis,
+  zero-padded where the number of paths differs
+- [hdf5_read_channel](#hdf5_read_channel) and [hdf5_write_channel](#hdf5_write_channel) take and return the unstructured data as a list `par` with one
+  dict per channel, one key per dataset
+
+**Typical workflow:**
+
+1. Generate the channels, or read them: [hdf5_read_channel](#hdf5_read_channel) from a channel file, [qrt_file_read](#qrt_file_read) from the output
+   of the QRT ray tracer
+2. Optionally, map the delays to a tap grid with [quantize_delays](#quantize_delays), or join the segments of a track with
+   [crossfade_segments](#crossfade_segments)
+3. Compute the frequency response at the subcarriers with [freq_response](#freq_response), or with [freq_response_mf](#freq_response_mf) for
+   coefficients sampled at several frequencies
+4. Evaluate the channels: [calc_delay_spread](#calc_delay_spread), [calc_angular_spread](#calc_angular_spread), [calc_rician_k_factor](#calc_rician_k_factor), [calc_xpr](#calc_xpr)
+5. Store them with [hdf5_write_channel](#hdf5_write_channel), or show the paths with [export_channel_obj](#export_channel_obj)
+
+**Terms** (full list in the [Glossary](quadriga_lib_api_cpp.md#glossary)):
+
+- **Snapshot**: one sample of the channel in time or position; `n_snap` snapshots, each with its own number of paths
+- **Path**: one propagation path from the transmitter to the receiver, e.g. the LOS path, a reflection or a ray of a
+  cluster
+- **Coefficient**: the complex amplitude $a$ of one path for one antenna pair, with the antenna patterns, the
+  polarization and the path gain
+- **Delay**: the propagation delay $\tau$ of a path in s, per antenna pair `(n_rx, n_tx, n_path)` or shared by all
+  pairs `(1, 1, n_path)`
+- **CIR**: the channel impulse response of one snapshot, its coefficients and delays
+- **Frequency response**: the channel matrix at subcarrier $k$, $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$, with
+  $f_k$ the offset of the subcarrier from the carrier (the absolute frequency for `_mf`)
+- **Multi-frequency channel** (suffix `_mf`): coefficients sampled at several frequencies, the frequency on the 4th
+  axis, as [channel.multifreq](#channel.multifreq) produces them
+- **Slot**: one storage place of an HDF5 channel file, addressed by four indices `(ix, iy, iz, iw)`, e.g. Tx, Rx and
+  frequency; the file holds a fixed grid of slots, its **storage layout**
+- **Origin**, **destination**: a QRT file holds the paths from each origin (a Tx position) to a list of CIR positions; a
+  destination (a receiver) owns a run of consecutive CIR positions, e.g. a track
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Store and read channels | [hdf5_create_file](#hdf5_create_file), [hdf5_write_channel](#hdf5_write_channel), [hdf5_read_channel](#hdf5_read_channel), [hdf5_read_layout](#hdf5_read_layout), [hdf5_reshape_layout](#hdf5_reshape_layout) |
+| Store and read metadata | [hdf5_write_dset](#hdf5_write_dset), [hdf5_read_dset](#hdf5_read_dset), [hdf5_read_dset_names](#hdf5_read_dset_names) |
+| Ray-tracing files | [qrt_file_parse](#qrt_file_parse), [qrt_file_read](#qrt_file_read) |
+| Frequency response | [freq_response](#freq_response), [freq_response_mf](#freq_response_mf) |
+| Process | [quantize_delays](#quantize_delays), [crossfade_segments](#crossfade_segments) |
+| Statistics | [calc_delay_spread](#calc_delay_spread), [calc_angular_spread](#calc_angular_spread), [calc_rician_k_factor](#calc_rician_k_factor), [calc_xpr](#calc_xpr) |
+| Show | [export_channel_obj](#export_channel_obj) |
+
+**Conventions.** Coefficients and delays of several snapshots are lists with one array per snapshot. Indices are
+0-based. HDF5 files store the structured channel data in single precision.
 
 ---
-<a id="baseband_freq_response"></a>
-## baseband_freq_response
-Compute the baseband frequency response of a MIMO channel
+<a id="calc_angular_spread"></a>
+## calc_angular_spread
+Calculate the RMS azimuth and elevation angular spreads of each CIR, optionally around the mean direction of its paths
 
-Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response)
+Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spread) · [MATLAB](quadriga_lib_api_mex.md#calc_angular_spread)
 
-- Computes the frequency-domain channel matrix at the carrier positions `pilot_grid` by a DFT over the time-domain
-  path coefficients and delays
-- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel; the number of paths
-  may differ between snapshots, `n_rx` and `n_tx` may not
-- Multi-frequency coefficients (e.g. from [channel.multifreq](#channel.multifreq)) and absolute carrier frequencies are handled by
-  [baseband_freq_response_multi](#baseband_freq_response_multi); the two functions take different arguments, so they are two functions,
-  while [interpolate_pattern](#interpolate_pattern) serves both of its cases with one argument set
-- `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair
-- The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
-  before sin / cos are evaluated in single precision; coefficients and sums are single precision, double inputs are
-  narrowed to float, results widened back
+- For one angle, with the path powers $p_l$ normalized to sum 1 over the paths of a CIR (the second-moment definition
+  of 3GPP TR 38.901):
+
+  $$\sigma = \sqrt{\sum_l p_l \, \Delta_l^2}, \quad \Delta_l = \arg e^{j (\phi_l - \bar\phi)}$$
+
+  with the circular mean $\bar\phi = \arg \sum_l p_l \, e^{j \phi_l}$
+- `wrapping = False`: the spreads of the given azimuth and elevation angles; near the poles, the azimuth spread
+  overstates the angular spread
+- `wrapping = True`: the paths are first rotated so that their power-weighted mean direction (the mean of the unit
+  vectors) lies at azimuth 0 on the equator; `calc_bank_angle` then also rotates them about that direction so that
+  the azimuth spread is largest (principal axis of the power-weighted covariance of the rotated angles); `orientation`
+  is the direction of an antenna that sees the paths at the rotated angles `phi` and `theta`
+- `quantize_deg` > 0: the deviations $\Delta_l$ are rounded to multiples of `quantize_deg` and the powers of equal
+  deviations summed, for azimuth and elevation separately
 
 ### Usage:
 ```python
-hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, pilot_grid, bandwidth, *, i_snap, use_kernel )
+azimuth_spread, elevation_spread, orientation, phi, theta = quadriga_lib.channel.calc_angular_spread( \
+    az, el, powers, *, wrapping, calc_bank_angle, quantize_deg )
 ```
 
 ### Inputs:
-- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
-- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`
-- **`pilot_grid`** — Sub-carrier positions relative to the bandwidth, `0.0` = carrier, `1.0` = carrier + `bandwidth`;
-  1D array of length `n_carrier`; `np.linspace(0, 1, n)` gives `n` evenly spaced carriers
-- **`bandwidth`** — Baseband bandwidth in Hz
-- **`i_snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
-- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
+- **`az`** — Path azimuths in rad; list of `n_cir` arrays `(n_path,)`, at least one CIR and one path per CIR; `n_path`
+  may differ between the CIRs
+- **`el`** — Path elevations in rad; list of `n_cir` arrays `(n_path,)`
+- **`powers`** — Path powers, linear, with a positive sum per CIR; list of `n_cir` arrays `(n_path,)`
+- **`wrapping`** — Rotate the paths to the equator before computing the spreads; default: `False`
+- **`calc_bank_angle`** — Rotate them also about the mean direction, for the largest azimuth
+  spread; only with `wrapping`; default: `False`
+- **`quantize_deg`** — Quantization step of the angle deviations in deg; 0 = none, else finite and >= 1e-3; default: 0.0
 
-### Output:
-- **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
+### Outputs:
+- **`azimuth_spread`** — RMS azimuth spread in rad; `(n_cir,)`
+- **`elevation_spread`** — RMS elevation spread in rad; `(n_cir,)`
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad of an antenna pointing at the mean
+  direction (a positive tilt points down), zero without `wrapping`; `(3, n_cir)`
+- **`phi`** — Path azimuths in rad in the frame of that antenna (as [interpolate_pattern](#interpolate_pattern)
+  returns them), the input `az` without `wrapping`; list of `n_cir` arrays `(n_path,)`
+- **`theta`** — Path elevations in rad in that frame, the input `el` without `wrapping`;
+  list of `n_cir` arrays `(n_path,)`
 
 ### See also:
-- [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-frequency coefficients, absolute carrier frequencies)
-- [channel.spherical](#channel.spherical) (single-frequency channel generator)
+- [calc_delay_spread](#calc_delay_spread) (delay spread of the same paths)
+- [interpolate_pattern](#interpolate_pattern) (antenna response in the rotated frame)
 
 ---
-<a id="baseband_freq_response_multi"></a>
-## baseband_freq_response_multi
-Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
+<a id="calc_delay_spread"></a>
+## calc_delay_spread
+Calculate the RMS delay spread of each CIR from its path delays and powers
 
-Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response_multi) · [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response_multi)
+Also in: [C++](quadriga_lib_api_cpp.md#calc_delay_spread) · [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread)
 
-- Interpolates the complex channel coefficients from the input frequencies `freq` to the output carrier
-  frequencies `freq_new` using SLERP (magnitude and unwrapped phase each linear), then applies the delay-induced
-  phase `exp(-j·2π·freq_new·delay)` per output carrier in double precision
-- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel; the number of paths
-  may differ between snapshots, `n_rx` and `n_tx` may not
-- Single-frequency coefficients with absolute output carriers: items `(n_rx, n_tx, n_path)`, `freq` the frequency
-  the coefficients were generated at; with `remove_delay_phase = True` (the default) and coefficients that carry the
-  delay phase at `freq`, as the channel generators return them, this gives the result of [baseband_freq_response](#baseband_freq_response)
-  with `pilot_grid · bandwidth = freq_new - freq`
-- `delay` is frequency-independent: items `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`; of a 4D item (as returned by
-  [channel.multifreq](#channel.multifreq)) only the first frequency is used
-- With `remove_delay_phase`, the channels from [channel.multifreq](#channel.multifreq) / [channel.spherical](#channel.spherical) must be generated with
-  `use_absolute_delays = True`: their coefficients carry the phase of the absolute path length also when `delay` is
-  relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`, which gives
-  wrong phases (magnitudes stay right)
-- Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
+- With the path powers $p_l$ normalized to sum 1 over the paths of a CIR, the mean delay and the RMS delay spread are
+
+  $$\bar\tau = \sum_l p_l \, \tau_l, \qquad \sigma_\tau = \sqrt{\sum_l p_l \, (\tau_l - \bar\tau)^2}$$
+
+- Paths more than `threshold_dB` below the strongest path of their CIR are left out
+- With `granularity` > 0, the delays are first rounded to the nearest multiple of `granularity`, and the powers of
+  the paths with the same rounded delay are summed
+- A CIR without power gives a spread and a mean delay of 0
 
 ### Usage:
 ```python
-hmat = quadriga_lib.channel.baseband_freq_response_multi( coeff, delay, freq, freq_new, *, remove_delay_phase, \
-    i_snap, use_kernel )
+ds, mean_delay = quadriga_lib.channel.calc_delay_spread( delays, powers, *, threshold_dB, granularity )
 ```
 
 ### Inputs:
-- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path, n_freq)`; for
-  `n_freq = 1` also `(n_rx, n_tx, n_path)`
-- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`,
-  with an optional 4th dimension of length `n_freq` (only the first frequency is used)
-- **`freq`** — Input sample frequencies in Hz, sorted ascending; 1D array of length `n_freq`
-- **`freq_new`** — Output carrier frequencies in Hz; 1D array of length `n_carrier`
-- **`remove_delay_phase`** — Remove the delay phase `exp(-j·2π·freq·delay)` from the coefficients before the
-  interpolation and apply it again at `freq_new`; `True` for the output of the channel generators, `False` for pure
-  envelope coefficients; default: `True`
-- **`i_snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
-- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else GENERIC),
-  1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
+- **`delays`** — Path delays in s; list of `n_cir` arrays `(n_path,)`, at least one CIR and one path per CIR; `n_path`
+  may differ between the CIRs
+- **`powers`** — Path powers, linear; list of `n_cir` arrays `(n_path,)`
+- **`threshold_dB`** — Power range in dB below the strongest path that is kept, > 0; default: 100.0
+- **`granularity`** — Spacing of the delay grid in s, finite and >= 0; 0 = no grid; with a grid, all
+  delays must be finite and their span must be below $2^{53}$ grid steps; default: 0.0
 
-### Output:
-- **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`
+### Outputs:
+- **`ds`** — RMS delay spread $\sigma_\tau$ in s; `(n_cir,)`
+- **`mean_delay`** — Mean delay $\bar\tau$ in s; `(n_cir,)`
 
 ### See also:
-- [baseband_freq_response](#baseband_freq_response) (single-frequency coefficients, relative carrier positions)
-- [channel.multifreq](#channel.multifreq) (multi-frequency channel generator)
+- [quantize_delays](#quantize_delays) (delays on a tap grid with interpolation)
+- [calc_angular_spread](#calc_angular_spread) (angular spreads)
 
 ---
-<a id="channel.export_obj_file"></a>
-## channel.export_obj_file
-Export propagation paths to a Wavefront OBJ file for 3D visualization
+<a id="calc_rician_k_factor"></a>
+## calc_rician_k_factor
+Calculate the Rician K-factor of each CIR, the ratio of the LOS to the NLOS power
 
-Also in: [C++](quadriga_lib_api_cpp.md#channel_export_obj_file) · [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file)
+Also in: [C++](quadriga_lib_api_cpp.md#calc_rician_k_factor) · [MATLAB](quadriga_lib_api_mex.md#calc_rician_k_factor)
 
-- Writes ray-traced paths as tube geometry to a `.obj` file (e.g. for use in Blender)
-- Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min_dB` are excluded; `max_paths` caps the total number of exported paths
-- Paths with non-finite coordinates are skipped
+- $K = P_\mathrm{LOS} / P_\mathrm{NLOS}$ with the sums of the path powers; LOS paths are those with a length
+  `path_length` <= $d_\mathrm{TR}$ + `window_size`, $d_\mathrm{TR}$ the Tx-Rx distance, all others are NLOS
+- Without NLOS power, $K$ is infinite, or 0 if the LOS power is zero too (also for a CIR without paths)
 
 ### Usage:
 ```python
-quadriga_lib.channel.export_obj_file( fn, chan, *, max_paths, gain_max_dB, gain_min_dB, colormap, i_snap, \
-    radius_max, radius_min, n_edges )
+kf, pg = quadriga_lib.channel.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, *, window_size )
 ```
 
 ### Inputs:
-- **`fn`** — Output `.obj` file path
-- **`chan`** — Channel; dict with the keys of [hdf5_read_channel](#hdf5_read_channel), list or stacked layout; needs `rx_pos`,
-  `tx_pos`, `center_freq`, `n_interact`, `interact_coord` and `coeff` with `delay`, or `polmat`; in the stacked
-  layout, columns of `interact_coord` beyond `sum(n_interact)` are ignored
-- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
-- **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
-- **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
-- **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
-- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: `None`
-- **`radius_max`** — Tube radius at maximum gain; default: 0.05
-- **`radius_min`** — Tube radius at minimum gain; default: 0.01
-- **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
+- **`powers`** — Path powers, linear; list of `n_cir` arrays `(n_path,)`, at least one CIR; `n_path` may differ
+  between the CIRs
+- **`path_length`** — Path lengths in m; list of `n_cir` arrays `(n_path,)`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `(3,)` (fixed) or `(3, n_cir)`
+- **`window_size`** — LOS window in m, >= 0; default: 0.01
+
+### Outputs:
+- **`kf`** — K-factor, linear; `(n_cir,)`
+- **`pg`** — Sum of all path powers, linear; `(n_cir,)`
+
+### See also:
+- [calc_xpr](#calc_xpr) (XPR with the same LOS window)
+- [calc_delay_spread](#calc_delay_spread) (delay spread of the same paths)
+
+---
+<a id="calc_xpr"></a>
+## calc_xpr
+Calculate the cross-polarization ratio (XPR) of each CIR in the linear and the circular polarization basis
+
+Also in: [C++](quadriga_lib_api_cpp.md#calc_xpr) · [MATLAB](quadriga_lib_api_mex.md#calc_xpr)
+
+- Total-power ratio: the co- and cross-polar powers of the paths of a CIR, weighted by the path powers $p_l$, are
+  summed, and the XPR is their ratio; LOS paths are left out unless `include_los` is set
+- Entries of the polarization transfer matrix $M$ of a path, first index receive, second transmit polarization:
+  rows 0-1 of `polmat` = $M_{vv}$, 2-3 = $M_{hv}$ (H rx, V tx), 4-5 = $M_{vh}$ (V rx, H tx), 6-7 = $M_{hh}$, each as
+  real and imaginary part
+- Circular basis: $M_{rt} = \mathbf{r}^T M \, \mathbf{t}$ (plain transpose), as [channel.spherical](#channel.spherical)
+  couples antenna patterns, with the same vectors at both ends, each in the $(e_\theta, e_\phi)$ frame of its antenna:
+  $\mathbf{L} = (1, +j) / \sqrt{2}$ (LHCP) and $\mathbf{R} = (1, -j) / \sqrt{2}$ (RHCP) in (V, H), which gives
+
+  $$M_{LL}, M_{RR} = \frac{1}{2} \left( M_{vv} - M_{hh} \pm j (M_{vh} + M_{hv}) \right)$$
+
+  $$M_{LR}, M_{RL} = \frac{1}{2} \left( M_{vv} + M_{hh} \pm j (M_{hv} - M_{vh}) \right)$$
+
+  (upper sign for the first entry)
+
+- The names L and R follow the IEEE definition (rotation seen along the propagation direction) for the time
+  convention $e^{+j 2\pi f t}$, which the coefficients $e^{-j 2\pi f \tau}$ of the library imply, with
+  $e_\theta \times e_\phi$ the outward direction of the pattern
+- Co-polar means the same circular vector at both ends: the LOS matrix $\mathrm{diag}(1, -1)$ of
+  [channel.spherical](#channel.spherical) is co-polar (handedness kept), $\mathrm{diag}(1, 1)$ (one mirrored component, as
+  by a single reflection) is cross-polar
+
+### Usage:
+```python
+xpr, pg = quadriga_lib.channel.calc_xpr( powers, polmat, path_length, tx_pos, rx_pos, *, include_los, \
+    window_size )
+```
+
+### Inputs:
+- **`powers`** — Path powers $p_l$, linear; list of `n_cir` arrays `(n_path,)`; `n_path` may differ between the CIRs
+- **`polmat`** — Polarization transfer matrices, magnitudes below about 1e18; list of `n_cir` arrays `(8, n_path)`
+- **`path_length`** — Path lengths in m; list of `n_cir` arrays `(n_path,)`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `(3,)` (fixed) or `(3, n_cir)`
+- **`include_los`** — Include the LOS paths in the XPR; default: `False`
+- **`window_size`** — LOS window in m, >= 0: paths with `path_length` <= $d_\mathrm{TR}$ +
+  `window_size` are LOS, $d_\mathrm{TR}$ the Tx-Rx distance; default: 0.01
+
+### Outputs:
+- **`xpr`** — XPR, linear; `(n_cir, 6)`; columns:
+
+  | Column | XPR |
+  | ------ | --- |
+  | 0 | Linear: $(P_{vv} + P_{hh}) / (P_{vh} + P_{hv})$ with $P_{rt} = \sum_l p_l \lvert M_{rt} \rvert^2$ |
+  | 1 | V (receive V): $P_{vv} / P_{vh}$ |
+  | 2 | H (receive H): $P_{hh} / P_{hv}$ |
+  | 3 | Circular: $(P_{LL} + P_{RR}) / (P_{LR} + P_{RL})$ |
+  | 4 | LHCP (receive L): $P_{LL} / P_{LR}$ |
+  | 5 | RHCP (receive R): $P_{RR} / P_{RL}$ |
+
+- **`pg`** — Path gain of all paths, LOS included,
+  $\frac{1}{2} \sum_l p_l \sum_{r,t \in \{v,h\}} \lvert M_{rt} \rvert^2$; `(n_cir,)`
+
+### Notes:
+- A ratio with zero cross-polar power is infinite, or 0 if the co-polar power is zero too (also for a CIR without
+  paths, which has `pg` = 0)
+- A scaling of `polmat` does not change the XPR, but `pg`
+
+### See also:
+- [calc_rician_k_factor](#calc_rician_k_factor) (LOS and NLOS power with the same LOS window)
+- [channel.spherical](#channel.spherical) (polarization transfer matrices of the paths)
 
 ---
 <a id="crossfade_segments"></a>
@@ -1075,18 +1209,150 @@ channel = quadriga_lib.channel.crossfade_segments( segments, n_overlap, *, overl
 - [gbsm.single_link_channel](#gbsm.single_link_channel) (channels of one segment)
 
 ---
+<a id="export_channel_obj"></a>
+## export_channel_obj
+Export propagation paths to a Wavefront OBJ file for 3D visualization
+
+Also in: [C++](quadriga_lib_api_cpp.md#export_channel_obj) · [MATLAB](quadriga_lib_api_mex.md#export_channel_obj)
+
+- Writes the paths of ray-traced channels as tubes to an OBJ file and their colors to an MTL file of the same name
+  (`.mtl` instead of `.obj`), e.g. for Blender; existing files are overwritten
+- Path gain in dB: with coefficients the power summed over all antenna pairs, else from `polmat` (sum of the squared
+  entries) with the free-space gain of the length of the drawn path
+- The gain, clipped to `[gain_min_dB, gain_max_dB]`, sets the color (64 steps of `colormap`) and the radius (linear
+  from 0 at `gain_min_dB` to `radius_max` at `gain_max_dB`, at least `radius_min`); a path with a radius up to
+  0.1 mm is written as a polyline
+- Paths below `gain_min_dB` and paths with non-finite coordinates are left out
+
+### Usage:
+```python
+quadriga_lib.channel.export_channel_obj( fn, chan, *, max_paths, gain_max_dB, gain_min_dB, colormap, \
+    i_snap, radius_max, radius_min, n_edges )
+```
+
+### Inputs:
+- **`fn`** — Path of the OBJ file, ending in `.obj`; str or path-like
+- **`chan`** — Channel; dict with the keys of [hdf5_read_channel](#hdf5_read_channel), list or stacked layout; needs `rx_pos`,
+  `tx_pos`, `center_freq`, `n_interact`, `interact_coord` and `coeff` with `delay`, or `polmat`; in the stacked
+  layout, columns of `interact_coord` beyond `sum(n_interact)` are ignored
+- **`max_paths`** — Number of the strongest paths per snapshot to export; 0 = all; default: 0
+- **`gain_max_dB`** — Gain in dB of the largest radius and the last color, finite; default: -60.0
+- **`gain_min_dB`** — Gain in dB of the first color, finite and below `gain_max_dB`; weaker paths are left out;
+  default: -140.0
+- **`colormap`** — Name of the colormap: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer;
+  default: `"jet"`
+- **`i_snap`** — 0-based indices of the snapshots to export; `(n,)`; default: `None` (all snapshots)
+- **`radius_max`** — Tube radius in m at `gain_max_dB`, >= 0; default: 0.05
+- **`radius_min`** — Smallest tube radius in m, >= 0; at most `radius_max` (a larger value is reduced to it);
+  default: 0.01
+- **`n_edges`** — Vertices of the tube cross-section, >= 3; default: 5
+
+---
+<a id="freq_response"></a>
+## freq_response
+Frequency response of a MIMO channel at the given subcarriers
+
+Also in: [C++](quadriga_lib_api_cpp.md#freq_response) · [MATLAB](quadriga_lib_api_mex.md#freq_response)
+
+- The frequency response of one snapshot at the subcarriers $k$: $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$ with the
+  offset $f_k$ = `bandwidth` · `pilot_grid[k]` from the carrier
+- The snapshots are list items, computed in parallel; the number of paths may differ between them
+- For a multi-frequency channel and absolute carrier frequencies, use [freq_response_mf](#freq_response_mf)
+- Precision: the phase is reduced to one period in double precision; sin / cos, coefficients and sums are single
+  precision
+
+### Usage:
+```python
+hmat = quadriga_lib.channel.freq_response( coeff, delay, pilot_grid, bandwidth, *, i_snap, use_kernel )
+```
+
+### Inputs:
+- **`coeff`** — Complex coefficients; list of `n_snap` arrays `(n_rx, n_tx, n_path)`
+- **`delay`** — Delays in s; list of `n_snap` arrays `(n_rx, n_tx, n_path)` or `(1, 1, n_path)`
+- **`pilot_grid`** — Subcarrier positions relative to the bandwidth, finite: 0 = carrier, 1 = carrier + `bandwidth`;
+  `(n_carrier,)`; `np.linspace(0, 1, n)` gives `n` evenly spaced carriers
+- **`bandwidth`** — Bandwidth in Hz, finite and >= 0
+- **`i_snap`** — 0-based indices of the snapshots to compute; `(n_out,)`; default: `None` (all snapshots)
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (raises if
+  unavailable); default: 0
+
+### Output:
+- **`hmat`** — Complex frequency response; complex128; `(n_rx, n_tx, n_carrier, n_out)`; the selected snapshots must
+  have equal `n_rx` and `n_tx`
+
+### See also:
+- [freq_response_mf](#freq_response_mf) (multi-frequency channel, absolute carrier frequencies)
+- [channel.spherical](#channel.spherical) (coefficients and delays)
+- [quantize_delays](#quantize_delays) (delays on a tap grid, for time-domain processing)
+
+---
+<a id="freq_response_mf"></a>
+## freq_response_mf
+Frequency response of a MIMO channel from coefficients sampled at several frequencies
+
+Also in: [C++](quadriga_lib_api_cpp.md#freq_response_mf) · [MATLAB](quadriga_lib_api_mex.md#freq_response_mf)
+
+- The frequency response of one snapshot of a multi-frequency channel at the absolute carrier frequencies
+  $f_k$ = `freq_new[k]`: the coefficients of each path are interpolated from the input frequencies `freq` to $f_k$
+  and the delay phase is applied there, $H_k = \sum_l \tilde a_l(f_k) \, e^{-j 2\pi f_k \tau_l}$
+- Interpolation between the two neighbouring input frequencies: amplitude linear, phase along the shorter arc
+  (SLERP); constant outside the range of `freq`
+- `remove_delay_phase = True` interpolates the envelope $a_l(f_i) \, e^{j 2\pi f_i \tau_l}$ instead of $a_l(f_i)$, so
+  that the delay phase the channel generators include is not interpolated
+- The snapshots are list items, computed in parallel; the number of paths may differ between them
+
+### Usage:
+```python
+hmat = quadriga_lib.channel.freq_response_mf( coeff, delay, freq, freq_new, *, remove_delay_phase, \
+    i_snap, use_kernel )
+```
+
+### Inputs:
+- **`coeff`** — Complex coefficients; list of `n_snap` arrays `(n_rx, n_tx, n_path, n_freq)`, for `n_freq = 1` also
+  `(n_rx, n_tx, n_path)`
+- **`delay`** — Delays in s; list of `n_snap` arrays `(n_rx, n_tx, n_path)` or `(1, 1, n_path)` (a 4th dimension of
+  length `n_freq` is allowed, only the first frequency is used)
+- **`freq`** — Input frequencies in Hz, finite, strictly ascending; `(n_freq,)`
+- **`freq_new`** — Output carrier frequencies in Hz, finite; `(n_carrier,)`
+- **`remove_delay_phase`** — Remove the delay phase from the coefficients before the interpolation: `True` for the
+  coefficients of [channel.multifreq](#channel.multifreq) and [channel.spherical](#channel.spherical), `False` for coefficients without delay phase;
+  default: `True`
+- **`i_snap`** — 0-based indices of the snapshots to compute; `(n_out,)`; default: `None` (all snapshots)
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else GENERIC),
+  1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
+
+### Output:
+- **`hmat`** — Complex frequency response; complex128; `(n_rx, n_tx, n_carrier, n_out)`; the selected snapshots must
+  have equal `n_rx` and `n_tx`
+
+### Notes:
+- With `remove_delay_phase = True`, generate the channels with `use_absolute_delays = True`: their coefficients carry
+  the phase of the absolute path length also when `delay` holds relative delays. With relative delays the phase of
+  the Tx-Rx distance stays in the coefficients and is interpolated across `freq`, which gives wrong phases (the
+  magnitudes stay right) unless the spacing of `freq` is far below $c$ / (Tx-Rx distance)
+- One input frequency: the coefficients apply at all carriers; with `remove_delay_phase = True` the result is that of
+  [freq_response](#freq_response) with `bandwidth` · `pilot_grid` = `freq_new - freq`
+- Precision: the delay phase is reduced to one period in double precision (and removed in double precision with
+  `remove_delay_phase`); sin / cos of the output phase and the interpolation are single
+  precision, the sums double precision
+
+### See also:
+- [freq_response](#freq_response) (single-frequency coefficients, carriers relative to the bandwidth)
+- [channel.multifreq](#channel.multifreq) (multi-frequency channel)
+
+---
 <a id="hdf5_create_file"></a>
 ## hdf5_create_file
-Create a new HDF5 channel file with a custom storage layout
+Create a new HDF5 channel file with a given storage layout
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_create_file) · [MATLAB](quadriga_lib_api_mex.md#hdf5_create_file)
 
-- Initializes a new HDF5 file for storing channel data
-- Defines a 4D storage layout `(nx, ny, nz, nw)`; each index combination maps to one channel slot
-- Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
-- The total slot count is fixed at creation; the layout can be reshaped with [hdf5_reshape_layout](#hdf5_reshape_layout)
-- Raises an error if the target file already exists (also one that cannot be read); delete it first to recreate it
-- Files can be read by any HDF5 tool but must be modified only with quadriga-lib
+- Creates a channel file with `nx · ny · nz · nw` empty slots; the slot count is fixed, [hdf5_reshape_layout](#hdf5_reshape_layout) changes
+  only the dimensions
+- [hdf5_write_channel](#hdf5_write_channel) and [hdf5_write_dset](#hdf5_write_dset) create a missing file themselves, with the layout that just holds their
+  slots; this function sets any other one
+- The file is an HDF5 file (quadriga-lib channel format, version 3) that any HDF5 reader opens, e.g. h5py, MATLAB or
+  HDFView. Change it only with the functions of this section: files changed by other HDF5 tools may be rejected
 
 ### Usage:
 ```python
@@ -1094,36 +1360,27 @@ quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file to create
-- **`nx`** — Number of elements on the x-dimension; default: 65536
-- **`ny`** — Number of elements on the y-dimension; default: 1
-- **`nz`** — Number of elements on the z-dimension; default: 1
-- **`nw`** — Number of elements on the w-dimension; default: 1
+- **`fn`** — File name, str or path-like; the file must not exist
+- **`nx`** — Number of slots along x, at least 1; default: 65536
+- **`ny`**, **`nz`**, **`nw`** — Number of slots along y, z and w, each at least 1; at most 4294967295 (2^32 - 1)
+  slots in total; default: 1
 
 ### See also:
-- [hdf5_write_channel](#hdf5_write_channel) (for writing channel data)
-- [hdf5_write_dset](#hdf5_write_dset) (for writing arbitrary unstructured data)
-- [hdf5_read_layout](#hdf5_read_layout) (for reading the layout)
+- [hdf5_write_channel](#hdf5_write_channel) (writes channels into slots)
+- [hdf5_read_layout](#hdf5_read_layout) (reads the layout and the occupied slots)
 
 ---
 <a id="hdf5_read_channel"></a>
 ## hdf5_read_channel
-Read channel data from HDF5 files
+Read channel objects from one or several slots of an HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [MATLAB](quadriga_lib_api_mex.md#hdf5_read_channel)
 
-- Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file
-- Each of ix, iy, iz, iw may be a scalar, vector, or omitted (= None)
-- Datasets span `n_rx` RX antennas, `n_tx` TX antennas, `n_path` paths and `n_snap` snapshots;
-  snapshots typically index positions along a trajectory or frequencies
-- Slots are visited in column-major order and empty slots are skipped.
-- Not every dataset spans all dimensions; only datasets present in the file are returned
-- Per-snapshot data is returned as a `list` of arrays, one per snapshot, since `n_path` may differ between snapshots
-- Structured fields are stored in single precision in the file and returned in double.
-- Unstructured datasets keep their stored type and shape.
-- `i_snap` selects a subset of snapshots; if `None`, all snapshots are read
-- Errors if the file does not exist or is not a quadriga-lib channel file; files modified with other HDF5 tools are
-  not supported and may be rejected.
+- Returns the channels of the selected slots that hold data as a list of dicts `chan`, and their unstructured data as
+  a list of dicts `par` of the same length
+- `ix`, `iy`, `iz` and `iw` select the slots along each dimension; the selection is every combination, in
+  column-major order (`ix` fastest), and empty slots are skipped ([hdf5_read_layout](#hdf5_read_layout) tells which slots hold data)
+- `i_snap` reads only the given snapshots of every selected slot (see Notes)
 
 ### Usage:
 ```python
@@ -1131,59 +1388,63 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file
-- **`ix`** — 0-based slot indices along dimension X; scalar or vector; default: `0 ... nx-1`
-- **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
-- **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
-- **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
-- **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Applies to every selected slot; raises an error if an index exceeds the number of snapshots of a selected slot.
-- **`stack`** — If `True`, stack snapshots; default: `False` (return as list)
+- **`fn`** — File name of an existing channel file, str or path-like
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot indices along x, y, z and w, 0-based, inside the layout; int or
+  array; default: `None` (all slots of the dimension)
+- **`i_snap`** — Snapshot indices, 0-based, any order, repeats allowed, below `n_snap` of every selected slot that
+  has snapshots; `(n_out,)`; default: `None` (all snapshots)
+- **`stack`** — `False`: members with one entry per snapshot are lists of arrays; `True`: one array with the
+  snapshot on the last axis, zero-padded to the largest number of paths; default: `False`
 
 ### Outputs:
-- **`chan`** — List of dicts with the following keys:
-  | Key                | Description                                                              | Shape `stack = False`             | Shape `stack = True`                 |
-  | ------------------ | ------------------------------------------------------------------------ | --------------------------------- | ------------------------------------ |
-  | `name`             | Channel name                                                             | str                               | str                                  |
-  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
-  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
-  | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
-  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
-  | `coeff`            | Channel coefficients, complex-valued                                     | list of `(n_rx, n_tx, n_path_s)`  | `(n_rx, n_tx, n_path, n_snap)`       |
-  | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)`  | `(n_rx, n_tx, n_path, n_snap)`       |
-  | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `path_length`      | Path length in m                                                         | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `polmat`           | Polarization transfer matrix, real, rows as in [channel.planar](#channel.planar)        | list of `(8, n_path_s)`           | `(8, n_path, n_snap)`                |
-  | `path_angles`      | Departure and arrival angles (AOD, EOD, AOA, EOA) in rad                 | list of `(n_path_s, 4)`           | `(n_path, 4, n_snap)`                |
-  | `fbs_pos`          | First-bounce scatterer positions                                         | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
-  | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
-  | `n_interact`       | Number of interaction points per path; int64                             | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(n_interact_s))`  | `(3, max(sum(n_interact)), n_snap)`  |
-  | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or `(1,)`             | `(n_snap,)` or `(1,)`                |
-  | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int                               | int                                  |
+- **`chan`** — Channels, one per selected slot that holds data; list of dicts with the keys:
+  | Key | Description | Shape `stack = False` | Shape `stack = True` |
+  | --- | ----------- | --------------------- | -------------------- |
+  | `name` | Channel name | str | str |
+  | `tx_pos`, `rx_pos` | Tx and Rx positions in m | `(3, 1)` (fixed) or `(3, n_snap)` | as left |
+  | `tx_orientation`, `rx_orientation` | Tx and Rx orientations (bank, tilt, heading) in rad | `(3, 1)` (fixed) or `(3, n_snap)` | as left |
+  | `coeff` | Coefficients; complex128 | list of `(n_rx, n_tx, n_path)` | `(n_rx, n_tx, n_path, n_snap)` |
+  | `delay` | Delays in s | list of `(n_rx, n_tx, n_path)` or `(1, 1, n_path)` | `(n_rx, n_tx, n_path, n_snap)` or `(1, 1, n_path, n_snap)` |
+  | `path_gain` | Path gain without antennas, linear | list of `(n_path,)` | `(n_path, n_snap)` |
+  | `path_length` | Path length in m | list of `(n_path,)` | `(n_path, n_snap)` |
+  | `polmat` | Polarization transfer matrix (Glossary) | list of `(8, n_path)` | `(8, n_path, n_snap)` |
+  | `path_angles` | AOD, EOD, AOA, EOA in rad | list of `(n_path, 4)` | `(n_path, 4, n_snap)` |
+  | `fbs_pos`, `lbs_pos` | First- and last-bounce scatterer positions in m | list of `(3, n_path)` | `(3, n_path, n_snap)` |
+  | `n_interact` | Number of interaction points per path, 0 = LOS; int64 | list of `(n_path,)` | `(n_path, n_snap)` |
+  | `interact_coord` | Interaction points of all paths, concatenated | list of `(3, sum(n_interact))` | `(3, max(sum(n_interact)), n_snap)` |
+  | `center_freq` | Center frequency in Hz | `(1,)` or `(n_snap,)` | as left |
+  | `initial_position` | Reference snapshot, 0-based | int | int |
 
-- **`par`** — List of dicts with the unstructured data, one per entry of `chan` (empty dict if the slot has none).
+  `n_path` may differ between the snapshots; `stack = True` zero-pads to the largest one. A key exists if the channel
+  has the member
+- **`par`** — Unstructured data, one dict per entry of `chan` (empty if the slot has none); keys are the dataset
+  names without the prefix `par_`, values as [hdf5_read_dset](#hdf5_read_dset) returns them
+
+### Notes:
+- **Snapshot selection**: members with one entry per snapshot are sliced, also positions, orientations and
+  `center_freq` stored per snapshot; values stored once and the unstructured data are kept. A slot without snapshots
+  (only unstructured data) ignores `i_snap`
+- **Round trip** with [hdf5_write_channel](#hdf5_write_channel): the values come back in single precision; empty orientations come back as
+  `(3, 1)` zeros
+- **Unstructured data**: the datasets of the slot with the prefix `par_`; datasets of another prefix are not read
+- **Errors**: a missing file, an index outside the layout, an index in `i_snap` beyond the snapshots of a slot, or a
+  file that is not a quadriga-lib channel file; files changed by other HDF5 tools may be rejected
 
 ### See also:
-- [hdf5_read_layout](#hdf5_read_layout) (for reading the layout in the file)
-- [hdf5_write_channel](#hdf5_write_channel) (for writing channel data)
-- [hdf5_read_dset](#hdf5_read_dset) (for reading individual unstructured datasets)
-- [hdf5_write_dset](#hdf5_write_dset) (for writing individual unstructured datasets)
+- [hdf5_read_layout](#hdf5_read_layout) (finds the occupied slots)
+- [hdf5_write_channel](#hdf5_write_channel) (writes channels)
 
 ---
 <a id="hdf5_read_dset"></a>
 ## hdf5_read_dset
-Read a single unstructured dataset from an HDF5 file
+Read an unstructured dataset from a slot of an HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset) · [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset)
 
-- Reads one user-defined dataset from the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
-- The dataset is looked up under `prefix + name` (default prefix `par_`)
-- The returned type and shape are defined by the dataset's HDF5 dataspace: a scalar dataset gives a Python
-  number, a vector a numpy array of shape `(n,)` (also with a single element), a matrix or 3D array a numpy array
-  of the stored shape
-- Returns `None` if the dataset does not exist at the requested slot
-- Errors if the file does not exist or is not a quadriga-lib channel file
-- Supported types: str, scalar, vector, 2D array, and 3D array
+- Reads the dataset `prefix + name` of slot `(ix, iy, iz, iw)`, e.g. `par_carrier_frequency`
+- The type follows the stored dataset: str for a string, a Python number for a scalar, an array `(n,)` for a 1D
+  dataset (also with one element), else an array of the stored shape; dtypes float32, float64, int32, uint32, int64,
+  uint64
 
 ### Usage:
 ```python
@@ -1191,34 +1452,27 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, *, prefix 
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file
+- **`fn`** — File name of an existing channel file, str or path-like
 - **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
-- **`ix`** — Storage index for the x-dimension; 0-based; default: 0
-- **`iy`** — Storage index for the y-dimension; 0-based; default: 0
-- **`iz`** — Storage index for the z-dimension; 0-based; default: 0
-- **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot index along x, y, z and w, 0-based; default: 0
+- **`prefix`** — Prefix of the dataset name; `''` reads `name` as given; str; default: `'par_'`
 
 ### Output:
-- **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; `None` if the dataset is missing
+- **`dset`** — The dataset; `None` if the slot is empty or outside the layout or has no such dataset
 
 ### See also:
-- [hdf5_read_dset_names](#hdf5_read_dset_names) (for reading names of already written datasets)
-- [hdf5_write_dset](#hdf5_write_dset) (for writing individual unstructured datasets)
-- [hdf5_read_channel](#hdf5_read_channel) (for reading structured channel data)
+- [hdf5_read_dset_names](#hdf5_read_dset_names) (lists the datasets of a slot)
+- [hdf5_write_dset](#hdf5_write_dset) (writes a dataset)
 
 ---
 <a id="hdf5_read_dset_names"></a>
 ## hdf5_read_dset_names
-Read the names of unstructured datasets from an HDF5 file
+Read the names of the unstructured datasets of a slot of an HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset_names) · [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset_names)
 
-- Lists all unstructured datasets stored at the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
-- Lists the datasets whose names start with `prefix` (default `par_`; `''` lists all); the returned names have the
-  prefix stripped
-- Returns an empty list if no unstructured datasets are present at the slot
-- Errors if the file does not exist or is not a quadriga-lib channel file
+- Lists the datasets of slot `(ix, iy, iz, iw)` whose names start with `prefix`, without the prefix, in the order
+  they were written
 
 ### Usage:
 ```python
@@ -1226,32 +1480,27 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, *, prefix
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file
-- **`ix`** — Storage index for the x-dimension; 0-based; default: 0
-- **`iy`** — Storage index for the y-dimension; 0-based; default: 0
-- **`iz`** — Storage index for the z-dimension; 0-based; default: 0
-- **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`prefix`** — Prefix used to identify unstructured datasets; `''` lists all datasets; str; default: `'par_'`
+- **`fn`** — File name of an existing channel file, str or path-like
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot index along x, y, z and w, 0-based; default: 0
+- **`prefix`** — Prefix of the listed names; `''` lists all datasets with their full names; str; default: `'par_'`
 
 ### Output:
-- **`names`** — Names of the unstructured datasets at the slot whose names start with `prefix`, with the prefix
-  stripped, in creation order; list of str
+- **`names`** — Dataset names; list of str, empty if the slot is empty or outside the layout or has none
 
 ### See also:
-- [hdf5_read_dset](#hdf5_read_dset) (for reading individual unstructured datasets)
-- [hdf5_write_dset](#hdf5_write_dset) (for writing individual unstructured datasets)
+- [hdf5_read_dset](#hdf5_read_dset) (reads a dataset by name)
+- [hdf5_write_dset](#hdf5_write_dset) (writes a dataset)
 
 ---
 <a id="hdf5_read_layout"></a>
 ## hdf5_read_layout
-Read the storage layout of channel data inside an HDF5 file
+Read the storage layout of an HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_layout) · [MATLAB](quadriga_lib_api_mex.md#hdf5_read_layout)
 
-- Returns the dimensions of the 4D channel-slot grid stored inside an HDF5 file
-- Also reports which slots already hold data, so free slots can be found without scanning the file
-- Returns `(0, 0, 0, 0)` dimensions if the file does not exist
-- Raises an error if the file exists but is not a quadriga-lib channel file
+- Returns the dimensions of the slot grid and the slots that hold data
+- A missing file gives `[0, 0, 0, 0]`, so the function also tests whether a file exists; a file that is not a channel
+  file raises an error
 
 ### Usage:
 ```python
@@ -1259,28 +1508,26 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ```
 
 ### Input:
-- **`fn`** — Filename of the HDF5 file
+- **`fn`** — File name, str or path-like
 
 ### Outputs:
-- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `(4,)`; int64
-- **`has_data`** — Slot occupancy mask; 1 where a slot holds data, 0 otherwise; uint32; `(nx, ny, nz, nw)`
+- **`storage_dims`** — Layout `[nx, ny, nz, nw]`; int64; `(4,)`
+- **`has_data`** — 1 for the slots that were written, also with an empty channel, else 0; uint32; `(nx, ny, nz, nw)`
 
 ### See also:
-- [hdf5_create_file](#hdf5_create_file) (for creating a file with a custom storage layout)
-- [hdf5_read_channel](#hdf5_read_channel) (for reading channel data)
+- [hdf5_create_file](#hdf5_create_file) (creates a file with a given layout)
+- [hdf5_reshape_layout](#hdf5_reshape_layout) (changes the dimensions)
 
 ---
 <a id="hdf5_reshape_layout"></a>
 ## hdf5_reshape_layout
-Reshape the storage layout inside an existing HDF5 file
+Reshape the storage layout of an existing HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_reshape_layout) · [MATLAB](quadriga_lib_api_mex.md#hdf5_reshape_layout)
 
-- Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
-- The total number of slots (`nx · ny · nz · nw`) must match the original layout
-- Only the dimension metadata is updated; stored channel data is not moved
-- Errors if the file does not exist or is not a quadriga-lib channel file
-- One writer per file at a time; files are not locked
+- Sets new dimensions `[nx, ny, nz, nw]` with the slot count `nx · ny · nz · nw` of the file
+- The data stays in place: the slot with the linear index `ix + nx * (iy + ny * (iz + nz * iw))` keeps its channel,
+  which gets the slot index of that position in the new layout
 
 ### Usage:
 ```python
@@ -1288,38 +1535,28 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file
-- **`nx`** — Number of elements on the x-dimension
-- **`ny`** — Number of elements on the y-dimension; default: 1
-- **`nz`** — Number of elements on the z-dimension; default: 1
-- **`nw`** — Number of elements on the w-dimension; default: 1
+- **`fn`** — File name of an existing channel file, str or path-like
+- **`nx`** — New number of slots along x
+- **`ny`**, **`nz`**, **`nw`** — New number of slots along y, z and w; default: 1
+
+### See also:
+- [hdf5_create_file](#hdf5_create_file) (sets the layout of a new file)
+- [hdf5_read_layout](#hdf5_read_layout) (reads the layout)
 
 ---
 <a id="hdf5_write_channel"></a>
 ## hdf5_write_channel
-Write one or more channel objects to an HDF5 file
+Write channel objects to one or several slots of an HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_channel) · [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel)
 
-- Writes a list of channel dicts into 4D storage slots (one slot per list entry)
-- `chan` may also be a single dict, in which case one channel is written
-- Optional unstructured data (`par`) can be passed as a matching list of dicts (or a single dict)
-- Creates the file if it does not exist, with the layout that just holds all slots (largest index + 1 per
-  dimension); use [hdf5_create_file](#hdf5_create_file) for another layout
-- All inputs are checked before anything is written: every slot inside the layout of an existing file, no slot
-  twice, all channels valid
-- A slot that already contains data is replaced completely: its old structured data and all its unstructured
-  datasets (also those written with [hdf5_write_dset](#hdf5_write_dset)) are removed; `code` shows which slots were replaced.
-  The file does not shrink; copy the channels into a new file to reclaim the space of the removed data
-- One writer per file at a time; files are not locked
-- Structured data is stored in single precision regardless of the input precision
-- Unstructured datasets retain their numpy dtype and shape; supported types as in [hdf5_write_dset](#hdf5_write_dset)
-- Each scalar index input is broadcast to all channels; each vector index must have one entry per channel
-- Channel dict field layout matches [hdf5_read_channel](#hdf5_read_channel)
-- Per-snapshot fields accept the list model (list of arrays) or the stack model
-  (single array with the snapshot index as the last axis), detected per field
-- Coefficients may be passed as a complex `coeff`, or as separate real `coeff_re` and `coeff_im` (the two forms are mutually exclusive)
-- Slot indices are 0-based
+- Stores `chan[k]` with the unstructured data `par[k]` in slot `(ix[k], iy[k], iz[k], iw[k])`; a scalar index
+  applies to all channels
+- A missing file is created with the layout that just holds the slots (the largest index + 1 per dimension);
+  [hdf5_create_file](#hdf5_create_file) sets another layout
+- A slot that holds data is replaced completely: its old channel and all its unstructured datasets, also those added
+  with [hdf5_write_dset](#hdf5_write_dset), are removed
+- All inputs are checked before anything is written, so a failing check leaves the file unchanged
 
 ### Usage:
 ```python
@@ -1327,44 +1564,50 @@ code = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file
-- **`chan`** — Structured channel data; a channel dict or a list of channel dicts; field layout matches [hdf5_read_channel](#hdf5_read_channel)
-- **`par`** — Unstructured data; a dict or a list of dicts with the same number of entries as `chan`. Dict keys become HDF5 dataset
-  names per slot; `None` values are skipped. Pass `None` to disable; default: `None`
-- **`ix`** — 0-based slot indices along dimension X; scalar or vector of length `len(chan)`; default: `0 ... len(chan)-1`
-- **`iy`** — 0-based slot indices along dimension Y; scalar or vector of length `len(chan)`; default: 0
-- **`iz`** — 0-based slot indices along dimension Z; scalar or vector of length `len(chan)`; default: 0
-- **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
+- **`fn`** — File name, str or path-like
+- **`chan`** — Channels to write, valid; a channel dict or a non-empty list of `n_chan` dicts, keys in
+  [hdf5_read_channel](#hdf5_read_channel). Members with one entry per snapshot as a list of arrays or as one array with the snapshot on
+  the last axis (`stack = True` of [hdf5_read_channel](#hdf5_read_channel)), detected per key; the coefficients as complex `coeff` or as
+  real `coeff_re` and `coeff_im`, not both
+- **`par`** — Unstructured data; a dict or a list of `n_chan` dicts: a key is a dataset name (stored with the prefix
+  `par_`), the values follow the type rules of [hdf5_write_dset](#hdf5_write_dset), `None` values are skipped; default: `None`
+  (none)
+- **`ix`** — Slot index along x, 0-based; int or `n_chan` entries; default: `None` (`0 ... n_chan - 1`)
+- **`iy`**, **`iz`**, **`iw`** — Slot indices along y, z and w, 0-based; int or `n_chan` entries; default:
+  `None` (0)
 
 ### Output:
-- **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `(len(chan),)`; int64
+- **`code`** — `0` if the slot was empty, `1` if its data was replaced; int64; `(n_chan,)`
+
+### Notes:
+- A channel without data and without `par` entries replaces the data of an occupied slot (it then reads as an empty
+  channel, and [hdf5_read_layout](#hdf5_read_layout) reports it as written); it leaves an empty slot as it is and does not create a
+  missing file
+- The space of replaced data is not reused, so the file does not shrink; copying the channels into a new file reclaims
+  it
+- Files are not locked: one writer per file at a time, also for [hdf5_write_dset](#hdf5_write_dset) and [hdf5_reshape_layout](#hdf5_reshape_layout).
+  Reading is safe while no one writes
 
 ### See also:
-- [hdf5_create_file](#hdf5_create_file) (for creating a file with a custom storage layout)
-- [hdf5_reshape_layout](#hdf5_reshape_layout) (to change the layout later)
-- [hdf5_read_channel](#hdf5_read_channel) (for reading channel data)
+- [hdf5_read_channel](#hdf5_read_channel) (reads the channels back)
+- [hdf5_create_file](#hdf5_create_file) (creates a file with a given layout)
 
 ---
 <a id="hdf5_write_dset"></a>
 ## hdf5_write_dset
-Write a single unstructured dataset to an HDF5 file
+Write an unstructured dataset to a slot of an HDF5 channel file
 
 Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_dset) · [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset)
 
-- Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `name` must not be empty; `prefix + name` must contain only alphanumeric characters and underscores
-- Creates the file with the layout `(ix + 1, iy + 1, iz + 1, iw + 1)` if it does not exist; use [hdf5_create_file](#hdf5_create_file)
-  for another layout
-- A dataset of the same name at the same slot is not overwritten; an error is thrown instead
-- The dataset is added to the slot; everything else stored there is kept. A later [hdf5_write_channel](#hdf5_write_channel) to the
-  same slot replaces the slot completely, including the datasets written with this function
-- Supported types: str; Python float (stored as double), int and bool (stored as int64; a bool is stored as the
-  integer 0 or 1 and reads back as an int); numpy scalars and 0-d arrays; numpy arrays with 1, 2 or 3 dimensions
-  in any memory layout and byte order; numeric element types: float32, float64, int32, uint32, int64, uint64.
-  Other types (e.g. int16, numpy bool, complex) raise an error
-- 1D arrays are stored as vectors and read back with shape `(n,)`, also with a single element (not as a scalar);
-  2D and 3D arrays keep their shape, also `(n, 1)` and `(1, 1)`
-- One writer per file at a time; files are not locked
+- Adds the dataset `prefix + name` to slot `(ix, iy, iz, iw)`; everything else stored in the slot stays. An empty
+  slot gets a channel without structured data
+- A missing file is created with the layout `(ix + 1, iy + 1, iz + 1, iw + 1)`; [hdf5_create_file](#hdf5_create_file) sets another
+  layout
+- A dataset is written once: a dataset of the same name in the slot raises an error. A later [hdf5_write_channel](#hdf5_write_channel) to
+  the slot removes it with the rest of the slot
+- Invalid names and types raise an error before the file is changed
+- [hdf5_read_channel](#hdf5_read_channel) returns the datasets with the prefix `par_` as the unstructured data `par`; [hdf5_read_dset](#hdf5_read_dset)
+  reads each one back
 
 ### Usage:
 ```python
@@ -1372,18 +1615,20 @@ quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, *, prefix 
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file
-- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
-- **`data`** — Data to be written; type must be supported (see above); cannot be empty
-- **`ix`** — Storage index for the x-dimension; 0-based; default: 0
-- **`iy`** — Storage index for the y-dimension; 0-based; default: 0
-- **`iz`** — Storage index for the z-dimension; 0-based; default: 0
-- **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`prefix`** — Prefix prepended to `name` in the HDF5 file; alphanumeric and underscores only; str; default: `'par_'`
+- **`fn`** — File name, str or path-like
+- **`name`** — Dataset name without the prefix, not empty; `prefix + name` holds only letters, digits and `_`, at
+  most 65000 characters; str
+- **`data`** — A str; a Python float (stored as float64), int or bool (stored as int64, a bool as 0 or 1); a numpy
+  scalar, or a numpy array with 0 to 3 dimensions in any memory layout and byte order; dtypes float32, float64, int32,
+  uint32, int64, uint64, other dtypes (e.g. int16, bool, complex) raise an error. A 1D array is stored as a vector and
+  comes back with shape `(n,)`, also with one element; 2D and 3D arrays keep their shape, also `(n, 1)` and `(1, 1)`
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot index along x, y, z and w, 0-based; inside the layout of an
+  existing file; default: 0
+- **`prefix`** — Prefix of the dataset name; `''` stores `name` without a prefix; str; default: `'par_'`
 
 ### See also:
-- [hdf5_read_dset_names](#hdf5_read_dset_names) (for reading names of already written datasets)
-- [hdf5_read_dset](#hdf5_read_dset) (for reading individual unstructured datasets)
+- [hdf5_read_dset](#hdf5_read_dset) (reads a dataset by name)
+- [hdf5_read_dset_names](#hdf5_read_dset_names) (lists the datasets of a slot)
 
 ---
 <a id="qrt_file_parse"></a>
@@ -1392,10 +1637,10 @@ Read metadata from a QRT file
 
 Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_parse) · [MATLAB](quadriga_lib_api_mex.md#qrt_file_parse)
 
-- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR
-  offsets, names, positions, orientations, and file version
-- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
-  `cir_offset` reflect this
+- Reads the header of a QRT file: counts, names, frequencies, the positions and orientations of the CIRs and the
+  origins, and the file version; no path data
+- A file without destinations reports one destination `RX` that owns all CIRs
+- Raises an error for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt
 
 ### Usage:
 ```python
@@ -1404,22 +1649,28 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
 ```
 
 ### Input:
-- **`fn`** — Path to the QRT file
+- **`fn`** — File name, str or path-like
 
 ### Outputs:
-- **`n_cir`** — Number of channel snapshots per origin point
-- **`n_orig`** — Number of origin points (TX)
-- **`n_dest`** — Number of destination points (RX)
-- **`n_freq`** — Number of frequency bands
-- **`cir_offset`** — Number of CIRs before each destination (offset of its first CIR), the first entry 0; int64; `(n_dest,)`
-- **`orig_names`** — Names of the origin points (TX); list of strings; length `n_orig`
-- **`dest_names`** — Names of the destination points (RX); list of strings; length `n_dest`
-- **`version`** — QRT file version number
-- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); `(n_freq,)`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; `(n_cir, 3)`
-- **`cir_orientation`** — CIR orientations as Euler angles; `(n_cir, 3)`
-- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; `(n_orig, 3)`
-- **`orig_orientation`** — Origin (TX) orientations as Euler angles; `(n_orig, 3)`
+- **`n_cir`** — Number of CIRs of each origin; int
+- **`n_orig`** — Number of origin slots; int
+- **`n_dest`** — Number of destinations, at least 1; int
+- **`n_freq`** — Number of frequencies; int
+- **`cir_offset`** — Number of CIRs before each destination, i.e. the 0-based index of its first CIR; int64;
+  `(n_dest,)`
+- **`orig_names`** — Origin names, empty for a slot not written yet; list of str of length `n_orig`
+- **`dest_names`** — Destination names; list of str of length `n_dest`
+- **`version`** — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar); int
+- **`center_freq`** — Frequencies in Hz; `(n_freq,)`. Version 4 stores GHz and one frequency per origin, this is the one
+  of the first written origin (0 if none is written); version 5 files of earlier library versions store GHz too, a
+  version 5 list with all values below 1000 is read as GHz
+- **`cir_pos`** — CIR positions in m; `(n_cir, 3)`
+- **`cir_orientation`** — CIR orientations (bank, tilt, heading) in rad; `(n_cir, 3)`
+- **`orig_pos`** — Origin positions in m, zeros for a slot not written yet; `(n_orig, 3)`
+- **`orig_orientation`** — Origin orientations (bank, tilt, heading) in rad; `(n_orig, 3)`
+
+### See also:
+- [qrt_file_read](#qrt_file_read) (reads CIRs)
 
 ---
 <a id="qrt_file_read"></a>
@@ -1428,13 +1679,11 @@ Read ray-tracing CIR data from a QRT file
 
 Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [MATLAB](quadriga_lib_api_mex.md#qrt_file_read)
 
-- Reads channel impulse response data from QRT files
-- Reads in chunks of 16 snapshots; besides the output, at most two chunks are held in memory
-- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `polmat` is the transpose
-  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
-  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
-  that traversal
-- Per-snapshot outputs are returned as lists with one entry per requested snapshot
+- Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
+  [channel.spherical](#channel.spherical) (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or [channel.planar](#channel.planar) (the
+  angles)
+- Reads in chunks of 16 CIRs: besides the outputs, at most two chunks are held in memory
+- `uplink` swaps the ends: the origin becomes the receiver (see Notes)
 
 ### Usage:
 ```python
@@ -1444,79 +1693,82 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 ```
 
 ### Inputs:
-- **`fn`** — Path to the QRT file
-- **`i_cir`** — Snapshot indices to read, 0-based; `(n_out,)` or `None`; if `None` or empty, all snapshots are read (for a file
-  without CIRs, all outputs are empty with `n_out = 0`); default: `None`
-- **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
-- **`uplink`** — If `False`, origin=TX and destination=RX; if `True`, the roles are swapped (origin=RX, destination=TX); default: `False`
-- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling; 0 = values as stored in the QRT file with
-  `path_gain` = -PL; 1 = `polmat` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
-  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
-  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
-    | :-----------: | :---------------------------------------------: | :------------------------------: |
-    | 0             | As stored in QRT file                           | -PL                              |
-    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
-
-    Other values raise an error.
+- **`fn`** — File name, str or path-like
+- **`i_cir`** — CIR indices, 0-based, below `n_cir`; `(n_out,)`; default: `None` (all CIRs of the file)
+- **`i_orig`** — Origin index, 0-based, below `n_orig`; int; default: 0
+- **`uplink`** — `False`: origin = Tx, destination = Rx; `True`: origin = Rx, destination = Tx; default: `False`
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
 
 ### Outputs:
-- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`
-- **`tx_pos`** — Transmitter positions in Cartesian coordinates; `(3, n_out)`
-- **`tx_orientation`** — Transmitter orientations as Euler angles (bank, tilt, heading); `(3, n_out)`
-- **`rx_pos`** — Receiver positions in Cartesian coordinates; `(3, n_out)`
-- **`rx_orientation`** — Receiver orientations as Euler angles (bank, tilt, heading); `(3, n_out)`
-- **`fbs_pos`** — First-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
-- **`lbs_pos`** — Last-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
-- **`path_gain`** — Path gain in linear scale; list of length `n_out`; entries `(n_path, n_freq)`
-- **`path_length`** — Absolute path length from TX to RX phase center; list of length `n_out`; entries `(n_path,)`
-- **`polmat`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
-- **`aod`** — Departure azimuth angles; list of length `n_out`; entries `(n_path,)`
-- **`eod`** — Departure elevation angles; list of length `n_out`; entries `(n_path,)`
-- **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`
-- **`eoa`** — Arrival elevation angles; list of length `n_out`; entries `(n_path,)`
-- **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
-- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries int64 `(n_path,)`
-- **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(n_interact))`
-- **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
-  entries uint8 `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
-  193 (NLOS); LOS and GR paths are not marked as GBSM.
+- **`center_freq`** — Frequencies in Hz (version 4: of origin `i_orig`); `(n_freq,)`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `(3, n_out)`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientations (bank, tilt, heading) in rad; `(3, n_out)`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m: the first and the last interaction
+  point, the midpoint of Tx and Rx for a LOS path; list of `n_out` arrays `(3, n_path)`
+- **`path_gain`** — Path gain, linear (see Notes); list of `n_out` arrays `(n_path, n_freq)`
+- **`path_length`** — Length of the polyline from the Tx through the interaction points to the Rx in m; list of
+  `n_out` arrays `(n_path,)`
+- **`polmat`** — Polarization transfer matrix; list of `n_out` arrays `(8, n_path, n_freq)`; version 6: the
+  complex scalar coefficient, `(2, n_path, n_freq)`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure (at the Tx) and arrival (at the
+  Rx) in rad; list of `n_out` arrays `(n_path,)`
+- **`path_coord`** — Points of each path from the Tx through the interaction points to the Rx; list of `n_out` lists
+  of `n_path` arrays `(3, n_interact + 2)`
+- **`n_interact`** — Number of interaction points of each path, 0 = LOS; list of `n_out` int64 arrays `(n_path,)`
+- **`coord`** — Interaction points of all paths, concatenated in path order; list of `n_out` arrays
+  `(3, sum(n_interact))`
+- **`interact_type`** — Interaction type codes, concatenated like `coord`; list of `n_out` uint8 arrays
+  `(sum(n_interact),)`; empty for version 4 files
+
+### Notes:
+- **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
+  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
+  the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
+  $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
+  matrix (version 6: the power of the coefficient):
+  | `normalize_polmat` | `polmat` | `path_gain` |
+  | ------------------ | -------- | ----------- |
+  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
+  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+
+- **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
+  `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
+  `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
+  codes describe that traversal
+- An origin slot that is not written yet gives zero positions and orientations and no paths
+- GBSM paths of [export_rays_qrt](#export_rays_qrt) carry the code 193 at their scatterers; their LOS and GR paths look like
+  ray-traced ones (no interaction, one reflection 129)
+- **Errors**: an index out of range raises `ValueError`; a file that cannot be opened, is not a QRT file of version 4,
+  5 or 6, or is truncated or corrupt (counts or offsets beyond the file, path blocks of different CIRs that overlap)
+  raises `RuntimeError`. A message about one requested CIR starts with `Snapshot <k>: `, with `k` its position in
+  `i_cir`
 
 ### See also:
-- [generate_antenna](#generate_antenna) (for generating antenna arrays)
-- [channel.planar](#channel.planar) (for embedding antennas using departure and arrival angles)
-- [channel.spherical](#channel.spherical) (for embedding antennas using FBS/LBS positions)
-- [channel.multifreq](#channel.multifreq) (for multi-frequency antenna embedding)
+- [qrt_file_parse](#qrt_file_parse) (metadata without path data)
+- [channel.spherical](#channel.spherical) (coefficients from the paths)
+- [channel.planar](#channel.planar) (coefficients from the angles)
 
 ---
 <a id="quantize_delays"></a>
 ## quantize_delays
-Map path delays to a fixed tap grid using two-tap power-weighted interpolation
+Map the path delays to a tap grid by two-tap interpolation
 
 Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [MATLAB](quadriga_lib_api_mex.md#quantize_delays)
 
-- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α and δ^α,
-  where δ is the fractional offset within the bin and α is `power_exponent`
-- Two-tap interpolation avoids discontinuities when delays cross tap boundaries
-- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband
-  (incoherent power preservation)
-- If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped
-  (nearest-neighbor selection) but tap-selection logic still applies
-- Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
-- Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
-  shared delays are expanded internally when `fix_taps` is 0 or 3
-- Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
-- Delays must be non-negative, as for a tapped delay line, with a tolerance of `tap_spacing / 2`: delays in
-  `(-tap_spacing / 2, 0)` are treated as 0, so all of their power goes to tap 0. Delays at or below
-  `-tap_spacing / 2` raise `ValueError`, as do NaN, Inf and delays of 2^31 taps or more (`delay / tap_spacing < 2^31`,
-  e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)
-- Relative delays (`use_absolute_delays = false` in [channel.spherical](#channel.spherical), [channel.multifreq](#channel.multifreq) and
-  [channel.planar](#channel.planar)) are negative for element pairs that are closer to each other than the phase centres, by up
-  to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay
-  above `-tap_spacing / 2` only while these half sizes add up to less than `tap_spacing / 2` times the propagation
-  speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
-  acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
-- Run time and memory depend on the number of paths and taps, not on the absolute delay values
+- For time-domain processing with a tapped delay line: a path with delay $\tau$ and coefficient $a$ goes to the two
+  neighbouring taps $\lfloor \tau / \Delta \rfloor$ and $\lfloor \tau / \Delta \rfloor + 1$ of the grid with the
+  spacing $\Delta$ = `tap_spacing`, with the coefficients $a \, (1 - \delta)^\alpha$ and $a \, \delta^\alpha$, where
+  $\delta$ is the fractional offset of $\tau / \Delta$ and $\alpha$ = `power_exponent`; the coefficients change smoothly
+  when a delay crosses a tap
+- $\alpha = 1$ interpolates linearly (narrowband), $\alpha = 0.5$ keeps the power of each path (wideband)
+- A grid holds the taps with power, at most `max_taps`: all taps of the interpolation if they fit, else the nearest
+  taps of the paths, strongest first, and the remaining places for the strongest other taps. A path whose two taps
+  are not both in the grid goes to its nearest tap with its full coefficient, or is dropped if that tap is not in the
+  grid either
+- If every delay is within 1 % of the spacing from a tap, each path goes to its nearest tap with its full coefficient
+- All snapshots of the output have the same number of taps `n_taps`, the size of the largest grid; the taps beyond a
+  shorter grid have zero coefficients and delay 0, taps that are zero in all snapshots at the end are removed
 
 ### Usage:
 ```python
@@ -1525,53 +1777,99 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff, delay, *, tap_sp
 ```
 
 ### Inputs:
-- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
-- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or
-  shared `(1, 1, n_path)`; non-negative with a tolerance of `tap_spacing / 2`, finite, below
-  `2^31 * tap_spacing`
-- **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz
-  sampling rate; default: 5e-9
-- **`max_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
-- **`power_exponent`** — Interpolation exponent α; default: 1.0
-- **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
-  2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
-- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
-  arrays; default: `False`
+- **`coeff`** — Complex coefficients; list of `n_snap` arrays `(n_rx, n_tx, n_path_s)`, at least one; `n_path_s` may
+  differ between the snapshots, `n_rx` and `n_tx` (>= 1) not
+- **`delay`** — Delays in s; list of `n_snap` arrays `(n_rx, n_tx, n_path_s)` or `(1, 1, n_path_s)`, one of the two
+  forms for all snapshots; finite, above `-tap_spacing / 2` and below `2^31` · `tap_spacing`
+- **`tap_spacing`** — Tap spacing in s, > 0 and finite; 5 ns is a sampling rate of 200 MHz; default: 5e-9
+- **`max_taps`** — Largest number of taps of a grid; 0 = unlimited; default: 48
+- **`power_exponent`** — Interpolation exponent $\alpha$, > 0; default: 1.0
+- **`fix_taps`** — Which coefficients share a grid; default: 0
+
+  | Value | Grid |
+  | ----- | ---- |
+  | 0 | One grid per antenna pair and snapshot |
+  | 1 | One grid for all antenna pairs and snapshots |
+  | 2 | One grid per snapshot for all its antenna pairs; the grids of the snapshots differ |
+  | 3 | One grid per antenna pair for all snapshots |
+
+- **`stack`** — `True`: the outputs as 4D arrays with the snapshots on the last axis; `False`: as lists with one array
+  per snapshot; default: `False`
 
 ### Outputs:
-- **`coeff_q`** — Complex output coefficients; list of `(n_rx, n_tx, n_taps)` when `stack` is `False`, else
-  `(n_rx, n_tx, n_taps, n_snap)`
-- **`delay_q`** — Output delays in seconds; list of `(n_rx, n_tx, n_taps)` or `(1, 1, n_taps)` when
-  `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)` or `(1, 1, n_taps, n_snap)`; the `(1, 1, ...)`
-  shape only for shared delay input with `fix_taps` 1 or 2
+- **`coeff_q`** — Complex coefficients per tap; complex128; list of `n_snap` arrays `(n_rx, n_tx, n_taps)`, or
+  `(n_rx, n_tx, n_taps, n_snap)` with `stack`
+- **`delay_q`** — Tap delays in s; list of `n_snap` arrays `(n_rx, n_tx, n_taps)`, or `(n_rx, n_tx, n_taps, n_snap)`
+  with `stack`; `(1, 1, n_taps)` and `(1, 1, n_taps, n_snap)` for delays `(1, 1, n_path_s)` with `fix_taps` 1 or 2
+
+### Notes:
+- Negative delays: delays in `(-tap_spacing / 2, 0)` count as 0, all their power goes to tap 0 (the error is below
+  `tap_spacing / 2`, as for rounding to the nearest tap)
+- Relative delays (`use_absolute_delays = False` in [channel.spherical](#channel.spherical), [channel.planar](#channel.planar) and
+  [channel.multifreq](#channel.multifreq)) are negative for element pairs that are closer to each other than the phase centres, by up
+  to (half the Tx array size + half the Rx array size) / propagation speed. They stay above `-tap_spacing / 2` only
+  while these half sizes add up to less than about 0.75 m for radio at 5 ns taps, or 3.6 mm for sound at 48 kHz
+  taps, i.e. practically never for acoustic arrays: use absolute delays then
+- The upper limit of `2^31` taps is e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz; run time and memory depend on the
+  number of paths and taps, not on the delay values
+
+### See also:
+- [freq_response](#freq_response) (frequency response of the paths or taps)
+- [calc_delay_spread](#calc_delay_spread) (delay spread, with an optional delay granularity)
 
 ---
 
-<a id="sec-channel-generation-functions"></a>
-# Channel generation functions
+<a id="sec-channel-generators"></a>
+# Channel generators
+
+The functions of this section compute the channel coefficients of a link from its propagation paths and the antenna
+arrays at both ends. They apply the antenna patterns, the polarization and the motion of the antennas, and return the
+coefficients and delays that the functions of section "Channel data and processing" work with. The coefficients are
+given per port pair: `n_tx` and `n_rx` count the ports of the arrays, after their port weights.
+
+**Generators:**
+
+- [channel.spherical](#channel.spherical): paths given by their first- and last-bounce scatterers; each antenna element sees the path
+  from its own position (spherical wavefronts), so it covers large arrays and short distances
+- [channel.planar](#channel.planar): paths given by their departure and arrival angles; all elements of an array see the same
+  direction (planar wavefronts)
+- [channel.multifreq](#channel.multifreq): as [channel.spherical](#channel.spherical), at several frequencies with frequency-dependent antennas, path gains
+  and polarization, for radio and acoustic waves
+- [channel.irs](#channel.irs): paths over an intelligent reflecting surface (IRS), from two path sets that meet at the IRS array
+- [channel.ieee_indoor](#channel.ieee_indoor): complete channels of the IEEE TGn, TGac, TGah and TGax indoor models
+
+The paths come from a ray tracer (e.g. [qrt_file_read](#qrt_file_read)), from the geometry-based stochastic model, or from the user.
+For complete channels of a network layout, see [get_channels_layout](#get_channels_layout).
+
+All functions of this section are in the submodule `quadriga_lib.channel`, without the prefix `get_channels_` of their
+C++ and MATLAB names: `get_channels_spherical` is called as `quadriga_lib.channel.spherical`. The arrays are arrayant
+dicts ([generate_antenna](#generate_antenna)); the coefficients are returned as complex arrays.
+
+**Terms** (full list in the [Glossary](quadriga_lib_api_cpp.md#glossary)):
+
+- **Path gain**: the linear power gain of a path without antennas, `(n_path,)`
+- **Path length**: the length of a path from the Tx to the Rx phase center in m, which sets its delay
+- **Polarization transfer matrix** `polmat`: the Jones matrix of each path, `(8, n_path)` with interleaved real and
+  imaginary parts (Glossary, "Polarization")
+- **Absolute delays**: `use_absolute_delays = True` keeps the LOS delay in all paths; otherwise the delays are
+  relative to the LOS path
+- **Vector form**: [channel.planar](#channel.planar) and [channel.spherical](#channel.spherical) take the path inputs of several snapshots as lists of
+  arrays, one per snapshot, and return lists
 
 ---
 <a id="channel.ieee_indoor"></a>
 ## channel.ieee_indoor
-Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
+Generate indoor MIMO channels of the IEEE TGn, TGac, TGah and TGax models
 
 Also in: [C++](quadriga_lib_api_cpp.md#get_channels_ieee_indoor) · [MATLAB](quadriga_lib_api_mex.md#get_channels_ieee_indoor)
 
-- Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
-- 2D model: azimuth angles and planar motion only, no elevation
-- Supported channel types: `A, B, C, D, E, F` (TGn definitions)
-- MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
-- Time-evolving channels via `observation_time`, `update_interval`, and mobility parameters; `observation_time = 0.0` yields a static channel
-- Floor penetration loss according to TGah for `center_freq` < 1 GHz and TGax for above 1 GHz; floors add attenuation
-  (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP
-- Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls
-- Time evolution: each sub-path is rotated by `exp(+j 2 pi f_D t)`, i.e. a station moving towards the AP or a scatterer
-  sees a positive Doppler shift `f_D`, as the channel of [channel.spherical](#channel.spherical) along the returned station positions
-- Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation),
-  so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)
-- Override parameters (`kf`, `xpr_nlos`, `sf_std_los_dB`, `sf_std_nlos_dB`, `dist_breakpoint`): `NaN` selects the model default
-- Per-snapshot data (`coeff`, `delay`, `path_gain`) is returned as a list of per-snapshot arrays, 
-  or stacked into one array along an appended snapshot axis when `stack = True`
+- Channels of the IEEE 802.11 indoor models A to F (TGn), with the TGac extensions (several users with offset angles,
+  tap interpolation for shorter tap spacings), the floor loss of TGah below 1 GHz and the floor and wall loss of TGax
+  above; one channel per user
+- 2D model: azimuth angles only and motion in the horizontal plane; [channel.planar](#channel.planar) computes the coefficients with
+  the AP and station arrays
+- Static channels (`observation_time = 0`, one snapshot) or time-evolving channels with the Doppler shifts of the
+  station and the environment
 
 ### Usage:
 ```python
@@ -1582,88 +1880,104 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, channel_type, cent
 ```
 
 ### Inputs:
-- **`ap_array`** — Access point antenna array; `n_tx` = number of ports, see [generate_antenna](#generate_antenna)
-- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports, see [generate_antenna](#generate_antenna)
-- **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
-- **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
-- **`n_users`** — Number of users (TGac/TGah/TGax only); output list length equals `n_users`; default: 1
-- **`observation_time`** — Channel observation time in seconds; must be finite; default: 0
-- **`update_interval`** — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`; default: 1e-3
-- **`speed_station_kmh`** — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`; default: 0
-- **`speed_env_kmh`** — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`; default: 1.2 (TGn)
-- **`dist`** — TX-to-RX distance(s) in meters (finite, > 0); `(n_users,)` or `(1,)`; default: 4.99
-- **`n_floors`** — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `(n_users,)` or `(1,)`; default: 0
-- **`uplink`** — Set `True` to generate uplink (reverse) direction; coefficients are the transpose of the downlink; default: False
-- **`offset_angles_deg`** — Azimuth offset angles in degrees (finite); rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; `(4, n_users)`;
-  default: TGac auto-defaults for `n_users > 1`
-- **`n_subpath`** — Sub-paths per cluster for Laplacian angular spread mapping; default: 20
-- **`doppler_effect`** — Special Doppler: models D/E use the mains frequency in Hz, model F the vehicle speed in km/h (finite, >= 0); 0 disables; default: 50
-- **`seed`** — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device; default: -1
-- **`kf`** — Overrides the model KF (linear scale), finite and >= 0; default: A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0;
-  applied to first tap only; with `kf` given, the LOS path is kept also beyond the breakpoint and on other floors
-- **`xpr_nlos`** — Overrides the NLOS cross-polarization ratio (linear scale), finite and > 0; default: 2 (3 dB)
-- **`sf_std_los_dB`** — Overrides the LOS shadow fading std in dB (applied when d < breakpoint), finite and >= 0; default: 3 dB, 2 dB below 1 GHz (TGah)
-- **`sf_std_nlos_dB`** — Overrides the NLOS shadow fading std in dB (applied when d >= breakpoint), finite and >= 0;
-  default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB, each 1 dB lower below 1 GHz (TGah)
-- **`dist_breakpoint`** — Overrides the breakpoint distance in meters, finite and > 0; default: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
-- **`n_walls`** — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
-- **`wall_loss_dB`** — Penetration loss for a single wall in dB (finite); TGax defines 5 or 7; default: 5
-- **`stack`** — If `True`, per-snapshot data is stacked into a single array along an appended
-  snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
+- **`ap_array`**, **`sta_array`** — AP and station array, arrayant dict, keys in [generate_antenna](#generate_antenna); `n_ap` and
+  `n_sta` ports
+- **`channel_type`** — Model: `"A"`, `"B"`, `"C"`, `"D"`, `"E"` or `"F"`
+- **`center_freq`** — Carrier frequency in Hz, finite, above 100 MHz; default: 5.25e9
+- **`tap_spacing`** — Tap spacing in s, 10 ns divided by a power of 2; default: 10e-9
+- **`n_users`** — Number of users, >= 1; default: 1
+- **`observation_time`** — Observation time in s, finite, >= 0; 0: one snapshot; default: 0.0
+- **`update_interval`** — Time between snapshots in s, finite, > 0; default: 1e-3
+- **`speed_station_kmh`** — Station speed in km/h, finite; default: 0.0
+- **`speed_env_kmh`** — Speed of the environment in km/h, finite; TGn 1.2, TGac 0.089; default: 1.2
+- **`dist`** — Horizontal AP-station distance in m per user, finite, > 0; one value for all users or `(n_users,)`;
+  default: `None` (4.99 m)
+- **`n_floors`** — Floors between AP and station per user, integers 0 to 4; one value or `(n_users,)`; default: `None`
+  (0)
+- **`uplink`** — Return the uplink, with the station as Tx; default: `False`
+- **`offset_angles_deg`** — Offset angles in degrees per user, finite; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS;
+  `(4, n_users)`; default: `None` (0 for one user, the pseudo-random offsets of TGac for several)
+- **`n_subpath`** — Sub-paths per tap, >= 1; default: 20
+- **`doppler_effect`** — Special Doppler (Notes): the mains frequency in Hz for models D and E, the vehicle speed in
+  km/h for model F; finite, >= 0; 0 disables it; default: 50.0
+- **`seed`** — Seed of the random numbers; -1: the system random device; other values give the same channels on all
+  platforms; default: -1
+- **`kf`** — Ricean K-factor of the first tap, linear, finite, >= 0; default: `nan` (model default, Notes)
+- **`xpr_nlos`** — Cross-polarization ratio of the NLOS paths, linear, finite, > 0; default: `nan` (model default)
+- **`sf_std_los_dB`**, **`sf_std_nlos_dB`** — Standard deviation of the shadow fading in dB below and above the
+  breakpoint distance, finite, >= 0; default: `nan` (model default)
+- **`dist_breakpoint`** — Breakpoint distance in m, finite, > 0; default: `nan` (model default)
+- **`n_walls`** — Walls between AP and station per user (TGax), integers; one value or `(n_users,)`; default: `None`
+  (0)
+- **`wall_loss_dB`** — Loss of one wall in dB, finite; TGax: 5 or 7; default: 5.0
+- **`stack`** — Snapshot layout of the channels as in [hdf5_read_channel](#hdf5_read_channel); default: `False`
 
 ### Output:
-- **`chan`** — List of length `n_users` containing dictionaries of channel data. Only the keys
-  listed below are populated; all other channel keys are omitted by this generator.
-  | Key                | Description                                                              | Shape `stack = False`            | Shape `stack = True`           |
-  | ------------------ | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------ |
-  | `name`             | Channel name                                                             | str                              | str                            |
-  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
-  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
-  | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
-  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
-  | `coeff`            | Channel coefficients, complex valued                                     | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
-  | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
-  | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`            | `(n_path, n_snap)`             |
-  | `center_freq` | Center Frequency in Hz                                                   | `(1,)`                           | `(1,)`                         |
-  | `initial_position` | 0-based index of the reference snapshot                                  | int                              | int                            |
+- **`chan`** — Channels, list of `n_users` dicts, keys in [hdf5_read_channel](#hdf5_read_channel): `name` (`"user_<i>"`), `center_freq`,
+  `initial_position`, the positions and orientations (station positions `(3, n_snap)`), `coeff` and `delay`
+  `(n_rx, n_tx, n_path)` per snapshot (downlink `(n_sta, n_ap, n_path)`) and `path_gain` `(n_path,)` per snapshot: the
+  path powers without antennas, with path loss and shadow fading, whose mean over the snapshots is the power of the
+  model
+
+### Notes:
+- **Model defaults** (`NaN` in the override inputs), with the LOS shadow fading 3 dB and the NLOS XPR 2 (3 dB) for all
+  models; below 1 GHz (TGah) both shadow fading values are 1 dB lower:
+
+  | Model | A | B | C | D | E | F |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | KF, linear | 1 | 1 | 1 | 2 | 4 | 4 |
+  | Breakpoint distance in m | 5 | 5 | 5 | 10 | 20 | 30 |
+  | NLOS shadow fading in dB | 4 | 4 | 5 | 5 | 6 | 6 |
+
+- **LOS**: a user has a LOS path below the breakpoint distance on the floor of the AP, and always when `kf` is given;
+  the KF splits the power of the first tap between the LOS path and the first NLOS cluster
+- **Paths**: one per tap of the model tables with non-zero power, plus the LOS path; each tap sums `n_subpath` sub-paths
+  with Laplacian angular spreads. Below 10 ns `tap_spacing`, the taps are interpolated (TGac)
+- **Path loss** in dB at the distance $d$ = `dist`: $20 \lg(4\pi f_c / c) + 20 \lg d$ below the breakpoint distance
+  $d_\mathrm{BP}$, $20 \lg(4\pi f_c / c) + 20 \lg d_\mathrm{BP} + 35 \lg(d / d_\mathrm{BP})$ beyond, plus the floor
+  loss (TGah below 1 GHz, TGax above) and `n_walls` times `wall_loss_dB`. The shadow fading uses the LOS value below
+  the breakpoint, else the NLOS value; below 1 GHz on another floor, the TGah floor values replace it
+- **Geometry**: the AP at the origin, the station at the distance `dist` in the direction of the AoD LOS offset and
+  3 m higher per floor; floors add loss but no delay. The delays are relative to the LOS delay
+- **Time evolution**: `1 + floor(observation_time / update_interval)` snapshots, `update_interval` apart; each sub-path
+  turns by $e^{j 2\pi f_D t}$ with the Doppler shift $f_D$ of the station speed plus a random environment Doppler
+  (bell-shaped spectrum, TGn). The station moves along its heading, toward the AP for an AoA LOS offset of 0; moving
+  toward the AP or a scatterer gives a positive $f_D$, as [channel.spherical](#channel.spherical) along the returned station
+  positions
+- **Special Doppler** (`doppler_effect` > 0): models D and E modulate three taps with fluorescent light at the
+  harmonics of the mains frequency, model F adds the reflection of a moving vehicle to one tap (TGn)
+- **Uplink**: the coefficients and delays are the transposed downlink ones (reciprocal channel, no conjugation, the same
+  Doppler shift); the positions and orientations are swapped, the station is the Tx
 
 ### See also:
+- [channel.planar](#channel.planar) (computes the coefficients)
+- [hdf5_write_channel](#hdf5_write_channel) (store the channels)
 - [IEEE 802.11-03/940r4 - TGn Channel Models](https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc)
 - [IEEE 802.11-09/0308r12 - TGac Channel Model Addendum](https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc)
 - [IEEE 802.11-11/0968r4 - TGah Channel Model](https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx)
 - [IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model](https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx)
 - [S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025](http://quadriga-lib.org/publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf)
-- [hdf5_write_channel](#hdf5_write_channel) (for writing channel data to a HDF5 file)
-- [hdf5_read_channel](#hdf5_read_channel) (for reading channel data to a HDF5 file)
 
 ---
 <a id="channel.irs"></a>
 ## channel.irs
-Calculate MIMO channel coefficients for IRS-assisted communication
+Calculate MIMO channel coefficients and delays for paths over an intelligent reflecting surface
 
 Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [MATLAB](quadriga_lib_api_mex.md#get_channels_irs)
 
-- Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
-- IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
-  channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS port weights hold the IRS weights and must be given: an `irs_array` dict without `port_weights_re` /
-  `port_weights_im` raises, unlike in the other functions, where it stands for identity
-- Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
-  polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
-  column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
-  rows 6-7 = (H rx, H tx)
-- Each segment is computed by [channel.spherical](#channel.spherical): NLOS path lengths are `max(path_length, d_poly)` with the
-  polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
-- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`; the pair
-  of segment-1 path `i_1` and segment-2 path `i_2` has index `i_1 · n_path_2 + i_2` in `active_path` and
-  `active_path_out`, and the output keeps this order
-- A segment without paths (all its path inputs empty) gives empty outputs `(n_rx, n_tx, 0)`
-- If `active_path` is provided, it overrides `threshold_dB` for path selection
-- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
-- If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
-  is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
+- Paths of one link over an intelligent reflecting surface (IRS) with `n_irs` elements: segment 1 from the Tx to the
+  IRS and segment 2 from the IRS to the Rx, each computed by [channel.spherical](#channel.spherical) with the IRS elements as Rx and Tx
+  elements; each output path combines one path of each segment
+- Each IRS element $k$ reflects once with its weight $w_k$, column `i_irs` of the IRS port weights (a codebook entry):
+  per path pair, $\mathbf{H} = \mathbf{B} \, \mathrm{diag}(\mathbf{w}) \, \mathbf{A}$ with the element channels
+  $\mathbf{A}$ of segment 1 `(n_irs, n_tx)` and $\mathbf{B}$ of segment 2 `(n_rx, n_irs)`
+- The delay of a pair is the sum of its segment delays, each the $|w_k|^2$-weighted mean over the IRS elements; the
+  departure angles come from segment 1, the arrival angles from segment 2, as $|w_k|^2$-weighted mean directions
+- Kept are the path pairs whose strongest coefficient has a power above `threshold_dB`, or those set in `active_path`;
+  the pair of segment-1 path $i_1$ and segment-2 path $i_2$ has the index $i_1 n_{\mathrm{path},2} + i_2$ in
+  `active_path` and `active_path_out`, and the output keeps this order
+- The outputs come in another order than in C++: `active_path_out` comes before the angles, which only `angles=True`
+  returns
 
 ### Usage:
 ```python
@@ -1678,219 +1992,199 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit arrayant dict; `n_tx` = number of ports; see [generate_antenna](#generate_antenna)
-- **`rx_array`** — Receive arrayant dict; `n_rx` = number of ports; see [generate_antenna](#generate_antenna)
-- **`irs_array`** — IRS arrayant dict (TX-facing side) with `n_irs` elements; the port weights hold the IRS
-  weights, one codebook entry per column, `(n_irs, n_codebook)`; see [generate_antenna](#generate_antenna)
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`irs_pos`** — IRS position in Cartesian coordinates; `(3,)`
-- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `(3, n_path_1)`
-- **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `(3, n_path_1)`
-- **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `(n_path_1,)`
-- **`path_length_1`** — Total path lengths from TX to IRS phase center; values shorter than the polyline (e.g. 0) use
-  the polyline length; `(n_path_1,)`
-- **`polmat_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `(8, n_path_1)`
-- **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
-- **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
-- **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `(n_path_2,)`
-- **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
-  the polyline length; `(n_path_2,)`
-- **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
-- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
-- **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS port weights); default: `0`
-- **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
-- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
-- **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
-  elements as `irs_array`; only its patterns are used, its port weights and `element_pos` are ignored; default: `None`
-  (`irs_array` for both sides)
-- **`active_path`** — Mask selecting active path pairs, bool or numeric (nonzero = active); overrides `threshold_dB`
-  when not empty; `(n_path_1 · n_path_2,)`; default: `None`
-- **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
-  precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
+- **`tx_array`**, **`rx_array`** — Tx and Rx array, arrayant dict, keys in [generate_antenna](#generate_antenna); `n_tx` and `n_rx` ports
+- **`irs_array`** — IRS array with `n_irs` elements, arrayant dict, valid, with port weights `(n_irs, n_codebook)` that
+  hold the reflection weights; its patterns serve both segments unless `irs_array_2` is given
+- **`tx_pos`**, **`rx_pos`**, **`irs_pos`** — Tx, Rx and IRS position in m, finite; `(3,)`
+- **`tx_orientation`**, **`rx_orientation`**, **`irs_orientation`** — Orientations, Euler angles (bank, tilt, heading)
+  in rad, finite; `(3,)`
+- **`fbs_pos_1`**, **`lbs_pos_1`** — First- and last-bounce scatterer positions of the segment-1 paths in m;
+  `(3, n_path_1)`
+- **`path_gain_1`** — Path gains of segment 1, linear power; `(n_path_1,)`
+- **`path_length_1`** — Path lengths of segment 1 in m between the Tx and IRS phase centres, as in
+  [channel.spherical](#channel.spherical); `(n_path_1,)`
+- **`polmat_1`** — Jones matrices of segment 1, the IRS receiving (section description); `(8, n_path_1)`
+- **`fbs_pos_2`**, **`lbs_pos_2`**, **`path_gain_2`**, **`path_length_2`**, **`polmat_2`** — The same for segment 2
+  from the IRS to the Rx, the IRS transmitting; `n_path_2` paths
+- **`center_freq`** — Center frequency in Hz, finite and >= 0; 0 gives the coefficients at f = 0, as in
+  [channel.spherical](#channel.spherical); default: 0.0
+- **`i_irs`** — Codebook entry, 0-based column of the IRS port weights, below `n_codebook`; default: 0
+- **`threshold_dB`** — Minimum power in dB of the strongest coefficient of a kept path pair; not used with
+  `active_path`; default: -140.0
+- **`use_absolute_delays`** — Keep the delay of the direct Tx-Rx distance in all delays; `False`: delays relative to it
+  (Notes); default: `False`
+- **`angles`** — Also return the angles; default: `False`
+- **`irs_array_2`** — Patterns of the IRS for segment 2 (asymmetric IRS), arrayant dict, valid, `n_irs` elements; its
+  port weights and element positions are not used; default: `None` (`irs_array`)
+- **`active_path`** — Path pairs to keep, replacing `threshold_dB`; bool or numeric (nonzero = keep);
+  `(n_path_1 * n_path_2,)`; default: `None` (`threshold_dB`)
+- **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical); `int`; default: 0
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients; `(n_rx, n_tx, n_path_irs)`
-- **`delay`** — Propagation delays in seconds; `(n_rx, n_tx, n_path_irs)`
-- **`active_path_out`** — Mask of the path combinations in the output (can be passed as `active_path` to a later
-  call); `bool`; `(n_path_1 · n_path_2,)`
-- **`aod`** — Azimuth of departure in rad; `(n_rx, n_tx, n_path_irs)`; only with `angles=True`
-- **`eod`** — Elevation of departure in rad; same shape; only with `angles=True`
-- **`aoa`** — Azimuth of arrival in rad; same shape; only with `angles=True`
-- **`eoa`** — Elevation of arrival in rad; same shape; only with `angles=True`
+- **`coeff`** — Coefficients, complex; `(n_rx, n_tx, n_path_irs)` with the number of kept path pairs `n_path_irs`
+- **`delay`** — Delays in s; `(n_rx, n_tx, n_path_irs)`
+- **`active_path_out`** — Kept path pairs, for `active_path` of a later call; bool; `(n_path_1 * n_path_2,)`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
+  `(n_rx, n_tx, n_path_irs)`; only with `angles=True`
+
+### Notes:
+- **IRS port weights**: an `irs_array` without `port_weights_re` / `port_weights_im` raises here, unlike in the other
+  functions, where they mean identity; the IRS elements are not combined into ports
+- **Segments**: path lengths, LOS paths and the per-element geometry as in [channel.spherical](#channel.spherical); a segment without
+  paths (all its path inputs empty) gives the outputs `(n_rx, n_tx, 0)`
+- **Relative delays**: the delay of the direct Tx-Rx distance (not via the IRS) is subtracted; delays can be slightly
+  negative when the IRS is close to the Tx-Rx line
 
 ### See also:
-- [channel.spherical](#channel.spherical) (single-segment spherical-wave channel)
-- [channel.planar](#channel.planar) (single-segment planar-wave channel)
-- [generate_antenna](#generate_antenna) (antenna array generator)
+- [channel.spherical](#channel.spherical) (the channel of each segment)
 
 ---
 <a id="channel.multifreq"></a>
 ## channel.multifreq
-Compute channel coefficients for spherical waves across multiple frequencies
+Calculate MIMO channel coefficients and delays for spherical wave propagation at several frequencies
 
 Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadriga_lib_api_mex.md#get_channels_multifreq)
 
-- Multi-frequency extension of [channel.spherical](#channel.spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
-- Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (`tx_array['center_freq']`), RX array (`rx_array['center_freq']`), input samples (`freq`), and output (`freq_new`)
-- Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
-- TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
-- `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
-- Port weights are interpolated across frequencies (SLERP for complex pairs); pass 3D port weights `(n_elem, n_ports, n_freq)` for per-frequency port weights
-- Extrapolation clamps to the nearest frequency entry on all four grids
-- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
-  V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
-  rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
-- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
-  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
-  FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry
-- `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
-- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 0 holds the LOS path
-  (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
-  a LOS path found in the input is moved to slot 0 and leaves a zero-power path in its original slot
-  (input index + 1); all other paths keep their order, shifted by one slot
-- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0, n_freq_new)`; with
-  `add_fake_los_path = True` they hold only this zero-power LOS path, with the LOS delays per antenna pair
-- If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
-  per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
-  `propagation_speed` (both arrays endfire). [quantize_delays](#quantize_delays) rejects delays at or below `-tap_spacing / 2`. For
-  acoustics (`propagation_speed` about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes
-  adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
-  0.75 m. Use `use_absolute_delays = true` in that case
-- The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
-  [baseband_freq_response_multi](#baseband_freq_response_multi) with `remove_delay_phase = True` removes the phase of `delay`
-  before it interpolates across `freq`, so it needs channels generated with `use_absolute_delays = True`; with
-  relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
-  grid and gives wrong phases
+- As [channel.spherical](#channel.spherical), at the output frequencies `freq_new`, with multi-frequency arrays (frequency-dependent
+  patterns and port weights), path gains and Jones matrices; for radio waves and, with `propagation_speed` = 343 m/s
+  and scalar `polmat`, for sound
+- The geometry (element-pair path lengths, angles, LOS path) is computed once; at each output frequency, the patterns
+  and port weights of the arrays and `path_gain` and `polmat` are interpolated between their two neighbouring entries
+- The coefficients follow the formula of [channel.spherical](#channel.spherical) with $f_c$ = `freq_new[k]` and $c$ =
+  `propagation_speed`; the frequency is the last axis of the outputs, a multi-frequency channel
 
 ### Usage:
 ```python
-coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, \
-    freq, freq_new, *, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
+coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, tx_pos, tx_orientation, rx_pos, \
+    rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, freq, freq_new, *, \
+    use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
 ### Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [generate_antenna](#generate_antenna);
-  4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
-- **`rx_array`** — RX arrayant dict; same format as `tx_array`
-- **`tx_pos`** — Transmitter position, finite; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
-- **`rx_pos`** — Receiver position, finite; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
-- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
-- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
-- **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq)`
-- **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
-  TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
-- **`polmat`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
-  `(2, n_path, n_freq)` scalar pressure
-- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `(n_freq,)`
-- **`freq_new`** — Target output frequencies; `(n_freq_new,)`
-- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
-- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
-  unavailable); auto selects GENERIC in this version, see [interpolate_pattern](#interpolate_pattern); `int`; default: 0
+- **`tx_array`**, **`rx_array`** — Tx and Rx multi-frequency array, arrayant dict, keys in [generate_antenna](#generate_antenna): 4D
+  patterns with the frequency on the last axis and `center_freq` `(n,)`, or 3D patterns for one frequency; port
+  weights 2D (all frequencies) or 3D `(n_elements, n_ports, n)`; frequencies in any order; `n_tx` and `n_rx` ports
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in m, finite; `(3,)`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientation, Euler angles (bank, tilt, heading) in rad,
+  finite; `(3,)`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m; `(3, n_path)`
+- **`path_gain`** — Path gains at the frequencies `freq`, linear power; `(n_path, n_freq)`
+- **`path_length`** — Path lengths in m between the Tx and Rx phase centres, as in [channel.spherical](#channel.spherical); `(n_path,)`
+- **`polmat`** — Jones matrices at the frequencies `freq` (section description): `(8, n_path, n_freq)`, or
+  `(2, n_path, n_freq)` for a scalar coefficient (real and imaginary part, sound)
+- **`freq`** — Sample frequencies of `path_gain` and `polmat` in Hz, in any order; `(n_freq,)`, at least one
+- **`freq_new`** — Output frequencies in Hz; `(n_freq_new,)`, at least one
+- **`use_absolute_delays`** — Keep the delay of the Tx-Rx distance in all delays; `False`: delays relative to it;
+  default: `False`
+- **`add_fake_los_path`** — Put the LOS path into an added slot 0, with zero power if there is none; default: `False`
+- **`propagation_speed`** — Wave speed in m/s, > 0; default: 299792458.0
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto (GENERIC in this version), 1 = GENERIC, 2 = AVX2
+  (single-precision arithmetic; raises if unavailable); `int`; default: 0
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
-- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
+- **`coeff`** — Coefficients, complex; `(n_rx, n_tx, n_out, n_freq_new)`, `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`
+- **`delay`** — Delays in s; `(n_rx, n_tx, n_out, n_freq_new)`
+
+### Notes:
+- **Interpolation**: `path_gain` linear; patterns, port weights and `polmat` per complex value, the amplitude linear and
+  the phase along the shorter arc (linear for nearly opposite phases); constant outside the range of each grid
+- **Scalar `polmat`**: only the $F_\theta$ patterns are used,
+  $a_l = \sqrt{g_l} \, F_{\theta,r} \, m_l \, F_{\theta,t} \, e^{-j 2\pi f d / c}$ with the complex scalar $m_l$
+- **Paths**: NLOS path length, LOS path, `add_fake_los_path` and 0 paths as in [channel.spherical](#channel.spherical)
+- **Relative delays**: negative delays as in [channel.spherical](#channel.spherical), with $c$ = `propagation_speed`; for sound, this
+  affects practically every array, so use absolute delays for [quantize_delays](#quantize_delays)
+- **Delay phase**: the coefficients carry the phase of the absolute path length also with relative delays;
+  [freq_response_mf](#freq_response_mf) with `remove_delay_phase = True` therefore needs `use_absolute_delays = True`
 
 ### See also:
-- [channel.spherical](#channel.spherical) (single-frequency equivalent)
-- [generate_speaker](#generate_speaker) (acoustic source construction)
+- [channel.spherical](#channel.spherical) (one frequency)
+- [freq_response_mf](#freq_response_mf) (frequency response of a multi-frequency channel)
+- [join_arrays](#join_arrays) (multi-frequency arrays)
+- [generate_speaker](#generate_speaker) (loudspeaker arrays)
 
 ---
 <a id="channel.planar"></a>
 ## channel.planar
-Calculate MIMO channel coefficients for planar wave paths
+Calculate MIMO channel coefficients and delays for planar wave propagation
 
 Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [MATLAB](quadriga_lib_api_mex.md#get_channels_planar)
 
-- Computes complex channel coefficients and delays for all TX/RX port pairs across `n_path` propagation
-  paths under the planar wave assumption.
-- Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
-- LOS path detection is distance-based; the input angles are not used for LOS detection.
-- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
-  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
-  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
-- `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
-- The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
-- `center_freq = None` or a selected entry of `0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
-- If `use_absolute_delays == False`, the straight-line TX-RX delay between the phase centres (LOS delay) is subtracted
-  from all paths; per-element delays of pairs that are closer to each other than the phase centres are then
-  negative, down to about -(half the TX array size + half the RX array size) / speed of light; [quantize_delays](#quantize_delays) rejects
-  delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
-  `use_absolute_delays = true` in that case.
-- If `add_fake_los_path == True`, one output path is always added (output size `n_path + 1`): slot 0 holds the LOS
-  path, with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the
-  TX-RX distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other
-  paths keep their order, shifted by one slot.
-- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
-  hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- Errors in the path data of a snapshot start with `Snapshot <i>: ` (0-based), also for a single snapshot
-  (`Snapshot 0: `); antenna and `use_kernel` errors have no prefix.
+- Coefficients and delays of one link for each pair of a Tx and an Rx port and each path; a path is given by its
+  departure and arrival angles, which all elements of an array share (planar wavefronts)
+- Path $l$ of the element pair $(t, r)$ has the coefficient and delay
 
-### Batch mode:
-- If `aod` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots in one call,
-  the snapshots in parallel (OpenMP in C++).
-- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `polmat` are then lists of length `n_snap`;
-  list entries that are Fortran-contiguous float64 arrays are read in place, other entries are copied.
-- The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array or a
-  single-column `(3, 1)` array is applied to all snapshots.
-- All outputs are returned as lists of length `n_snap`, one entry per snapshot.
-- The GIL is released while processing, so the function can be combined with Python threads. The function keeps
-  references to all input arrays until it returns, but other threads must not write into them meanwhile.
+  $$a_l = \sqrt{g_l} \; \mathbf{F}_r^T \mathbf{M}_l \, \mathbf{F}_t \; e^{-j 2\pi f_c d / c}, \quad \tau_l = d / c, \quad d = \ell_l + d_t + d_r$$
+
+  with the path gain $g_l$, the Jones matrix $\mathbf{M}_l$ (`polmat`), the patterns $\mathbf{F} = (F_\theta, F_\phi)^T$
+  at the path angles, the path length $\ell_l$ between the phase centres (used as given), the distances $d_t$, $d_r$ of
+  the elements from the wavefront planes through the phase centres (negative for elements closer to the other end of the
+  path), the center frequency $f_c$ and the speed of light $c$; the port weights then combine the elements into ports
+- The positions enter only through the Tx-Rx distance (relative delays, LOS path)
+- Vector form: with lists of arrays as path inputs, one per snapshot, the outputs are lists; the snapshots are computed
+  in parallel
+- Path data of several frequencies: `path_gain`, `polmat` and `center_freq` may hold `n_freq` frequencies, of which
+  `i_freq` selects one (Python only, since the C++ function takes the data of one frequency)
 
 ### Usage:
 ```python
-coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, \
-    center_freq, *, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, tx_pos, tx_orientation, rx_pos, \
+    rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, center_freq, *, \
+    use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate_antenna](#generate_antenna); a 4D dict raises
-  `ValueError` (use [channel.multifreq](#channel.multifreq))
-- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_snap)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_snap)` in batch mode
-- **`aod`** — Departure azimuth angles in rad; `(n_path,)`, or a list of length `n_snap` in batch mode
-- **`eod`** — Departure elevation angles in rad; `(n_path,)`, or a list in batch mode
-- **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`, or a list in batch mode
-- **`eoa`** — Arrival elevation angles in rad; `(n_path,)`, or a list in batch mode
-- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list in batch mode
-- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list in batch mode
-- **`polmat`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list in batch mode
-- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
-  coefficients at f = 0 (see above); default: `None`
-- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
-  unavailable); auto selects GENERIC in this version, see [interpolate_pattern](#interpolate_pattern); `int`; default: 0
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
-  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`tx_array`**, **`rx_array`** — Tx and Rx array, arrayant dict with 3D patterns, keys in [generate_antenna](#generate_antenna);
+  `n_tx` and `n_rx` ports; a 4D (multi-frequency) dict raises `ValueError` (use [channel.multifreq](#channel.multifreq))
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in m, finite; `(3,)`; vector form: `(3,)` or `(3, 1)` (all
+  snapshots) or `(3, n_snap)`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientation, Euler angles (bank, tilt, heading) in rad,
+  finite; shapes as `tx_pos`
+- **`aod`**, **`eod`** — Azimuth and elevation of departure in rad, GCS; `(n_path,)`; vector form: lists with `n_snap`
+  entries
+- **`aoa`**, **`eoa`** — Azimuth and elevation of arrival in rad, GCS (the direction from the Rx toward the incoming
+  path); `(n_path,)`; vector form: lists
+- **`path_gain`** — Path gains, linear power; `(n_path,)` or `(n_path, n_freq)`; vector form: list
+- **`path_length`** — Path lengths in m between the Tx and Rx phase centres; `(n_path,)`; vector form: list
+- **`polmat`** — Jones matrices, real and imaginary parts interleaved (section description); `(8, n_path)` or
+  `(8, n_path, n_freq)`; vector form: list
+- **`center_freq`** — Center frequency in Hz, finite and >= 0, `(n_freq,)`; 0 or `None` gives the coefficients at f = 0
+  (Notes); default: `None`
+- **`use_absolute_delays`** — Keep the delay of the Tx-Rx distance in all delays; `False`: delays relative to it
+  (Notes); default: `False`
+- **`add_fake_los_path`** — Put the LOS path into an added slot 0, with zero power if there is none (Notes); default:
+  `False`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto (GENERIC in this version), 1 = GENERIC, 2 = AVX2
+  (single-precision arithmetic; raises if unavailable); `int`; default: 0
+- **`i_freq`** — 0-based frequency index into `path_gain`, `polmat` and `center_freq`, below `n_freq`; default: 0
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path)`
-- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
-- **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
+- **`coeff`** — Coefficients, complex; `(n_rx, n_tx, n_out)` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: lists of `n_snap` such arrays, as all outputs
+- **`delay`** — Delays in s; `(n_rx, n_tx, n_out)`
+- **`rx_Doppler`** — Doppler weight of each path for an Rx moving along its local x-axis: the cosine of the angle
+  between this axis and the arrival direction; the Doppler shift at the speed $v$ is $v f_c / c$ times this weight,
+  positive when the Rx moves toward the incoming path; `(n_out,)`
+
+### Notes:
+- **LOS path** (only with `add_fake_los_path`): the strongest path whose `path_length` is within 0.1 mm of the Tx-Rx
+  distance; the angles are not checked
+- **`add_fake_los_path`**: slot 0 holds the LOS path, with zero power (and `rx_Doppler` 0) if there is none; a LOS path
+  among the inputs moves to slot 0 and leaves a zero-power path in its own slot (input index + 1); the other paths
+  keep their order
+- **0 paths** (all path inputs empty): outputs `(n_rx, n_tx, 0)`, or only the zero-power LOS path with
+  `add_fake_los_path`
+- **Relative delays**: the delay of the Tx-Rx distance is subtracted from all delays; element pairs can then get
+  negative delays, as in [channel.spherical](#channel.spherical)
+- **`center_freq = 0`**: the delay phase is 1, the antenna and polarization phases remain; the delays are unchanged
+- **Port weights**: the delays of a port pair are means over its element pairs, weighted by the port-weight powers
+- **Errors and threads**: as in [channel.spherical](#channel.spherical)
 
 ### See also:
-- [channel.spherical](#channel.spherical) (spherical wave variant)
-- [channel.ieee_indoor](#channel.ieee_indoor) (IEEE compliant channels using `channel.planar` internally)
-- [generate_antenna](#generate_antenna) (antenna array generator)
+- [channel.spherical](#channel.spherical) (paths given by scatterers, spherical wavefronts)
+- [channel.ieee_indoor](#channel.ieee_indoor) (IEEE indoor channels, computed with this function)
+- [freq_response](#freq_response) (frequency response of the coefficients)
+- [quantize_delays](#quantize_delays) (delays on a tap grid)
 
 ---
 <a id="channel.spherical"></a>
@@ -1899,317 +2193,94 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadriga_lib_api_mex.md#get_channels_spherical)
 
-- Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths,
-  using the spherical wave assumption with per-element phase and delay.
-- Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
-  (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
-  V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
-  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
-- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
-  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
-  [qrt_file_read](#qrt_file_read) with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this
-  length; the per-element offsets follow the FBS / LBS geometry.
-- Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
-- The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
-- `center_freq = None` or a selected entry of `0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
-- If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
-  Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
-  down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
-  [quantize_delays](#quantize_delays) maps delays above `-tap_spacing / 2` to tap 0 and rejects lower ones (at 5 ns taps: half sizes
-  adding up to more than about 0.75 m); use `use_absolute_delays = true` in that case.
-- LOS detection: the path whose length is closest to the TX-RX distance, within 0.1 mm.
-- If `add_fake_los_path == True`, one output path is always added (`n_path + 1` outputs): slot 0 holds the LOS path,
-  with zero power if no LOS path was found. If a LOS path was found, it is moved to slot 0 and its original slot
-  (input index + 1) holds a zero-power path. All other paths keep their order, shifted by one slot.
-- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
-  hold only this zero-power LOS path, with the LOS delays and angles per antenna pair (also per snapshot in batch
-  mode).
-- Errors in the path data of a snapshot start with `Snapshot <i>: ` (0-based), also for a single snapshot
-  (`Snapshot 0: `); antenna and `use_kernel` errors have no prefix.
+- Coefficients and delays of one link for each pair of a Tx and an Rx port and each path; every element sees a path
+  from its own position (spherical wavefronts), so delays and phases follow the geometry of each element pair
+- A path runs from the Tx over its first-bounce scatterer (FBS) and last-bounce scatterer (LBS) to the Rx; the patterns
+  of both arrays are interpolated at the departure and arrival angles of each element pair ([interpolate_pattern](#interpolate_pattern))
+- Path $l$ of an element pair at the distance $d$ along the path has the coefficient and delay
 
-### Batch mode:
-- If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
-  in one call, the snapshots in parallel (OpenMP in C++).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `polmat` are then lists of length `n_snap`,
-  matching the output format of [qrt_file_read](#qrt_file_read); list entries that are Fortran-contiguous float64 arrays (as
-  returned by [qrt_file_read](#qrt_file_read)) are read in place, other entries are copied.
-- The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array
-  or a single-column `(3, 1)` array is applied to all snapshots.
-- All outputs are returned as lists of length `n_snap`, one entry per snapshot.
-- Snapshots without any path produce an empty output entry with `n_path = 0`, or only the zero-power LOS path
-  when `add_fake_los_path` is set (as for a single snapshot).
-- The GIL is released while processing, so the function can be combined with Python threads. The function keeps
-  references to all input arrays until it returns, but other threads must not write into them meanwhile.
+  $$a_l = \sqrt{g_l} \; \mathbf{F}_r^T \mathbf{M}_l \, \mathbf{F}_t \; e^{-j 2\pi f_c d / c}, \qquad \tau_l = d / c$$
+
+  with the path gain $g_l$, the Jones matrix $\mathbf{M}_l$ (`polmat`), the patterns $\mathbf{F} = (F_\theta, F_\phi)^T$
+  of the Rx and Tx element, the center frequency $f_c$ and the speed of light $c$; the port weights then combine the
+  elements into ports
+- Vector form: with lists of arrays as path inputs, one per snapshot, the outputs are lists; the snapshots are computed
+  in parallel
+- Path data of several frequencies: `path_gain`, `polmat` and `center_freq` may hold `n_freq` frequencies, of which
+  `i_freq` selects one (Python only, since the C++ function takes the data of one frequency)
 
 ### Usage:
 ```python
-coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, \
-    center_freq, *, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
+coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, tx_pos, tx_orientation, rx_pos, \
+    rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, center_freq, *, \
+    use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
 
 # Departure and arrival angles as well
 coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
 ```
 
 ### Inputs:
-- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate_antenna](#generate_antenna); a 4D dict raises
-  `ValueError` (use [channel.multifreq](#channel.multifreq))
-- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
-- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
-- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
-- **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
-  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
-- **`polmat`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
-  in batch mode
-- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
-- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
-- **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
-  port weights, the time to convert them to the ports; default: `False`
-- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
-  2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate_pattern](#interpolate_pattern);
-  `int`; default: 0
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
-  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`tx_array`**, **`rx_array`** — Tx and Rx array, arrayant dict with 3D patterns, keys in [generate_antenna](#generate_antenna);
+  `n_tx` and `n_rx` ports; a 4D (multi-frequency) dict raises `ValueError` (use [channel.multifreq](#channel.multifreq))
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in m, finite; `(3,)`; vector form: `(3,)` or `(3, 1)` (all
+  snapshots) or `(3, n_snap)`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientation, Euler angles (bank, tilt, heading) in rad,
+  finite; shapes as `tx_pos`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m; `(3, n_path)`; vector form: lists with
+  `n_snap` entries, as [qrt_file_read](#qrt_file_read) returns them
+- **`path_gain`** — Path gains, linear power; `(n_path,)` or `(n_path, n_freq)`; vector form: list
+- **`path_length`** — Path lengths in m between the Tx and Rx phase centres; a value below the Tx-FBS-LBS-Rx polyline
+  (e.g. 0) gives the polyline length (Notes); `(n_path,)`; vector form: list
+- **`polmat`** — Jones matrices, real and imaginary parts interleaved (section description); `(8, n_path)` or
+  `(8, n_path, n_freq)`; vector form: list
+- **`center_freq`** — Center frequency in Hz, finite and >= 0, `(n_freq,)`; 0 or `None` gives the coefficients at f = 0
+  (Notes); default: `None`
+- **`use_absolute_delays`** — Keep the delay of the Tx-Rx distance in all delays; `False`: delays relative to it
+  (Notes); default: `False`
+- **`add_fake_los_path`** — Put the LOS path into an added slot 0, with zero power if there is none (Notes); default:
+  `False`
+- **`angles`** — Also return the angles; `False` saves their memory and, with port weights, the time to compute them for
+  the ports; default: `False`
+- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto (GENERIC in this
+  version), 1 = GENERIC, 2 = AVX2 (single-precision arithmetic; raises if unavailable); `int`; default: 0
+- **`i_freq`** — 0-based frequency index into `path_gain`, `polmat` and `center_freq`, below `n_freq`; default: 0
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path)`
-- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
-- **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
-- **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
-- **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
-- **`eoa`** — Elevation of arrival in the GCS, in rad; same shape; only with `angles=True`
-- In batch mode, every output is a list of length `n_snap` whose entries have the shapes given above.
+- **`coeff`** — Coefficients, complex; `(n_rx, n_tx, n_out)` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: lists of `n_snap` such arrays, as all outputs
+- **`delay`** — Delays in s; `(n_rx, n_tx, n_out)`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
+  `(n_rx, n_tx, n_out)`; only with `angles=True`
+
+### Notes:
+- **NLOS path length**: the length between the phase centres is $\max(\ell, d_\mathrm{poly})$ with `path_length`
+  $\ell$ and the length $d_\mathrm{poly}$ of the Tx-FBS-LBS-Rx polyline; the excess, e.g. from more than two
+  interactions as in [qrt_file_read](#qrt_file_read), is added to the FBS-LBS segment
+- **LOS path**: the path whose length is closest to the Tx-Rx distance, within 0.1 mm; its element pairs use the
+  direct line between the elements instead of the FBS and LBS
+- **`add_fake_los_path`**: slot 0 holds the LOS path, with zero power if there is none; a LOS path among the inputs moves
+  to slot 0 and leaves a zero-power path in its own slot (input index + 1); the other paths keep their order
+- **0 paths** (all path inputs empty): outputs `(n_rx, n_tx, 0)`, or only the zero-power LOS path with
+  `add_fake_los_path`
+- **Relative delays**: the delay of the Tx-Rx distance is subtracted from all delays. Element pairs closer to each other
+  than the phase centres then get negative delays, down to about $-(D_t + D_r) / (2c)$ with the array sizes $D$;
+  [quantize_delays](#quantize_delays) rejects delays at or below `-tap_spacing / 2`, so large arrays need absolute delays
+- **`center_freq = 0`**: the delay phase is 1, the antenna and polarization phases remain; the delays are unchanged
+- **Port weights**: the delays and angles of a port pair are means over its element pairs, weighted by the
+  port-weight powers (the angles via the mean direction)
+- **Errors**: an error in the path data names its snapshot (`Snapshot <i>: `, 0-based, the lowest failing one), also
+  without the vector form (`Snapshot 0: `); invalid arrays and `use_kernel` raise without this prefix
+- **Threads**: the GIL is released during the computation; the function keeps references to its input arrays, but
+  other threads must not write into them meanwhile. List entries that are Fortran-contiguous float64 arrays are read
+  without a copy
 
 ### See also:
-- [channel.multifreq](#channel.multifreq) (multi-frequency extension)
-- [channel.planar](#channel.planar) (planar wave variant)
-- [qrt_file_read](#qrt_file_read) (produces the list format used by batch mode)
-
----
-
-<a id="sec-channel-statistics"></a>
-# Channel statistics
-
----
-<a id="acdf"></a>
-## acdf
-Calculate the empirical averaged cumulative distribution function (CDF)
-
-Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [MATLAB](quadriga_lib_api_mex.md#acdf)
-
-- Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each
-  column CDF are averaged, then mapped back to the bin grid
-- Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
-- `Inf` and `NaN` values are excluded from computation
-- A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu`
-  and `sig`; if no set has finite values (possible only with given `bins`), `cdf_avg`, `mu` and `sig` are NaN
-- If `bins` is empty, equally spaced bins spanning the data range are generated
-
-### Usage:
-```python
-cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, *, n_bins )
-```
-
-### Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, 
-  larger values overflow in `sig`; `(n_samples, n_sets)`
-- **`bins`** — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else a
-  `ValueError` is raised); if empty, equally spaced bins spanning the data range are generated;
-  `(n_bins_in,)`; default: `None`
-- **`n_bins`** — Number of bins when auto-generating; must be >= 2; ignored when non-empty `bins`
-  are provided; default: 201
-
-### Outputs:
-- **`cdf_per_set`** — Individual CDFs; one per column of data (NaN for a set without finite values); `(n_bins_out, n_sets)`
-- **`bins_out`** — Auto-generated bins; copy of `bins` when non-empty `bins` are provided;
-  `(n_bins_out,)` with `n_bins_out = n_bins` or `n_bins_out = n_bins_in`
-- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `(n_bins_out,)`
-- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `(9,)`
-- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `(9,)`
-
----
-<a id="calc_angular_spread"></a>
-## calc_angular_spread
-Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
-
-Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spread) · [MATLAB](quadriga_lib_api_mex.md#calc_angular_spread)
-
-- Computes RMS azimuth and elevation angular spreads from power-weighted angles
-- Inputs are lists of 1D arrays so each CIR can have a different number of paths
-- RMS spread uses the 3GPP TR 38.901 second-moment definition of wrapped deviations from the
-  circular mean
-- When `wrapping = True`, the power-weighted mean direction is computed in Cartesian coordinates
-  and all paths are rotated so the centroid lies on the equator before computing spreads,
-  avoiding pole singularity artifacts
-- When `wrapping = False`, spreads are computed directly from raw angles; `orientation` is zero
-  and `phi`/`theta` equal the input `az`/`el`
-- When `calc_bank_angle = True`, an optimal bank angle maximizing azimuth spread is derived
-  analytically from eigenvectors of the 2x2 power-weighted covariance matrix; only used when
-  `wrapping = True`
-- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers summed
-
-### Usage:
-```python
-azimuth_spread, elevation_spread, orientation, phi, theta = \
-    quadriga_lib.tools.calc_angular_spread( az, el, powers, *, wrapping, calc_bank_angle, quantize_deg )
-```
-
-### Inputs:
-- **`az`** — Azimuth angles; range -pi to pi; list of length `n_cir`, each element a 1D array of length `n_path`
-- **`el`** — Elevation angles; range -pi/2 to pi/2; list of length `n_cir`, each element a 1D array of length `n_path`
-- **`powers`** — Path powers; list of length `n_cir`, each element a 1D array of length `n_path`
-- **`wrapping`** — If True, enables spherical rotation; default: False
-- **`calc_bank_angle`** — If True, computes the optimal bank angle analytically; only used when `wrapping = True`; default: False
-- **`quantize_deg`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization);
-  otherwise it must be finite and >= 1e-3 deg, else a `ValueError` is raised
-
-### Outputs:
-- **`azimuth_spread`** — RMS azimuth angular spread; `(n_cir,)`
-- **`elevation_spread`** — RMS elevation angular spread; `(n_cir,)`
-- **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
-  direction (a positive tilt points down); `(3, n_cir)`
-- **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; list of length `n_cir`
-- **`theta`** — Rotated elevation angles; list of length `n_cir`
-
----
-<a id="calc_cross_polarization_ratio"></a>
-## calc_cross_polarization_ratio
-Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
-
-Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [MATLAB](quadriga_lib_api_mex.md#calc_cross_polarization_ratio)
-
-- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method:
-  co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio
-- Inputs are lists so each CIR can have a different number of paths
-- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis
-- `polmat` is the 2x2 Jones matrix `M` (rows = RX polarisation V/H, columns = TX polarisation V/H), stored column-major with
-  interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
-  rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its receive and transmit
-  polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
-- V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
-  the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries couple circular patterns through `polmat` as `channel.spherical` couples antenna patterns,
-  `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
-  (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP); names after the IEEE
-  definition for the time convention exp(+j 2 pi f t) of the library's coefficients exp(-j 2 pi f tau).
-  `M_<rx><tx>`: `M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
-  `M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2` (receive L, transmit R), `M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`.
-  Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` is co-polar (handedness
-  kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar
-- LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
-- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
-  `path_length <= dTR + window_size` are excluded by default
-- Normalization of `polmat` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `polmat` above about 1e18 overflow and give NaN
-- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR
-  is set to 0
-- TX/RX positions may be fixed `(3, 1)` or mobile `(3, n_cir)`
-
-### Usage:
-```python
-xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, polmat, path_length, tx_pos, rx_pos, \
-    *, include_los, window_size )
-```
-
-### Inputs:
-- **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
-  array of length `n_path`
-- **`polmat`** — Polarization transfer matrices with interleaved real/imag parts per CIR; list of length
-  `n_cir`, each element a 2D array of shape `(8, n_path)`
-- **`path_length`** — Absolute TX-to-RX path lengths per CIR; list of length `n_cir`, each element
-  a 1D array of length `n_path`
-- **`tx_pos`** — Transmitter position [x; y; z]; `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
-- **`rx_pos`** — Receiver position [x; y; z]; `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
-- **`include_los`** — If True, includes LOS and near-LOS paths in the XPR calculation; default: False
-- **`window_size`** — LOS exclusion window; paths with `path_length <= dTR + window_size` are excluded when
-  `include_los = False`; default: 0.01
-
-### Outputs:
-- **`xpr`** — XPR on linear scale; `(n_cir, 6)`; columns (0-based):
-   | Col | Description                                                     |
-   | :-: | --------------------------------------------------------------- |
-   | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
-   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
-   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
-   | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
-   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)       |
-   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)       |
-- **`pg`** — Total path gain summed over all paths (including LOS) as
-  `0.5 · sum(powers · (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `(n_cir,)`
-
----
-<a id="calc_delay_spread"></a>
-## calc_delay_spread
-RMS delay spread from per-CIR delays and linear-scale powers
-
-Also in: [C++](quadriga_lib_api_cpp.md#calc_delay_spread) · [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread)
-
-- Computes RMS delay spread from a set of delays and corresponding linear-scale powers per CIR
-- Inputs are lists of 1D arrays so each CIR can have a different number of paths
-- Paths with power below `p_max / 10^(0.1 · threshold_dB)` are excluded; the default of
-  100 dB effectively includes all paths
-- When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their
-  powers summed before the spread is computed
-
-### Usage:
-```python
-ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, *, threshold_dB, granularity )
-```
-
-### Inputs:
-- **`delays`** — Delays per CIR; list of length `n_cir`, each element a 1D array of length `n_path`
-- **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
-  array of length `n_path`
-- **`threshold_dB`** — Power threshold in [dB] relative to the strongest path; paths below it
-  are excluded; default: 100.0
-- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0.0 (no grouping); must be
-  finite and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53,
-  else a `ValueError` is raised
-
-### Outputs:
-- **`ds`** — RMS delay spread per CIR; `(n_cir,)`
-- **`mean_delay`** — Mean delay per CIR; `(n_cir,)`
-
----
-<a id="calc_rician_k_factor"></a>
-## calc_rician_k_factor
-Calculate the Rician K-Factor from channel impulse response data
-
-Also in: [C++](quadriga_lib_api_cpp.md#calc_rician_k_factor) · [MATLAB](quadriga_lib_api_mex.md#calc_rician_k_factor)
-
-- Computes the Rician K-Factor (KF): ratio of LOS power to NLOS power per CIR
-- Inputs are lists of 1D arrays so each CIR can have a different number of paths
-- LOS paths are those with length ≤ `dTR + window_size`, where `dTR` is the direct TX-RX distance;
-  remaining paths are NLOS
-- If total NLOS power is zero, KF is set to infinity; if total LOS power is zero, KF is set to 0
-- TX/RX positions may be fixed `(3,)` / `(3, 1)` (reused for all CIRs) or mobile `(3, n_cir)`
-
-### Usage:
-```python
-kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, *, window_size )
-```
-
-### Inputs:
-- **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
-  array of length `n_path`
-- **`path_length`** — Absolute TX-to-RX path lengths per CIR; list of length `n_cir`, each element
-  a 1D array of length `n_path` matching `powers`
-- **`tx_pos`** — Transmitter position [x; y; z]; `(3,)` or `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
-- **`rx_pos`** — Receiver position [x; y; z]; `(3,)` or `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
-- **`window_size`** — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS;
-  default: 0.01
-
-### Outputs:
-- **`kf`** — Rician K-Factor on linear scale; `(n_cir,)`
-- **`pg`** — Total path gain (sum of all path powers) per CIR; `(n_cir,)`
+- [channel.planar](#channel.planar) (paths given by angles, planar wavefronts)
+- [channel.multifreq](#channel.multifreq) (several frequencies)
+- [channel.irs](#channel.irs) (paths over an IRS)
+- [qrt_file_read](#qrt_file_read) (path data of many snapshots)
+- [freq_response](#freq_response) (frequency response of the coefficients)
+- [quantize_delays](#quantize_delays) (delays on a tap grid)
 
 ---
 
@@ -3335,6 +3406,47 @@ rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, *, d_min )
 
 <a id="sec-math-functions"></a>
 # Math functions
+
+---
+<a id="acdf"></a>
+## acdf
+Empirical cumulative distribution functions (CDF) of several data sets, their average and quantile statistics
+
+Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [MATLAB](quadriga_lib_api_mex.md#acdf)
+
+- The CDF of each data set (column of `data`) at the bin centers: each finite value counts for the nearest bin (values
+  outside the bins for the first or last one), and the CDF is the cumulative count divided by the number of finite
+  values of the set
+- Average `cdf_avg` in quantile space: for the probabilities $P = 0, 0.001, \dots, 0.999$, the bins at which the
+  CDFs of the sets reach $P$ are averaged over the sets, and the averaged quantile function is mapped back to the
+  bins; this averages the position of the distributions instead of their CDF values
+- `mu` and `sig`: mean and standard deviation (normalized by $N - 1$) of the quantiles at
+  $P = 0.1, 0.2, \dots, 0.9$ over the sets, each taken over the 11 probabilities within $\pm 0.005$; for one set its
+  quantiles and 0
+- Non-finite values are left out; a set without finite values gets a NaN CDF and is left out of `cdf_avg`, `mu` and
+  `sig`, which are NaN if no set has finite values (possible only with given bins)
+- Generated bins: `n_bins` equally spaced bins from the smallest to the largest finite value of `data` (±10 % of the
+  value, or ±1 for 0, if all are equal); `data` without finite values then throws
+
+### Usage:
+```python
+cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, *, n_bins )
+```
+
+### Inputs:
+- **`data`** — Data sets, one per column, magnitudes below about 1e18; `(n_samples, n_sets)`
+- **`bins`** — Bin centers, finite and strictly ascending; `(n_bins_in,)`; default: `None` (generated bins)
+- **`n_bins`** — Number of generated bins, >= 2; not used with `bins`; default: 201
+
+### Outputs:
+- **`cdf_per_set`** — CDF of each set; `(n_bins_out, n_sets)`
+- **`bins_out`** — Bin centers, `bins` or the generated ones; `(n_bins_out,)`
+- **`cdf_avg`** — Average CDF; `(n_bins_out,)`
+- **`mu`** — Mean of the quantiles at 0.1, ..., 0.9; `(9,)`
+- **`sig`** — Standard deviation of these quantiles; `(9,)`
+
+### See also:
+- [calc_delay_spread](#calc_delay_spread) (delay spreads of many CIRs, a typical input)
 
 ---
 <a id="calc_rotation_matrix"></a>

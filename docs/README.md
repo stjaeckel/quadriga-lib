@@ -25,34 +25,30 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 ## API sections
 - [C++: General usage notes](api/cpp/general-usage-notes.md)
 - [C++: Antennas, transducers and patterns](api/cpp/antennas-transducers-and-patterns.md): 16 functions
-- [C++: Channel class](api/cpp/channel-class.md): 2 functions
-- [C++: Channel functions](api/cpp/channel-functions.md): 27 functions
-- [C++: Channel generation functions](api/cpp/channel-generation-functions.md): 7 functions
-- [C++: Channel statistics](api/cpp/channel-statistics.md): 5 functions
+- [C++: Channel data and processing](api/cpp/channel-data-and-processing.md): 26 functions
+- [C++: Channel generators](api/cpp/channel-generators.md): 5 functions
 - [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 17 functions
-- [C++: Math functions](api/cpp/math-functions.md): 9 functions
-- [C++: Miscellaneous / Tools](api/cpp/miscellaneous-tools.md): 3 functions
+- [C++: Math functions](api/cpp/math-functions.md): 10 functions
+- [C++: Miscellaneous / Tools](api/cpp/miscellaneous-tools.md): 4 functions
 - [C++: Network layouts and mobility](api/cpp/network-layouts-and-mobility.md): 17 functions
-- [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 35 functions
+- [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 36 functions
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](api/mex/general-usage-notes.md)
 - [MATLAB / Octave: Antennas, transducers and patterns](api/mex/antennas-transducers-and-patterns.md): 12 functions
-- [MATLAB / Octave: Channel functions](api/mex/channel-functions.md): 15 functions
-- [MATLAB / Octave: Channel generation functions](api/mex/channel-generation-functions.md): 5 functions
-- [MATLAB / Octave: Channel statistics](api/mex/channel-statistics.md): 5 functions
+- [MATLAB / Octave: Channel data and processing](api/mex/channel-data-and-processing.md): 19 functions
+- [MATLAB / Octave: Channel generators](api/mex/channel-generators.md): 5 functions
 - [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 16 functions
-- [MATLAB / Octave: Math functions](api/mex/math-functions.md): 5 functions
+- [MATLAB / Octave: Math functions](api/mex/math-functions.md): 6 functions
 - [MATLAB / Octave: Miscellaneous / Tools](api/mex/miscellaneous-tools.md): 2 functions
 - [MATLAB / Octave: Network layouts and mobility](api/mex/network-layouts-and-mobility.md): 16 functions
 - [MATLAB / Octave: Site-specific simulation tools](api/mex/site-specific-simulation-tools.md): 17 functions
 - [MATLAB / Octave: Sum-of-sinusoids random number generator](api/mex/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [Python: General usage notes](api/python/general-usage-notes.md)
 - [Python: Antennas, transducers and patterns](api/python/antennas-transducers-and-patterns.md): 12 functions
-- [Python: Channel functions](api/python/channel-functions.md): 15 functions
-- [Python: Channel generation functions](api/python/channel-generation-functions.md): 5 functions
-- [Python: Channel statistics](api/python/channel-statistics.md): 5 functions
+- [Python: Channel data and processing](api/python/channel-data-and-processing.md): 19 functions
+- [Python: Channel generators](api/python/channel-generators.md): 5 functions
 - [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 16 functions
-- [Python: Math functions](api/python/math-functions.md): 5 functions
+- [Python: Math functions](api/python/math-functions.md): 6 functions
 - [Python: Miscellaneous / Tools](api/python/miscellaneous-tools.md): 3 functions
 - [Python: Network layouts and mobility](api/python/network-layouts-and-mobility.md): 16 functions
 - [Python: Site-specific simulation tools](api/python/site-specific-simulation-tools.md): 16 functions

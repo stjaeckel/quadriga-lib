@@ -5,17 +5,17 @@
 #include "qd_helpers_python_types.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # qrt_file_parse
 Read metadata from a QRT file
 
-- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR
-  offsets, names, positions, orientations, and file version
-- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
-  `cir_offset` reflect this
+- Reads the header of a QRT file: counts, names, frequencies, the positions and orientations of the CIRs and the
+  origins, and the file version; no path data
+- A file without destinations reports one destination `RX` that owns all CIRs
+- Raises an error for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt
 
 ## Usage:
 ```
@@ -24,22 +24,28 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
 ```
 
 ## Input:
-- **`fn`** — Path to the QRT file
+- **`fn`** — File name, str or path-like
 
 ## Outputs:
-- **`n_cir`** — Number of channel snapshots per origin point
-- **`n_orig`** — Number of origin points (TX)
-- **`n_dest`** — Number of destination points (RX)
-- **`n_freq`** — Number of frequency bands
-- **`cir_offset`** — Number of CIRs before each destination (offset of its first CIR), the first entry 0; int64; `(n_dest,)`
-- **`orig_names`** — Names of the origin points (TX); list of strings; length `n_orig`
-- **`dest_names`** — Names of the destination points (RX); list of strings; length `n_dest`
-- **`version`** — QRT file version number
-- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); `(n_freq,)`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; `(n_cir, 3)`
-- **`cir_orientation`** — CIR orientations as Euler angles; `(n_cir, 3)`
-- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; `(n_orig, 3)`
-- **`orig_orientation`** — Origin (TX) orientations as Euler angles; `(n_orig, 3)`
+- **`n_cir`** — Number of CIRs of each origin; int
+- **`n_orig`** — Number of origin slots; int
+- **`n_dest`** — Number of destinations, at least 1; int
+- **`n_freq`** — Number of frequencies; int
+- **`cir_offset`** — Number of CIRs before each destination, i.e. the 0-based index of its first CIR; int64;
+  `(n_dest,)`
+- **`orig_names`** — Origin names, empty for a slot not written yet; list of str of length `n_orig`
+- **`dest_names`** — Destination names; list of str of length `n_dest`
+- **`version`** — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar); int
+- **`center_freq`** — Frequencies in Hz; `(n_freq,)`. Version 4 stores GHz and one frequency per origin, this is the one
+  of the first written origin (0 if none is written); version 5 files of earlier library versions store GHz too, a
+  version 5 list with all values below 1000 is read as GHz
+- **`cir_pos`** — CIR positions in m; `(n_cir, 3)`
+- **`cir_orientation`** — CIR orientations (bank, tilt, heading) in rad; `(n_cir, 3)`
+- **`orig_pos`** — Origin positions in m, zeros for a slot not written yet; `(n_orig, 3)`
+- **`orig_orientation`** — Origin orientations (bank, tilt, heading) in rad; `(n_orig, 3)`
+
+## See also:
+- [[qrt_file_read]] (reads CIRs)
 MD!*/
 
 py::tuple qrt_file_parse(const py::handle &fn)
@@ -75,13 +81,11 @@ py::tuple qrt_file_parse(const py::handle &fn)
 # qrt_file_read
 Read ray-tracing CIR data from a QRT file
 
-- Reads channel impulse response data from QRT files
-- Reads in chunks of 16 snapshots; besides the output, at most two chunks are held in memory
-- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `polmat` is the transpose
-  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
-  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
-  that traversal
-- Per-snapshot outputs are returned as lists with one entry per requested snapshot
+- Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
+  [[channel.spherical]] (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or [[channel.planar]] (the
+  angles)
+- Reads in chunks of 16 CIRs: besides the outputs, at most two chunks are held in memory
+- `uplink` swaps the ends: the origin becomes the receiver (see Notes)
 
 ## Usage:
 ```
@@ -91,49 +95,61 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file
-- **`i_cir`** — Snapshot indices to read, 0-based; `(n_out,)` or `None`; if `None` or empty, all snapshots are read (for a file
-  without CIRs, all outputs are empty with `n_out = 0`); default: `None`
-- **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
-- **`uplink`** — If `False`, origin=TX and destination=RX; if `True`, the roles are swapped (origin=RX, destination=TX); default: `False`
-- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling; 0 = values as stored in the QRT file with
-  `path_gain` = -PL; 1 = `polmat` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
-  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
-  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
-    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
-    | :-----------: | :---------------------------------------------: | :------------------------------: |
-    | 0             | As stored in QRT file                           | -PL                              |
-    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
-
-    Other values raise an error.
+- **`fn`** — File name, str or path-like
+- **`i_cir`** — CIR indices, 0-based, below `n_cir`; `(n_out,)`; default: `None` (all CIRs of the file)
+- **`i_orig`** — Origin index, 0-based, below `n_orig`; int; default: 0
+- **`uplink`** — `False`: origin = Tx, destination = Rx; `True`: origin = Rx, destination = Tx; default: `False`
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
 
 ## Outputs:
-- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`
-- **`tx_pos`** — Transmitter positions in Cartesian coordinates; `(3, n_out)`
-- **`tx_orientation`** — Transmitter orientations as Euler angles (bank, tilt, heading); `(3, n_out)`
-- **`rx_pos`** — Receiver positions in Cartesian coordinates; `(3, n_out)`
-- **`rx_orientation`** — Receiver orientations as Euler angles (bank, tilt, heading); `(3, n_out)`
-- **`fbs_pos`** — First-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
-- **`lbs_pos`** — Last-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
-- **`path_gain`** — Path gain in linear scale; list of length `n_out`; entries `(n_path, n_freq)`
-- **`path_length`** — Absolute path length from TX to RX phase center; list of length `n_out`; entries `(n_path,)`
-- **`polmat`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
-- **`aod`** — Departure azimuth angles; list of length `n_out`; entries `(n_path,)`
-- **`eod`** — Departure elevation angles; list of length `n_out`; entries `(n_path,)`
-- **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`
-- **`eoa`** — Arrival elevation angles; list of length `n_out`; entries `(n_path,)`
-- **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
-- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries int64 `(n_path,)`
-- **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(n_interact))`
-- **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
-  entries uint8 `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
-  193 (NLOS); LOS and GR paths are not marked as GBSM.
+- **`center_freq`** — Frequencies in Hz (version 4: of origin `i_orig`); `(n_freq,)`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `(3, n_out)`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientations (bank, tilt, heading) in rad; `(3, n_out)`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m: the first and the last interaction
+  point, the midpoint of Tx and Rx for a LOS path; list of `n_out` arrays `(3, n_path)`
+- **`path_gain`** — Path gain, linear (see Notes); list of `n_out` arrays `(n_path, n_freq)`
+- **`path_length`** — Length of the polyline from the Tx through the interaction points to the Rx in m; list of
+  `n_out` arrays `(n_path,)`
+- **`polmat`** — Polarization transfer matrix; list of `n_out` arrays `(8, n_path, n_freq)`; version 6: the
+  complex scalar coefficient, `(2, n_path, n_freq)`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure (at the Tx) and arrival (at the
+  Rx) in rad; list of `n_out` arrays `(n_path,)`
+- **`path_coord`** — Points of each path from the Tx through the interaction points to the Rx; list of `n_out` lists
+  of `n_path` arrays `(3, n_interact + 2)`
+- **`n_interact`** — Number of interaction points of each path, 0 = LOS; list of `n_out` int64 arrays `(n_path,)`
+- **`coord`** — Interaction points of all paths, concatenated in path order; list of `n_out` arrays
+  `(3, sum(n_interact))`
+- **`interact_type`** — Interaction type codes, concatenated like `coord`; list of `n_out` uint8 arrays
+  `(sum(n_interact),)`; empty for version 4 files
+
+## Notes:
+- **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
+  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
+  the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
+  $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
+  matrix (version 6: the power of the coefficient):<br><br>
+  | `normalize_polmat` | `polmat` | `path_gain` |
+  | ------------------ | -------- | ----------- |
+  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
+  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+
+- **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
+  `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
+  `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
+  codes describe that traversal
+- An origin slot that is not written yet gives zero positions and orientations and no paths
+- GBSM paths of [[export_rays_qrt]] carry the code 193 at their scatterers; their LOS and GR paths look like
+  ray-traced ones (no interaction, one reflection 129)
+- **Errors**: an index out of range raises `ValueError`; a file that cannot be opened, is not a QRT file of version 4,
+  5 or 6, or is truncated or corrupt (counts or offsets beyond the file, path blocks of different CIRs that overlap)
+  raises `RuntimeError`. A message about one requested CIR starts with `Snapshot <k>: `, with `k` its position in
+  `i_cir`
 
 ## See also:
-- [[generate_antenna]] (for generating antenna arrays)
-- [[channel.planar]] (for embedding antennas using departure and arrival angles)
-- [[channel.spherical]] (for embedding antennas using FBS/LBS positions)
-- [[channel.multifreq]] (for multi-frequency antenna embedding)
+- [[qrt_file_parse]] (metadata without path data)
+- [[channel.spherical]] (coefficients from the paths)
+- [[channel.planar]] (coefficients from the angles)
 MD!*/
 
 py::tuple qrt_file_read(const py::handle &fn,

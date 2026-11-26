@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.tools.calc_rician_k_factor.
+# Python interface test for quadriga_lib.channel.calc_rician_k_factor.
 
 import sys
 import os
@@ -27,7 +27,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         self.assertEqual(kf.shape, (1,))
         self.assertEqual(pg.shape, (1,))
@@ -41,7 +41,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         npt.assert_allclose(kf[0], 3.0 / 0.5, atol=1e-10, rtol=0)
         npt.assert_allclose(pg[0], 3.5, atol=1e-10, rtol=0)
@@ -53,7 +53,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         self.assertTrue(np.isinf(kf[0]))
         self.assertGreater(kf[0], 0.0)
@@ -65,7 +65,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         self.assertEqual(kf[0], 0.0)
         npt.assert_allclose(pg[0], 1.5, atol=1e-10, rtol=0)
@@ -77,7 +77,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[10.0, 20.0], [0.0, 0.0], [0.0, 0.0]])
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         self.assertEqual(kf.shape, (2,))
         self.assertEqual(pg.shape, (2,))
@@ -93,7 +93,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[3.0], [4.0], [0.0]])  # dTR = 5.0
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         npt.assert_allclose(kf[0], 1.0 / 0.5, atol=1e-10, rtol=0)
 
@@ -105,11 +105,11 @@ class test_case(unittest.TestCase):
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
         # Small window: only first path is LOS
-        kf, _ = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, _ = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
         npt.assert_allclose(kf[0], 1.0 / 0.75, atol=1e-10, rtol=0)
 
         # Large window: first two paths are LOS
-        kf, _ = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=1.0)
+        kf, _ = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=1.0)
         npt.assert_allclose(kf[0], 1.5 / 0.25, atol=1e-10, rtol=0)
 
     def test_empty_snapshot(self):
@@ -119,7 +119,7 @@ class test_case(unittest.TestCase):
         tx_pos = np.array([[0.0], [0.0], [0.0]])
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
-        kf, pg = quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+        kf, pg = quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
         self.assertEqual(kf[0], 0.0)
         self.assertEqual(pg[0], 0.0)
@@ -127,7 +127,7 @@ class test_case(unittest.TestCase):
     def test_error_empty_powers(self):
         """Empty powers list should raise error"""
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_rician_k_factor([], [], np.zeros((3, 1)), np.zeros((3, 1)), window_size=0.01)
+            quadriga_lib.channel.calc_rician_k_factor([], [], np.zeros((3, 1)), np.zeros((3, 1)), window_size=0.01)
 
     def test_error_mismatched_sizes(self):
         """Mismatched powers and path_length list sizes"""
@@ -137,7 +137,7 @@ class test_case(unittest.TestCase):
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+            quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
     def test_error_wrong_tx_pos_shape(self):
         """Wrong tx_pos shape should raise error"""
@@ -147,7 +147,7 @@ class test_case(unittest.TestCase):
         rx_pos = np.array([[10.0], [0.0], [0.0]])
 
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
+            quadriga_lib.channel.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, window_size=0.01)
 
 
     def test_none_for_mandatory_arrays(self):
@@ -156,9 +156,9 @@ class test_case(unittest.TestCase):
         path_length = [np.array([10.0])]
         pos = np.zeros((3, 1))
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.calc_rician_k_factor(powers, path_length, None, pos)
+            quadriga_lib.channel.calc_rician_k_factor(powers, path_length, None, pos)
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.calc_rician_k_factor(powers, path_length, pos, None)
+            quadriga_lib.channel.calc_rician_k_factor(powers, path_length, pos, None)
 
 if __name__ == '__main__':
     unittest.main()

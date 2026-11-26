@@ -7,18 +7,16 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_RESHAPE_LAYOUT
-Reshape the storage layout inside an existing HDF5 file
+Reshape the storage layout of an existing HDF5 channel file
 
-- Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
-- The total number of slots (`nx · ny · nz · nw`) must match the original layout
-- Only the dimension metadata is updated; stored channel data is not moved
-- Errors if the file does not exist or is not a quadriga-lib channel file
-- One writer per file at a time; files are not locked
+- Sets new dimensions `[nx, ny, nz, nw]` with the slot count `nx · ny · nz · nw` of the file
+- The data stays in place: in the column-major order of the slots (as in `has_data` of [[hdf5_read_layout]]), slot
+  `k` keeps its channel, which gets the slot index of position `k` in the new layout
 
 ## Usage:
 ```
@@ -26,15 +24,13 @@ quadriga_lib.hdf5_reshape_layout( fn, nx, ny, nz, nw );
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; string
-- **`nx`** — New number of slots along dimension X
-- **`ny`** — New number of slots along dimension Y; default: 1
-- **`nz`** — New number of slots along dimension Z; default: 1
-- **`nw`** — New number of slots along dimension W; default: 1
+- **`fn`** — File name of an existing channel file
+- **`nx`** — New number of slots along x
+- **`ny`**, **`nz`**, **`nw`** — New number of slots along y, z and w; default: 1
 
 ## See also:
-- [[hdf5_create_file]] (for creating a file with a custom storage layout)
-- [[hdf5_read_layout]] (for reading the existing layout)
+- [[hdf5_create_file]] (sets the layout of a new file)
+- [[hdf5_read_layout]] (reads the layout)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

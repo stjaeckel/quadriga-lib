@@ -8,20 +8,19 @@
 #include "qd_helpers_wrappers.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # QRT_FILE_READ
 Read ray-tracing CIR data from a QRT file
 
-- Reads channel impulse response data from QRT files
-- All output arguments are optional; MATLAB only computes outputs that are requested
-- Reads in chunks of 16 snapshots; besides the output, at most two chunks are held in memory
-- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
-  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
-  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
-  that traversal
+- Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
+  [[get_channels_spherical]] (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or
+  [[get_channels_planar]] (the angles)
+- Only the requested outputs are computed; with at most 5 outputs, no path data is read
+- Reads in chunks of 16 CIRs: besides the outputs, at most two chunks are held in memory
+- `uplink` swaps the ends: the origin becomes the receiver (see Notes)
 
 ## Usage:
 ```
@@ -31,52 +30,61 @@ Read ray-tracing CIR data from a QRT file
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file; string
-- **`i_cir`** — Snapshot indices; 1-based; `[n_out]` or empty; default: `[]` (read all; for a file
-  without CIRs, all outputs are empty with `n_out = 0`)
-- **`i_orig`** — Origin index; 1-based; scalar; default: 1
-- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
-- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss; default: 1
-  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
-  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
-    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
-    | :-----------: | :---------------------------------------------: | :------------------------------: |
-    | 0             | As stored in QRT file                           | -PL                              |
-    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
-
-    Other values are rejected with an error.
+- **`fn`** — File name
+- **`i_cir`** — CIR indices, 1-based, at most `n_cir`; `[n_out, 1]`; default: `[]` (all CIRs of the file)
+- **`i_orig`** — Origin index, 1-based, at most `n_orig`; default: 1
+- **`uplink`** — `false`: origin = Tx, destination = Rx; `true`: origin = Rx, destination = Tx; default: `false`
+- **`normalize_polmat`** — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes); default: 1
 
 ## Outputs:
-- **`center_freq`** — Center frequency in Hz; `[n_freq, 1]`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, n_out]`
-- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, n_out]`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, n_out]`
-- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, n_out]`
-- **`fbs_pos`** — First-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
-- **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
-- **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path, 1]`
-- **`polmat`** — Polarization transfer matrix; Cell of length `n_out`;
-  elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
-- **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
-- **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
-- **`aoa`** — Arrival azimuth angles; Cell of length `n_out`; elements `[n_path, 1]`
-- **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path, 1]`
-- **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
-  elements Cell of length `n_path`, each `[3, n_interact + 2]`
-- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
-  Cell of length `n_out`; elements `[n_path, 1]`
-- **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
-  Cell of length `n_out`; elements `[3, sum(n_interact)]`
-- **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(n_interact), 1]`. Empty for v4 legacy files. GBSM paths written with the C++ API
-  carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
+- **`center_freq`** — Frequencies in Hz (version 4: of origin `i_orig`); `[n_freq, 1]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `[3, n_out]`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientations (bank, tilt, heading) in rad; `[3, n_out]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m: the first and the last interaction
+  point, the midpoint of Tx and Rx for a LOS path; cell array `[n_out, 1]` of `[3, n_path]`
+- **`path_gain`** — Path gain, linear (see Notes); cell array `[n_out, 1]` of `[n_path, n_freq]`
+- **`path_length`** — Length of the polyline from the Tx through the interaction points to the Rx in m; cell array
+  `[n_out, 1]` of `[n_path, 1]`
+- **`polmat`** — Polarization transfer matrix; cell array `[n_out, 1]` of `[8, n_path, n_freq]`; version 6: the
+  complex scalar coefficient, `[2, n_path, n_freq]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure (at the Tx) and arrival (at the
+  Rx) in rad; cell array `[n_out, 1]` of `[n_path, 1]`
+- **`path_coord`** — Points of each path from the Tx through the interaction points to the Rx; cell array
+  `[n_out, 1]` of cell arrays `[n_path, 1]` of `[3, n_interact + 2]`
+- **`n_interact`** — Number of interaction points of each path, 0 = LOS; cell array `[n_out, 1]` of uint32
+  `[n_path, 1]`
+- **`coord`** — Interaction points of all paths, concatenated in path order; cell array `[n_out, 1]` of single
+  `[3, sum(n_interact)]`
+- **`interact_type`** — Interaction type codes, concatenated like `coord`; cell array `[n_out, 1]` of uint8
+  `[sum(n_interact), 1]`; empty for version 4 files
+
+## Notes:
+- **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
+  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
+  the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
+  $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
+  matrix (version 6: the power of the coefficient):<br><br>
+  | `normalize_polmat` | `polmat` | `path_gain` |
+  | ------------------ | -------- | ----------- |
+  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
+  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+
+- **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
+  `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
+  `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
+  codes describe that traversal
+- An origin slot that is not written yet gives zero positions and orientations and no paths
+- GBSM paths of [[export_rays_qrt]] carry the code 193 at their scatterers; their LOS and GR paths look like
+  ray-traced ones (no interaction, one reflection 129)
+- **Errors**: an index out of range, or a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is
+  truncated or corrupt (counts or offsets beyond the file, path blocks of different CIRs that overlap). A message about
+  one requested CIR starts with `Snapshot <k>: `, with `k` its position in `i_cir`
 
 ## See also:
-- [[generate_antenna]] (for generating antenna arrays)
-- [[get_channels_planar]] (for embedding antennas using departure and arrival angles)
-- [[get_channels_spherical]] (for embedding antennas using FBS/LBS positions)
-- [[get_channels_multifreq]] (for multi-frequency antenna embedding)
+- [[qrt_file_parse]] (metadata without path data)
+- [[get_channels_spherical]] (coefficients from the paths)
+- [[get_channels_planar]] (coefficients from the angles)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -132,7 +132,7 @@ class test_case(unittest.TestCase):
     def test_positional_optional_raises(self):
         # An optional argument passed by position is a TypeError naming the call
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.calc_angular_spread([[0.1]], [[0.0]], [[1.0]], True)
+            quadriga_lib.channel.calc_angular_spread([[0.1]], [[0.0]], [[1.0]], True)
         with self.assertRaises(TypeError):
             quadriga_lib.arrayant.calc_directivity(quadriga_lib.arrayant.generate_antenna("omni"), [0])
 

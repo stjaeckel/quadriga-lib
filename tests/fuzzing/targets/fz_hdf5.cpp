@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// HDF5 channel files: hdf5_read_layout, hdf5_read_channel (also with snapshot selection and as hdf5_read_channel_vec)
+// HDF5 channel files: hdf5_read_layout, hdf5_read_channel (also with snapshot selection and the vector form)
 // and the unstructured datasets (hdf5_read_dset_names, hdf5_read_dset) of the first slots
 
 #include "fuzz_target.hpp"
@@ -54,5 +54,5 @@ void fuzz_one(const uint8_t *data, size_t size)
     // Several slots in one call, and selected snapshots (unsorted, repeated) of each
     const arma::u32_mat slots = {{0, 1, 0, 1, 0}, {0, 0, 1, 1, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}};
     const arma::uvec i_snap = {1, 0, 1};
-    fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<float>(fn, slots); });
-    fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<double>(fn, slots, i_snap); });}
+    fz::clean([&] { quadriga_lib::hdf5_read_channel<float>(fn, slots); });
+    fz::clean([&] { quadriga_lib::hdf5_read_channel<double>(fn, slots, i_snap); });}

@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Pins down baseband_freq_response and baseband_freq_response_vec: values for delays of 1 and 1.5 wavelengths at a
+// Pins down freq_response and its vector form: values for delays of 1 and 1.5 wavelengths at a
 // bandwidth equal to c, snapshot selection, phases of long delays, carrier counts that are not a multiple of 8,
 // agreement of the kernels, outputs that alias inputs, and input validation.
 // Oracle: H_k = sum_p c_p · exp(-j·2·pi·B·p_k·tau_p) in double precision, the cycle count reduced by x - round(x).
@@ -32,7 +32,7 @@ TEST_CASE("Baseband Frequency Response - Single")
     auto pilots = arma::linspace<arma::vec>(0.0, 2.0, 21);
 
     arma::cube hmat_re, hmat_im;
-    quadriga_lib::baseband_freq_response(coeff_re, coeff_im, delay, pilots, fc, &hmat_re, &hmat_im);
+    quadriga_lib::freq_response(coeff_re, coeff_im, delay, pilots, fc, &hmat_re, &hmat_im);
 
     auto T = arma::mat(4, 3);
 
@@ -103,7 +103,7 @@ TEST_CASE("Baseband Frequency Response - Multi")
     auto pilots = arma::linspace<arma::fvec>(0.0, 2.0, 21);
 
     std::vector<arma::fcube> hmat_re, hmat_im;
-    quadriga_lib::baseband_freq_response_vec(coeff_re_vec, coeff_im_vec, delay_vec, pilots, fc, &hmat_re, &hmat_im);
+    quadriga_lib::freq_response(coeff_re_vec, coeff_im_vec, delay_vec, pilots, fc, &hmat_re, &hmat_im);
 
     CHECK(hmat_re.size() == 3);
     CHECK(hmat_im.size() == 3);
@@ -151,7 +151,7 @@ TEST_CASE("Baseband Frequency Response - Multi")
     // Change the snapshot order
     arma::uvec i_snap = {1, 2, 1, 0};
 
-    quadriga_lib::baseband_freq_response_vec<float>(coeff_re_vec, coeff_im_vec, delay_vec, pilots, fc, &hmat_re, &hmat_im, nullptr, i_snap);
+    quadriga_lib::freq_response<float>(coeff_re_vec, coeff_im_vec, delay_vec, pilots, fc, &hmat_re, &hmat_im, nullptr, i_snap);
 
     CHECK(hmat_re.size() == 4);
     CHECK(hmat_im.size() == 4);
@@ -188,7 +188,7 @@ TEST_CASE("Baseband Frequency Response - Long delays with the phase in double pr
     dl(0) = tau;
     arma::vec pg = {0.5, 1.0};
     arma::cx_cube h;
-    quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, B, nullptr, nullptr, &h);
+    quadriga_lib::freq_response<double>(cr, ci, dl, pg, B, nullptr, nullptr, &h);
     for (arma::uword k = 0; k < 2; ++k)
     {
         std::complex<double> ref = std::polar(1.0, -2.0 * arma::datum::pi * B * pg(k) * tau);
@@ -200,7 +200,7 @@ TEST_CASE("Baseband Frequency Response - Long delays with the phase in double pr
     dlf(0) = 0.125f; // exact in float
     arma::fvec pgf = {0.5f, 1.0f};
     arma::cx_fcube hf;
-    quadriga_lib::baseband_freq_response<float>(crf, cif, dlf, pgf, B, nullptr, nullptr, &hf);
+    quadriga_lib::freq_response<float>(crf, cif, dlf, pgf, B, nullptr, nullptr, &hf);
     for (arma::uword k = 0; k < 2; ++k)
     {
         std::complex<double> ref = std::polar(1.0, -2.0 * arma::datum::pi * B * (double)pgf(k) * 0.125);
@@ -234,7 +234,7 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
     if (kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
         continue;
     arma::cx_cube h;
-    quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, B, nullptr, nullptr, &h, kernel);
+    quadriga_lib::freq_response<double>(cr, ci, dl, pg, B, nullptr, nullptr, &h, kernel);
     REQUIRE(h.n_slices == pg.n_elem);
 
     double err = 0.0;
@@ -258,8 +258,8 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
     for (arma::uword p = 0; p < n_path; ++p)
         dl1(p) = tau(p), dlx.slice(p).fill(tau(p));
     arma::cx_cube h1, hx;
-    quadriga_lib::baseband_freq_response<double>(cr, ci, dl1, pg, B, nullptr, nullptr, &h1);
-    quadriga_lib::baseband_freq_response<double>(cr, ci, dlx, pg, B, nullptr, nullptr, &hx);
+    quadriga_lib::freq_response<double>(cr, ci, dl1, pg, B, nullptr, nullptr, &h1);
+    quadriga_lib::freq_response<double>(cr, ci, dlx, pg, B, nullptr, nullptr, &hx);
     CHECK(arma::approx_equal(h1, hx, "absdiff", 1e-12));
 
     // Non-finite delays give NaN; a phase beyond 2^50 cycles (1e8 s at 100 MHz) stays finite
@@ -269,7 +269,7 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
     {
         d1(0) = d;
         arma::cx_cube hn;
-        quadriga_lib::baseband_freq_response<double>(c1, c0, d1, pg2, B, nullptr, nullptr, &hn);
+        quadriga_lib::freq_response<double>(c1, c0, d1, pg2, B, nullptr, nullptr, &hn);
         for (arma::uword k = 0; k < 3; ++k)
             if (std::isfinite(d))
                 CHECK(std::abs(std::abs(hn(k)) - 1.0) < 1e-6);
@@ -293,7 +293,7 @@ TEST_CASE("Baseband Frequency Response - Carrier counts that are not a multiple 
         arma::vec pg = arma::linspace<arma::vec>(0.0, 1.0, n_carrier);
         arma::cube hr, hi;
         arma::cx_cube h;
-        quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, B, &hr, &hi, &h);
+        quadriga_lib::freq_response<double>(cr, ci, dl, pg, B, &hr, &hi, &h);
         REQUIRE(h.n_slices == n_carrier);
         REQUIRE(hr.n_slices == n_carrier);
         CHECK(arma::approx_equal(hr, arma::cube(arma::real(h)), "absdiff", 0.0));
@@ -319,37 +319,37 @@ TEST_CASE("Baseband Frequency Response - Carrier counts that are not a multiple 
         arma::fcube crf = arma::conv_to<arma::fcube>::from(cr), cif = arma::conv_to<arma::fcube>::from(ci);
         arma::fcube dlf = arma::conv_to<arma::fcube>::from(dl), hrf;
         arma::fvec pgf = arma::conv_to<arma::fvec>::from(pg);
-        quadriga_lib::baseband_freq_response<float>(crf, cif, dlf, pgf, B, &hrf, nullptr);
+        quadriga_lib::freq_response<float>(crf, cif, dlf, pgf, B, &hrf, nullptr);
         REQUIRE(hrf.n_slices == n_carrier);
         CHECK(hrf.is_finite());
 
         // No output requested: returns without computing
-        quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, B, nullptr, nullptr, nullptr);
+        quadriga_lib::freq_response<double>(cr, ci, dl, pg, B, nullptr, nullptr, nullptr);
     }
 }
 
-TEST_CASE("baseband_freq_response - Outputs that alias inputs")
+TEST_CASE("freq_response - Outputs that alias inputs")
 {
     arma::cube cre(2, 2, 4, arma::fill::randn), cim(2, 2, 4, arma::fill::randn), dl(2, 2, 4, arma::fill::randu);
     dl *= 1.0e-7;
     arma::vec pilot = arma::linspace<arma::vec>(0.0, 1.0, 4);
     arma::cube Hr, Hi;
-    CHECK_NOTHROW(quadriga_lib::baseband_freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi));
+    CHECK_NOTHROW(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi));
 
     // An output is an input
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cre, cim, dl, pilot, 1.0e8, &cre, &Hi), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &cim), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cre, cim, dl, pilot, 1.0e8, &dl, &Hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &cre, &Hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &cim), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &dl, &Hi), std::invalid_argument);
 
     // Both outputs are the same object
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
 
     // An output uses the memory of an input
     arma::cube cre_view(cre.memptr(), 2, 2, 4, false, true);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &cre_view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &cre_view), std::invalid_argument);
 }
 
-TEST_CASE("baseband_freq_response_vec - Outputs that alias inputs")
+TEST_CASE("freq_response (vector form) - Outputs that alias inputs")
 {
     std::vector<arma::cube> cre(2), cim(2), dl(2), Hr, Hi;
     for (int s = 0; s < 2; ++s)
@@ -359,15 +359,15 @@ TEST_CASE("baseband_freq_response_vec - Outputs that alias inputs")
         dl[s] = arma::cube(2, 2, 4, arma::fill::randu) * 1.0e-7;
     }
     arma::vec pilot = arma::linspace<arma::vec>(0.0, 1.0, 4);
-    CHECK_NOTHROW(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi));
+    CHECK_NOTHROW(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi));
 
     // An output is an input
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &cre, &Hi), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &cim), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &dl, &Hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &cre, &Hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &cim), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &dl, &Hi), std::invalid_argument);
 
     // Both outputs are the same object
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
 }
 
 TEST_CASE("Baseband Frequency Response - Non-finite bandwidth or pilots throw")
@@ -378,18 +378,18 @@ TEST_CASE("Baseband Frequency Response - Non-finite bandwidth or pilots throw")
     std::vector<arma::cube> vr = {coeff_re}, vhr, vhi; std::vector<arma::cube> vi = {coeff_im}, vd = {delay};
     for (double bw : {std::nan(""), (double)INFINITY})
     {
-        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response(coeff_re, coeff_im, delay, pilots, bw, &hr, &hi), std::invalid_argument);
-        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response_vec(vr, vi, vd, pilots, bw, &vhr, &vhi), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::freq_response(coeff_re, coeff_im, delay, pilots, bw, &hr, &hi), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::freq_response(vr, vi, vd, pilots, bw, &vhr, &vhi), std::invalid_argument);
 
         // Non-finite pilot entries throw as well
         arma::vec p = pilots;
         p(1) = bw;
-        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response(coeff_re, coeff_im, delay, p, 1.0e8, &hr, &hi), std::invalid_argument);
-        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response_vec(vr, vi, vd, p, 1.0e8, &vhr, &vhi), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::freq_response(coeff_re, coeff_im, delay, p, 1.0e8, &hr, &hi), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::freq_response(vr, vi, vd, p, 1.0e8, &vhr, &vhi), std::invalid_argument);
     }
 }
 
-TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 if available")
+TEST_CASE("freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 if available")
 {
     // Auto is AVX2 when available, else GENERIC; _vec passes the kernel to every snapshot; invalid values throw
     const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
@@ -397,7 +397,7 @@ TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 
     arma::cube dl = arma::randu<arma::cube>(1, 1, 9) * 1e-6;
     arma::vec pg = arma::linspace<arma::vec>(0.0, 1.0, 13);
     arma::cube hr_auto, hi_auto;
-    quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr_auto, &hi_auto);
+    quadriga_lib::freq_response<double>(cr, ci, dl, pg, 1e8, &hr_auto, &hi_auto);
     const std::vector<arma::cube> vcr = {cr, cr}, vci = {ci, ci}, vdl = {dl, dl};
     for (int k : {1, 2})
     {
@@ -405,12 +405,12 @@ TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 
         std::vector<arma::cube> vhr, vhi;
         if (k == 2 && !avx2)
         {
-            CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr, &hi, nullptr, k), std::invalid_argument);
-            CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, {}, k), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cr, ci, dl, pg, 1e8, &hr, &hi, nullptr, k), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::freq_response<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, {}, k), std::invalid_argument);
             continue;
         }
-        quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr, &hi, nullptr, k);
-        quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, {}, k);
+        quadriga_lib::freq_response<double>(cr, ci, dl, pg, 1e8, &hr, &hi, nullptr, k);
+        quadriga_lib::freq_response<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, {}, k);
         CHECK(arma::approx_equal(hr, hr_auto, "absdiff", 1e-5));
         CHECK(arma::approx_equal(hi, hi_auto, "absdiff", 1e-5));
         CHECK(arma::approx_equal(vhr[1], hr, "absdiff", 0.0));
@@ -420,11 +420,11 @@ TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 
     }
     arma::cube hr;
     std::vector<arma::cube> vhr;
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr, nullptr, nullptr, 3), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, nullptr, nullptr, {}, -1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cr, ci, dl, pg, 1e8, &hr, nullptr, nullptr, 3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(vcr, vci, vdl, pg, 1e8, &vhr, nullptr, nullptr, {}, -1), std::invalid_argument);
 }
 
-TEST_CASE("baseband_freq_response_vec - Complex output equals the split outputs")
+TEST_CASE("freq_response (vector form) - Complex output equals the split outputs")
 {
     // Snapshots with different path counts, one without paths; spherical and planar delays; with and without i_snap
     std::vector<arma::cube> cre, cim, dl;
@@ -439,7 +439,7 @@ TEST_CASE("baseband_freq_response_vec - Complex output equals the split outputs"
     {
         std::vector<arma::cube> Hr, Hi;
         std::vector<arma::cx_cube> H(1, arma::cx_cube(1, 1, 1)); // Stale size, resized by the call
-        quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi, &H, i_snap);
+        quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi, &H, i_snap);
         const size_t n_out = i_snap.is_empty() ? 3 : 4;
         REQUIRE(H.size() == n_out);
         for (size_t i = 0; i < n_out; ++i)
@@ -450,7 +450,7 @@ TEST_CASE("baseband_freq_response_vec - Complex output equals the split outputs"
 
         // Complex output alone gives the same values
         std::vector<arma::cx_cube> H2;
-        quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, nullptr, nullptr, &H2, i_snap);
+        quadriga_lib::freq_response<double>(cre, cim, dl, pilot, 1.0e8, nullptr, nullptr, &H2, i_snap);
         for (size_t i = 0; i < n_out; ++i)
             CHECK(arma::approx_equal(H2[i], H[i], "absdiff", 0.0));
     }
@@ -459,14 +459,14 @@ TEST_CASE("baseband_freq_response_vec - Complex output equals the split outputs"
     auto bad = dl;
     bad[2] = arma::cube(1, 1, 2);
     std::vector<arma::cx_cube> H;
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, bad, pilot, 1.0e8, nullptr, nullptr, &H), std::invalid_argument);
-    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, bad, pilot, 1.0e8, nullptr, nullptr, &H), Catch::Matchers::StartsWith("Snapshot 2: "));
+    CHECK_THROWS_AS(quadriga_lib::freq_response<double>(cre, cim, bad, pilot, 1.0e8, nullptr, nullptr, &H), std::invalid_argument);
+    CHECK_THROWS_WITH(quadriga_lib::freq_response<double>(cre, cim, bad, pilot, 1.0e8, nullptr, nullptr, &H), Catch::Matchers::StartsWith("Snapshot 2: "));
 
     // Single precision: the complex output equals the split outputs
     std::vector<arma::fcube> cre_f = {arma::conv_to<arma::fcube>::from(cre[0])}, cim_f = {arma::conv_to<arma::fcube>::from(cim[0])},
                              dl_f = {arma::conv_to<arma::fcube>::from(dl[0])}, Hr_f, Hi_f;
     std::vector<arma::cx_fcube> H_f;
-    quadriga_lib::baseband_freq_response_vec<float>(cre_f, cim_f, dl_f, arma::conv_to<arma::fvec>::from(pilot), 1.0e8, &Hr_f, &Hi_f, &H_f);
+    quadriga_lib::freq_response<float>(cre_f, cim_f, dl_f, arma::conv_to<arma::fvec>::from(pilot), 1.0e8, &Hr_f, &Hi_f, &H_f);
     CHECK(arma::approx_equal(arma::real(H_f[0]), Hr_f[0], "absdiff", 0.0f));
     CHECK(arma::approx_equal(arma::imag(H_f[0]), Hi_f[0], "absdiff", 0.0f));
 }

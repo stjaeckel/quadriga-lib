@@ -66,13 +66,13 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) Â
   1 = resolve never; default: 0
 - **`apply_fspl`** â€” If `true`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
-  distance, matching the `path_length` used by [qrt_file_read](channel-functions.md#qrt_file_read) for a
+  distance, matching the `path_length` used by [qrt_file_read](channel-data-and-processing.md#qrt_file_read) for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 Â°C, RH = 50 %, p = 1 atm; default: `false`
 - **`apply_phase`** â€” If `true`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium wave
   speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so
-  `polmat` stays normalized. This is the phase [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from
+  `polmat` stays normalized. This is the phase [get_channels_spherical](channel-generators.md#get_channels_spherical) would otherwise add from
   `path_length`; default: `false`
 
 ### Outputs:
@@ -82,7 +82,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) Â
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order
-  of `polmat` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
+  of `polmat` in [get_channels_spherical](channel-generators.md#get_channels_spherical); `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** â€” Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
   (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
@@ -90,8 +90,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) Â
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
-- [qrt_file_read](channel-functions.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
+- [get_channels_spherical](channel-generators.md#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 <a id="cube"></a>

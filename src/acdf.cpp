@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include "qd_helpers_shared.hpp"
 
 #include <cmath>
@@ -12,27 +12,31 @@
 #include <vector>
 
 /*!SECTION
-Channel statistics
+Math functions
 SECTION!*/
 
 /*!MD
 # acdf
-Calculate the empirical averaged cumulative distribution function (CDF)
+Empirical cumulative distribution functions (CDF) of several data sets, their average and quantile statistics
 
-- Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, 
-  then mapped back to the bin grid
-- Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
-- `Inf` and `NaN` values are excluded from computation
-- A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu` and `sig`;
-  if no set has finite values (possible only with user-supplied bins), `cdf_avg`, `mu` and `sig` are NaN
-- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back
-  (data without any finite value then throws); if non-empty, those bin centers are used and must be finite and
-  strictly ascending, else `std::invalid_argument` is thrown; if `nullptr`, bins are auto-generated internally
+- The CDF of each data set (column of `data`) at the bin centers: each finite value counts for the nearest bin (values
+  outside the bins for the first or last one), and the CDF is the cumulative count divided by the number of finite
+  values of the set
+- Average `cdf_avg` in quantile space: for the probabilities $P = 0, 0.001, \dots, 0.999$, the bins at which the
+  CDFs of the sets reach $P$ are averaged over the sets, and the averaged quantile function is mapped back to the
+  bins; this averages the position of the distributions instead of their CDF values
+- `mu` and `sig`: mean and standard deviation (normalized by $N - 1$) of the quantiles at
+  $P = 0.1, 0.2, \dots, 0.9$ over the sets, each taken over the 11 probabilities within $\pm 0.005$; for one set its
+  quantiles and 0
+- Non-finite values are left out; a set without finite values gets a NaN CDF and is left out of `cdf_avg`, `mu` and
+  `sig`, which are NaN if no set has finite values (possible only with given bins)
+- Generated bins: `n_bins` equally spaced bins from the smallest to the largest finite value of `data` (±10 % of the
+  value, or ±1 for 0, if all are equal); `data` without finite values then throws
 
 ## Declaration:
 ```
-void quadriga_lib::acdf(const arma::Mat<dtype> &data,
+void quadriga_lib::acdf(
+    const arma::Mat<dtype> &data,
     arma::Col<dtype> *bins = nullptr,
     arma::Mat<dtype> *cdf_per_set = nullptr,
     arma::Col<dtype> *cdf_avg = nullptr,
@@ -42,17 +46,19 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 ```
 
 ## Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, larger
-  values overflow in `sig`; `[n_samples, n_sets]`
-- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, 
-  used as-is if non-empty (finite, strictly ascending), ignored if `nullptr`; `[n_bins]`
-- **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
+- **`data`** — Data sets, one per column, magnitudes below about 1e18; `[n_samples, n_sets]`
+- **`bins`** *(optional, in/out)* — Bin centers: non-empty = used, finite and strictly ascending; empty = generated and
+  stored; `nullptr` = generated, not returned; `[n_bins]`
+- **`n_bins`** *(optional)* — Number of generated bins, >= 2; not used with given bins
 
 ## Outputs:
-- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data (NaN for a set without finite values); `[n_bins, n_sets]`
-- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins]`
-- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across the data sets with finite values, `[9]`
-- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values, `[9]`
+- **`cdf_per_set`** *(optional)* — CDF of each set; `[n_bins, n_sets]`
+- **`cdf_avg`** *(optional)* — Average CDF; `[n_bins]`
+- **`mu`** *(optional)* — Mean of the quantiles at 0.1, ..., 0.9; `[9]`
+- **`sig`** *(optional)* — Standard deviation of these quantiles; `[9]`
+
+## See also:
+- [[calc_delay_spread]] (delay spreads of many CIRs, a typical input)
 MD!*/
 
 template <typename dtype>

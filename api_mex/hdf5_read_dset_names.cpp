@@ -7,17 +7,15 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_READ_DSET_NAMES
-Read names of unstructured datasets stored at a 4D slot in an HDF5 file
+Read the names of the unstructured datasets of a slot of an HDF5 channel file
 
-- Finds all datasets whose HDF5 name starts with `prefix` at slot `(ix, iy, iz, iw)`
-- Returned names have the prefix stripped
-- Returns an empty cell array if no matching datasets are present at the slot
-- Errors if the file does not exist or is not a quadriga-lib channel file
+- Lists the datasets of slot `(ix, iy, iz, iw)` whose names start with `prefix`, without the prefix, in the order
+  they were written
 
 ## Usage:
 ```
@@ -25,19 +23,17 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix );
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file; string
-- **`ix`** — 1-based slot index along dimension X; scalar; default: 1
-- **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
-- **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
-- **`iw`** — 1-based slot index along dimension W; scalar; default: 1
-- **`prefix`** — Prefix used to identify unstructured datasets; string; `''` lists all datasets with their full names; default (omitted or `[]`): `'par_'`
+- **`fn`** — File name of an existing channel file
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot index along x, y, z and w, 1-based; default: 1
+- **`prefix`** — Prefix of the listed names; `''` lists all datasets with their full names; default: `'par_'`
 
 ## Output:
-- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings; `[n_names, 1]`
+- **`names`** — Dataset names; cell array of strings; `[n_names, 1]`, empty if the slot is empty or outside the
+  layout or has none
 
 ## See also:
-- [[hdf5_read_dset]] (for reading individual unstructured datasets)
-- [[hdf5_write_dset]] (for writing individual unstructured datasets)
+- [[hdf5_read_dset]] (reads a dataset by name)
+- [[hdf5_write_dset]] (writes a dataset)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -249,6 +249,18 @@ TEST_CASE("QRT Write - init argument validation")
     CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient,
                                                        std::vector<std::string>{"a", "b"}, off, 1, false),
                     std::invalid_argument);
+    // cir_offset: non-decreasing and at most the number of CIRs (here 2); a destination may have no CIRs
+    const std::vector<std::string> abc = {"a", "b", "c"};
+    for (const arma::u32_vec &bad : {arma::u32_vec{0u, 3u, 3u}, arma::u32_vec{0u, 1u, 0u}, arma::u32_vec{0u, 5u, 1u}})
+        CHECK_THROWS_WITH(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, abc, bad, 1, false),
+                          "Input 'cir_offset' must be non-decreasing and at most the number of CIRs.");
+    for (const arma::u32_vec &ok : {arma::u32_vec{0u, 1u, 1u}, arma::u32_vec{0u, 2u, 2u}})
+    {
+        quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, abc, ok, 1, false);
+        std::remove(fn.c_str());
+    }
+    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, arma::fmat(0, 3), cir_orient, abc, arma::u32_vec{0u, 0u, 0u}, 1, false);
+    std::remove(fn.c_str());
 }
 
 TEST_CASE("QRT Write - init leaves an existing file unchanged when an input is invalid")

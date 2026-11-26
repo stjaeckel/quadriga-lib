@@ -14,35 +14,27 @@
 #include "qd_helpers_channel.hpp"
 
 /*!SECTION
-Channel generation functions
+Channel generators
 SECTION!*/
 
 /*!MD
 # get_channels_planar
-Calculate MIMO channel coefficients for planar wave paths
+Calculate MIMO channel coefficients and delays for planar wave propagation
 
-- Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
-- Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
-- LOS path detection is distance-based (angles ignored).
-- Polarization transfer matrix `polmat` must be normalized; rows are interleaved real/imag components.
-- If `add_fake_los_path` is true, one output path is always added (output size `n_path+1`): slot 0 holds the LOS path,
-  with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
-  distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths
-  keep their order, shifted by one slot.
-- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
-  hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- Polarization coupling: `polmat` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H),
-  column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
-  rows 6-7 = (H rx, H tx).
-- `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
-- `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
-  lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
-  centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
-  delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
-  `use_absolute_delays = true` in that case.
+- Coefficients and delays of one link for each pair of a Tx and an Rx port and each path; a path is given by its
+  departure and arrival angles, which all elements of an array share (planar wavefronts)
+- Path $l$ of the element pair $(t, r)$ has the coefficient and delay
 
-## Declaration:
+  $$a_l = \sqrt{g_l} \; \mathbf{F}_r^T \mathbf{M}_l \, \mathbf{F}_t \; e^{-j 2\pi f_c d / c}, \quad \tau_l = d / c, \quad d = \ell_l + d_t + d_r$$
+
+  with the path gain $g_l$, the Jones matrix $\mathbf{M}_l$ (`polmat`), the patterns $\mathbf{F} = (F_\theta, F_\phi)^T$
+  at the path angles, the path length $\ell_l$ between the phase centres (used as given), the distances $d_t$, $d_r$ of
+  the elements from the wavefront planes through the phase centres (`dist` of [[interpolate_pattern]]), the center
+  frequency $f_c$ and the speed of light $c$; the port weights then combine the elements into ports
+- The positions enter only through the Tx-Rx distance (relative delays, LOS path)
+- Vector form: the path inputs and the outputs have one entry per snapshot; the snapshots are computed in parallel
+
+## Declarations:
 ```
 void quadriga_lib::get_channels_planar(
     const quadriga_lib::arrayant<dtype> &tx_array,
@@ -66,43 +58,80 @@ void quadriga_lib::get_channels_planar(
     bool add_fake_los_path = false,
     arma::Col<dtype> *rx_Doppler = nullptr,
     int use_kernel = 0);
+
+void quadriga_lib::get_channels_planar(
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const std::vector<arma::Col<dtype>> &aod,
+    const std::vector<arma::Col<dtype>> &eod,
+    const std::vector<arma::Col<dtype>> &aoa,
+    const std::vector<arma::Col<dtype>> &eoa,
+    const std::vector<arma::Col<dtype>> &path_gain,
+    const std::vector<arma::Col<dtype>> &path_length,
+    const std::vector<arma::Mat<dtype>> &polmat,
+    std::vector<arma::Cube<dtype>> &coeff_re,
+    std::vector<arma::Cube<dtype>> &coeff_im,
+    std::vector<arma::Cube<dtype>> &delay,
+    double center_freq = 0.0,
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    std::vector<arma::Col<dtype>> *rx_Doppler = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
+    int use_kernel = 0);
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` elements
-- **`rx_array`** — Receive antenna array; `n_rx` elements
-- **`tx_pos`** — Transmitter position in [m]; `[3, 1]` or `[1, 3]`
-- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
-- **`rx_pos`** — Receiver position in [m]; `[3, 1]` or `[1, 3]`
-- **`rx_orientation`** — Receiver orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
-- **`aod`** — Departure azimuth angles; `[n_path]`
-- **`eod`** — Departure elevation angles; `[n_path]`
-- **`aoa`** — Arrival azimuth angles; `[n_path]`
-- **`eoa`** — Arrival elevation angles; `[n_path]`
-- **`path_gain`** — Path gains in linear scale; `[n_path]`
-- **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
-- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
-- **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
-- **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot
-- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
-  precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
-  [[interpolate_pattern]]
+- **`tx_array`**, **`rx_array`** — Tx and Rx array, valid ([[arrayant]]); `n_tx` and `n_rx` ports
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in m, finite; `[3, 1]` or `[1, 3]`; vector form: `[3, 1]` (all
+  snapshots) or `[3, n_snap]`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientation, Euler angles (bank, tilt, heading) in rad,
+  finite; sizes as `tx_pos`
+- **`aod`**, **`eod`** — Azimuth and elevation of departure in rad, GCS; `[n_path]`
+- **`aoa`**, **`eoa`** — Azimuth and elevation of arrival in rad, GCS (the direction from the Rx toward the incoming
+  path); `[n_path]`
+- **`path_gain`** — Path gains, linear power; `[n_path]`
+- **`path_length`** — Path lengths in m between the Tx and Rx phase centres; `[n_path]`
+- **`polmat`** — Jones matrices, real and imaginary parts interleaved ([Glossary](cpp_api.html#glossary),
+  "Polarization"); `[8, n_path]`
+- **`center_freq`** *(optional)* — Center frequency in Hz, finite and >= 0; 0 gives the coefficients at f = 0 (Notes)
+- **`use_absolute_delays`** *(optional)* — Keep the delay of the Tx-Rx distance in all delays; `false`: delays relative
+  to it (Notes)
+- **`add_fake_los_path`** *(optional)* — Put the LOS path into an added slot 0, with zero power if there is none (Notes)
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto (GENERIC in this version), 1 = GENERIC,
+  2 = AVX2 (single-precision arithmetic, also for `double`; throws if unavailable)
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`
-- **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; positive = moving toward path, negative = away; `[n_path(+1)]`
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
+  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
+- **`rx_Doppler`** *(optional)* — Doppler weight of each path for an Rx moving along its local x-axis: the cosine of the
+  angle between this axis and the arrival direction; the Doppler shift at the speed $v$ is $v f_c / c$ times this
+  weight, positive when the Rx moves toward the incoming path; `[n_out]`
+- **`coeff`** *(optional)* — Vector form: complex coefficients, replacing `coeff_re` / `coeff_im` (then left empty)
+
+## Notes:
+- **LOS path** (only with `add_fake_los_path`): the strongest path whose `path_length` is within 0.1 mm of the Tx-Rx
+  distance; the angles are not checked
+- **`add_fake_los_path`**: slot 0 holds the LOS path, with zero power (and `rx_Doppler` 0) if there is none; a LOS path
+  among the inputs moves to slot 0 and leaves a zero-power path in its own slot (input index + 1); the other paths
+  keep their order
+- **0 paths** (all path inputs empty): outputs `[n_rx, n_tx, 0]`, or only the zero-power LOS path with
+  `add_fake_los_path`
+- **Relative delays**: the delay of the Tx-Rx distance is subtracted from all delays; element pairs can then get
+  negative delays, as in [[get_channels_spherical]]
+- **`center_freq = 0`**: the delay phase is 1, the antenna and polarization phases remain; the delays are unchanged
+- **Port weights**: the delays of a port pair are means over its element pairs, weighted by the port-weight powers
+- **Vector form**: as in [[get_channels_spherical]]
 
 ## See also:
-- [[get_channels_planar_vec]] (several snapshots in one call)
-- [[get_channels_spherical]] (spherical wave variant accounting for per-element angle differences)
-- [[get_channels_ieee_indoor]] (for generating IEEE compliant channels using `get_channels_planar` internally)
-- [[baseband_freq_response]] (for calculating the frequency response)
-- [[quantize_delays]] (for mapping delays to a fixed grid)
-- [[arrayant]] (antenna array class)
+- [[get_channels_spherical]] (paths given by scatterers, spherical wavefronts)
+- [[get_channels_ieee_indoor]] (IEEE indoor channels, computed with this function)
+- [[freq_response]] (frequency response of the coefficients)
+- [[quantize_delays]] (delays on a tap grid)
 MD!*/
 
 template <typename dtype>
@@ -115,6 +144,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
                                        double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
                                        arma::Col<dtype> *rx_Doppler, int use_kernel)
 {
+    if (!std::isfinite(center_freq_in) || center_freq_in < 0.0 || !std::isfinite((dtype)center_freq_in))
+        throw std::invalid_argument("Input 'center_freq' must be finite and >= 0.");
     const dtype center_freq = dtype(center_freq_in);
     constexpr dtype los_limit = dtype(1.0e-4);
     constexpr dtype zero = dtype(0.0);
@@ -393,89 +424,23 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dou
                                                 double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<double> *rx_Doppler, int use_kernel);
 
-/*!MD
-# get_channels_planar_vec
-Calculate MIMO channel coefficients for planar wave paths for several snapshots
-
-- Batch form of [[get_channels_planar]]: computes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP);
-  each snapshot gives the same result as a single call with its inputs.
-- `n_snap` is the length of the path inputs; all seven must have the same length. A snapshot's paths follow the rules
-  of [[get_channels_planar]], including 0 paths.
-- Positions and orientations have one column per snapshot; a single column applies to all snapshots.
-- The output vectors get `n_snap` entries. Entries that already have the output size are written in place, without
-  reallocating their memory.
-- An error in a snapshot throws `std::invalid_argument` with the message of the single call, preceded by
-  `"Snapshot <i>: "` (0-based, the lowest failing index). Invalid antennas and `use_kernel` throw without the prefix,
-  also when `n_snap = 0`.
-- With `coeff`, the coefficients are returned as complex values in place of `coeff_re` / `coeff_im`, which are left
-  empty. Each thread computes one snapshot at a time into its own split buffers, so the split data of all snapshots is
-  never held at once.
-
-## Declaration:
-```
-void quadriga_lib::get_channels_planar_vec(
-    const quadriga_lib::arrayant<dtype> &tx_array,
-    const quadriga_lib::arrayant<dtype> &rx_array,
-    const arma::Mat<dtype> &tx_pos,
-    const arma::Mat<dtype> &tx_orientation,
-    const arma::Mat<dtype> &rx_pos,
-    const arma::Mat<dtype> &rx_orientation,
-    const std::vector<arma::Col<dtype>> &aod,
-    const std::vector<arma::Col<dtype>> &eod,
-    const std::vector<arma::Col<dtype>> &aoa,
-    const std::vector<arma::Col<dtype>> &eoa,
-    const std::vector<arma::Col<dtype>> &path_gain,
-    const std::vector<arma::Col<dtype>> &path_length,
-    const std::vector<arma::Mat<dtype>> &polmat,
-    std::vector<arma::Cube<dtype>> &coeff_re,
-    std::vector<arma::Cube<dtype>> &coeff_im,
-    std::vector<arma::Cube<dtype>> &delay,
-    double center_freq = 0.0,
-    bool use_absolute_delays = false,
-    bool add_fake_los_path = false,
-    std::vector<arma::Col<dtype>> *rx_Doppler = nullptr,
-    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
-    int use_kernel = 0);
-```
-
-## Inputs:
-- **`tx_array`**, **`rx_array`** — Transmit and receive antenna arrays, as in [[get_channels_planar]]
-- **`tx_pos`** — Transmitter positions in [m], finite; `[3, n_snap]` or `[3, 1]`
-- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
-- **`rx_pos`** — Receiver positions in [m], finite; `[3, n_snap]` or `[3, 1]`
-- **`rx_orientation`** — Receiver orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
-- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad]; vectors of length `n_snap`,
-  entries `[n_path]`
-- **`path_gain`**, **`path_length`** — Path gains (linear) and path lengths; vectors of length `n_snap`, entries `[n_path]`
-- **`polmat`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
-- **`center_freq`**, **`use_absolute_delays`**, **`add_fake_los_path`**, **`use_kernel`** *(optional)* — As in
-  [[get_channels_planar]], for all snapshots
-
-## Outputs:
-- **`coeff_re`**, **`coeff_im`**, **`delay`** — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
-- **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; vector of length `n_snap`, entries `[n_path(+1)]`
-- **`coeff`** *(optional)* — Complex coefficients, replacing `coeff_re` and `coeff_im` (then left empty); vector of
-  length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
-
-## See also:
-- [[get_channels_planar]] (single snapshot)
-- [[get_channels_spherical_vec]] (spherical wave variant)
-MD!*/
 
 template <typename dtype>
-void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
-                                           const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
-                                           const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
-                                           const std::vector<arma::Col<dtype>> &aod, const std::vector<arma::Col<dtype>> &eod,
-                                           const std::vector<arma::Col<dtype>> &aoa, const std::vector<arma::Col<dtype>> &eoa,
-                                           const std::vector<arma::Col<dtype>> &path_gain, const std::vector<arma::Col<dtype>> &path_length,
-                                           const std::vector<arma::Mat<dtype>> &polmat,
-                                           std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
-                                           std::vector<arma::Cube<dtype>> &delay,
-                                           double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
-                                           std::vector<arma::Col<dtype>> *rx_Doppler,
-                                           std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
+void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
+                                       const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                       const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
+                                       const std::vector<arma::Col<dtype>> &aod, const std::vector<arma::Col<dtype>> &eod,
+                                       const std::vector<arma::Col<dtype>> &aoa, const std::vector<arma::Col<dtype>> &eoa,
+                                       const std::vector<arma::Col<dtype>> &path_gain, const std::vector<arma::Col<dtype>> &path_length,
+                                       const std::vector<arma::Mat<dtype>> &polmat,
+                                       std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
+                                       std::vector<arma::Cube<dtype>> &delay,
+                                       double center_freq_in, bool use_absolute_delays, bool add_fake_los_path,
+                                       std::vector<arma::Col<dtype>> *rx_Doppler,
+                                       std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
+    if (!std::isfinite(center_freq_in) || center_freq_in < 0.0 || !std::isfinite((dtype)center_freq_in))
+        throw std::invalid_argument("Input 'center_freq' must be finite and >= 0.");
     const dtype center_freq = dtype(center_freq_in);
     const size_t n_snap = aod.size();
     if (eod.size() != n_snap || aoa.size() != n_snap || eoa.size() != n_snap ||
@@ -503,28 +468,28 @@ void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<dtype> &
                                      });
 }
 
-template void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<float> &tx_array, const quadriga_lib::arrayant<float> &rx_array,
-                                                    const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
-                                                    const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
-                                                    const std::vector<arma::Col<float>> &aod, const std::vector<arma::Col<float>> &eod,
-                                                    const std::vector<arma::Col<float>> &aoa, const std::vector<arma::Col<float>> &eoa,
-                                                    const std::vector<arma::Col<float>> &path_gain, const std::vector<arma::Col<float>> &path_length,
-                                                    const std::vector<arma::Mat<float>> &polmat,
-                                                    std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
-                                                    std::vector<arma::Cube<float>> &delay,
-                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
-                                                    std::vector<arma::Col<float>> *rx_Doppler,
-                                                    std::vector<arma::Cube<std::complex<float>>> *coeff, int use_kernel);
+template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<float> &tx_array, const quadriga_lib::arrayant<float> &rx_array,
+                                                const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
+                                                const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
+                                                const std::vector<arma::Col<float>> &aod, const std::vector<arma::Col<float>> &eod,
+                                                const std::vector<arma::Col<float>> &aoa, const std::vector<arma::Col<float>> &eoa,
+                                                const std::vector<arma::Col<float>> &path_gain, const std::vector<arma::Col<float>> &path_length,
+                                                const std::vector<arma::Mat<float>> &polmat,
+                                                std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
+                                                std::vector<arma::Cube<float>> &delay,
+                                                double center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                std::vector<arma::Col<float>> *rx_Doppler,
+                                                std::vector<arma::Cube<std::complex<float>>> *coeff, int use_kernel);
 
-template void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
-                                                    const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
-                                                    const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
-                                                    const std::vector<arma::Col<double>> &aod, const std::vector<arma::Col<double>> &eod,
-                                                    const std::vector<arma::Col<double>> &aoa, const std::vector<arma::Col<double>> &eoa,
-                                                    const std::vector<arma::Col<double>> &path_gain, const std::vector<arma::Col<double>> &path_length,
-                                                    const std::vector<arma::Mat<double>> &polmat,
-                                                    std::vector<arma::Cube<double>> &coeff_re, std::vector<arma::Cube<double>> &coeff_im,
-                                                    std::vector<arma::Cube<double>> &delay,
-                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
-                                                    std::vector<arma::Col<double>> *rx_Doppler,
-                                                    std::vector<arma::Cube<std::complex<double>>> *coeff, int use_kernel);
+template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
+                                                const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
+                                                const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
+                                                const std::vector<arma::Col<double>> &aod, const std::vector<arma::Col<double>> &eod,
+                                                const std::vector<arma::Col<double>> &aoa, const std::vector<arma::Col<double>> &eoa,
+                                                const std::vector<arma::Col<double>> &path_gain, const std::vector<arma::Col<double>> &path_length,
+                                                const std::vector<arma::Mat<double>> &polmat,
+                                                std::vector<arma::Cube<double>> &coeff_re, std::vector<arma::Cube<double>> &coeff_im,
+                                                std::vector<arma::Cube<double>> &delay,
+                                                double center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                std::vector<arma::Col<double>> *rx_Doppler,
+                                                std::vector<arma::Cube<std::complex<double>>> *coeff, int use_kernel);

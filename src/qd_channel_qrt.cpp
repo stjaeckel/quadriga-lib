@@ -143,21 +143,19 @@ static inline double qd_qrt_freq_scale(const float *freq, size_t n_freq, int ver
 }
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # qrt_read_cache_init
-Initialize a QRT read cache for fast repeated access
+Read the metadata of a QRT file into a cache for repeated reads
 
-- Reads all fixed metadata from a QRT file into a `quadriga_lib::qrt_read_cache` struct.
-- Pre-computes byte offsets so that [[qrt_file_read]] needs only 2 seeks and 4 reads per CIR instead of re-parsing the header.
-- Populate once, then pass the cache and a shared `std::ifstream` to [[qrt_file_read]] calls that read a file in parts.
-- If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
-- For a TX slot reserved by [[qrt_file_init]] but not yet written, `orig_index` and `path_data_offset`
-  are `0`; [[qrt_file_read]] treats that as an empty (unwritten) origin.
-- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
-  if a count or offset in it does not fit the file size, or if two origins share one data block.
+- Reads the header of a QRT file once and precomputes the byte offsets of the path data, so that [[qrt_file_read]] and
+  [[qrt_file_read_raw]] with this cache and an open stream read only the requested data, 2 seeks and 4 reads per CIR
+- Use it to read a file in parts, e.g. in chunks of CIRs or one origin after another (Example of [[qrt_file_read]])
+- The cache describes the file as it was read: create a new one after [[qrt_file_append]]
+- Throws `std::runtime_error` for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is
+  truncated or corrupt (counts or offsets beyond the file, two origins with one data block)
 
 ## Declaration:
 ```
@@ -167,26 +165,26 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file
-- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
+- **`fn`** — File name; not used when `file` is given
+- **`file`** *(optional)* — Open binary stream of the file in a good state, left open; `nullptr` opens and closes the
+  file
 
 ## Returns:
-- Populated `quadriga_lib::qrt_read_cache` struct with the following members:<br><br>
-  | Member             | Type         | Description                                                                                     |
-  | ------------------ | ------------ | ----------------------------------------------------------------------------------------------- |
-  | `version`          | `int`        | QRT file version                                                                                |
-  | `n_orig`           | `unsigned`   | Number of origin (TX) positions                                                                 |
-  | `n_cir`            | `unsigned`   | Number of CIRs per origin                                                                       |
-  | `n_dest`           | `unsigned`   | Number of destinations (RX)                                                                     |
-  | `n_freq`           | `unsigned`   | Number of frequency bands                                                                       |
-  | `freq`             | `arma::fvec` | Frequencies in Hz (converted from GHz for v4 files and older v5 files; v4: of the first origin); `[n_freq]` |
-  | `cir_pos`          | `arma::fmat` | CIR positions; `[n_cir, 3]`                                                                     |
-  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[n_cir, 3]`                                                          |
-  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[n_orig, 3]`                                                                 |
-  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[n_orig, 3]`                                                      |
-  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[n_orig]`                                     |
-  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; `[n_orig]`  |
-  | `orig_freq`        | `arma::fvec` | v4 files only: frequency of each origin in Hz, 0 if the TX slot is unwritten; `[n_orig]`; empty otherwise |
+- The cache, a `quadriga_lib::qrt_read_cache` with the members:<br><br>
+  | Member | Type | Description |
+  | ------ | ---- | ----------- |
+  | `version` | `int` | File version, 4 to 6 |
+  | `n_orig`, `n_cir`, `n_dest`, `n_freq` | `unsigned` | Numbers of origin slots, CIRs, destinations (0 if the file lists none) and frequencies |
+  | `freq` | `arma::fvec` | Frequencies in Hz as [[qrt_file_parse]] returns them; `[n_freq]` |
+  | `cir_pos`, `cir_orientation` | `arma::fmat` | CIR positions in m and orientations in rad; `[n_cir, 3]` |
+  | `orig_pos_all`, `orig_orientation` | `arma::fmat` | Origin positions in m and orientations in rad; `[n_orig, 3]` |
+  | `orig_index` | `arma::u64_vec` | Byte offset of the data block of each origin, 0 = slot not written yet; `[n_orig]` |
+  | `path_data_offset` | `arma::u64_vec` | Byte offset of the CIR index table of each origin, 0 = slot not written yet; `[n_orig]` |
+  | `orig_freq` | `arma::fvec` | Version 4: frequency of each origin in Hz, 0 = slot not written yet; `[n_orig]`; empty otherwise |
+
+## See also:
+- [[qrt_file_read]] (reads CIRs with the cache)
+- [[qrt_file_read_raw]] (reads the paths of an origin with the cache)
 MD!*/
 
 quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string &fn,
@@ -219,7 +217,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
 
     size_t pos = 11 + 3 * sizeof(unsigned); // read position (ID, version, 3 counters)
 
-    // Version 4 has one frequency, read from the first origin below; 0 Hz if there is no origin
+    // Version 4 has one frequency, read from the first written origin below; 0 Hz if none is written
     cache.n_freq = 1;
     cache.freq.zeros(1);
     if (cache.version > 4)
@@ -331,9 +329,15 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
                 throw std::runtime_error("QRT file corrupt: two origins share one data block.");
     }
 
-    // Stored frequencies to Hz; version 4 reports the frequency of the first origin (0 Hz if it is not written yet)
-    if (cache.version == 4 && cache.n_orig != 0)
-        cache.freq(0) = cache.orig_freq(0);
+    // Stored frequencies to Hz; version 4 reports the frequency of the first written origin (0 Hz if none is written),
+    // as qrt_file_parse does
+    if (cache.version == 4)
+        for (unsigned i = 0; i < cache.n_orig; ++i)
+            if (cache.orig_index(i) != 0)
+            {
+                cache.freq(0) = cache.orig_freq(i);
+                break;
+            }
     cache.freq *= (float)qd_qrt_freq_scale(cache.freq.memptr(), cache.freq.n_elem, cache.version);
     cache.orig_freq *= (float)qd_qrt_freq_scale(cache.orig_freq.memptr(), cache.orig_freq.n_elem, cache.version);
 
@@ -348,16 +352,15 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
 # qrt_file_init
 Create a new QRT file and write its metadata header
 
-- Writes a v5 (EM) or v6 (scalar) header: frequencies, CIR positions/orientations, RX (MT) metadata, and a reserved BS (TX) region.
-- Writes no path data. The BS position/orientation rows and the BS index table are reserved as zeros; each [[qrt_file_append]] call fills the next free slot.
-- CIR orientation is stored compressed: only the angle columns that carry a nonzero value after conversion to `float` are written,
-  encoded in a per-file format byte. [[qrt_file_append]] reads this byte from the file.
-- `n_orig` fixes the number of TX slots; the file can hold at most that many appended TX blocks.
-- Positional data is converted to `float` on write regardless of `dtype`.
+- Writes the header of a QRT file: the frequencies, the CIR positions and orientations, the destinations and `n_orig`
+  empty origin slots; [[qrt_file_append]] then writes the paths of one origin per call
+- An EM file (version 5) stores a polarization transfer matrix per path and frequency, a scalar file (version 6, e.g.
+  acoustic) one complex coefficient
+- Values are stored as float32, the frequencies in Hz
+- All inputs are checked before the file is opened, so an invalid input leaves an existing file unchanged
 
 ## Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::qrt_file_init(
     const std::string &fn,
     const arma::Col<dtype> &center_freq,
@@ -370,19 +373,20 @@ void quadriga_lib::qrt_file_init(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
-  opened, so an invalid input throws and leaves an existing file unchanged)
-- **`center_freq`** — Center frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries; stored in Hz as `float`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
-- **`dest_names`** *(optional)* — Receiver (MT) names, at most 255 characters each; `[n_dest]`
-- **`cir_offset`** *(optional)* — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
-- **`n_orig`** *(optional)* — Number of origin (TX) slots to reserve; at least 1
-- **`scalar_mode`** *(optional)* — `true` writes a v6 scalar-layout file, `false` a v5 EM file
+- **`fn`** — File name; an existing file is overwritten
+- **`center_freq`** — Frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries
+- **`cir_pos`** — CIR positions in m, one row per CIR; `[n_cir, 3]`, `n_cir = 0` allowed
+- **`cir_orientation`** — CIR orientations (bank, tilt, heading) in rad; `[n_cir, 3]`; empty = zeros
+- **`dest_names`** *(optional)* — Destination names, at most 255 characters each; `[n_dest]`; omitted: one destination
+  `RX` with `cir_offset` `{0}`
+- **`cir_offset`** *(optional)* — Number of CIRs before each destination, i.e. the 0-based index of its first CIR; the
+  first entry 0, non-decreasing, at most `n_cir` (a destination may have no CIRs); `[n_dest]`
+- **`n_orig`** *(optional)* — Number of origin slots, at least 1
+- **`scalar_mode`** *(optional)* — `true`: scalar file (version 6); `false`: EM file (version 5)
 
 ## See also:
-- [[qrt_file_append]] (write one TX block into a reserved slot)
-- [[qrt_file_read]] (read CIR data back)
+- [[qrt_file_append]] (writes the paths of an origin)
+- [[qrt_file_read]] (reads CIRs)
 MD!*/
 
 template <typename dtype>
@@ -418,6 +422,9 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
         throw std::invalid_argument("Input 'dest_names' has too many entries.");
     if (cir_offset.n_elem != 0 && cir_offset[0] != 0)
         throw std::invalid_argument("Input 'cir_offset' must start with 0.");
+    for (arma::uword i = 1; i < cir_offset.n_elem; ++i)
+        if (cir_offset[i] < cir_offset[i - 1] || (arma::uword)cir_offset[i] > cir_pos.n_rows)
+            throw std::invalid_argument("Input 'cir_offset' must be non-decreasing and at most the number of CIRs.");
     for (const auto &name : dest_names)
         if (name.size() > 255)
             throw std::invalid_argument("Entries of 'dest_names' cannot exceed 255 characters.");
@@ -514,18 +521,18 @@ template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const a
 
 /*!MD
 # qrt_file_append
-Append one transmitter's path data to an existing QRT file
+Append the paths of one origin to an existing QRT file
 
-- Writes the path data for a single TX into the next free slot reserved by [[qrt_file_init]], and records the TX name, position, and orientation.
-- Paths are grouped by their CIR index (`path::i_cir`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
-- Validates every path before writing: `i_cir` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
-- Throws when all TX slots are already filled — the file holds at most the `n_orig` slots reserved at init.
-- Only v5/6 files can be appended to. Positional data is converted to `float` on write.
-- Returns the total number of paths written.
+- Writes the paths of one origin (e.g. a Tx) into the next free origin slot of a file of [[qrt_file_init]], with the
+  name, position and orientation of the origin
+- A path belongs to the CIR of its index `i_cir`; the paths of one CIR keep their order in `path_data`
+- The file stores the interaction points, coefficients and interaction type codes of each path; `length` and the
+  counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [[path]] are not stored
+- All inputs are checked before anything is written; a file whose origin slots are all written throws
+  `std::runtime_error`
 
 ## Declaration:
 ```
-template <typename dtype>
 size_t quadriga_lib::qrt_file_append(
     const std::string &fn,
     const std::vector<quadriga_lib::path> &path_data,
@@ -535,18 +542,20 @@ size_t quadriga_lib::qrt_file_append(
 ```
 
 ## Inputs:
-- **`fn`** — Path to an existing QRT file created by [[qrt_file_init]]
-- **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
-- **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
-- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; empty = zeros
-- **`orig_name`** *(optional)* — Transmitter name; at most 255 characters
+- **`fn`** — File name of a QRT file of version 5 or 6
+- **`path_data`** — Paths of the origin; `i_cir` below `n_cir` of the file, `n_freq()` and the mode
+  (`is_scalar()`) as in the file
+- **`orig_pos`** — Origin position in m, finite; `[3, 1]` or `[1, 3]`
+- **`orig_orientation`** *(optional)* — Origin orientation (bank, tilt, heading) in rad, finite; `[3, 1]` or
+  `[1, 3]`; empty = zeros
+- **`orig_name`** *(optional)* — Origin name, at most 255 characters
 
 ## Returns:
-- Number of paths written across all CIRs.
+- Number of paths written
 
 ## See also:
-- [[qrt_file_init]] (create the file and reserve TX slots)
-- [[qrt_file_read]] (read the appended data back)
+- [[qrt_paths_from_scatterers]] (paths from spherical path data)
+- [[qrt_file_read_raw]] (reads the paths back)
 MD!*/
 
 template <typename dtype>
@@ -765,12 +774,13 @@ template size_t quadriga_lib::qrt_file_append<double>(const std::string &fn, con
 # qrt_file_parse
 Read metadata from a QRT file
 
-- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version.
-- All output arguments are optional; pass `nullptr` to skip any.
-- If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
-- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
-- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
-  or if a count or offset in it does not fit the file size.
+- Reads the header of a QRT file: counts, names, frequencies, the positions and orientations of the CIRs and the
+  origins, and the file version; no path data
+- All outputs are optional (`nullptr` skips one) and must be distinct objects; they are set after the whole header is
+  read
+- A file without destinations reports one destination `RX` that owns all CIRs
+- Throws `std::runtime_error` for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is
+  truncated or corrupt
 
 ## Declaration:
 ```
@@ -793,23 +803,31 @@ void quadriga_lib::qrt_file_parse(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file
-- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
+- **`fn`** — File name; not used when `file` is given
+- **`file`** *(optional)* — Open binary stream of the file in a good state, left open; `nullptr` opens and closes the
+  file
 
 ## Outputs:
-- **`n_cir`** *(optional)* — Number of channel snapshots per origin point
-- **`n_orig`** *(optional)* — Number of origin points (TX)
-- **`n_dest`** *(optional)* — Number of destination points (RX)
-- **`n_freq`** *(optional)* — Number of frequency bands
-- **`cir_offset`** *(optional)* — Number of CIRs before each destination (offset of its first CIR), the first entry 0; `[n_dest]`
-- **`orig_names`** *(optional)* — Names of origin points; `[n_orig]`
-- **`dest_names`** *(optional)* — Names of destination points; `[n_dest]`
-- **`version`** *(optional)* — QRT file version number
-- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); `[n_freq]`
-- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[n_cir, 3]`
-- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[n_cir, 3]`
-- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[n_orig, 3]`
-- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles; `[n_orig, 3]`
+- **`n_cir`** *(optional)* — Number of CIRs of each origin
+- **`n_orig`** *(optional)* — Number of origin slots
+- **`n_dest`** *(optional)* — Number of destinations, at least 1
+- **`n_freq`** *(optional)* — Number of frequencies
+- **`cir_offset`** *(optional)* — Number of CIRs before each destination, i.e. the 0-based index of its first CIR;
+  `[n_dest]`
+- **`orig_names`** *(optional)* — Origin names, empty for a slot not written yet; `[n_orig]`
+- **`dest_names`** *(optional)* — Destination names; `[n_dest]`
+- **`version`** *(optional)* — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar)
+- **`center_freq`** *(optional)* — Frequencies in Hz; `[n_freq]`. Version 4 stores GHz and one frequency per origin,
+  this is the one of the first written origin (0 if none is written); version 5 files of earlier library versions store
+  GHz too, a version 5 list with all values below 1000 is read as GHz
+- **`cir_pos`** *(optional)* — CIR positions in m; `[n_cir, 3]`
+- **`cir_orientation`** *(optional)* — CIR orientations (bank, tilt, heading) in rad; `[n_cir, 3]`
+- **`orig_pos`** *(optional)* — Origin positions in m, zeros for a slot not written yet; `[n_orig, 3]`
+- **`orig_orientation`** *(optional)* — Origin orientations (bank, tilt, heading) in rad; `[n_orig, 3]`
+
+## See also:
+- [[qrt_file_read]] (reads CIRs)
+- [[qrt_read_cache_init]] (the same metadata as a cache for repeated reads)
 MD!*/
 
 void quadriga_lib::qrt_file_parse(const std::string &fn,
@@ -863,7 +881,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
     size_t pos = 11 + 3 * sizeof(unsigned); // read position (ID, version, 3 counters)
 
-    arma::fvec l_freq(1, arma::fill::zeros); // Version 4: read from the first origin below; 0 Hz if there is no origin
+    arma::fvec l_freq(1, arma::fill::zeros); // Version 4: read from the first written origin below; 0 Hz if none is written
     if (ver > 4)
         qrt_read_freq_list(fileR, file_size, pos, l_no_freq, l_freq);
 
@@ -952,6 +970,9 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
     if (l_cir_index.n_elem == 0 || l_cir_index[0] != 0)
         throw std::runtime_error("Invalid CIR index in QRT file. Potential file corruption.");
+    for (arma::uword i = 1; i < l_cir_index.n_elem; ++i) // Destinations own runs of consecutive CIRs
+        if (l_cir_index[i] < l_cir_index[i - 1] || l_cir_index[i] > l_no_cir)
+            throw std::runtime_error("Invalid CIR index in QRT file. Potential file corruption.");
 
     // Read origin names — requires seeking to each origin's data block
     std::vector<std::string> l_orig_names;
@@ -979,11 +1000,16 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
         }
     }
 
-    if (center_freq && ver == 4 && l_no_orig != 0)
+    arma::uword i_first = 0; // Version 4: the first written origin; offset 0 marks an origin not written yet
+    while (ver == 4 && i_first < l_orig_index.n_elem && l_orig_index(i_first) == 0)
+        ++i_first;
+    if (center_freq && ver == 4 && l_no_orig != 0 && i_first == l_orig_index.n_elem)
+        l_freq.zeros(1); // No origin written: frequency 0, as in qrt_read_cache_init
+    else if (center_freq && ver == 4 && l_no_orig != 0)
     {
-        // In version 4 the frequency is stored per-origin; read from the first origin
-        qrt_check_offset(file_size, l_orig_index(0), "orig_index");
-        fileR.seekg((std::streampos)l_orig_index(0));
+        // In version 4 the frequency is stored per origin; read from the first written origin
+        qrt_check_offset(file_size, l_orig_index(i_first), "orig_index");
+        fileR.seekg((std::streampos)l_orig_index(i_first));
 
         uint8_t tx_name_length = 0;
         fileR.read((char *)&tx_name_length, sizeof(uint8_t));
@@ -1043,25 +1069,15 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 # qrt_file_read
 Read ray-tracing CIR data from a QRT file
 
-- Reads the channel impulse response data of a list of CIRs (snapshots) of one origin point.
-- All output arguments are optional; pass `nullptr` to skip any. Per-CIR outputs are vectors with one entry per
-  requested CIR; positions and orientations have one column per requested CIR.
-- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
-  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
-  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
-  that traversal.
-- Without a `cache`, each call reads the whole file header first. To read a file in parts (e.g. in chunks of CIRs,
-  to bound the memory), pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache; the
-  per-CIR I/O is then 2 seeks and 4 reads. `fn` is ignored when both `file` and `cache` are provided.
-- Reading a TX slot that was reserved by [[qrt_file_init]] but not yet written by [[qrt_file_append]] returns
-  empty path outputs with zeroed positions, rather than throwing.
-- Path data is read only when a path output (`fbs_pos` to `interact_type`) is requested; positions and orientations
-  come from the header.
-- Throws `std::invalid_argument` for an index out of range, before any CIR is read or any output is changed. Throws `std::runtime_error` if
-  the file cannot be opened, is not a QRT file of a supported version, is truncated, or if a count or offset in it
-  does not fit the file size or the path blocks of different requested CIRs overlap (path data: only when it is
-  read); outputs may then be partly written. A message about
-  one requested CIR starts with `"Snapshot <k>: "`, with k its position in `i_cir`.
+- Reads the paths of a list of CIRs of one origin, with the positions and orientations of both ends: the inputs of
+  [[get_channels_spherical]] (`fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, `polmat`) or
+  [[get_channels_planar]] (the angles)
+- All outputs are optional (`nullptr` skips one) and must be distinct objects. Per-CIR outputs have one entry per
+  requested CIR, positions and orientations one column; the path data is read only when a path output (`fbs_pos` to
+  `interact_type`) is requested
+- `uplink` swaps the ends: the origin becomes the receiver (see Notes)
+- Without a `cache`, each call reads the whole file header first. To read a file in parts (e.g. in chunks of CIRs, to
+  bound the memory), pass an open stream and a cache of [[qrt_read_cache_init]] (Example)
 
 ## Declaration:
 ```
@@ -1094,45 +1110,35 @@ void quadriga_lib::qrt_file_read(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
-- **`i_cir`** *(optional)* — CIR (snapshot) indices, 0-based; `[n_out]`; empty = all CIRs of the file (`n_out = 0` for a file
-  without CIRs)
-- **`i_orig`** *(optional)* — Origin index, 0-based
-- **`uplink`** *(optional)* — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
-- **`normalize_polmat`** *(optional)* — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
-  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
-  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
-
-    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
-    | ------------- | ----------------------------------------------- | -------------------------------- |
-    | 0             | As stored in QRT file                           | -PL                              |
-    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
-
-  Other values throw `std::invalid_argument`.
-- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
-- **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
+- **`fn`** — File name; not used when `file` is given
+- **`i_cir`** *(optional)* — CIR indices, 0-based, below `n_cir`; empty = all CIRs of the file; `[n_out]`
+- **`i_orig`** *(optional)* — Origin index, 0-based, below `n_orig`
+- **`uplink`** *(optional)* — `false`: origin = Tx, destination = Rx; `true`: origin = Rx, destination = Tx
+- **`normalize_polmat`** *(optional)* — Scaling of `polmat` and `path_gain`, 0 or 1 (see Notes)
+- **`file`** *(optional)* — Open binary stream of the file, left open
+- **`cache`** *(optional)* — Metadata of the file from [[qrt_read_cache_init]]
 
 ## Outputs:
-- **`center_freq`** *(optional)* — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** *(optional)* — Transmitter positions in Cartesian coordinates; `[3, n_out]`
-- **`tx_orientation`** *(optional)* — Transmitter orientations (bank, tilt, heading); `[3, n_out]`
-- **`rx_pos`** *(optional)* — Receiver positions in Cartesian coordinates; `[3, n_out]`
-- **`rx_orientation`** *(optional)* — Receiver orientations (bank, tilt, heading); `[3, n_out]`
-- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[n_out]` of `[3, n_path]`
-- **`path_gain`** *(optional)* — Path gain on linear scale; `[n_out]` of `[n_path, n_freq]`
-- **`path_length`** *(optional)* — Absolute path length TX to RX phase center; `[n_out]` of `[n_path]`
-- **`polmat`** *(optional)* — Polarization transfer matrix; `[n_out]` of `[8, n_path, n_freq]`, or `[2, n_path, n_freq]` for v6 files
-- **`aod`** *(optional)* — Departure azimuth angles; `[n_out]` of `[n_path]`
-- **`eod`** *(optional)* — Departure elevation angles; `[n_out]` of `[n_path]`
-- **`aoa`** *(optional)* — Arrival azimuth angles; `[n_out]` of `[n_path]`
-- **`eoa`** *(optional)* — Arrival elevation angles; `[n_out]` of `[n_path]`
-- **`path_coord`** *(optional)* — Interaction coordinates per path; `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
-- **`n_interact`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS; `[n_out]` of `[n_path]`
-- **`coord`** *(optional)* — Interaction coordinates; `[n_out]` of `[3, sum(n_interact)]`
-- **`interact_type`** *(optional)* — Interaction type codes, concatenated per path and segmented by `n_interact`; `[n_out]` of `[sum(n_interact)]`.
-  Empty for v4 legacy files. GBSM paths of [[qrt_paths_from_scatterers]] carry 129 (GR) and 193 (NLOS); LOS and GR
-  paths are not marked as GBSM.
+- **`center_freq`** *(optional)* — Frequencies in Hz (version 4: of origin `i_orig`); `[n_freq]`
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in m; `[3, n_out]`
+- **`tx_orientation`**, **`rx_orientation`** *(optional)* — Tx and Rx orientations (bank, tilt, heading) in rad;
+  `[3, n_out]`
+- **`fbs_pos`**, **`lbs_pos`** *(optional)* — First- and last-bounce scatterer positions in m: the first and the
+  last interaction point, the midpoint of Tx and Rx for a LOS path; `[n_out]` of `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain, linear (see Notes); `[n_out]` of `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Length of the polyline from the Tx through the interaction points to the Rx in m;
+  `[n_out]` of `[n_path]`
+- **`polmat`** *(optional)* — Polarization transfer matrix, `[n_out]` of `[8, n_path, n_freq]`; version 6: the
+  complex scalar coefficient, `[n_out]` of `[2, n_path, n_freq]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Azimuth and elevation of departure (at the Tx) and
+  arrival (at the Rx) in rad; `[n_out]` of `[n_path]`
+- **`path_coord`** *(optional)* — Points of each path from the Tx through the interaction points to the Rx;
+  `[n_out]` of `[n_path]` of `[3, n_interact + 2]`
+- **`n_interact`** *(optional)* — Number of interaction points of each path, 0 = LOS; `[n_out]` of `[n_path]`
+- **`coord`** *(optional)* — Interaction points of all paths, concatenated in path order; `[n_out]` of
+  `[3, sum(n_interact)]`
+- **`interact_type`** *(optional)* — Interaction type codes ([[ray_state_update]]), concatenated like `coord`;
+  `[n_out]` of `[sum(n_interact)]`; empty for version 4 files
 
 ## Example:
 ```
@@ -1151,9 +1157,35 @@ for (arma::uword i0 = 0; i0 < cache.n_cir; i0 += 256)
 }
 ```
 
+## Notes:
+- **Path gain**: the file stores per path the coefficients with the interaction (material) losses; the reader adds the
+  propagation loss of the path length $d$, for EM files (versions 4 and 5) the free-space loss
+  $\mathrm{PL} = 32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d / \mathrm{m})$ dB, for scalar files (version 6)
+  the spherical spreading and the air absorption $\alpha(f)$ of ISO 9613-1 at 20 °C, 50 % humidity and 1 atm,
+  $\mathrm{PL} = 20 \log_{10}(d / \mathrm{m}) + \alpha(f) \, d$ dB. With $p$ the larger column power of the stored
+  matrix (version 6: the power of the coefficient):<br><br>
+  | `normalize_polmat` | `polmat` | `path_gain` |
+  | ------------------ | -------- | ----------- |
+  | 0 | As stored | $10^{-\mathrm{PL}/10}$ |
+  | 1 | Stored matrix divided by $\sqrt{p}$: largest column power 1 (uplink: row power) | $p \cdot 10^{-\mathrm{PL}/10}$ |
+
+- **Uplink**: `polmat` is the transpose of the downlink matrix (reciprocal channel, no conjugation) with the same
+  `path_gain`; positions, orientations, angles, `fbs_pos`, `lbs_pos` and `path_coord` swap their ends.
+  `n_interact`, `coord` and `interact_type` keep the stored order from the origin to the destination, and the type
+  codes describe that traversal
+- An origin slot that is not written yet gives zero positions and orientations and no paths
+- GBSM paths of [[qrt_paths_from_scatterers]] and [[export_rays_qrt]] carry the code 193 at their scatterers; their
+  LOS and GR paths look like ray-traced ones (no interaction, one reflection 129)
+- **Errors**: an index out of range throws `std::invalid_argument` before any output is changed. A file that cannot be
+  opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt (counts or offsets beyond the file, path
+  blocks of different CIRs that overlap; path data only when it is read) throws `std::runtime_error`, and outputs may
+  then be partly written. A message about one requested CIR starts with `Snapshot <k>: `, with `k` its position in
+  `i_cir`
+
 ## See also:
-- [[qrt_read_cache_init]] (populate cache for reading a file in parts)
-- [[qrt_file_parse]] (extract file metadata without reading CIR data)
+- [[qrt_read_cache_init]] (cache for reading a file in parts)
+- [[qrt_file_parse]] (metadata without path data)
+- [[qrt_file_read_raw]] (the stored paths as path objects)
 MD!*/
 
 // Reads one CIR, with the file metadata from the cache; the stream is open and the indices are checked
@@ -1712,19 +1744,14 @@ template void qd_qrt_file_read_impl(const std::string &fn, const arma::uvec &i_c
 
 /*!MD
 # qrt_file_read_raw
-Read raw ray-tracing path data from a QRT file into path objects
+Read the stored paths of one origin of a QRT file as path objects
 
-- Reassembles the stored path data for a single origin (TX) into a vector of [[path]] objects — the inverse of [[qrt_file_append]].
-- Unlike [[qrt_file_read]], which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage:
-  coordinates, polarization coefficients, and interaction type codes.
-- Each returned path has `i_cir` set to its CIR index. Counters not stored in the file
-  (`n_ref`, `n_tra`, `n_sub`, `n_sct`) and `length` are left at their defaults.
-- Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
-- An origin slot that was reserved by [[qrt_file_init]] but never written by [[qrt_file_append]] returns an empty vector.
-- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
-  if a count or offset in it does not fit the file size, or if the path blocks of different CIRs overlap.
-- For tight loops over many origins, pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache to avoid
-  re-parsing the header on each call.
+- Returns the paths that [[qrt_file_append]] wrote for origin `i_orig`, CIR by CIR, each with its CIR index `i_cir`,
+  interaction points, coefficients and interaction type codes; [[qrt_file_read]] returns the same data as CIR data
+- `length` and the counters `n_ref`, `n_tra`, `n_sub`, `n_sct` of [[path]] are not stored and stay 0
+- An origin slot that is not written yet gives an empty vector
+- To read many origins, pass an open stream and a cache of [[qrt_read_cache_init]], so that the header is read once
+- Throws `std::runtime_error` for version 4 files and for file errors as [[qrt_file_read]]
 
 ## Declaration:
 ```
@@ -1736,18 +1763,18 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
-- **`i_orig`** *(optional)* — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
-- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
-- **`cache`** *(optional)* — Pre-parsed metadata from [[qrt_read_cache_init]]; pass `nullptr` to parse the header on this call
+- **`fn`** — File name; not used when `file` is given
+- **`i_orig`** *(optional)* — Origin index, 0-based, below `n_orig`
+- **`file`** *(optional)* — Open binary stream of the file in a good state, left open; `nullptr` opens and closes the
+  file
+- **`cache`** *(optional)* — Metadata of the file from [[qrt_read_cache_init]]
 
 ## Returns:
-- Vector of [[path]] objects for the requested origin, one per stored path across all CIRs; empty if the origin slot is unwritten.
+- Paths of the origin in CIR order; `[n_path]`
 
 ## See also:
-- [[qrt_file_append]] (write path data — the inverse operation)
-- [[qrt_read_cache_init]] (populate cache for fast repeated reads)
-- [[qrt_file_read]] (read processed CIR data instead of raw paths)
+- [[qrt_file_append]] (writes the paths)
+- [[qrt_file_read]] (reads the paths as CIR data)
 MD!*/
 
 std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::string &fn,
@@ -1909,12 +1936,12 @@ Path objects of one CIR from spherical path data, for qrt_file_append
   [[qrt_file_append]]; one call per CIR, the objects of all CIRs of one origin appended together
 - Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `n_ref` = 1); NLOS two point scatterers at
   `fbs_pos`, `lbs_pos` (code 193, `n_sct` = 2); `length` = polyline from the Tx to the last interaction. Counters
-  and `length` exist on the returned objects only ([[qrt_file_read_raw]] returns 0): files store the codes
+  and `length` exist on the returned objects only, files store the codes ([[qrt_file_read_raw]] returns 0)
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
   [[qrt_file_read]] (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
-- `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]]:
-  `qrt_file_read` recomputes the lengths from the stored positions; not checked
+- `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]], since
+  [[qrt_file_read]] recomputes the lengths from the stored positions; not checked
 - Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
   0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
@@ -1922,7 +1949,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
 
 ## Declaration:
 ```
-std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
+std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
@@ -1935,12 +1962,13 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 ```
 
 ## Inputs:
-- **`center_freq`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
-- **`tx_pos`** — Tx (origin) position in [m]; `[3, 1]` or `[1, 3]`
-- **`rx_pos`** — Rx position of the CIR in [m]; `[3, 1]` or `[1, 3]`
-- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
-- **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
-- **`polmat`** — Polarization transfer matrices, row order of [[get_channels_spherical]]; `[8, n_path, n_freq]`
+- **`center_freq`** — Frequencies in Hz, finite and > 0, 1 to 127 entries; `[n_freq]`
+- **`tx_pos`** — Tx (origin) position in m, finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Rx position of the CIR in m, finite; `[3, 1]` or `[1, 3]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m, finite (GR: `lbs_pos`);
+  `[3, n_path]`
+- **`path_gain`** — Path gains, linear, finite and >= 0; `[n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, finite; `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::i_cir`, < 2^32
 

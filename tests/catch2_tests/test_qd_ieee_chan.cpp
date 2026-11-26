@@ -36,7 +36,7 @@ static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double
 
     for (arma::uword i = 0; i < w; ++i)
     {
-        quadriga_lib::baseband_freq_response<double>(
+        quadriga_lib::freq_response<double>(
             chan.coeff_re[i],
             chan.coeff_im[i],
             chan.delay[i],
@@ -359,7 +359,7 @@ TEST_CASE("IEEE Chan - A + Doppler Shift")
     arma::cx_mat H(pilot_grid.n_elem, w);
     for (arma::uword i = 0; i < w; ++i)
     {
-        quadriga_lib::baseband_freq_response<double>(chan[0].coeff_re[i], chan[0].coeff_im[i], chan[0].delay[i], pilot_grid, BW, nullptr, nullptr, &hmat);
+        quadriga_lib::freq_response<double>(chan[0].coeff_re[i], chan[0].coeff_im[i], chan[0].delay[i], pilot_grid, BW, nullptr, nullptr, &hmat);
         H.col(i) = arma::vectorise(hmat);
     }
 
@@ -437,7 +437,7 @@ TEST_CASE("IEEE Chan - C + TGn Bell Doppler integrated shape")
 
     for (arma::uword i = 0; i < w; ++i)
     {
-        quadriga_lib::baseband_freq_response<double>(
+        quadriga_lib::freq_response<double>(
             chan[0].coeff_re[i],
             chan[0].coeff_im[i],
             chan[0].delay[i],
@@ -829,9 +829,9 @@ TEST_CASE("IEEE Chan - Reciprocity")
                 // Frequency domain: H_up(f) = H_down(f)^T at every frequency, within single precision (the DFT
                 // computes sin / cos and sums in float)
                 arma::cx_cube hmat_down, hmat_up;
-                quadriga_lib::baseband_freq_response<double>(dl.coeff_re[s], dl.coeff_im[s], dl.delay[s],
+                quadriga_lib::freq_response<double>(dl.coeff_re[s], dl.coeff_im[s], dl.delay[s],
                                                              pilot_grid, 100e6, nullptr, nullptr, &hmat_down);
-                quadriga_lib::baseband_freq_response<double>(ul.coeff_re[s], ul.coeff_im[s], ul.delay[s],
+                quadriga_lib::freq_response<double>(ul.coeff_re[s], ul.coeff_im[s], ul.delay[s],
                                                              pilot_grid, 100e6, nullptr, nullptr, &hmat_up);
                 REQUIRE(hmat_up.n_slices == hmat_down.n_slices);
                 for (arma::uword f = 0; f < hmat_down.n_slices; ++f)

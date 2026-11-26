@@ -5,26 +5,20 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Channel generation functions
+Channel generators
 SECTION!*/
 
 /*!MD
 # GET_CHANNELS_IEEE_INDOOR
-Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
+Generate indoor MIMO channels of the IEEE TGn, TGac, TGah and TGax models
 
-- Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
-- 2D model: azimuth angles and planar motion only, no elevation
-- Supported channel types: `A, B, C, D, E, F` (TGn definitions)
-- MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
-- Time-evolving channels via `observation_time`, `update_interval`, and mobility parameters; `observation_time = 0.0` yields a static channel
-- Floor penetration loss according to TGah for `center_freq` < 1 GHz and TGax for above 1 GHz; floors add attenuation
-  (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP
-- Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls
-- Time evolution: each sub-path is rotated by `exp(+j 2 pi f_D t)`, i.e. a station moving towards the AP or a scatterer
-  sees a positive Doppler shift `f_D`, as the channel of [[get_channels_spherical]] along the returned station positions
-- Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation),
-  so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)
-- Override parameters (`kf`, `xpr_nlos`, `sf_std_los_dB`, `sf_std_nlos_dB`, `dist_breakpoint`): `NaN` or `[]` selects the model default
+- Channels of the IEEE 802.11 indoor models A to F (TGn), with the TGac extensions (several users with offset angles,
+  tap interpolation for shorter tap spacings), the floor loss of TGah below 1 GHz and the floor and wall loss of TGax
+  above; one channel per user
+- 2D model: azimuth angles only and motion in the horizontal plane; [[get_channels_planar]] computes the coefficients
+  with the AP and station arrays
+- Static channels (`observation_time = 0`, one snapshot) or time-evolving channels with the Doppler shifts of the
+  station and the environment
 
 ## Usage:
 ```
@@ -35,59 +29,80 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 ```
 
 ## Inputs:
-- **`ap_array`** — Access point antenna array; `n_tx` = number of ports; see [[generate_antenna]]
-- **`sta_array`** — Mobile station antenna array; `n_rx` = number of ports; see [[generate_antenna]]
-- **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
-- **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
-- **`n_users`** — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`; default: 1
-- **`observation_time`** — Channel observation time in seconds; must be finite; default: 0
-- **`update_interval`** — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`; default: 1e-3
-- **`speed_station_kmh`** — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`; default: 0
-- **`speed_env_kmh`** — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`; default: 1.2 (TGn)
-- **`dist`** — TX-to-RX distance(s) in meters (finite, > 0); `[n_users]` or `[1]`; default: 4.99
-- **`n_floors`** — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`; default: 0
-- **`uplink`** — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink; default: false
-- **`offset_angles_deg`** — Azimuth offset angles in degrees (finite); rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; `[4, n_users]`;
-  default: `[]` (TGac auto-defaults for `n_users > 1`)
-- **`n_subpath`** — Sub-paths per cluster for Laplacian angular spread mapping; default: 20
-- **`doppler_effect`** — Special Doppler: models D/E use the mains frequency in Hz, model F the vehicle speed in km/h (finite, >= 0); 0 disables; default: 50
-- **`seed`** — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device; default: -1
-- **`kf`** — Overrides the model KF (linear scale), finite and >= 0; default: A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0;
-  applied to first tap only; with `kf` given, the LOS path is kept also beyond the breakpoint and on other floors
-- **`xpr_nlos`** — Overrides the NLOS cross-polarization ratio (linear scale), finite and > 0;
-  default: 2 (3 dB)
-- **`sf_std_los_dB`** — Overrides the LOS shadow fading std in dB (applied when d < breakpoint), finite and >= 0; default: 3 dB, 2 dB below 1 GHz (TGah)
-- **`sf_std_nlos_dB`** — Overrides the NLOS shadow fading std in dB (applied when d >= breakpoint), finite and >= 0;
-  default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB, each 1 dB lower below 1 GHz (TGah)
-- **`dist_breakpoint`** — Overrides the breakpoint distance in meters, finite and > 0; default: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
-- **`n_walls`** — Number of walls per user TGax models; `[n_users]` or `[1]`; default: 0
-- **`wall_loss_dB`** — Penetration loss for a single wall in dB (finite); TGax defines 5 or 7; default: 5
+- **`ap_array`**, **`sta_array`** — AP and station array, struct, fields in [[generate_antenna]]; `n_ap` and `n_sta`
+  ports
+- **`channel_type`** — Model: `'A'`, `'B'`, `'C'`, `'D'`, `'E'` or `'F'`
+- **`center_freq`** — Carrier frequency in Hz, finite, above 100 MHz; default: 5.25e9
+- **`tap_spacing`** — Tap spacing in s, 10 ns divided by a power of 2; default: 10e-9
+- **`n_users`** — Number of users, >= 1; default: 1
+- **`observation_time`** — Observation time in s, finite, >= 0; 0: one snapshot; default: 0
+- **`update_interval`** — Time between snapshots in s, finite, > 0; default: 1e-3
+- **`speed_station_kmh`** — Station speed in km/h, finite; default: 0
+- **`speed_env_kmh`** — Speed of the environment in km/h, finite; TGn 1.2, TGac 0.089; default: 1.2
+- **`dist`** — Horizontal AP-station distance in m per user, finite, > 0; one value for all users or `[n_users, 1]`;
+  default: 4.99
+- **`n_floors`** — Floors between AP and station per user, 0 to 4; one value or `[n_users, 1]`; default: 0
+- **`uplink`** — Return the uplink, with the station as Tx; default: `false`
+- **`offset_angles_deg`** — Offset angles in degrees per user, finite; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS;
+  `[4, n_users]`; default: `[]` (0 for one user, the pseudo-random offsets of TGac for several)
+- **`n_subpath`** — Sub-paths per tap, >= 1; default: 20
+- **`doppler_effect`** — Special Doppler (Notes): the mains frequency in Hz for models D and E, the vehicle speed in
+  km/h for model F; finite, >= 0; 0 disables it; default: 50
+- **`seed`** — Seed of the random numbers; -1: the system random device; other values give the same channels on all
+  platforms; default: -1
+- **`kf`** — Ricean K-factor of the first tap, linear, finite, >= 0; default: `NaN` (model default, Notes)
+- **`xpr_nlos`** — Cross-polarization ratio of the NLOS paths, linear, finite, > 0; default: `NaN` (model default)
+- **`sf_std_los_dB`**, **`sf_std_nlos_dB`** — Standard deviation of the shadow fading in dB below and above the
+  breakpoint distance, finite, >= 0; default: `NaN` (model default)
+- **`dist_breakpoint`** — Breakpoint distance in m, finite, > 0; default: `NaN` (model default)
+- **`n_walls`** — Walls between AP and station per user (TGax); one value or `[n_users, 1]`; default: 0
+- **`wall_loss_dB`** — Loss of one wall in dB, finite; TGax: 5 or 7; default: 5
 
 ## Output:
-- **`chan`**<br>
-  Struct array of length `n_users` containing the channel data with the following fields:<br><br>
-  | Field              | Description                                                              | Type                                  |
-  | ------------------ | ------------------------------------------------------------------------ | ------------------------------------- |
-  | `name`             | Channel name                                                             | String                                |
-  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | Size: `[3, 1]` or `[3, n_snap]`       |
-  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | Size: `[3, 1]` or `[3, n_snap]`       |
-  | `tx_orientation`   |  Transmitter orientation, Euler angles (AP for downlink, STA for uplink) | Size: `[3, 1]` or `[3, n_snap]`       |
-  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | Size: `[3, 1]` or `[3, n_snap]`       |
-  | `coeff_re`         | Channel coefficients, real part                                          | Size: `[n_rx, n_tx, n_path, n_snap]`  |
-  | `coeff_im`         | Channel coefficients, imaginary part                                     | Size: `[n_rx, n_tx, n_path, n_snap]`  |
-  | `delay`            | Propagation delays in seconds                                            | Size: `[n_rx, n_tx, n_path, n_snap]`  |
-  | `path_gain`        | Path gain before antenna, linear scale                                   | Size: `[n_path, n_snap]`              |
-  | `center_freq` | Center Frequency in Hz                                                   | Scalar                                |
+- **`chan`** — Channels, struct array `[1, n_users]`, fields in [[hdf5_read_channel]]: `name` (`'user_<i>'`, 0-based),
+  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff_re`, `coeff_im`, `delay`
+  `[n_rx, n_tx, n_path, n_snap]` (downlink `[n_sta, n_ap, n_path, n_snap]`) and `path_gain` `[n_path, n_snap]`: the
+  path powers without antennas, with path loss and shadow fading, whose mean over the snapshots is the power of the
+  model
+
+## Notes:
+- **Model defaults** (`NaN` in the override inputs), with the LOS shadow fading 3 dB and the NLOS XPR 2 (3 dB) for all
+  models; below 1 GHz (TGah) both shadow fading values are 1 dB lower:
+
+  | Model | A | B | C | D | E | F |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | KF, linear | 1 | 1 | 1 | 2 | 4 | 4 |
+  | Breakpoint distance in m | 5 | 5 | 5 | 10 | 20 | 30 |
+  | NLOS shadow fading in dB | 4 | 4 | 5 | 5 | 6 | 6 |
+
+- **LOS**: a user has a LOS path below the breakpoint distance on the floor of the AP, and always when `kf` is given;
+  the KF splits the power of the first tap between the LOS path and the first NLOS cluster
+- **Paths**: one per tap of the model tables with non-zero power, plus the LOS path; each tap sums `n_subpath` sub-paths
+  with Laplacian angular spreads. Below 10 ns `tap_spacing`, the taps are interpolated (TGac)
+- **Path loss** in dB at the distance $d$ = `dist`: $20 \lg(4\pi f_c / c) + 20 \lg d$ below the breakpoint distance
+  $d_\mathrm{BP}$, $20 \lg(4\pi f_c / c) + 20 \lg d_\mathrm{BP} + 35 \lg(d / d_\mathrm{BP})$ beyond, plus the floor
+  loss (TGah below 1 GHz, TGax above) and `n_walls` times `wall_loss_dB`. The shadow fading uses the LOS value below
+  the breakpoint, else the NLOS value; below 1 GHz on another floor, the TGah floor values replace it
+- **Geometry**: the AP at the origin, the station at the distance `dist` in the direction of the AoD LOS offset and
+  3 m higher per floor; floors add loss but no delay. The delays are relative to the LOS delay
+- **Time evolution**: `1 + floor(observation_time / update_interval)` snapshots, `update_interval` apart; each sub-path
+  turns by $e^{j 2\pi f_D t}$ with the Doppler shift $f_D$ of the station speed plus a random environment Doppler
+  (bell-shaped spectrum, TGn). The station moves along its heading, toward the AP for an AoA LOS offset of 0; moving
+  toward the AP or a scatterer gives a positive $f_D$, as [[get_channels_spherical]] along the returned station
+  positions
+- **Special Doppler** (`doppler_effect` > 0): models D and E modulate three taps with fluorescent light at the
+  harmonics of the mains frequency, model F adds the reflection of a moving vehicle to one tap (TGn)
+- **Uplink**: the coefficients and delays are the transposed downlink ones (reciprocal channel, no conjugation, the same
+  Doppler shift); the positions and orientations are swapped, the station is the Tx
 
 ## See also:
+- [[get_channels_planar]] (computes the coefficients)
+- [[hdf5_write_channel]] (store the channels)
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
 - <a target="_blank" rel="noopener noreferrer" href="publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf">S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025</a>
-- [[hdf5_write_channel]] (for writing channel data to a HDF5 file)
-- [[hdf5_read_channel]] (for reading channel data to a HDF5 file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

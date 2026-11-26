@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// get_channels_planar and get_channels_planar_vec: amplitudes, delays and Doppler of hand-placed paths between omni
+// get_channels_planar and its vector form: amplitudes, delays and Doppler of hand-placed paths between omni
 // elements (exact by construction), the coupling matrix, the slot layout of add_fake_los_path, zero paths, the tilt
 // sign, aliasing and shape checks; the AVX2 kernel and the vec form are compared with the GENERIC single call.
 
@@ -468,6 +468,36 @@ TEST_CASE("Get Channels Planar - Position and orientation shapes")
         }
 }
 
+TEST_CASE("Get Channels Planar - center_freq must be finite and >= 0")
+{
+    // center_freq: 0 (coefficients at f = 0) and positive values are accepted; negative and non-finite values throw
+    // before any output is written
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    const arma::vec aod = {0.0}, eod = {0.0}, aoa = {arma::datum::pi}, eoa = {0.0}, gain = {1.0}, length = {30.0};
+    const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t(), tx = arma::vec{0.0, 0.0, 1.0},
+                    rx = arma::vec{20.0, 0.0, 1.0}, o = arma::vec{0.0, 0.0, 0.0};
+    auto run = [&](double fc, arma::cube &cr, arma::cube &ci, arma::cube &dl)
+    { quadriga_lib::get_channels_planar(ant, ant, tx, o, rx, o, aod, eod, aoa, eoa, gain, length, M, cr, ci, dl, fc); };
+    arma::cube cr, ci, dl;
+    run(0.0, cr, ci, dl), run(1.0e9, cr, ci, dl);
+    for (double fc : {-1.0e9, -1.0, arma::datum::nan, arma::datum::inf})
+    {
+        arma::cube c_re = cr, d = dl, c_im = ci;
+        CHECK_THROWS_WITH(run(fc, c_re, c_im, d), "Input 'center_freq' must be finite and >= 0.");
+        CHECK(arma::approx_equal(c_re, cr, "absdiff", 0.0));
+        CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
+    }
+    std::vector<arma::vec> v1 = {aod}, v2 = {eod}, v3 = {aoa}, v4 = {eoa}, v5 = {gain}, v6 = {length};
+    std::vector<arma::mat> vm = {M};
+    std::vector<arma::cube> vr, vi, vd;
+    // Vector form: checked once before the snapshots (no "Snapshot" prefix), also without snapshots
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar(ant, ant, tx, o, rx, o, v1, v2, v3, v4, v5, v6, vm, vr, vi, vd, -1.0), "Input 'center_freq' must be finite and >= 0.");
+    const std::vector<arma::vec> ev;
+    const std::vector<arma::mat> em;
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar(ant, ant, tx, o, rx, o, ev, ev, ev, ev, ev, ev, em, vr, vi, vd, -1.0),
+                      "Input 'center_freq' must be finite and >= 0.");
+}
+
 TEST_CASE("Get Channels Planar - AVX2 interpolation agrees with GENERIC, auto is GENERIC")
 {
     auto tx = quadriga_lib::generate_antenna<double>("custom", 5.0, NAN, {90.0, 90.0});
@@ -545,10 +575,10 @@ TEST_CASE("Get Channels Planar - vec form equals single calls")
             std::vector<arma::cube> cr, ci, dl, cr2(2), ci2(2), dl2;
             std::vector<arma::vec> dop, dop2;
             std::vector<arma::cx_cube> cx;
-            quadriga_lib::get_channels_planar_vec<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, aod, eod, aoa, eoa, gain, len, M,
-                                                          cr, ci, dl, 3.5e9, false, fake_los, &dop);
-            quadriga_lib::get_channels_planar_vec<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, aod, eod, aoa, eoa, gain, len, M,
-                                                          cr2, ci2, dl2, 3.5e9, false, fake_los, &dop2, &cx);
+            quadriga_lib::get_channels_planar<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, aod, eod, aoa, eoa, gain, len, M,
+                                                      cr, ci, dl, 3.5e9, false, fake_los, &dop);
+            quadriga_lib::get_channels_planar<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, aod, eod, aoa, eoa, gain, len, M,
+                                                      cr2, ci2, dl2, 3.5e9, false, fake_los, &dop2, &cx);
             REQUIRE(cr.size() == n_snap);
             REQUIRE(dop.size() == n_snap);
             REQUIRE(cx.size() == n_snap);
@@ -583,18 +613,18 @@ TEST_CASE("Get Channels Planar - vec form equals single calls")
     const float *p = cr[0].memptr();
     const std::complex<float> *pc = cx[0].memptr();
     const arma::fmat z(3, 1, arma::fill::zeros), r = arma::fmat({10.0f, 0.0f, 0.0f}).t();
-    quadriga_lib::get_channels_planar_vec<float>(txf, txf, z, z, r, z, a1, a1, a1, a1, g1, l1, M1, cr, ci, dl, 1e9f);
+    quadriga_lib::get_channels_planar<float>(txf, txf, z, z, r, z, a1, a1, a1, a1, g1, l1, M1, cr, ci, dl, 1e9f);
     CHECK(cr[0].memptr() == p);
     CHECK(std::abs(dl[0](0) * 299792458.0f - 10.0f) < 1e-4f); // relative to LOS
-    quadriga_lib::get_channels_planar_vec<float>(txf, txf, z, z, r, z, a1, a1, a1, a1, g1, l1, M1, cr, ci, dl, 1e9f,
-                                                 false, false, nullptr, &cx);
+    quadriga_lib::get_channels_planar<float>(txf, txf, z, z, r, z, a1, a1, a1, a1, g1, l1, M1, cr, ci, dl, 1e9f,
+                                             false, false, nullptr, &cx);
     CHECK(cx[0].memptr() == pc);
     CHECK(cr.empty());
 
     // No snapshots: empty outputs
     std::vector<arma::fvec> e_v;
     std::vector<arma::fmat> e_m;
-    quadriga_lib::get_channels_planar_vec<float>(txf, txf, z, z, r, z, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl);
+    quadriga_lib::get_channels_planar<float>(txf, txf, z, z, r, z, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl);
     CHECK(cr.empty());
     CHECK(dl.empty());
 }
@@ -609,11 +639,11 @@ TEST_CASE("Get Channels Planar - vec form errors")
     std::vector<arma::cube> cr, ci, dl;
 
     std::vector<arma::vec> bad_len(2, arma::vec({0.0}));
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p1, p1, r1, p1, a, a, a, a, g, bad_len, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar<double>(ant, ant, p1, p1, r1, p1, a, a, a, a, g, bad_len, M, cr, ci, dl),
                       ContainsSubstring("must have the same length"));
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p2, p1, r1, p1, a, a, a, a, g, l, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar<double>(ant, ant, p2, p1, r1, p1, a, a, a, a, g, l, M, cr, ci, dl),
                       ContainsSubstring("1 or 'n_snap' columns"));
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p1, p1, arma::mat(r1.t()), p1, a, a, a, a, g, l, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar<double>(ant, ant, p1, p1, arma::mat(r1.t()), p1, a, a, a, a, g, l, M, cr, ci, dl),
                       ContainsSubstring("must have 3 rows"));
 
     // Invalid antenna and kernel throw without the snapshot prefix, also without snapshots
@@ -621,19 +651,19 @@ TEST_CASE("Get Channels Planar - vec form errors")
     bad.e_theta_re.reset();
     std::vector<arma::vec> e_v;
     std::vector<arma::mat> e_m;
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(bad, ant, p1, p1, r1, p1, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar<double>(bad, ant, p1, p1, r1, p1, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl),
                       ContainsSubstring("Input 'tx_array' is not valid: ") && !ContainsSubstring("Snapshot"));
-    CHECK_THROWS_AS(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p1, p1, r1, p1, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl,
-                                                                  0.0, false, false, nullptr, nullptr, 7),
+    CHECK_THROWS_AS(quadriga_lib::get_channels_planar<double>(ant, ant, p1, p1, r1, p1, e_v, e_v, e_v, e_v, e_v, e_v, e_m, cr, ci, dl,
+                                                              0.0, false, false, nullptr, nullptr, 7),
                     std::invalid_argument);
 
     // Errors of the single call name the lowest failing snapshot, also from the parallel region (40 snapshots)
     a.resize(40, a[0]), g.resize(40, g[0]), l.resize(40, l[0]), M.resize(40, M[0]);
     M[23] = arma::mat(7, 1, arma::fill::ones), M[5] = M[23];
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p1, p1, r1, p1, a, a, a, a, g, l, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar<double>(ant, ant, p1, p1, r1, p1, a, a, a, a, g, l, M, cr, ci, dl),
                       ContainsSubstring("Snapshot 5: "));
     std::vector<arma::cx_cube> cx;
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar_vec<double>(ant, ant, p1, p1, r1, p1, a, a, a, a, g, l, M, cr, ci, dl,
-                                                                    0.0, false, false, nullptr, &cx),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_planar<double>(ant, ant, p1, p1, r1, p1, a, a, a, a, g, l, M, cr, ci, dl,
+                                                                0.0, false, false, nullptr, &cx),
                       ContainsSubstring("Snapshot 5: "));
 }

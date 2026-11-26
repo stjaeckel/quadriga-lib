@@ -8,60 +8,62 @@
 #include "qd_helpers_shared.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
-# BASEBAND_FREQ_RESPONSE_MULTI
-Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
+# FREQ_RESPONSE_MF
+Frequency response of a MIMO channel from coefficients sampled at several frequencies
 
-- Interpolates the complex channel coefficients from the input frequencies `freq` to the output carrier
-  frequencies `freq_new` using SLERP (magnitude and unwrapped phase each linear), then applies the delay-induced
-  phase `exp(-j·2π·freq_new·delay)` per output carrier in double precision
-- One snapshot is a 4D array `[n_rx, n_tx, n_path, n_freq]`; a batch of snapshots is a cell array of such arrays
-  (`coeff_re`, `coeff_im` and `delay` cell arrays of the same length), processed in parallel; the number of paths may
-  differ between snapshots
-- Single-frequency coefficients with absolute output carriers: `n_freq = 1` (a 3D array), `freq` the frequency the
-  coefficients were generated at; with `remove_delay_phase = true` (the default) and coefficients that carry the delay
-  phase at `freq`, as the channel generators return them, this gives the result of [[baseband_freq_response]] with
-  `pilot_grid · bandwidth = freq_new - freq`
-- `delay` is frequency-independent: `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`; of a 4D `delay` (as returned by
-  [[get_channels_multifreq]]) only the first frequency is used
-- With `remove_delay_phase`, the channels from [[get_channels_multifreq]] / [[get_channels_spherical]] must be
-  generated with `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also
-  when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`,
-  which gives wrong phases (magnitudes stay right)
-- Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
+- The frequency response of one snapshot of a multi-frequency channel at the absolute carrier frequencies
+  $f_k$ = `freq_new(k)`: the coefficients of each path are interpolated from the input frequencies `freq` to $f_k$
+  and the delay phase is applied there, $H_k = \sum_l \tilde a_l(f_k) \, e^{-j 2\pi f_k \tau_l}$
+- Interpolation between the two neighbouring input frequencies: amplitude linear, phase along the shorter arc
+  (SLERP); constant outside the range of `freq`
+- `remove_delay_phase = true` interpolates the envelope $a_l(f_i) \, e^{j 2\pi f_i \tau_l}$ instead of $a_l(f_i)$, so
+  that the delay phase the channel generators include is not interpolated
+- One snapshot is a 4D array `[n_rx, n_tx, n_path, n_freq]`; several snapshots are cell arrays with one array per
+  snapshot (`coeff_re`, `coeff_im` and `delay` of the same length), computed in parallel; the number of paths may
+  differ between them
 
 ## Usage:
 ```
-[ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response_multi( coeff_re, coeff_im, delay, freq, freq_new, ...
+[ hmat_re, hmat_im ] = quadriga_lib.freq_response_mf( coeff_re, coeff_im, delay, freq, freq_new, ...
     remove_delay_phase, i_snap, use_kernel );
 ```
 
 ## Inputs:
-- **`coeff_re`** — Real part of the channel coefficients; `[n_rx, n_tx, n_path, n_freq]`, or a cell array of length
-  `n_snap` with one such array per snapshot
-- **`coeff_im`** — Imaginary part of the channel coefficients; same layout as `coeff_re`
-- **`delay`** — Path delays in seconds; an array `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` (a 4th dimension of length
-  `n_freq` is allowed, only the first frequency is used), or a cell array of length `n_snap` with one such array per
-  snapshot
-- **`freq`** — Input sample frequencies in Hz, sorted ascending; `[n_freq, 1]`
-- **`freq_new`** — Output carrier frequencies in Hz; `[n_carrier, 1]`
-- **`remove_delay_phase`** — Remove the delay phase `exp(-j·2π·freq·delay)` from the coefficients before the
-  interpolation and apply it again at `freq_new`; `true` for the output of the channel generators, `false` for pure
-  envelope coefficients; default: `true`
-- **`i_snap`** — Snapshots to process, 1-based; `[n_out, 1]`; default: `[]` (all snapshots)
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path, n_freq]`, or
+  cell arrays of length `n_snap` with one such array per snapshot
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` (a 4th dimension of length `n_freq` is
+  allowed, only the first frequency is used), or a cell array as `coeff_re`
+- **`freq`** — Input frequencies in Hz, finite, strictly ascending; `[n_freq, 1]`
+- **`freq_new`** — Output carrier frequencies in Hz, finite; `[n_carrier, 1]`
+- **`remove_delay_phase`** — Remove the delay phase from the coefficients before the interpolation: `true` for the
+  coefficients of [[get_channels_multifreq]] and [[get_channels_spherical]], `false` for coefficients without delay
+  phase; default: `true`
+- **`i_snap`** — 1-based indices of the snapshots to compute; `[n_out, 1]`; default: `[]` (all snapshots)
 - **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ## Outputs:
-- **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier, n_out]`
-- **`hmat_im`** — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier, n_out]`
+- **`hmat_re`** / **`hmat_im`** — Real and imaginary part of the frequency response; `[n_rx, n_tx, n_carrier, n_out]`;
+  the selected snapshots must have equal `n_rx` and `n_tx`
+
+## Notes:
+- With `remove_delay_phase = true`, generate the channels with `use_absolute_delays = true`: their coefficients carry
+  the phase of the absolute path length also when `delay` holds relative delays. With relative delays the phase of
+  the Tx-Rx distance stays in the coefficients and is interpolated across `freq`, which gives wrong phases (the
+  magnitudes stay right) unless the spacing of `freq` is far below $c$ / (Tx-Rx distance)
+- One input frequency (3D arrays): the coefficients apply at all carriers; with `remove_delay_phase = true` the
+  result is that of [[freq_response]] with `bandwidth` · `pilot_grid` = `freq_new - freq`
+- Precision: the delay phase is reduced to one period in double precision (and removed in double precision with
+  `remove_delay_phase`); sin / cos of the output phase and the interpolation are single
+  precision, the sums double precision
 
 ## See also:
-- [[baseband_freq_response]] (single-frequency coefficients, relative carrier positions)
-- [[get_channels_multifreq]] (multi-frequency channel generator)
+- [[freq_response]] (single-frequency coefficients, carriers relative to the bandwidth)
+- [[get_channels_multifreq]] (multi-frequency channel)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -118,7 +120,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&hmat_im, n_rx, n_tx, freq_new.n_elem, snap.n_elem);
 
-    CALL_QD(quadriga_lib::baseband_freq_response_multi_vec<double>(coeff_re, coeff_im, delay, freq, freq_new,
-                                                                   &hmat_re, (nlhs > 1) ? &hmat_im : nullptr, nullptr,
-                                                                   remove_delay_phase, i_snap, use_kernel));
+    CALL_QD(quadriga_lib::freq_response_mf<double>(coeff_re, coeff_im, delay, freq, freq_new,
+                                                   &hmat_re, (nlhs > 1) ? &hmat_im : nullptr, nullptr,
+                                                   remove_delay_phase, i_snap, use_kernel));
 }

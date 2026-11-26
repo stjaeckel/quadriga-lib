@@ -159,14 +159,14 @@ static void run(fz::input &in)
         const bool cx = in.ConsumeBool();
         const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
         if (in.ConsumeBool())
-            fz::clean([&] { quadriga_lib::get_channels_spherical_vec<T>(tx, rx, tp, to, rp, ro, fbs, lbs, gain, length, M,
-                                                                        v_re, v_im, v_dl, fc, absolute, fake_los,
-                                                                        vopt(v_aod, 3), vopt(v_eod, 4), vopt(v_aoa, 5), vopt(v_eoa, 6),
-                                                                        cx ? &v_cx : nullptr, use_kernel); });
+            fz::clean([&] { quadriga_lib::get_channels_spherical<T>(tx, rx, tp, to, rp, ro, fbs, lbs, gain, length, M,
+                                                                    v_re, v_im, v_dl, fc, absolute, fake_los,
+                                                                    vopt(v_aod, 3), vopt(v_eod, 4), vopt(v_aoa, 5), vopt(v_eoa, 6),
+                                                                    cx ? &v_cx : nullptr, use_kernel); });
         else
-            fz::clean([&] { quadriga_lib::get_channels_planar_vec<T>(tx, rx, tp, to, rp, ro, a1, a2, a3, a4, gain, length, M,
-                                                                     v_re, v_im, v_dl, fc, absolute, fake_los,
-                                                                     (outs & 8) ? &v_dop : nullptr, cx ? &v_cx : nullptr, use_kernel); });
+            fz::clean([&] { quadriga_lib::get_channels_planar<T>(tx, rx, tp, to, rp, ro, a1, a2, a3, a4, gain, length, M,
+                                                                 v_re, v_im, v_dl, fc, absolute, fake_los,
+                                                                 (outs & 8) ? &v_dop : nullptr, cx ? &v_cx : nullptr, use_kernel); });
         break;
     }
     default:

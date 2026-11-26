@@ -2,10 +2,10 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Tests of get_channels_irs, combine_irs_coord and channel::add_paths. get_channels_irs: path loss, IRS array
+// Tests of get_channels_irs and combine_irs_coord. get_channels_irs: path loss, IRS array
 // gain and delays on TX-IRS-RX geometries with closed-form path lengths, empty segments, input shapes, aliasing,
 // the tilt convention, a separate RX-side IRS array, and AVX2 against GENERIC. combine_irs_coord: the merged
-// coordinate list with reversed segments and inactive paths. add_paths: the size checks of each field.
+// coordinate list with reversed segments and inactive paths.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -262,234 +262,6 @@ TEST_CASE("Tools - Combine IRS Coord")
     CHECK(arma::approx_equal(interact_coord, T.t(), "absdiff", 1e-14));
 }
 
-TEST_CASE("Channel - Add Paths")
-{
-    quadriga_lib::channel<double> c;
-    c.tx_pos = arma::mat(3, 1);
-    c.tx_pos(2, 0) = 1.0;
-
-    c.rx_pos = arma::mat(3, 2); // 2 snapshots
-    c.rx_pos(0, 0) = 20.0;
-    c.rx_pos(1, 0) = 0.0;
-    c.rx_pos(2, 0) = 1.0;
-    c.rx_pos(0, 1) = 20.0;
-    c.rx_pos(1, 1) = 1.0;
-    c.rx_pos(2, 1) = 1.0;
-
-    // Adding nothing to nothing should work
-    c.add_paths(0);
-
-    auto coeff_new = arma::cube(2, 3, 5, arma::fill::randn);
-    auto coeff_alt = arma::cube(1, 1, 5, arma::fill::randn);
-
-    // Test out of bound
-    REQUIRE_THROWS_AS(c.add_paths(2), std::invalid_argument);
-
-    // Channel object requires existing MIMO coefficients
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_new), std::invalid_argument);
-
-    // Add coefficients to channel
-    c.coeff_re.push_back(arma::cube(2, 3, 4, arma::fill::randn));
-    c.coeff_re.push_back(arma::cube(2, 3, 4, arma::fill::randn));
-    c.coeff_im.push_back(arma::cube(2, 3, 4, arma::fill::randn));
-    c.coeff_im.push_back(arma::cube(2, 3, 4, arma::fill::randn));
-    c.delay.push_back(arma::cube(2, 3, 4, arma::fill::randn));
-    c.delay.push_back(arma::cube(2, 3, 4, arma::fill::randn));
-
-    // The channel object has coefficients, but no coefficients are added
-    REQUIRE_THROWS_AS(c.add_paths(0), std::invalid_argument);
-
-    // Test incomplete coeff
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, &coeff_new), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, &coeff_new), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, nullptr, &coeff_new), std::invalid_argument);
-
-    // Test wrong MIMO dimensions
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_alt, &coeff_new, &coeff_new), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_alt, &coeff_new), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt), std::invalid_argument);
-
-    // Add 5 additional paths to snapshot 1
-    c.add_paths(0, &coeff_new, &coeff_new, &coeff_new);
-    CHECK(c.is_valid().size() == 0);
-    auto n_paths = c.n_path();
-    CHECK(n_paths[0] == 9ULL);
-    CHECK(n_paths[1] == 4ULL);
-
-    // Test compact delays
-    c.delay.clear();
-    c.delay.push_back(arma::cube(1, 1, 9, arma::fill::randn));
-    c.delay.push_back(arma::cube(1, 1, 4, arma::fill::randn));
-    c.add_paths(1, &coeff_new, &coeff_new, &coeff_alt);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 9ULL);
-    CHECK(n_paths[1] == 9ULL);
-
-    // Create IRS
-    arma::u32_vec n_interact_irs = {1, 2, 3};
-    arma::mat interact_coord_irs = arma::mat(3, 6, arma::fill::randn);
-    auto coeff_irs = arma::cube(2, 3, 3, arma::fill::randn);
-    auto delay_irs = arma::cube(1, 1, 3, arma::fill::randn);
-
-    // Try to add IRS to channel without coords
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_irs, &coeff_irs, &delay_irs, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
-
-    // Add interaction coordinates to channel
-    arma::u32_vec n_interact_add = {0, 1, 2, 3, 4, 5, 6, 7, 8};
-    c.n_interact.push_back(n_interact_add);
-    c.n_interact.push_back(n_interact_add);
-    auto sum_no_interact = (arma::uword)arma::sum(n_interact_add);
-    c.interact_coord.push_back(arma::mat(3, sum_no_interact, arma::fill::randn));
-    c.interact_coord.push_back(c.interact_coord[0]);
-
-    // Missing Coord
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, &n_interact_irs), std::invalid_argument);
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, nullptr, &interact_coord_irs), std::invalid_argument);
-
-    // Mismatching number of paths
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
-
-    // Correct
-    c.add_paths(0, &coeff_irs, &coeff_irs, &delay_irs, &n_interact_irs, &interact_coord_irs);
-    CHECK(c.is_valid().size() == 0);
-    CHECK(arma::approx_equal(c.interact_coord[0].cols(0, sum_no_interact - 1), c.interact_coord[1], "absdiff", 1e-14));
-    CHECK(arma::approx_equal(c.interact_coord[0].cols(sum_no_interact, sum_no_interact + 5), interact_coord_irs, "absdiff", 1e-14));
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 12ULL);
-    CHECK(n_paths[1] == 9ULL);
-
-    // Adding coords without coefficients should fail
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
-
-    // Add coords to a channel without coefficients
-    c.coeff_re.clear();
-    c.coeff_im.clear();
-    c.delay.clear();
-    REQUIRE_THROWS_AS(c.add_paths(1, &coeff_irs, &coeff_irs, &delay_irs, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
-    c.add_paths(1, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs);
-    CHECK(c.is_valid().size() == 0);
-    CHECK(arma::approx_equal(c.interact_coord[1].cols(sum_no_interact, sum_no_interact + 5), interact_coord_irs, "absdiff", 1e-14));
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 12ULL);
-    CHECK(n_paths[1] == 12ULL);
-
-    // Add path gain
-    auto path_gain = arma::vec(3, arma::fill::randn);
-    c.path_gain.push_back(arma::vec(12, arma::fill::randn));
-    c.path_gain.push_back(arma::vec(12, arma::fill::randn));
-    c.add_paths(0, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs, &path_gain);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 15ULL);
-    CHECK(n_paths[1] == 12ULL);
-
-    // The channel object has 'path_gain', but no 'path_gain_add' are added!
-    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
-
-    // Add path_length
-    c.n_interact.clear();
-    c.interact_coord.clear();
-    auto path_length = arma::vec(1, arma::fill::randn);
-
-    // Channel has no path length
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length, &path_length), std::invalid_argument);
-    c.path_length.push_back(arma::vec(15, arma::fill::randn));
-    c.path_length.push_back(arma::vec(12, arma::fill::randn));
-
-    // Path gain and path length mismatch
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, &path_gain, &path_length), std::invalid_argument);
-
-    // No path length provided (but channel has it)
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length), std::invalid_argument);
-
-    // OK
-    c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length, &path_length);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 15ULL);
-    CHECK(n_paths[1] == 13ULL);
-
-    // Add path_polarization
-    c.path_gain.clear();
-    auto path_polarization = arma::mat(8, 1, arma::fill::randn);
-
-    // Channel has no path_polarization
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length, &path_polarization), std::invalid_argument);
-    c.polmat.push_back(arma::mat(8, 15, arma::fill::randn));
-    c.polmat.push_back(arma::mat(8, 13, arma::fill::randn));
-
-    // Mismatch
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_gain, &path_polarization), std::invalid_argument);
-
-    // No path_polarization provided (but channel has it)
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length), std::invalid_argument);
-
-    // OK
-    c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length, &path_polarization);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 15ULL);
-    CHECK(n_paths[1] == 14ULL);
-
-    // Add path_angles
-    c.path_length.clear();
-    path_polarization = arma::mat(8, 2, arma::fill::randn);
-    auto path_angles = arma::mat(2, 4, arma::fill::randn);
-
-    // Channel has no path_angles
-    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_polarization, &path_angles), std::invalid_argument);
-    c.path_angles.push_back(arma::mat(15, 4, arma::fill::randn));
-    c.path_angles.push_back(arma::mat(14, 4, arma::fill::randn));
-
-    // No path_angles provided (but channel has it)
-    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_polarization), std::invalid_argument);
-
-    // OK
-    c.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_polarization, &path_angles);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 17ULL);
-    CHECK(n_paths[1] == 14ULL);
-
-    // Add fbs_pos
-    c.polmat.clear();
-    auto path_pos = arma::mat(3, 2, arma::fill::randn);
-
-    // Channel has no fbs_pos
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles, &path_pos), std::invalid_argument);
-    c.fbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
-    c.fbs_pos.push_back(arma::mat(3, 14, arma::fill::randn));
-
-    // No fbs_pos provided (but channel has it)
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles), std::invalid_argument);
-
-    // OK
-    c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles, &path_pos);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 17ULL);
-    CHECK(n_paths[1] == 16ULL);
-
-    // Add lbs_pos; the channel has no lbs_pos
-    c.path_angles.clear();
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos, &path_pos), std::invalid_argument);
-    c.lbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
-    c.lbs_pos.push_back(arma::mat(3, 16, arma::fill::randn));
-
-    // No lbs_pos provided (but channel has it)
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos), std::invalid_argument);
-
-    // OK
-    c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos, &path_pos);
-    CHECK(c.is_valid().size() == 0);
-    n_paths = c.n_path();
-    CHECK(n_paths[0] == 17ULL);
-    CHECK(n_paths[1] == 18ULL);
-}
-
 TEST_CASE("Tools - Combine IRS Coord inactive")
 {
     // n_path_1 = 1, n_path_2 = 3; active_path skips the middle path (index 1), whose 2 coordinates
@@ -595,41 +367,6 @@ TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths")
         CHECK(std::abs(cr(0) / a - std::cos(k * L)) < 1e-6);
         CHECK(std::abs(ci(0) / a + std::sin(k * L)) < 1e-6);
     }
-}
-
-TEST_CASE("Channel - Add Paths with 0 paths in the first field")
-{
-    // The first given field sets the number of added paths, also when it is 0; every other field must match
-    quadriga_lib::channel<double> c;
-    c.tx_pos = arma::mat(3, 1, arma::fill::zeros);
-    c.rx_pos = arma::mat(3, 1, arma::fill::ones);
-    c.coeff_re.push_back(arma::cube(2, 2, 1, arma::fill::ones));
-    c.coeff_im.push_back(arma::cube(2, 2, 1, arma::fill::zeros));
-    c.delay.push_back(arma::cube(1, 1, 1, arma::fill::zeros));
-    c.path_gain.push_back(arma::vec(1, arma::fill::ones));
-    c.path_length.push_back(arma::vec(1, arma::fill::ones));
-
-    arma::cube re0(2, 2, 0), im0(2, 2, 0), dl0(1, 1, 0);
-    arma::vec v0, v5(5, arma::fill::ones);
-
-    // 0 coefficient paths and 5 path gains
-    CHECK_THROWS_AS(c.add_paths(0, &re0, &im0, &dl0, nullptr, nullptr, &v5, &v0), std::invalid_argument);
-    // 0 path gains and 5 path lengths (no coefficients involved)
-    quadriga_lib::channel<double> d = c;
-    d.coeff_re.clear(), d.coeff_im.clear(), d.delay.clear();
-    CHECK_THROWS_AS(d.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, &v0, &v5), std::invalid_argument);
-    // The objects are unchanged and valid
-    CHECK(c.is_valid().empty());
-    CHECK(d.is_valid().empty());
-    CHECK(c.path_gain[0].n_elem == 1);
-    CHECK(d.path_length[0].n_elem == 1);
-
-    // 0 paths in every field is accepted
-    c.add_paths(0, &re0, &im0, &dl0, nullptr, nullptr, &v0, &v0);
-    d.add_paths(0, nullptr, nullptr, nullptr, nullptr, nullptr, &v0, &v0);
-    CHECK(c.is_valid().empty());
-    CHECK(d.is_valid().empty());
-    CHECK(c.n_path()(0) == 1);
 }
 
 TEST_CASE("Tools - Combine IRS Coord - shapes of interact_coord_1 / _2 are checked")
@@ -823,6 +560,31 @@ TEST_CASE("Get Channels IRS - Position and orientation shapes")
             CHECK(arma::approx_equal(c_re, cr, "absdiff", 0.0));
             CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
         }
+}
+
+TEST_CASE("Get Channels IRS - center_freq must be finite and >= 0")
+{
+    // center_freq: 0 (coefficients at f = 0) and positive values are accepted; negative and non-finite values throw
+    // before any output is written
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    auto irs = ant;
+    irs.port_weights_re = arma::mat({1.0});
+    irs.port_weights_im = arma::mat({0.0});
+    const arma::mat fb = arma::mat({5.0, 0.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::vec g = {1.0}, l = {0.0};
+    const arma::mat tx = arma::vec{0.0, 0.0, 1.0}, rx = arma::vec{10.0, 0.0, 1.0}, ip = arma::vec{5.0, 5.0, 1.0},
+                    o = arma::vec{0.0, 0.0, 0.0};
+    auto run = [&](double fc, arma::cube &cr, arma::cube &ci, arma::cube &dl)
+    { quadriga_lib::get_channels_irs(ant, ant, irs, tx, o, rx, o, ip, o, fb, fb, g, l, M, fb, fb, g, l, M, cr, ci, dl, 0, -140.0, fc); };
+    arma::cube cr, ci, dl;
+    run(0.0, cr, ci, dl), run(1.0e9, cr, ci, dl);
+    for (double fc : {-1.0e9, -1.0, arma::datum::nan, arma::datum::inf})
+    {
+        arma::cube c_re = cr, d = dl, c_im = ci;
+        CHECK_THROWS_WITH(run(fc, c_re, c_im, d), "Input 'center_freq' must be finite and >= 0.");
+        CHECK(arma::approx_equal(c_re, cr, "absdiff", 0.0));
+        CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
+    }
 }
 
 TEST_CASE("Get Channels IRS - Empty element_pos and port_weights_im of any shape")

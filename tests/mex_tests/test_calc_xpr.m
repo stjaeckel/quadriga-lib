@@ -2,9 +2,9 @@
 % Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 % Part of quadriga-lib — see LICENSE for terms.
 
-function test_calc_cross_polarization_ratio()
-% MEX interface test for quadriga_lib.calc_cross_polarization_ratio.
-% Physics validation lives in the Catch2 suite (test_calc_cross_polarization_ratio.cpp).
+function test_calc_xpr()
+% MEX interface test for quadriga_lib.calc_xpr.
+% Physics validation lives in the Catch2 suite (test_calc_xpr.cpp).
 
 %% Basic NLOS XPR
 % 1 LOS + 2 NLOS paths, TX at origin, RX at (10,0,0)
@@ -22,7 +22,7 @@ pl = [10.0; 12.0; 15.0];
 tx_pos = [0; 0; 0];
 rx_pos = [10; 0; 0];
 
-[xpr, pg] = quadriga_lib.calc_cross_polarization_ratio(powers, M, pl, tx_pos, rx_pos);
+[xpr, pg] = quadriga_lib.calc_xpr(powers, M, pl, tx_pos, rx_pos);
 
 assertEqual(size(xpr), [1, 6]);
 assertEqual(size(pg), [1, 1]);
@@ -47,11 +47,11 @@ M2(:,2) = [0.8, 0.0, 0.2, 0.0, 0.2, 0.0, 0.7, 0.0];
 pl2 = [10.0; 15.0];
 
 % Without LOS
-xpr_no = quadriga_lib.calc_cross_polarization_ratio(powers2, M2, pl2, tx_pos, rx_pos, false);
+xpr_no = quadriga_lib.calc_xpr(powers2, M2, pl2, tx_pos, rx_pos, false);
 assertElementsAlmostEqual(xpr_no(1,2), 16.0, 'absolute', 1e-10);
 
 % With LOS
-xpr_yes = quadriga_lib.calc_cross_polarization_ratio(powers2, M2, pl2, tx_pos, rx_pos, true);
+xpr_yes = quadriga_lib.calc_xpr(powers2, M2, pl2, tx_pos, rx_pos, true);
 assertElementsAlmostEqual(xpr_yes(1,2), 66.0, 'absolute', 1e-10);
 
 %% Complex M elements
@@ -59,7 +59,7 @@ M3 = [0.8, 0.2, 0.05, 0.05, 0.1, -0.1, 0.7, -0.3]';
 pl3 = 20.0;
 pw3 = 1.0;
 
-[xpr3, pg3] = quadriga_lib.calc_cross_polarization_ratio(pw3, M3, pl3, tx_pos, rx_pos);
+[xpr3, pg3] = quadriga_lib.calc_xpr(pw3, M3, pl3, tx_pos, rx_pos);
 
 abs2_vv = 0.8^2 + 0.2^2;
 abs2_vh = 0.1^2 + 0.1^2;
@@ -80,12 +80,12 @@ M_w(:,3) = [0.7, 0.0, 0.2,  0.0, 0.3,  0.0, 0.6,  0.0];
 pl_w = [10.0; 10.005; 12.0];
 
 % A window of 0.01 m excludes paths 1 and 2 (path lengths 10 m and 10.005 m)
-xpr_w = quadriga_lib.calc_cross_polarization_ratio(powers_w, M_w, pl_w, tx_pos, rx_pos, false, 0.01);
+xpr_w = quadriga_lib.calc_xpr(powers_w, M_w, pl_w, tx_pos, rx_pos, false, 0.01);
 assertElementsAlmostEqual(xpr_w(1,2), 0.49/0.09, 'absolute', 1e-10);
 
 %% Equal M elements give XPR = 1 in linear basis
 M_eq = [0.5, 0.0, 0.5, 0.0, 0.5, 0.0, 0.5, 0.0]';
-xpr_eq = quadriga_lib.calc_cross_polarization_ratio(1.0, M_eq, 20.0, tx_pos, rx_pos);
+xpr_eq = quadriga_lib.calc_xpr(1.0, M_eq, 20.0, tx_pos, rx_pos);
 assertElementsAlmostEqual(xpr_eq(1,1), 1.0, 'absolute', 1e-10);
 assertElementsAlmostEqual(xpr_eq(1,2), 1.0, 'absolute', 1e-10);
 assertElementsAlmostEqual(xpr_eq(1,3), 1.0, 'absolute', 1e-10);
@@ -102,7 +102,7 @@ pl_mc = [10.0, 10.0; 14.0, 13.0; 0.0, 0.0];
 tx_mc = [0, 1; 0, 0; 0, 0];
 rx_mc = [10, 11; 0, 0; 0, 0];
 
-xpr_mc = quadriga_lib.calc_cross_polarization_ratio(powers_mc, M_mc, pl_mc, tx_mc, rx_mc);
+xpr_mc = quadriga_lib.calc_xpr(powers_mc, M_mc, pl_mc, tx_mc, rx_mc);
 assertEqual(size(xpr_mc), [2, 6]);
 
 % CIR 1 V-XPR: 0.32/0.02 = 16
@@ -110,7 +110,7 @@ assertElementsAlmostEqual(xpr_mc(1,2), 0.32/0.02, 'absolute', 1e-10);
 
 %% Errors
 try
-    quadriga_lib.calc_cross_polarization_ratio(powers);
+    quadriga_lib.calc_xpr(powers);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -121,8 +121,8 @@ end
 
 %% Circular XPR: the LOS matrix diag(1,-1) keeps the handedness (co-polar), diag(1,1) reverses it
 Mc = [[1.0; 0.0; 0.0; 0.0; 0.0; 0.0; -1.0; 0.0], [1.0; 0.0; 0.0; 0.0; 0.0; 0.0; 1.0; 0.0]];
-xpr_c1 = quadriga_lib.calc_cross_polarization_ratio(1.0, Mc(:,1), 20.0, [0;0;0], [5;0;0]);
-xpr_c2 = quadriga_lib.calc_cross_polarization_ratio(1.0, Mc(:,2), 20.0, [0;0;0], [5;0;0]);
+xpr_c1 = quadriga_lib.calc_xpr(1.0, Mc(:,1), 20.0, [0;0;0], [5;0;0]);
+xpr_c2 = quadriga_lib.calc_xpr(1.0, Mc(:,2), 20.0, [0;0;0], [5;0;0]);
 assertTrue(all(isinf(xpr_c1(1,4:6))));
 assertEqual(xpr_c2(1,4:6), [0, 0, 0]);
 

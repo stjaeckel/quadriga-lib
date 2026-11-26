@@ -313,8 +313,8 @@ Each function entry shows buttons "C++", "MATLAB", "Python" (on the website) and
 
 ```toml
 [families]
-get_channels_planar = ["get_channels_planar", "get_channels_planar_vec"]
 interp = ["interp_2D"]
+version = ["quadriga_lib_version", "quadriga_lib_has_AVX2", "quadriga_lib_has_CUDA"]
 ```
 
 Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-item function before its differently named vector variant. All listed C++ functions link back to the family. An unknown family, an unknown C++ name, an unknown Python name in `[python_names]` or a C++ function in two families stops the build. Overloads that share one name (for example the vector form of a function on a `std::vector` of arrayants) are one C++ function and need no entry.

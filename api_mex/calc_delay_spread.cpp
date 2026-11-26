@@ -7,17 +7,21 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel statistics
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # CALC_DELAY_SPREAD
-RMS delay spread from per-CIR delays and linear-scale powers
+Calculate the RMS delay spread of each CIR from its path delays and powers
 
-- Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; the default
-  of 100 dB effectively includes all paths
-- When `granularity > 0`, paths falling into the same delay bin of width `granularity` have
-  their powers summed before computing the spread; binning is applied before the spread calculation
+- With the path powers $p_l$ normalized to sum 1 over the paths of a CIR, the mean delay and the RMS delay spread are
+
+  $$\bar\tau = \sum_l p_l \, \tau_l, \qquad \sigma_\tau = \sqrt{\sum_l p_l \, (\tau_l - \bar\tau)^2}$$
+
+- Paths more than `threshold_dB` below the strongest path of their CIR are left out
+- With `granularity` > 0, the delays are first rounded to the nearest multiple of `granularity`, and the powers of
+  the paths with the same rounded delay are summed
+- A CIR without power gives a spread and a mean delay of 0
 
 ## Usage:
 ```
@@ -25,20 +29,19 @@ RMS delay spread from per-CIR delays and linear-scale powers
 ```
 
 ## Inputs:
-- **`delays`** — Delays in [s] per CIR; `[n_path, n_cir]`
-- **`powers`** — Path powers on linear scale in [W]; `[n_path, n_cir]`
-- **`threshold_dB`** — Power threshold in [dB] relative to strongest path; paths below it are excluded; default: 100
-- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping); must be finite
-  and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53, else an
-  error is raised
+- **`delays`** — Path delays in s, one column per CIR; `[n_path, n_cir]`
+- **`powers`** — Path powers, linear; zero-power entries pad CIRs with fewer paths; `[n_path, n_cir]`
+- **`threshold_dB`** — Power range in dB below the strongest path that is kept, > 0; default: 100
+- **`granularity`** — Spacing of the delay grid in s, finite and >= 0; 0 = no grid; with a grid, all
+  delays must be finite and their span must be below $2^{53}$ grid steps; default: 0
 
 ## Outputs:
-- **`ds`** — RMS delay spread in [s] per CIR; `[n_cir, 1]`
-- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir, 1]`
+- **`ds`** — RMS delay spread $\sigma_\tau$ in s; `[n_cir, 1]`
+- **`mean_delay`** — Mean delay $\bar\tau$ in s; `[n_cir, 1]`
 
 ## See also:
-- [[quantize_delays]] (for mapping delays to a fixed tap grid)
-- [[calc_rician_k_factor]] (for calculating K-factor)
+- [[quantize_delays]] (delays on a tap grid with interpolation)
+- [[calc_angular_spread]] (angular spreads)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

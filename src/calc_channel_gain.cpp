@@ -5,32 +5,39 @@
 #include "quadriga_channel.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
-# channel_calc_effective_path_gain
-Calculate the effective path gain per snapshot in linear scale
+# calc_channel_gain
+Calculate the channel gain of each snapshot, the power summed over all paths and antenna pairs
 
-- Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
-- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
-- Throws if neither coefficients nor polarization data are present, or with the `is_valid()` message of an invalid
-  channel
+- With coefficients: $G = \sum_{r,t,l} \lvert a_{r,t,l} \rvert^2$ over all receive and transmit antennas and paths
+- Without coefficients, from `polmat` for ideal dual-polarized antennas (V and H, unit gain) at both ends:
+  $G = \sum_l g_l \sum_{i} \lvert M_{l,i} \rvert^2$ over the four entries of the polarization transfer matrix of each
+  path; $g_l$ is `path_gain`, else the free-space gain
+  $10^{-(32.45 + 20 \log_{10}(f / \mathrm{GHz}) + 20 \log_{10}(d_l / \mathrm{m})) / 10}$ from `path_length` $d_l$ at
+  `center_freq` $f$ (per snapshot if it has `n_snap` entries, 1 GHz if empty), else 1
 
 ## Declaration:
 ```
-arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dtype> &chan);
+arma::Col<dtype> quadriga_lib::calc_channel_gain(const channel<dtype> &chan);
 ```
 
 ## Input:
-- **`chan`** — Channel object, see [[channel]]
+- **`chan`** — Channel, valid (see [[channel]]), with `coeff_re` / `coeff_im` or `polmat`; a channel without snapshots
+  gives an empty result
 
 ## Returns:
-- Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
+- Channel gain, linear, 0 for a snapshot without paths; `[n_snap]`
+
+## See also:
+- [[calc_xpr]] (path gain and XPR from `polmat`)
+- [[calc_rician_k_factor]] (gain split into LOS and NLOS power)
 MD!*/
 
 template <typename dtype>
-arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dtype> &chan)
+arma::Col<dtype> quadriga_lib::calc_channel_gain(const channel<dtype> &chan)
 {
     arma::uword n_snap_arma = chan.n_snap();
     size_t n_snap_vector = (size_t)n_snap_arma;
@@ -102,5 +109,5 @@ arma::Col<dtype> quadriga_lib::channel_calc_effective_path_gain(const channel<dt
     return PG;
 }
 
-template arma::Col<float> quadriga_lib::channel_calc_effective_path_gain(const channel<float> &chan);
-template arma::Col<double> quadriga_lib::channel_calc_effective_path_gain(const channel<double> &chan);
+template arma::Col<float> quadriga_lib::calc_channel_gain(const channel<float> &chan);
+template arma::Col<double> quadriga_lib::calc_channel_gain(const channel<double> &chan);

@@ -6,21 +6,89 @@
 #include "qd_helpers_wrappers.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
+
+/*!SECTION_DESC
+A **channel** describes the propagation between a transmit and a receive antenna array: for each snapshot, a set of
+propagation paths, each with a complex coefficient per antenna pair and a delay. The functions of this section store
+channels in files, turn them into frequency responses, prepare them for link-level simulation, compute their statistics
+and show the paths in 3D. The channels themselves come from the functions of section "Channel generators" or from
+[[get_channels_layout]].<br><br>
+
+**What a channel holds** (a struct, fields in [[hdf5_read_channel]]):
+
+- The positions and orientations of the transmitter and the receiver, per snapshot or fixed
+- The **coefficients** `coeff_re` / `coeff_im` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
+- Optionally, antenna-independent path data: path gain, path length, polarization transfer matrix, angles, scatterer
+  positions and the interaction points of ray-traced paths
+- Unstructured metadata: named values of any type
+
+**In MATLAB / Octave:**
+
+- Several channels are a 1xN struct array. A field with one entry per snapshot is one array with the snapshot on the
+  last dimension, zero-padded where the number of paths differs between snapshots
+- [[hdf5_read_channel]] and [[hdf5_write_channel]] take and return the unstructured data as a struct array `par` of
+  the size of the channel struct array, one field per dataset
+
+**Typical workflow:**
+
+1. Generate the channels, or read them: [[hdf5_read_channel]] from a channel file, [[qrt_file_read]] from the output
+   of the QRT ray tracer
+2. Optionally, map the delays to a tap grid with [[quantize_delays]], or join the segments of a track with
+   [[crossfade_segments]]
+3. Compute the frequency response at the subcarriers with [[freq_response]], or with [[freq_response_mf]] for
+   coefficients sampled at several frequencies
+4. Evaluate the channels: [[calc_delay_spread]], [[calc_angular_spread]], [[calc_rician_k_factor]], [[calc_xpr]]
+5. Store them with [[hdf5_write_channel]], or show the paths with [[export_channel_obj]]
+
+**Terms** (full list in the [Glossary](cpp_api.html#glossary)):
+
+- **Snapshot**: one sample of the channel in time or position; `n_snap` snapshots, each with its own number of paths
+- **Path**: one propagation path from the transmitter to the receiver, e.g. the LOS path, a reflection or a ray of a
+  cluster
+- **Coefficient**: the complex amplitude $a$ of one path for one antenna pair, with the antenna patterns, the
+  polarization and the path gain
+- **Delay**: the propagation delay $\tau$ of a path in s, per antenna pair `[n_rx, n_tx, n_path]` or shared by all
+  pairs `[1, 1, n_path]`
+- **CIR**: the channel impulse response of one snapshot, its coefficients and delays
+- **Frequency response**: the channel matrix at subcarrier $k$, $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$, with
+  $f_k$ the offset of the subcarrier from the carrier (the absolute frequency for `_mf`)
+- **Multi-frequency channel** (suffix `_mf`): coefficients sampled at several frequencies, the frequency on the 4th
+  dimension, as [[get_channels_multifreq]] produces them
+- **Slot**: one storage place of an HDF5 channel file, addressed by four indices `(ix, iy, iz, iw)`, e.g. Tx, Rx and
+  frequency; the file holds a fixed grid of slots, its **storage layout**
+- **Origin**, **destination**: a QRT file holds the paths from each origin (a Tx position) to a list of CIR positions; a
+  destination (a receiver) owns a run of consecutive CIR positions, e.g. a track
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Store and read channels | [[hdf5_create_file]], [[hdf5_write_channel]], [[hdf5_read_channel]], [[hdf5_read_layout]], [[hdf5_reshape_layout]] |
+| Store and read metadata | [[hdf5_write_dset]], [[hdf5_read_dset]], [[hdf5_read_dset_names]] |
+| Ray-tracing files | [[qrt_file_parse]], [[qrt_file_read]] |
+| Frequency response | [[freq_response]], [[freq_response_mf]] |
+| Process | [[quantize_delays]], [[crossfade_segments]] |
+| Statistics | [[calc_delay_spread]], [[calc_angular_spread]], [[calc_rician_k_factor]], [[calc_xpr]] |
+| Show | [[export_channel_obj]] |
+
+**Conventions.** Coefficients and delays of several snapshots are one array with the snapshot on the last dimension,
+as in the channel struct, or cell arrays with one array per snapshot ([[freq_response]]). Indices are 1-based, also the
+slot indices of the HDF5 files and the CIR and origin indices of the QRT files. HDF5 files store the structured channel
+data in single precision.
+SECTION_DESC!*/
 
 /*!MD
 # HDF5_READ_CHANNEL
-Read one or more channel objects from an HDF5 file
+Read channel objects from one or several slots of an HDF5 channel file
 
-- Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file
-- Each of ix, iy, iz, iw may be a scalar, vector, or omitted (omitted/empty = read full extent along that dimension)
-- Slots are visited in column-major order and empty slots are skipped.
-- Structured fields are stored in single precision in the file and returned in double.
-- Unstructured datasets keep their stored type and shape.
-- If no data is found, both outputs are empty `0x0` structs.
-- Errors if the file does not exist or is not a quadriga-lib channel file; files modified with other HDF5 tools
-  are not supported and may be rejected.
+- Returns the channels of the selected slots that hold data as a struct array `chan`, and their unstructured data as
+  a struct array `par` of the same size
+- `ix`, `iy`, `iz` and `iw` select the slots along each dimension; the selection is every combination, in
+  column-major order (`ix` fastest), and empty slots are skipped ([[hdf5_read_layout]] tells which slots hold data)
+- `i_snap` reads only the given snapshots of every selected slot (see Notes)
+- No data in the selection gives `0x0` structs
 
 ## Usage:
 ```
@@ -28,46 +96,51 @@ Read one or more channel objects from an HDF5 file
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; string
-- **`ix`** — 1-based slot indices along dimension X; scalar or vector; default: `1:nx`
-- **`iy`** — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
-- **`iz`** — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
-- **`iw`** — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
-- **`i_snap`** — Snapshot indices to read; 1-based; default: all snapshots. Applies to every
-  selected slot; errors if an index exceeds the number of snapshots of a selected slot.
+- **`fn`** — File name of an existing channel file
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot indices along x, y, z and w, 1-based, inside the layout; scalar
+  or vector; default: `[]` (all slots of the dimension)
+- **`i_snap`** — Snapshot indices, 1-based, any order, repeats allowed, at most `n_snap` of every selected slot that
+  has snapshots; `[n_out, 1]`; default: `[]` (all snapshots)
 
 ## Outputs:
-- **`chan`** — Struct array of length `N` (number of non-empty slots in the selection) with the channel data. Fields per element:<br><br>
-  | Field              | Description                                                              | Type / Size                         |
-  | ------------------ | ------------------------------------------------------------------------ | ----------------------------------- |
-  | `name`             | Channel name                                                             | String                              |
-  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | `[3, 1]` or `[3, n_snap]`           |
-  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | `[3, 1]` or `[3, n_snap]`           |
-  | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `[3, 1]` or `[3, n_snap]`           |
-  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `[3, 1]` or `[3, n_snap]`           |
-  | `coeff_re`         | Channel coefficients, real part                                          | `[n_rx, n_tx, n_path, n_snap]`      |
-  | `coeff_im`         | Channel coefficients, imaginary part                                     | `[n_rx, n_tx, n_path, n_snap]`      |
-  | `delay`            | Propagation delays in seconds                                            | `[n_rx, n_tx, n_path, n_snap]`      |
-  | `path_gain`        | Path gain before antenna, linear scale                                   | `[n_path, n_snap]`                  |
-  | `path_length`      | Path length in m                                                         | `[n_path, n_snap]`                  |
-  | `polmat`           | Polarization transfer matrix, interleaved complex                        | `[8, n_path, n_snap]`               |
-  | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | `[n_path, 4, n_snap]`               |
-  | `fbs_pos`          | First-bounce scatterer positions                                         | `[3, n_path, n_snap]`               |
-  | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
-  | `n_interact`       | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
-  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(n_interact)), n_snap]`|
-  | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
-  | `initial_position` | Reference snapshot (start of the current segment); 1-based; absent = 1   | int32, scalar                       |
-- **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
-  **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
-  do not contain a given field, the corresponding element is left empty. If no unstructured data is present anywhere,
-  `par` is an empty `0x0` struct.
+- **`chan`** — Channels, one per selected slot that holds data; struct array `[1, n_chan]` with the fields:<br><br>
+  | Field | Description | Class / size |
+  | ----- | ----------- | ------------ |
+  | `name` | Channel name | char |
+  | `tx_pos`, `rx_pos` | Tx and Rx positions in m | `[3, 1]` (fixed) or `[3, n_snap]` |
+  | `tx_orientation`, `rx_orientation` | Tx and Rx orientations (bank, tilt, heading) in rad | `[3, 1]` (fixed) or `[3, n_snap]` |
+  | `coeff_re`, `coeff_im` | Coefficients, real and imaginary part | `[n_rx, n_tx, n_path, n_snap]` |
+  | `delay` | Delays in s | `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]` |
+  | `path_gain` | Path gain without antennas, linear | `[n_path, n_snap]` |
+  | `path_length` | Path length in m | `[n_path, n_snap]` |
+  | `polmat` | Polarization transfer matrix (Glossary) | `[8, n_path, n_snap]` |
+  | `path_angles` | AOD, EOD, AOA, EOA in rad | `[n_path, 4, n_snap]` |
+  | `fbs_pos`, `lbs_pos` | First- and last-bounce scatterer positions in m | `[3, n_path, n_snap]` |
+  | `n_interact` | Number of interaction points per path, 0 = LOS | uint32, `[n_path, n_snap]` |
+  | `interact_coord` | Interaction points of all paths, concatenated | `[3, max(sum(n_interact)), n_snap]` |
+  | `center_freq` | Center frequency in Hz | scalar or `[n_snap, 1]` |
+  | `initial_position` | Reference snapshot, 1-based; a missing field means 1 | int32 scalar |
+
+  `n_path` is the largest number of paths of the snapshots; smaller snapshots are zero-padded. A field exists if a
+  channel of the selection has it; the other channels get an empty value
+- **`par`** — Unstructured data; struct array `[1, n_chan]` whose fields are the dataset names of all channels
+  (without the prefix `par_`); a channel without a dataset gets an empty value; `0x0` struct if no channel has
+  unstructured data
+
+## Notes:
+- **Snapshot selection**: fields with one entry per snapshot are sliced, also positions, orientations and
+  `center_freq` stored per snapshot; values stored once and the unstructured data are kept. A slot without snapshots
+  (only unstructured data) ignores `i_snap`
+- **Round trip** with [[hdf5_write_channel]]: the values come back in single precision; empty orientations come back as
+  `[3, 1]` zeros
+- **Unstructured data**: the datasets of the slot with the prefix `par_`, in their stored class and shape
+  ([[hdf5_read_dset]]); datasets of another prefix are not read
+- **Errors**: a missing file, an index outside the layout, an index in `i_snap` beyond the snapshots of a slot, or a
+  file that is not a quadriga-lib channel file; files changed by other HDF5 tools may be rejected
 
 ## See also:
-- [[hdf5_read_layout]] (for reading the layout in the file)
-- [[hdf5_write_channel]] (for writing channel data)
-- [[hdf5_read_dset]] (for reading individual unstructured datasets)
-- [[hdf5_write_dset]] (for writing individual unstructured datasets)
+- [[hdf5_read_layout]] (finds the occupied slots)
+- [[hdf5_write_channel]] (writes channels)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -93,7 +166,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<quadriga_lib::channel<double>> channels;
     arma::u32_vec dims, channel_id;
     CALL_QD(dims = quadriga_lib::hdf5_read_layout(fn, &channel_id));
-    CALL_QD(channels = quadriga_lib::hdf5_read_channel_vec<double>(fn, qd_hdf5_select_slots(fn, dims, channel_id, ix, iy, iz, iw), i_snap));
+    CALL_QD(channels = quadriga_lib::hdf5_read_channel<double>(fn, qd_hdf5_select_slots(fn, dims, channel_id, ix, iy, iz, iw), i_snap));
 
     // Keep par-only channels (c.empty() ignores par_data); check the structured data
     channels.erase(std::remove_if(channels.begin(), channels.end(), [](const quadriga_lib::channel<double> &c)

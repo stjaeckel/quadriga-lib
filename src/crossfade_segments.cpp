@@ -12,7 +12,7 @@
 #include <vector>
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD

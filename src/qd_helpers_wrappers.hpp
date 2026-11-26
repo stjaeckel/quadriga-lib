@@ -39,7 +39,7 @@ static inline void qd_arrayant_fill_defaults(quadriga_lib::arrayant<double> &ant
         ant.port_weights_im.zeros(ant.port_weights_re.n_rows, ant.port_weights_re.n_cols);
 }
 
-// Occupied slots of an HDF5 slot selection, for hdf5_read_channel_vec (used by the MEX and Python read wrappers)
+// Occupied slots of an HDF5 slot selection, for hdf5_read_channel (used by the MEX and Python read wrappers)
 // - fn, dims, channel_id: file name, layout {nx, ny, nz, nw} and channel ID per slot, as returned by
 //   hdf5_read_layout; dims = 0 (missing file) throws std::runtime_error
 // - ix, iy, iz, iw: 0-based indices per dimension (any order, repeats allowed); empty = full extent; an index outside

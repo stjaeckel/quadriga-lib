@@ -7,27 +7,27 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel statistics
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # CALC_ANGULAR_SPREAD
-Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
+Calculate the RMS azimuth and elevation angular spreads of each CIR, optionally around the mean direction of its paths
 
-- Computes RMS azimuth and elevation angular spreads from power-weighted angles; each column
-  of `az`/`el`/`powers` is one CIR; zero-power paths can be used to pad CIRs with fewer paths
-- RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the
-  circular mean (3GPP TR 38.901 second-moment definition)
-- When `wrapping = true`, the power-weighted mean direction is computed in Cartesian
-  coordinates and all paths are rotated so the centroid lies on the equator before computing
-  spreads, avoiding pole singularity artifacts
-- When `wrapping = false`, spreads are computed directly from raw angles; `orientation` is
-  zero and `phi`/`theta` equal the input `az`/`el`
-- When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived
-  analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered
-  angles; only used when `wrapping = true`
-- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers
-  summed before computing spreads
+- For one angle, with the path powers $p_l$ normalized to sum 1 over the paths of a CIR (the second-moment definition
+  of 3GPP TR 38.901):
+
+  $$\sigma = \sqrt{\sum_l p_l \, \Delta_l^2}, \quad \Delta_l = \arg e^{j (\phi_l - \bar\phi)}$$
+
+  with the circular mean $\bar\phi = \arg \sum_l p_l \, e^{j \phi_l}$
+- `wrapping = false`: the spreads of the given azimuth and elevation angles; near the poles, the azimuth spread
+  overstates the angular spread
+- `wrapping = true`: the paths are first rotated so that their power-weighted mean direction (the mean of the unit
+  vectors) lies at azimuth 0 on the equator; `calc_bank_angle` then also rotates them about that direction so that
+  the azimuth spread is largest (principal axis of the power-weighted covariance of the rotated angles); `orientation`
+  is the direction of an antenna that sees the paths at the rotated angles `phi` and `theta`
+- `quantize_deg` > 0: the deviations $\Delta_l$ are rounded to multiples of `quantize_deg` and the powers of equal
+  deviations summed, for azimuth and elevation separately
 
 ## Usage:
 ```
@@ -36,21 +36,28 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 ```
 
 ## Inputs:
-- **`az`** — Azimuth angles; range -pi to pi; `[n_path, n_cir]`
-- **`el`** — Elevation angles; range -pi/2 to pi/2; `[n_path, n_cir]`
-- **`powers`** — Path powers in [W]; `[n_path, n_cir]`
-- **`wrapping`** — If true, enables spherical rotation; default: false
-- **`calc_bank_angle`** — If true, computes optimal bank angle analytically; only used when `wrapping = true`; default: false
-- **`quantize_deg`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization);
-  otherwise it must be finite and >= 1e-3 deg, else an error is raised
+- **`az`** — Path azimuths in rad, one column per CIR; `[n_path, n_cir]`
+- **`el`** — Path elevations in rad; `[n_path, n_cir]`
+- **`powers`** — Path powers, linear, with a positive sum per CIR; zero-power entries pad CIRs with fewer paths;
+  `[n_path, n_cir]`
+- **`wrapping`** — Rotate the paths to the equator before computing the spreads; default: false
+- **`calc_bank_angle`** — Rotate them also about the mean direction, for the largest azimuth
+  spread; only with `wrapping`; default: false
+- **`quantize_deg`** — Quantization step of the angle deviations in deg; 0 = none, else finite and >= 1e-3; default: 0
 
 ## Outputs:
-- **`azimuth_spread`** — RMS azimuth angular spread; `[n_cir, 1]`
-- **`elevation_spread`** — RMS elevation angular spread; `[n_cir, 1]`
-- **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
-  direction (a positive tilt points down); `[3, n_cir]`
-- **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; `[n_path, n_cir]`
-- **`theta`** — Rotated elevation angles; `[n_path, n_cir]`
+- **`azimuth_spread`** — RMS azimuth spread in rad; `[n_cir, 1]`
+- **`elevation_spread`** — RMS elevation spread in rad; `[n_cir, 1]`
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad of an antenna pointing at the mean
+  direction (a positive tilt points down), zero without `wrapping`; `[3, n_cir]`
+- **`phi`** — Path azimuths in rad in the frame of that antenna (as [[interpolate_pattern]]
+  returns them), the input `az` without `wrapping`; `[n_path, n_cir]`
+- **`theta`** — Path elevations in rad in that frame, the input `el` without `wrapping`;
+  `[n_path, n_cir]`
+
+## See also:
+- [[calc_delay_spread]] (delay spread of the same paths)
+- [[interpolate_pattern]] (antenna response in the rotated frame)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

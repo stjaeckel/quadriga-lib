@@ -70,7 +70,7 @@ messages pass through, also for fields the function does not use. A field `Subpa
 
 For moved positions, evaluate [gbsm_draw](#gbsm_draw) (`'lsf'`), [path_loss](#path_loss), [lsp_generate](#lsp_generate) and for indoor UTs [o2i_loss](#o2i_loss)
 again with the same SOS phases: they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) from
-slice 2 of `lsp`. Ray structs can also come from path data, with [gbsm_rays_from_paths](#gbsm_rays_from_paths) (e.g. of [qrt_file_read](channel-functions.md#qrt_file_read)),
+slice 2 of `lsp`. Ray structs can also come from path data, with [gbsm_rays_from_paths](#gbsm_rays_from_paths) (e.g. of [qrt_file_read](channel-data-and-processing.md#qrt_file_read)),
 or be filled directly (fields in [ssf_rays](#ssf_rays)); continue with step 6.
 
 **Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
@@ -412,7 +412,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 
 Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_rays_from_paths) · [Python](../python/geometry-based-stochastic-model.md#gbsm.rays_from_paths)
 
-- Returns the ray struct of [ssf_rays](#ssf_rays) (`fallback` empty) from path data in the names and order of [qrt_file_read](channel-functions.md#qrt_file_read),
+- Returns the ray struct of [ssf_rays](#ssf_rays) (`fallback` empty) from path data in the names and order of [qrt_file_read](channel-data-and-processing.md#qrt_file_read),
   read with `normalize_polmat = 1` (`uplink = true` gives the reverse link; `normalize_polmat = 0` leaves only the
   free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
@@ -420,7 +420,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_rays_from_paths) �
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
   GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `n_interact` of
-  [qrt_file_read](channel-functions.md#qrt_file_read) (interaction count = path type); for ray-traced files the user sets it (values > 2 are an error)
+  [qrt_file_read](channel-data-and-processing.md#qrt_file_read) (interaction count = path type); for ray-traced files the user sets it (values > 2 are an error)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
 ### Usage:
@@ -435,7 +435,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generators.md#get_channels_planar); `[8, n_path, n_freq]`
 - **`method`** — Value of `rays.method`; sets the GR power law and the default mobility; default: `'quadriga'`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
@@ -447,7 +447,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`rays`** — Ray struct with `n_ray = n_path`, see [ssf_rays](#ssf_rays); use with `link_gain_dB = 0` and without `kf_ratio`
 
 ### See also:
-- [qrt_file_read](channel-functions.md#qrt_file_read) (source of the path data)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read) (source of the path data)
 - [ssf_paths](#ssf_paths) (paths at moved positions)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
@@ -461,8 +461,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
   `rays.center_freq(i_freq)`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (see Terms)
-- `'phase'`: [get_channels_planar](channel-generation-functions.md#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
-  delays, path lengths and angles stay those of the ray-data positions. `'drift'`: [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) with the
+- `'phase'`: [get_channels_planar](channel-generators.md#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
+  delays, path lengths and angles stay those of the ray-data positions. `'drift'`: [get_channels_spherical](channel-generators.md#get_channels_spherical) with the
   arrays at the positions and orientations of the snapshot
 - `'taps'`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
@@ -508,7 +508,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
   `false`
 
 ### Outputs:
-- **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](channel-functions.md#hdf5_read_channel): `center_freq` scalar;
+- **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel): `center_freq` scalar;
   `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
   `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
   (`'rays'`); `'rays'` also `path_gain`, `path_length`, `polmat`, `path_angles` and in `'drift'`
@@ -945,7 +945,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_clusters) · [Pytho
 - [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
 - [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [ssf_rays](#ssf_rays) (the rays of the clusters)
-- [calc_delay_spread](channel-statistics.md#calc_delay_spread), [calc_angular_spread](channel-statistics.md#calc_angular_spread) (spreads of the output)
+- [calc_delay_spread](channel-data-and-processing.md#calc_delay_spread), [calc_angular_spread](channel-data-and-processing.md#calc_angular_spread) (spreads of the output)
 
 ---
 <a id="ssf_paths"></a>
@@ -957,10 +957,10 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_paths) · [Python](
 - Computes the antenna-free paths (gains, lengths, polarization matrices, angles and scatterers) of the kept rays of
   `rays` (see Terms) at new Tx and Rx positions (default: the ray-data positions), LOS and GR also at zero power; paths
   in ray order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`)
-- `'phase'`: use the outputs with [get_channels_planar](channel-generation-functions.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
+- `'phase'`: use the outputs with [get_channels_planar](channel-generators.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
   phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer identified
   and the displacement phase counts twice, without an error
-- `'drift'`: use the outputs at the new positions with [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) or [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq); needs
+- `'drift'`: use the outputs at the new positions with [get_channels_spherical](channel-generators.md#get_channels_spherical) or [get_channels_multifreq](channel-generators.md#get_channels_multifreq); needs
   the scatterers of [ssf_scatterers](#ssf_scatterers)
 
 | Quantity | `'phase'` | `'drift'` |
@@ -1003,7 +1003,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_paths) · [Python](
 ### Outputs:
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path, 1]`
-- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generators.md#get_channels_planar); `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad], GCS; `[n_path, 1]`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in [m]; `[3, n_path]`, `[3, 0]` in `'phase'`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; uint32; `[n_path, 1]`
@@ -1073,7 +1073,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
-| `polmat` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | yes |
+| `polmat` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generators.md#get_channels_planar) | yes |
 | `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
 | `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
 | `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |

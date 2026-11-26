@@ -25,18 +25,6 @@ namespace quadriga_lib
 
     // ---- Channel statistics ----
 
-    // Calculate the empirical averaged cumulative distribution function (CDF)
-    // Input data matrix has samples in rows and data sets in columns.
-    // Individual CDFs are computed per column. An averaged CDF is obtained by
-    // quantile-space averaging. Inf and NaN values are excluded.
-    template <typename dtype>
-    void acdf(const arma::Mat<dtype> &data,            // Input data, Size [n_samples, n_sets]
-              arma::Col<dtype> *bins = nullptr,        // Bin centers (in/out), Length [n_bins]
-              arma::Mat<dtype> *cdf_per_set = nullptr, // Individual CDFs, Size [n_bins, n_sets]
-              arma::Col<dtype> *cdf_avg = nullptr,     // Averaged CDF, Length [n_bins]
-              arma::Col<dtype> *mu = nullptr,          // Mean 0.1-0.9 quantiles, Length [9]
-              arma::Col<dtype> *sig = nullptr,         // Std of 0.1-0.9 quantiles, Length [9]
-              arma::uword n_bins = 201);               // Number of auto-generated bins
 
     // Calculate the RMS delay spread in [s]
     // - Returns the RMS delay spread in [s], [n_cir]
@@ -86,13 +74,13 @@ namespace quadriga_lib
     // - Computes XPR in both linear (V/H) and circular (LHCP/RHCP) polarization bases
     // - Circular basis obtained via Jones matrix transformation: M_circ = T * M_lin * T^-1
     // - Only applies for NLOS paths by default; LOS identified by path_length ≈ dTR
-    // - All paths with path_length < dTR + window_size are excluded unless include_los is true
+    // - All paths with path_length <= dTR + window_size are excluded unless include_los is true
     // - polmat is column-major with interleaved Re/Im: rows = [Re(Mvv),Im(Mvv),Re(Mhv),Im(Mhv),Re(Mvh),Im(Mvh),Re(Mhh),Im(Mhh)], labels <rx><tx>
     // - polmat may or may not be normalized (normalization cancels in the XPR ratio)
     // - pg is always computed over all paths (including LOS), regardless of include_los
-    // - If cross-polarized power is zero, XPR is set to 0 (undefined)
+    // - If the cross-polarized power is zero, XPR is infinite (0 if the co-polarized power is zero too)
     template <typename dtype>
-    void calc_cross_polarization_ratio(
+    void calc_xpr(
         const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
         const std::vector<arma::Mat<dtype>> &polmat,      // Polarization transfer matrix (Jones rows as in get_channels_spherical), Vector (n_cir) of matrices of size [8, n_path]
         const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center in [m], Vector (n_cir) of vectors of length [n_path]

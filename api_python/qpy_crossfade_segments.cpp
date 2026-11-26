@@ -5,7 +5,7 @@
 #include "qd_helpers_python_types.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD

@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Linear and circular XPR and the path gain of calc_cross_polarization_ratio: the LOS window, several CIRs with
+// Linear and circular XPR and the path gain of calc_xpr: the LOS window, several CIRs with
 // mobile ends, complex entries, float, validation and aliasing. Oracles: hand-computed power sums of small real or
 // complex Jones matrices; the circular columns are also compared with get_channels_spherical driven by circular
 // patterns. Naming in the comments: M_<rx><tx>, rows 2-3 = M_hv (H rx, V tx), rows 4-5 = M_vh (V rx, H tx).
@@ -14,7 +14,7 @@
 #include <complex>
 #include <vector>
 
-TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
+TEST_CASE("calc_xpr - Basic NLOS XPR")
 {
     // Single CIR with 3 paths: 1 LOS + 2 NLOS
     // TX at origin, RX at (10, 0, 0) => dTR = 10.0
@@ -52,7 +52,7 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     arma::mat xpr;
     arma::vec pg;
 
-    quadriga_lib::calc_cross_polarization_ratio(powers_vec, M_vec, pl_vec, tx, rx, &xpr, &pg);
+    quadriga_lib::calc_xpr(powers_vec, M_vec, pl_vec, tx, rx, &xpr, &pg);
 
     REQUIRE(xpr.n_rows == 1);
     REQUIRE(xpr.n_cols == 6);
@@ -80,7 +80,7 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     CHECK(std::abs(xpr(0, 0) - 1.15 / 0.075) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Include LOS")
+TEST_CASE("calc_xpr - Include LOS")
 {
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -108,12 +108,12 @@ TEST_CASE("calc_cross_polarization_ratio - Include LOS")
     arma::mat xpr_no_los, xpr_with_los;
 
     // Without LOS (default)
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr_no_los,
-                                                (arma::Col<double> *)nullptr, false);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr_no_los,
+                           (arma::Col<double> *)nullptr, false);
 
     // With LOS
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr_with_los,
-                                                (arma::Col<double> *)nullptr, true);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr_with_los,
+                           (arma::Col<double> *)nullptr, true);
 
     // V-XPR without LOS: only NLOS path
     // P_vv = 0.5*0.64, P_vh = 0.5*0.04 => XPR_V = 0.64/0.04 = 16
@@ -125,7 +125,7 @@ TEST_CASE("calc_cross_polarization_ratio - Include LOS")
     CHECK(std::abs(xpr_with_los(0, 1) - 66.0) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Circular polarization identity check")
+TEST_CASE("calc_xpr - Circular polarization identity check")
 {
     // M = diag(1, -1) is the LOS matrix of get_channels_* and the ray tracer (the receive frame's e_phi points the
     // other way). The circular entries couple the same circular vector at both ends, c(r, t) = r^T M t, with
@@ -154,7 +154,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular polarization identity check"
     std::vector<arma::vec> plv = {pl};
 
     arma::mat xpr;
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr);
 
     // Linear XPR should be infinite (zero cross-pol, nonzero co-pol => perfect isolation)
     // M_vv=1, M_hv=0, M_vh=0, M_hh=-1
@@ -170,7 +170,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular polarization identity check"
     CHECK(std::isinf(xpr(0, 5)));
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
+TEST_CASE("calc_xpr - Circular XPR for identity matrix")
 {
     // M = identity: M_vv=1, M_hv=0, M_vh=0, M_hh=1
     // Relative to the LOS matrix diag(1, -1) the H component is mirrored, as by a single reflection: the
@@ -198,7 +198,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
     std::vector<arma::vec> plv = {pl};
 
     arma::mat xpr;
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr);
 
     // Linear XPR: P_vv=1, P_hh=1, P_hv=0, P_vh=0 => perfect isolation (Inf)
     CHECK(std::isinf(xpr(0, 0)));
@@ -209,7 +209,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
     CHECK(xpr(0, 5) == 0.0);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
+TEST_CASE("calc_xpr - Complex M elements")
 {
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -232,7 +232,7 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
 
     arma::mat xpr;
     arma::vec pg;
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr, &pg);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr, &pg);
 
     double abs2_vv = 0.8 * 0.8 + 0.2 * 0.2;     // 0.68
     double abs2_vh = 0.1 * 0.1 + 0.1 * 0.1;     // 0.02
@@ -245,7 +245,7 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
     CHECK(std::abs(xpr(0, 0) - (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh)) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Multiple CIRs with mobile TX/RX")
+TEST_CASE("calc_xpr - Multiple CIRs with mobile TX/RX")
 {
     // 2 CIRs with different TX/RX positions
     arma::mat tx(3, 2);
@@ -285,7 +285,7 @@ TEST_CASE("calc_cross_polarization_ratio - Multiple CIRs with mobile TX/RX")
     arma::mat xpr;
     arma::vec pg;
 
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr, &pg);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr, &pg);
 
     REQUIRE(xpr.n_rows == 2);
     REQUIRE(xpr.n_cols == 6);
@@ -300,7 +300,7 @@ TEST_CASE("calc_cross_polarization_ratio - Multiple CIRs with mobile TX/RX")
     CHECK(std::abs(xpr(1, 1) - 0.144 / 0.036) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Window size effect")
+TEST_CASE("calc_xpr - Window size effect")
 {
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -330,12 +330,12 @@ TEST_CASE("calc_cross_polarization_ratio - Window size effect")
     arma::mat xpr_small, xpr_large;
 
     // Small window (0.001): excludes only path 0
-    quadriga_lib::calc_cross_polarization_ratio<double>(pv, mv, plv, tx, rx, &xpr_small,
-                                                        (arma::Col<double> *)nullptr, false, 0.001);
+    quadriga_lib::calc_xpr<double>(pv, mv, plv, tx, rx, &xpr_small,
+                                   (arma::Col<double> *)nullptr, false, 0.001);
 
     // Large window (0.01): excludes paths 0 and 1
-    quadriga_lib::calc_cross_polarization_ratio<double>(pv, mv, plv, tx, rx, &xpr_large,
-                                                        (arma::Col<double> *)nullptr, false, 0.01);
+    quadriga_lib::calc_xpr<double>(pv, mv, plv, tx, rx, &xpr_large,
+                                   (arma::Col<double> *)nullptr, false, 0.01);
 
     // Small window includes path 1, large window excludes it
     CHECK(xpr_small(0, 1) != xpr_large(0, 1));
@@ -345,7 +345,7 @@ TEST_CASE("calc_cross_polarization_ratio - Window size effect")
     CHECK(std::abs(xpr_large(0, 1) - 0.49 / 0.09) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Only pg output requested")
+TEST_CASE("calc_xpr - Only pg output requested")
 {
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -364,14 +364,14 @@ TEST_CASE("calc_cross_polarization_ratio - Only pg output requested")
     std::vector<arma::vec> plv = {pl};
 
     arma::vec pg;
-    quadriga_lib::calc_cross_polarization_ratio<double>(pv, mv, plv, tx, rx,
-                                                        (arma::Mat<double> *)nullptr, &pg);
+    quadriga_lib::calc_xpr<double>(pv, mv, plv, tx, rx,
+                                   (arma::Mat<double> *)nullptr, &pg);
 
     REQUIRE(pg.n_elem == 1);
     CHECK(std::abs(pg(0) - 2.0) < 1e-14); // (1+0+0+1) = 2.0
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Input validation errors")
+TEST_CASE("calc_xpr - Input validation errors")
 {
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -385,7 +385,7 @@ TEST_CASE("calc_cross_polarization_ratio - Input validation errors")
         std::vector<arma::vec> plv;
         arma::mat xpr;
         CHECK_THROWS_AS(
-            quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr),
+            quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr),
             std::invalid_argument);
     }
 
@@ -405,7 +405,7 @@ TEST_CASE("calc_cross_polarization_ratio - Input validation errors")
         std::vector<arma::vec> plv = {pl};
         arma::mat xpr;
         CHECK_THROWS_AS(
-            quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr),
+            quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr),
             std::invalid_argument);
     }
 
@@ -424,7 +424,7 @@ TEST_CASE("calc_cross_polarization_ratio - Input validation errors")
         std::vector<arma::vec> plv = {pl};
         arma::mat xpr;
         CHECK_THROWS_AS(
-            quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, bad_tx, rx, &xpr),
+            quadriga_lib::calc_xpr(pv, mv, plv, bad_tx, rx, &xpr),
             std::invalid_argument);
     }
 
@@ -441,13 +441,13 @@ TEST_CASE("calc_cross_polarization_ratio - Input validation errors")
         std::vector<arma::vec> plv = {pl};
         arma::mat xpr;
         CHECK_THROWS_AS(
-            (quadriga_lib::calc_cross_polarization_ratio<double>(pv, mv, plv, tx, rx, &xpr,
-                                                                 (arma::Col<double> *)nullptr, false, -0.01)),
+            (quadriga_lib::calc_xpr<double>(pv, mv, plv, tx, rx, &xpr,
+                                            (arma::Col<double> *)nullptr, false, -0.01)),
             std::invalid_argument);
     }
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Float precision")
+TEST_CASE("calc_xpr - Float precision")
 {
     arma::fmat tx(3, 1);
     tx.col(0) = arma::fvec({0.0f, 0.0f, 0.0f});
@@ -470,7 +470,7 @@ TEST_CASE("calc_cross_polarization_ratio - Float precision")
 
     arma::fmat xpr;
     arma::fvec pg;
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr, &pg);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr, &pg);
 
     REQUIRE(xpr.n_rows == 1);
     REQUIRE(xpr.n_cols == 6);
@@ -479,7 +479,7 @@ TEST_CASE("calc_cross_polarization_ratio - Float precision")
     CHECK(std::abs(xpr(0, 1) - 16.0f) < 1e-5f);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
+TEST_CASE("calc_xpr - Circular XPR with known cross-pol")
 {
     // M = {{0.5, 0.5}, {0.5, 0.5}} (all real)
     // This distributes power equally in all polarization components
@@ -501,7 +501,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
     std::vector<arma::vec> plv = {pl};
 
     arma::mat xpr;
-    quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr);
+    quadriga_lib::calc_xpr(pv, mv, plv, tx, rx, &xpr);
 
     // Linear: all |M|²=0.25, so XPR = 1.0 everywhere (0 dB)
     CHECK(std::abs(xpr(0, 0) - 1.0) < 1e-10);
@@ -520,7 +520,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
     CHECK(std::abs(xpr(0, 5) - 1.0) < 1e-10);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polarisation")
+TEST_CASE("calc_xpr - V-XPR and H-XPR are per receive polarisation")
 {
     // M rows: 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx).
     // V-XPR = sum |M(V rx, V tx)|^2 / sum |M(V rx, H tx)|^2, H-XPR = sum |M(H rx, H tx)|^2 / sum |M(H rx, V tx)|^2
@@ -529,19 +529,19 @@ TEST_CASE("calc_cross_polarization_ratio - V-XPR and H-XPR are per receive polar
 
     // Leakage from V transmit into H receive only (rows 2-3): V receive sees no cross-pol
     std::vector<arma::mat> Mv = {arma::mat(arma::vec({1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0}))};
-    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr);
+    quadriga_lib::calc_xpr<double>(pw, Mv, pl, tx, rx, &xpr);
     CHECK(std::isinf(xpr(0, 1)));                 // V-XPR
     CHECK(std::abs(xpr(0, 2) - 4.0) < 1e-12);     // H-XPR = 1 / 0.25
     CHECK(std::abs(xpr(0, 0) - 8.0) < 1e-12);     // aggregate (1 + 1) / 0.25
 
     // Leakage from H transmit into V receive only (rows 4-5): H receive sees no cross-pol
     Mv = {arma::mat(arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 0.0}))};
-    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr);
+    quadriga_lib::calc_xpr<double>(pw, Mv, pl, tx, rx, &xpr);
     CHECK(std::abs(xpr(0, 1) - 4.0) < 1e-12);
     CHECK(std::isinf(xpr(0, 2)));
 }
 
-TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive polarisation and match get_channels_spherical")
+TEST_CASE("calc_xpr - Circular columns are per receive polarisation and match get_channels_spherical")
 {
     // Circular coupling matrix C (rows = RX L/R, columns = TX L/R) -> linear M = P^-T C P^-1 with P = [L R],
     // L = (1, +j)/sqrt(2), R = (1, -j)/sqrt(2) in (V, H), P^-1 = [1 -j; 1 j] / sqrt(2)
@@ -564,7 +564,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive pola
     arma::mat tx = arma::vec({0.0, 0.0, 0.0}), rx = arma::vec({100.0, 0.0, 0.0}), xpr;
     std::vector<arma::vec> pw = {{1.0}}, pl = {{100.0}};
     std::vector<arma::mat> Mv = {M};
-    quadriga_lib::calc_cross_polarization_ratio<double>(pw, Mv, pl, tx, rx, &xpr, nullptr, true);
+    quadriga_lib::calc_xpr<double>(pw, Mv, pl, tx, rx, &xpr, nullptr, true);
     CHECK(std::abs(xpr(0, 3) - (1.0 + 4.0) / (0.25 + 0.0625)) < 1e-12); // (LL + RR) / (LR + RL)
     CHECK(std::abs(xpr(0, 4) - 1.0 / 0.25) < 1e-12);                    // LHCP: |C_LL|^2 / |C_LR|^2
     CHECK(std::abs(xpr(0, 5) - 4.0 / 0.0625) < 1e-12);                  // RHCP: |C_RR|^2 / |C_RL|^2
@@ -597,7 +597,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive pola
     // LOS matrix of get_channels_* (co-polar) and a mirrored H component as by one reflection (cross-polar)
     Mv = {arma::mat(arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0})), arma::mat(arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0}))};
     std::vector<arma::vec> pw2 = {{1.0}, {1.0}}, pl2 = {{100.0}, {100.0}};
-    quadriga_lib::calc_cross_polarization_ratio<double>(pw2, Mv, pl2, tx, rx, &xpr, nullptr, true);
+    quadriga_lib::calc_xpr<double>(pw2, Mv, pl2, tx, rx, &xpr, nullptr, true);
     CHECK(std::isinf(xpr(0, 3)));
     CHECK(std::isinf(xpr(0, 4)));
     CHECK(std::isinf(xpr(0, 5)));
@@ -606,23 +606,23 @@ TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive pola
     CHECK(xpr(1, 5) == 0.0);
 }
 
-TEST_CASE("calc_cross_polarization_ratio - outputs that alias inputs")
+TEST_CASE("calc_xpr - outputs that alias inputs")
 {
     std::vector<arma::vec> powers = {arma::vec({1.0, 0.5})}, path_length = {arma::vec({10.0, 20.0})};
     std::vector<arma::mat> M = {arma::mat(8, 2, arma::fill::ones)};
     arma::mat tx(3, 1, arma::fill::zeros), rx(3, 1, arma::fill::zeros), xpr;
     rx(0) = 10.0;
     arma::vec pg;
-    CHECK_NOTHROW(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &xpr, &pg));
+    CHECK_NOTHROW(quadriga_lib::calc_xpr(powers, M, path_length, tx, rx, &xpr, &pg));
 
     arma::vec t3 = {0.0, 0.0, 0.0}, r3 = {10.0, 0.0, 0.0};
-    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, t3, rx, &xpr, &t3), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, r3, &xpr, &r3), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &tx, &pg), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &xpr, &powers[0]), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_xpr(powers, M, path_length, t3, rx, &xpr, &t3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_xpr(powers, M, path_length, tx, r3, &xpr, &r3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_xpr(powers, M, path_length, tx, rx, &tx, &pg), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_xpr(powers, M, path_length, tx, rx, &xpr, &powers[0]), std::invalid_argument);
     CHECK(t3(0) == 0.0);
     CHECK(r3(0) == 10.0);
 
     arma::vec view(xpr.memptr(), 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &xpr, &view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_xpr(powers, M, path_length, tx, rx, &xpr, &view), std::invalid_argument);
 }

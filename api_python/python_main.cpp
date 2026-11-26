@@ -22,7 +22,7 @@ PYBIND11_MODULE(quadriga_lib, m)
     py::module_ arrayant = m.def_submodule("arrayant", "Antennas, transducers and patterns");
     quadriga_lib_arrayant(arrayant);
 
-    py::module_ channel = m.def_submodule("channel", "Channel functions");
+    py::module_ channel = m.def_submodule("channel", "Channel data, processing and generators");
     quadriga_lib_channel(channel);
 
     py::module_ tools = m.def_submodule("tools", "Miscellaneous / Tools");

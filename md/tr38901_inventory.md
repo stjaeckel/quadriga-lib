@@ -351,7 +351,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Large-scale setup | 7.8.1, Tables 7.8-1, 7.8-1A | Partial | `generate_layout` (`src/generate_layout.cpp:1278`; hexagonal presets `:634`, `:635`); `init_link_states` (`src/layout_pipeline.cpp:805`; LOS field `:665`, O2I fields `:579`); `attach_terminals` (`src/layout_pipeline.cpp:2117`; large-scale gain `:2207`, RSRP `:2215`); `path_loss`, `lsp_generate` (SF), `los_probability`, `o2i_loss`, `generate_antenna` | The hexagonal layout with wrap-around (`38.901_UMa`, `38.901_UMi`), the UT drop, per-link loss, SF, LOS state, O2I, the tilted vertical array and the attachment of each UT to its serving cell by the large-scale gain (rule `large_scale`) or by RSRP exist. The DFT virtualisation is the caller's. |
-| Large-scale metrics: coupling loss, geometry | Table 7.8-1 | Partial | `acdf` (`src/qd_tools_acdf.cpp:59`) | CDFs only; coupling loss and SIR are the caller's. |
+| Large-scale metrics: coupling loss, geometry | Table 7.8-1 | Partial | `acdf` (`src/acdf.cpp`) | CDFs only; coupling loss and SIR are the caller's. |
 | Large-scale comparison with 3GPP results | 7.8.1 | No | – | |
 
 #### 3.8.2 Full calibration (7.8.2)
@@ -360,7 +360,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 |---|---|---|---|---|
 | Full calibration setup | 7.8.2, Tables 7.8-2, 7.8-2A | Partial | `lsp_generate`, `ssf_clusters`, `ssf_rays`, `gbsm_single_link_channel`, `generate_antenna` | Chain and BS arrays exist (the BS configurations of Tables 7.8-2 and 7.8-2A, including the config 1 port mapping, are `generate_antenna` tuples, see 3.3); the handheld UT configurations are missing (7.3). |
 | Full metric: DS and AS CDFs | Table 7.8-2 | Partial | `calc_delay_spread` (`src/qd_tools_calc_delay_spread.cpp:55`); `calc_angular_spread` (`src/qd_tools_calc_angular_spread.cpp:150`) | **Drift:** the metric asks for the TR 25.996 circular AS; the library uses another definition (see Annex A.1). |
-| Full metric: PRB singular values | Table 7.8-2 | Partial | `baseband_freq_response` (`src/baseband_freq_response.cpp:68`) | H per subcarrier; PRB averaging and eigenvalues are the caller's. |
+| Full metric: PRB singular values | Table 7.8-2 | Partial | `freq_response` (`src/freq_response.cpp`) | H per subcarrier; PRB averaging and eigenvalues are the caller's. |
 | Full comparison with 3GPP results | 7.8.2 | No | – | Open item in ssf_notes section 7. |
 
 #### 3.8.3 Calibration of additional features (7.8.3)

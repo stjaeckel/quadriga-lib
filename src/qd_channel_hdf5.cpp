@@ -24,7 +24,7 @@
 namespace h5 = qd::hdf5;
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 // Internal helpers
@@ -503,17 +503,14 @@ static void qHDF_commit_channel(qHDF_file &h, h5::root_links &root, h5::output &
 
 /*!MD
 # hdf5_create_file
-Create a new HDF5 channel file with a defined storage layout
+Create a new HDF5 channel file with a given storage layout
 
-- Initializes a new HDF5 file for storing wireless channel data; throws `std::runtime_error` if the file exists.
-- Defines a 4D layout (x, y, z, w) where each index combination maps to one channel storage slot.
-- Typical dimension mapping: x = BS, y = UE, z = frequency, w = scenario/repetition.
-- Layout can be reshaped later with [[hdf5_reshape_layout]] if the total slot count stays constant.
-- The total slot count `nx × ny × nz × nw` must not exceed 4294967295 (2^32 - 1); larger layouts throw before
-  the file is created.
-- Files use the quadriga-lib channel file format version 3, an HDF5 file readable by any HDF5 reader (h5py, MATLAB,
-  HDFView). Modify files only with the quadriga-lib functions: files changed by other HDF5 tools are not supported
-  and may be rejected.
+- Creates a channel file with `nx · ny · nz · nw` empty slots; the slot count is fixed, [[hdf5_reshape_layout]] changes
+  only the dimensions
+- [[hdf5_write_channel]] and [[hdf5_write_dset]] create a missing file themselves, with the layout that just holds their
+  slots; this function sets any other one
+- The file is an HDF5 file (quadriga-lib channel format, version 3) that any HDF5 reader opens, e.g. h5py, MATLAB or
+  HDFView. Change it only with the functions of this section: files changed by other HDF5 tools may be rejected
 
 ## Declaration:
 ```
@@ -526,15 +523,13 @@ void quadriga_lib::hdf5_create_file(
 ```
 
 ## Inputs:
-- **`fn`** — Path and filename of the HDF5 file to create
-- **`nx`** *(optional)* — Size of x-dimension
-- **`ny`** *(optional)* — Size of y-dimension
-- **`nz`** *(optional)* — Size of z-dimension
-- **`nw`** *(optional)* — Size of w-dimension
+- **`fn`** — File name; the file must not exist
+- **`nx`**, **`ny`**, **`nz`**, **`nw`** *(optional)* — Number of slots along x, y, z and w, each at least 1; at most
+  4294967295 (2^32 - 1) slots in total
 
 ## See also:
-- [[hdf5_reshape_layout]] (change layout dimensions of an existing file)
-- [[hdf5_write_channel]] (write channel data into a slot)
+- [[hdf5_write_channel]] (writes a channel into a slot)
+- [[hdf5_read_layout]] (reads the layout and the occupied slots)
 MD!*/
 
 void quadriga_lib::hdf5_create_file(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
@@ -589,10 +584,9 @@ void quadriga_lib::hdf5_create_file(const std::string &fn, unsigned nx, unsigned
 # hdf5_read_layout
 Read the storage layout of an HDF5 channel file
 
-- Returns `{nx, ny, nz, nw}` describing the 4D slot grid of the file.
-- Returns `{0, 0, 0, 0}` if the file does not exist; throws if the file exists but is not a quadriga-lib channel
-  file.
-- `channel_id` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
+- Returns the dimensions of the slot grid and, optionally, the slots that hold data
+- A missing file gives `{0, 0, 0, 0}`, so the function also tests whether a file exists; a file that is not a channel
+  file throws
 
 ## Declaration:
 ```
@@ -602,17 +596,18 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 ```
 
 ## Input:
-- **`fn`** — Path to the HDF5 file
+- **`fn`** — File name
 
 ## Output:
-- **`channel_id`** *(optional)* — Serialized slot occupancy list; `[nx·ny·nz·nw]`
+- **`channel_id`** *(optional)* — Channel ID of each slot, 0 = never written; slot `(ix, iy, iz, iw)` is entry
+  `ix + nx * (iy + ny * (iz + nz * iw))`; `[nx · ny · nz · nw]`; not changed for a missing file
 
 ## Returns:
-- Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
+- Layout `{nx, ny, nz, nw}`; `[4]`
 
 ## See also:
-- [[hdf5_create_file]] (create a file with a defined layout)
-- [[hdf5_reshape_layout]] (change layout dimensions of an existing file)
+- [[hdf5_create_file]] (creates a file with a given layout)
+- [[hdf5_reshape_layout]] (changes the dimensions)
 MD!*/
 
 arma::u32_vec quadriga_lib::hdf5_read_layout(const std::string &fn, arma::u32_vec *channel_id)
@@ -754,24 +749,15 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
 
 /*!MD
 # hdf5_write_channel
-Write a channel object to an HDF5 file at a specified 4D index
+Write channel objects to one or several slots of an HDF5 channel file
 
-- Writes a `quadriga_lib::channel<dtype>` object to slot `(ix, iy, iz, iw)` in the HDF5 file.
-- Creates the file with the layout `(ix + 1) × (iy + 1) × (iz + 1) × (iw + 1)` if it does not exist; use
-  [[hdf5_create_file]] for another layout.
-- If the slot already holds data, the slot is replaced completely: the old structured data and all unstructured
-  datasets of the slot (`par_*`, including those added with [[hdf5_write_dset]]) are removed, and only the new
-  channel is stored there. The space of the removed data is not reused, so the file does not shrink; to reclaim
-  it, copy the channels into a new file ([[hdf5_read_channel]], [[hdf5_write_channel]]).
-- Throws if the index was not reserved during [[hdf5_create_file]].
-- Structured data is always stored in single precision; input may be float or double.
-- Unstructured data: names in `par_names` are not empty and contain only letters, digits and `_`; supported types are
-  string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.
-- Channel names longer than 255 characters are rejected.
-- One writer per file at a time; files are not locked. Reading is safe while no one writes; different files can be
-  read and written from parallel threads.
+- Stores `chan` in slot `(ix, iy, iz, iw)`; the vector form stores `chan_vec[i]` in the slot of column `i` of `slots`
+- A missing file is created with the layout that just holds the slots, `(ix + 1) × (iy + 1) × (iz + 1) × (iw + 1)`
+  (vector form: the largest index + 1 per dimension); [[hdf5_create_file]] sets another layout
+- A slot that holds data is replaced completely: its old channel and all its unstructured datasets, also those added
+  with [[hdf5_write_dset]], are removed
 
-## Declaration:
+## Declarations:
 ```
 int quadriga_lib::hdf5_write_channel(
     const std::string &fn,
@@ -780,23 +766,38 @@ int quadriga_lib::hdf5_write_channel(
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0);
+
+arma::s32_vec quadriga_lib::hdf5_write_channel(
+    const std::string &fn,
+    const std::vector<quadriga_lib::channel<dtype>> &chan_vec,
+    const arma::u32_mat &slots);
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`chan`** — Channel object to write
-- **`ix`** *(optional)* — Slot index in x-dimension
-- **`iy`** *(optional)* — Slot index in y-dimension
-- **`iz`** *(optional)* — Slot index in z-dimension
-- **`iw`** *(optional)* — Slot index in w-dimension
+- **`fn`** — File name
+- **`chan`** — Channel to write; valid (`.is_valid()` of [[channel]]), at most 4294967295 snapshots; the names in
+  `par_names` unique, names and types as in [[hdf5_write_dset]]
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** *(optional)* — Slot index, 0-based; inside the layout of an existing file
+- **`chan_vec`** — Channels to write (vector form), each as `chan`; `[n_slot]`
+- **`slots`** — Slot indices `(ix, iy, iz, iw)` (vector form), 0-based, one column per channel, each slot once,
+  inside the layout of an existing file; `[4, n_slot]`
 
 ## Returns:
-- `0` if the slot was empty, `1` if existing data in the slot was replaced
+- `0` if the slot was empty, `1` if its data was replaced; vector form: one value per slot, `[n_slot]`
+
+## Notes:
+- Vector form: all inputs are checked before anything is written, so a failing check leaves the file unchanged
+- A channel without data (`chan.empty()` and no `par_names`) replaces the data of an occupied slot (it then reads as an
+  empty channel, and [[hdf5_read_layout]] reports it as written); it leaves an empty slot as it is and does not create a
+  missing file
+- The space of replaced data is not reused, so the file does not shrink; copying the channels into a new file reclaims
+  it
+- Files are not locked: one writer per file at a time, also for [[hdf5_write_dset]] and [[hdf5_reshape_layout]].
+  Reading is safe while no one writes; different files can be read and written from parallel threads
 
 ## See also:
-- [[hdf5_create_file]] (create file and reserve layout)
-- [[hdf5_write_channel_vec]] (write several slots)
-- [[hdf5_read_channel]] (read channel data from a slot)
+- [[hdf5_read_channel]] (reads the channels back)
+- [[hdf5_create_file]] (creates a file with a given layout)
 MD!*/
 
 // Check a channel before anything is written: validity, snapshot count, names and types of the unstructured data;
@@ -828,15 +829,15 @@ static int qHDF_write_slot(const std::string &fn, const quadriga_lib::channel<dt
                            unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
     const bool channel_is_empty = chan.empty();
-
-    if (channel_is_empty && names.empty())
-        return 0;
+    const bool nothing = channel_is_empty && names.empty(); // Replaces only the data of an occupied slot
 
     // Open the file (created just large enough for the slot if it does not exist), the slot and its old channel group
     const char *open_hint = " It may be open in another program.";
     qHDF_file h;
     if (!qHDF_open(h, fn, true, open_hint))
     {
+        if (nothing) // An empty channel does not create a file
+            return 0;
         qHDF_create_for_slot(fn, ix, iy, iz, iw);
         if (!qHDF_open(h, fn, true, open_hint)) // Only if the file was removed in between
             throw std::runtime_error("Cannot open file '" + fn + "'." + open_hint);
@@ -845,6 +846,11 @@ static int qHDF_write_slot(const std::string &fn, const quadriga_lib::channel<dt
     if (slot < 0)
         throw std::invalid_argument("Inputs 'ix', 'iy', 'iz' and 'iw' must address a slot inside the storage layout.");
     const uint64_t old = qHDF_channel_ref(h, slot);
+    if (nothing && old == 0) // An empty slot stays as it is
+    {
+        h.f.close();
+        return 0;
+    }
     h5::root_links root("channel_");
     root.load(h.f, h.root, h.eof, old);
     qHDF_check_chunks(h, root.ranges());
@@ -885,42 +891,10 @@ template int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadr
 template int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<double> &chan,
                                               unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
-/*!MD
-# hdf5_write_channel_vec
-Write several channel objects to slots of an HDF5 file
-
-- Writes `chan_vec[i]` to the slot in column `i` of `slots`, as [[hdf5_write_channel]] does for each.
-- All inputs are checked before anything is written: the number of channels must equal the number of columns of
-  `slots`, no slot may be listed twice, every slot must lie inside the layout of an existing file, and every channel
-  must be valid. Otherwise `std::invalid_argument` is thrown and the file is not changed.
-- Creates the file with the layout that just holds all slots (largest index + 1 per dimension) if it does not exist;
-  use [[hdf5_create_file]] for another layout.
-- One writer per file at a time; files are not locked.
-
-## Declaration:
-```
-arma::s32_vec quadriga_lib::hdf5_write_channel_vec(
-    const std::string &fn,
-    const std::vector<quadriga_lib::channel<dtype>> &chan_vec,
-    const arma::u32_mat &slots);
-```
-
-## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`chan_vec`** — Channel objects to write; `[n_slot]`
-- **`slots`** — Slot indices `(ix, iy, iz, iw)`, 0-based, one column per channel; `[4, n_slot]`
-
-## Returns:
-- Per slot: `0` if the slot was empty, `1` if existing data was replaced; `[n_slot]`
-
-## See also:
-- [[hdf5_write_channel]] (write one slot)
-- [[hdf5_read_channel_vec]] (read several slots)
-MD!*/
 
 template <typename dtype>
-arma::s32_vec quadriga_lib::hdf5_write_channel_vec(const std::string &fn, const std::vector<quadriga_lib::channel<dtype>> &chan_vec,
-                                                   const arma::u32_mat &slots)
+arma::s32_vec quadriga_lib::hdf5_write_channel(const std::string &fn, const std::vector<quadriga_lib::channel<dtype>> &chan_vec,
+                                               const arma::u32_mat &slots)
 {
     if (slots.n_cols != 0 && slots.n_rows != 4)
         throw std::invalid_argument("Input 'slots' must have 4 rows.");
@@ -980,32 +954,23 @@ arma::s32_vec quadriga_lib::hdf5_write_channel_vec(const std::string &fn, const 
     return code;
 }
 
-template arma::s32_vec quadriga_lib::hdf5_write_channel_vec(const std::string &fn, const std::vector<quadriga_lib::channel<float>> &chan_vec,
-                                                            const arma::u32_mat &slots);
+template arma::s32_vec quadriga_lib::hdf5_write_channel(const std::string &fn, const std::vector<quadriga_lib::channel<float>> &chan_vec,
+                                                        const arma::u32_mat &slots);
 
-template arma::s32_vec quadriga_lib::hdf5_write_channel_vec(const std::string &fn, const std::vector<quadriga_lib::channel<double>> &chan_vec,
-                                                            const arma::u32_mat &slots);
+template arma::s32_vec quadriga_lib::hdf5_write_channel(const std::string &fn, const std::vector<quadriga_lib::channel<double>> &chan_vec,
+                                                        const arma::u32_mat &slots);
 
 /*!MD
 # hdf5_read_channel
-Read a channel object from an HDF5 file at a specified 4D index
+Read channel objects from one or several slots of an HDF5 channel file
 
-- Returns an empty channel object (`n_snap() == 0`) if the slot is empty or outside the layout.
-- `i_snap` selects snapshots (0-based, any order, repeats allowed): only their groups are read; fields with one entry
-  per snapshot (also positions, orientations and center frequency stored per snapshot) are sliced, data stored once
-  per channel and the unstructured data are kept. An index `>= n_snap` of a slot with snapshots throws; a slot without snapshots ignores `i_snap`
-  `std::invalid_argument`.
-- Structured data is stored in single precision in the file and converted to `dtype` on read.
-- Unstructured fields (`std::any`) retain their original stored type without conversion; see [[hdf5_read_dset]]
-  for the returned types.
-- Round trip with [[hdf5_write_channel]]: every per-snapshot field comes back with one entry per snapshot, also for
-  snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
-  with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
-- Throws `std::runtime_error` if the file is malformed (e.g. a dataset does not have the size given by the
-  attributes of the channel, or a required dataset or attribute is missing) or is not a quadriga-lib channel file;
-  files modified with other HDF5 tools are not supported and may be rejected.
+- Returns the channel of slot `(ix, iy, iz, iw)` in `dtype`; an empty slot or a slot outside the layout gives an
+  empty channel (`n_snap() == 0`)
+- The vector form reads the slots in the columns of `slots` with one opening of the file and returns one channel per
+  column
+- `i_snap` reads only the given snapshots (see Notes)
 
-## Declaration:
+## Declarations:
 ```
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     const std::string &fn,
@@ -1014,23 +979,39 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iz = 0,
     unsigned iw = 0,
     const uint_list &i_snap = {});
+
+std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel(
+    const std::string &fn,
+    const arma::u32_mat &slots,
+    const uint_list &i_snap = {});
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`ix`** *(optional)* — Slot index in x-dimension
-- **`iy`** *(optional)* — Slot index in y-dimension
-- **`iz`** *(optional)* — Slot index in z-dimension
-- **`iw`** *(optional)* — Slot index in w-dimension
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
+- **`fn`** — File name of an existing channel file
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** *(optional)* — Slot index, 0-based
+- **`slots`** — Slot indices `(ix, iy, iz, iw)` (vector form), 0-based, one column per slot; `[4, n_slot]`
+- **`i_snap`** *(optional)* — Snapshot indices, 0-based, any order, repeats allowed, below `n_snap` of every slot
+  that has snapshots; empty = all; `[n_out]`
 
 ## Returns:
-- Channel object at the specified slot; empty if no data is present
+- The channel; vector form: one channel per column of `slots`, `[n_slot]`
+
+## Notes:
+- **Snapshot selection**: only the selected snapshots are read. Members with one entry per snapshot are sliced, also
+  positions, orientations and `center_freq` stored per snapshot; values stored once and the unstructured data are
+  kept. A slot without snapshots (only unstructured data) ignores `i_snap`
+- **Round trip** with [[hdf5_write_channel]]: every member with one entry per snapshot comes back with one entry per
+  snapshot, also for snapshots without paths; a channel written without `center_freq` comes back with an empty one;
+  empty orientations come back as `[3, 1]` zeros
+- **Unstructured data**: the datasets of the slot with the prefix `par_`, in the order they were written and in their
+  stored type ([[hdf5_read_dset]] lists the types); datasets of another prefix are not read
+- **Errors**: a missing file, a file that is not a quadriga-lib channel file of version 3, or a malformed file (e.g. a
+  dataset whose size does not match the attributes of the channel, or a missing dataset) throws `std::runtime_error`;
+  files changed by other HDF5 tools may be rejected
 
 ## See also:
-- [[hdf5_write_channel]] (write a channel object to a slot)
-- [[hdf5_read_channel_vec]] (read several slots)
-- [[hdf5_read_layout]] (inspect slot occupancy before reading)
+- [[hdf5_read_layout]] (finds the occupied slots)
+- [[hdf5_write_channel]] (writes channels)
 MD!*/
 
 // Read the channel group at 'ref' (not 0) of an open file; 'i_snap' selects snapshots (empty: all). Each
@@ -1360,39 +1341,10 @@ template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(const std:
 template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                                                                        const uint_list &i_snap);
 
-/*!MD
-# hdf5_read_channel_vec
-Read the channels of several slots of an HDF5 file
-
-- Reads the slots listed in the columns of `slots` with one opening of the file; the result has one channel per
-  column, in the column order.
-- Each entry equals [[hdf5_read_channel]] of that slot with the same `i_snap`: empty slots and slots outside the
-  layout give an empty channel; `i_snap` applies to every slot with snapshots.
-
-## Declaration:
-```
-std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(
-    const std::string &fn,
-    const arma::u32_mat &slots,
-    const uint_list &i_snap = {});
-```
-
-## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`slots`** — Slot indices `(ix, iy, iz, iw)`, 0-based, one column per slot; `[4, n_slot]`
-- **`i_snap`** *(optional)* — Snapshot indices, 0-based; empty = all snapshots; `[n_out]`
-
-## Returns:
-- Channel objects, one per slot; `[n_slot]`
-
-## See also:
-- [[hdf5_read_channel]] (read one slot)
-- [[hdf5_write_channel_vec]] (write several slots)
-MD!*/
 
 template <typename dtype>
-std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::u32_mat &slots,
-                                                                              const uint_list &i_snap_in)
+std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel(const std::string &fn, const arma::u32_mat &slots,
+                                                                          const uint_list &i_snap_in)
 {
     const arma::uvec &i_snap = i_snap_in.vec();
     if (slots.n_cols != 0 && slots.n_rows != 4)
@@ -1411,20 +1363,19 @@ std::vector<quadriga_lib::channel<dtype>> quadriga_lib::hdf5_read_channel_vec(co
     return chan_vec;
 }
 
-template std::vector<quadriga_lib::channel<float>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::u32_mat &slots,
-                                                                                       const uint_list &i_snap);
+template std::vector<quadriga_lib::channel<float>> quadriga_lib::hdf5_read_channel(const std::string &fn, const arma::u32_mat &slots,
+                                                                                   const uint_list &i_snap);
 
-template std::vector<quadriga_lib::channel<double>> quadriga_lib::hdf5_read_channel_vec(const std::string &fn, const arma::u32_mat &slots,
-                                                                                        const uint_list &i_snap);
+template std::vector<quadriga_lib::channel<double>> quadriga_lib::hdf5_read_channel(const std::string &fn, const arma::u32_mat &slots,
+                                                                                    const uint_list &i_snap);
 
 /*!MD
 # hdf5_reshape_layout
-Reshape the 4D storage layout of an existing HDF5 channel file
+Reshape the storage layout of an existing HDF5 channel file
 
-- Updates `{nx, ny, nz, nw}` of an existing file; total slot count `nx × ny × nz × nw` must remain unchanged.
-- Throws if the new layout violates the total-count constraint or has more than 4294967295 (2^32 - 1) slots.
-- Throws if the file does not exist or is not a quadriga-lib channel file.
-- One writer per file at a time; files are not locked.
+- Sets new dimensions `{nx, ny, nz, nw}` with the slot count `nx · ny · nz · nw` of the file
+- The data stays in place: the slot with the linear index `ix + nx * (iy + ny * (iz + nz * iw))` of [[hdf5_read_layout]]
+  keeps its channel, which gets the slot index of that position in the new layout
 
 ## Declaration:
 ```
@@ -1437,15 +1388,13 @@ void quadriga_lib::hdf5_reshape_layout(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`nx`** — New size of x-dimension
-- **`ny`** *(optional)* — New size of y-dimension
-- **`nz`** *(optional)* — New size of z-dimension
-- **`nw`** *(optional)* — New size of w-dimension
+- **`fn`** — File name of an existing channel file
+- **`nx`** — New number of slots along x
+- **`ny`**, **`nz`**, **`nw`** *(optional)* — New number of slots along y, z and w
 
 ## See also:
-- [[hdf5_create_file]] (set initial layout at file creation)
-- [[hdf5_read_layout]] (query current layout)
+- [[hdf5_create_file]] (sets the layout of a new file)
+- [[hdf5_read_layout]] (reads the layout)
 MD!*/
 
 void quadriga_lib::hdf5_reshape_layout(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
@@ -1472,18 +1421,14 @@ void quadriga_lib::hdf5_reshape_layout(const std::string &fn, unsigned nx, unsig
 
 /*!MD
 # hdf5_read_dset
-Read an unstructured dataset from an HDF5 file at a specified 4D index
+Read an unstructured dataset from a slot of an HDF5 channel file
 
-- Reads a user-defined dataset stored under `prefix + name` (e.g., `"par_carrier_frequency"`).
-- Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
-- Use [[any_type_id]] to determine the contained type and shape, then `std::any_cast` to that type.
-- Returned types: a scalar dataset gives a scalar; a 1D dataset an `arma::Col`, also when it has a single element;
-  a 2D dataset an `arma::Mat`; a 3D dataset an `arma::Cube`. An `arma::Row` written with [[hdf5_write_dset]]
-  therefore comes back as an `arma::Col`.
-- Element types: float, double, 32- and 64-bit signed and unsigned integers.
-- Strings are returned without trailing NUL characters (an empty string written by [[hdf5_write_dset]] comes back
-  empty).
-- Throws if the file does not exist or is not a quadriga-lib channel file.
+- Reads the dataset `prefix + name` of slot `(ix, iy, iz, iw)`, e.g. `par_carrier_frequency`
+- The type follows the stored dataset: a scalar dataset gives a scalar, a 1D dataset an `arma::Col` (also with one
+  element, so an `arma::Row` comes back as `arma::Col`), a 2D dataset an `arma::Mat`, a 3D dataset an `arma::Cube`,
+  with the element type float, double, unsigned, int, unsigned long long or long long; a string comes back without
+  trailing NUL characters
+- [[any_type_id]] gives the type and the shape, `std::any_cast` to that type the value
 
 ## Declaration:
 ```
@@ -1498,20 +1443,17 @@ std::any quadriga_lib::hdf5_read_dset(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`name`** — Dataset name without prefix, e.g., `"carrier_frequency"`
-- **`ix`** *(optional)* — Slot index in x-dimension
-- **`iy`** *(optional)* — Slot index in y-dimension
-- **`iz`** *(optional)* — Slot index in z-dimension
-- **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Dataset name prefix prepended before `name`
+- **`fn`** — File name of an existing channel file
+- **`name`** — Dataset name without the prefix, e.g. `carrier_frequency`
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** *(optional)* — Slot index, 0-based
+- **`prefix`** *(optional)* — Prefix of the dataset name; `""` reads `name` as given
 
 ## Returns:
-- `std::any` containing the dataset, or empty `std::any` if not found
+- The dataset; an empty `std::any` if the slot is empty or outside the layout or has no such dataset
 
 ## See also:
-- [[hdf5_write_dset]] (write an unstructured dataset)
-- [[any_type_id]] (inspect the type held in a `std::any`)
+- [[hdf5_read_dset_names]] (lists the datasets of a slot)
+- [[hdf5_write_dset]] (writes a dataset)
 MD!*/
 
 std::any quadriga_lib::hdf5_read_dset(const std::string &fn, const std::string &name,
@@ -1531,10 +1473,10 @@ std::any quadriga_lib::hdf5_read_dset(const std::string &fn, const std::string &
 
 /*!MD
 # hdf5_read_dset_names
-Read names of unstructured datasets stored at a 4D slot in an HDF5 file
+Read the names of the unstructured datasets of a slot of an HDF5 channel file
 
-- Finds all datasets whose HDF5 name starts with `prefix` at slot `(ix, iy, iz, iw)`; returned names exclude the prefix.
-- Throws if the file does not exist or is not a quadriga-lib channel file.
+- Lists the datasets of slot `(ix, iy, iz, iw)` whose names start with `prefix`, without the prefix, in the order
+  they were written
 
 ## Declaration:
 ```
@@ -1548,19 +1490,16 @@ std::vector<std::string> quadriga_lib::hdf5_read_dset_names(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`ix`** *(optional)* — Slot index in x-dimension
-- **`iy`** *(optional)* — Slot index in y-dimension
-- **`iz`** *(optional)* — Slot index in z-dimension
-- **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Prefix used to identify unstructured datasets
+- **`fn`** — File name of an existing channel file
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** *(optional)* — Slot index, 0-based
+- **`prefix`** *(optional)* — Prefix of the listed names; `""` lists all datasets with their full names
 
 ## Returns:
-- Dataset names without the prefix, in creation order; empty if the slot has none
+- Dataset names; empty if the slot is empty or outside the layout or has none
 
 ## See also:
-- [[hdf5_read_dset]] (read a dataset by name)
-- [[hdf5_write_dset]] (write an unstructured dataset)
+- [[hdf5_read_dset]] (reads a dataset by name)
+- [[hdf5_write_dset]] (writes a dataset)
 MD!*/
 
 std::vector<std::string> quadriga_lib::hdf5_read_dset_names(const std::string &fn, unsigned ix, unsigned iy, unsigned iz,
@@ -1582,20 +1521,17 @@ std::vector<std::string> quadriga_lib::hdf5_read_dset_names(const std::string &f
 
 /*!MD
 # hdf5_write_dset
-Write a single unstructured dataset to an HDF5 file at a specified 4D index
+Write an unstructured dataset to a slot of an HDF5 channel file
 
-- Dataset is stored under `prefix + name`; name must contain only alphanumeric characters and underscores.
-- Adds the dataset to the slot and keeps everything else stored there (channel data and other datasets); an empty
-  slot is reserved for it. A later [[hdf5_write_channel]] to the same slot replaces the slot completely, including the
-  datasets written with this function.
-- Supported scalar types: `std::string`, `unsigned`, `int`, `long long`, `unsigned long long`, `float`, `double`
-- Supported Armadillo types: `arma::Col`, `arma::Row`, `arma::Mat`, `arma::Cube` with element types `float`, `double`, `int`, `unsigned`, `sword`, `uword`, `unsigned long long`
-- `arma::Row` is converted to `arma::Col` before writing.
-- Throws for unsupported types and invalid names, before the file is changed.
-- Throws if a dataset with the same name already exists at the specified slot; no overwrite/update is supported.
-- One writer per file at a time; files are not locked.
-- Creates the file with the layout `(ix + 1) × (iy + 1) × (iz + 1) × (iw + 1)` if it does not exist; use
-  [[hdf5_create_file]] for another layout.
+- Adds the dataset `prefix + name` to slot `(ix, iy, iz, iw)`; everything else stored in the slot stays. An empty
+  slot gets a channel without structured data
+- A missing file is created with the layout `(ix + 1) × (iy + 1) × (iz + 1) × (iw + 1)`; [[hdf5_create_file]] sets
+  another layout
+- A dataset is written once: a dataset of the same name in the slot throws. A later [[hdf5_write_channel]] to the slot
+  removes it with the rest of the slot
+- Invalid names and types throw before the file is changed
+- [[hdf5_read_channel]] returns the datasets with the prefix `par_` as the unstructured data of the channel;
+  [[hdf5_read_dset]] reads each one back, an `arma::Row` as `arma::Col`
 
 ## Declaration:
 ```
@@ -1611,19 +1547,17 @@ void quadriga_lib::hdf5_write_dset(
 ```
 
 ## Inputs:
-- **`fn`** — Path to the HDF5 file
-- **`name`** — Dataset name without prefix; alphanumeric and underscores only; not empty
-- **`data`** — Data to write; type must be supported (see above)
-- **`ix`** *(optional)* — Slot index in x-dimension
-- **`iy`** *(optional)* — Slot index in y-dimension
-- **`iz`** *(optional)* — Slot index in z-dimension
-- **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Prefix prepended to `name` in the HDF5 file
+- **`fn`** — File name
+- **`name`** — Dataset name without the prefix, not empty; `prefix + name` holds only letters, digits and `_`, at
+  most 65000 characters
+- **`data`** — A value of a type of [[any_type_id]]: a string, a scalar, an `arma::Col`, `arma::Row`, `arma::Mat`
+  or `arma::Cube`
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** *(optional)* — Slot index, 0-based; inside the layout of an existing file
+- **`prefix`** *(optional)* — Prefix of the dataset name
 
 ## See also:
-- [[hdf5_read_dset]] (read an unstructured dataset by name)
-- [[hdf5_read_dset_names]] (list available dataset names at a slot)
-- [[any_type_id]] (inspect the type held in a `std::any`)
+- [[hdf5_read_dset]] (reads a dataset by name)
+- [[hdf5_read_dset_names]] (lists the datasets of a slot)
 MD!*/
 
 void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &name, const std::any &data,

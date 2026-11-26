@@ -8,22 +8,25 @@
 #include <iomanip>
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
-# channel_export_obj_file
+# export_channel_obj
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-- Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
-- Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
-- Paths with non-finite coordinates are skipped
-- Throws with the `is_valid()` message of an invalid channel
+- Writes the paths of ray-traced channels as tubes to an OBJ file and their colors to an MTL file of the same name
+  (`.mtl` instead of `.obj`), e.g. for Blender; existing files are overwritten
+- Path gain in dB: with coefficients $10 \log_{10} \sum_{r,t} \lvert a_{r,t} \rvert^2$ over all antenna pairs, else
+  from `polmat` as in [[calc_channel_gain]] with the free-space gain of the length of the drawn path
+- The gain, clipped to `[gain_min_dB, gain_max_dB]`, sets the color (64 steps of `colormap`) and the radius (linear
+  from 0 at `gain_min_dB` to `radius_max` at `gain_max_dB`, at least `radius_min`); a path with a radius up to
+  0.1 mm is written as a polyline
+- Paths below `gain_min_dB` and paths with non-finite coordinates are left out
 
 ## Declaration:
 ```
-void quadriga_lib::channel_export_obj_file(
+void quadriga_lib::export_channel_obj(
     const std::string &fn,
     const channel<dtype> &chan,
     arma::uword max_paths = 0,
@@ -37,30 +40,34 @@ void quadriga_lib::channel_export_obj_file(
 ```
 
 ## Inputs:
-- **`fn`** — Output `.obj` file path
-- **`chan`** — Channel with ray tracing data (`n_interact`, `interact_coord`), `center_freq` and coefficients or `polmat`; see [[channel]]
-- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
-- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
-- **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
-- **`radius_max`** *(optional)* — Tube radius at maximum gain
-- **`radius_min`** *(optional)* — Tube radius at minimum gain
-- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
+- **`fn`** — Path of the OBJ file, ending in `.obj`
+- **`chan`** — Channel, valid and not empty (see [[channel]]), with `center_freq`, `n_interact`, `interact_coord` and
+  `coeff_re` / `coeff_im` or `polmat`
+- **`max_paths`** *(optional)* — Number of the strongest paths per snapshot to export; 0 = all
+- **`gain_max_dB`** *(optional)* — Gain in dB of the largest radius and the last color, finite
+- **`gain_min_dB`** *(optional)* — Gain in dB of the first color, finite and below `gain_max_dB`; weaker paths are
+  left out
+- **`colormap`** *(optional)* — Name of the colormap, see [[colormap]]
+- **`i_snap`** *(optional)* — 0-based indices of the snapshots to export, each below `n_snap`; omitted = all
+- **`radius_max`** *(optional)* — Tube radius in m at `gain_max_dB`, >= 0
+- **`radius_min`** *(optional)* — Smallest tube radius in m, >= 0; at most `radius_max` (a larger value is reduced to
+  it)
+- **`n_edges`** *(optional)* — Vertices of the tube cross-section, >= 3
 
 ## See also:
-- [[path_to_tube]] (generates tube geometry from path data)
-- [[colormap]] (colormap lookup used for coloring)
+- [[path_to_tube]] (tube geometry of one path)
+- [[colormap]] (the colors)
+- [[qrt_file_read]] (ray-traced channels with interaction points)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<dtype> &chan,
-                                           arma::uword max_paths,
-                                           double gain_max_dB_in, double gain_min_dB_in,
-                                           const std::string &colormap,
-                                           const uint_list &i_snap_arg,
-                                           double radius_max_in, double radius_min_in,
-                                           arma::uword n_edges)
+void quadriga_lib::export_channel_obj(const std::string &fn, const channel<dtype> &chan,
+                                      arma::uword max_paths,
+                                      double gain_max_dB_in, double gain_min_dB_in,
+                                      const std::string &colormap,
+                                      const uint_list &i_snap_arg,
+                                      double radius_max_in, double radius_min_in,
+                                      arma::uword n_edges)
 {
     const arma::uvec &i_snap_sel = i_snap_arg.vec();
     const dtype gain_max_dB = dtype(gain_max_dB_in);
@@ -336,11 +343,11 @@ void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<
     outFile.close();
 }
 
-template void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<float> &chan, arma::uword max_paths,
-                                                    double gain_max_dB, double gain_min_dB, const std::string &colormap,
-                                                    const uint_list &i_snap, double radius_max, double radius_min,
-                                                    arma::uword n_edges);
-template void quadriga_lib::channel_export_obj_file(const std::string &fn, const channel<double> &chan, arma::uword max_paths,
-                                                    double gain_max_dB, double gain_min_dB, const std::string &colormap,
-                                                    const uint_list &i_snap, double radius_max, double radius_min,
-                                                    arma::uword n_edges);
+template void quadriga_lib::export_channel_obj(const std::string &fn, const channel<float> &chan, arma::uword max_paths,
+                                               double gain_max_dB, double gain_min_dB, const std::string &colormap,
+                                               const uint_list &i_snap, double radius_max, double radius_min,
+                                               arma::uword n_edges);
+template void quadriga_lib::export_channel_obj(const std::string &fn, const channel<double> &chan, arma::uword max_paths,
+                                               double gain_max_dB, double gain_min_dB, const std::string &colormap,
+                                               const uint_list &i_snap, double radius_max, double radius_min,
+                                               arma::uword n_edges);

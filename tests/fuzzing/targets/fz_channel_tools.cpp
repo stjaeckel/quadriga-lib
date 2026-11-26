@@ -3,8 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Channel coefficient tools on fuzzed coefficient and delay cubes (consistent or mismatched sizes): quantize_delays
-// (also with outputs that alias inputs), baseband_freq_response, baseband_freq_response_vec,
-// baseband_freq_response_multi and baseband_freq_response_multi_vec, with the available kernels
+// (also with outputs that alias inputs), freq_response and freq_response_mf (single and vector forms), with the
+// available kernels
 
 #include "fuzz_target.hpp"
 
@@ -48,7 +48,7 @@ static void run(fz::input &in)
     arma::Col<T> pilot = in.col<T>(in.size(16));
     const double bandwidth = in.value<double>();
 
-    // baseband_freq_response on one snapshot
+    // freq_response on one snapshot
     {
         static const arma::Cube<T> empty;
         const arma::uword s = n_snap == 0 ? 0 : in.ConsumeIntegralInRange<arma::uword>(0, n_snap - 1);
@@ -57,12 +57,12 @@ static void run(fz::input &in)
         arma::Cube<std::complex<T>> h;
         if (out_mask & 8)
             h_re.set_size(in.size(3), in.size(3), in.size(3)), h.set_size(in.size(3), in.size(3), in.size(3));
-        fz::clean([&] { quadriga_lib::baseband_freq_response(a, b, d, pilot, bandwidth,
+        fz::clean([&] { quadriga_lib::freq_response(a, b, d, pilot, bandwidth,
                                                              (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
                                                              (out_mask & 4) ? &h : nullptr, use_kernel); });
     }
 
-    // baseband_freq_response_vec on all or some snapshots
+    // freq_response on all or some snapshots
     {
         arma::uvec i_snap(in.size(5));
         for (auto &i : i_snap)
@@ -71,13 +71,13 @@ static void run(fz::input &in)
         std::vector<arma::Cube<std::complex<T>>> h;
         if (out_mask & 8)
             h_re.resize(in.size(3)), h.resize(in.size(3));
-        fz::clean([&] { quadriga_lib::baseband_freq_response_vec(cre, cim, dl, pilot, bandwidth,
-                                                                 (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
-                                                                 (out_mask & 4) ? &h : nullptr, fz::opt((out_mask & 32), i_snap),
-                                                                 use_kernel); });
+        fz::clean([&] { quadriga_lib::freq_response(cre, cim, dl, pilot, bandwidth,
+                                                    (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
+                                                    (out_mask & 4) ? &h : nullptr, fz::opt((out_mask & 32), i_snap),
+                                                    use_kernel); });
     }
 
-    // baseband_freq_response_multi with the snapshots as input frequencies
+    // freq_response_mf with the snapshots as input frequencies
     {
         arma::Col<T> freq = in.col<T>(in.ConsumeBool() ? n_snap : in.size(5)), freq_new = in.col<T>(in.size(16));
         if (in.ConsumeBool())
@@ -87,11 +87,11 @@ static void run(fz::input &in)
         arma::Cube<T> h_re, h_im;
         arma::Cube<std::complex<T>> h;
         const bool remove_phase = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, (out_mask & 1) ? &h_re : nullptr,
+        fz::clean([&] { quadriga_lib::freq_response_mf(cre, cim, dl, freq, freq_new, (out_mask & 1) ? &h_re : nullptr,
                                                                    (out_mask & 2) ? &h_im : nullptr, (out_mask & 4) ? &h : nullptr,
                                                                    remove_phase, use_kernel); });
 
-        // baseband_freq_response_multi_vec on copies of this input as snapshots, one of them sometimes truncated
+        // freq_response_mf on copies of this input as snapshots, one of them sometimes truncated
         const arma::uword n_batch = in.size(3);
         std::vector<std::vector<arma::Cube<T>>> b_re(n_batch, cre), b_im(n_batch, cim), b_dl(n_batch, dl);
         if (n_batch != 0 && in.ConsumeBool())
@@ -103,7 +103,7 @@ static void run(fz::input &in)
         std::vector<arma::Cube<std::complex<T>>> v;
         if (out_mask & 8)
             v_re.resize(in.size(3)), v.resize(in.size(3));
-        fz::clean([&] { quadriga_lib::baseband_freq_response_multi_vec(b_re, b_im, b_dl, freq, freq_new, (out_mask & 1) ? &v_re : nullptr,
+        fz::clean([&] { quadriga_lib::freq_response_mf(b_re, b_im, b_dl, freq, freq_new, (out_mask & 1) ? &v_re : nullptr,
                                                                        (out_mask & 2) ? &v_im : nullptr, (out_mask & 4) ? &v : nullptr,
                                                                        remove_phase, fz::opt((out_mask & 32), i_snap), use_kernel); });
     }

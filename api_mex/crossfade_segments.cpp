@@ -7,7 +7,7 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
@@ -39,19 +39,20 @@ channel = quadriga_lib.crossfade_segments( segments, n_overlap, overlap, par );
 - **`channel`** — The joined channel, 1x1 struct, fields in [[hdf5_read_channel]]; `par` is not carried
 
 ## Notes:
-- **Snapshots**: segment k starts with `n_overlap(k)` snapshots that are also the last ones of segment k - 1; the output
-  has `sum(n_snap(k) - n_overlap(k))` snapshots, summed over k
-- **Ramp**: in the last `n_r = round(overlap · n_overlap(k))` shared snapshots, the old paths fade out with `1 - w(i)`
-  and the new ones fade in with `w(i)`, in power, with `w(i) = 0.5 · (1 + sin((i / (n_r + 1) - 0.5) · π))` for i = 1,
-  ..., n_r. Before the ramp, the snapshots are those of the old segment
+- **Snapshots**: segment $k$ starts with `n_overlap(k)` snapshots that are also the last ones of segment $k - 1$; the
+  output has $\sum_k (n_{\mathrm{snap},k} - n_{\mathrm{overlap},k})$ snapshots
+- **Ramp**: in the last $n_r = \mathrm{round}(\mathrm{overlap} \cdot n_{\mathrm{overlap},k})$ shared snapshots, the old
+  paths fade out with $1 - w_i$ and the new ones fade in with $w_i$, in power, with
+  $$w_i = \frac{1}{2} \left( 1 + \sin\left( \left( \frac{i}{n_r + 1} - \frac{1}{2} \right) \pi \right) \right), \quad i = 1, \dots, n_r$$
+  Before the ramp, the snapshots are those of the old segment
 - **LOS and GR** (types 0 and 1 of the entry `path_type` of `par`; without it, tap index 0 of the entry `tap` and tap
   index 3 held by one ray, without index 4 or 5, as [[ssf_rays]] numbers them): one path with the data of the new
   segment (of the old one where the new one has no power), scaled to
-  `abs(h)^2 = (1 - w) · abs(h_old)^2 + w · abs(h_new)^2` by the path gain (rays) or the tap power (taps)
-- **Rays** (channels with `path_gain`): the NLOS paths of both segments side by side, with the amplitudes `sqrt(1 - w)`
-  and `sqrt(w)`; `path_length`, `path_angles`, `fbs_pos` and `lbs_pos` are kept where all segments have them
+  $\lvert h \rvert^2 = (1 - w) \lvert h_\mathrm{old} \rvert^2 + w \lvert h_\mathrm{new} \rvert^2$ by the path gain (rays) or the tap power (taps)
+- **Rays** (channels with `path_gain`): the NLOS paths of both segments side by side, with the amplitudes $\sqrt{1 - w}$
+  and $\sqrt{w}$; `path_length`, `path_angles`, `fbs_pos` and `lbs_pos` are kept where all segments have them
 - **Taps** (without `path_gain`, one tap count per segment): one set of tap slots for all snapshots (LOS, GR, NLOS); the
-  NLOS taps of the old segment hold `1 - w` and those of the new segment `w` of their mean power over the ramp; slots
+  NLOS taps of the old segment hold $1 - w$ and those of the new segment $w$ of their mean power over the ramp; slots
   without power hold zero coefficients and the smallest delay of the snapshot
 - **Other data**: delays as given (one reference for all segments); positions interpolated in the ramp, orientations
   along the shorter way; `name` and `center_freq` of segment 1; `n_interact` and `interact_coord` are not carried

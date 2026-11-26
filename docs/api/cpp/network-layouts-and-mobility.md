@@ -306,7 +306,7 @@ L.pairing = arma::join_cols(site.t(), arma::regspace<arma::urowvec>(0, site.n_el
 - **Evaluation**: at the first rows of both nodes and `layout.center_freq[i_freq]`, with the link states of the first
   segment, the wrap image and the antennas as in [get_channels_from_rays](#get_channels_from_rays); `layout.pairing` is ignored
 - **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [get_channels_from_rays](#get_channels_from_rays) plus the gain of one
-  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [get_channels_planar](channel-generation-functions.md#get_channels_planar)
+  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [get_channels_planar](channel-generators.md#get_channels_planar)
   gives it; no rays
 - **`"rsrp"`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of $\lvert h \rvert^2$ over the rays of
   [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
@@ -389,7 +389,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#export_rays_qrt) · [Py
 
 - Stores the rays of the linked pairs with their link gain as CIRs: one origin per site, one destination per terminal
   and one CIR per row of the terminal
-- Separates the ray generation from the antennas: [qrt_file_read](channel-functions.md#qrt_file_read), [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths) and
+- Separates the ray generation from the antennas: [qrt_file_read](channel-data-and-processing.md#qrt_file_read), [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths) and
   [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) turn a CIR into channels for any arrays, orientations and positions, without the GBSM
   chain
 - Positions in the file are local; add the returned shift to the positions read back
@@ -419,7 +419,7 @@ arma::vec quadriga_lib::export_rays_qrt(
   first node of the terminal (its nodes share their positions)
 - **Content of a CIR**: the rays of the link and of the segment that holds the row (scatterers added where missing), the
   link gain and the K-factor ratio of [get_channels_from_rays](#get_channels_from_rays) at the row, [ssf_paths](geometry-based-stochastic-model.md#ssf_paths) with `"drift"`,
-  [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers). A CIR read back gives the channel of [get_channels_from_rays](#get_channels_from_rays) (`output = "rays"`,
+  [qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers). A CIR read back gives the channel of [get_channels_from_rays](#get_channels_from_rays) (`output = "rays"`,
   `mobility = "drift"`) at the row within float32 accuracy
 - **Reading back**: [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths) with the method of the links and the `n_interact` of the file as
   `path_type`, then [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) with link gain 0 and mobility `"drift"`
@@ -432,8 +432,8 @@ arma::vec quadriga_lib::export_rays_qrt(
 
 ### See also:
 - [generate_rays](#generate_rays), [get_channels_from_rays](#get_channels_from_rays) (the rays and the link gain)
-- [qrt_file_read](channel-functions.md#qrt_file_read), [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths), [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) (evaluation of the file)
-- [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) (the stored paths)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read), [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths), [gbsm_single_link_channel](geometry-based-stochastic-model.md#gbsm_single_link_channel) (evaluation of the file)
+- [qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers) (the stored paths)
 
 ---
 <a id="generate_layout"></a>
@@ -736,7 +736,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#get_channels_from_rays)
   rays of [generate_rays](#generate_rays), and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout.pairing` (empty: all) are computed;
   the sectors of a site share the rays of their propagation link
-- Tracks with several segments are joined by [crossfade_segments](channel-functions.md#crossfade_segments)
+- Tracks with several segments are joined by [crossfade_segments](channel-data-and-processing.md#crossfade_segments)
 
 ### Declaration:
 ```cpp
@@ -767,7 +767,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
 - **`overlap`** *(optional)* — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1],
-  see [crossfade_segments](channel-functions.md#crossfade_segments)
+  see [crossfade_segments](channel-data-and-processing.md#crossfade_segments)
 
 ### Output:
 - **`index`** *(optional)* — Tx node, Rx node and frequency index of each channel, 0-based; `[3, n_channel]`
@@ -813,7 +813,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#get_channels_layout) ·
 - Computes the channels in one call from the layout: one channel per Tx node, Rx node and frequency, for the pairs in
   `layout.pairing` (empty: all pairs); [get_channels_from_rays](#get_channels_from_rays) is the third stage alone, from given rays
 - Supports tracks (with times or speeds), point drops that move with their speed, tracks of several segments, joined by
-  the cross-fade of [crossfade_segments](channel-functions.md#crossfade_segments), and both output forms, `"taps"` and `"rays"`
+  the cross-fade of [crossfade_segments](channel-data-and-processing.md#crossfade_segments), and both output forms, `"taps"` and `"rays"`
 - Runs the stages [init_link_states](#init_link_states), [generate_rays](#generate_rays) and [get_channels_from_rays](#get_channels_from_rays) with their default settings;
   the results are those of the stages called one by one
 - Without link states in `layout.links`, draws them for this call only and leaves the layout unchanged; with link

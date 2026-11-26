@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// path_to_tube and channel_export_obj_file: the export runs for the minimal ray-tracing channel (positions,
+// path_to_tube and export_channel_obj: the export runs for the minimal ray-tracing channel (positions,
 // polarization matrix, interaction coordinates) with all optional arguments, rejects incomplete channels and
 // invalid arguments, and skips paths with non-finite coordinates. The file content is not compared to an oracle.
 
@@ -41,7 +41,7 @@ TEST_CASE("Channel - OBJ Export")
 {
     quadriga_lib::channel<double> c;
 
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_chan.obj", c), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_chan.obj", c), std::invalid_argument);
 
     // Single transmitter
     c.tx_pos = {0.0, 0.0, 1.0};
@@ -52,7 +52,7 @@ TEST_CASE("Channel - OBJ Export")
                 {0.0, 1.0},
                 {1.0, 1.0}};
 
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_chan.obj", c), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_chan.obj", c), std::invalid_argument);
 
     // 2 Paths: LOS and 1 single-bounce
     arma::u32_vec n_interact = {0, 1};
@@ -63,7 +63,7 @@ TEST_CASE("Channel - OBJ Export")
     c.interact_coord.push_back(interact_coord.t());
     c.interact_coord.push_back(interact_coord.t());
 
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_chan.obj", c), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_chan.obj", c), std::invalid_argument);
 
     arma::mat M(8, 2);
     M(0, 0) = 1.0;
@@ -77,17 +77,17 @@ TEST_CASE("Channel - OBJ Export")
 
     // This is the minimum data required from the RT simulation:
     // - TX and RX positions, Polarization Matrix and Path interaction coordinates
-    quadriga_lib::channel_export_obj_file("test_chan.obj", c);
-    quadriga_lib::channel_export_obj_file("test_chan.obj", c, 1);
-    quadriga_lib::channel_export_obj_file("test_chan.obj", c, 0, -50.0);
-    quadriga_lib::channel_export_obj_file("test_chan.obj", c, 0, -50.0, -82.6);
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_no_such_dir_chan/test_chan.obj", c), std::runtime_error);
+    quadriga_lib::export_channel_obj("test_chan.obj", c);
+    quadriga_lib::export_channel_obj("test_chan.obj", c, 1);
+    quadriga_lib::export_channel_obj("test_chan.obj", c, 0, -50.0);
+    quadriga_lib::export_channel_obj("test_chan.obj", c, 0, -50.0, -82.6);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_no_such_dir_chan/test_chan.obj", c), std::runtime_error);
 
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_chan.obj", c, 0, -50.0, -82.6, "bla"), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_chan.obj", c, 0, -50.0, -82.6, "bla"), std::invalid_argument);
 
-    quadriga_lib::channel_export_obj_file("test_chan.obj", c, 0, -50.0, -82.6, "turbo");
+    quadriga_lib::export_channel_obj("test_chan.obj", c, 0, -50.0, -82.6, "turbo");
     const arma::uvec i_snap = {1, 0, 0, 1};
-    quadriga_lib::channel_export_obj_file("test_chan.obj", c, 0, -50.0, -82.6, "jet", i_snap, 0.5, 0.2, 12);
+    quadriga_lib::export_channel_obj("test_chan.obj", c, 0, -50.0, -82.6, "jet", i_snap, 0.5, 0.2, 12);
 
     std::remove("test_chan.obj");
     std::remove("test_chan.mtl");
@@ -107,10 +107,10 @@ TEST_CASE("Channel - OBJ Export skips paths with non-finite coordinates")
     c.delay.push_back(arma::cube(1, 1, 2, arma::fill::value(1.0e-7)));
 
     // The gain range must be positive
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_chan_nonfinite.obj", c, 0, -100.0, -100.0), std::invalid_argument);
-    REQUIRE_THROWS_AS(quadriga_lib::channel_export_obj_file("test_chan_nonfinite.obj", c, 0, -100.0, -60.0), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_chan_nonfinite.obj", c, 0, -100.0, -100.0), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::export_channel_obj("test_chan_nonfinite.obj", c, 0, -100.0, -60.0), std::invalid_argument);
 
-    quadriga_lib::channel_export_obj_file("test_chan_nonfinite.obj", c, 0, 0.0, -100.0);
+    quadriga_lib::export_channel_obj("test_chan_nonfinite.obj", c, 0, 0.0, -100.0);
 
     std::ifstream file("test_chan_nonfinite.obj");
     REQUIRE(file.is_open());

@@ -2,10 +2,10 @@
 % Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 % Part of quadriga-lib — see LICENSE for terms.
 
-function test_baseband_freq_response
-% MEX interface test for quadriga_lib.baseband_freq_response.
+function test_freq_response
+% MEX interface test for quadriga_lib.freq_response.
 % Scope: argument and output handling, index conversion, cell-array batches, kernels, error paths.
-% Physics validation lives in the Catch2 suite (test_baseband_freq_response.cpp).
+% Physics validation lives in the Catch2 suite (test_freq_response.cpp).
 
 %% Common single-frequency test data
 % [n_rx=4, n_tx=3, n_path=2]
@@ -25,7 +25,7 @@ delay(2) = 1.5/fc;
 pilots = 0:0.1:2;   % 21 pilot positions, range 0..2
 
 %% One snapshot
-[ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc );
+[ hmat_re, hmat_im ] = quadriga_lib.freq_response( real(coeff), imag(coeff), delay, pilots, fc );
 
 assertEqual( size(hmat_re), [4 3 21] );
 assertEqual( size(hmat_im), [4 3 21] );
@@ -45,9 +45,9 @@ assertElementsAlmostEqual( hmat_re(:,:,11), T, 'absolute', 1.5e-6 );
 assertElementsAlmostEqual( hmat_re(:,1,:)*4, hmat_re(:,2,:), 'absolute', 1.5e-6 );
 
 %% Single carrier
-[ hmat_re_s1, hmat_im_s1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, 0.5, fc );
+[ hmat_re_s1, hmat_im_s1 ] = quadriga_lib.freq_response( real(coeff), imag(coeff), delay, 0.5, fc );
 assertEqual( size(hmat_re_s1), [4 3] );
-[ hmat_re_ref, hmat_im_ref ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, [0.4, 0.5, 0.6], fc );
+[ hmat_re_ref, hmat_im_ref ] = quadriga_lib.freq_response( real(coeff), imag(coeff), delay, [0.4, 0.5, 0.6], fc );
 assertElementsAlmostEqual( hmat_re_s1, hmat_re_ref(:,:,2), 'absolute', 1e-6 );
 assertElementsAlmostEqual( hmat_im_s1, hmat_im_ref(:,:,2), 'absolute', 1e-6 );
 
@@ -61,7 +61,7 @@ for s = 1:n_snap
 end
 
 %% All snapshots (i_snap omitted)
-[ hmat_re_ms, hmat_im_ms ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
+[ hmat_re_ms, hmat_im_ms ] = quadriga_lib.freq_response( cre, cim, dl, pilots, fc );
 assertEqual( size(hmat_re_ms), [4 3 21 3] );
 assertEqual( size(hmat_im_ms), [4 3 21 3] );
 for s = 1:n_snap
@@ -70,32 +70,32 @@ for s = 1:n_snap
 end
 
 %% i_snap
-[ hmat_re_a, hmat_im_a ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 2 3] );
+[ hmat_re_a, hmat_im_a ] = quadriga_lib.freq_response( cre, cim, dl, pilots, fc, [1 2 3] );
 assertEqual( hmat_re_a, hmat_re_ms );
 assertEqual( hmat_im_a, hmat_im_ms );
 
-[ hmat_re_sub, hmat_im_sub ] = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [3 1] );
+[ hmat_re_sub, hmat_im_sub ] = quadriga_lib.freq_response( cre, cim, dl, pilots, fc, [3 1] );
 assertEqual( size(hmat_re_sub), [4 3 21 2] );
 assertEqual( hmat_re_sub, hmat_re_ms(:,:,:,[3 1]) );
 assertEqual( hmat_im_sub, hmat_im_ms(:,:,:,[3 1]) );
 
 % One array is one snapshot
-[ hmat_re_1, hmat_im_1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, [1 1] );
+[ hmat_re_1, hmat_im_1 ] = quadriga_lib.freq_response( real(coeff), imag(coeff), delay, pilots, fc, [1 1] );
 assertEqual( size(hmat_re_1), [4 3 21 2] );
 assertEqual( hmat_re_1(:,:,:,2), hmat_re );
 assertEqual( hmat_im_1(:,:,:,1), hmat_im );
 
 % Only the first output; without assignment it is ans
-hmat_re_o = quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
+hmat_re_o = quadriga_lib.freq_response( cre, cim, dl, pilots, fc );
 assertEqual( hmat_re_o, hmat_re_ms );
-quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc );
+quadriga_lib.freq_response( cre, cim, dl, pilots, fc );
 assertEqual( ans, hmat_re_ms );
 
 % [] equals an omitted optional input
-assertEqual( quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [], [] ), hmat_re_ms );
+assertEqual( quadriga_lib.freq_response( cre, cim, dl, pilots, fc, [], [] ), hmat_re_ms );
 
 % Single-precision inputs give double outputs
-[ hr_sp, hi_sp ] = quadriga_lib.baseband_freq_response( single(real(coeff)), single(imag(coeff)), single(delay), ...
+[ hr_sp, hi_sp ] = quadriga_lib.freq_response( single(real(coeff)), single(imag(coeff)), single(delay), ...
     single(pilots), single(fc) );
 assertTrue( isa(hr_sp, 'double') );
 assertElementsAlmostEqual( hr_sp + 1j*hi_sp, hmat_re + 1j*hmat_im, 'absolute', 1e-5 );
@@ -104,25 +104,25 @@ assertElementsAlmostEqual( hr_sp + 1j*hi_sp, hmat_re + 1j*hmat_im, 'absolute', 1
 cre_v = { real(coeff), real(coeff(:,:,1)) };
 cim_v = { imag(coeff), imag(coeff(:,:,1)) };
 dl_v = { delay, delay(1) };
-[ hr_v, hi_v ] = quadriga_lib.baseband_freq_response( cre_v, cim_v, dl_v, pilots, fc );
-[ hr_1, hi_1 ] = quadriga_lib.baseband_freq_response( cre_v{2}, cim_v{2}, dl_v{2}, pilots, fc );
+[ hr_v, hi_v ] = quadriga_lib.freq_response( cre_v, cim_v, dl_v, pilots, fc );
+[ hr_1, hi_1 ] = quadriga_lib.freq_response( cre_v{2}, cim_v{2}, dl_v{2}, pilots, fc );
 assertEqual( size(hr_v), [4 3 21 2] );
 assertEqual( hr_v(:,:,:,1), hmat_re );
 assertEqual( hr_v(:,:,:,2), hr_1 );
 assertEqual( hi_v(:,:,:,2), hi_1 );
 
 %% Errors
-assert_throws( @() quadriga_lib.baseband_freq_response( cat(4, real(coeff), real(coeff)), ...
+assert_throws( @() quadriga_lib.freq_response( cat(4, real(coeff), real(coeff)), ...
     cat(4, imag(coeff), imag(coeff)), delay, pilots, fc ), 'more than 3 dimensions' );
-assert_throws( @() quadriga_lib.baseband_freq_response( cre, imag(coeff), dl, pilots, fc ), 'must all be cell arrays' );
-assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), cim, dl, pilots, fc ), 'must all be cell arrays' );
-assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [0 1] ), '1-based' );
-assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl, pilots, fc, [1 5] ), 'outside the range of the' );
-assert_throws( @() quadriga_lib.baseband_freq_response( {real(coeff), zeros(2,3,2)}, {imag(coeff), zeros(2,3,2)}, ...
+assert_throws( @() quadriga_lib.freq_response( cre, imag(coeff), dl, pilots, fc ), 'must all be cell arrays' );
+assert_throws( @() quadriga_lib.freq_response( real(coeff), cim, dl, pilots, fc ), 'must all be cell arrays' );
+assert_throws( @() quadriga_lib.freq_response( cre, cim, dl, pilots, fc, [0 1] ), '1-based' );
+assert_throws( @() quadriga_lib.freq_response( cre, cim, dl, pilots, fc, [1 5] ), 'outside the range of the' );
+assert_throws( @() quadriga_lib.freq_response( {real(coeff), zeros(2,3,2)}, {imag(coeff), zeros(2,3,2)}, ...
     {delay, delay}, pilots, fc ), 'same number of rows and columns' );
-assert_throws( @() quadriga_lib.baseband_freq_response( cre, cim, dl(1:2), pilots, fc ), 'same number of snapshots' );
-assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots ), 'Wrong number of input arguments' );
-assert_throws( @() quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, [], 0, 1 ), ...
+assert_throws( @() quadriga_lib.freq_response( cre, cim, dl(1:2), pilots, fc ), 'same number of snapshots' );
+assert_throws( @() quadriga_lib.freq_response( real(coeff), imag(coeff), delay, pilots ), 'Wrong number of input arguments' );
+assert_throws( @() quadriga_lib.freq_response( real(coeff), imag(coeff), delay, pilots, fc, [], 0, 1 ), ...
     'Wrong number of input arguments' );
 assert_throws( @() three_outputs( real(coeff), imag(coeff), delay, pilots, fc ), 'Wrong number of output arguments' );
 
@@ -131,13 +131,13 @@ cr = reshape(sin(1:24), 2, 3, 4); ci = reshape(cos(1:24), 2, 3, 4); d4 = reshape
 pg = linspace(0, 1, 5)';
 modes = { {cr, ci, d4, pg, 1e8, []}, {{cr, cr}, {ci, ci}, {d4, d4}, pg, 1e8, []} };
 for m = 1:2
-    [~] = quadriga_lib.baseband_freq_response( modes{m}{:}, 1 );
-    assert_throws( @() quadriga_lib.baseband_freq_response( modes{m}{:}, 3 ), 'Input ''use_kernel'' must be 0, 1 or 2.' );
+    [~] = quadriga_lib.freq_response( modes{m}{:}, 1 );
+    assert_throws( @() quadriga_lib.freq_response( modes{m}{:}, 3 ), 'Input ''use_kernel'' must be 0, 1 or 2.' );
 end
 end
 
 function three_outputs( varargin )
-[~, ~, ~] = quadriga_lib.baseband_freq_response( varargin{:} );
+[~, ~, ~] = quadriga_lib.freq_response( varargin{:} );
 end
 
 function assert_throws( fn, expected )

@@ -40,7 +40,7 @@ quadriga_lib.export_pattern_obj( fn, arrayant, directivity_range_dB, colormap, o
 
 ## See also:
 - [[calc_directivity]], [[calc_beamwidth]] (the same pattern as numbers)
-- [[channel_export_obj_file]] (exports propagation paths to an OBJ file)
+- [[export_channel_obj]] (exports propagation paths to an OBJ file)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

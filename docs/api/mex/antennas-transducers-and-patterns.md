@@ -252,7 +252,7 @@ quadriga_lib.export_pattern_obj( fn, arrayant, directivity_range_dB, colormap, o
 
 ### See also:
 - [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (the same pattern as numbers)
-- [channel_export_obj_file](channel-functions.md#channel_export_obj_file) (exports propagation paths to an OBJ file)
+- [export_channel_obj](channel-data-and-processing.md#export_channel_obj) (exports propagation paths to an OBJ file)
 
 ---
 <a id="generate_antenna"></a>
@@ -556,7 +556,7 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#interpolate_pattern) 
 - [apply_port_weights](#apply_port_weights) (patterns per port instead of per element)
 - [rotate_pattern](#rotate_pattern) (applies an orientation to the stored patterns)
 - [join_arrays](#join_arrays), [generate_speaker](#generate_speaker) (build multi-element, multi-frequency arrays)
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (channel coefficients from the interpolated patterns)
+- [get_channels_spherical](channel-generators.md#get_channels_spherical) (channel coefficients from the interpolated patterns)
 
 ---
 <a id="join_arrays"></a>

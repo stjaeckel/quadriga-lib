@@ -4,11 +4,53 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-mat
 
 | Function | Summary |
 | --- | --- |
+| [acdf](#acdf) | Empirical cumulative distribution functions (CDF) of several data sets, their average and quantile statistics |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Calculate rotation matrices from Euler angles |
 | [fast_cart2geo](#fast_cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
 | [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and cosine of a vector |
 | [interp](#interp) | Perform linear interpolation (1D or 2D) on multiple data sets |
+
+---
+<a id="acdf"></a>
+## acdf
+Empirical cumulative distribution functions (CDF) of several data sets, their average and quantile statistics
+
+Also in: [C++](../cpp/math-functions.md#acdf) · [MATLAB](../mex/math-functions.md#acdf)
+
+- The CDF of each data set (column of `data`) at the bin centers: each finite value counts for the nearest bin (values
+  outside the bins for the first or last one), and the CDF is the cumulative count divided by the number of finite
+  values of the set
+- Average `cdf_avg` in quantile space: for the probabilities $P = 0, 0.001, \dots, 0.999$, the bins at which the
+  CDFs of the sets reach $P$ are averaged over the sets, and the averaged quantile function is mapped back to the
+  bins; this averages the position of the distributions instead of their CDF values
+- `mu` and `sig`: mean and standard deviation (normalized by $N - 1$) of the quantiles at
+  $P = 0.1, 0.2, \dots, 0.9$ over the sets, each taken over the 11 probabilities within $\pm 0.005$; for one set its
+  quantiles and 0
+- Non-finite values are left out; a set without finite values gets a NaN CDF and is left out of `cdf_avg`, `mu` and
+  `sig`, which are NaN if no set has finite values (possible only with given bins)
+- Generated bins: `n_bins` equally spaced bins from the smallest to the largest finite value of `data` (±10 % of the
+  value, or ±1 for 0, if all are equal); `data` without finite values then throws
+
+### Usage:
+```python
+cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, *, n_bins )
+```
+
+### Inputs:
+- **`data`** — Data sets, one per column, magnitudes below about 1e18; `(n_samples, n_sets)`
+- **`bins`** — Bin centers, finite and strictly ascending; `(n_bins_in,)`; default: `None` (generated bins)
+- **`n_bins`** — Number of generated bins, >= 2; not used with `bins`; default: 201
+
+### Outputs:
+- **`cdf_per_set`** — CDF of each set; `(n_bins_out, n_sets)`
+- **`bins_out`** — Bin centers, `bins` or the generated ones; `(n_bins_out,)`
+- **`cdf_avg`** — Average CDF; `(n_bins_out,)`
+- **`mu`** — Mean of the quantiles at 0.1, ..., 0.9; `(9,)`
+- **`sig`** — Standard deviation of these quantiles; `(9,)`
+
+### See also:
+- [calc_delay_spread](channel-data-and-processing.md#calc_delay_spread) (delay spreads of many CIRs, a typical input)
 
 ---
 <a id="calc_rotation_matrix"></a>

@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Pins down get_channels_spherical and get_channels_spherical_vec: per-element delays, angles, amplitudes and phases
+// Pins down get_channels_spherical and its vector form: per-element delays, angles, amplitudes and phases
 // of spherical waves, TX and RX orientation, antenna coupling, the polarisation matrix M, path_length against the
 // TX-FBS-LBS-RX polyline, add_fake_los_path, agreement of the AVX2 and generic antenna interpolation, empty and
 // invalid inputs. Oracles: closed-form geometry of small layouts with omni and xpol antennas on axis-aligned links.
@@ -2159,6 +2159,36 @@ TEST_CASE("Get Channels Spherical - Position and orientation shapes")
         }
 }
 
+TEST_CASE("Get Channels Spherical - center_freq must be finite and >= 0")
+{
+    // center_freq: 0 (coefficients at f = 0) and positive values are accepted; negative and non-finite values throw
+    // before any output is written
+    auto ant = quadriga_lib::generate_antenna<double>("omni", 1.0);
+    const arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::vec gain = {1.0}, length = {0.0};
+    const arma::mat tx = arma::vec{0.0, 0.0, 1.0}, rx = arma::vec{20.0, 0.0, 1.0}, o = arma::vec{0.0, 0.0, 0.0};
+    auto run = [&](double fc, arma::cube &cr, arma::cube &ci, arma::cube &dl)
+    { quadriga_lib::get_channels_spherical(ant, ant, tx, o, rx, o, fbs, fbs, gain, length, M, cr, ci, dl, fc); };
+    arma::cube cr, ci, dl;
+    run(0.0, cr, ci, dl), run(1.0e9, cr, ci, dl);
+    for (double fc : {-1.0e9, -1.0, arma::datum::nan, arma::datum::inf})
+    {
+        arma::cube c_re = cr, d = dl, c_im = ci;
+        CHECK_THROWS_WITH(run(fc, c_re, c_im, d), "Input 'center_freq' must be finite and >= 0.");
+        CHECK(arma::approx_equal(c_re, cr, "absdiff", 0.0));
+        CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
+    }
+    std::vector<arma::mat> vf = {fbs}, vm = {M};
+    std::vector<arma::vec> vg = {gain}, vl = {length};
+    std::vector<arma::cube> vr, vi, vd;
+    // Vector form: checked once before the snapshots (no "Snapshot" prefix), also without snapshots
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical(ant, ant, tx, o, rx, o, vf, vf, vg, vl, vm, vr, vi, vd, -1.0), "Input 'center_freq' must be finite and >= 0.");
+    const std::vector<arma::vec> ev;
+    const std::vector<arma::mat> em;
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical(ant, ant, tx, o, rx, o, em, em, ev, ev, em, vr, vi, vd, -1.0),
+                      "Input 'center_freq' must be finite and >= 0.");
+}
+
 TEST_CASE("Get Channels Spherical - vec form equals single calls")
 {
     // 40 snapshots (enough for the parallel region), shared or per-snapshot positions, snapshots without paths
@@ -2191,17 +2221,17 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
         {
             const arma::mat Tp = shared ? arma::mat(tx_pos.col(0)) : tx_pos;
             std::vector<arma::cube> cr, ci, dl, ad, ed, aa, ea;
-            quadriga_lib::get_channels_spherical_vec<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, fbs, lbs, gain, len, M,
-                                                             cr, ci, dl, 3.5e9, false, fake_los, &ad, &ed, &aa, &ea);
+            quadriga_lib::get_channels_spherical<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, fbs, lbs, gain, len, M,
+                                                         cr, ci, dl, 3.5e9, false, fake_los, &ad, &ed, &aa, &ea);
             REQUIRE(cr.size() == n_snap);
             REQUIRE(ea.size() == n_snap);
 
             // Complex output: same values as the split output (same computation), split outputs left empty
             std::vector<arma::cube> cr2(2), ci2(2), dl2;
             std::vector<arma::cx_cube> cx;
-            quadriga_lib::get_channels_spherical_vec<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, fbs, lbs, gain, len, M,
-                                                             cr2, ci2, dl2, 3.5e9, false, fake_los,
-                                                             nullptr, nullptr, nullptr, nullptr, &cx);
+            quadriga_lib::get_channels_spherical<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, fbs, lbs, gain, len, M,
+                                                         cr2, ci2, dl2, 3.5e9, false, fake_los,
+                                                         nullptr, nullptr, nullptr, nullptr, &cx);
             CHECK(cr2.empty());
             CHECK(ci2.empty());
             REQUIRE(cx.size() == n_snap);
@@ -2236,7 +2266,7 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
     std::vector<arma::fvec> gain_f = {arma::fvec({1.0f})}, len_f = {arma::fvec({0.0f})};
     std::vector<arma::fcube> cr(1, arma::fcube(1, 1, 1)), ci, dl;
     const float *p = cr[0].memptr();
-    quadriga_lib::get_channels_spherical_vec<float>(txf, txf, arma::fmat({0.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
+    quadriga_lib::get_channels_spherical<float>(txf, txf, arma::fmat({0.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
                                                     arma::fmat({10.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
                                                     fbs_f, fbs_f, gain_f, len_f, M_f, cr, ci, dl, 1e9f);
     CHECK(cr[0].memptr() == p);
@@ -2246,7 +2276,7 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
     // Complex output entries of the right size are written in place too
     std::vector<arma::cx_fcube> cx(1, arma::cx_fcube(1, 1, 1));
     const std::complex<float> *pc = cx[0].memptr();
-    quadriga_lib::get_channels_spherical_vec<float>(txf, txf, arma::fmat({0.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
+    quadriga_lib::get_channels_spherical<float>(txf, txf, arma::fmat({0.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
                                                     arma::fmat({10.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
                                                     fbs_f, fbs_f, gain_f, len_f, M_f, cr, ci, dl, 1e9f, false, false,
                                                     nullptr, nullptr, nullptr, nullptr, &cx);
@@ -2257,7 +2287,7 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
     // No snapshots: empty outputs
     std::vector<arma::fmat> e_m;
     std::vector<arma::fvec> e_v;
-    quadriga_lib::get_channels_spherical_vec<float>(txf, txf, arma::fmat(3, 1, arma::fill::zeros), arma::fmat(3, 1, arma::fill::zeros),
+    quadriga_lib::get_channels_spherical<float>(txf, txf, arma::fmat(3, 1, arma::fill::zeros), arma::fmat(3, 1, arma::fill::zeros),
                                                     arma::fmat(3, 1, arma::fill::ones), arma::fmat(3, 1, arma::fill::zeros),
                                                     e_m, e_m, e_v, e_v, e_m, cr, ci, dl);
     CHECK(cr.empty());
@@ -2275,32 +2305,32 @@ TEST_CASE("Get Channels Spherical - vec form errors")
 
     auto bad_len = gain;
     bad_len.pop_back();
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, bad_len, len, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, bad_len, len, M, cr, ci, dl),
                       ContainsSubstring("must have the same length"));
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p2, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical<double>(ant, ant, p2, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
                       ContainsSubstring("1 or 'n_snap' columns"));
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, arma::mat(r1.t()), p1, fbs, fbs, gain, len, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical<double>(ant, ant, p1, p1, arma::mat(r1.t()), p1, fbs, fbs, gain, len, M, cr, ci, dl),
                       ContainsSubstring("must have 3 rows"));
-    CHECK_NOTHROW(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p3, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl));
+    CHECK_NOTHROW(quadriga_lib::get_channels_spherical<double>(ant, ant, p3, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl));
 
     // Invalid antennas and kernels throw without a snapshot prefix, also without snapshots
     std::vector<arma::mat> e_m;
     std::vector<arma::vec> e_v;
     auto bad = ant;
     bad.e_theta_im.reset();
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(bad, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical<double>(bad, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl),
                       ContainsSubstring("Input 'tx_array' is not valid: ") && !ContainsSubstring("Snapshot"));
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, bad, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical<double>(ant, bad, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
                       ContainsSubstring("Input 'rx_array' is not valid: ") && !ContainsSubstring("Snapshot"));
-    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl,
-                                                                     0.0, false, false, nullptr, nullptr, nullptr, nullptr, nullptr, 7),
+    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical<double>(ant, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl,
+                                                                 0.0, false, false, nullptr, nullptr, nullptr, nullptr, nullptr, 7),
                     std::invalid_argument);
 
     // Errors of the single call name the lowest failing snapshot, also from the parallel region (40 snapshots)
     fbs.resize(40, fbs[0]), M.resize(40, M[0]), gain.resize(40, gain[0]), len.resize(40, len[0]);
     M[23] = arma::mat(7, 1, arma::fill::ones), M[5] = M[23];
-    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
                       ContainsSubstring("Snapshot 5: ") && ContainsSubstring("'polmat' must have 8 rows"));
-    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
                     std::invalid_argument);
 }

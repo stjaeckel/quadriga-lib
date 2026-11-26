@@ -6,16 +6,26 @@
 #include "qd_helpers_channel.hpp"
 
 /*!SECTION
-Channel functions
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
 # any_type_id
 Get the type ID and the shape of the value in a `std::any` object
 
-- Inspects a `std::any` object and returns an integer type identifier for its contents
-- Optionally retrieves dimensions (rows, columns, slices) for Armadillo matrix/cube/vector types; for `std::string`, `dims[0]` is the string length, `dims[1]`/`dims[2]` are zero
-- To access the data, cast the object with `std::any_cast` to the type given by the ID
+- Tells which of the supported types a `std::any` holds, e.g. an unstructured dataset of [[hdf5_read_dset]] or an
+  entry of `par_data` of a [[channel]], so that `std::any_cast` to that type gives the value
+- The ID of a numeric value is $10 m + k$ with the container $m$ and the element type $k$:<br><br>
+  | $m$ | Container | $k$ | Element type |
+  | --- | --------- | --- | ------------ |
+  | 1 | scalar | 0 | `float` |
+  | 2 | `arma::Mat` | 1 | `double` |
+  | 3 | `arma::Cube` | 2 | `unsigned long long` (`arma::uword`) |
+  | 4 | `arma::Col` | 3 | `long long` (`arma::sword`) |
+  | 5 | `arma::Row` | 4 | `unsigned` |
+  | | | 5 | `int` |
+
+  e.g. 21 is `arma::Mat<double>`; 9 is `std::string`, -1 a type not listed, -2 no value
 
 ## Declaration:
 ```
@@ -25,30 +35,18 @@ int quadriga_lib::any_type_id(
 ```
 
 ## Input:
-- **`data`** — Pointer to the `std::any` object to inspect
+- **`data`** — Object to inspect; `nullptr` gives -2
 
 ## Output:
-- **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
+- **`dims`** *(optional)* — Shape `[rows, cols, slices]`: `[1, 1, 1]` for a scalar or a type not listed,
+  `[n_elem, 1, 1]` for `arma::Col` and `arma::Row`, `[length, 0, 0]` for a string; not changed for -2; 3 values
 
 ## Returns:
-- Integer type ID of the contained value:<br><br>
-  | ID  | Type                      | ID  | Type                   | ID  | Type                      |
-  | --- | ------------------------- | --- | ---------------------- | --- | ------------------------- |
-  | -2  | `no value`                | -1  | `unsupported type`     | 9   | `std::string`             |
-  | 10  | `float`                   | 11  | `double`               | 12  | `unsigned long long int`  |
-  | 13  | `long long int`           | 14  | `unsigned int`         | 15  | `int`                     |
-  | 20  | `arma::Mat<float>`        | 21  | `arma::Mat<double>`    | 22  | `arma::Mat<arma::uword>`  |
-  | 23  | `arma::Mat<arma::sword>`  | 24  | `arma::Mat<unsigned>`  | 25  | `arma::Mat<int>`          |
-  | 30  | `arma::Cube<float>`       | 31  | `arma::Cube<double>`   | 32  | `arma::Cube<arma::uword>` |
-  | 33  | `arma::Cube<arma::sword>` | 34  | `arma::Cube<unsigned>` | 35  | `arma::Cube<int>`         |
-  | 40  | `arma::Col<float>`        | 41  | `arma::Col<double>`    | 42  | `arma::Col<arma::uword>`  |
-  | 43  | `arma::Col<arma::sword>`  | 44  | `arma::Col<unsigned>`  | 45  | `arma::Col<int>`          |
-  | 50  | `arma::Row<float>`        | 51  | `arma::Row<double>`    | 52  | `arma::Row<arma::uword>`  |
-  | 53  | `arma::Row<arma::sword>`  | 54  | `arma::Row<unsigned>`  | 55  | `arma::Row<int>`          |
+- Type ID
 
 ## See also:
-- [[hdf5_read_dset]] (uses `any_type_id` to read dataset from HDF5 file)
-- [[hdf5_write_dset]] (HDF5 dataset writer)
+- [[hdf5_read_dset]] (returns such objects)
+- [[hdf5_write_dset]] (stores them)
 MD!*/
 
 int quadriga_lib::any_type_id(const std::any *par_data, unsigned long long *dims)

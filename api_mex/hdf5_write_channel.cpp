@@ -5,26 +5,20 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_WRITE_CHANNEL
-Write one or more channel objects to an HDF5 file
+Write channel objects to one or several slots of an HDF5 channel file
 
-- Writes a struct array of channels into 4D slots (one slot per array element)
-- Optional unstructured data can be passed as a matching struct array
-- Creates the file if it does not exist, with the layout that just holds all slots (largest index per dimension);
-  use [[hdf5_create_file]] for another layout
-- All inputs are checked before anything is written: every slot inside the layout of an existing file, no slot
-  twice, all channels valid
-- A slot that already contains data is replaced completely: its old structured data and all its unstructured
-  datasets (also those written with [[hdf5_write_dset]]) are removed; `code` shows which slots were replaced. The
-  file does not shrink; copy the channels into a new file to reclaim the space of the removed data
-- One writer per file at a time; files are not locked
-- Structured data is stored in single precision regardless of MATLAB input precision
-- Unstructured datasets retain their MATLAB type and shape (see [[hdf5_write_dset]])
-- Each scalar location input is broadcast to all `numel(chan)` channels; each vector input must have exactly `numel(chan)` elements
+- Stores `chan(k)` with the unstructured data `par(k)` in slot `(ix(k), iy(k), iz(k), iw(k))`; a scalar index
+  applies to all channels
+- A missing file is created with the layout that just holds the slots (the largest index per dimension);
+  [[hdf5_create_file]] sets another layout
+- A slot that holds data is replaced completely: its old channel and all its unstructured datasets, also those added
+  with [[hdf5_write_dset]], are removed
+- All inputs are checked before anything is written, so a failing check leaves the file unchanged
 
 ## Usage:
 ```
@@ -32,23 +26,29 @@ code = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; string
-- **`chan`** — Structured channel data; non-empty struct array; field layout matches [[hdf5_read_channel]]
-- **`par`** — Unstructured data; struct array of the same size as `chan`. Field names become HDF5 dataset
-  names per slot (each prefixed with `par_`). Empty fields are skipped; default: `[]` (none).
-  Field values follow the type rules of [[hdf5_write_dset]] (at most 3 dimensions).
-- **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default: `1:numel(chan)`
-- **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default: 1
-- **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default: 1
-- **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default: 1
+- **`fn`** — File name
+- **`chan`** — Channels to write, valid; struct array, fields in [[hdf5_read_channel]]; `n_chan` entries, at least 1
+- **`par`** — Unstructured data; struct array of `n_chan` entries: a field name is a dataset name (stored with the
+  prefix `par_`), the values follow the type rules of [[hdf5_write_dset]], empty fields are skipped; default: `[]`
+  (none)
+- **`ix`** — Slot index along x, 1-based; scalar or `n_chan` entries; default: `1:n_chan`
+- **`iy`**, **`iz`**, **`iw`** — Slot indices along y, z and w, 1-based; scalar or `n_chan` entries; default: 1
 
 ## Output:
-- **`code`** — Per channel: `0` if the slot was empty, `1` if existing data was replaced; `[numel(chan), 1]`; int32
+- **`code`** — `0` if the slot was empty, `1` if its data was replaced; int32; `[n_chan, 1]`
+
+## Notes:
+- A channel without data and without `par` entries replaces the data of an occupied slot (it then reads as an empty
+  channel, and [[hdf5_read_layout]] reports it as written); it leaves an empty slot as it is and does not create a
+  missing file
+- The space of replaced data is not reused, so the file does not shrink; copying the channels into a new file reclaims
+  it
+- Files are not locked: one writer per file at a time, also for [[hdf5_write_dset]] and [[hdf5_reshape_layout]].
+  Reading is safe while no one writes
 
 ## See also:
-- [[hdf5_create_file]] (for creating a file with a custom storage layout)
-- [[hdf5_reshape_layout]] (to change the layout later)
-- [[hdf5_read_channel]] (for reading channel data)
+- [[hdf5_read_channel]] (reads the channels back)
+- [[hdf5_create_file]] (creates a file with a given layout)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -144,6 +144,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Write all channels (C++ checks all inputs first and creates a missing file)
     arma::s32_vec code;
-    CALL_QD(code = quadriga_lib::hdf5_write_channel_vec(fn, channels, slots));
+    CALL_QD(code = quadriga_lib::hdf5_write_channel(fn, channels, slots));
     plhs[0] = qd_mex_copy2matlab(&code);
 }

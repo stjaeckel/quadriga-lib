@@ -72,7 +72,7 @@ Class for storing and manipulating an array of antenna or acoustic elements
 Not in: MATLAB, Python
 
 - All functions give the same results for an empty `element_pos` and empty port weights as for zeros and identity,
-  except the IRS array of [get_channels_irs](channel-generation-functions.md#get_channels_irs), whose port weights hold the IRS weights and must be given
+  except the IRS array of [get_channels_irs](channel-generators.md#get_channels_irs), whose port weights hold the IRS weights and must be given
 - In a multi-frequency vector all entries use the same form, either empty or given (see [is_valid](#is_valid))
 
 ### Attributes:
@@ -377,7 +377,7 @@ void quadriga_lib::export_pattern_obj(
 ### See also:
 - [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (the same pattern as numbers)
 - [colormap](site-specific-simulation-tools.md#colormap) (the available color scales)
-- [channel_export_obj_file](channel-functions.md#channel_export_obj_file) (exports propagation paths to an OBJ file)
+- [export_channel_obj](channel-data-and-processing.md#export_channel_obj) (exports propagation paths to an OBJ file)
 
 ---
 <a id="generate_antenna"></a>
@@ -750,7 +750,7 @@ quadriga_lib::interpolate_pattern(speaker, azimuth, elevation, Vf_re, Vf_im, Hf_
 - [apply_port_weights](#apply_port_weights) (patterns per port instead of per element)
 - [rotate_pattern](#rotate_pattern) (applies an orientation to the stored patterns)
 - [join_arrays](#join_arrays), [generate_speaker](#generate_speaker) (build multi-element, multi-frequency arrays)
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (channel coefficients from the interpolated patterns)
+- [get_channels_spherical](channel-generators.md#get_channels_spherical) (channel coefficients from the interpolated patterns)
 
 ---
 <a id="is_valid"></a>

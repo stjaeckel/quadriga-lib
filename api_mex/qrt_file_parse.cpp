@@ -7,42 +7,47 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # QRT_FILE_PARSE
 Read metadata from a QRT file
 
-- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count,
-  CIR offsets, names, positions, orientations, and file version
-- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
-  `cir_offset` reflect this
+- Reads the header of a QRT file: counts, names, frequencies, the positions and orientations of the CIRs and the
+  origins, and the file version; no path data
+- A file without destinations reports one destination `RX` that owns all CIRs
+- Raises an error for a file that cannot be opened, is not a QRT file of version 4, 5 or 6, or is truncated or corrupt
 
 ## Usage:
 ```
 [ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
-     cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
+    cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 ```
 
 ## Input:
-- **`fn`** — Path to the QRT file; string
+- **`fn`** — File name
 
 ## Outputs:
-- **`n_cir`** — Number of channel snapshots per origin point; uint64 scalar
-- **`n_orig`** — Number of origin points (TX); uint64 scalar
-- **`n_dest`** — Number of destination points (RX); uint64 scalar
-- **`n_freq`** — Number of frequency bands; uint64 scalar
-- **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
-  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest, 1]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig, 1]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest, 1]`
-- **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq, 1]`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
-- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`
-- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[n_orig, 3]`
+- **`n_cir`** — Number of CIRs of each origin; uint64
+- **`n_orig`** — Number of origin slots; uint64
+- **`n_dest`** — Number of destinations, at least 1; uint64
+- **`n_freq`** — Number of frequencies; uint64
+- **`cir_offset`** — Number of CIRs before each destination (an offset, the first entry 0): the CIRs of destination
+  `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest, 1]`
+- **`orig_names`** — Origin names, empty for a slot not written yet; cell array of strings; `[n_orig, 1]`
+- **`dest_names`** — Destination names; cell array of strings; `[n_dest, 1]`
+- **`version`** — File version: 4 (EM, legacy), 5 (EM) or 6 (scalar); int32
+- **`center_freq`** — Frequencies in Hz; single; `[n_freq, 1]`. Version 4 stores GHz and one frequency per origin, this
+  is the one of the first written origin (0 if none is written); version 5 files of earlier library versions store GHz
+  too, a version 5 list with all values below 1000 is read as GHz
+- **`cir_pos`** — CIR positions in m; single; `[n_cir, 3]`
+- **`cir_orientation`** — CIR orientations (bank, tilt, heading) in rad; single; `[n_cir, 3]`
+- **`orig_pos`** — Origin positions in m, zeros for a slot not written yet; single; `[n_orig, 3]`
+- **`orig_orientation`** — Origin orientations (bank, tilt, heading) in rad; single; `[n_orig, 3]`
+
+## See also:
+- [[qrt_file_read]] (reads CIRs)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

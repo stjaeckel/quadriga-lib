@@ -10,16 +10,16 @@
 #include <string>
 
 /*!SECTION
-Channel statistics
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # calc_rician_k_factor
-Calculate the Rician K-Factor from channel impulse response data
+Calculate the Rician K-factor of each CIR, the ratio of the LOS to the NLOS power
 
-- KF = LOS power / NLOS power; LOS paths are those with length ≤ `dTR + window_size`, where `dTR` is the direct TX-RX distance.
-- If total NLOS power is zero, KF is set to `HUGE_VAL`; if total LOS power is zero, KF is set to 0.
-- TX/RX positions may be fixed `[3, 1]` (reused for all snapshots) or mobile `[3, n_cir]`.
+- $K = P_\mathrm{LOS} / P_\mathrm{NLOS}$ with the sums of the path powers; LOS paths are those with a length
+  `path_length` <= $d_\mathrm{TR}$ + `window_size`, $d_\mathrm{TR}$ the Tx-Rx distance, all others are NLOS
+- Without NLOS power, $K$ is infinite, or 0 if the LOS power is zero too (also for a CIR without paths)
 
 ## Declaration:
 ```
@@ -34,15 +34,19 @@ void quadriga_lib::calc_rician_k_factor(
 ```
 
 ## Inputs:
-- **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
-- **`path_length`** — Absolute TX-to-RX path lengths; same structure as `powers`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates [x; y; z]; `[3, 1]` or `[3, n_cir]`
-- **`rx_pos`** — Receiver position in Cartesian coordinates [x; y; z]; `[3, 1]` or `[3, n_cir]`
-- **`window_size`** *(optional)* — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS
+- **`powers`** — Path powers, linear; `[n_cir]` vectors `[n_path]`, at least one CIR; `n_path` may differ between the
+  CIRs
+- **`path_length`** — Path lengths in m; `[n_cir]` vectors `[n_path]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `[3, 1]` (fixed) or `[3, n_cir]`
+- **`window_size`** *(optional)* — LOS window in m, >= 0
 
 ## Outputs:
-- **`kf`** *(optional)* — Rician K-Factor on linear scale; `[n_cir]`
-- **`pg`** *(optional)* — Total path gain (sum of all path powers) in [W]; `[n_cir]`
+- **`kf`** *(optional)* — K-factor, linear; `[n_cir]`
+- **`pg`** *(optional)* — Sum of all path powers, linear; `[n_cir]`
+
+## See also:
+- [[calc_xpr]] (XPR with the same LOS window)
+- [[calc_delay_spread]] (delay spread of the same paths)
 MD!*/
 
 template <typename dtype>

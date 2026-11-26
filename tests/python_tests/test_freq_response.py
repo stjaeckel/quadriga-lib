@@ -2,9 +2,9 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.channel.baseband_freq_response.
+# Python interface test for quadriga_lib.channel.freq_response.
 # Scope: argument and output handling, defaults, snapshot lists, error paths.
-# Physics validation lives in the Catch2 suite (test_baseband_freq_response.cpp).
+# Physics validation lives in the Catch2 suite (test_freq_response.cpp).
 
 import sys
 import os
@@ -42,7 +42,7 @@ class test_case(unittest.TestCase):
         delay_list = [delay, delay, delay]
         pilots = np.arange(0, 2.1, 0.1)
 
-        hmat = channel.baseband_freq_response(coeff_list, delay_list, np.linspace(0, 1, 11), fc)
+        hmat = channel.freq_response(coeff_list, delay_list, np.linspace(0, 1, 11), fc)
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 
@@ -57,7 +57,7 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(hmat_re[:, :, :, 0] * 2.0, hmat_re[:, :, :, 1], decimal=6)
         npt.assert_almost_equal(hmat_re[:, :, :, 0] * 3.0, hmat_re[:, :, :, 2], decimal=5)
 
-        hmat = channel.baseband_freq_response(coeff_list, delay_list, pilots, fc, i_snap=[1, 2, 1, 0])
+        hmat = channel.freq_response(coeff_list, delay_list, pilots, fc, i_snap=[1, 2, 1, 0])
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 
@@ -79,65 +79,65 @@ class test_case(unittest.TestCase):
         for kw in ({'delay': d, 'pilot_grid': PG, 'bandwidth': 1e6}, {'coeff': c, 'pilot_grid': PG, 'bandwidth': 1e6},
                    {'coeff': c, 'delay': d, 'bandwidth': 1e6}, {'coeff': c, 'delay': d, 'pilot_grid': PG}):
             with self.assertRaises(TypeError):
-                channel.baseband_freq_response(**kw)
+                channel.freq_response(**kw)
 
     def test_error_delay_not_list(self):
         with self.assertRaisesRegex(ValueError, "Input 'delay' must be a list"):
-            channel.baseband_freq_response([np.zeros((1, 1, 1), dtype=complex)], np.zeros((1, 1, 1)), PG, 1e6)
+            channel.freq_response([np.zeros((1, 1, 1), dtype=complex)], np.zeros((1, 1, 1)), PG, 1e6)
 
     def test_error_coeff_not_list(self):
         with self.assertRaisesRegex(ValueError, "Input 'coeff' must be a list"):
-            channel.baseband_freq_response(np.zeros((1, 1, 1), dtype=complex), [np.zeros((1, 1, 1))], PG, 1e6)
+            channel.freq_response(np.zeros((1, 1, 1), dtype=complex), [np.zeros((1, 1, 1))], PG, 1e6)
 
     def test_error_delay_length_mismatch(self):
         c = [np.zeros((1, 1, 1), dtype=complex)] * 2
         with self.assertRaises(ValueError):
-            channel.baseband_freq_response(c, [np.zeros((1, 1, 1))], PG, 1e6)
+            channel.freq_response(c, [np.zeros((1, 1, 1))], PG, 1e6)
 
     def test_error_2d_coeff(self):
         with self.assertRaisesRegex(ValueError, "Input 'coeff' must hold 3D arrays, got 2D"):
-            channel.baseband_freq_response([np.zeros((2, 3), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6)
+            channel.freq_response([np.zeros((2, 3), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6)
 
     def test_error_4d_coeff(self):
         # A multi-frequency item is an error, not a batch
         with self.assertRaisesRegex(ValueError, "Input 'coeff' must hold 3D arrays, got 4D"):
-            channel.baseband_freq_response([np.zeros((1, 1, 1, 2), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6)
+            channel.freq_response([np.zeros((1, 1, 1, 2), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6)
         c = [np.zeros((1, 1, 1), dtype=complex), np.zeros((1, 1, 1, 2), dtype=complex)]
         with self.assertRaisesRegex(ValueError, "Snapshot 1: Input 'coeff' must hold 3D arrays, got 4D"):
-            channel.baseband_freq_response(c, [np.zeros((1, 1, 1))] * 2, PG, 1e6)
+            channel.freq_response(c, [np.zeros((1, 1, 1))] * 2, PG, 1e6)
 
     def test_error_4d_delay(self):
         with self.assertRaisesRegex(ValueError, "Input 'delay' must hold arrays of at most 3 dimensions"):
-            channel.baseband_freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1, 2))], PG, 1e6)
+            channel.freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1, 2))], PG, 1e6)
 
     def test_error_empty_pilot_grid(self):
         with self.assertRaises(ValueError):
-            channel.baseband_freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1))], np.array([]), 1e6)
+            channel.freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1))], np.array([]), 1e6)
 
     def test_error_n_rx_mismatch(self):
         c = [np.zeros((2, 1, 1), dtype=complex), np.zeros((3, 1, 1), dtype=complex)]
         with self.assertRaises(ValueError):
-            channel.baseband_freq_response(c, [np.zeros((1, 1, 1))] * 2, PG, 1e6)
+            channel.freq_response(c, [np.zeros((1, 1, 1))] * 2, PG, 1e6)
 
     def test_error_delay_shape_mismatch(self):
         with self.assertRaises(ValueError):
-            channel.baseband_freq_response([np.zeros((1, 1, 3), dtype=complex)], [np.zeros((1, 1, 2))], PG, 1e6)
+            channel.freq_response([np.zeros((1, 1, 3), dtype=complex)], [np.zeros((1, 1, 2))], PG, 1e6)
 
     def test_error_snap_out_of_range(self):
         with self.assertRaises(ValueError):
-            channel.baseband_freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6,
-                                           i_snap=np.array([5]))
+            channel.freq_response([np.zeros((1, 1, 1), dtype=complex)], [np.zeros((1, 1, 1))], PG, 1e6,
+                                  i_snap=np.array([5]))
 
     def test_empty_list(self):
         with self.assertRaisesRegex(ValueError, "'coeff_re' must contain at least one snapshot"):
-            channel.baseband_freq_response([], [], PG, 1e6)
+            channel.freq_response([], [], PG, 1e6)
 
     # ---- i_snap and varying n_path ----
 
     def test_snap(self):
         c = [i * np.ones((1, 1, 1), dtype=complex) for i in [1, 2, 3]]
         dl = [np.zeros((1, 1, 1))] * 3
-        hmat = channel.baseband_freq_response(c, dl, PG, 1e6, i_snap=np.array([2, 0]))
+        hmat = channel.freq_response(c, dl, PG, 1e6, i_snap=np.array([2, 0]))
         self.assertEqual(hmat.shape, (1, 1, 4, 2))
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 3.0, atol=1e-6, rtol=0)
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 1.0, atol=1e-6, rtol=0)
@@ -145,14 +145,14 @@ class test_case(unittest.TestCase):
     def test_varying_n_path(self):
         c0 = np.ones((1, 1, 2), dtype=complex)
         c1 = np.ones((1, 1, 5), dtype=complex)
-        hmat = channel.baseband_freq_response([c0, c1], [np.zeros((1, 1, 2)), np.zeros((1, 1, 5))], PG, 1e6)
+        hmat = channel.freq_response([c0, c1], [np.zeros((1, 1, 2)), np.zeros((1, 1, 5))], PG, 1e6)
         self.assertEqual(hmat.shape, (1, 1, 4, 2))
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 2.0, atol=1e-6, rtol=0)
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 5.0, atol=1e-6, rtol=0)
 
     def test_output_shape(self):
-        hmat = channel.baseband_freq_response([np.ones((3, 2, 4), dtype=complex)], [np.zeros((1, 1, 4))],
-                                              np.linspace(0, 1, 16), 1e6)
+        hmat = channel.freq_response([np.ones((3, 2, 4), dtype=complex)], [np.zeros((1, 1, 4))],
+                                     np.linspace(0, 1, 16), 1e6)
         self.assertEqual(hmat.shape, (3, 2, 16, 1))
 
 
@@ -164,17 +164,17 @@ class test_array_handling(unittest.TestCase):
         d = rng.random((3, 2, 5)) * 1e-7
         pg = np.array([0.0, 0.3, -0.2, 1.0])
         c0, d0, pg0 = c.copy(), d.copy(), pg.copy()
-        ref = channel.baseband_freq_response([c, 2 * c], [d, d], pg, 1e8)
-        npt.assert_array_equal(channel.baseband_freq_response(coeff=[c, 2 * c], delay=[d, d], pilot_grid=pg,
-                                                              bandwidth=1e8, i_snap=None, use_kernel=0), ref)
+        ref = channel.freq_response([c, 2 * c], [d, d], pg, 1e8)
+        npt.assert_array_equal(channel.freq_response(coeff=[c, 2 * c], delay=[d, d], pilot_grid=pg,
+                                                     bandwidth=1e8, i_snap=None, use_kernel=0), ref)
         big_c, big_d = np.zeros((3, 2, 10), dtype=complex), np.zeros((3, 2, 10))
         big_c[:, :, ::2], big_d[:, :, ::2] = c, d
         variants = {"fortran": ([np.asfortranarray(c), np.asfortranarray(2 * c)], [np.asfortranarray(d)] * 2),
                     "sliced": ([big_c[:, :, ::2], 2 * big_c[:, :, ::2]], [big_d[:, :, ::2]] * 2)}
         for name, (cv, dv) in variants.items():
-            npt.assert_array_equal(channel.baseband_freq_response(cv, dv, pg, 1e8), ref, err_msg=name)
-        h32 = channel.baseband_freq_response([c.astype(np.complex64), (2 * c).astype(np.complex64)],
-                                             [d.astype(np.float32)] * 2, pg.astype(np.float32), 1e8)
+            npt.assert_array_equal(channel.freq_response(cv, dv, pg, 1e8), ref, err_msg=name)
+        h32 = channel.freq_response([c.astype(np.complex64), (2 * c).astype(np.complex64)],
+                                    [d.astype(np.float32)] * 2, pg.astype(np.float32), 1e8)
         npt.assert_allclose(h32, ref, atol=1e-5 * np.abs(ref).max(), rtol=0)
         npt.assert_array_equal(c, c0)
         npt.assert_array_equal(d, d0)
@@ -186,11 +186,11 @@ class test_use_kernel(unittest.TestCase):
     def test(self):
         coeff, delay = [np.ones((2, 3, 4), dtype=complex)], [np.zeros((1, 1, 4))]
         pg = np.linspace(0, 1, 5)
-        channel.baseband_freq_response(coeff, delay, pg, 1e8, use_kernel=1)
-        calls = (lambda: channel.baseband_freq_response(coeff, delay, pg, 1e8, use_kernel=3),
-                 lambda: channel.baseband_freq_response([np.ones((2, 3, 0), dtype=complex)], [np.zeros((1, 1, 0))],
-                                                        pg, 1e8, use_kernel=3),
-                 lambda: channel.baseband_freq_response([], [], pg, 1e8, use_kernel=3))
+        channel.freq_response(coeff, delay, pg, 1e8, use_kernel=1)
+        calls = (lambda: channel.freq_response(coeff, delay, pg, 1e8, use_kernel=3),
+                 lambda: channel.freq_response([np.ones((2, 3, 0), dtype=complex)], [np.zeros((1, 1, 0))],
+                                               pg, 1e8, use_kernel=3),
+                 lambda: channel.freq_response([], [], pg, 1e8, use_kernel=3))
         for call in calls:
             with self.assertRaises(ValueError) as ctx:
                 call()

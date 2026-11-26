@@ -59,8 +59,8 @@ through, also for keys the function does not use.
    as in the table below
 6. Per link and segment: [ssf_scatterers](#ssf_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
    link gain (see Terms) as `link_gain_dB` (TR methods: once per object, which holds one frequency; `"quadriga"`:
-   once per `i_freq`), or [ssf_paths](#ssf_paths) for other channel functions and the QRT route ([qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers),
-   [qrt_file_append](channel-functions.md#qrt_file_append))
+   once per `i_freq`), or [ssf_paths](#ssf_paths) for other channel functions and the QRT route ([qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers),
+   [qrt_file_append](channel-data-and-processing.md#qrt_file_append))
 
 | Method | Random sets | Calls in step 5 |
 | --- | --- | --- |
@@ -71,7 +71,7 @@ through, also for keys the function does not use.
 For moved positions, evaluate [gbsm_draw](#gbsm_draw) (`"lsf"`), [path_loss](#path_loss), [lsp_generate](#lsp_generate) and for indoor UTs
 [o2i_loss](#o2i_loss) again with the same SOS phases: they give the link gain (see Terms) and `kf_ratio` = KF(position) /
 KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [gbsm_rays_from_paths](#gbsm_rays_from_paths) (e.g. of
-[qrt_file_read](channel-functions.md#qrt_file_read)), or fill a [gbsm_rays](#gbsm_rays) object directly; continue with step 6.
+[qrt_file_read](channel-data-and-processing.md#qrt_file_read)), or fill a [gbsm_rays](#gbsm_rays) object directly; continue with step 6.
 
 **Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
 
@@ -148,7 +148,7 @@ Not in: MATLAB, Python
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
-| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | all |
+| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generators.md#get_channels_planar) | all |
 | `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
 | `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
@@ -496,13 +496,13 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths) · [Python](../python/geometry-based-stochastic-model.md#gbsm.rays_from_paths)
 
 - Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [qrt_file_read](channel-functions.md#qrt_file_read), read as `qrt_file_read<double>` with `normalize_polmat = 1` (`uplink = true` gives the reverse
+  [qrt_file_read](channel-data-and-processing.md#qrt_file_read), read as `qrt_file_read<double>` with `normalize_polmat = 1` (`uplink = true` gives the reverse
   link; `normalize_polmat = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) pass the `n_interact` of [qrt_file_read](channel-functions.md#qrt_file_read)
+  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers) pass the `n_interact` of [qrt_file_read](channel-data-and-processing.md#qrt_file_read)
   (interaction count = path type); for ray-traced files the user sets it (values > 2 throw)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
@@ -542,8 +542,8 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`rays`** — Ray data with `n_ray = n_path`, see [gbsm_rays](#gbsm_rays); use with `link_gain_dB = 0` and without `kf_ratio`
 
 ### See also:
-- [qrt_file_read](channel-functions.md#qrt_file_read) (source of the path data)
-- [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) (write the paths of [ssf_paths](#ssf_paths) to a QRT file)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read) (source of the path data)
+- [qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers) (write the paths of [ssf_paths](#ssf_paths) to a QRT file)
 - [ssf_paths](#ssf_paths) (paths at moved positions)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 
@@ -557,8 +557,8 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_single_link_cha
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
   `rays.center_freq(i_freq)`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (power > 0 at `i_freq`, plus LOS and GR)
-- `"phase"`: [get_channels_planar](channel-generation-functions.md#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
-  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) with the
+- `"phase"`: [get_channels_planar](channel-generators.md#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
+  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [get_channels_spherical](channel-generators.md#get_channels_spherical) with the
   arrays at the positions and orientations of the snapshot
 - `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
@@ -638,7 +638,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - [gbsm_rays](#gbsm_rays) (input data, `b_med` and `b_eff`)
 - [ssf_scatterers](#ssf_scatterers) (scatterers for `"drift"`)
 - [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data)
-- [channel](channel-class.md#channel) (the returned object)
+- [channel](channel-data-and-processing.md#channel) (the returned object)
 
 ---
 <a id="los_probability"></a>
@@ -1096,7 +1096,7 @@ void quadriga_lib::ssf_clusters(
 - [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
 - [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [ssf_rays](#ssf_rays) (the rays of the clusters)
-- [calc_delay_spread](channel-statistics.md#calc_delay_spread), [calc_angular_spread](channel-statistics.md#calc_angular_spread) (spreads of the output)
+- [calc_delay_spread](channel-data-and-processing.md#calc_delay_spread), [calc_angular_spread](channel-data-and-processing.md#calc_angular_spread) (spreads of the output)
 
 ---
 <a id="ssf_paths"></a>
@@ -1109,11 +1109,11 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_paths) · [Pytho
   kept rays of `rays` at new Tx and Rx positions (default: the ray-data positions). Kept are LOS and GR rays always
   (also at zero power) and NLOS rays with power > 0 at some frequency; paths in ray order, `ray_ind` maps them to
   the rays (e.g. `rays.tap(ray_ind)`)
-- `"phase"`: use the outputs with [get_channels_planar](channel-generation-functions.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
+- `"phase"`: use the outputs with [get_channels_planar](channel-generators.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
   phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer
   identified and the displacement phase counts twice, without an error
-- `"drift"`: use the outputs at the new positions with [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) or [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq), or
-  pass them to [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers); needs the scatterers of [ssf_scatterers](#ssf_scatterers)
+- `"drift"`: use the outputs at the new positions with [get_channels_spherical](channel-generators.md#get_channels_spherical) or [get_channels_multifreq](channel-generators.md#get_channels_multifreq), or
+  pass them to [qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers); needs the scatterers of [ssf_scatterers](#ssf_scatterers)
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
@@ -1171,7 +1171,7 @@ void quadriga_lib::ssf_paths(
 ### Outputs:
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generators.md#get_channels_planar); `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Departure and arrival angles in [rad], GCS; `[n_path]`
 - **`fbs_pos`**, **`lbs_pos`** *(optional)* — Scatterer positions in [m]; `[3, n_path]`, `[3, 0]` in `"phase"`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`

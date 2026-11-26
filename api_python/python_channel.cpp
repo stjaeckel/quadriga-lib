@@ -7,8 +7,9 @@
 
 namespace py = pybind11;
 
-#include "qpy_baseband_freq_response.cpp"
-#include "qpy_channel_export_obj_file.cpp"
+#include "qpy_freq_response.cpp"
+#include "qpy_export_channel_obj.cpp"
+#include "qpy_channel_statistics.cpp"
 #include "qpy_crossfade_segments.cpp"
 #include "qpy_hdf5.cpp"
 #include "qpy_get_channels.cpp"
@@ -17,7 +18,7 @@ namespace py = pybind11;
 
 void quadriga_lib_channel(py::module_ &m)
 {
-    m.def("baseband_freq_response", &baseband_freq_response,
+    m.def("freq_response", &freq_response,
           py::arg("coeff").none(false),
           py::arg("delay").none(false),
           py::arg("pilot_grid").none(false),
@@ -26,7 +27,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("i_snap") = py::none(),
           py::arg("use_kernel") = 0);
 
-    m.def("baseband_freq_response_multi", &baseband_freq_response_multi,
+    m.def("freq_response_mf", &freq_response_mf,
           py::arg("coeff").none(false),
           py::arg("delay").none(false),
           py::arg("freq").none(false),
@@ -44,7 +45,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("par") = py::none(),
           py::arg("stack") = false);
 
-    m.def("export_obj_file", &channel_export_obj_file,
+    m.def("export_channel_obj", &export_channel_obj,
           py::arg("fn"),
           py::arg("chan").none(false),
           py::kw_only(),
@@ -244,4 +245,38 @@ void quadriga_lib_channel(py::module_ &m)
           py::kw_only(),
           py::arg("uplink") = false,
           py::arg("normalize_polmat") = 1);
+
+    m.def("calc_angular_spread", &calc_angular_spread,
+          py::arg("az"),
+          py::arg("el"),
+          py::arg("powers"),
+          py::kw_only(),
+          py::arg("wrapping") = false,
+          py::arg("calc_bank_angle") = false,
+          py::arg("quantize_deg") = 0.0);
+
+    m.def("calc_delay_spread", &calc_delay_spread,
+          py::arg("delays"),
+          py::arg("powers"),
+          py::kw_only(),
+          py::arg("threshold_dB") = 100.0,
+          py::arg("granularity") = 0.0);
+
+    m.def("calc_rician_k_factor", &calc_rician_k_factor,
+          py::arg("powers"),
+          py::arg("path_length"),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
+          py::kw_only(),
+          py::arg("window_size") = 0.01);
+
+    m.def("calc_xpr", &calc_xpr,
+          py::arg("powers"),
+          py::arg("polmat"),
+          py::arg("path_length"),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
+          py::kw_only(),
+          py::arg("include_los") = false,
+          py::arg("window_size") = 0.01);
 }

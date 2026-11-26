@@ -3,9 +3,9 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Channel objects with fuzzed members (consistent or mismatched sizes, unstructured par_names / par_data of all
-// types): channel::is_valid, channel_calc_effective_path_gain, add_paths, channel_export_obj_file, then hdf5_create_file,
-// hdf5_write_channel (also hdf5_write_channel_vec), hdf5_write_dset, hdf5_reshape_layout and the readers
-// hdf5_read_layout, hdf5_read_channel (also with i_snap and hdf5_read_channel_vec), hdf5_read_dset_names, hdf5_read_dset
+// types): channel::is_valid, calc_channel_gain, export_channel_obj, then hdf5_create_file,
+// hdf5_write_channel (also the vector form), hdf5_write_dset, hdf5_reshape_layout and the readers
+// hdf5_read_layout, hdf5_read_channel (also with i_snap and the vector form), hdf5_read_dset_names, hdf5_read_dset
 
 #include "fuzz_target.hpp"
 
@@ -145,23 +145,7 @@ static void run(fz::input &in)
     c.initial_position = in.ConsumeBool() ? 0 : in.ConsumeIntegral<int>();
 
     fz::clean([&] { c.is_valid(); });
-    fz::clean([&] { quadriga_lib::channel_calc_effective_path_gain(c); });
-    {
-        const arma::uword i_snap = in.index(n_snap), n_add = in.size(4);
-        const uint16_t add = in.ConsumeIntegral<uint16_t>();
-        arma::Cube<T> a_re = in.cube<T>(n_rx, n_tx, n_add), a_im = in.cube<T>(n_rx, n_tx, sz(n_add)),
-                      a_dl = in.ConsumeBool() ? in.cube<T>(1, 1, n_add) : in.cube<T>(sz(n_rx), sz(n_tx), n_add);
-        arma::u32_vec a_ni(sz(n_add));
-        for (auto &v : a_ni)
-            v = in.ConsumeIntegralInRange<unsigned>(0, 3);
-        arma::Mat<T> a_ic = in.mat<T>(sz(3), sz((arma::uword)arma::accu(a_ni)));
-        arma::Col<T> a_pg = in.col<T>(sz(n_add)), a_pl = in.col<T>(sz(n_add));
-        arma::Mat<T> a_pp = in.mat<T>(sz(8), sz(n_add)), a_pa = in.mat<T>(sz(n_add), sz(4)), a_fbs = in.mat<T>(sz(3), sz(n_add)),
-                     a_lbs = in.mat<T>(sz(3), sz(n_add));
-        auto opt = [&](auto &x, int bit) { return (add >> bit) & 1 ? &x : nullptr; };
-        fz::clean([&] { c.add_paths(i_snap, opt(a_re, 0), opt(a_im, 1), opt(a_dl, 2), opt(a_ni, 3), opt(a_ic, 4), opt(a_pg, 5),
-                                    opt(a_pl, 6), opt(a_pp, 7), opt(a_pa, 8), opt(a_fbs, 9), opt(a_lbs, 10)); });
-    }
+    fz::clean([&] { quadriga_lib::calc_channel_gain(c); });
     {
         const std::string obj = (fz::work_dir() / "paths.obj").string();
         const arma::uword max_paths = in.size(5), n_edges = in.size(6);
@@ -169,7 +153,7 @@ static void run(fz::input &in)
         arma::uvec i_snap(in.size(3));
         for (auto &i : i_snap)
             i = in.index(c.n_snap());
-        fz::clean([&] { quadriga_lib::channel_export_obj_file(obj, c, max_paths, g_max, g_min, "jet", i_snap, r_max, r_min, n_edges); });
+        fz::clean([&] { quadriga_lib::export_channel_obj(obj, c, max_paths, g_max, g_min, "jet", i_snap, r_max, r_min, n_edges); });
     }
 
     // HDF5: a new file, written at a fuzzed index (inside or outside the layout), then read back
@@ -209,8 +193,8 @@ static void run(fz::input &in)
         if (in.ConsumeBool()) // Other shapes, also without rows
             slots.resize(in.size(5), in.size(3));
         std::vector<quadriga_lib::channel<T>> chan_vec = {c, c};
-        fz::clean([&] { quadriga_lib::hdf5_write_channel_vec(fn, chan_vec, slots); });
-        fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, i_snap); });    }
+        fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, chan_vec, slots); });
+        fz::clean([&] { quadriga_lib::hdf5_read_channel<T>(fn, slots, i_snap); });    }
     std::vector<std::string> names;
     fz::clean([&] { names = quadriga_lib::hdf5_read_dset_names(fn, ix, iy, iz, iw); });
     for (const auto &n : names)

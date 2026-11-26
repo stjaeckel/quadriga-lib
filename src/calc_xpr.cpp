@@ -9,42 +9,38 @@
 #include <limits>
 
 /*!SECTION
-Channel statistics
+Channel data and processing
 SECTION!*/
 
 /*!MD
-# calc_cross_polarization_ratio
-Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
+# calc_xpr
+Calculate the cross-polarization ratio (XPR) of each CIR in the linear and the circular polarization basis
 
-- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method:
-  co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio.
-- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis.
-- LOS paths are identified by comparing path length against direct TX-RX distance `dTR`; paths with
-  `path_length <= dTR + window_size` are excluded by default (`include_los = false`).
-- Polarization transfer matrix `polmat` is the 2x2 Jones matrix `M` (rows = RX polarisation V/H, columns = TX polarisation
-  V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx),
-  rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its
-  receive and transmit polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
-- V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
-  the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries couple circular patterns through `polmat` as [[get_channels_spherical]] couples antenna patterns,
-  `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
-  (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP). The names follow the
-  IEEE definition (rotation seen along the propagation direction) for the time convention exp(+j 2 pi f t), which the
-  library's coefficients exp(-j 2 pi f tau) imply, and e_theta x e_phi = the outward direction of the pattern.
-  `M_<rx><tx>`: `M_LL = (M_vv - M_hh + j(M_vh + M_hv)) / 2`, `M_RR = (M_vv - M_hh - j(M_vh + M_hv)) / 2`,
-  `M_LR = (M_vv + M_hh + j(M_hv - M_vh)) / 2` (receive L, transmit R), `M_RL = (M_vv + M_hh + j(M_vh - M_hv)) / 2`.
-  Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` of [[get_channels_spherical]] is
-  co-polar (handedness kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar.
-- LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR.
-- Normalization of `polmat` does not affect XPR (cancels in ratio) but does affect `pg`; magnitudes in `polmat` above about
-  1e18 overflow and give NaN.
-- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
-- TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
+- Total-power ratio: the co- and cross-polar powers of the paths of a CIR, weighted by the path powers $p_l$, are
+  summed, and the XPR is their ratio; LOS paths are left out unless `include_los` is set
+- Entries of the polarization transfer matrix $M$ of a path, first index receive, second transmit polarization:
+  rows 0-1 of `polmat` = $M_{vv}$, 2-3 = $M_{hv}$ (H rx, V tx), 4-5 = $M_{vh}$ (V rx, H tx), 6-7 = $M_{hh}$, each as
+  real and imaginary part
+- Circular basis: $M_{rt} = \mathbf{r}^T M \, \mathbf{t}$ (plain transpose), as [[get_channels_spherical]]
+  couples antenna patterns, with the same vectors at both ends, each in the $(e_\theta, e_\phi)$ frame of its antenna:
+  $\mathbf{L} = (1, +j) / \sqrt{2}$ (LHCP) and $\mathbf{R} = (1, -j) / \sqrt{2}$ (RHCP) in (V, H), which gives
+
+  $$M_{LL}, M_{RR} = \frac{1}{2} \left( M_{vv} - M_{hh} \pm j (M_{vh} + M_{hv}) \right)$$
+
+  $$M_{LR}, M_{RL} = \frac{1}{2} \left( M_{vv} + M_{hh} \pm j (M_{hv} - M_{vh}) \right)$$
+
+  (upper sign for the first entry)
+
+- The names L and R follow the IEEE definition (rotation seen along the propagation direction) for the time
+  convention $e^{+j 2\pi f t}$, which the coefficients $e^{-j 2\pi f \tau}$ of the library imply, with
+  $e_\theta \times e_\phi$ the outward direction of the pattern
+- Co-polar means the same circular vector at both ends: the LOS matrix $\mathrm{diag}(1, -1)$ of
+  [[get_channels_spherical]] is co-polar (handedness kept), $\mathrm{diag}(1, 1)$ (one mirrored component, as
+  by a single reflection) is cross-polar
 
 ## Declaration:
 ```
-void quadriga_lib::calc_cross_polarization_ratio(
+void quadriga_lib::calc_xpr(
     const std::vector<arma::Col<dtype>> &powers,
     const std::vector<arma::Mat<dtype>> &polmat,
     const std::vector<arma::Col<dtype>> &path_length,
@@ -57,39 +53,50 @@ void quadriga_lib::calc_cross_polarization_ratio(
 ```
 
 ## Inputs:
-- **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
-- **`polmat`** — Polarization transfer matrices; `[n_cir]` vector, each element of size `[8, n_path]`
-- **`path_length`** — Absolute TX-to-RX path lengths; same structure as `powers`
-- **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` or `[3, n_cir]`
-- **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` or `[3, n_cir]`
-- **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR calculation
-- **`window_size`** *(optional)* — LOS exclusion window; paths with `path_length <= dTR + window_size` are excluded
-  when `include_los = false`
+- **`powers`** — Path powers $p_l$, linear; `[n_cir]` vectors `[n_path]`, at least one; `n_path` may differ between
+  the CIRs
+- **`polmat`** — Polarization transfer matrices, magnitudes below about 1e18; `[n_cir]` matrices `[8, n_path]`
+- **`path_length`** — Path lengths in m; `[n_cir]` vectors `[n_path]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `[3, 1]` (fixed) or `[3, n_cir]`
+- **`include_los`** *(optional)* — Include the LOS paths in the XPR
+- **`window_size`** *(optional)* — LOS window in m, >= 0: paths with `path_length` <= $d_\mathrm{TR}$ +
+  `window_size` are LOS, $d_\mathrm{TR}$ the Tx-Rx distance
 
 ## Outputs:
-- **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
-   | Col | Description                                                     |
-   | --- | --------------------------------------------------------------- |
-   | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
-   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_vh)^2) (receive V)          |
-   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_hv)^2) (receive H)          |
-   | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
-   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_LR)^2) (receive L)       |
-   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_RL)^2) (receive R)       |
-- **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
-  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
+- **`xpr`** *(optional)* — XPR, linear; `[n_cir, 6]`; columns:
+
+  | Column | XPR |
+  | ------ | --- |
+  | 0 | Linear: $(P_{vv} + P_{hh}) / (P_{vh} + P_{hv})$ with $P_{rt} = \sum_l p_l \lvert M_{rt} \rvert^2$ |
+  | 1 | V (receive V): $P_{vv} / P_{vh}$ |
+  | 2 | H (receive H): $P_{hh} / P_{hv}$ |
+  | 3 | Circular: $(P_{LL} + P_{RR}) / (P_{LR} + P_{RL})$ |
+  | 4 | LHCP (receive L): $P_{LL} / P_{LR}$ |
+  | 5 | RHCP (receive R): $P_{RR} / P_{RL}$ |
+
+- **`pg`** *(optional)* — Path gain of all paths, LOS included,
+  $\frac{1}{2} \sum_l p_l \sum_{r,t \in \{v,h\}} \lvert M_{rt} \rvert^2$; `[n_cir]`
+
+## Notes:
+- A ratio with zero cross-polar power is infinite, or 0 if the co-polar power is zero too (also for a CIR without
+  paths, which has `pg` = 0)
+- A scaling of `polmat` does not change the XPR, but `pg`
+
+## See also:
+- [[calc_rician_k_factor]] (LOS and NLOS power with the same LOS window)
+- [[get_channels_spherical]] (polarization transfer matrices of the paths)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,
-                                                 const std::vector<arma::Mat<dtype>> &polmat,
-                                                 const std::vector<arma::Col<dtype>> &path_length,
-                                                 const arma::Mat<dtype> &tx_pos,
-                                                 const arma::Mat<dtype> &rx_pos,
-                                                 arma::Mat<dtype> *xpr,
-                                                 arma::Col<dtype> *pg,
-                                                 bool include_los,
-                                                 double window_size_in)
+void quadriga_lib::calc_xpr(const std::vector<arma::Col<dtype>> &powers,
+                            const std::vector<arma::Mat<dtype>> &polmat,
+                            const std::vector<arma::Col<dtype>> &path_length,
+                            const arma::Mat<dtype> &tx_pos,
+                            const arma::Mat<dtype> &rx_pos,
+                            arma::Mat<dtype> *xpr,
+                            arma::Col<dtype> *pg,
+                            bool include_los,
+                            double window_size_in)
 {
     const dtype window_size = dtype(window_size_in);
     // --- Input validation ---
@@ -282,7 +289,7 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
     }
 }
 
-template void quadriga_lib::calc_cross_polarization_ratio(
+template void quadriga_lib::calc_xpr(
     const std::vector<arma::Col<float>> &powers,
     const std::vector<arma::Mat<float>> &polmat,
     const std::vector<arma::Col<float>> &path_length,
@@ -293,7 +300,7 @@ template void quadriga_lib::calc_cross_polarization_ratio(
     bool include_los,
     double window_size);
 
-template void quadriga_lib::calc_cross_polarization_ratio(
+template void quadriga_lib::calc_xpr(
     const std::vector<arma::Col<double>> &powers,
     const std::vector<arma::Mat<double>> &polmat,
     const std::vector<arma::Col<double>> &path_length,

@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.channel.export_obj_file.
+# Python interface test for quadriga_lib.channel.export_channel_obj.
 
 import sys
 import os
@@ -63,7 +63,7 @@ def _to_lists(chan):
     return out
 
 
-class test_channel_export_obj_file(unittest.TestCase):
+class test_export_channel_obj(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -77,7 +77,7 @@ class test_channel_export_obj_file(unittest.TestCase):
     def _export(self, name, chan, **kwargs):
         """Run the exporter and return the path to the written OBJ file."""
         fn = self._path(name)
-        quadriga_lib.channel.export_obj_file(fn, chan, **kwargs)
+        quadriga_lib.channel.export_channel_obj(fn, chan, **kwargs)
         return fn
 
     # ---- Value tests ----
@@ -151,7 +151,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         ref = _significant_lines(self._export('omit.obj', chan))
         self.assertEqual(_significant_lines(self._export('none.obj', chan, i_snap=None)), ref)
         fn = pathlib.Path(self._path('path.obj'))
-        quadriga_lib.channel.export_obj_file(fn, chan=chan)
+        quadriga_lib.channel.export_channel_obj(fn, chan=chan)
         self.assertEqual(_significant_lines(str(fn)), ref)
 
     def test_scalar_params(self):
@@ -169,7 +169,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         with self.assertRaises(TypeError):
             self._export('n.obj', None)
         with self.assertRaises(TypeError):  # options are keyword-only
-            quadriga_lib.channel.export_obj_file(self._path('p.obj'), chan, 1)
+            quadriga_lib.channel.export_channel_obj(self._path('p.obj'), chan, 1)
 
     def test_error_invalid_channel(self):
         chan = _make_chan()
@@ -185,7 +185,7 @@ class test_channel_export_obj_file(unittest.TestCase):
     def test_error_options(self):
         chan = _make_chan()
         with self.assertRaisesRegex(ValueError, "'fn' must end with '.obj'"):
-            quadriga_lib.channel.export_obj_file(self._path('bad.txt'), chan)
+            quadriga_lib.channel.export_channel_obj(self._path('bad.txt'), chan)
         with self.assertRaisesRegex(ValueError, "Colormap 'not_a_colormap' is not supported."):
             self._export('cm.obj', chan, colormap='not_a_colormap')
         with self.assertRaisesRegex(ValueError, "'n_edges' must be at least 3"):

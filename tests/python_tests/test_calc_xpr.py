@@ -2,7 +2,7 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
-# Python interface test for quadriga_lib.tools.calc_cross_polarization_ratio.
+# Python interface test for quadriga_lib.channel.calc_xpr.
 
 import sys
 import os
@@ -32,7 +32,7 @@ class test_case(unittest.TestCase):
         M = [np.hstack([M_los, M_nlos1, M_nlos2])]
         pl = [np.array([10.0, 12.0, 15.0])]
 
-        xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
+        xpr, pg = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx)
 
         self.assertEqual(xpr.shape, (1, 6))
         self.assertEqual(pg.shape, (1,))
@@ -61,10 +61,10 @@ class test_case(unittest.TestCase):
         pl = [np.array([10.0, 15.0])]
 
         # Without LOS
-        xpr_no, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=False)
+        xpr_no, _ = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx, include_los=False)
 
         # With LOS
-        xpr_yes, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=True)
+        xpr_yes, _ = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx, include_los=True)
 
         # V-XPR without LOS: 0.5*0.64 / (0.5*0.04) = 16
         npt.assert_allclose(xpr_no[0, 1], 16.0, atol=1e-10, rtol=0)
@@ -81,7 +81,7 @@ class test_case(unittest.TestCase):
         M = [np.array([0.8, 0.2, 0.05, 0.05, 0.1, -0.1, 0.7, -0.3]).reshape(8, 1)]
         pl = [np.array([20.0])]
 
-        xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
+        xpr, pg = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx)
 
         abs2_vv = 0.8**2 + 0.2**2   # 0.68
         abs2_vh = 0.1**2 + 0.1**2   # 0.02
@@ -109,7 +109,7 @@ class test_case(unittest.TestCase):
         M = [np.hstack([M0_c0, M0_c1]), np.hstack([M1_c0, M1_c1])]
         pl = [np.array([10.0, 14.0]), np.array([10.0, 13.0])]
 
-        xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio([pw0, pw1], M, pl, tx, rx)
+        xpr, pg = quadriga_lib.channel.calc_xpr([pw0, pw1], M, pl, tx, rx)
 
         self.assertEqual(xpr.shape, (2, 6))
         self.assertEqual(pg.shape, (2,))
@@ -129,7 +129,7 @@ class test_case(unittest.TestCase):
         M = [np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]).reshape(8, 1)]
         pl = [np.array([20.0])]
 
-        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
+        xpr, _ = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx)
 
         # Linear XPR: perfect isolation (co-pol > 0, cross-pol = 0) => Inf
         # Circular XPR: the LOS keeps the handedness, co-pol > 0, cross-pol = 0 => Inf
@@ -140,7 +140,7 @@ class test_case(unittest.TestCase):
 
         # M = identity mirrors the H component relative to the LOS (as one reflection): circular co-pol = 0
         M = [np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]).reshape(8, 1)]
-        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
+        xpr, _ = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx)
         npt.assert_equal(xpr[0, 0], np.inf)
         npt.assert_allclose(xpr[0, 3:], 0.0, atol=1e-14, rtol=0)
 
@@ -157,7 +157,7 @@ class test_case(unittest.TestCase):
         pl = [np.array([10.0, 10.005, 12.0])]
 
         # Large window: excludes paths 0 and 1
-        xpr_large, _ = quadriga_lib.tools.calc_cross_polarization_ratio(
+        xpr_large, _ = quadriga_lib.channel.calc_xpr(
             pw, M, pl, tx, rx, include_los=False, window_size=0.01)
 
         # Only path 2: V-XPR = 0.49/0.09
@@ -168,7 +168,7 @@ class test_case(unittest.TestCase):
         tx = np.array([[0.0], [0.0], [0.0]])
         rx = np.array([[10.0], [0.0], [0.0]])
         with self.assertRaises(Exception):
-            quadriga_lib.tools.calc_cross_polarization_ratio([], [], [], tx, rx)
+            quadriga_lib.channel.calc_xpr([], [], [], tx, rx)
 
     def test_equal_linear_xpr(self):
         """Equal M elements give XPR = 1 in linear basis"""
@@ -179,7 +179,7 @@ class test_case(unittest.TestCase):
         M = [np.array([0.5, 0.0, 0.5, 0.0, 0.5, 0.0, 0.5, 0.0]).reshape(8, 1)]
         pl = [np.array([20.0])]
 
-        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
+        xpr, _ = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx)
 
         npt.assert_allclose(xpr[0, 0], 1.0, atol=1e-10, rtol=0)
         npt.assert_allclose(xpr[0, 1], 1.0, atol=1e-10, rtol=0)
@@ -195,15 +195,15 @@ class test_case(unittest.TestCase):
         M_nlos = np.array([0.8, 0.0, 0.2, 0.0, 0.2, 0.0, 0.7, 0.0]).reshape(8, 1)
         M = [np.hstack([M_los, M_nlos])]
         pl = [np.array([10.0, 15.0])]
-        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=None)
+        xpr, _ = quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx, include_los=None)
         npt.assert_allclose(xpr[0, 1], 16.0, atol=1e-10, rtol=0)  # LOS excluded
         with self.assertRaises(TypeError) as ctx:
-            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=2.5)
+            quadriga_lib.channel.calc_xpr(pw, M, pl, tx, rx, include_los=2.5)
         self.assertIn("'include_los'", str(ctx.exception))
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, None, rx)
+            quadriga_lib.channel.calc_xpr(pw, M, pl, None, rx)
         with self.assertRaises(TypeError):
-            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, None)
+            quadriga_lib.channel.calc_xpr(pw, M, pl, tx, None)
 
 if __name__ == '__main__':
     unittest.main()

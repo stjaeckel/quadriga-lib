@@ -14,35 +14,24 @@
 #include "qd_helpers_channel.hpp"
 
 /*!SECTION
-Channel generation functions
+Channel generators
 SECTION!*/
 
 /*!MD
 # get_channels_irs
-Calculate MIMO channel coefficients for IRS-assisted communication
+Calculate MIMO channel coefficients and delays for paths over an intelligent reflecting surface
 
-- Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
-- IRS is modeled as a passive array of `n_irs` elements; each element reflects once with its weight w_k from column
-  `i_irs` of the IRS port weights (the codebook entry): `H = B · diag(w) · A` per path pair, with the per-element
-  channels A (TX → IRS) and B (IRS → RX); delays and angles of a pair are |w_k|²-weighted means over the elements
-- The IRS port weights holds the IRS weights and must be given: empty port weights of `irs_array` throws, unlike
-  in the other functions, where it stands for identity
-- Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
-  polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
-  column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
-  rows 6-7 = (H rx, H tx)
-- Each segment is computed by [[get_channels_spherical]]: NLOS path lengths are `max(path_length, d_poly)` with the
-  polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
-- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`; the pair
-  of segment-1 path `i_1` and segment-2 path `i_2` has index `i_1 * n_path_2 + i_2` in `active_path` and
-  `active_path_out`, and the output keeps this order
-- A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
-- If `active_path` is provided, it overrides `threshold_dB` for path selection
-- Optional `irs_array_2` provides the patterns of the RX-facing side (asymmetric IRS); the weights and element positions
-  come from `irs_array`
-- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
-- If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
-  is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
+- Paths of one link over an intelligent reflecting surface (IRS) with `n_irs` elements: segment 1 from the Tx to the
+  IRS and segment 2 from the IRS to the Rx, each computed by [[get_channels_spherical]] with the IRS elements as Rx and
+  Tx elements; each output path combines one path of each segment
+- Each IRS element $k$ reflects once with its weight $w_k$, column `i_irs` of the IRS port weights (a codebook entry):
+  per path pair, $\mathbf{H} = \mathbf{B} \, \mathrm{diag}(\mathbf{w}) \, \mathbf{A}$ with the element channels
+  $\mathbf{A}$ of segment 1 `[n_irs, n_tx]` and $\mathbf{B}$ of segment 2 `[n_rx, n_irs]`
+- The delay of a pair is the sum of its segment delays, each the $|w_k|^2$-weighted mean over the IRS elements; the
+  departure angles come from segment 1, the arrival angles from segment 2, as $|w_k|^2$-weighted mean directions
+- Kept are the path pairs whose strongest coefficient has a power above `threshold_dB`, or those set in `active_path`;
+  the pair of segment-1 path $i_1$ and segment-2 path $i_2$ has the index $i_1 n_{\mathrm{path},2} + i_2$ in
+  `active_path` and `active_path_out`, and the output keeps this order
 
 ## Declaration:
 ```
@@ -84,53 +73,54 @@ void quadriga_lib::get_channels_irs(
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [[arrayant]]
-- **`rx_array`** — Receive antenna array with `n_rx` elements; see [[arrayant]]
-- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [[arrayant]]
-- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
-- **`rx_pos`** — Receiver position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
-- **`irs_pos`** — IRS position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
-- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
-- **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
-- **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
-- **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1]`
-- **`path_length_1`** — Total path lengths from TX to IRS phase center; values shorter than the polyline (e.g. 0) use
-  the polyline length; `[n_path_1]`
-- **`polmat_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `[8, n_path_1]`
-- **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
-- **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
-- **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `[n_path_2]`
-- **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
-  the polyline length; `[n_path_2]`
-- **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
-- **`i_irs`** *(optional)* — IRS codebook port index
-- **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
-- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
-- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side with `n_irs` elements; enables asymmetric IRS patterns; only its patterns are used, its port weights and `element_pos` are ignored; empty (no elements): `irs_array` on both sides; see [[arrayant]]
-- **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
-- **`use_kernel`** *(optional)* — Kernel of both segments, passed to [[get_channels_spherical]]: 0 = auto, 1 = GENERIC,
-  2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
-  this version
+- **`tx_array`**, **`rx_array`** — Tx and Rx array, valid ([[arrayant]]); `n_tx` and `n_rx` ports
+- **`irs_array`** — IRS array with `n_irs` elements, valid, with port weights `[n_irs, n_codebook]` that hold the
+  reflection weights; its patterns serve both segments unless `irs_array_2` is given
+- **`tx_pos`**, **`rx_pos`**, **`irs_pos`** — Tx, Rx and IRS position in m, finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`**, **`rx_orientation`**, **`irs_orientation`** — Orientations, Euler angles (bank, tilt, heading)
+  in rad, finite; `[3, 1]` or `[1, 3]`
+- **`fbs_pos_1`**, **`lbs_pos_1`** — First- and last-bounce scatterer positions of the segment-1 paths in m;
+  `[3, n_path_1]`
+- **`path_gain_1`** — Path gains of segment 1, linear power; `[n_path_1]`
+- **`path_length_1`** — Path lengths of segment 1 in m between the Tx and IRS phase centres, as in
+  [[get_channels_spherical]]; `[n_path_1]`
+- **`polmat_1`** — Jones matrices of segment 1, the IRS receiving ([Glossary](cpp_api.html#glossary), "Polarization");
+  `[8, n_path_1]`
+- **`fbs_pos_2`**, **`lbs_pos_2`**, **`path_gain_2`**, **`path_length_2`**, **`polmat_2`** — The same for segment 2
+  from the IRS to the Rx, the IRS transmitting; `n_path_2` paths
+- **`i_irs`** *(optional)* — Codebook entry, 0-based column of the IRS port weights, below `n_codebook`
+- **`threshold_dB`** *(optional)* — Minimum power in dB of the strongest coefficient of a kept path pair; not used with
+  `active_path`
+- **`center_freq`** *(optional)* — Center frequency in Hz, finite and >= 0; 0 gives the coefficients at f = 0, as in
+  [[get_channels_spherical]]
+- **`use_absolute_delays`** *(optional)* — Keep the delay of the direct Tx-Rx distance in all delays; `false`: delays
+  relative to it (Notes)
+- **`irs_array_2`** *(optional)* — Patterns of the IRS for segment 2 (asymmetric IRS), valid, `n_irs` elements; its
+  port weights and element positions are not used; empty: `irs_array`
+- **`active_path`** *(optional)* — Path pairs to keep, replacing `threshold_dB`; empty: `threshold_dB`;
+  `[n_path_1 * n_path_2]`
+- **`use_kernel`** *(optional)* — Kernel of both segments, as in [[get_channels_spherical]]
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_irs]`
-- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path_irs]`
-- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
-- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
-- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
-- **`active_path_out`** *(optional)* — Boolean mask indicating which path combinations are in the output (can be passed
-  as `active_path` to a later call or to [[combine_irs_coord]]); `[n_path_1 * n_path_2]`
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path_irs]` with the
+  number of kept path pairs `n_path_irs`
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path_irs]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Azimuth and elevation of departure and arrival in rad, GCS;
+  `[n_rx, n_tx, n_path_irs]`
+- **`active_path_out`** *(optional)* — Kept path pairs, for `active_path` of a later call or [[combine_irs_coord]];
+  `[n_path_1 * n_path_2]`
+
+## Notes:
+- **IRS port weights**: empty port weights throw here, unlike in the other functions, where they mean identity; the
+  IRS elements are not combined into ports
+- **Segments**: path lengths, LOS paths and the per-element geometry as in [[get_channels_spherical]]; a segment
+  without paths (all its path inputs empty) gives the outputs `[n_rx, n_tx, 0]`
+- **Relative delays**: the delay of the direct Tx-Rx distance (not via the IRS) is subtracted; delays can be slightly
+  negative when the IRS is close to the Tx-Rx line
 
 ## See also:
-- [[combine_irs_coord]] (coordinate setup for IRS geometry)
-- [[get_channels_spherical]] (single-segment spherical-wave channel)
-- [[get_channels_planar]] (single-segment planar-wave channel)
-- [[arrayant]] (antenna array class)
+- [[get_channels_spherical]] (the channel of each segment)
+- [[combine_irs_coord]] (interaction coordinates of the kept path pairs)
 MD!*/
 
 template <typename dtype>
@@ -148,6 +138,8 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
                                     const arrayant<dtype> &irs_array_2, const std::vector<bool> &active_path,
                                     std::vector<bool> *active_path_out, int use_kernel)
 {
+    if (!std::isfinite(center_freq_in) || center_freq_in < 0.0 || !std::isfinite((dtype)center_freq_in))
+        throw std::invalid_argument("Input 'center_freq' must be finite and >= 0.");
     const dtype threshold_dB = dtype(threshold_dB_in);
     const dtype center_freq = dtype(center_freq_in);
     // Positions and orientations, checked here so that an error names the argument (the segment calls of

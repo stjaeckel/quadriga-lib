@@ -56,21 +56,6 @@ namespace quadriga_lib
         // Validate integrity
         std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
 
-        // Add paths to an exisiting channel
-        // - If a field exists in the calling channel object, it must also be provided to the method
-        // - Number of transmit and receive antennas must match
-        void add_paths(arma::uword i_snap,                                   // Snapshot index to which the paths should be added
-                       const arma::Cube<dtype> *coeff_re_add = nullptr,      // Channel coefficients, real part, Cube of size [n_rx, n_tx, n_path_add]
-                       const arma::Cube<dtype> *coeff_im_add = nullptr,      // Channel coefficients, imaginary part, Cube of size [n_rx, n_tx, n_path_add]
-                       const arma::Cube<dtype> *delay_add = nullptr,         // Path delays in seconds, Cube of size [n_rx, n_tx, n_path_add] or [1, 1, n_path_add]
-                       const arma::u32_vec *n_interact_add = nullptr,        // Number of interaction coordinates, vector of length [n_path_add]
-                       const arma::Mat<dtype> *interact_coord_add = nullptr, // Interaction coordinates, matrix of size [3, sum(n_interact)]
-                       const arma::Col<dtype> *path_gain_add = nullptr,      // Path gain before antenna patterns, vector of length [n_path_add]
-                       const arma::Col<dtype> *path_length_add = nullptr,    // Absolute path length from TX to RX phase center, vector of length [n_path_add]
-                       const arma::Mat<dtype> *polmat_add = nullptr,         // Polarization transfer matrix, Matrix of size [8, n_path_add], interleaved complex
-                       const arma::Mat<dtype> *path_angles_add = nullptr,    // Departure and arrival angles, Matrix of size [n_path_add, 4], {AOD, EOD, AOA, EOA}
-                       const arma::Mat<dtype> *fbs_pos_add = nullptr,        // First-bounce scatterer positions, Matrix of size [3, n_path_add]
-                       const arma::Mat<dtype> *lbs_pos_add = nullptr);       // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
     };
 
     // Effective path gain (linear scale) per snapshot, [n_snap]
@@ -78,7 +63,7 @@ namespace quadriga_lib
     // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
     // - throws an error if neither coeff_re/im nor polmat is available
     template <typename dtype>
-    arma::Col<dtype> channel_calc_effective_path_gain(const channel<dtype> &chan);
+    arma::Col<dtype> calc_channel_gain(const channel<dtype> &chan);
 
     // Join the channels of consecutive segments of one link by a power cross-fade
     // - Segment k starts with n_overlap[k] snapshots that are also the last ones of segment k - 1
@@ -91,7 +76,7 @@ namespace quadriga_lib
     // Write propagation paths to a Wavefront OBJ file
     // - e.g. for visualization in Blender
     template <typename dtype>
-    void channel_export_obj_file(
+    void export_channel_obj(
         const std::string &fn,                   // Filename of the OBJ file
         const channel<dtype> &chan,              // Channel with ray tracing data (n_interact, interact_coord)
         arma::uword max_paths = 0,               // Maximum number of paths to be shown, Default: all
@@ -254,9 +239,9 @@ namespace quadriga_lib
     //   slots inside the layout of an existing file, all channels valid
     // - Returns 0 (new) or 1 (overwritten) per slot
     template <typename dtype>                                                         // Float or double
-    arma::s32_vec hdf5_write_channel_vec(const std::string &fn,                       // Filename of the HDF5 file
-                                         const std::vector<channel<dtype>> &chan_vec, // Channel objects to write, [n_slot]
-                                         const arma::u32_mat &slots);                 // Slot indices (ix, iy, iz, iw), 0-based, [4, n_slot]
+    arma::s32_vec hdf5_write_channel(const std::string &fn,                       // Filename of the HDF5 file
+                                     const std::vector<channel<dtype>> &chan_vec, // Channel objects to write, [n_slot]
+                                     const arma::u32_mat &slots);                 // Slot indices (ix, iy, iz, iw), 0-based, [4, n_slot]
 
     // Read the storage layout of channel data inside an HDF5 file
     // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}
@@ -295,9 +280,9 @@ namespace quadriga_lib
     // Read several channels from HDF5 file, one per column of 'slots', opening the file once
     // - Empty slots or slots outside the layout give empty channels; 'i_snap' as in hdf5_read_channel, for every slot
     template <typename dtype = double>                                                                   // Read as float or double
-    std::vector<channel<dtype>> hdf5_read_channel_vec(const std::string &fn,                    // Filename of the HDF5 file
-                                                      const arma::u32_mat &slots,               // Slot indices (ix, iy, iz, iw), 0-based, [4, n_slot]
-                                                      const uint_list &i_snap = {});           // Snapshot indices, 0-based; empty = all
+    std::vector<channel<dtype>> hdf5_read_channel(const std::string &fn,                    // Filename of the HDF5 file
+                                                  const arma::u32_mat &slots,               // Slot indices (ix, iy, iz, iw), 0-based, [4, n_slot]
+                                                  const uint_list &i_snap = {});           // Snapshot indices, 0-based; empty = all
 
     // Read single unstructured dataset from HDF5 file
     // - Besides structured channel data, extra datasets of various types can be added
@@ -350,19 +335,18 @@ namespace quadriga_lib
     // - Calculates the discrete Fourier transform of the coefficients
     // - Outputs are returned in the frequency domain at the given sample positions
     // - Uses AVX2 to accelerate the computations (calculate 8 carriers in parallel)
-    // - It is possible to call this function in a loop for multiple snapshots and parallelize this loop using OpenMP
     // - The phase bandwidth * pilot * delay is computed in double precision and reduced to one period; sin / cos,
     //   coefficients and sums are single precision
     template <typename dtype>
-    void baseband_freq_response(
+    void freq_response(
         const arma::Cube<dtype> &coeff_re,               // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
         const arma::Cube<dtype> &coeff_im,               // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
         const arma::Cube<dtype> &delay,                  // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-        const arma::Col<dtype> &pilot_grid,              // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+        const arma::Col<dtype> &pilot_grid,              // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carrier ]
         const double bandwidth,                          // The baseband bandwidth in [Hz]
-        arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
-        arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
-        arma::Cube<std::complex<dtype>> *hmat = nullptr, // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carriers]
+        arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
+        arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
+        arma::Cube<std::complex<dtype>> *hmat = nullptr, // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
         int use_kernel = 0);                             // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
@@ -375,7 +359,7 @@ namespace quadriga_lib
     // - Delays are taken from delay[0] only (frequency-independent geometry); supports [n_rx, n_tx, n_path]
     //   or broadcastable [1, 1, n_path]
     template <typename dtype>
-    void baseband_freq_response_multi(
+    void freq_response_mf(
         const std::vector<arma::Cube<dtype>> &coeff_re,  // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
         const std::vector<arma::Cube<dtype>> &coeff_im,  // Imag part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
         const std::vector<arma::Cube<dtype>> &delay,     // Delays [s], length [n_freq], each [n_rx, n_tx, n_path] or [1, 1, n_path]
@@ -388,29 +372,29 @@ namespace quadriga_lib
         int use_kernel = 0);                             // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Compute the baseband frequency response of multiple MIMO channels
-    // - Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
+    // - Vector form of freq_response, one entry per snapshot, snapshots in parallel (OpenMP)
     // - Each element of the input vectors is a cube of shape [n_rx, n_tx, n_path]; delay supports broadcasting to [1, 1, n_path]
     // - Output vectors have length n_out: either n_snap (all snapshots) or length(i_snap) (subset)
     // - Internal arithmetic is single-precision
     template <typename dtype>
-    void baseband_freq_response_vec(
+    void freq_response(
         const std::vector<arma::Cube<dtype>> &coeff_re,               // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
         const std::vector<arma::Cube<dtype>> &coeff_im,               // Imaginary part of time-domain channel coefficients, same structure as coeff_re
         const std::vector<arma::Cube<dtype>> &delay,                  // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
-        const arma::Col<dtype> &pilot_grid,                           // Normalized sub-carrier positions in range [0.0, 1.0]; [n_carriers]
+        const arma::Col<dtype> &pilot_grid,                           // Sub-carrier positions relative to the bandwidth, 0.0 = fc; [n_carrier]
         const double bandwidth,                                       // Total baseband bandwidth
-        std::vector<arma::Cube<dtype>> *hmat_re = nullptr,            // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
+        std::vector<arma::Cube<dtype>> *hmat_re = nullptr,            // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carrier]
         std::vector<arma::Cube<dtype>> *hmat_im = nullptr,            // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
         std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr, // Complex-valued frequency-domain channel matrices, same structure as hmat_re
         const uint_list &i_snap = {},                                // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
         int use_kernel = 0);                                          // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients
-    // - Batch wrapper around [[baseband_freq_response_multi]], applying it across snapshots in parallel via OpenMP
+    // - Vector form of freq_response_mf, one entry per snapshot, snapshots in parallel (OpenMP)
     // - Inputs are indexed [snapshot][input frequency]; freq and freq_new are shared by all snapshots
     // - Output vectors have length n_out: either n_snap (all snapshots) or length(i_snap) (subset)
     template <typename dtype>
-    void baseband_freq_response_multi_vec(
+    void freq_response_mf(
         const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,  // Real part, n_snap vectors of n_freq cubes [n_rx, n_tx, n_path]
         const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,  // Imaginary part, same structure as coeff_re
         const std::vector<std::vector<arma::Cube<dtype>>> &delay,     // Delays [s], n_snap vectors of n_freq cubes; only entry 0 of each snapshot is used
@@ -558,7 +542,7 @@ namespace quadriga_lib
         const arma::u32_vec &path_type, // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
         arma::uword i_cir = 0);         // CIR index, stored in path::i_cir, < 2^32
 
-    // ---- Channel generation functions ----
+    // ---- Channel generators ----
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
@@ -606,7 +590,7 @@ namespace quadriga_lib
     // - Output vectors get n_snap entries; entries that already have the output size are written in place
     // - The optional complex output is computed one snapshot per thread at a time (no split copy of all snapshots)
     template <typename dtype>
-    void get_channels_spherical_vec(
+    void get_channels_spherical(
         const arrayant<dtype> &tx_array,                               // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
         const arrayant<dtype> &rx_array,                               // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arma::Mat<dtype> &tx_pos,                                // Transmitter positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
@@ -640,7 +624,7 @@ namespace quadriga_lib
     // - Jones matrix polmat can have 2 rows (scalar pressure: Re, Im of (V rx, V tx) only) or 8 rows (full polarimetric, row
     //   order as in get_channels_spherical)
     // - NLOS path lengths and add_fake_los_path as in get_channels_spherical
-    // - For baseband_freq_response_multi with remove_delay_phase = true, generate the channels with use_absolute_delays = true
+    // - For freq_response_mf with remove_delay_phase = true, generate the channels with use_absolute_delays = true
     // - Output coefficients and delays are returned as vectors of cubes, one per output frequency
     template <typename dtype>
     void get_channels_multifreq(
@@ -755,7 +739,7 @@ namespace quadriga_lib
     // - Output vectors get n_snap entries; entries that already have the output size are written in place
     // - The optional complex output is computed one snapshot per thread at a time (no split copy of all snapshots)
     template <typename dtype>
-    void get_channels_planar_vec(
+    void get_channels_planar(
         const arrayant<dtype> &tx_array,                               // Transmit antenna array with 'n_tx' elements (= ports after the port weights)
         const arrayant<dtype> &rx_array,                               // Receive antenna array with 'n_rx' elements (= ports after the port weights)
         const arma::Mat<dtype> &tx_pos,                                // Transmitter positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]

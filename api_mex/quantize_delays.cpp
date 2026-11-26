@@ -7,33 +7,26 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # QUANTIZE_DELAYS
-Map path delays to a fixed tap grid using two-tap power-weighted interpolation
+Map the path delays to a tap grid by two-tap interpolation
 
-- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α and δ^α, 
-  where δ is the fractional offset within the bin and α is `power_exponent`
-- Two-tap interpolation avoids discontinuities when delays cross tap boundaries
-- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
-- If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped 
-  (nearest neighbor selection) but tap-selection logic still applies
-- Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared `[1, 1, n_path, n_snap]`; 
-  shared delays are expanded internally when `fix_taps` is 0 or 3
-- Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
-- Delays must be non-negative, as for a tapped delay line, with a tolerance of `tap_spacing / 2`: delays in
-  `(-tap_spacing / 2, 0)` are treated as 0, so all of their power goes to tap 0. Delays at or below
-  `-tap_spacing / 2` raise an error, as do NaN, Inf and delays of 2^31 taps or more (`delay / tap_spacing < 2^31`,
-  e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)
-- Relative delays (`use_absolute_delays = false` in [[get_channels_spherical]], [[get_channels_multifreq]] and
-  [[get_channels_planar]]) are negative for element pairs that are closer to each other than the phase centres, by up
-  to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay
-  above `-tap_spacing / 2` only while these half sizes add up to less than `tap_spacing / 2` times the propagation
-  speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
-  acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
-- Run time and memory depend on the number of paths and taps, not on the absolute delay values
+- For time-domain processing with a tapped delay line: a path with delay $\tau$ and coefficient $a$ goes to the two
+  neighbouring taps $\lfloor \tau / \Delta \rfloor$ and $\lfloor \tau / \Delta \rfloor + 1$ of the grid with the
+  spacing $\Delta$ = `tap_spacing`, with the coefficients $a \, (1 - \delta)^\alpha$ and $a \, \delta^\alpha$, where
+  $\delta$ is the fractional offset of $\tau / \Delta$ and $\alpha$ = `power_exponent`; the coefficients change smoothly
+  when a delay crosses a tap
+- $\alpha = 1$ interpolates linearly (narrowband), $\alpha = 0.5$ keeps the power of each path (wideband)
+- A grid holds the taps with power, at most `max_taps`: all taps of the interpolation if they fit, else the nearest
+  taps of the paths, strongest first, and the remaining places for the strongest other taps. A path whose two taps
+  are not both in the grid goes to its nearest tap with its full coefficient, or is dropped if that tap is not in the
+  grid either
+- If every delay is within 1 % of the spacing from a tap, each path goes to its nearest tap with its full coefficient
+- All snapshots of the output have the same number of taps `n_taps`, the size of the largest grid; the taps beyond a
+  shorter grid have zero coefficients and delay 0, taps that are zero in all snapshots at the end are removed
 
 ## Usage:
 ```
@@ -42,26 +35,42 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 ```
 
 ## Inputs:
-- **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
-- **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
-- **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; non-negative
-  with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
-- **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9
-- **`max_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
-- **`power_exponent`** — Interpolation exponent α; default: 1.0
-- **`fix_taps`** — Delay grid sharing mode; default: 0<br><br>
-  | Value | Meaning                                                                                         |
-  | :---: | ----------------------------------------------------------------------------------------------- |
-  | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps, n_snap]`                       |
-  | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps, n_snap]` for shared delay input, `[n_rx, n_tx, n_taps, n_snap]` for per-antenna input |
-  | 2     | Per snapshot; output delays `[1, 1, n_taps, n_snap]` for shared delay input, `[n_rx, n_tx, n_taps, n_snap]` for per-antenna input; each snapshot independent |
-  | 3     | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps, n_snap]`               |
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients, the paths of a snapshot zero-padded to
+  `n_path`; `[n_rx, n_tx, n_path, n_snap]`
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; finite, above
+  `-tap_spacing / 2` and below `2^31` · `tap_spacing`
+- **`tap_spacing`** — Tap spacing in s, > 0 and finite; 5 ns is a sampling rate of 200 MHz; default: 5e-9
+- **`max_taps`** — Largest number of taps of a grid; 0 = unlimited; default: 48
+- **`power_exponent`** — Interpolation exponent $\alpha$, > 0; default: 1
+- **`fix_taps`** — Which coefficients share a grid; default: 0
+
+  | Value | Grid |
+  | ----- | ---- |
+  | 0 | One grid per antenna pair and snapshot |
+  | 1 | One grid for all antenna pairs and snapshots |
+  | 2 | One grid per snapshot for all its antenna pairs; the grids of the snapshots differ |
+  | 3 | One grid per antenna pair for all snapshots |
 
 ## Outputs:
-- **`coeff_re_q`** — Output coefficients, real part; `[n_rx, n_tx, n_taps, n_snap]`
-- **`coeff_im_q`** — Output coefficients, imaginary part; `[n_rx, n_tx, n_taps, n_snap]`
-- **`delay_q`** — Output delays in seconds; `[n_rx, n_tx, n_taps, n_snap]`, or `[1, 1, n_taps, n_snap]` for shared delay
-  input with `fix_taps` 1 or 2
+- **`coeff_re_q`** / **`coeff_im_q`** — Real and imaginary part of the coefficients per tap;
+  `[n_rx, n_tx, n_taps, n_snap]`
+- **`delay_q`** — Tap delays in s; `[n_rx, n_tx, n_taps, n_snap]`, or `[1, 1, n_taps, n_snap]` for delays
+  `[1, 1, n_path, n_snap]` with `fix_taps` 1 or 2
+
+## Notes:
+- Negative delays: delays in `(-tap_spacing / 2, 0)` count as 0, all their power goes to tap 0 (the error is below
+  `tap_spacing / 2`, as for rounding to the nearest tap)
+- Relative delays (`use_absolute_delays = false` in [[get_channels_spherical]], [[get_channels_planar]] and
+  [[get_channels_multifreq]]) are negative for element pairs that are closer to each other than the phase centres,
+  by up to (half the Tx array size + half the Rx array size) / propagation speed. They stay above
+  `-tap_spacing / 2` only while these half sizes add up to less than about 0.75 m for radio at 5 ns taps, or 3.6 mm
+  for sound at 48 kHz taps, i.e. practically never for acoustic arrays: use absolute delays then
+- The upper limit of `2^31` taps is e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz; run time and memory depend on the
+  number of paths and taps, not on the delay values
+
+## See also:
+- [[freq_response]] (frequency response of the paths or taps)
+- [[calc_delay_spread]] (delay spread, with an optional delay granularity)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

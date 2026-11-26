@@ -4,6 +4,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-site-s
 
 | Function | Summary |
 | --- | --- |
+| [path](#path) | Class for one propagation path: interaction points, transfer coefficients and interaction types |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
 | [colormap](#colormap) | Generate a colormap matrix with RGB values |
 | [combine_irs_coord](#combine_irs_coord) | Combine path interaction coordinates for IRS-assisted TX → RX channels |
@@ -39,6 +40,112 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-site-s
 | [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing |
 | [triangle_mesh_split](#triangle_mesh_split) | Split a 3D triangular mesh into two sub-meshes along a given axis |
 | [write_png](#write_png) | Write a data matrix to a color-coded PNG file |
+
+---
+<a id="path"></a>
+## path
+Class for one propagation path: interaction points, transfer coefficients and interaction types
+
+Not in: MATLAB, Python
+
+- Holds one path from an origin to a destination through up to 255 interaction points (segments); the origin and the
+  destination themselves are not stored
+- Per frequency (1 to 127) one transfer coefficient: in EM mode the polarization transfer matrix (8 floats, Glossary
+  "Polarization"), in scalar mode (e.g. acoustic) one complex pressure coefficient (2 floats); per interaction point
+  one interaction type code ([ray_state_update](#ray_state_update) lists the codes)
+- Compact for large path sets: the 56-byte object holds the counters, the first 2 type codes and the coefficients of
+  frequency 0 (scalar mode: frequencies 0 to 3); a buffer on the heap holds the points and the other coefficients and
+  codes
+- The ray tracer ([ray_progress](#ray_progress)) builds paths, [qrt_file_append](channel-data-and-processing.md#qrt_file_append) stores them in QRT files and
+  [qrt_file_read_raw](channel-data-and-processing.md#qrt_file_read_raw) reads them back
+- Copyable and movable; a moved-from object has 0 points, 1 frequency and EM mode
+
+### Attributes:
+| Attribute | Size | Description |
+| --------- | ---- | ----------- |
+| `unsigned i_cir` | scalar | CIR index: the CIR the path belongs to |
+| `uint8_t n_ref` | scalar | Number of reflections |
+| `uint8_t n_tra` | scalar | Number of transmissions (refractions) |
+| `uint8_t n_sub` | scalar | Number of subdivisions |
+| `uint8_t n_sct` | scalar | Number of scattering events |
+
+### Member functions:
+| Function | Description |
+| -------- | ----------- |
+| `path()` | EM path without points, 1 frequency |
+| `path(segments, frequencies, scalar)` | Path as set by `.init()` |
+| `.init(segments = 0, frequencies = 1, scalar = false)` | Resets the path: `segments` points at (0, 0, 0) (at most 255), `frequencies` coefficients (1 to 127) of value one (identity matrix in EM mode), type codes, counters, `i_cir` and length 0 |
+| `.free()` | Releases the buffer: 0 points, 1 frequency, EM mode; the other members keep their values |
+| `.n_seg()`, `.n_freq()`, `.is_scalar()` | Number of points, number of frequencies, `true` in scalar mode |
+| `.coord(seg = 0)` | Pointer to `[x, y, z]` of point `seg` in m (0-based, below `n_seg()`) |
+| `operator()(i)` | Coordinate `i` (0 = x, 1 = y, 2 = z) of the last point; NaN for a path without points or `i` > 2 |
+| `.polmat(i_freq = 0)` | Pointer to the coefficients of frequency `i_freq` (0-based, below `n_freq()`): 8 floats (EM, column-major, real and imaginary parts interleaved) or 2 (scalar) |
+| `.length()`, `.set_length(len)` | Stored length in m, from the origin to the last point |
+| `.interaction_type_codes()` | Type codes, one per point; `std::vector<uint8_t>` |
+| `.set_interaction_type_codes(codes)` | Sets the type codes; `n_seg()` codes |
+| `.calc_length()`, `.calc_gain()`, `.polmat_update()`, `.duplicate()`, `.extend()` | See below |
+
+### Function 'calc_length':
+Length of the path from the origin through the interaction points to the destination `D`
+
+```cpp
+float calc_length(float Dx, float Dy, float Dz) const;
+float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz);
+float calc_length(const float *D, const float *O = nullptr);
+```
+- Without the origin `O`: the stored length plus the distance from the last point to `D`; NaN for a path without
+  points
+- With `O`: computes all legs from `O`, stores the length from `O` to the last point and returns the total; for a
+  path without points the distance from `O` to `D`
+- `D`, `O`: positions `[x, y, z]` in m
+
+### Function 'calc_gain':
+Power gain of the path at one frequency
+
+```cpp
+float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
+```
+- The coefficient power $P$: in EM mode the larger column power of the matrix, in scalar mode $\lvert c \rvert^2$. A
+  path whose coefficients hold NaN or whose column powers sum to less than the smallest normal float gets 0, so that it
+  can be pruned
+- With `freq` > 0 and a length $d$ > 0, the free-space loss is applied: $P \, (\lambda / (4 \pi d))^2$ with
+  $\lambda = c / f$ in EM mode, $P / d^2$ in scalar mode (the value of `freq` is not used there)
+- `freq` in Hz; `i_freq` frequency index, 0-based, below `n_freq()`; `len` in m: > 0 replaces the stored length as
+  $d$
+
+### Function 'polmat_update':
+Apply an interaction to the coefficients of one frequency and return the new gain
+
+```cpp
+float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0,
+                    float freq = 0.0f, float len = 0.0f);
+```
+- Left-multiplies the coefficients $M$ of frequency `i_freq` by the interaction $U$ and scales them by the amplitude
+  of the power gain $g$: $M \leftarrow \sqrt{\lvert g \rvert} \, U M$
+- `coeff_update`: $U$, 8 floats (EM) or 2 (scalar), not overlapping the coefficients of the path; `nullptr` = no
+  multiplication. `gain_update`: $g$; 1 = no scaling
+- Returns `calc_gain(freq, i_freq, len)` of the new coefficients; with path loss after the last `extend`, when the
+  stored length is final
+
+### Function 'duplicate':
+Copy the path into another object
+
+```cpp
+float duplicate(path &target) const;
+```
+- `target` (not the path itself) gets an independent copy; returns the stored length
+
+### Function 'extend':
+Copy the path with one more interaction point into another object
+
+```cpp
+float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
+```
+- `target` (not the path itself) gets a copy with the point `[x, y, z]` in m and its type code `type` appended; the
+  counters are copied unchanged, the caller updates them
+- The stored length grows by the distance from the last point to the new one; the first point adds nothing, since the
+  origin is not stored (`calc_length` with the origin or `set_length` sets it)
+- Returns the new stored length; a path with 255 points throws `std::runtime_error`
 
 ---
 <a id="calc_diffraction_gain"></a>
@@ -93,7 +200,7 @@ void calc_diffraction_gain(
 - **`thin_slab_threshold`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab amplitude `ρ`: a series is summed where `ρ ≥ eps`; 0 = resolve always (default); `eps ≥ 1` re-emits every series whose `ρ` is below one, and a round trip at or above one is always summed; see [ray_state_update](#ray_state_update)
 - **`apply_fspl`** *(optional)* — If `true`, folds the geometric spreading loss into `gain`, so that `gain` becomes an
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
-  the direct TX-RX distance, matching the `path_length` definition used by [qrt_file_read](channel-functions.md#qrt_file_read) for a transmission-only 
+  the direct TX-RX distance, matching the `path_length` definition used by [qrt_file_read](channel-data-and-processing.md#qrt_file_read) for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
   `center_freq`.
@@ -101,7 +208,7 @@ void calc_diffraction_gain(
   same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
   of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
   magnitude, `polmat` stays normalized. This is the phase contribution that
-  [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from `path_length`; enabling it here gives the complete
+  [get_channels_spherical](channel-generators.md#get_channels_spherical) would otherwise add from `path_length`; enabling it here gives the complete
   omni-radiator coefficient without running the channel generator.
 
 ### Outputs:
@@ -111,7 +218,7 @@ void calc_diffraction_gain(
   power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
   For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row order
-  of `polmat` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_pos]`;
+  of `polmat` in [get_channels_spherical](channel-generators.md#get_channels_spherical); `[8, n_pos]`;
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
@@ -123,8 +230,8 @@ void calc_diffraction_gain(
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines mtl_prop format)
 - [ray_mesh_interact](#ray_mesh_interact) (used for media interactions)
-- [qrt_file_read](channel-functions.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
+- [get_channels_spherical](channel-generators.md#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 <a id="colormap"></a>
@@ -158,8 +265,8 @@ Not in: MATLAB, Python
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
 - Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
-- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the `active_path_out` output of [get_channels_irs](channel-generation-functions.md#get_channels_irs)) reduces this to active combinations only
-- Typically used after [get_channels_irs](channel-generation-functions.md#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
+- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the `active_path_out` output of [get_channels_irs](channel-generators.md#get_channels_irs)) reduces this to active combinations only
+- Typically used after [get_channels_irs](channel-generators.md#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
 
 ### Declaration:
 ```cpp
@@ -186,14 +293,14 @@ void quadriga_lib::combine_irs_coord(
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
-- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the `active_path_out` output of [get_channels_irs](channel-generation-functions.md#get_channels_irs) directly; `[n_path_1 × n_path_2]`
+- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the `active_path_out` output of [get_channels_irs](channel-generators.md#get_channels_irs) directly; `[n_path_1 × n_path_2]`
 
 ### Outputs:
 - **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`
 - **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(n_interact)]`
 
 ### See also:
-- [get_channels_irs](channel-generation-functions.md#get_channels_irs) (generates `active_path` and channel coefficients for IRS channels)
+- [get_channels_irs](channel-generators.md#get_channels_irs) (generates `active_path` and channel coefficients for IRS channels)
 - [coord2path](#coord2path) (consumes interaction coordinates to compute angles and path geometry)
 
 ---
@@ -1009,7 +1116,7 @@ polmat_update(polmat, U, &g, false, true, true, &idx); // full chain step: scatt
   2x2 is `[VV; HV]` (response to a V input) and column 1 is `[VH; HH]` (response to an H input).
   The labels are `<out><in>`: the first letter is the output (receive) polarisation, the second the input
   (transmit) polarisation, so rows 0-1 = (V out, V in), rows 2-3 = (H out, V in), rows 4-5 = (V out, H in),
-  rows 6-7 = (H out, H in). This is the row order of `polmat` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (rows = RX, columns = TX).
+  rows 6-7 = (H out, H in). This is the row order of `polmat` in [get_channels_spherical](channel-generators.md#get_channels_spherical) (rows = RX, columns = TX).
 - **Scalar mode**, 2 values per ray: `[Re Im]`.
 - The update is `M_out = M_update * M_state` (new interaction left-multiplies), consistent with
   `E_out = polmat * E_in` for column vectors and Armadillo/MATLAB column-major storage.
@@ -1025,7 +1132,7 @@ Commit the paths of a launch configuration that reach a receiver
 Not in: MATLAB, Python
 
 - Intersects the current beam set with the receive point cloud ([ray_point_intersect](#ray_point_intersect)) and appends one
-  [path](channel-functions.md#path) object to `paths_commit` for every ray-point pair that survives the gates below.
+  [path](#path) object to `paths_commit` for every ray-point pair that survives the gates below.
 - A pair is committed when the receiver is not shaded by the ray's own first-bounce face, the total path
   length stays below `max_path_length`, and the gain at `center_freq[0]` stays above `min_gain_dB`.
 - Shading is a half-space test against the plane of the first-bounce face: the receiver must lie on the
@@ -1072,7 +1179,7 @@ arma::uword quadriga_lib::ray_commit(
 ```
 
 ### Inputs:
-- **`paths`** — In-flight per-ray [path](channel-functions.md#path) objects; `[n_ray]`. Frequency count and layout define those of the committed paths; not modified
+- **`paths`** — In-flight per-ray [path](#path) objects; `[n_ray]`. Frequency count and layout define those of the committed paths; not modified
 - **`mesh`** — Faces of the triangular mesh; each row `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`. Only the
   faces named by `fbs_ind` are read, for the shading plane
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read));
@@ -1123,7 +1230,7 @@ arma::uword quadriga_lib::ray_commit(
 - [ray_progress](#ray_progress) (advance the launch configuration to the next generation)
 - [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_ind` and `point_ind`)
 - [calc_diffraction_gain](#calc_diffraction_gain) (covers the paths removed by `ignore_direct_path`)
-- [path](channel-functions.md#path) (the per-ray storage object)
+- [path](#path) (the per-ray storage object)
 
 ---
 <a id="ray_init"></a>
@@ -1176,7 +1283,7 @@ arma::uword ray_init(
 ### Inputs:
 - **`n_ray_target`** — Desired ray count; quantized to the nearest icosphere grid (see above)
 - **`n_freq`** — Number of frequency bins allocated per path in `paths`; must be ≥ 1 (throws if 0; the
-  [path](channel-functions.md#path) layout supports 1-127)
+  [path](#path) layout supports 1-127)
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
@@ -1204,7 +1311,7 @@ arma::uword ray_init(
   consumer can alias it as an `[n_ray, 3]` matrix without copying
 - **`acc_dist`** *(optional)* — Accumulated in-layer distance, zeroed; `[n_ray, 1 + n_freq]`; col 0 = geometric distance
   (frequency-independent, shared), col `1+f` = refracted distance at frequency `f`
-- **`paths`** *(optional)* — Per-ray [path](channel-functions.md#path) objects, one per ray; each reinitialized to 0 segments with `n_freq`
+- **`paths`** *(optional)* — Per-ray [path](#path) objects, one per ray; each reinitialized to 0 segments with `n_freq`
   frequency bins in the `scalar_mode` layout, and `length` seeded to `orig_length` (the `O`-to-origin offset);
   `n_ray` entries
 
@@ -1219,7 +1326,7 @@ arma::uword ray_init(
 - [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [ray_state_update](#ray_state_update) (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
 - [ray_commit](#ray_commit) (consumes the same `rx_points` when committing paths that reach a receiver)
-- [path](channel-functions.md#path) (the per-ray storage object populated in `paths`)
+- [path](#path) (the per-ray storage object populated in `paths`)
 
 ---
 <a id="ray_mesh_interact"></a>
@@ -1431,7 +1538,7 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
 
 Not in: MATLAB, Python
 
-- Consumes a launch configuration (origins, destinations, per-ray medium state, and [path](channel-functions.md#path) storage) and
+- Consumes a launch configuration (origins, destinations, per-ray medium state, and [path](#path) storage) and
   returns the next iteration: for every ray that hits the mesh, its reflected and/or transmitted
   continuation(s), plus the four sub-beams of any ray flagged for subdivision. Rays that miss, fall below
   `min_gain_dB`, or reach an interaction, reflection or transmission limit are terminated — unless they
@@ -1451,7 +1558,7 @@ Not in: MATLAB, Python
   function proceeds, so peak footprint stays close to one generation.
   Designed for `n_ray` up to ~10^8; the ray index is 32-bit, so `n_ray` is capped at 2^32-1.
 - Geometry is traced once, at the reference frequency `center_freq[0]`. For the remaining frequencies
-  only the polarization/gain coefficient is recomputed and folded into each [path](channel-functions.md#path); the per-frequency
+  only the polarization/gain coefficient is recomputed and folded into each [path](#path); the per-frequency
   refracted direction and in-medium distance are approximated by the reference-frequency values (see the
   note on `center_freq`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
@@ -1547,7 +1654,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   is the base-frequency geometry by construction; only the refracted length varies with frequency. Inside a
   medium both include the relaunch offset of the last event (a few float ulp of the coordinate, about 1 µm
   per metre), so the leg the next event measures from `orig` adds up to the leg from the hit point
-- **`paths`** — Per-ray [path](channel-functions.md#path) objects; `n_ray` entries. Frequency count and layout must match
+- **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Frequency count and layout must match
   `center_freq` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`. Must be supplied together with `tridir`; empty / NULL disables beam tracing
@@ -1570,7 +1677,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - [ray_state_update](#ray_state_update) (inside/outside state machine and thin-slab resolution)
 - [ray_subdivide_flag](#ray_subdivide_flag) (per-ray subdivision decision, delegated via `subdiv_flag_in`)
 - [subdivide_rays](#subdivide_rays) (adaptive beam-tube refinement)
-- [path](channel-functions.md#path) (per-ray storage object accumulated across generations)
+- [path](#path) (per-ray storage object accumulated across generations)
 
 ---
 <a id="ray_state_update"></a>
@@ -1774,7 +1881,7 @@ void quadriga_lib::ray_state_update(
    |  205 | 0xCD |  221 |   237   | refl, sheet, resolve, inside, ok | reflection off an isolated sheet, ray inside a medium       |
    |  199 | 0xC7 |  215 |   231   | refl, sheet, glued, resolve, ok | reflection off a glued sheet from the host side              |
    |  207 | 0xCF |  223 |   239   | refl, sheet, glued, resolve, inside, ok | reflection off a glued sheet from the solid side    |
-   |  193 | 0xC1 |    — |    —    | refl, scatter, ok               | point scatterer of a GBSM path ([qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers)); ray-traced scattering is not implemented |
+   |  193 | 0xC1 |    — |    —    | refl, scatter, ok               | point scatterer of a GBSM path ([qrt_paths_from_scatterers](channel-data-and-processing.md#qrt_paths_from_scatterers)); ray-traced scattering is not implemented |
 
    A stack of two different sheets is crossed as one event with the codes of a sheet; a singular stack kills the ray.
 
@@ -1826,7 +1933,7 @@ void quadriga_lib::ray_subdivide_flag(
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from [ray_triangle_intersect](#ray_triangle_intersect) for the same `orig` / `dest` pair
 - **`trivec`** — Beam wavefront triangle vertices relative to the ray origin; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
-- **`paths`** — Per-ray [path](channel-functions.md#path) objects; `n_ray` entries. Only the subdivision counter `n_sub` and the segment count are read
+- **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Only the subdivision counter `n_sub` and the segment count are read
 - **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
   never split: the sub-beams restart their in-layer accumulator and recompute their direction
   geometrically, which is only valid outside

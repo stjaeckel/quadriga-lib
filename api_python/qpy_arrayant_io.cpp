@@ -215,7 +215,7 @@ quadriga_lib.arrayant.export_pattern_obj( fn, arrayant, *, directivity_range_dB,
 
 ## See also:
 - [[calc_directivity]], [[calc_beamwidth]] (the same pattern as numbers)
-- [[channel.export_obj_file]] (exports propagation paths to an OBJ file)
+- [[export_channel_obj]] (exports propagation paths to an OBJ file)
 MD!*/
 
 void export_pattern_obj(const py::handle &fn,

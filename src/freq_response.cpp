@@ -14,25 +14,21 @@ static constexpr arma::uword qd_carrier_block = 1;
 #endif
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
-# baseband_freq_response
-Compute the baseband frequency response of a MIMO channel
+# freq_response
+Frequency response of a MIMO channel at the given subcarriers
 
-- Computes the frequency-domain channel matrix `H` at given sub-carrier positions via DFT over time-domain
-  path coefficients and delays
-- `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
-- `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
-- The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
-  before sin / cos are evaluated in single precision, so long (absolute) delays keep their accuracy; coefficients and
-  sums are single precision (both kernels); double inputs are narrowed to float internally, results widened back
-- Safe to call in a loop over snapshots and parallelize with OpenMP
+- The frequency response of one snapshot at the subcarriers $k$ (section description, "Frequency response"):
+  $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$ with the offset $f_k$ = `bandwidth` · `pilot_grid[k]` from the carrier
+- Vector form: one cube per snapshot; the snapshots are computed in parallel, `i_snap` selects them
+- For a multi-frequency channel and absolute carrier frequencies, use [[freq_response_mf]]
 
-## Declaration:
+## Declarations:
 ```
-void quadriga_lib::baseband_freq_response(
+void quadriga_lib::freq_response(
     const arma::Cube<dtype> &coeff_re,
     const arma::Cube<dtype> &coeff_im,
     const arma::Cube<dtype> &delay,
@@ -42,30 +38,53 @@ void quadriga_lib::baseband_freq_response(
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
     int use_kernel = 0);
+
+void quadriga_lib::freq_response(
+    const std::vector<arma::Cube<dtype>> &coeff_re,
+    const std::vector<arma::Cube<dtype>> &coeff_im,
+    const std::vector<arma::Cube<dtype>> &delay,
+    const arma::Col<dtype> &pilot_grid,
+    const double bandwidth,
+    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
+    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
+    const uint_list &i_snap = {},
+    int use_kernel = 0);
 ```
 
 ## Inputs:
-- **`coeff_re`** — Real part of time-domain channel coefficients; `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of time-domain channel coefficients; `[n_rx, n_tx, n_path]`
-- **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
-- **`bandwidth`** — Total baseband bandwidth
-- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path]`; vector form:
+  one cube per snapshot, `[n_snap]`, at least one
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`; vector form: one cube per snapshot
+- **`pilot_grid`** — Subcarrier positions relative to the bandwidth, finite: 0 = carrier, 1 = carrier + `bandwidth`;
+  `[n_carrier]`, at least one
+- **`bandwidth`** — Bandwidth in Hz, finite and >= 0
+- **`i_snap`** *(optional)* — Vector form: 0-based indices of the snapshots to compute, each below `n_snap`; omitted =
+  all; `[n_out]`
+- **`use_kernel`** *(optional)* — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2; throws if
+  unavailable
 
 ## Outputs:
-- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
-- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
-- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
+- **`hmat_re`** / **`hmat_im`** *(optional)* — Real and imaginary part of the frequency response;
+  `[n_rx, n_tx, n_carrier]`; vector form: one cube per selected snapshot, `[n_out]`
+- **`hmat`** *(optional)* — Complex frequency response; sizes as `hmat_re`
+
+## Notes:
+- Precision: the phase $f_k \tau_l$ in cycles is computed and reduced to one period in double precision, so long
+  (absolute) delays keep their accuracy; sin / cos, coefficients and sums are single precision in both kernels, also
+  for `dtype = double`
+- A snapshot without paths gives a zero frequency response
+- Vector form: the snapshots may differ in `n_rx`, `n_tx` and `n_path`; an error names the first failing snapshot, and
+  the outputs may then be partly written
 
 ## See also:
-- [[baseband_freq_response_vec]] (batched version)
-- [[baseband_freq_response_multi]] (multi-freq counterpart)
-- [[get_channels_planar]] (for generating coeff and delay)
-- [[get_channels_spherical]] (for generating coeff and delay)
+- [[freq_response_mf]] (multi-frequency channel, absolute carrier frequencies)
+- [[get_channels_spherical]] (coefficients and delays)
+- [[quantize_delays]] (delays on a tap grid, for time-domain processing)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> &coeff_re,     // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
+void quadriga_lib::freq_response(const arma::Cube<dtype> &coeff_re,     // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
                                           const arma::Cube<dtype> &coeff_im,     // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
                                           const arma::Cube<dtype> &delay,        // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
                                           const arma::Col<dtype> &pilot_grid,    // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
@@ -172,11 +191,11 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> &coeff_re,    
 
 }
 
-template void quadriga_lib::baseband_freq_response(const arma::Cube<float> &coeff_re, const arma::Cube<float> &coeff_im, const arma::Cube<float> &delay,
+template void quadriga_lib::freq_response(const arma::Cube<float> &coeff_re, const arma::Cube<float> &coeff_im, const arma::Cube<float> &delay,
                                                    const arma::Col<float> &pilot_grid, const double bandwidth,
                                                    arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im, arma::Cube<std::complex<float>> *hmat, int use_kernel);
 
-template void quadriga_lib::baseband_freq_response(const arma::Cube<double> &coeff_re, const arma::Cube<double> &coeff_im, const arma::Cube<double> &delay,
+template void quadriga_lib::freq_response(const arma::Cube<double> &coeff_re, const arma::Cube<double> &coeff_im, const arma::Cube<double> &delay,
                                                    const arma::Col<double> &pilot_grid, const double bandwidth,
                                                    arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat, int use_kernel);
 
@@ -189,55 +208,12 @@ static void qd_size_batch_output(std::vector<arma::Cube<T>> *out, size_t n_out)
         out->resize(n_out);
 }
 
-/*!MD
-# baseband_freq_response_vec
-Compute the baseband frequency response of multiple MIMO channels
-
-- Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
-- Each element of the input vectors is a cube of shape `[n_rx, n_tx, n_path]`; `delay` supports broadcasting to `[1, 1, n_path]`
-- Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
-- The snapshots are checked by [[baseband_freq_response]]; an error names the lowest failing snapshot (`"Snapshot <i>: "`), and the outputs may then be partly written
-- Same arithmetic as [[baseband_freq_response]]: phase in double precision, sin / cos and sums in single precision
-
-## Declaration:
-```
-void quadriga_lib::baseband_freq_response_vec(
-    const std::vector<arma::Cube<dtype>> &coeff_re,
-    const std::vector<arma::Cube<dtype>> &coeff_im,
-    const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &pilot_grid,
-    const double bandwidth,
-    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
-    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
-    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    const uint_list &i_snap = {},
-    int use_kernel = 0);
-```
-
-## Inputs:
-- **`coeff_re`** — Real part of time-domain channel coefficients, vector of `n_snap` cubes `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of time-domain channel coefficients, same structure as `coeff_re`
-- **`delay`** — Path delays in seconds, same structure as `coeff_re`; each cube broadcastable to `[1, 1, n_path]`
-- **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
-- **`bandwidth`** — Total baseband bandwidth
-- **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** *(optional)* — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
-
-## Outputs:
-- **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
-- **`hmat_im`** *(optional)* — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
-- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrices, same structure as `hmat_re`
-
-## See also:
-- [[baseband_freq_response]] (single-snapshot variant)
-- [[baseband_freq_response_multi_vec]] (multi-freq counterpart)
-MD!*/
 
 template <typename dtype>
-void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> &coeff_re, const std::vector<arma::Cube<dtype>> &coeff_im,
-                                              const std::vector<arma::Cube<dtype>> &delay, const arma::Col<dtype> &pilot_grid, const double bandwidth,
-                                              std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
-                                              std::vector<arma::Cube<std::complex<dtype>>> *hmat, const uint_list &i_snap_in, int use_kernel)
+void quadriga_lib::freq_response(const std::vector<arma::Cube<dtype>> &coeff_re, const std::vector<arma::Cube<dtype>> &coeff_im,
+                                 const std::vector<arma::Cube<dtype>> &delay, const arma::Col<dtype> &pilot_grid, const double bandwidth,
+                                 std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
+                                 std::vector<arma::Cube<std::complex<dtype>>> *hmat, const uint_list &i_snap_in, int use_kernel)
 {
     const arma::uvec &i_snap = i_snap_in.vec();
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
@@ -266,37 +242,38 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
     const arma::uword n_elem = snap.n_elem * coeff_re[snap[0]].n_rows * coeff_re[snap[0]].n_cols * pilot_grid.n_elem;
     qd_batch_loop(snap.n_elem, snap.n_elem > 1 && n_elem >= 1024, "Snapshot", [&](size_t i)
                   { const arma::uword s = snap[i];
-                    quadriga_lib::baseband_freq_response<dtype>(coeff_re[s], coeff_im[s], delay[s], pilot_grid, bandwidth,
+                    quadriga_lib::freq_response<dtype>(coeff_re[s], coeff_im[s], delay[s], pilot_grid, bandwidth,
                                                                 hmat_re ? &(*hmat_re)[i] : nullptr, hmat_im ? &(*hmat_im)[i] : nullptr,
                                                                 hmat ? &(*hmat)[i] : nullptr, use_kernel); }, &snap);
 }
 
-template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
-                                                       const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &pilot_grid, const double bandwidth,
-                                                       std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
-                                                       std::vector<arma::Cube<std::complex<float>>> *hmat, const uint_list &i_snap, int use_kernel);
+template void quadriga_lib::freq_response(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
+                                          const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &pilot_grid, const double bandwidth,
+                                          std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
+                                          std::vector<arma::Cube<std::complex<float>>> *hmat, const uint_list &i_snap, int use_kernel);
 
-template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
-                                                       const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &pilot_grid, const double bandwidth,
-                                                       std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
-                                                       std::vector<arma::Cube<std::complex<double>>> *hmat, const uint_list &i_snap, int use_kernel);
+template void quadriga_lib::freq_response(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
+                                          const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &pilot_grid, const double bandwidth,
+                                          std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
+                                          std::vector<arma::Cube<std::complex<double>>> *hmat, const uint_list &i_snap, int use_kernel);
 
 /*!MD
-# baseband_freq_response_multi
-Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
+# freq_response_mf
+Frequency response of a MIMO channel from coefficients sampled at several frequencies
 
-- Interpolates complex channel coefficients from a coarse input frequency grid (`freq`) to a dense
-  output grid (`freq_new`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
-- Applies delay-induced phase rotation `exp(-j·2·pi·freq_new·delay)` per output carrier in double
-  precision to preserve accuracy at high carrier frequencies
-- Only `delay[0]` is used; all entries in the `delay` vector should be identical
-  (path geometry is frequency-independent)
-- `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
-- Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
+- The frequency response of one snapshot of a multi-frequency channel at the absolute carrier frequencies
+  $f_k$ = `freq_new[k]`: the coefficients of each path are interpolated from the input frequencies `freq` to $f_k$
+  and the delay phase is applied there, $H_k = \sum_l \tilde a_l(f_k) \, e^{-j 2\pi f_k \tau_l}$
+- Interpolation between the two neighbouring input frequencies: amplitude linear, phase along the shorter arc
+  ([[fast_slerp]]); constant outside the range of `freq`
+- `remove_delay_phase = true` interpolates the envelope $a_l(f_i) \, e^{j 2\pi f_i \tau_l}$ instead of $a_l(f_i)$, so
+  that the delay phase the channel generators include is not interpolated
+- Vector form: one vector per snapshot, indexed `[snapshot][input frequency]`; the snapshots are computed in parallel,
+  `i_snap` selects them
 
-## Declaration:
+## Declarations:
 ```
-void quadriga_lib::baseband_freq_response_multi(
+void quadriga_lib::freq_response_mf(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
@@ -307,36 +284,62 @@ void quadriga_lib::baseband_freq_response_multi(
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
     bool remove_delay_phase = true,
     int use_kernel = 0);
+
+void quadriga_lib::freq_response_mf(
+    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
+    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
+    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
+    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
+    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
+    bool remove_delay_phase = true,
+    const uint_list &i_snap = {},
+    int use_kernel = 0);
 ```
 
 ## Inputs:
-- **`coeff_re`** — Real part of channel coefficients at each input frequency, vector of `n_freq` cubes `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of channel coefficients at each input frequency, same structure as `coeff_re`
-- **`delay`** — Path delays in seconds, vector of `n_freq` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`freq`** — Input sample frequencies, sorted ascending; `[n_freq]`
-- **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq[f]·delay)` before SLERP and re-applies
-  analytically at output frequencies; must be `true` for output from [[get_channels_multifreq]] or
-  [[get_channels_spherical]], `false` for pure envelope coefficients. These channels must be generated with
-  `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also when `delay` holds
-  relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
-  across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
-  below `c / (TX-RX distance)`
-- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients, one cube per input frequency, all of
+  one size; `[n_freq]` cubes `[n_rx, n_tx, n_path]`, `n_rx` and `n_tx` >= 1; vector form: one such vector per
+  snapshot, `[n_snap]`, at least one
+- **`delay`** — Delays in s, one cube per input frequency, `[n_freq]`; only `delay[0]` is used, `[n_rx, n_tx, n_path]`
+  or `[1, 1, n_path]`, the others may be empty; vector form: one such vector per snapshot
+- **`freq`** — Input frequencies in Hz, finite, strictly ascending; `[n_freq]`, at least one
+- **`freq_new`** — Output carrier frequencies in Hz, finite; `[n_carrier]`, at least one
+- **`remove_delay_phase`** *(optional)* — Remove the delay phase from the coefficients before the interpolation:
+  `true` for the coefficients of [[get_channels_multifreq]] and [[get_channels_spherical]], `false` for coefficients
+  without delay phase
+- **`i_snap`** *(optional)* — Vector form: 0-based indices of the snapshots to compute, each below `n_snap`; omitted =
+  all; `[n_out]`
+- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: 0 = auto (AVX2 if available, else
+  GENERIC), 1 = GENERIC, 2 = AVX2; throws if unavailable
 
 ## Outputs:
-- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
-- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
-- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
+- **`hmat_re`** / **`hmat_im`** *(optional)* — Real and imaginary part of the frequency response;
+  `[n_rx, n_tx, n_carrier]`; vector form: one cube per selected snapshot, `[n_out]`
+- **`hmat`** *(optional)* — Complex frequency response; sizes as `hmat_re`
+
+## Notes:
+- With `remove_delay_phase = true`, generate the channels with `use_absolute_delays = true`: their coefficients carry
+  the phase of the absolute path length also when `delay` holds relative delays. With relative delays the phase of
+  the Tx-Rx distance stays in the coefficients and is interpolated across `freq`, which gives wrong phases (the
+  magnitudes stay right) unless the spacing of `freq` is far below $c$ / (Tx-Rx distance)
+- One input frequency: the coefficients apply at all carriers; with `remove_delay_phase = true` the result is that of
+  [[freq_response]] with `bandwidth` · `pilot_grid` = `freq_new - freq`
+- Precision: the delay phase is reduced to one period in double precision (and removed in double precision with
+  `remove_delay_phase`); sin / cos of the output phase and the interpolation are single
+  precision, the sums double precision
+- A snapshot without paths gives a zero frequency response
+- Vector form: an error names the first failing snapshot, and the outputs may then be partly written
 
 ## See also:
-- [[baseband_freq_response]] (single-snapshot narrowband version)
-- [[baseband_freq_response_multi_vec]] (batched version)
-- [[get_channels_multifreq]] (produces the multi-frequency input coefficients)
+- [[freq_response]] (single-frequency coefficients, carriers relative to the bandwidth)
+- [[get_channels_multifreq]] (multi-frequency channel)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re, // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
+void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<dtype>> &coeff_re, // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
                                                 const std::vector<arma::Cube<dtype>> &coeff_im, // Imag part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
                                                 const std::vector<arma::Cube<dtype>> &delay,    // Delays [s], length [n_freq], each [n_rx, n_tx, n_path] or [1, 1, n_path]
                                                 const arma::Col<dtype> &freq,                   // Input sample frequencies [Hz], length [n_freq]
@@ -659,70 +662,24 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     }
 }
 
-template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
+template void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
                                                          const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &freq,
                                                          const arma::Col<float> &freq_new, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
                                                          arma::Cube<std::complex<float>> *hmat, bool remove_delay_phase, int use_kernel);
 
-template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
+template void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
                                                          const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq,
                                                          const arma::Col<double> &freq_new, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
                                                          arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase, int use_kernel);
-/*!MD
-# baseband_freq_response_multi_vec
-Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients
-
-- Batch wrapper around [[baseband_freq_response_multi]], applying it across snapshots in parallel via OpenMP
-- Inputs are indexed `[snapshot][input frequency]`: `coeff_re[s][f]` is the cube of snapshot `s` at `freq[f]`
-- `freq` and `freq_new` are shared by all snapshots; only `delay[s][0]` is used, the other entries may be empty
-- Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
-- The snapshots are checked by [[baseband_freq_response_multi]]; an error names the lowest failing snapshot (`"Snapshot <i>: "`), and the outputs may then be partly written
-
-## Declaration:
-```
-void quadriga_lib::baseband_freq_response_multi_vec(
-    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
-    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
-    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
-    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
-    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
-    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
-    bool remove_delay_phase = true,
-    const uint_list &i_snap = {},
-    int use_kernel = 0);
-```
-
-## Inputs:
-- **`coeff_re`** — Real part of channel coefficients, `n_snap` vectors of `n_freq` cubes `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of channel coefficients, same structure as `coeff_re`
-- **`delay`** — Path delays in seconds, `n_snap` vectors of `n_freq` cubes; entry `0` of each has shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`freq`** — Input sample frequencies, sorted ascending; `[n_freq]`
-- **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — As in [[baseband_freq_response_multi]]; default `true`
-- **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
-- **`use_kernel`** *(optional)* — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable
-
-## Outputs:
-- **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carrier]`
-- **`hmat_im`** *(optional)* — Imaginary part, same structure as `hmat_re`
-- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrices, same structure as `hmat_re`
-
-## See also:
-- [[baseband_freq_response_multi]] (single-snapshot variant)
-- [[baseband_freq_response_vec]] (single-freq counterpart)
-- [[get_channels_multifreq]] (produces the multi-frequency input coefficients)
-MD!*/
 
 template <typename dtype>
-void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
-                                                    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
-                                                    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
-                                                    const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
-                                                    std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
-                                                    std::vector<arma::Cube<std::complex<dtype>>> *hmat,
-                                                    bool remove_delay_phase, const uint_list &i_snap_in, int use_kernel)
+void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
+                                    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
+                                    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
+                                    const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
+                                    std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
+                                    std::vector<arma::Cube<std::complex<dtype>>> *hmat,
+                                    bool remove_delay_phase, const uint_list &i_snap_in, int use_kernel)
 {
     const arma::uvec &i_snap = i_snap_in.vec();
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
@@ -755,23 +712,23 @@ void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vecto
     const arma::uword n_elem = first.empty() ? 0 : snap.n_elem * first[0].n_rows * first[0].n_cols * freq_new.n_elem;
     qd_batch_loop(snap.n_elem, snap.n_elem > 1 && n_elem >= 1024, "Snapshot", [&](size_t i)
                   { const arma::uword s = snap[i];
-                    quadriga_lib::baseband_freq_response_multi<dtype>(coeff_re[s], coeff_im[s], delay[s], freq, freq_new,
+                    quadriga_lib::freq_response_mf<dtype>(coeff_re[s], coeff_im[s], delay[s], freq, freq_new,
                                                                       hmat_re ? &(*hmat_re)[i] : nullptr, hmat_im ? &(*hmat_im)[i] : nullptr,
                                                                       hmat ? &(*hmat)[i] : nullptr, remove_delay_phase, use_kernel); }, &snap);
 }
 
-template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<float>>> &coeff_re,
-                                                             const std::vector<std::vector<arma::Cube<float>>> &coeff_im,
-                                                             const std::vector<std::vector<arma::Cube<float>>> &delay,
-                                                             const arma::Col<float> &freq, const arma::Col<float> &freq_new,
-                                                             std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
-                                                             std::vector<arma::Cube<std::complex<float>>> *hmat,
-                                                             bool remove_delay_phase, const uint_list &i_snap, int use_kernel);
+template void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<float>>> &coeff_re,
+                                             const std::vector<std::vector<arma::Cube<float>>> &coeff_im,
+                                             const std::vector<std::vector<arma::Cube<float>>> &delay,
+                                             const arma::Col<float> &freq, const arma::Col<float> &freq_new,
+                                             std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
+                                             std::vector<arma::Cube<std::complex<float>>> *hmat,
+                                             bool remove_delay_phase, const uint_list &i_snap, int use_kernel);
 
-template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<double>>> &coeff_re,
-                                                             const std::vector<std::vector<arma::Cube<double>>> &coeff_im,
-                                                             const std::vector<std::vector<arma::Cube<double>>> &delay,
-                                                             const arma::Col<double> &freq, const arma::Col<double> &freq_new,
-                                                             std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
-                                                             std::vector<arma::Cube<std::complex<double>>> *hmat,
-                                                             bool remove_delay_phase, const uint_list &i_snap, int use_kernel);
+template void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<double>>> &coeff_re,
+                                             const std::vector<std::vector<arma::Cube<double>>> &coeff_im,
+                                             const std::vector<std::vector<arma::Cube<double>>> &delay,
+                                             const arma::Col<double> &freq, const arma::Col<double> &freq_new,
+                                             std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
+                                             std::vector<arma::Cube<std::complex<double>>> *hmat,
+                                             bool remove_delay_phase, const uint_list &i_snap, int use_kernel);

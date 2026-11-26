@@ -8,52 +8,49 @@
 #include "qd_helpers_shared.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
-# BASEBAND_FREQ_RESPONSE
-Compute the baseband frequency response of a MIMO channel
+# FREQ_RESPONSE
+Frequency response of a MIMO channel at the given subcarriers
 
-- Computes the frequency-domain channel matrix at the carrier positions `pilot_grid` by a DFT over the time-domain
-  path coefficients and delays
-- One snapshot is a 3D array; a batch of snapshots is a cell array of such arrays (`coeff_re`, `coeff_im` and `delay`
-  cell arrays of the same length), processed in parallel; the number of paths may differ between snapshots
-- A channel struct (e.g. from [[hdf5_read_channel]]) holds its snapshots on the 4th dimension, zero-padded;
+- The frequency response of one snapshot at the subcarriers $k$: $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$ with the
+  offset $f_k$ = `bandwidth` · `pilot_grid(k)` from the carrier
+- One snapshot is a 3D array; several snapshots are cell arrays with one array per snapshot (`coeff_re`,
+  `coeff_im` and `delay` of the same length), computed in parallel; the number of paths may differ between them
+- A channel struct of [[hdf5_read_channel]] holds the snapshots on the 4th dimension, zero-padded;
   `num2cell(ch.coeff_re, [1 2 3])`, and the same for `coeff_im` and `delay`, gives the cell arrays (the zero-padded
   paths do not change the result)
-- Multi-frequency coefficients (e.g. from [[get_channels_multifreq]]) and absolute carrier frequencies are handled by
-  [[baseband_freq_response_multi]]; the two functions take different arguments, so they are two functions, while
-  [[interpolate_pattern]] serves both of its cases with one argument set
-- `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
-- The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
-  before sin / cos are evaluated in single precision; coefficients and sums are single precision; double inputs are
-  narrowed to float internally, results widened back
+- For a multi-frequency channel and absolute carrier frequencies, use [[freq_response_mf]]
+- Precision: the phase is reduced to one period in double precision; sin / cos, coefficients and sums are single
+  precision
 
 ## Usage:
 ```
-[ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, pilot_grid, bandwidth, ...
+[ hmat_re, hmat_im ] = quadriga_lib.freq_response( coeff_re, coeff_im, delay, pilot_grid, bandwidth, ...
     i_snap, use_kernel );
 ```
 
 ## Inputs:
-- **`coeff_re`** — Real part of the channel coefficients; `[n_rx, n_tx, n_path]`, or a cell array of length `n_snap`
-  with one such array per snapshot
-- **`coeff_im`** — Imaginary part of the channel coefficients; same layout as `coeff_re`
-- **`delay`** — Path delays in seconds; same layout as `coeff_re`, each array `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`pilot_grid`** — Sub-carrier positions relative to the bandwidth, `0.0` = carrier, `1.0` = carrier + `bandwidth`;
+- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path]`, or cell arrays
+  of length `n_snap` with one such array per snapshot
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`, or a cell array as `coeff_re`
+- **`pilot_grid`** — Subcarrier positions relative to the bandwidth, finite: 0 = carrier, 1 = carrier + `bandwidth`;
   `[n_carrier, 1]`
-- **`bandwidth`** — Baseband bandwidth in Hz
-- **`i_snap`** — Snapshots to process, 1-based; `[n_out, 1]`; default: `[]` (all snapshots)
-- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
+- **`bandwidth`** — Bandwidth in Hz, finite and >= 0
+- **`i_snap`** — 1-based indices of the snapshots to compute; `[n_out, 1]`; default: `[]` (all snapshots)
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable);
+  default: 0
 
 ## Outputs:
-- **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier, n_out]`
-- **`hmat_im`** — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier, n_out]`
+- **`hmat_re`** / **`hmat_im`** — Real and imaginary part of the frequency response; `[n_rx, n_tx, n_carrier, n_out]`;
+  the selected snapshots must have equal `n_rx` and `n_tx`
 
 ## See also:
-- [[baseband_freq_response_multi]] (multi-frequency coefficients, absolute carrier frequencies)
-- [[get_channels_spherical]] (single-frequency channel generator)
+- [[freq_response_mf]] (multi-frequency channel, absolute carrier frequencies)
+- [[get_channels_spherical]] (coefficients and delays)
+- [[quantize_delays]] (delays on a tap grid, for time-domain processing)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -103,7 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&hmat_im, n_rx, n_tx, pilot_grid.n_elem, snap.n_elem);
 
-    CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(coeff_re, coeff_im, delay, pilot_grid, bandwidth,
-                                                             &hmat_re, (nlhs > 1) ? &hmat_im : nullptr, nullptr,
-                                                             i_snap, use_kernel));
+    CALL_QD(quadriga_lib::freq_response<double>(coeff_re, coeff_im, delay, pilot_grid, bandwidth,
+                                                &hmat_re, (nlhs > 1) ? &hmat_im : nullptr, nullptr,
+                                                i_snap, use_kernel));
 }

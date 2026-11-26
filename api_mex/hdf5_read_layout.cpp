@@ -7,17 +7,16 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_READ_LAYOUT
-Read the storage layout of channel data inside an HDF5 file
+Read the storage layout of an HDF5 channel file
 
-- Returns the dimensions of the 4D channel slot grid stored inside an HDF5 file
-- Returns `[0, 0, 0, 0]` if the file does not exist; errors if the file exists but is not a
-  quadriga-lib channel file
-- Also reports which slots already contain data, so callers can locate free slots without scanning the file
+- Returns the dimensions of the slot grid and, optionally, the slots that hold data
+- A missing file gives `[0, 0, 0, 0]`, so the function also tests whether a file exists; a file that is not a channel
+  file raises an error
 
 ## Usage:
 ```
@@ -25,15 +24,15 @@ Read the storage layout of channel data inside an HDF5 file
 ```
 
 ## Input:
-- **`fn`** — Filename of the HDF5 file; string
+- **`fn`** — File name
 
 ## Outputs:
-- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; uint32; `[1, 4]`
-- **`has_data`** — Slot occupancy mask; `true` where data exists, `false` otherwise; `[nx, ny, nz, nw]`; logical
+- **`storage_dims`** — Layout `[nx, ny, nz, nw]`; uint32; `[1, 4]`
+- **`has_data`** — `true` for the slots that were written, also with an empty channel; logical; `[nx, ny, nz, nw]`, empty for a missing file
 
 ## See also:
-- [[hdf5_create_file]] (for creating a file with a custom storage layout)
-- [[hdf5_reshape_layout]] (to change the layout later)
+- [[hdf5_create_file]] (creates a file with a given layout)
+- [[hdf5_reshape_layout]] (changes the dimensions)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

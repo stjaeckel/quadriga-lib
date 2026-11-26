@@ -7,25 +7,21 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_WRITE_DSET
-Write a single unstructured dataset to an HDF5 file
+Write an unstructured dataset to a slot of an HDF5 channel file
 
-- Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
-- `name` must not be empty and must contain only alphanumeric characters and underscores
-- Creates the file with the layout `[ix, iy, iz, iw]` if it does not exist; use [[hdf5_create_file]] for another
-  layout
-- A dataset of the same name at the same slot is not overwritten; an error is thrown instead
-- The dataset is added to the slot; everything else stored there is kept. A later [[hdf5_write_channel]] to the
-  same slot replaces the slot completely, including the datasets written with this function
-- Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element
-  types: single, double, int32, uint32, int64, uint64
-- Arrays with more than 3 dimensions, sparse and complex arrays are rejected
-- Row vectors are stored as given (`[1, n]`)
-- One writer per file at a time; files are not locked
+- Adds the dataset `prefix + name` to slot `(ix, iy, iz, iw)`; everything else stored in the slot stays. An empty
+  slot gets a channel without structured data
+- A missing file is created with the layout `[ix, iy, iz, iw]`; [[hdf5_create_file]] sets another layout
+- A dataset is written once: a dataset of the same name in the slot raises an error. A later [[hdf5_write_channel]] to
+  the slot removes it with the rest of the slot
+- Invalid names and types raise an error before the file is changed
+- [[hdf5_read_channel]] returns the datasets with the prefix `par_` as the unstructured data `par`; [[hdf5_read_dset]]
+  reads each one back
 
 ## Usage:
 ```
@@ -33,18 +29,19 @@ quadriga_lib.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix );
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; string
-- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; string
-- **`data`** — Data to be written; type must be supported (see above); cannot be empty
-- **`ix`** — 1-based slot index along dimension X; scalar; default: 1
-- **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
-- **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
-- **`iw`** — 1-based slot index along dimension W; scalar; default: 1
-- **`prefix`** — Prefix prepended to `name` in the HDF5 file; string; `''` stores `name` without a prefix; default (omitted or `[]`): `'par_'`
+- **`fn`** — File name
+- **`name`** — Dataset name without the prefix, not empty; `prefix + name` holds only letters, digits and `_`, at
+  most 65000 characters
+- **`data`** — Not empty: a char array (string), or a real, non-sparse single, double, int32, uint32, int64 or uint64
+  array with at most 3 dimensions. A scalar is stored as a scalar, a column vector as a vector, a row vector as a
+  `[1, n]` matrix
+- **`ix`**, **`iy`**, **`iz`**, **`iw`** — Slot index along x, y, z and w, 1-based; inside the layout of an
+  existing file; default: 1
+- **`prefix`** — Prefix of the dataset name; `''` stores `name` without a prefix; default: `'par_'`
 
 ## See also:
-- [[hdf5_read_dset_names]] (for reading names of already written datasets)
-- [[hdf5_read_dset]] (for reading individual unstructured datasets)
+- [[hdf5_read_dset]] (reads a dataset by name)
+- [[hdf5_read_dset_names]] (lists the datasets of a slot)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

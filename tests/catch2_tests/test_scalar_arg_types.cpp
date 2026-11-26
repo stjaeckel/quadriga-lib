@@ -51,14 +51,14 @@ static void calls_with_literals()
     quadriga_lib::arrayant<double> ad = quadriga_lib::generate_antenna("omni", 10); // dtype defaults to double
 
     // quadriga_channel.hpp
-    quadriga_lib::channel_export_obj_file("a.obj", c, 0, -60, -140, "jet", ui, 0.05, 0.01);
+    quadriga_lib::export_channel_obj("a.obj", c, 0, -60, -140, "jet", ui, 0.05, 0.01);
     quadriga_lib::quantize_delays(vc, vc, vc, vc2, vc3, vc4, 5e-9, 48, 1);
     quadriga_lib::get_channels_spherical(a, a, m, m, m, m, m, m, col, col, m, cu, cu2, cu3, 3.5e9);
-    quadriga_lib::get_channels_spherical_vec(a, a, m, m, m, m, vm, vm, vcol, vcol, vm, vc, vc2, vc3, 3.5e9);
+    quadriga_lib::get_channels_spherical(a, a, m, m, m, m, vm, vm, vcol, vcol, vm, vc, vc2, vc3, 3.5e9);
     quadriga_lib::get_channels_multifreq(av, av, m, m, m, m, m, m, m, col, cu, col, col, vc, vc2, vc3, false, false, 343);
     quadriga_lib::get_channels_irs(a, a, a, m, m, m, m, m, m, m, m, col, col, m, m, m, col, col, m, cu, cu2, cu3, 0, -140, 3.5e9);
     quadriga_lib::get_channels_planar(a, a, m, m, m, m, col, col, col, col, col, col, m, cu, cu2, cu3, 3.5e9);
-    quadriga_lib::get_channels_planar_vec(a, a, m, m, m, m, vcol, vcol, vcol, vcol, vcol, vcol, vm, vc, vc2, vc3, 3.5e9);
+    quadriga_lib::get_channels_planar(a, a, m, m, m, m, vcol, vcol, vcol, vcol, vcol, vcol, vm, vc, vc2, vc3, 3.5e9);
 
     // quadriga_sos.hpp
     m = quadriga_lib::sos_preset<T>("exponential", &col, &col, 10);
@@ -70,7 +70,7 @@ static void calls_with_literals()
     col = quadriga_lib::calc_delay_spread(vcol, vcol, 100, 0);
     quadriga_lib::calc_angular_spread(vcol, vcol, vcol, &col, &col, &m, &vcol, &vcol, false, false, 1);
     quadriga_lib::calc_rician_k_factor(vcol, vcol, m, m, &col, &col, 0.01);
-    quadriga_lib::calc_cross_polarization_ratio(vcol, vm, vcol, m, m, &m2, &col, false, 0.01);
+    quadriga_lib::calc_xpr(vcol, vm, vcol, m, m, &m2, &col, false, 0.01);
     quadriga_lib::calc_diffraction_gain(m, m, m, ui, prop, 3.5e9);
     quadriga_lib::generate_diffraction_paths(m, m, 3.5e9, 2, cu, cu2, cu3, cu4);
     quadriga_lib::icosphere(2, 1, m);

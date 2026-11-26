@@ -5,42 +5,26 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Channel generation functions
+Channel generators
 SECTION!*/
 
 /*!MD
 # GET_CHANNELS_PLANAR
-Calculate MIMO channel coefficients for planar wave paths
+Calculate MIMO channel coefficients and delays for planar wave propagation
 
-- Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
-- Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
-- LOS path detection is distance-based (angles ignored).
-- Polarization transfer matrix `polmat` must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H,
-  columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
-  rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
-- `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- If `add_fake_los_path` is true, one output path is always added (output size `n_path+1`): slot 1 holds the LOS path,
-  with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
-  distance; it is moved to slot 1 and its original slot (input index + 1) holds a zero-power path. All other paths
-  keep their order, shifted by one slot.
-- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
-  hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
-- `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
-  lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
-  centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
-  delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
-  `use_absolute_delays = true` in that case.
+- Coefficients and delays of one link for each pair of a Tx and an Rx port and each path; a path is given by its
+  departure and arrival angles, which all elements of an array share (planar wavefronts)
+- Path $l$ of the element pair $(t, r)$ has the coefficient and delay
 
-## Batch mode:
-- If `aod` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP).
-- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `polmat` are then cell arrays of length
-  `n_snap`.
-- The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
-  snapshots.
-- All outputs are cell arrays of length `n_snap`, `[n_snap, 1]`, whose entries have the shapes given below.
-- Snapshots without any path produce an empty entry, or only the zero-power LOS path with `add_fake_los_path` (as for
-  a single snapshot).
+  $$a_l = \sqrt{g_l} \; \mathbf{F}_r^T \mathbf{M}_l \, \mathbf{F}_t \; e^{-j 2\pi f_c d / c}, \quad \tau_l = d / c, \quad d = \ell_l + d_t + d_r$$
+
+  with the path gain $g_l$, the Jones matrix $\mathbf{M}_l$ (`polmat`), the patterns $\mathbf{F} = (F_\theta, F_\phi)^T$
+  at the path angles, the path length $\ell_l$ between the phase centres (used as given), the distances $d_t$, $d_r$ of
+  the elements from the wavefront planes through the phase centres (`dist` of [[interpolate_pattern]]), the center
+  frequency $f_c$ and the speed of light $c$; the port weights then combine the elements into ports
+- The positions enter only through the Tx-Rx distance (relative delays, LOS path)
+- Vector form: with cell arrays as path inputs, one cell per snapshot, the outputs are cell arrays; the snapshots are
+  computed in parallel
 
 ## Usage:
 ```
@@ -50,41 +34,54 @@ Calculate MIMO channel coefficients for planar wave paths
 ```
 
 ## Inputs:
-- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports, see [[generate_antenna]]
-- **`rx_array`** — Receive antenna array; `n_rx` = number of ports, see [[generate_antenna]]
-- **`tx_pos`** — Transmitter position; `[3, 1]`, or `[3, n_snap]` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
-  batch mode
-- **`rx_pos`** — Receiver position; `[3, 1]`, or `[3, n_snap]` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
-  batch mode
-- **`aod`** — Departure azimuth angles; rad; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
-- **`eod`** — Departure elevation angles; rad; `[n_path, 1]`, or a cell in batch mode
-- **`aoa`** — Arrival azimuth angles; rad; `[n_path, 1]`, or a cell in batch mode
-- **`eoa`** — Arrival elevation angles; rad; `[n_path, 1]`, or a cell in batch mode
-- **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell in batch mode
-- **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
-- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
-- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
-- **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
-- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]]; default: 0
-
+- **`tx_array`**, **`rx_array`** — Tx and Rx array, struct, fields in [[generate_antenna]]; `n_tx` and `n_rx` ports
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in m, finite; 3 elements; vector form: 3 elements (all snapshots) or
+  `[3, n_snap]`
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientation, Euler angles (bank, tilt, heading) in rad,
+  finite; sizes as `tx_pos`
+- **`aod`**, **`eod`** — Azimuth and elevation of departure in rad, GCS; `[n_path, 1]`; vector form: cell arrays with
+  `n_snap` entries
+- **`aoa`**, **`eoa`** — Azimuth and elevation of arrival in rad, GCS (the direction from the Rx toward the incoming
+  path); `[n_path, 1]`; vector form: cell arrays
+- **`path_gain`** — Path gains, linear power; `[n_path, 1]`; vector form: cell array
+- **`path_length`** — Path lengths in m between the Tx and Rx phase centres; `[n_path, 1]`; vector form: cell array
+- **`polmat`** — Jones matrices, real and imaginary parts interleaved (section description); `[8, n_path]`; vector
+  form: cell array
+- **`center_freq`** — Center frequency in Hz, finite and >= 0; 0 gives the coefficients at f = 0 (Notes); default: 0
+- **`use_absolute_delays`** — Keep the delay of the Tx-Rx distance in all delays; `false`: delays relative to it
+  (Notes); default: `false`
+- **`add_fake_los_path`** — Put the LOS path into an added slot 1, with zero power if there is none (Notes); default:
+  `false`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto (GENERIC in this version), 1 = GENERIC, 2 = AVX2
+  (single-precision arithmetic; error if unavailable); default: 0
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`
-- **`rx_Doppler`** — Doppler weights for moving RX; positive = moving toward path, negative = away; `[1, n_path(+1)]`
+- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
+  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
+- **`rx_Doppler`** — Doppler weight of each path for an Rx moving along its local x-axis: the cosine of the angle
+  between this axis and the arrival direction; the Doppler shift at the speed $v$ is $v f_c / c$ times this weight,
+  positive when the Rx moves toward the incoming path; `[1, n_out]`
+
+## Notes:
+- **LOS path** (only with `add_fake_los_path`): the strongest path whose `path_length` is within 0.1 mm of the Tx-Rx
+  distance; the angles are not checked
+- **`add_fake_los_path`**: slot 1 holds the LOS path, with zero power (and `rx_Doppler` 0) if there is none; a LOS path
+  among the inputs moves to slot 1 and leaves a zero-power path in its own slot (input index + 1); the other paths
+  keep their order
+- **0 paths** (all path inputs empty): outputs `[n_rx, n_tx, 0]`, or only the zero-power LOS path with
+  `add_fake_los_path`
+- **Relative delays**: the delay of the Tx-Rx distance is subtracted from all delays; element pairs can then get
+  negative delays, as in [[get_channels_spherical]]
+- **`center_freq = 0`**: the delay phase is 1, the antenna and polarization phases remain; the delays are unchanged
+- **Port weights**: the delays of a port pair are means over its element pairs, weighted by the port-weight powers
+- **Vector form**: as in [[get_channels_spherical]]
 
 ## See also:
-- [[get_channels_spherical]] (spherical wave variant accounting for per-element angle differences)
-- [[get_channels_ieee_indoor]] (for generating IEEE compliant channels using `get_channels_planar` internally)
-- [[generate_antenna]] (antenna array generator)
-- [[baseband_freq_response]] (for calculating the frequency response)
-- [[quantize_delays]] (for mapping delays to a fixed grid)
+- [[get_channels_spherical]] (paths given by scatterers, spherical wavefronts)
+- [[get_channels_ieee_indoor]] (IEEE indoor channels, computed with this function)
+- [[freq_response]] (frequency response of the coefficients)
+- [[quantize_delays]] (delays on a tap grid)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -144,10 +141,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             }
         }
 
-        CALL_QD(quadriga_lib::get_channels_planar_vec<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                              aod, eod, aoa, eoa, path_gain, path_length, polmat,
-                                                              out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
-                                                              (nlhs > 3) ? &rx_Doppler : nullptr, nullptr, use_kernel));
+        CALL_QD(quadriga_lib::get_channels_planar<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
+                                                          aod, eod, aoa, eoa, path_gain, path_length, polmat,
+                                                          out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
+                                                          (nlhs > 3) ? &rx_Doppler : nullptr, nullptr, use_kernel));
         return;
     }
 

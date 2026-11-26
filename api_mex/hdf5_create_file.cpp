@@ -7,20 +7,19 @@
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel functions
+Channel data and processing
 SECTION!*/
 
 /*!MD
 # HDF5_CREATE_FILE
-Create a new HDF5 channel file with a custom storage layout
+Create a new HDF5 channel file with a given storage layout
 
-- Initializes a new HDF5 file for storing wireless channel data
-- Defines a 4D layout `(nx, ny, nz, nw)` where each index combination maps to one channel storage slot
-- Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
-- Storage layout is fixed at creation and cannot be altered later, except by reshaping while
-  keeping the total slot count constant
-- Errors if the target file already exists (also one that cannot be read); delete it first to recreate it
-- Files can be read by any HDF5 tool but must be modified only with quadriga-lib
+- Creates a channel file with `nx · ny · nz · nw` empty slots; the slot count is fixed, [[hdf5_reshape_layout]] changes
+  only the dimensions
+- [[hdf5_write_channel]] and [[hdf5_write_dset]] create a missing file themselves, with the layout that just holds their
+  slots; this function sets any other one
+- The file is an HDF5 file (quadriga-lib channel format, version 3) that any HDF5 reader opens, e.g. h5py, MATLAB or
+  HDFView. Change it only with the functions of this section: files changed by other HDF5 tools may be rejected
 
 ## Usage:
 ```
@@ -28,16 +27,14 @@ quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw );
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file to create; string
-- **`nx`** — Number of slots along dimension X; default: 65536
-- **`ny`** — Number of slots along dimension Y; default: 1
-- **`nz`** — Number of slots along dimension Z; default: 1
-- **`nw`** — Number of slots along dimension W; default: 1
+- **`fn`** — File name; the file must not exist
+- **`nx`** — Number of slots along x, at least 1; default: 65536
+- **`ny`**, **`nz`**, **`nw`** — Number of slots along y, z and w, each at least 1; at most 4294967295 (2^32 - 1)
+  slots in total; default: 1
 
 ## See also:
-- [[hdf5_write_channel]] (for writing channel data)
-- [[hdf5_write_dset]] (for writing arbitrary unstructured data)
-- [[hdf5_read_layout]] (for reading the layout)
+- [[hdf5_write_channel]] (writes channels into slots)
+- [[hdf5_read_layout]] (reads the layout and the occupied slots)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

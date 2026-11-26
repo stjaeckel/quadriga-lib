@@ -275,7 +275,7 @@ quadriga_lib.arrayant.export_pattern_obj( fn, arrayant, *, directivity_range_dB,
 
 ### See also:
 - [calc_directivity](#calc_directivity), [calc_beamwidth](#calc_beamwidth) (the same pattern as numbers)
-- [channel.export_obj_file](channel-functions.md#channel.export_obj_file) (exports propagation paths to an OBJ file)
+- [export_channel_obj](channel-data-and-processing.md#export_channel_obj) (exports propagation paths to an OBJ file)
 
 ---
 <a id="generate_antenna"></a>
@@ -590,7 +590,7 @@ V, H = quadriga_lib.arrayant.interpolate_pattern( arrayant, azimuth, elevation, 
 - [apply_port_weights](#apply_port_weights) (patterns per port instead of per element)
 - [rotate_pattern](#rotate_pattern) (applies an orientation to the stored patterns)
 - [join_arrays](#join_arrays), [generate_speaker](#generate_speaker) (build multi-element, multi-frequency arrays)
-- [channel.spherical](channel-generation-functions.md#channel.spherical) (channel coefficients from the interpolated patterns)
+- [channel.spherical](channel-generators.md#channel.spherical) (channel coefficients from the interpolated patterns)
 
 ---
 <a id="join_arrays"></a>

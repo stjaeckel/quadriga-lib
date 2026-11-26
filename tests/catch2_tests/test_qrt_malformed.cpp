@@ -9,6 +9,7 @@
 #include "quadriga_channel.hpp"
 #include "qd_helpers_wrappers.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -288,5 +289,37 @@ TEST_CASE("QRT Reader - CIRs that share one path block")
     qrt_require_fast_throw([&]
                            { quadriga_lib::qrt_read_cache_init(fn); });
 
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("QRT Reader - destination offsets that decrease or point beyond the end of the CIRs")
+{
+    // A file with 3 CIRs and 3 destinations at the CIR offsets {0, 1, 2}; patched offsets must throw
+    const std::string fn = "tests/data/test_qrt_malformed_dest.qrt";
+    quadriga_lib::qrt_file_init<double>(fn, arma::vec{3.0e9}, arma::mat(3, 3, arma::fill::zeros), arma::mat(),
+                                        {"a", "b", "c"}, arma::u32_vec{0u, 1u, 2u});
+    std::vector<char> good;
+    {
+        std::ifstream i(fn, std::ios::binary);
+        good.assign(std::istreambuf_iterator<char>(i), std::istreambuf_iterator<char>());
+    }
+    const char pattern[] = {0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 'a'};
+    auto it = std::search(good.begin(), good.end(), std::begin(pattern), std::end(pattern));
+    REQUIRE(it != good.end());
+    const size_t at = (size_t)(it - good.begin());
+    REQUIRE_NOTHROW(qrt_parse_all(fn));
+    {
+        std::vector<char> empty_last = good; // {0, 1, 3}: the last destination has no CIRs
+        empty_last[at + 8] = 3;
+        qrt_write_bytes(fn, empty_last, empty_last.size());
+        CHECK_NOTHROW(qrt_parse_all(fn));
+    }
+    for (const auto &patch : std::vector<std::pair<size_t, char>>{{8, 0}, {8, 4}}) // {0, 1, 0} and {0, 1, 4}
+    {
+        std::vector<char> bad = good;
+        bad[at + patch.first] = patch.second;
+        qrt_write_bytes(fn, bad, bad.size());
+        qrt_require_fast_throw([&] { qrt_parse_all(fn); });
+    }
     std::remove(fn.c_str());
 }

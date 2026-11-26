@@ -6,56 +6,118 @@
 #include "qd_helpers_shared.hpp"
 
 /*!SECTION
-Channel class
+Channel data and processing
 SECTION!*/
+
+/*!SECTION_DESC
+A **channel** describes the propagation between a transmit and a receive antenna array: for each snapshot, a set of
+propagation paths, each with a complex coefficient per antenna pair and a delay. The functions of this section store
+channels in files, turn them into frequency responses, prepare them for link-level simulation, compute their statistics
+and show the paths in 3D. The channels themselves come from the functions of section "Channel generators" or from
+[[get_channels_layout]].<br><br>
+
+**What a channel holds** ([[channel]]):
+
+- The positions and orientations of the transmitter and the receiver, per snapshot or fixed
+- The **coefficients** `coeff_re` / `coeff_im` and the **delays** `delay` of each snapshot, `[n_rx, n_tx, n_path]`
+- Optionally, antenna-independent path data: path gain, path length, polarization transfer matrix, angles, scatterer
+  positions and the interaction points of ray-traced paths
+- Unstructured metadata: named values of any type in `par_names` / `par_data`
+
+**Typical workflow:**
+
+1. Generate the channels, or read them: [[hdf5_read_channel]] from a channel file, [[qrt_file_read]] from the output
+   of the QRT ray tracer
+2. Optionally, map the delays to a tap grid with [[quantize_delays]], or join the segments of a track with
+   [[crossfade_segments]]
+3. Compute the frequency response at the subcarriers with [[freq_response]], or with [[freq_response_mf]] for
+   coefficients sampled at several frequencies
+4. Evaluate the channels: [[calc_channel_gain]], [[calc_delay_spread]], [[calc_angular_spread]],
+   [[calc_rician_k_factor]], [[calc_xpr]]
+5. Store them with [[hdf5_write_channel]], or show the paths with [[export_channel_obj]]
+
+**Terms** (full list in the [Glossary](cpp_api.html#glossary)):
+
+- **Snapshot**: one sample of the channel in time or position; `n_snap` snapshots, each with its own number of paths
+- **Path**: one propagation path from the transmitter to the receiver, e.g. the LOS path, a reflection or a ray of a
+  cluster
+- **Coefficient**: the complex amplitude $a$ of one path for one antenna pair, with the antenna patterns, the
+  polarization and the path gain
+- **Delay**: the propagation delay $\tau$ of a path in s, per antenna pair `[n_rx, n_tx, n_path]` or shared by all
+  pairs `[1, 1, n_path]`
+- **CIR**: the channel impulse response of one snapshot, its coefficients and delays
+- **Frequency response**: the channel matrix at subcarrier $k$, $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$, with
+  $f_k$ the offset of the subcarrier from the carrier (the absolute frequency for `_mf`)
+- **Multi-frequency channel** (suffix `_mf`): coefficients sampled at several frequencies, one entry per frequency, as
+  [[get_channels_multifreq]] produces them
+- **Slot**: one storage place of an HDF5 channel file, addressed by four indices `(ix, iy, iz, iw)`, e.g. Tx, Rx and
+  frequency; the file holds a fixed grid of slots, its **storage layout**
+- **Origin**, **destination**: a QRT file holds the paths from each origin (a Tx position) to a list of CIR positions; a
+  destination (a receiver) owns a run of consecutive CIR positions, e.g. a track
+
+**Functions by task:**
+
+| Task | Functions |
+| ---- | --------- |
+| Store and read channels | [[hdf5_create_file]], [[hdf5_write_channel]], [[hdf5_read_channel]], [[hdf5_read_layout]], [[hdf5_reshape_layout]] |
+| Store and read metadata | [[hdf5_write_dset]], [[hdf5_read_dset]], [[hdf5_read_dset_names]] |
+| Ray-tracing files | [[qrt_file_init]], [[qrt_file_append]], [[qrt_paths_from_scatterers]], [[qrt_file_parse]], [[qrt_file_read]], [[qrt_file_read_raw]], [[qrt_read_cache_init]] |
+| Frequency response | [[freq_response]], [[freq_response_mf]] |
+| Process | [[quantize_delays]], [[crossfade_segments]] |
+| Statistics | [[calc_channel_gain]], [[calc_delay_spread]], [[calc_angular_spread]], [[calc_rician_k_factor]], [[calc_xpr]] |
+| Show | [[export_channel_obj]] |
+
+**Conventions.** Coefficients and delays are given per snapshot as a `std::vector` of cubes. [[freq_response]],
+[[freq_response_mf]], [[hdf5_read_channel]] and [[hdf5_write_channel]] have vector forms, same-name overloads with one
+entry per snapshot or slot. HDF5 files store the structured channel data in single precision.
+SECTION_DESC!*/
 
 /*!MD
 # channel<++>
-Class for storing and managing MIMO channel data and metadata across multiple snapshots
+MIMO channel between a transmit and a receive array: coefficients, delays and path data per snapshot, and metadata
 
-- Represents path-level MIMO channel data between antenna arrays over multiple time snapshots
-- Each snapshot may have a different number of propagation paths `n_path`
-- Unstructured metadata supported via `par_names` / `par_data`
+- The data of one link (section description, "What a channel holds"); the fields are public and set directly, e.g.
+  from [[get_channels_spherical]], or read with [[hdf5_read_channel]] and [[qrt_file_read]]
+- Snapshot fields are `std::vector` with one entry per snapshot; an empty field is not present. `n_snap` is the largest
+  number of entries of any field; positions and orientations with one column apply to all snapshots
+- `.is_valid()` checks the sizes; the functions that take a channel check it first
 
-## Attributes:<br>
-| Attribute                                         | Size                                                            | Description                                                 |
-| ------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| `std::string name`                                | —                                                               | Name of the channel object                                  |
-| `arma::Col<dtype> center_freq`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
-| `arma::Mat<dtype> tx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Transmitter positions                                       |
-| `arma::Mat<dtype> rx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Receiver positions                                          |
-| `arma::Mat<dtype> tx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Transmitter orientation (Euler angles)                      |
-| `arma::Mat<dtype> rx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Receiver orientation (Euler angles)                         |
-| `std::vector<arma::Cube<dtype>> coeff_re`         | per snap `[n_rx, n_tx, n_path]`                                 | Channel coefficients, real part                             |
-| `std::vector<arma::Cube<dtype>> coeff_im`         | per snap `[n_rx, n_tx, n_path]`                                 | Channel coefficients, imaginary part                        |
-| `std::vector<arma::Cube<dtype>> delay`            | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds                                      |
-| `std::vector<arma::Col<dtype>> path_gain`         | per snap `[n_path]`                                             | Path gains before antenna pattern                           |
-| `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
-| `std::vector<arma::Mat<dtype>> polmat`            | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
-| `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
-| `std::vector<arma::Mat<dtype>> fbs_pos`           | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
-| `std::vector<arma::Mat<dtype>> lbs_pos`           | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
-| `std::vector<arma::Col<unsigned>> n_interact`     | per snap `[n_path]`                                             | Number of interactions per path                             |
-| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(n_interact)]`                                 | Interaction point coordinates                               |
-| `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
-| `std::vector<std::any> par_data`                  | —                                                               | Unstructured metadata values (string, scalar, matrix, etc.) |
-| `int initial_position`                            | scalar                                                          | 0-based index of the reference snapshot                     |
+## Attributes:
+| Attribute | Size | Description |
+| --------- | ---- | ----------- |
+| `std::string name` | at most 255 characters | Name of the channel, default `"empty"` |
+| `arma::Col<dtype> center_freq` | `[1]`, `[n_snap]` or `[]` | Center frequency in Hz |
+| `arma::Mat<dtype> tx_pos` | `[3, 1]` or `[3, n_snap]` | Transmitter positions in m |
+| `arma::Mat<dtype> rx_pos` | `[3, 1]` or `[3, n_snap]` | Receiver positions in m |
+| `arma::Mat<dtype> tx_orientation` | `[3, 1]`, `[3, n_snap]` or `[]` | Transmitter orientation, Euler angles (bank, tilt, heading) in rad |
+| `arma::Mat<dtype> rx_orientation` | `[3, 1]`, `[3, n_snap]` or `[]` | Receiver orientation, Euler angles (bank, tilt, heading) in rad |
+| `std::vector<arma::Cube<dtype>> coeff_re` | per snapshot `[n_rx, n_tx, n_path]` | Coefficients, real part; `n_rx` and `n_tx` equal in all snapshots |
+| `std::vector<arma::Cube<dtype>> coeff_im` | per snapshot `[n_rx, n_tx, n_path]` | Coefficients, imaginary part |
+| `std::vector<arma::Cube<dtype>> delay` | per snapshot `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` | Delays in s; `[1, 1, n_path]` without coefficients |
+| `std::vector<arma::Col<dtype>> path_gain` | per snapshot `[n_path]` | Path gain, linear, without antennas |
+| `std::vector<arma::Col<dtype>> path_length` | per snapshot `[n_path]` | Path length in m from the Tx to the Rx phase center |
+| `std::vector<arma::Mat<dtype>> polmat` | per snapshot `[8, n_path]` | Polarization transfer matrices, interleaved real and imaginary parts |
+| `std::vector<arma::Mat<dtype>> path_angles` | per snapshot `[n_path, 4]` | Departure and arrival angles (AOD, EOD, AOA, EOA) in rad |
+| `std::vector<arma::Mat<dtype>> fbs_pos` | per snapshot `[3, n_path]` | First-bounce scatterer positions in m |
+| `std::vector<arma::Mat<dtype>> lbs_pos` | per snapshot `[3, n_path]` | Last-bounce scatterer positions in m |
+| `std::vector<arma::Col<unsigned>> n_interact` | per snapshot `[n_path]` | Number of interactions of each path, 0 = LOS; with `interact_coord` |
+| `std::vector<arma::Mat<dtype>> interact_coord` | per snapshot `[3, sum(n_interact)]` | Interaction points of the paths in m, in path order |
+| `std::vector<std::string> par_names` | `[n_par]` | Names of the metadata fields |
+| `std::vector<std::any> par_data` | `[n_par]` | Metadata values, of a type [[any_type_id]] knows |
+| `int initial_position` | scalar | 0-based index of the reference snapshot, mainly for internal use |
 
-## Simple member functions:<br>
-| Method        | Description                                                   |
-| ------------- | ------------------------------------------------------------- |
-| `.n_snap()`   | Returns the number of snapshots                               |
-| `.n_rx()`     | Returns number of receive antennas; 0 if coefficients absent  |
-| `.n_tx()`     | Returns number of transmit antennas; 0 if coefficients absent |
-| `.n_path()`   | Returns number of paths per snapshot as a vector              |
-| `.empty()`    | Returns true if the object contains no channel data           |
-| `.is_valid()` | Returns empty string if valid, otherwise an error message     |
+## Simple member functions:
+| Method | Description |
+| ------ | ----------- |
+| `.n_snap()` | Number of snapshots |
+| `.n_rx()` | Number of receive antennas; 0 without coefficients |
+| `.n_tx()` | Number of transmit antennas; 0 without coefficients |
+| `.n_path()` | Number of paths of each snapshot, `[n_snap]` |
+| `.empty()` | True if the channel holds no structured data |
+| `.is_valid()` | Empty string if the channel is valid, else an error message |
 
-## Complex member functions:
-- .[[add_paths]]
-
-Computations and file I/O on a channel are free functions, see section "Channel functions"
-(e.g. [[channel_calc_effective_path_gain]], [[channel_export_obj_file]], [[hdf5_write_channel]], [[quantize_delays]]).
+Computations and file I/O on a channel are free functions in this section, e.g. [[calc_channel_gain]],
+[[export_channel_obj]], [[hdf5_write_channel]] and [[quantize_delays]].
 MD!*/
 
 // Object dimensions
@@ -383,282 +445,6 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
             return std::string("Unsupported datatype in unstructured data.");
 
     return std::string("");
-}
-
-/*!MD
-# .add_paths
-Append new propagation paths to an existing channel snapshot
-
-- Adds path-level data to snapshot `i_snap` in a `channel` object; does not modify `tx_pos`, `rx_pos`, or orientation fields
-- All provided fields must have consistent length `n_path_add` and match existing snapshot structure
-- The first provided field sets `n_path_add`, also when it holds 0 paths; a field with a different path count throws
-
-## Declaration:
-```
-void quadriga_lib::channel<dtype>::add_paths(
-    arma::uword i_snap,
-    const arma::Cube<dtype> *coeff_re_add = nullptr,
-    const arma::Cube<dtype> *coeff_im_add = nullptr,
-    const arma::Cube<dtype> *delay_add = nullptr,
-    const arma::u32_vec *n_interact_add = nullptr,
-    const arma::Mat<dtype> *interact_coord_add = nullptr,
-    const arma::Col<dtype> *path_gain_add = nullptr,
-    const arma::Col<dtype> *path_length_add = nullptr,
-    const arma::Mat<dtype> *polmat_add = nullptr,
-    const arma::Mat<dtype> *path_angles_add = nullptr,
-    const arma::Mat<dtype> *fbs_pos_add = nullptr,
-    const arma::Mat<dtype> *lbs_pos_add = nullptr);
-```
-
-## Inputs:
-- **`i_snap`** — 0-based snapshot index to append paths to
-- **`coeff_re_add`** *(optional)* — Real part of channel coefficients; `[n_rx, n_tx, n_path_add]`
-- **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_add]`
-- **`delay_add`** *(optional)* — Propagation delays in seconds; `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
-- **`n_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
-- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(n_interact)]`
-- **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
-- **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
-- **`polmat_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
-- **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
-- **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
-- **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
-MD!*/
-
-template <typename dtype>
-void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
-                                             const arma::Cube<dtype> *coeff_re_add, const arma::Cube<dtype> *coeff_im_add, const arma::Cube<dtype> *delay_add,
-                                             const arma::u32_vec *n_interact_add, const arma::Mat<dtype> *interact_coord_add,
-                                             const arma::Col<dtype> *path_gain_add, const arma::Col<dtype> *path_length_add,
-                                             const arma::Mat<dtype> *polmat_add, const arma::Mat<dtype> *path_angles_add,
-                                             const arma::Mat<dtype> *fbs_pos_add, const arma::Mat<dtype> *lbs_pos_add)
-{
-    std::string error_message = this->is_valid();
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    arma::uword n_snap_chan = this->n_snap();
-    if (i_snap >= n_snap_chan)
-        throw std::invalid_argument("Input 'i_snap' is out of range.");
-
-    // Check MIMO coefficients
-    // The first given field sets the number of added paths (also when it is 0), every other field must match
-    bool add_coefficients = false;
-    bool n_path_set = false;
-    arma::uword n_path_add = 0ULL;
-    if (coeff_re_add != nullptr)
-    {
-        if (this->coeff_re.size() == 0)
-            throw std::invalid_argument("Channel object requires existing MIMO coefficients.");
-
-        if (coeff_im_add == nullptr || delay_add == nullptr)
-            throw std::invalid_argument("'coeff_im_add' or 'delay_add' is missing.");
-
-        n_path_add = coeff_re_add->n_slices;
-        n_path_set = true;
-        if (coeff_im_add->n_slices != n_path_add)
-            throw std::invalid_argument("Size of 'coeff_im_add' does not match size of 'coeff_re_add'.");
-        if (delay_add->n_slices != n_path_add)
-            throw std::invalid_argument("Size of 'delay_add' does not match size of 'coeff_re_add'.");
-
-        arma::uword n_rx = this->n_rx(), n_tx = this->n_tx();
-        if (coeff_re_add->n_rows != n_rx || coeff_re_add->n_cols != n_tx ||
-            coeff_im_add->n_rows != n_rx || coeff_im_add->n_cols != n_tx)
-            throw std::invalid_argument("Inputs 'coeff_re_add' and 'coeff_im_add' must have n_rx rows and n_tx columns.");
-
-        n_rx = this->delay[i_snap].n_rows, n_tx = this->delay[i_snap].n_cols;
-        if (delay_add->n_rows != n_rx || delay_add->n_cols != n_tx)
-            throw std::invalid_argument("Input 'delay_add' must have the rows and columns of the snapshot's 'delay'.");
-
-        add_coefficients = true;
-    }
-    if (!add_coefficients && (coeff_im_add != nullptr || delay_add != nullptr))
-        throw std::invalid_argument("'coeff_re_add' is missing.");
-    if (!add_coefficients && this->coeff_re.size() != 0)
-        throw std::invalid_argument("The channel object has coefficients, but no coefficients are added.");
-
-    // Check interaction coordinates
-    bool add_interact_coord = false;
-    if (n_interact_add != nullptr)
-    {
-        if (this->n_interact.size() == 0)
-            throw std::invalid_argument("Channel object requires existing interaction coordinates.");
-
-        if (interact_coord_add == nullptr)
-            throw std::invalid_argument("'n_interact_add' is given but 'interact_coord_add' is missing.");
-
-        if (!n_path_set)
-            n_path_add = n_interact_add->n_elem, n_path_set = true;
-        if (n_interact_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'n_interact_add' does not match size of 'coeff_re_add'.");
-
-        // 64-bit sum: arma::sum of a u32_vec is a 32-bit sum and can wrap
-        arma::uword sum_no_interact = 0;
-        for (const unsigned *p = n_interact_add->begin(); p < n_interact_add->end(); ++p)
-            sum_no_interact += (arma::uword)*p;
-        if (interact_coord_add->n_cols != sum_no_interact)
-            throw std::invalid_argument("Number of columns in 'interact_coord_add' must match sum of 'n_interact_add'.");
-
-        add_interact_coord = true;
-    }
-    if (!add_interact_coord && interact_coord_add != nullptr)
-        throw std::invalid_argument("'interact_coord_add' is given but 'n_interact_add' is missing.");
-    if (!add_interact_coord && this->n_interact.size() != 0)
-        throw std::invalid_argument("The channel object has interaction coordinates, but no coordinates are added.");
-
-    // Check path gain
-    if (path_gain_add != nullptr)
-    {
-        if (this->path_gain.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'path_gain'.");
-
-        if (!n_path_set)
-            n_path_add = path_gain_add->n_elem, n_path_set = true;
-        if (path_gain_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'path_gain_add' does not match 'n_path_add'.");
-    }
-    else if (this->path_gain.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_gain', but no 'path_gain_add' is provided.");
-
-    // Check path_length
-    if (path_length_add != nullptr)
-    {
-        if (this->path_length.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'path_length'.");
-
-        if (!n_path_set)
-            n_path_add = path_length_add->n_elem, n_path_set = true;
-        if (path_length_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'path_length_add' does not match 'n_path_add'.");
-    }
-    else if (this->path_length.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_length', but no 'path_length_add' is provided.");
-
-    // Check polmat
-    if (polmat_add != nullptr)
-    {
-        if (this->polmat.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'polmat'.");
-
-        if (!n_path_set)
-            n_path_add = polmat_add->n_cols, n_path_set = true;
-        if (polmat_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'polmat_add' does not match 'n_path_add'.");
-        if (polmat_add->n_rows != 8ULL)
-            throw std::invalid_argument("Number of rows in 'polmat_add' must be 8.");
-    }
-    else if (this->polmat.size() != 0)
-        throw std::invalid_argument("The channel object has 'polmat', but no 'polmat_add' is provided.");
-
-    // Check path_angles
-    if (path_angles_add != nullptr)
-    {
-        if (this->path_angles.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'path_angles'.");
-
-        if (!n_path_set)
-            n_path_add = path_angles_add->n_rows, n_path_set = true;
-        if (path_angles_add->n_rows != n_path_add)
-            throw std::invalid_argument("Number of rows in 'path_angles_add' does not match 'n_path_add'.");
-        if (path_angles_add->n_cols != 4ULL)
-            throw std::invalid_argument("Number of columns in 'path_angles_add' must be 4.");
-    }
-    else if (this->path_angles.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_angles', but no 'path_angles_add' is provided.");
-
-    // Check fbs_pos
-    if (fbs_pos_add != nullptr)
-    {
-        if (this->fbs_pos.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'fbs_pos'.");
-
-        if (!n_path_set)
-            n_path_add = fbs_pos_add->n_cols, n_path_set = true;
-        if (fbs_pos_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'fbs_pos_add' does not match 'n_path_add'.");
-        if (fbs_pos_add->n_rows != 3ULL)
-            throw std::invalid_argument("Number of rows in 'fbs_pos_add' must be 3.");
-    }
-    else if (this->fbs_pos.size() != 0)
-        throw std::invalid_argument("The channel object has 'fbs_pos', but no 'fbs_pos_add' is provided.");
-
-    // Check lbs_pos
-    if (lbs_pos_add != nullptr)
-    {
-        if (this->lbs_pos.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'lbs_pos'.");
-
-        if (!n_path_set)
-            n_path_add = lbs_pos_add->n_cols, n_path_set = true;
-        if (lbs_pos_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'lbs_pos_add' does not match 'n_path_add'.");
-        if (lbs_pos_add->n_rows != 3ULL)
-            throw std::invalid_argument("Number of rows in 'lbs_pos_add' must be 3.");
-    }
-    else if (this->lbs_pos.size() != 0)
-        throw std::invalid_argument("The channel object has 'lbs_pos', but no 'lbs_pos_add' is provided.");
-
-    // The fields of snapshot i_snap are written: an input must not be one of them or share memory with one
-    auto check_mat = [&](const arma::Mat<dtype> *out, const char *name)
-    {
-        qd_check_alias(out, name, interact_coord_add, path_gain_add, path_length_add, polmat_add,
-                       path_angles_add, fbs_pos_add, lbs_pos_add);
-    };
-    if (add_coefficients)
-    {
-        qd_check_alias(&this->coeff_re[i_snap], "coeff_re[i_snap]", coeff_re_add, coeff_im_add, delay_add);
-        qd_check_alias(&this->coeff_im[i_snap], "coeff_im[i_snap]", coeff_re_add, coeff_im_add, delay_add);
-        qd_check_alias(&this->delay[i_snap], "delay[i_snap]", coeff_re_add, coeff_im_add, delay_add);
-    }
-    if (add_interact_coord)
-    {
-        qd_check_alias(&this->n_interact[i_snap], "n_interact[i_snap]", n_interact_add);
-        check_mat(&this->interact_coord[i_snap], "interact_coord[i_snap]");
-    }
-    if (path_gain_add != nullptr)
-        check_mat(&this->path_gain[i_snap], "path_gain[i_snap]");
-    if (path_length_add != nullptr)
-        check_mat(&this->path_length[i_snap], "path_length[i_snap]");
-    if (polmat_add != nullptr)
-        check_mat(&this->polmat[i_snap], "polmat[i_snap]");
-    if (path_angles_add != nullptr)
-        check_mat(&this->path_angles[i_snap], "path_angles[i_snap]");
-    if (fbs_pos_add != nullptr)
-        check_mat(&this->fbs_pos[i_snap], "fbs_pos[i_snap]");
-    if (lbs_pos_add != nullptr)
-        check_mat(&this->lbs_pos[i_snap], "lbs_pos[i_snap]");
-
-    // Add data to existing channel
-    if (add_coefficients)
-    {
-        this->coeff_re[i_snap] = arma::join_slices(this->coeff_re[i_snap], *coeff_re_add);
-        this->coeff_im[i_snap] = arma::join_slices(this->coeff_im[i_snap], *coeff_im_add);
-        this->delay[i_snap] = arma::join_slices(this->delay[i_snap], *delay_add);
-    }
-
-    if (add_interact_coord)
-    {
-        this->n_interact[i_snap] = arma::join_cols(this->n_interact[i_snap], *n_interact_add);
-        this->interact_coord[i_snap] = arma::join_rows(this->interact_coord[i_snap], *interact_coord_add);
-    }
-
-    if (path_gain_add != nullptr)
-        this->path_gain[i_snap] = arma::join_cols(this->path_gain[i_snap], *path_gain_add);
-
-    if (path_length_add != nullptr)
-        this->path_length[i_snap] = arma::join_cols(this->path_length[i_snap], *path_length_add);
-
-    if (polmat_add != nullptr)
-        this->polmat[i_snap] = arma::join_rows(this->polmat[i_snap], *polmat_add);
-
-    if (path_angles_add != nullptr)
-        this->path_angles[i_snap] = arma::join_cols(this->path_angles[i_snap], *path_angles_add);
-
-    if (fbs_pos_add != nullptr)
-        this->fbs_pos[i_snap] = arma::join_rows(this->fbs_pos[i_snap], *fbs_pos_add);
-
-    if (lbs_pos_add != nullptr)
-        this->lbs_pos[i_snap] = arma::join_rows(this->lbs_pos[i_snap], *lbs_pos_add);
 }
 
 template class quadriga_lib::channel<float>;

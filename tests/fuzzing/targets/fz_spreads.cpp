@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Channel statistics: acdf, calc_delay_spread, calc_angular_spread, calc_rician_k_factor and
-// calc_cross_polarization_ratio with fuzzed (empty, ragged, zero, negative, non-finite) delays, angles and powers
+// calc_xpr with fuzzed (empty, ragged, zero, negative, non-finite) delays, angles and powers
 
 #include "fuzz_target.hpp"
 
@@ -131,7 +131,7 @@ static void run(fz::input &in)
         const bool include_los = in.ConsumeBool();
         const int mask_x = in.ConsumeIntegralInRange<int>(0, 3);
         fz::clean([&]
-                  { quadriga_lib::calc_cross_polarization_ratio<T>(powers, M, path_length, tx_pos, rx_pos, (mask_x & 1) ? &xpr : nullptr,
+                  { quadriga_lib::calc_xpr<T>(powers, M, path_length, tx_pos, rx_pos, (mask_x & 1) ? &xpr : nullptr,
                                                                    (mask_x & 2) ? &pg : nullptr, include_los, window_size); });
     }
 }

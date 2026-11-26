@@ -5,43 +5,20 @@
 #include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
-Channel generation functions
+Channel generators
 SECTION!*/
 
 /*!MD
 # GET_CHANNELS_MULTIFREQ
-Compute channel coefficients for spherical waves across multiple frequencies
+Calculate MIMO channel coefficients and delays for spherical wave propagation at several frequencies
 
-- Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
-- Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
-- TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
-- `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
-- Extrapolation clamps to the nearest frequency entry on all four grids
-- `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
-- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
-  V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx),
-  rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
-- NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
-  TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS) is added to the
-  FBS-LBS segment. Delays and phases follow this length; the per-element offsets follow the FBS / LBS geometry.
-- Port weights are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
-- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`: with `add_fake_los_path`, slot 1 holds the LOS path
-  (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
-  a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
-  (input index + 1); all other paths keep their order, shifted by one slot
-- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0, n_freq_new]`; with
-  `add_fake_los_path = true` they hold only this zero-power LOS path, with the LOS delays per antenna pair
-- If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
-  per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
-  `propagation_speed` (both arrays endfire). [[quantize_delays]] rejects delays at or below `-tap_spacing / 2`. For
-  acoustics (`propagation_speed` about 343 m/s) that happens for practically every array: at 48 kHz taps, half sizes
-  adding up to more than about 3.6 mm (a 5 cm microphone pair already exceeds it); for radio at 5 ns taps, about
-  0.75 m. Use `use_absolute_delays = true` in that case
-- The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
-  [[baseband_freq_response_multi]] removes the phase of `delay` before it interpolates across
-  `center_freq`, so it needs channels generated with `use_absolute_delays = true`; with relative delays, the phase of
-  the TX-RX distance stays in the coefficients, is interpolated across the frequency grid and gives wrong phases
+- As [[get_channels_spherical]], at the output frequencies `freq_new`, with multi-frequency arrays (frequency-dependent
+  patterns and port weights), path gains and Jones matrices; for radio waves and, with `propagation_speed` = 343 m/s
+  and scalar `polmat`, for sound
+- The geometry (element-pair path lengths, angles, LOS path) is computed once; at each output frequency, the patterns
+  and port weights of the arrays and `path_gain` and `polmat` are interpolated between their two neighbouring entries
+- The coefficients follow the formula of [[get_channels_spherical]] with $f_c$ = `freq_new(k)` and $c$ =
+  `propagation_speed`; the frequency is the 4th dimension of the outputs, a multi-frequency channel
 
 ## Usage:
 ```
@@ -51,36 +28,47 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ```
 
 ## Inputs:
-- **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [[generate_antenna]]
-- **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [[generate_antenna]]
-- **`tx_pos`** — Transmitter position, finite; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`rx_pos`** — Receiver position, finite; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq]`
-- **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
-  TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
-- **`polmat`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
-  `[2, n_path, n_freq]` (scalar pressure)
-- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `[n_freq, 1]`
-- **`freq_new`** — Target output frequencies; `[n_freq_new, 1]`
-- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
-- **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
-  found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
-- **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
-- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
-  unavailable); auto selects GENERIC in this version, see [[interpolate_pattern]]; default: 0
+- **`tx_array`**, **`rx_array`** — Tx and Rx multi-frequency array, struct array `[1, n]` with one entry per frequency
+  in any order, fields in [[generate_antenna]], valid, at least one entry; `n_tx` and `n_rx` ports
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in m, finite; 3 elements
+- **`tx_orientation`**, **`rx_orientation`** — Tx and Rx orientation, Euler angles (bank, tilt, heading) in rad,
+  finite; 3 elements
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m; `[3, n_path]`
+- **`path_gain`** — Path gains at the frequencies `freq`, linear power; `[n_path, n_freq]`
+- **`path_length`** — Path lengths in m between the Tx and Rx phase centres, as in [[get_channels_spherical]];
+  `[n_path, 1]`
+- **`polmat`** — Jones matrices at the frequencies `freq` (section description): `[8, n_path, n_freq]`, or
+  `[2, n_path, n_freq]` for a scalar coefficient (real and imaginary part, sound)
+- **`freq`** — Sample frequencies of `path_gain` and `polmat` in Hz, in any order; `[n_freq, 1]`, at least one
+- **`freq_new`** — Output frequencies in Hz; `[n_freq_new, 1]`, at least one
+- **`use_absolute_delays`** — Keep the delay of the Tx-Rx distance in all delays; `false`: delays relative to it;
+  default: `false`
+- **`add_fake_los_path`** — Put the LOS path into an added slot 1, with zero power if there is none; default: `false`
+- **`propagation_speed`** — Wave speed in m/s, > 0; default: 299792458
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto (GENERIC in this version), 1 = GENERIC, 2 = AVX2
+  (single-precision arithmetic; error if unavailable); default: 0
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_out, n_freq_new]`
+- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out, n_freq_new]`,
+  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_out, n_freq_new]`
+
+## Notes:
+- **Interpolation**: `path_gain` linear; patterns, port weights and `polmat` per complex value, the amplitude linear and
+  the phase along the shorter arc (linear for nearly opposite phases); constant outside the range of each grid
+- **Scalar `polmat`**: only the $F_\theta$ patterns are used,
+  $a_l = \sqrt{g_l} \, F_{\theta,r} \, m_l \, F_{\theta,t} \, e^{-j 2\pi f d / c}$ with the complex scalar $m_l$
+- **Paths**: NLOS path length, LOS path, `add_fake_los_path` and 0 paths as in [[get_channels_spherical]]
+- **Relative delays**: negative delays as in [[get_channels_spherical]], with $c$ = `propagation_speed`; for sound, this
+  affects practically every array, so use absolute delays for [[quantize_delays]]
+- **Delay phase**: the coefficients carry the phase of the absolute path length also with relative delays;
+  [[freq_response_mf]] with `remove_delay_phase = true` therefore needs `use_absolute_delays = true`
 
 ## See also:
-- [[get_channels_spherical]] (single-frequency equivalent)
-- [[generate_speaker]] (acoustic source construction)
+- [[get_channels_spherical]] (one frequency)
+- [[freq_response_mf]] (frequency response of a multi-frequency channel)
+- [[join_arrays]] (multi-frequency arrays)
+- [[generate_speaker]] (loudspeaker arrays)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

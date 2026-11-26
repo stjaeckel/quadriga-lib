@@ -70,14 +70,14 @@ gain, polmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   never; default: 0
 - **`apply_fspl`** — If `True`, folds the geometric spreading loss into `gain`, making it an absolute
   propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
-  distance, matching the `path_length` used by [qrt_file_read](channel-functions.md#qrt_file_read) for a
+  distance, matching the `path_length` used by [qrt_file_read](channel-data-and-processing.md#qrt_file_read) for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.;
   default: `False`
 - **`apply_phase`** — If `True`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium
   wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
-  so `polmat` stays normalized. This is the phase [channel.spherical](channel-generation-functions.md#channel.spherical) would otherwise add from
+  so `polmat` stays normalized. This is the phase [channel.spherical](channel-generators.md#channel.spherical) would otherwise add from
   `path_length`; default: `False`
 
 ### Outputs:
@@ -87,7 +87,7 @@ gain, polmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, column-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row
-  order of `polmat` in [channel.spherical](channel-generation-functions.md#channel.spherical), `(8, n_pos)`; scalar
+  order of `polmat` in [channel.spherical](channel-generators.md#channel.spherical), `(8, n_pos)`; scalar
   mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)` with `n_seg` from `lod`
   (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
@@ -95,8 +95,8 @@ gain, polmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 ### See also:
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines the material format)
-- [qrt_file_read](channel-functions.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
-- [channel.spherical](channel-generation-functions.md#channel.spherical) (applies the same propagation phase as `apply_phase`)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
+- [channel.spherical](channel-generators.md#channel.spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 <a id="cube"></a>

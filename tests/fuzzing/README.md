@@ -113,18 +113,18 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_layout_csv` | Layout files (CSV) | `layout_csv_read` with the input as the Tx file, as the Rx file and as both, alone and with a valid file of the other side, without and with a given frequency list; a layout that reads must be valid; `layout_csv_write` (compact and with every cell) and a second read must give the same layout (all members that the files hold); `sample_track` on every node; `drop_terminals` into the cells of the Tx side must give a valid layout with the number of UTs asked for |
 | `fz_conf` | Scenario parameter file | `conf_file_read` with all outputs, with and without the value checks |
 | `fz_qrt` | QRT file | `qrt_file_parse`, `qrt_read_cache_init`, `qrt_file_read` for several origins and CIR lists (single CIRs, past the end, two CIRs with a cache, all CIRs of small files) in both directions, `qrt_file_read_raw` |
-| `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel` (also with `i_snap`), `hdf5_read_channel_vec`, `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
+| `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel` (also with `i_snap` and the vector form), `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
 | `fz_generate_antenna` | Parameters | `generate_antenna` (each type with its inputs; all types with tuples of fuzzed lengths and values) and `generate_speaker` |
 | `fz_interpolate_pattern` | Antenna array, angles | `interpolate_pattern` (single and vector form) |
 | `fz_arrayant_edit` | Antenna array | The `arrayant` functions and members in a fuzzed order, the vector overloads of the arrayant functions, `qdant_write` and `qdant_read` |
-| `fz_get_channels` | Antenna arrays, paths | `get_channels_spherical`, `get_channels_planar` (also `_vec`), `get_channels_irs`, `get_channels_multifreq` |
-| `fz_channel_tools` | Coefficients, delays | `quantize_delays`, the `baseband_freq_response` functions |
+| `fz_get_channels` | Antenna arrays, paths | `get_channels_spherical`, `get_channels_planar` (also the vector forms), `get_channels_irs`, `get_channels_multifreq` |
+| `fz_channel_tools` | Coefficients, delays | `quantize_delays`, the `freq_response` functions |
 | `fz_hdf5_write` | Channel object | `channel` member functions, the HDF5 writers, then the HDF5 readers on the written file |
 | `fz_sos` | Frequencies, phases, ACF tables | The `sos_*` functions |
 | `fz_ray_intersect` | Rays, meshes, points | `ray_triangle_intersect`, `ray_point_intersect`, `subdivide_rays` |
 | `fz_mesh_tools` | Triangle mesh | `point_inside_mesh`, `obj_overlap_test`, `subdivide_triangles`, the `triangle_mesh_*` functions, the mesh generators |
 | `fz_point_cloud` | Points | The `point_cloud_*` functions |
-| `fz_spreads` | Delays, angles, powers | `acdf`, `calc_delay_spread`, `calc_angular_spread`, `calc_rician_k_factor`, `calc_cross_polarization_ratio` |
+| `fz_spreads` | Delays, angles, powers | `acdf`, `calc_delay_spread`, `calc_angular_spread`, `calc_rician_k_factor`, `calc_xpr` |
 | `fz_path_tools` | Path coordinates | `coord2path`, `combine_irs_coord`, `path_to_tube`, `generate_diffraction_paths` (EM and scalar mode) |
 
 The file targets write the fuzz input to a file and call the reader. The API targets turn the fuzz input into sizes, indices and values, with sizes that mostly fit together and sometimes do not, and call the functions with them; the comment at the top of each target lists in detail what it calls. Each API target picks `float` or `double` per input. Where the API allows an output argument to be the same object as an input, the targets also call it that way. Not fuzzed: the CUDA code, the MATLAB and Python interfaces, the correctness of results (the job of the unit tests) and thread safety.

@@ -37,7 +37,7 @@ store them in files, move the nodes along tracks and compute the channels of all
 **In Python:**
 
 - The functions are in the submodule `quadriga_lib.layout`, e.g. `quadriga_lib.layout.generate_layout`;
-  `layout_csv_read` and `layout_csv_write` are `layout.csv_read` and `layout.csv_write`. [crossfade_segments](channel-functions.md#crossfade_segments) is in
+  `layout_csv_read` and `layout_csv_write` are `layout.csv_read` and `layout.csv_write`. [crossfade_segments](channel-data-and-processing.md#crossfade_segments) is in
   `quadriga_lib.channel`
 - A layout is a dict with the member names of the C++ class `layout`: `tx`, `rx` and `links` are nested dicts,
   `scenpar_override` is a dict with one array per scenario key
@@ -135,7 +135,7 @@ node, site, gain_dB = quadriga_lib.layout.attach_terminals( layout, *, rule, ray
 - **Evaluation**: at the first rows of both nodes and `layout["center_freq"][i_freq]`, with the link states of the first
   segment, the wrap image and the antennas as in [get_channels_from_rays](#get_channels_from_rays); `layout["pairing"]` is ignored
 - **`"large_scale"`** (TR 38.901 Table 7.8-1): the link gain of [get_channels_from_rays](#get_channels_from_rays) plus the gain of one
-  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [channel.planar](channel-generation-functions.md#channel.planar) gives
+  unit-gain LOS path through both antennas (port weights, element positions, orientations), as [channel.planar](channel-generators.md#channel.planar) gives
   it; no rays
 - **`"rsrp"`** (TR 36.873 eq. (8.1-1)): per Rx port the sum of $\lvert h \rvert^2$ over the rays of
   [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) (`output = "rays"`, mobility `"phase"`), link gain included, transmit power 1
@@ -258,7 +258,7 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#export_rays_qrt) · [MATLA
 
 - Stores the rays of the linked pairs with their link gain as CIRs: one origin per site, one destination per terminal
   and one CIR per row of the terminal
-- Separates the ray generation from the antennas: [qrt_file_read](channel-functions.md#qrt_file_read), [gbsm.rays_from_paths](geometry-based-stochastic-model.md#gbsm.rays_from_paths) and
+- Separates the ray generation from the antennas: [qrt_file_read](channel-data-and-processing.md#qrt_file_read), [gbsm.rays_from_paths](geometry-based-stochastic-model.md#gbsm.rays_from_paths) and
   [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) turn a CIR into channels for any arrays, orientations and positions, without the GBSM
   chain
 - Positions in the file are local; add the returned shift to the positions read back
@@ -299,7 +299,7 @@ shift = quadriga_lib.layout.export_rays_qrt( fn, layout, *, rays )
 
 ### See also:
 - [generate_rays](#generate_rays), [get_channels_from_rays](#get_channels_from_rays) (the rays and the link gain)
-- [qrt_file_read](channel-functions.md#qrt_file_read), [gbsm.rays_from_paths](geometry-based-stochastic-model.md#gbsm.rays_from_paths), [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) (evaluation of the file)
+- [qrt_file_read](channel-data-and-processing.md#qrt_file_read), [gbsm.rays_from_paths](geometry-based-stochastic-model.md#gbsm.rays_from_paths), [gbsm.single_link_channel](geometry-based-stochastic-model.md#gbsm.single_link_channel) (evaluation of the file)
 
 ---
 <a id="generate_layout"></a>
@@ -587,7 +587,7 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#get_channels_from_rays) ·
   rays of [generate_rays](#generate_rays), and returns one channel per Tx node, Rx node and frequency
 - Only the channel links of the given propagation links and of the pairs in `layout["pairing"]` (empty: all) are
   computed; the sectors of a site share the rays of their propagation link
-- Tracks with several segments are joined by [crossfade_segments](channel-functions.md#crossfade_segments)
+- Tracks with several segments are joined by [crossfade_segments](channel-data-and-processing.md#crossfade_segments)
 
 ### Usage:
 ```python
@@ -609,11 +609,11 @@ channels, index = quadriga_lib.layout.get_channels_from_rays( layout, rays, *, i
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays; default: `False`
 - **`overlap`** — Part of the snapshots shared by consecutive segments that the cross-fade uses, in [0, 1], see
-  [crossfade_segments](channel-functions.md#crossfade_segments); default: 0.5
-- **`stack`** — Snapshot layout of the channels as in [hdf5_read_channel](channel-functions.md#hdf5_read_channel); default: `False`
+  [crossfade_segments](channel-data-and-processing.md#crossfade_segments); default: 0.5
+- **`stack`** — Snapshot layout of the channels as in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel); default: `False`
 
 ### Outputs:
-- **`channels`** — Channels; list of channel dicts, keys in [hdf5_read_channel](channel-functions.md#hdf5_read_channel)
+- **`channels`** — Channels; list of channel dicts, keys in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel)
 - **`index`** — Tx node, Rx node and frequency index of each channel, 0-based; int64; `(3, n_channel)`
 
 ### Notes:
@@ -654,7 +654,7 @@ Also in: [C++](../cpp/network-layouts-and-mobility.md#get_channels_layout) · [M
 - Computes the channels in one call from the layout: one channel per Tx node, Rx node and frequency, for the pairs in
   `layout["pairing"]` (empty: all pairs); [get_channels_from_rays](#get_channels_from_rays) is the third stage alone, from given rays
 - Supports tracks (with times or speeds), point drops that move with their speed, tracks of several segments, joined by
-  the cross-fade of [crossfade_segments](channel-functions.md#crossfade_segments), and both output forms, `"taps"` and `"rays"`
+  the cross-fade of [crossfade_segments](channel-data-and-processing.md#crossfade_segments), and both output forms, `"taps"` and `"rays"`
 - Runs the stages [init_link_states](#init_link_states), [generate_rays](#generate_rays) and [get_channels_from_rays](#get_channels_from_rays) with their default settings;
   the results are those of the stages called one by one
 - Without link states in `layout["links"]`, draws them for this call only and leaves the layout unchanged; with link
@@ -678,11 +678,11 @@ channels, index = quadriga_lib.layout.get_channels_layout( layout, *, times, out
 - **`seed`** — Master seed for empty links, as in [init_link_states](#init_link_states); with filled links only -1; default: -1
 - **`config_dirs`** — Folders of user conf files for empty links, searched before the shipped folder; str or list of
   str; default: None
-- **`stack`** — Snapshot layout of the channels as in [hdf5_read_channel](channel-functions.md#hdf5_read_channel); default: `False`
+- **`stack`** — Snapshot layout of the channels as in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel); default: `False`
 
 ### Outputs:
 - **`channels`** — Channels, Tx node fastest, then Rx node, then frequency; list of channel dicts, keys in
-  [hdf5_read_channel](channel-functions.md#hdf5_read_channel)
+  [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel)
 - **`index`** — Tx node, Rx node and frequency index of each channel, 0-based; int64; `(3, n_channel)`
 
 ### Example:

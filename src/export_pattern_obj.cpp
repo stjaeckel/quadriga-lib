@@ -53,7 +53,7 @@ void quadriga_lib::export_pattern_obj(
 ## See also:
 - [[calc_directivity]], [[calc_beamwidth]] (the same pattern as numbers)
 - [[colormap]] (the available color scales)
-- [[channel_export_obj_file]] (exports propagation paths to an OBJ file)
+- [[export_channel_obj]] (exports propagation paths to an OBJ file)
 MD!*/
 
 template <typename dtype>

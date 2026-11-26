@@ -3,25 +3,30 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include "qd_helpers_mex.hpp"
 
 /*!SECTION
-Channel statistics
+Math functions
 SECTION!*/
 
 /*!MD
 # ACDF
-Calculate the empirical averaged cumulative distribution function (CDF)
+Empirical cumulative distribution functions (CDF) of several data sets, their average and quantile statistics
 
-- Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each 
-  column CDF are averaged, then mapped back to the bin grid
-- Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
-- `Inf` and `NaN` values are excluded from computation
-- A data set without any finite value gets a NaN column in `cdf_per_set` and is left out of `cdf_avg`, `mu`
-  and `sig`; if no set has finite values (possible only with `bins_in`), `cdf_avg`, `mu` and `sig` are NaN
-- If `bins_in` is empty, equally spaced bins spanning the data range are generated
+- The CDF of each data set (column of `data`) at the bin centers: each finite value counts for the nearest bin (values
+  outside the bins for the first or last one), and the CDF is the cumulative count divided by the number of finite
+  values of the set
+- Average `cdf_avg` in quantile space: for the probabilities $P = 0, 0.001, \dots, 0.999$, the bins at which the
+  CDFs of the sets reach $P$ are averaged over the sets, and the averaged quantile function is mapped back to the
+  bins; this averages the position of the distributions instead of their CDF values
+- `mu` and `sig`: mean and standard deviation (normalized by $N - 1$) of the quantiles at
+  $P = 0.1, 0.2, \dots, 0.9$ over the sets, each taken over the 11 probabilities within $\pm 0.005$; for one set its
+  quantiles and 0
+- Non-finite values are left out; a set without finite values gets a NaN CDF and is left out of `cdf_avg`, `mu` and
+  `sig`, which are NaN if no set has finite values (possible only with given bins)
+- Generated bins: `n_bins` equally spaced bins from the smallest to the largest finite value of `data` (±10 % of the
+  value, or ±1 for 0, if all are equal); `data` without finite values then throws
 
 ## Usage:
 ```
@@ -29,21 +34,19 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 ```
 
 ## Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, 
-  larger values overflow in `sig`; `[n_samples, n_sets]`
-- **`bins_in`** — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else an
-  error is raised); if empty, equally spaced bins spanning the data range are generated; `[n_bins_in]` or
-  empty; default: `[]`
-- **`n_bins`** — Number of bins when auto-generating; must be >= 2; ignored when non-empty `bins_in` 
-  are provided; default: 201
+- **`data`** — Data sets, one per column, magnitudes below about 1e18; `[n_samples, n_sets]`
+- **`bins_in`** — Bin centers, finite and strictly ascending; `[n_bins_in, 1]`; default: `[]` (generated bins)
+- **`n_bins`** — Number of generated bins, >= 2; not used with `bins_in`; default: 201
 
 ## Outputs:
-- **`cdf_per_set`** — Individual CDFs; one per column of data (NaN for a set without finite values); `[n_bins_out, n_sets]`
-- **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
-  `[n_bins_out, 1]` with `n_bins_out = n_bins` or `n_bins_out = n_bins_in`
-- **`cdf_avg`** — Averaged CDF via quantile-space averaging across the data sets with finite values; `[n_bins_out, 1]`
-- **`mu`** — Mean of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
-- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values; `[9, 1]`
+- **`cdf_per_set`** — CDF of each set; `[n_bins_out, n_sets]`
+- **`bins_out`** — Bin centers, `bins_in` or the generated ones; `[n_bins_out, 1]`
+- **`cdf_avg`** — Average CDF; `[n_bins_out, 1]`
+- **`mu`** — Mean of the quantiles at 0.1, ..., 0.9; `[9, 1]`
+- **`sig`** — Standard deviation of these quantiles; `[9, 1]`
+
+## See also:
+- [[calc_delay_spread]] (delay spreads of many CIRs, a typical input)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
