@@ -13,6 +13,7 @@ matlab = ON
 python = ON
 avx2 = ON
 cuda = OFF
+tests = OFF
 
 # GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12
 gcc_version = 12
@@ -62,7 +63,7 @@ all:
 		-D ENABLE_OCTAVE=$(octave) \
 		-D ENABLE_MEX_DOC=$(python) \
 		-D ENABLE_PYTHON=$(python) \
-		-D ENABLE_TESTS=OFF \
+		-D ENABLE_TESTS=$(tests) \
 		-D ARMA_EXT=$(arma_internal) \
 		-D ENABLE_AVX2=$(avx2) \
 		-D ENABLE_CUDA=$(cuda) \
@@ -94,10 +95,9 @@ python_install: python
 	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
 	cp  $(PYTHON_SHARED_OBJ)  $(PYTHON_SITE_PACKAGES)/
 
-# Tests: builds and installs as "make" does, then builds Catch2 and the test binary and runs the tests
+# Tests: builds and installs as "make" does, with Catch2 and the test binary in the same build, then runs the tests
+test: tests = ON
 test:   all moxunit-lib
-	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
-	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc)
 	bash tests/check_avx2_objects.sh $(CMAKE_BUILD_DIR)
 	bash tests/check_mex_symbol_versions.sh $(CMAKE_BUILD_DIR)
 	bash tests/check_mex_call_qd.sh

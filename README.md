@@ -100,6 +100,7 @@ More examples are in the usage sections of the [API documentation](http://quadri
 - Optional: MATLAB (with a supported compiler, see [MATLAB and GCC](#matlab-and-gcc)), Octave with `octave-dev`, Python 3 with `numpy` and `pytest`
 - Bundled in `external/` (no install needed): Armadillo, pybind11, Catch2, MOxUnit, pugixml
 - Optional, tests only: HDF5 C library 1.12 or newer, for an interoperability test of the HDF5 channel files
+- Optional, faster builds: Ninja, ccache and mold (see [Faster builds](#faster-builds))
 
 On Ubuntu:
 
@@ -151,6 +152,20 @@ make gcc_version= matlab=OFF
 ```
 
 The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly. `ENABLE_SANITIZERS` (CMake only, default `OFF`) builds with AddressSanitizer and UndefinedBehaviorSanitizer for testing; it turns MATLAB, Octave and CUDA off. `ENABLE_FUZZING` (CMake only, default `OFF`, Clang) builds the fuzz targets of [tests/fuzzing](tests/fuzzing/README.md) instead of the interfaces.
+
+### Faster builds
+
+Three tools shorten the build when they are installed; CMake finds and uses them without further settings:
+
+```bash
+sudo apt install ninja-build ccache mold
+```
+
+- **Ninja** runs the build steps instead of Make; the `GNUmakefile` picks it when it is on the `PATH` (`USE_NINJA=0` turns it off; switching needs `make clean`).
+- **ccache** keeps the compiled object files. A new build folder or a second checkout of the same sources then compiles almost nothing. Paths inside the source folder are hashed relative to it, so checkouts at different paths share one cache. The cache size is set with `ccache -M 20G`. `-D ENABLE_CCACHE=OFF` turns it off.
+- **mold** links the MEX files, the Python module and the test binary in a fraction of the time of the default linker.
+
+The MEX files share a precompiled header with Armadillo and the library headers, and the MEX, Python and test code is compiled with `-O2` (the library itself with `-O3`). Changing a library source therefore relinks the MEX files instead of compiling them again.
 
 The shared library has the soname `libquadriga.so.<major>.<minor>`. The API may change between minor releases, so programs linked against the shared library are rebuilt for each minor release.
 

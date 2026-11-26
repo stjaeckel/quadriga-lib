@@ -5,6 +5,7 @@
 matlab = ON
 python = ON
 avx2 = ON
+tests = OFF
 
 # Set to 1 to use Ninja (faster), 0 to use Visual Studio generator
 USE_NINJA = 1
@@ -29,16 +30,16 @@ TEST_BIN  = $(CMAKE_BUILD_DIR)\Release\test_bin.exe
 !ENDIF
 
 all:
-	cmake -B $(CMAKE_BUILD_DIR) $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=%CD% -D ENABLE_AVX2=$(avx2) -D ENABLE_MATLAB=$(matlab) -D ENABLE_PYTHON=$(python) -D ENABLE_TESTS=OFF
+	cmake -B $(CMAKE_BUILD_DIR) $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=%CD% -D ENABLE_AVX2=$(avx2) -D ENABLE_MATLAB=$(matlab) -D ENABLE_PYTHON=$(python) -D ENABLE_TESTS=$(tests)
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
 	cmake --install $(CMAKE_BUILD_DIR) --config Release
 
 # Requires pytest and numpy:
 #	pip install pytest numpy
-# Builds Catch2 and the test binary, then runs the C++, MATLAB and Python tests
-test: all moxunit-lib
-	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
-	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
+# Builds and installs as "all" does, with Catch2 and the test binary in the same build, then runs the C++, MATLAB and
+# Python tests
+test: moxunit-lib
+	$(MAKE) /nologo CMAKE_BUILD_DIR=$(CMAKE_BUILD_DIR) USE_NINJA=$(USE_NINJA) matlab=$(matlab) python=$(python) avx2=$(avx2) tests=ON all
 	$(TEST_BIN)
 !IF "$(matlab)" == "ON"
 	matlab -batch "run('tests\quadriga_lib_mex_tests.m');"

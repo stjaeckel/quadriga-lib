@@ -59,15 +59,18 @@ if(MSVC)
     endif()
 else()
     set(OPT_FLAGS -O3)
+    set(OPT_FLAGS_API -O2) # MEX, Python and test code: the library keeps -O3
     if(ENABLE_FUZZING) # The whole library gets the coverage instrumentation. UBSan stays recoverable, so that the fuzz
         # runner can stop at undefined behaviour (halt_on_error=1) and skip known cases with a suppressions file
         if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             message(FATAL_ERROR "ENABLE_FUZZING needs Clang (libFuzzer), e.g. -D CMAKE_CXX_COMPILER=clang++")
         endif()
         set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,address,undefined)
+        set(OPT_FLAGS_API "")
         add_link_options(-fsanitize=address,undefined)
     elseif(ENABLE_SANITIZERS) # -O1 -g instead of -O3 keeps the stack traces in the reports readable
         set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize-recover=address)
+        set(OPT_FLAGS_API "")
         add_link_options(-fsanitize=address,undefined)
     endif()
     # One section per function and data object, so that the MATLAB MEX links (-Wl,--gc-sections) drop the library
@@ -78,6 +81,26 @@ else()
 endif()
 
 include(ExternalProject)
+
+# The mold linker, when installed, links the MEX files, the Python module and test_bin in a fraction of the time
+find_program(MOLD_LINKER mold)
+if(MOLD_LINKER AND NOT MSVC)
+    add_link_options(-fuse-ld=mold)
+    message(STATUS "Using mold linker: ${MOLD_LINKER}")
+endif()
+
+# Compiler cache: ccache, when installed, stores the object files, so that unchanged sources compile fast in a new
+# checkout or build folder. Paths below the source folder are hashed relative to it, so that checkouts at different
+# paths share the cache; the sloppiness setting lets it cache files that use a precompiled header.
+option(ENABLE_CCACHE "Use ccache when installed" ON)
+if(ENABLE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    find_program(CCACHE_PROGRAM ccache)
+    if(CCACHE_PROGRAM)
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM} base_dir=${CMAKE_SOURCE_DIR} sloppiness=pch_defines,time_macros)
+        set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_CXX_COMPILER_LAUNCHER})
+        message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+    endif()
+endif()
 include(CheckCXXCompilerFlag)
 
 # Check for OpenMP support
@@ -125,6 +148,7 @@ add_custom_command(
 )
 add_custom_command(
     OUTPUT ${MATLAB_MEX_DIR}/.stamp
+    BYPRODUCTS ${MATLAB_MEX_DIR}/lib/libmex.lib ${MATLAB_MEX_DIR}/lib/libmx.lib # Link inputs on Windows
     COMMAND ${CMAKE_COMMAND} -E tar xf ${MATLAB_MEX_ZIP}
     COMMAND ${CMAKE_COMMAND} -E touch ${MATLAB_MEX_DIR}/.stamp
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -269,6 +293,10 @@ if (ENABLE_TESTS)
         if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
             list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
         endif()
+        if(CMAKE_CXX_COMPILER_LAUNCHER) # The compiler cache, with "|" for the list separator
+            string(REPLACE ";" "|" CATCH2_LAUNCHER "${CMAKE_CXX_COMPILER_LAUNCHER}")
+            list(APPEND CATCH2_EP_ARGS LIST_SEPARATOR | CMAKE_ARGS -DCMAKE_CXX_COMPILER_LAUNCHER=${CATCH2_LAUNCHER})
+        endif()
         if (MSVC)
             list(APPEND CATCH2_EP_ARGS CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
             set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/Catch2.lib")
@@ -410,6 +438,13 @@ if (BUILD_SHARED_LIB)
     endif()
 endif()
 
+# Ninja starts the jobs with the longest chain of remaining steps first. An extra step after a target with long
+# units (Python, tests) lets them start with the core library instead of after all MEX files.
+function(qd_start_early tgt)
+    add_custom_command(OUTPUT ${tgt}.stamp COMMAND ${CMAKE_COMMAND} -E touch ${tgt}.stamp DEPENDS ${tgt})
+    add_custom_target(${tgt}_early ALL DEPENDS ${tgt}.stamp)
+endfunction()
+
 # --- Link Target Selection ---
 if(BUILD_SHARED_LIB)
     set(QUADRIGA_LINK_TARGET quadriga_shared)
@@ -417,116 +452,166 @@ else()
     set(QUADRIGA_LINK_TARGET quadriga_static)
 endif()
 
-# --- MATLAB API ---
-if(BUILD_MATLAB)
-    # Compiles MEX files directly with g++ (Linux) or cl.exe (Windows). No MATLAB installation required
-    # Note: MATLAB always links quadriga_static regardless of QUADRIGA_LINK_TARGET, so the MEX files do not need a
-    # libquadriga.so at run time
-    file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
-    if(MSVC)
-        set(MEX_COMPAT_SHIM "")
-    else()
-        set(MEX_COMPAT_SHIM ${CMAKE_SOURCE_DIR}/src/mex_compat_shim.cpp)
+# --- Python API ---
+if (BUILD_PYTHON)
+    execute_process( # Get the Python extension suffix (like .cpython-311-x86_64-linux-gnu.so)
+        COMMAND ${Python3_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
+        OUTPUT_VARIABLE PYTHON_EXTENSION_SUFFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(PYTHON_SOURCES 
+        api_python/python_main.cpp
+        api_python/python_arrayant.cpp
+        api_python/python_channel.cpp
+        api_python/python_RTtools.cpp
+        api_python/python_sos.cpp
+        api_python/python_tools.cpp
+        api_python/python_gbsm.cpp
+        api_python/python_layout.cpp
+    )
+    # The units compile in an object library, which does not wait for the core library
+    add_library(quadriga_py_obj OBJECT ${PYTHON_SOURCES})
+    target_include_directories(quadriga_py_obj PRIVATE
+        ${QUADRIGA_CORE_INCLUDES}
+        ${PYBIND11_H}
+        ${Python3_INCLUDE_DIRS}
+    )
+    add_dependencies(quadriga_py_obj pybind11_lib pugixml_lib)
+    if (NOT ARMADILLO_FOUND)
+        add_dependencies(quadriga_py_obj armadillo_lib)
     endif()
-    file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
-    # MEX build commands do not track their includes, hence the glob; MEX files also depend on the library, so
-    # core-only headers rebuild them whatever their name
-    file(GLOB QD_HELPER_HEADERS "${CMAKE_SOURCE_DIR}/src/qd_helpers_*.hpp")
-    list(FILTER QD_HELPER_HEADERS EXCLUDE REGEX "/qd_helpers_python[^/]*\\.hpp$")
-    set(MEX_MATLAB_TARGETS "")
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(quadriga_py_obj PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+    target_compile_options(quadriga_py_obj PRIVATE ${OPT_FLAGS_API})
+    set_target_properties(quadriga_py_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    add_library(quadriga_py MODULE $<TARGET_OBJECTS:quadriga_py_obj>)
+    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES})
+    else()
+        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES} ${CUDA_LINK_LIBS})
+    endif()
+    set_target_properties(quadriga_py PROPERTIES PREFIX "" OUTPUT_NAME "quadriga_lib" SUFFIX "${PYTHON_EXTENSION_SUFFIX}" POSITION_INDEPENDENT_CODE ON)
+    if(MSVC)
+        target_link_libraries(quadriga_py PRIVATE shlwapi.lib)
+    else()
+        set_target_properties(quadriga_py PROPERTIES INSTALL_RPATH "$ORIGIN" BUILD_RPATH "$ORIGIN")
+    endif()
+    qd_start_early(quadriga_py)
+    message(STATUS "Building Python module: quadriga_lib${PYTHON_EXTENSION_SUFFIX}")
+endif()
 
+# --- MATLAB and Octave API ---
+# Every MEX file is a target of its own: it is compiled once, a library change only relinks it, the compile tracks the
+# included headers, and a compiler cache can store the object. One precompiled header per API holds the headers that
+# all MEX files parse.
+file(GLOB API_MEX_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
+set(MEX_PCH_HEADERS <mex.h> <armadillo> <quadriga_lib.hpp>)
+if(BUILD_MATLAB OR BUILD_OCTAVE)
+    file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
+endif()
+
+# Makes the object library ${tgt} with all MEX files and one precompiled header. Object libraries do not wait for the
+# core library, so they compile while it does. qd_mex_objects(<var> <tgt> <name>) gives the objects of one MEX file and,
+# on MSVC, the object of the header.
+function(qd_add_mex_objects tgt)
+    add_library(${tgt} OBJECT ${API_MEX_FILES})
+    target_include_directories(${tgt} PRIVATE ${MEX_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src
+                               ${ARMADILLO_INCLUDE_DIRS})
+    set_target_properties(${tgt} PROPERTIES COMPILE_OPTIONS "${MEX_COMPILE_OPTIONS}" CXX_EXTENSIONS OFF)
+    target_compile_definitions(${tgt} PRIVATE ${MEX_DEFINITIONS})
+    target_precompile_headers(${tgt} PRIVATE ${MEX_PCH_HEADERS})
+    if(MEX_OBJECT_DEPENDENCIES)
+        add_dependencies(${tgt} ${MEX_OBJECT_DEPENDENCIES})
+    endif()
+endfunction()
+function(qd_mex_objects var tgt name)
+    set(${var} "$<FILTER:$<TARGET_OBJECTS:${tgt}>,INCLUDE,/(${name}\\.cpp|cmake_pch\\.cxx)\\.o(bj)?$>" PARENT_SCOPE)
+endfunction()
+
+if (NOT ARMADILLO_FOUND)
+    set(MEX_OBJECT_DEPENDENCIES armadillo_lib)
+endif()
+
+if(BUILD_MATLAB)
+    # Compiled without a MATLAB installation, with the vendored headers. MATLAB always links quadriga_static
+    # regardless of QUADRIGA_LINK_TARGET, so the MEX files do not need a libquadriga.so at run time. The library is
+    # linked as a file, so that its OpenMP compile flag does not reach the MEX files.
+    set(MEX_INCLUDE_DIRS ${MATLAB_MEX_INCLUDE_DIR})
+    set(MEX_DEFINITIONS MATLAB_MEX_FILE)
+    list(APPEND MEX_OBJECT_DEPENDENCIES matlab_mex_unzip)
+    if(MSVC)
+        # /EHs without "c": MATLAB's error functions throw through extern "C" code. CMake's default /EHsc in
+        # CMAKE_CXX_FLAGS would add the "c"; the other targets get /EHsc from add_compile_options above, and Catch2
+        # has taken its flags before this point.
+        string(REPLACE "/EHsc" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(MEX_COMPILE_OPTIONS /nologo /EHs /O2 /MP)
+    else()
+        set(MEX_COMPILE_OPTIONS ${OPT_FLAGS_API} -fPIC -ffunction-sections -fdata-sections)
+        add_library(mex_compat_shim OBJECT ${CMAKE_SOURCE_DIR}/src/mex_compat_shim.cpp)
+        set_target_properties(mex_compat_shim PROPERTIES COMPILE_OPTIONS "${MEX_COMPILE_OPTIONS}" CXX_EXTENSIONS OFF)
+    endif()
+    qd_add_mex_objects(mexm)
+
+    set(MEX_MATLAB_TARGETS "")
     foreach(mex_src ${API_MEX_FILES})
         get_filename_component(mex_basename ${mex_src} NAME_WE)
-
-        # Uniform dependency: all MEX files depend on the link target
-        set(mex_deps ${mex_src})
-        list(APPEND mex_deps quadriga_static ${MEX_COMPAT_SHIM})
-        list(APPEND mex_deps ${QD_HELPER_HEADERS})
-        list(APPEND mex_deps ${MATLAB_MEX_DIR}/.stamp)
-
+        set(tgt mex_${mex_basename})
+        qd_mex_objects(objects mexm ${mex_basename})
+        add_library(${tgt} MODULE "${objects}")
+        add_dependencies(${tgt} quadriga_static)
+        set_target_properties(${tgt} PROPERTIES PREFIX "" OUTPUT_NAME ${mex_basename} LINKER_LANGUAGE CXX
+                              LIBRARY_OUTPUT_DIRECTORY ${MEX_OUTPUT_DIR})
         if(MSVC)
-            set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexw64")
-            add_custom_command(
-                OUTPUT ${mex_output}
-                COMMAND ${CMAKE_CXX_COMPILER}
-                        /nologo /std:c++17 /EHs /O2 /MT /LD /DMATLAB_MEX_FILE
-                        /I${MATLAB_MEX_INCLUDE_DIR} /I${CMAKE_SOURCE_DIR}/include /I${CMAKE_SOURCE_DIR}/src /I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} ${MEX_COMPAT_SHIM} /link $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS}
-                        shlwapi.lib "${MATLAB_MEX_LIB_DIR}/libmex.lib" "${MATLAB_MEX_LIB_DIR}/libmx.lib"
-                        /OUT:${mex_output} /DLL /EXPORT:mexFunction
-                DEPENDS ${mex_deps}
-                COMMENT "Building MATLAB MEX file ${mex_basename}.mexw64"
-                VERBATIM
-            )
+            set_target_properties(${tgt} PROPERTIES SUFFIX ".mexw64")
+            target_link_libraries(${tgt} PRIVATE $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS} shlwapi.lib
+                                  "${MATLAB_MEX_LIB_DIR}/libmex.lib" "${MATLAB_MEX_LIB_DIR}/libmx.lib")
+            target_link_options(${tgt} PRIVATE /EXPORT:mexFunction)
         else()
-            set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexa64")
-            add_custom_command(
-                OUTPUT ${mex_output}
-                COMMAND ${CMAKE_CXX_COMPILER}
-                        -std=c++17 -O3 -shared -fPIC -ffunction-sections -fdata-sections -DMATLAB_MEX_FILE
-                        -I${MATLAB_MEX_INCLUDE_DIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} ${MEX_COMPAT_SHIM} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS} -lgomp
-                        -Wl,--gc-sections
-                        -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT} -Wl,--no-undefined-version -Wl,--unresolved-symbols=ignore-all
-                        -o ${mex_output}
-                DEPENDS ${mex_deps}
-                COMMENT "Building MATLAB MEX file ${mex_basename}.mexa64"
-                VERBATIM
-            )
+            set_target_properties(${tgt} PROPERTIES SUFFIX ".mexa64")
+            target_sources(${tgt} PRIVATE $<TARGET_OBJECTS:mex_compat_shim>)
+            target_link_libraries(${tgt} PRIVATE $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS} gomp)
+            target_link_options(${tgt} PRIVATE -Wl,--gc-sections -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT}
+                                -Wl,--no-undefined-version -Wl,--unresolved-symbols=ignore-all)
         endif()
-
-        add_custom_target(mex_${mex_basename} ALL DEPENDS ${mex_output})
-        list(APPEND MEX_MATLAB_TARGETS mex_${mex_basename})
+        list(APPEND MEX_MATLAB_TARGETS ${tgt})
     endforeach()
-
     add_custom_target(mex_matlab ALL DEPENDS ${MEX_MATLAB_TARGETS})
 endif()
 
-# --- Octave API ---
 if(BUILD_OCTAVE)
-    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared") # Shared lib
-        execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p INCFLAGS OUTPUT_VARIABLE OCTAVE_INCFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTINCLUDEDIR OUTPUT_VARIABLE OCTAVE_OCTINCLUDEDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTLIBDIR OUTPUT_VARIABLE OCTAVE_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+    # Compiled with the flags of mkoctfile; mkoctfile links them, as it adds a version stub and the Octave libraries
+    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p INCFLAGS OUTPUT_VARIABLE OCTAVE_INCFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+    separate_arguments(OCTAVE_INCFLAGS UNIX_COMMAND "${OCTAVE_INCFLAGS}")
+    list(TRANSFORM OCTAVE_INCFLAGS REPLACE "^-I" "")
+    set(MEX_INCLUDE_DIRS ${OCTAVE_INCFLAGS})
+    set(MEX_DEFINITIONS MEX_DEBUG)
+    set(MEX_COMPILE_OPTIONS ${OPT_FLAGS_API} -fPIC -pthread -fopenmp -U_FORTIFY_SOURCE -Wall -Wpedantic -Wextra -Wfloat-conversion)
+    qd_add_mex_objects(mexo)
+
+    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+        set(QD_MEX_EXTRA_LIBS "")
+        set(QD_MEX_EXTRA_LDFLAGS "-Wl,-rpath,\\$ORIGIN")  # find libquadriga.so next to the .mex
+    else()
+        set(QD_MEX_EXTRA_LIBS ${CUDA_MEX_LINK_LIBS})       # static: pull CUDA in explicitly
+        set(QD_MEX_EXTRA_LDFLAGS "")
     endif()
 
-    file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
-    file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
-    # MEX build commands do not track their includes, hence the glob; MEX files also depend on the library, so
-    # core-only headers rebuild them whatever their name
-    file(GLOB QD_HELPER_HEADERS "${CMAKE_SOURCE_DIR}/src/qd_helpers_*.hpp")
-    list(FILTER QD_HELPER_HEADERS EXCLUDE REGEX "/qd_helpers_python[^/]*\\.hpp$")
     set(MEX_OCTAVE_TARGETS "")
-
     foreach(mex_src ${API_MEX_FILES})
         get_filename_component(mex_basename ${mex_src} NAME_WE)
         set(octave_output "${MEX_OUTPUT_DIR}/${mex_basename}.mex")
-
-        set(mex_deps ${mex_src})
-        list(APPEND mex_deps ${QUADRIGA_LINK_TARGET})
-        list(APPEND mex_deps ${QD_HELPER_HEADERS})
-
-        if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
-            set(QD_MEX_EXTRA_LIBS "")
-            set(QD_MEX_EXTRA_LDFLAGS "-Wl,-rpath,\\$ORIGIN")  # find libquadriga.so next to the .mex
-        else()
-            set(QD_MEX_EXTRA_LIBS ${CUDA_MEX_LINK_LIBS})       # static: pull CUDA in explicitly
-            set(QD_MEX_EXTRA_LDFLAGS "")
-        endif()
-
+        qd_mex_objects(octave_objects mexo ${mex_basename})
         add_custom_command(
             OUTPUT ${octave_output}
-            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE"
-                    ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output} ${mex_src}
+            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}"
+                    ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output} "${octave_objects}"
                     -L$<TARGET_FILE_DIR:${QUADRIGA_LINK_TARGET}> -lquadriga
-                    ${QD_MEX_EXTRA_LIBS}
-                    -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                    ${QD_MEX_EXTRA_LDFLAGS} -s
-            DEPENDS ${mex_deps}
-            COMMENT "Building Octave MEX file ${octave_output}"
-            VERBATIM
+                    ${QD_MEX_EXTRA_LIBS} ${QD_MEX_EXTRA_LDFLAGS} -s
+            DEPENDS mexo ${octave_objects} ${QUADRIGA_LINK_TARGET}
+            COMMENT "Linking Octave MEX file ${mex_basename}.mex"
+            VERBATIM COMMAND_EXPAND_LISTS
         )
-
         list(APPEND MEX_OCTAVE_TARGETS ${octave_output})
     endforeach()
     add_custom_target(mex_octave ALL DEPENDS ${MEX_OCTAVE_TARGETS})
@@ -553,48 +638,6 @@ if(BUILD_MEX_DOC AND (BUILD_MATLAB OR BUILD_OCTAVE))
     add_custom_target(mex_documentation ALL DEPENDS ${MEX_DOC_TARGETS})
 endif()
 
-# --- Python API ---
-if (BUILD_PYTHON)
-    execute_process( # Get the Python extension suffix (like .cpython-311-x86_64-linux-gnu.so)
-        COMMAND ${Python3_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
-        OUTPUT_VARIABLE PYTHON_EXTENSION_SUFFIX
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(PYTHON_SOURCES 
-        api_python/python_main.cpp
-        api_python/python_arrayant.cpp
-        api_python/python_channel.cpp
-        api_python/python_RTtools.cpp
-        api_python/python_sos.cpp
-        api_python/python_tools.cpp
-        api_python/python_gbsm.cpp
-        api_python/python_layout.cpp
-    )
-    add_library(quadriga_py MODULE ${PYTHON_SOURCES})
-    target_include_directories(quadriga_py PRIVATE
-        ${QUADRIGA_CORE_INCLUDES}
-        ${PYBIND11_H}
-        ${Python3_INCLUDE_DIRS}
-    )
-    add_dependencies(quadriga_py pybind11_lib pugixml_lib)
-    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
-        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES})
-    else()
-        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES} ${CUDA_LINK_LIBS})
-    endif()
-    set_target_properties(quadriga_py PROPERTIES PREFIX "" OUTPUT_NAME "quadriga_lib" SUFFIX "${PYTHON_EXTENSION_SUFFIX}" POSITION_INDEPENDENT_CODE ON)
-    if(MSVC)
-        target_link_libraries(quadriga_py PRIVATE shlwapi.lib)
-    else()
-        set_target_properties(quadriga_py PROPERTIES INSTALL_RPATH "$ORIGIN" BUILD_RPATH "$ORIGIN")
-    endif()
-    # The Python units depend on the helper headers except the MEX ones, which they do not include
-    file(GLOB PYTHON_INCLUDED_FILES "api_python/*.cpp" "src/qd_helpers_*.hpp")
-    list(FILTER PYTHON_INCLUDED_FILES EXCLUDE REGEX "/qd_helpers_mex[^/]*\\.hpp$")
-    set_source_files_properties(${PYTHON_SOURCES} PROPERTIES OBJECT_DEPENDS "${PYTHON_INCLUDED_FILES}")
-    message(STATUS "Building Python module: quadriga_lib${PYTHON_EXTENSION_SUFFIX}")
-endif()
-
 # --- Catch2 Tests ---
 if (ENABLE_TESTS)
     set(CATCH2_MAIN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tests/quadriga_lib_catch2_tests.cpp")
@@ -616,38 +659,48 @@ if (ENABLE_TESTS)
         message(STATUS "HDF5 interop test enabled (HDF5 ${HDF5_VERSION})")
     endif()
 
-    add_executable(test_bin ${CATCH2_MAIN_SRC} ${TEST_SOURCES})
-    add_dependencies(test_bin catch2_dep)
-    target_include_directories(test_bin PRIVATE
+    # The test units compile in an object library, which does not wait for the core library
+    add_library(test_obj OBJECT ${CATCH2_MAIN_SRC} ${TEST_SOURCES})
+    add_dependencies(test_obj catch2_dep)
+    if (NOT ARMADILLO_FOUND)
+        add_dependencies(test_obj armadillo_lib)
+    endif()
+    target_include_directories(test_obj PRIVATE
         ${QUADRIGA_CORE_INCLUDES}
         ${CATCH2_INCLUDE_DIR}
         ${HDF5_INTEROP_INCLUDE_DIRS}
     )
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(test_obj PRIVATE OpenMP::OpenMP_CXX)
+    endif()
 
+    add_executable(test_bin "$<FILTER:$<TARGET_OBJECTS:test_obj>,EXCLUDE,\\.gch$>")
     target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB} ${HDF5_INTEROP_LIBS})
     if(HDF5_FOUND)
-        target_compile_options(test_bin PRIVATE ${HDF5_DEFINITIONS}) # E.g. the dllimport switch of a shared HDF5
+        target_compile_options(test_obj PRIVATE ${HDF5_DEFINITIONS}) # E.g. the dllimport switch of a shared HDF5
     endif()
 
     # The kernel tests compare AVX2 with GENERIC under #ifdef BUILD_WITH_AVX2, so the macro is defined only when
     # the library has the AVX2 kernels (the library itself gets BUILD_WITH_AVX2=0 or 1)
     if(BUILD_WITH_AVX2)
-        target_compile_definitions(test_bin PRIVATE BUILD_WITH_AVX2=1)
+        target_compile_definitions(test_obj PRIVATE BUILD_WITH_AVX2=1)
     endif()
 
     # As in the library: nothing links BLAS or LAPACK, so Armadillo must not emit calls to them
-    target_compile_definitions(test_bin PRIVATE ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
+    target_compile_definitions(test_obj PRIVATE ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
 
     if(MSVC)
         target_link_libraries(test_bin PRIVATE shlwapi.lib)
-        target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /MP)
-        target_compile_definitions(test_bin PRIVATE _USE_MATH_DEFINES)
+        target_compile_options(test_obj PRIVATE /EHsc /Zc:__cplusplus /nologo /MP)
+        target_compile_definitions(test_obj PRIVATE _USE_MATH_DEFINES)
     else()
-        target_compile_options(test_bin PRIVATE -w)
+        target_compile_options(test_obj PRIVATE -w ${OPT_FLAGS_API})
     endif()
 
+    qd_start_early(test_bin)
+
     # Catch2 and the library headers are parsed once and reused by every test file
-    target_precompile_headers(test_bin PRIVATE <catch2/catch_test_macros.hpp> <quadriga_lib.hpp>)
+    target_precompile_headers(test_obj PRIVATE <catch2/catch_test_macros.hpp> <quadriga_lib.hpp>)
 endif()
 
 # --- Fuzz targets: tests/fuzzing/README.md ---
