@@ -554,14 +554,11 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
         }
     };
 
-    bool omp_failed = false;
-    std::string omp_error;
-
-    // Pairwise tests, dynamic scheduling balances objects of different size
-#pragma omp parallel for schedule(dynamic) if (n_obj >= 8)
-    for (int i_obj_1_int = 0; i_obj_1_int < (int)n_obj; ++i_obj_1_int)
+    // Pairwise tests, dynamic scheduling balances objects of different size; serial below 8 objects, without a region,
+    // so that ray_triangle_intersect keeps the thread pool
+    qd_batch_loop(n_obj, n_obj >= 8, nullptr, [&](size_t i_obj_1_s)
     {
-        arma::uword i_obj_1 = (arma::uword)i_obj_1_int;
+        arma::uword i_obj_1 = (arma::uword)i_obj_1_s;
 
         arma::uword n_faces_1 = p_faces_per_object[i_obj_1];
         dtype *p_obj_1 = obj_faces[i_obj_1].memptr();
@@ -636,12 +633,8 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
             arma::Mat<dtype> edge_dest_t = edges->rows(3, 5).t(); // [3, n_edges].t() → [n_edges, 3]
             arma::Mat<dtype> faces_t = faces->rows(0, 8).t();     // [9, n_faces].t() → [n_faces, 9]
 
-            OMP_SAFE_CALL(omp_failed, omp_error,
-                          quadriga_lib::ray_triangle_intersect<dtype>(edge_orig_t, edge_dest_t, faces_t,
-                                                                      nullptr, nullptr, nullptr, &hit, &hit_2));
-
-            if (hit.n_elem != n_edges || hit_2.n_elem != n_edges) // Failed, the error is thrown after the loop
-                continue;
+            quadriga_lib::ray_triangle_intersect<dtype>(edge_orig_t, edge_dest_t, faces_t,
+                                                        nullptr, nullptr, nullptr, &hit, &hit_2);
 
             dtype *p_faces = faces->memptr();
             dtype *p_edges = edges->memptr();
@@ -877,10 +870,7 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const ar
                 continue;
             }
         }
-    } // end parallel for
-
-    if (omp_failed)
-        throw std::runtime_error(omp_error);
+    });
 
     // Get the number of intersecting objects
     arma::uword n_intersecting = 0;

@@ -1605,3 +1605,31 @@ TEST_CASE("Get Channels Multifreq - AVX2 interpolation agrees with GENERIC, auto
                                                                  false, false, 299792458.0, nullptr, -1),
                     std::invalid_argument);
 }
+
+TEST_CASE("Multifreq - Parallel frequency loop equals one call per frequency")
+{
+    // 9 output frequencies run the frequency loop in parallel, 1 runs it serially
+    auto tx = wrap_single(quadriga_lib::generate_antenna<double>("xpol", 10.0));
+    auto rx = wrap_single(quadriga_lib::generate_antenna<double>("xpol", 10.0));
+    arma::mat fbs = {{10.0, 5.0, -3.0}, {0.0, 8.0, 6.0}, {2.0, 1.0, 4.0}};
+    arma::mat pg = {{1.0, 0.5}, {0.3, 0.2}, {0.1, 0.4}};
+    arma::vec pl = {12.0, 20.0, 18.0};
+    arma::cube M(8, 3, 2, arma::fill::randn);
+    arma::vec fi = {1e9, 3e9};
+    arma::vec fo = arma::linspace(0.8e9, 3.2e9, 9);
+
+    std::vector<arma::cube> cr, ci, dl;
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 1.0}, {0.0, 0.1, 0.2}, {15.0, 2.0, 1.5}, {0.0, 0.0, 0.5},
+                                         fbs, fbs, pg, pl, M, fi, fo, cr, ci, dl);
+    REQUIRE(cr.size() == 9);
+    for (arma::uword f = 0; f < fo.n_elem; ++f)
+    {
+        std::vector<arma::cube> cr1, ci1, dl1;
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 1.0}, {0.0, 0.1, 0.2}, {15.0, 2.0, 1.5}, {0.0, 0.0, 0.5},
+                                             fbs, fbs, pg, pl, M, fi, arma::vec{fo(f)}, cr1, ci1, dl1);
+        INFO("frequency " << f);
+        CHECK(arma::approx_equal(cr[f], cr1[0], "absdiff", 1e-12));
+        CHECK(arma::approx_equal(ci[f], ci1[0], "absdiff", 1e-12));
+        CHECK(arma::approx_equal(dl[f], dl1[0], "absdiff", 1e-14));
+    }
+}

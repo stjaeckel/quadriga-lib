@@ -245,36 +245,41 @@ TEST_CASE("Test OBJ Overlap - Object IDs are returned as given")
 
 TEST_CASE("Test OBJ Overlap - Reasons do not depend on the call or the thread count")
 {
-    // Six mutually overlapping cubes; the reasons must be identical over repeated calls with 1 and 4 threads
-    arma::mat mesh;
-    arma::uvec obj;
-    for (int i = 0; i < 6; ++i)
-    {
-        arma::mat c = quadriga_lib::cube<double>({1.0}, {}, {0.5 * i, 0.3 * i, 0.1 * i});
-        mesh = arma::join_cols(mesh, c);
-        obj = arma::join_cols(obj, arma::uvec(12, arma::fill::value(i + 1)));
-    }
+    // A chain of mutually overlapping cubes; the reasons must be identical over repeated calls with 1 and 4 threads.
+    // 6 cubes run the pairwise loop serially, 9 in parallel.
     const int n_threads_before = omp_get_max_threads();
-    std::vector<std::string> ref;
-    arma::uvec ref_ids;
-    for (int nt : {1, 1, 4, 4, 1, 4})
+    for (int n_cube : {6, 9})
     {
-        omp_set_num_threads(nt);
-        std::vector<std::string> why;
-        arma::uvec res;
-        res = quadriga_lib::obj_overlap_test(mesh, obj, &why);
-        if (ref.empty())
+        INFO("cubes " << n_cube);
+        arma::mat mesh;
+        arma::uvec obj;
+        for (int i = 0; i < n_cube; ++i)
         {
-            ref = why, ref_ids = res;
-            REQUIRE(res.n_elem == 6);
-            continue;
+            arma::mat c = quadriga_lib::cube<double>({1.0}, {}, {0.5 * i, 0.3 * i, 0.1 * i});
+            mesh = arma::join_cols(mesh, c);
+            obj = arma::join_cols(obj, arma::uvec(12, arma::fill::value(i + 1)));
         }
-        INFO("threads " << nt);
-        CHECK(arma::all(res == ref_ids));
-        CHECK(why == ref);
-    }
-    omp_set_num_threads(n_threads_before);
+        std::vector<std::string> ref;
+        arma::uvec ref_ids;
+        for (int nt : {1, 1, 4, 4, 1, 4})
+        {
+            omp_set_num_threads(nt);
+            std::vector<std::string> why;
+            arma::uvec res;
+            res = quadriga_lib::obj_overlap_test(mesh, obj, &why);
+            if (ref.empty())
+            {
+                ref = why, ref_ids = res;
+                REQUIRE(res.n_elem == (arma::uword)n_cube);
+                continue;
+            }
+            INFO("threads " << nt);
+            CHECK(arma::all(res == ref_ids));
+            CHECK(why == ref);
+        }
+        omp_set_num_threads(n_threads_before);
 
-    // The reason of object 1 is the finding of its first pair (1,2)
-    CHECK(ref[0].find("OBJ-IDs (1,2)") != std::string::npos);
+        // The reason of object 1 is the finding of its first pair (1,2)
+        CHECK(ref[0].find("OBJ-IDs (1,2)") != std::string::npos);
+    }
 }

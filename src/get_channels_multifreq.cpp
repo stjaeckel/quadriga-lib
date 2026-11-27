@@ -20,7 +20,7 @@
 // exact is set when freq matches an entry within 1e-6 (relative) or lies outside the range; then only i_lo is used
 template <typename dtype>
 static inline void qd_find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype freq,
-                                     arma::uword &i_lo, arma::uword &i_hi, dtype &w, bool &exact)
+                                        arma::uword &i_lo, arma::uword &i_hi, dtype &w, bool &exact)
 {
     arma::uword n = center_freqs.n_elem;
     exact = false;
@@ -79,8 +79,8 @@ static inline void qd_find_freq_bracket(const arma::Col<dtype> &center_freqs, dt
 // SLERP per element between two complex matrices given as real and imaginary parts; an empty imaginary part is zero
 template <typename dtype>
 static inline void qd_interpolate_complex_matrix(const arma::Mat<dtype> &re_lo, const arma::Mat<dtype> &im_lo,
-                                              const arma::Mat<dtype> &re_hi, const arma::Mat<dtype> &im_hi,
-                                              dtype w, arma::Mat<dtype> &re_out, arma::Mat<dtype> &im_out)
+                                                 const arma::Mat<dtype> &re_hi, const arma::Mat<dtype> &im_hi,
+                                                 dtype w, arma::Mat<dtype> &re_out, arma::Mat<dtype> &im_out)
 {
     arma::uword nR = re_lo.n_rows, nC = re_lo.n_cols, nE = nR * nC;
     re_out.set_size(nR, nC);
@@ -250,7 +250,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         add(coeff_re, 0), add(coeff_im, 1), add(delay, 2);
         if (coeff != nullptr)
             add(*coeff, 3);
-        std::sort(ranges.begin(), ranges.end(), [](const range &a, const range &b) { return a.first < b.first; });
+        std::sort(ranges.begin(), ranges.end(), [](const range &a, const range &b)
+                  { return a.first < b.first; });
         for (size_t i = 1, i_max = 0; i < ranges.size(); ++i)
         {
             if (ranges[i].first < ranges[i_max].end)
@@ -413,8 +414,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     // Port weights of one array at an output frequency, interpolated between its bracket entries (SLERP per complex entry;
     // empty port_weights_re = identity, empty port_weights_im = zero), and its column-normalized power for the delays
     auto interpolate_port_weights = [](const std::vector<quadriga_lib::arrayant<dtype>> &arr, arma::uword lo, arma::uword hi,
-                                   dtype w, bool exact, arma::uword n_el, arma::uword n_pt,
-                                   arma::Mat<dtype> &cpl_re, arma::Mat<dtype> &cpl_im, arma::Mat<dtype> &cpl_pwr)
+                                       dtype w, bool exact, arma::uword n_el, arma::uword n_pt,
+                                       arma::Mat<dtype> &cpl_re, arma::Mat<dtype> &cpl_im, arma::Mat<dtype> &cpl_pwr)
     {
         const arma::Mat<dtype> &re_lo = arr[lo].port_weights_re, &im_lo = arr[lo].port_weights_im;
         if (exact)
@@ -442,11 +443,6 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     };
 
     // Phase 2: Per-frequency processing (parallelized over output frequencies)
-    // The interpolation calls inside the parallel region do not throw for the validated arrays; should one, the error
-    // is passed on after the region
-    bool omp_failed = false;
-    std::string omp_error;
-
     // Pattern of one array at the angles of one path, interpolated between its bracket entries (SLERP per value)
     auto interpolate_pattern = [&](const std::vector<quadriga_lib::arrayant<dtype>> &arr, arma::uword lo, arma::uword hi,
                                    dtype w, bool exact, const arma::Mat<dtype> &az, const arma::Mat<dtype> &el,
@@ -455,19 +451,16 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     {
         if (exact)
         {
-            OMP_SAFE_CALL(omp_failed, omp_error,
-                          qd_interpolate_pattern_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
-                                                                  V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr, nullptr, kernel));
+            qd_interpolate_pattern_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
+                                                   V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr, nullptr, kernel);
             return;
         }
         arma::Mat<dtype> Vr_lo(n_links, 1), Vi_lo(n_links, 1), Hr_lo(n_links, 1), Hi_lo(n_links, 1);
         arma::Mat<dtype> Vr_hi(n_links, 1), Vi_hi(n_links, 1), Hr_hi(n_links, 1), Hi_hi(n_links, 1);
-        OMP_SAFE_CALL(omp_failed, omp_error,
-                      qd_interpolate_pattern_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
-                                                              Vr_lo, Vi_lo, Hr_lo, Hi_lo, nullptr, nullptr, nullptr, nullptr, kernel));
-        OMP_SAFE_CALL(omp_failed, omp_error,
-                      qd_interpolate_pattern_dispatch<dtype>(arr[hi], az, el, i_element, ori, pos,
-                                                              Vr_hi, Vi_hi, Hr_hi, Hi_hi, nullptr, nullptr, nullptr, nullptr, kernel));
+        qd_interpolate_pattern_dispatch<dtype>(arr[lo], az, el, i_element, ori, pos,
+                                               Vr_lo, Vi_lo, Hr_lo, Hi_lo, nullptr, nullptr, nullptr, nullptr, kernel);
+        qd_interpolate_pattern_dispatch<dtype>(arr[hi], az, el, i_element, ori, pos,
+                                               Vr_hi, Vi_hi, Hr_hi, Hi_hi, nullptr, nullptr, nullptr, nullptr, kernel);
         for (arma::uword k = 0; k < n_links; ++k)
         {
             qd_slerp_complex(Vr_lo[k], Vi_lo[k], Vr_hi[k], Vi_hi[k], w, V_re[k], V_im[k]);
@@ -475,11 +468,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         }
     };
 
-    const int n_freq_new_i = (int)n_freq_new;
-#pragma omp parallel for schedule(static) if (n_freq_new >= 8)
-    for (int f_i = 0; f_i < n_freq_new_i; ++f_i)
-    {
-        const arma::uword f = (arma::uword)f_i;
+    // Serial below 8 frequencies, without a region, so that the antenna interpolation keeps the thread pool
+    qd_batch_loop(n_freq_new, n_freq_new >= 8, nullptr, [&](size_t f_s)
+                  {
+        const arma::uword f = (arma::uword)f_s;
         const dtype f_new = freq_new[f];
         const dtype wavelength = (f_new > zero) ? propagation_speed / f_new : one;
         const dtype wave_number = (f_new > zero) ? two_pi * f_new / propagation_speed : zero;
@@ -661,12 +653,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             const dtype *src_re = PR.memptr(), *src_im = PI.memptr();
             for (arma::uword k = 0; k < PR.n_elem; ++k)
                 dst[2 * k] = src_re[k], dst[2 * k + 1] = src_im[k];
-        }
-
-    }
-
-    if (omp_failed)
-        throw std::runtime_error(omp_error);
+        } });
 }
 
 template void quadriga_lib::get_channels_multifreq(

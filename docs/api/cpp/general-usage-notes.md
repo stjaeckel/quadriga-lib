@@ -11,6 +11,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-genera
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output argument cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation. A returned result is a new object and may be assigned to an input.
 - Invalid inputs (shape/domain, an index outside the layout of a file) cause a `std::invalid_argument`; a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) a `std::runtime_error`.
+- OpenMP: functions with large loops run them in parallel. Call them from serial code or from an active parallel region; inside a region that runs on one thread (`if` false, `num_threads(1)`), their own parallel regions start new threads on every call.
 - Conventions and the names of shared quantities: see the [Glossary](#glossary).
 
 <a id="glossary"></a>
