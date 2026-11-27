@@ -7,6 +7,7 @@ outputs and figures, and the Markdown twins of the tutorial pages and of the tut
 import base64
 import dataclasses
 import json
+import posixpath
 import re
 from dataclasses import dataclass, field
 
@@ -14,7 +15,11 @@ from qdocs import config, prose, render_md
 
 STEM_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
-LANGUAGES = {"python": ("Python", "python"), "matlab": ("MATLAB", "matlab"), "octave": ("Octave", "matlab")}
+# A tutorial has up to one notebook per variant: tutorials/<stem>.ipynb (Python) and tutorials/matlab/<stem>.ipynb
+# (MATLAB, run with the Octave or the MATLAB kernel); the variants share the stem and one entry on the index
+VARIANTS = {"python": ("Python", ""), "matlab": ("MATLAB", "matlab")}  # id: (label, subfolder), in pill order
+KERNELS = {"python": "python", "matlab": "matlab", "octave": "matlab"}  # kernelspec.language: variant (= lexer)
+SHARED_KEYS = ("title", "series", "order", "level")  # metadata the variants of a tutorial must agree on
 META_KEYS = {"title": (str, True), "summary": (str, True), "level": (str, True), "duration_min": (int, True),
              "order": (int, True), "series": (str, False)}
 LEVELS = ("beginner", "intermediate", "advanced")
@@ -53,14 +58,31 @@ class Tutorial:
     duration: int
     order: int          # position in its series (or among the tutorials without a series)
     series: str         # series id (file stem in SERIES_DIR), "" without a series
-    language: str       # display name
     lexer: str          # fence language of the code cells
     cells: list
     files: dict         # site path -> bytes: notebook copy, figures, twin
+    variant: str = "python"   # key of VARIANTS
+    site: str = ""            # site path without extension: tutorials/<stem> or tutorials/matlab/<stem>
+    variants: dict = field(default_factory=dict)  # {variant: Tutorial} of the same stem, shared by all of them
+
+    def url(self, ext, location):
+        """Link from a site file at location to this tutorial's .html or .md file."""
+        return posixpath.relpath("%s.%s" % (self.site, ext), posixpath.dirname(location) or ".")
 
 
 def _text(value):
     return "".join(value) if isinstance(value, list) else (value or "")
+
+
+def _sources(root):
+    """(notebook path, variant, path relative to root, executed copy path) of all committed notebooks."""
+    out = []
+    for variant, (_, sub) in VARIANTS.items():
+        folder = root / FOLDER / sub
+        for p in sorted(folder.glob("*.ipynb")) if folder.is_dir() else []:
+            rel = posixpath.join(FOLDER, sub, p.name)
+            out.append((p, variant, rel, root / posixpath.join(EXECUTED, sub, p.name)))
+    return out
 
 
 def read_all(root, diag, release=False):
@@ -68,8 +90,7 @@ def read_all(root, diag, release=False):
     executed copy tutorials/executed/<stem>.ipynb; diagnostics name the notebook. A notebook with errors is left
     out. Missing executed copies leave their tutorials out with the warning not-executed (an error with
     release); without tutorials/executed/ the index lists no tutorial."""
-    folder = root / FOLDER
-    sources = sorted(folder.glob("*.ipynb")) if folder.is_dir() else []
+    sources = _sources(root)
     if not sources:
         return []
     if release:
@@ -83,17 +104,16 @@ def read_all(root, diag, release=False):
                "lists none")
         return []
     out = []
-    for p in sources:
-        rel = "%s/%s" % (FOLDER, p.name)
-        run = executed / p.name
+    for p, variant, rel, run in sources:
+        run_rel = run.relative_to(root).as_posix()
         if not run.is_file():
-            report(rel, None, "no executed copy %s/%s (make tutorials); left out" % (EXECUTED, p.name))
+            report(rel, None, "no executed copy %s (make tutorials); left out" % run_rel)
             continue
-        t = read(run, rel, diag)
+        t = read(run, rel, diag, variant)
         if t:
             if _meta(p) not in (None, _meta(run)):
-                report(rel, None, "the executed copy %s/%s has other tutorial metadata than the notebook "
-                       "(make tutorials)" % (EXECUTED, p.name))
+                report(rel, None, "the executed copy %s has other tutorial metadata than the notebook "
+                       "(make tutorials)" % run_rel)
             out.append(t)
     return sorted(out, key=lambda t: (t.order, t.title))
 
@@ -110,17 +130,15 @@ def left_out(root):
     """The site files of the tutorials that read_all leaves out because they have not been run: {site path:
     (warning kind, note)} for tutorials/<stem>.html, .md and .ipynb of each notebook without an executed copy.
     The link checks report links to them as warnings; links to tutorials without a notebook stay errors."""
-    folder = root / FOLDER
-    sources = sorted(folder.glob("*.ipynb")) if folder.is_dir() else []
     out = {}
-    for p in sources:
-        if not (root / EXECUTED / p.name).is_file():
+    for p, _, rel, run in _sources(root):
+        if not run.is_file():
             for ext in ("html", "md", "ipynb"):
-                out["%s/%s.%s" % (FOLDER, p.stem, ext)] = ("not-executed", "tutorial not run, make tutorials")
+                out["%s.%s" % (rel[:-len(".ipynb")], ext)] = ("not-executed", "tutorial not run, make tutorials")
     return out
 
 
-def read(p, rel, diag):
+def read(p, rel, diag, variant="python"):
     errors = diag.errors
     stem = p.stem
     if not STEM_RE.match(stem):
@@ -140,13 +158,17 @@ def read(p, rel, diag):
     if "level" in info and info["level"] not in LEVELS:  # a missing level is reported by check_keys
         diag.error(rel, None, "metadata.quadriga_tutorial.level: one of %s" % ", ".join(LEVELS))
     kernel = meta.get("kernelspec", {}).get("language")
-    if kernel not in LANGUAGES:
-        diag.error(rel, None, "metadata.kernelspec.language: missing or not one of %s" % ", ".join(LANGUAGES))
+    if kernel not in KERNELS:
+        diag.error(rel, None, "metadata.kernelspec.language: missing or not one of %s" % ", ".join(KERNELS))
+    elif KERNELS[kernel] != variant:
+        diag.error(rel, None, "metadata.kernelspec.language: a notebook in %s/matlab needs the Octave or MATLAB "
+                   "kernel" % FOLDER if variant == "matlab" else
+                   "metadata.kernelspec.language: a MATLAB or Octave notebook belongs in %s/matlab" % FOLDER)
     if diag.errors > errors:
         return None
-    language, lexer = LANGUAGES[kernel]
+    site = posixpath.join(FOLDER, VARIANTS[variant][1], stem)
     t = Tutorial(stem, rel, info["title"], info["summary"], info["level"], info["duration_min"], info["order"],
-                 info.get("series", ""), language, lexer, [], {"%s/%s.ipynb" % (FOLDER, stem): raw})
+                 info.get("series", ""), variant, [], {site + ".ipynb": raw}, variant, site)
     md_lines, offsets = [], []
     for n, c in enumerate(nb.get("cells", []), 1):
         lines = _text(c.get("source")).split("\n")
@@ -217,11 +239,17 @@ def _declared(root):
     """{series id: [notebook path]} from the committed notebooks, executed or not (unreadable ones are
     reported by read_all)."""
     out = {}
-    for p in sorted((root / FOLDER).glob("*.ipynb")) if (root / FOLDER).is_dir() else []:
+    for p, _, rel, _ in _sources(root):
         info = _meta(p)
         if isinstance(info, dict) and isinstance(info.get("series"), str) and info["series"]:
-            out.setdefault(info["series"], []).append("%s/%s" % (FOLDER, p.name))
+            out.setdefault(info["series"], []).append(rel)
     return out
+
+
+def shown(entry, variant):
+    """The tutorial that a page of the given variant links for an index entry: that variant if it exists,
+    otherwise the entry itself (the variant the index links)."""
+    return entry.variants.get(variant, entry)
 
 
 def group(root, pages, tutorials, diag):
@@ -238,8 +266,19 @@ def group(root, pages, tutorials, diag):
             for rel in paths:
                 diag.error(rel, None, "metadata.quadriga_tutorial.series: no series file %s/%s.md"
                            % (SERIES_DIR, sid))
+    by_stem = {}
     for t in tutorials:  # an executed copy that differs from its notebook was reported by read_all
-        by_id.get(t.series, other).tutorials.append(t)
+        by_stem.setdefault(t.stem, {})[t.variant] = t
+    for variants in by_stem.values():
+        variants = {v: variants[v] for v in VARIANTS if v in variants}  # in pill order
+        entry = next(iter(variants.values()))  # Python if it exists: the variant the index links
+        for t in variants.values():
+            t.variants = variants
+            for key in SHARED_KEYS:
+                if getattr(t, key) != getattr(entry, key):
+                    diag.error(t.path, None, "metadata.quadriga_tutorial.%s: differs from the %s variant %s"
+                               % (key, VARIANTS[entry.variant][0], entry.path))
+        by_id.get(entry.series, other).tutorials.append(entry)
     for s in pages:
         if s.page_id not in declared:
             diag.warning(s.path, None, "no notebook names this series (metadata.quadriga_tutorial.series)",
@@ -247,8 +286,9 @@ def group(root, pages, tutorials, diag):
     out = list(by_id.values()) + ([other] if other.tutorials else [])
     for g in out:
         g.tutorials.sort(key=lambda t: (t.order, t.title))
-        for t in g.tutorials:
-            t.files["%s/%s.md" % (FOLDER, t.stem)] = twin(t, g).encode("utf-8")
+        for entry in g.tutorials:
+            for t in entry.variants.values():
+                t.files[t.site + ".md"] = twin(t, g).encode("utf-8")
     return out
 
 
@@ -265,24 +305,33 @@ class _CellDiag:
 
 def _outputs(t, c, n, rel, diag):
     alt = (c.get("metadata", {}).get("quadriga_tutorial") or {}).get("alt")
-    out = []
+    out, stream = [], None  # stream: name of the stream that made the last output, None after other outputs
     for k, o in enumerate(c.get("outputs", []), 1):
         kind = o.get("output_type")
-        if kind == "stream":
-            out.append(Output("text", ANSI_RE.sub("", _text(o.get("text"))).rstrip("\n")))
-        elif kind == "error":
+        if kind == "stream":  # the Octave kernel ends lines with CRLF and sends each disp() as its own output
+            text = ANSI_RE.sub("", _text(o.get("text")).replace("\r\n", "\n")).rstrip("\n")
+            if o.get("name") == stream:
+                out[-1].text += "\n" + text  # one box for consecutive text of one stream, as Jupyter shows it
+            else:
+                out.append(Output("text", text))
+            stream = o.get("name")
+            continue
+        stream = None
+        if kind == "error":
             diag.error(rel, None, "cell %d: the executed copy has a failing cell (%s)" % (n, o.get("ename")))
         elif kind in ("execute_result", "display_data"):
             data = o.get("data", {})
-            src = "%s/fig-%d-%d" % (t.stem, n, k)
+            src = "%s/fig-%d-%d" % (t.stem, n, k)  # relative to the page, which is next to the figure folder
+            folder = posixpath.dirname(t.site)
             if "image/svg+xml" in data:
                 src += ".svg"
-                t.files["%s/%s" % (FOLDER, src)] = _text(data["image/svg+xml"]).encode("utf-8")
+                t.files["%s/%s" % (folder, src)] = _text(data["image/svg+xml"]).encode("utf-8")
             elif "image/png" in data:
                 src += ".png"
-                t.files["%s/%s" % (FOLDER, src)] = base64.b64decode(_text(data["image/png"]))
+                t.files["%s/%s" % (folder, src)] = base64.b64decode(_text(data["image/png"]))
             elif "text/plain" in data:
-                out.append(Output("text", ANSI_RE.sub("", _text(data["text/plain"])).rstrip("\n")))
+                text = _text(data["text/plain"]).replace("\r\n", "\n")
+                out.append(Output("text", ANSI_RE.sub("", text).rstrip("\n")))
                 continue
             else:
                 diag.warning(rel, None, "cell %d: output %d has no SVG, PNG or plain text; left out" % (n, k),
@@ -299,22 +348,41 @@ def _fence(lines, lang):
     return [ticks + lang] + lines + [ticks]
 
 
+def variant_line(t, location):
+    """'Also in: [MATLAB](...)' or 'Not in: MATLAB': the other variants of a tutorial, as the pills of the HTML
+    pages."""
+    also = ["[%s](%s)" % (label, t.variants[v].url("md", location)) for v, (label, _) in VARIANTS.items()
+            if v != t.variant and v in t.variants]
+    absent = [label for v, (label, _) in VARIANTS.items() if v not in t.variants]
+    return " · ".join(([("Also in: " + " · ".join(also))] if also else []) +
+                      ([("Not in: " + ", ".join(absent))] if absent else []))
+
+
+def _neighbour(label, entry, t, location):
+    x = shown(entry, t.variant)
+    other = " (%s)" % VARIANTS[x.variant][0] if x.variant != t.variant else ""
+    return "%s: [%s](%s)%s" % (label, x.title, x.url("md", location), other)
+
+
 def twin(t, g):
-    """tutorials/<stem>.md: twin header, the downloads, the place in the series g (part n of m, previous and
-    next; not for the tutorials without a series), Markdown cells through the twin writer, code and outputs."""
-    loc = "%s/%s.md" % (FOLDER, t.stem)
+    """<site path>.md: twin header, the downloads, the other variants, the place in the series g (part n of m,
+    previous and next in the same variant where it exists; not for the tutorials without a series), Markdown
+    cells through the twin writer, code and outputs."""
+    loc = t.site + ".md"
     rows = render_md.index_rows([h for c in t.cells for h in c.headings])  # links as their text
     h2 = [(text, hid, None) for text, hid, _ in rows]
-    out = render_md.twin_header(t.title, "%s/%s/%s.html" % (config.SITE_BASE_URL, FOLDER, t.stem), h2)
+    out = render_md.twin_header(t.title, "%s/%s.html" % (config.SITE_BASE_URL, t.site), h2)
     out += ["", "[Download notebook .ipynb](%s.ipynb) · [Markdown .md](%s.md)" % (t.stem, t.stem)]
+    out += ["", variant_line(t, loc)]
     if g.numbered:
-        n = g.tutorials.index(t)
-        line = ["Part %d of %d of [%s](../tutorials.md#%s)" % (n + 1, len(g.tutorials),
-                                                             prose.plain_text(prose.strip_gaps(g.title)), g.id)]
+        n = [e.stem for e in g.tutorials].index(t.stem)
+        index = posixpath.relpath("tutorials.md", posixpath.dirname(loc))
+        line = ["Part %d of %d of [%s](%s#%s)" % (n + 1, len(g.tutorials),
+                                                 prose.plain_text(prose.strip_gaps(g.title)), index, g.id)]
         if n > 0:
-            line.append("Previous: [%s](%s.md)" % (g.tutorials[n - 1].title, g.tutorials[n - 1].stem))
+            line.append(_neighbour("Previous", g.tutorials[n - 1], t, loc))
         if n + 1 < len(g.tutorials):
-            line.append("Next: [%s](%s.md)" % (g.tutorials[n + 1].title, g.tutorials[n + 1].stem))
+            line.append(_neighbour("Next", g.tutorials[n + 1], t, loc))
         out += ["", " · ".join(line)]
     for c in t.cells:
         if c.kind == "markdown":
@@ -339,9 +407,9 @@ def index_twin(page, groups):
             heads = [dataclasses.replace(h, level=h.level + 1) for h in g.page.headings]
             body = render_md.twin_lines(g.page.body, loc, headings=heads)
             text += [""] + body if body else []
-        items = ["%s [%s](%s/%s.md) · %s · %s · about %d min · %s" % (
-                     "%d." % n if g.numbered else "-", t.title, FOLDER, t.stem, t.language, t.level, t.duration,
-                     " ".join(render_md.twin_lines([t.summary], loc)))
+        items = ["%s [%s](%s) · %s · %s · about %d min · %s · %s" % (
+                     "%d." % n if g.numbered else "-", t.title, t.url("md", loc), VARIANTS[t.variant][0], t.level,
+                     t.duration, " ".join(render_md.twin_lines([t.summary], loc)), variant_line(t, loc))
                  for n, t in enumerate(g.tutorials, 1)]
         text += [""] + items if items else []
     return "\n".join(text) + "\n"

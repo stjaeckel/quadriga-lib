@@ -137,8 +137,8 @@ def test_pages_twins_and_index(mini_repo, run_site):
     page = site(mini_repo, "tutorials/mini_demo.html")
     assert '<a class="dl" href="mini_demo.ipynb">Download notebook <small>.ipynb</small></a>' in page
     index = site(mini_repo, "tutorials.html")
-    assert 'href="tutorials/mini_demo.html"' in index and ">Python</span>" in index and ">Beginner</span>" in index
-    assert "<h3>Mini demo</h3>" in index and ">about 5 min</span>" in index
+    assert 'href="tutorials/mini_demo.html"' in index and ">Beginner</span>" in index
+    assert ">Mini demo</a></h3>" in index and ">about 5 min</span>" in index
     md = site(mini_repo, "tutorials.md")
     assert ("1. [Mini demo](tutorials/mini_demo.md) · Python · beginner · about 5 min · A *small* notebook for the "
             "tests.") in md
@@ -155,7 +155,8 @@ def test_series(mini_repo, run_site):
     assert '<section class="tut-series" id="demo"><h2>Demo series</h2>' in index
     assert "What the <em>demo</em> series covers." in index
     assert '<h3 id="before-you-start">Before you start</h3>' in index  # series headings one level down
-    assert '<span class="tut-part">Part 1</span><h3>Mini demo</h3>' in index
+    assert ('<span class="tut-part">Part 1</span><h3><a class="tut-link" href="tutorials/mini_demo.html">Mini demo'
+            '</a></h3>') in index
     assert '<summary><span>Demo series</span><span class="count">1</span></summary>' in index  # sidebar, closed
     assert '<li class="sub"><a href="tutorials/mini_demo.html">Mini demo</a></li>' in index
     md = site(mini_repo, "tutorials.md")
@@ -174,7 +175,7 @@ def test_series_order_and_pager(mini_repo, run_site):
     code, out = run_site(mini_repo)
     assert code == 0, out
     index = site(mini_repo, "tutorials.html")
-    assert index.index("<h3>Zero</h3>") < index.index("<h3>Mini demo</h3>")
+    assert index.index(">Zero</a></h3>") < index.index(">Mini demo</a></h3>")
     page = site(mini_repo, "tutorials/mini_demo.html")
     assert '<span class="tut-part">Part 2 of 2</span>' in page
     assert '<a class="prev" href="mini_zero.html"><small>← Previous</small><span>Zero</span></a>' in page
@@ -232,7 +233,7 @@ def test_tutorials_without_series(mini_repo, run_site):
     index = site(mini_repo, "tutorials.html")
     assert '<section class="tut-series" id="demo"><h2>Demo series</h2>' in index  # kept, without tutorials
     assert '<section class="tut-series" id="other"><h2>Other tutorials</h2>' in index
-    assert "<h3>Mini demo</h3>" in index and 'class="tut-part"' not in index
+    assert ">Mini demo</a></h3>" in index and 'class="tut-part"' not in index
     page = site(mini_repo, "tutorials/mini_demo.html")
     assert 'class="tut-part"' not in page and "tut-pager" not in page  # no parts, no previous and next
     assert '<ol class="tut-parts">' in page and 'href="mini_zero.html">Two</a>' in page
@@ -349,3 +350,164 @@ def test_link_to_missing_tutorial(mini_repo, run_site):
         assert re.search(r"website/faq\.html:\d+: error: link target missing: tutorials/mini_dmeo\.html", out)
         assert re.search(r"website/faq\.md:\d+: error: link target missing: "
                          r"http://quadriga-lib\.org/tutorials/mini_dmeo\.md", out)
+
+
+# MATLAB variants: tutorials/matlab/<stem>.ipynb, executed into tutorials/executed/matlab/, pages in tutorials/matlab/
+
+MNB = "tutorials/matlab/mini_demo.ipynb"
+MRUN = "tutorials/executed/matlab/mini_demo.ipynb"
+
+
+def matlab(root, stem="mini_demo", kernel="octave", **meta):
+    """A MATLAB variant of a Python tutorial: a copy of its notebook and executed copy with an Octave kernel, the
+    code cells fenced as MATLAB and the first stream output ending in CRLF, as Octave writes it."""
+    for src, dst in (("tutorials", "tutorials/matlab"), ("tutorials/executed", "tutorials/executed/matlab")):
+        path = root / src / (stem + ".ipynb")
+        nb = json.loads(path.read_text(encoding="utf-8"))
+        nb["metadata"]["kernelspec"] = {"name": kernel, "display_name": kernel.capitalize(), "language": kernel}
+        nb["metadata"]["quadriga_tutorial"].update(meta)
+        for c in nb["cells"]:
+            for o in c.get("outputs", []):
+                if o.get("output_type") == "stream":
+                    o["text"] = "".join(o["text"]).rstrip("\n") + "\r\n"
+        (root / dst).mkdir(parents=True, exist_ok=True)
+        (root / dst / (stem + ".ipynb")).write_text(json.dumps(nb), encoding="utf-8")
+
+
+def test_variants_python_only(mini_repo, run_site):
+    assert run_site(mini_repo)[0] == 0
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert ('<div class="tut-meta"><span class="tut-part">Part 1 of 1</span><a class="pill" aria-current="page" '
+            'href="mini_demo.html">Python</a><span class="pill none" title="No MATLAB variant">MATLAB –</span>'
+            '<span class="tag">Beginner</span>') in page
+    index = site(mini_repo, "tutorials.html")
+    assert ('<a class="pill only" href="tutorials/mini_demo.html">Python</a><span class="pill none" '
+            'title="No MATLAB variant">MATLAB –</span>') in index
+    assert "\n\nNot in: MATLAB\n" in site(mini_repo, "tutorials/mini_demo.md")
+    assert "· Python · beginner · about 5 min · A *small* notebook for the tests. · Not in: MATLAB\n" in \
+        site(mini_repo, "tutorials.md")
+
+
+def test_variants_both(mini_repo, run_site):
+    matlab(mini_repo, summary="The MATLAB *variant*.", duration_min=7)  # may differ; the index shows Python's
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert "mini_demo.ipynb: " not in out
+    py = site(mini_repo, "tutorials/mini_demo.html")
+    assert ('<a class="pill" aria-current="page" href="mini_demo.html">Python</a>'
+            '<a class="pill" href="matlab/mini_demo.html">MATLAB</a>') in py
+    m = site(mini_repo, "tutorials/matlab/mini_demo.html")
+    assert ('<a class="pill" href="../mini_demo.html">Python</a>'
+            '<a class="pill" aria-current="page" href="mini_demo.html">MATLAB</a><span class="tag">Beginner</span>'
+            '<span class="tag">about 7 min</span>') in m
+    assert '<a href="../../tutorials.html#demo">Demo series</a></p>' in m  # breadcrumb from one folder deeper
+    assert 'class="language-matlab"' in m and '<div class="out"><pre>9.9.9</pre></div>' in m  # CRLF removed
+    assert '<img src="mini_demo/fig-4-1.svg"' in m
+    assert site(mini_repo, "tutorials/matlab/mini_demo/fig-4-1.svg").startswith("<svg")
+    assert '<a class="current" href="mini_demo.html" aria-current="page">Mini demo</a>' in m
+    assert (mini_repo / "website" / MNB).read_bytes() == (mini_repo / MRUN).read_bytes()
+    index = site(mini_repo, "tutorials.html")
+    assert index.count('class="tut-row"') == 1  # one entry for both variants
+    assert '<a class="tut-link" href="tutorials/mini_demo.html">Mini demo</a>' in index
+    assert ('<a class="pill" href="tutorials/mini_demo.html">Python</a>'
+            '<a class="pill" href="tutorials/matlab/mini_demo.html">MATLAB</a>') in index
+    assert "A <em>small</em> notebook for the tests." in index and "variant" not in index
+    twin = site(mini_repo, "tutorials/matlab/mini_demo.md")
+    assert "Web page: http://quadriga-lib.org/tutorials/matlab/mini_demo.html" in twin
+    assert "\n\nAlso in: [Python](../mini_demo.md)\n" in twin
+    assert "Part 1 of 1 of [Demo series](../../tutorials.md#demo)" in twin
+    assert "```matlab\nimport quadriga_lib" in twin
+    assert "the [FAQ](../../faq.md#cite)" in twin
+    assert "\n\nAlso in: [MATLAB](matlab/mini_demo.md)\n" in site(mini_repo, "tutorials/mini_demo.md")
+    assert ("1. [Mini demo](tutorials/mini_demo.md) · Python · beginner · about 5 min · A *small* notebook for the "
+            "tests. · Also in: [MATLAB](tutorials/matlab/mini_demo.md)\n") in site(mini_repo, "tutorials.md")
+
+
+def test_variants_matlab_only(mini_repo, run_site):
+    matlab(mini_repo)
+    (mini_repo / NB).unlink()
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
+    index = site(mini_repo, "tutorials.html")
+    assert '<a class="tut-link" href="tutorials/matlab/mini_demo.html">Mini demo</a>' in index
+    assert ('<span class="pill none" title="No Python variant">Python –</span>'
+            '<a class="pill only" href="tutorials/matlab/mini_demo.html">MATLAB</a>') in index
+    assert '<li class="sub"><a href="tutorials/matlab/mini_demo.html">Mini demo</a></li>' in index  # sidebar
+    m = site(mini_repo, "tutorials/matlab/mini_demo.html")
+    assert '<span class="pill none" title="No Python variant">Python –</span>' in m
+    assert "1. [Mini demo](tutorials/matlab/mini_demo.md) · MATLAB · " in site(mini_repo, "tutorials.md")
+
+
+def test_variant_metadata_must_match(mini_repo, run_site):
+    matlab(mini_repo, title="Other", level="advanced", order=3, series="")
+    code, out = run_site(mini_repo)
+    assert code == 1
+    for key in ("title", "level", "order", "series"):
+        assert ("%s: error: metadata.quadriga_tutorial.%s: differs from the Python variant %s" % (MNB, key, NB)) in out
+
+
+def test_variant_folder_and_kernel(mini_repo, run_site):
+    matlab(mini_repo, kernel="python")
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert ("%s: error: metadata.kernelspec.language: a notebook in tutorials/matlab needs the Octave or MATLAB "
+            "kernel" % MNB) in out
+    shutil.rmtree(mini_repo / "tutorials/matlab")
+    edit(mini_repo, lambda nb: nb["metadata"]["kernelspec"].update(language="octave"))
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert ("%s: error: metadata.kernelspec.language: a MATLAB or Octave notebook belongs in tutorials/matlab"
+            % NB) in out
+
+
+def test_variant_sidebar_and_pager_fall_back(mini_repo, run_site):
+    second(mini_repo, order=2, title="Two")  # Python only
+    matlab(mini_repo)
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    m = site(mini_repo, "tutorials/matlab/mini_demo.html")
+    assert '<li><a href="../mini_zero.html">Two <span class="tag">Python</span></a></li>' in m
+    assert ('<a class="next" href="../mini_zero.html"><small>Next → (Python)</small><span>Two</span></a>') in m
+    zero = site(mini_repo, "tutorials/mini_zero.html")
+    assert '<li><a href="mini_demo.html">Mini demo</a></li>' in zero  # its own language exists
+    assert "Next: [Two](../mini_zero.md) (Python)" in site(mini_repo, "tutorials/matlab/mini_demo.md")
+
+
+def test_variant_not_executed(mini_repo, run_site):
+    matlab(mini_repo)
+    (mini_repo / MRUN).unlink()
+    link_to_tutorials(mini_repo, "matlab/mini_demo")
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert ("%s: warning: no executed copy %s (make tutorials); left out [not-executed]" % (MNB, MRUN)) in out
+    assert re.search(r"website/faq\.html:\d+: warning: link target left out: tutorials/matlab/mini_demo\.html", out)
+    assert not (mini_repo / "website/tutorials/matlab/mini_demo.html").exists()
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert '<span class="pill none" title="No MATLAB variant">MATLAB –</span>' in page
+    code, out = run_site(mini_repo, "--release")
+    assert code == 1 and "%s: error: no executed copy" % MNB in out
+
+
+def test_consecutive_printed_outputs_share_one_box(mini_repo, run_site):
+    edit(mini_repo, lambda nb: nb["cells"][1]["outputs"].append({"output_type": "stream", "name": "stdout",
+                                                                 "text": "second\r\n"}))
+    assert run_site(mini_repo)[0] == 0
+    assert '<div class="out"><pre>9.9.9\nsecond</pre></div>' in site(mini_repo, "tutorials/mini_demo.html")
+    edit(mini_repo, lambda nb: nb["cells"][1]["outputs"].append({"output_type": "stream", "name": "stderr",
+                                                                 "text": "warning: w\n"}))
+    assert run_site(mini_repo)[0] == 0
+    page = site(mini_repo, "tutorials/mini_demo.html")  # another stream starts a new box
+    assert '<pre>9.9.9\nsecond</pre></div><div class="out"><pre>warning: w</pre>' in page
+
+
+def test_variant_fallback_to_matlab(mini_repo, run_site):
+    second(mini_repo, order=0, title="Zero")
+    matlab(mini_repo, stem="mini_zero")
+    (mini_repo / "tutorials/mini_zero.ipynb").unlink()  # part 1 exists in MATLAB only
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert '<li><a href="matlab/mini_zero.html">Zero <span class="tag">MATLAB</span></a></li>' in page
+    assert '<a class="prev" href="matlab/mini_zero.html"><small>← Previous (MATLAB)</small>' in page
+    assert "Previous: [Zero](matlab/mini_zero.md) (MATLAB)" in site(mini_repo, "tutorials/mini_demo.md")

@@ -13,6 +13,7 @@ Contributions are welcome. For anything beyond a small fix, please open an issue
 - [Writing](#writing)
 - [Figures](#figures)
 - [Results and sources](#results-and-sources)
+- [MATLAB variants](#matlab-variants)
 - [Running the notebooks](#running-the-notebooks)
 - [Checking the page on the website](#checking-the-page-on-the-website)
 - [Before submitting](#before-submitting)
@@ -49,6 +50,8 @@ pip install quadriga-lib numpy matplotlib jupyter
 
 Tutorials are written against the next release, so they may use functions that are not on PyPI yet; an existing tutorial can then fail with a released package (e.g. `AttributeError: module 'quadriga_lib' has no attribute ...`). In that case, build the library from the source tree and install its Python module into the active environment with `make python_install` from the repository root. This needs a C++ compiler and CMake; the steps and requirements are in [Building from source](../README.md#building-from-source) in the repository README.
 
+A MATLAB variant of a tutorial ([MATLAB variants](#matlab-variants)) is run with Octave and its Jupyter kernel `octave`: install Octave (on Ubuntu `sudo apt install octave`) and the package `octave_kernel` in the same environment (`conda install -c conda-forge octave_kernel` or `pip install octave_kernel`). The kernel needs the MEX files of Quadriga-Lib, the folder `+quadriga_lib`: the build from the source tree (`make` in the repository root) puts it into the repository root, where the tutorial build looks for it ([Running the notebooks](#running-the-notebooks)).
+
 Building the website needs further tools: pandoc and a few Python packages, listed in [Set up a build machine](../website_builder/README.md#set-up-a-build-machine) in the website README. `make website` uses the `python3` found first on the `PATH`, so activate the environment that has these packages before building; it can be the same environment as for the tutorials or another one.
 
 Readers set up their environment from the "Setup" section of the tutorial index page of the website. Its text is maintained in `website_builder/content/tutorials.md` and applies to all tutorials; packages that only one tutorial or series needs are named in that tutorial.
@@ -57,7 +60,7 @@ Readers set up their environment from the "Setup" section of the tutorial index 
 
 A new tutorial is created under its final name, `tutorials/<stem>.ipynb` ([Naming and metadata](#naming-and-metadata)). Files with other names, such as JupyterLab's `Untitled.ipynb`, are picked up by the build as well and stop the website build, because the name does not follow the rules; rename them before running the build.
 
-1. In JupyterLab, create a notebook with the Python 3 kernel and rename it to `<stem>.ipynb` in `tutorials/`. Saving it with a kernel writes `metadata.kernelspec`, which the website builder needs.
+1. In JupyterLab, create a notebook with the Python 3 kernel and rename it to `<stem>.ipynb` in `tutorials/` (a MATLAB variant: the Octave kernel, `tutorials/matlab/<stem>.ipynb`). Saving it with a kernel writes `metadata.kernelspec`, which the website builder needs.
 2. Add the tutorial metadata `quadriga_tutorial` to the notebook metadata ([Naming and metadata](#naming-and-metadata)).
 3. Save.
 
@@ -91,7 +94,7 @@ Example, as it appears in the notebook metadata:
 }
 ```
 
-The language of the code comes from `metadata.kernelspec.language`, which Jupyter writes when the notebook is saved with a kernel. The website builder accepts `python`, `matlab` and `octave`; this README describes Python notebooks.
+The language of the code comes from `metadata.kernelspec.language`, which Jupyter writes when the notebook is saved with a kernel. A notebook in `tutorials/` uses the Python kernel (`python`), a MATLAB variant in `tutorials/matlab/` the Octave kernel (`octave`; the builder also accepts `matlab`).
 
 Each code cell that produces a figure carries an alt text in its cell metadata, `"quadriga_tutorial": {"alt": "..."}`. The alt text describes what the figure shows (axes, curves, the visible result) for readers who cannot see it. In JupyterLab, cell metadata is edited in the property inspector ([Editing notebooks](#editing-notebooks)).
 
@@ -152,18 +155,34 @@ A figure should be readable without the surrounding text.
 - A statement is cited from a source that was read in full, not from its abstract or from another paper that cites it. Where a claim could not be checked in the original, the text says so or leaves the claim out. Conventions (definitions, parameters, normalizations) are attributed only to sources that use them.
 - Bibliographic details and DOIs can be checked with the Crossref API, `https://api.crossref.org/works/<doi>`.
 
+## MATLAB variants
+
+A tutorial can have a MATLAB variant: the same tutorial written with the MATLAB API, as a second notebook `matlab/<stem>.ipynb` with the stem of the Python notebook. The website shows both as one tutorial: the index has one entry for them, and the line under the title of each page has the pills Python and MATLAB, which link the other variant; a variant that does not exist is shown dashed. A tutorial can also exist as a MATLAB notebook only.
+
+- The MATLAB variant is run with the Octave kernel, so that its outputs can be made with free software. Its code also runs in MATLAB; the check below shows this.
+- Its content and sections follow the Python notebook. Text that names Python functions, packages or API links (`python_api.html#...`) names the MATLAB ones instead (`mex_api.html#...`).
+- The keys `title`, `series`, `order` and `level` of the tutorial metadata are the same as in the Python notebook; otherwise the website build stops with an error. `summary` and `duration_min` may differ; the index shows those of the Python notebook.
+- The first Markdown cell says that the code runs in MATLAB R2024a or newer (the oldest MATLAB release the library supports) and in Octave 8.4 or newer (the version of Ubuntu 24.04), and that the outputs on the page were made with Octave; the first code cell prints `version()` and `quadriga_lib.version()`.
+- The code runs in both programs: char arrays in single quotes (double quotes make a string object in MATLAB and a char array in Octave), comments with `%`, `~=` and `~` (not `!=` and `!`), `fprintf` and `disp` (not `printf`), `end` (not `endif` or `endfor`), no `++` or `+=`, and only functions and properties that both have in these versions (e.g. `caxis`, not `clim`; `set(cb, 'Position', ...)` after `cb = colorbar()`, not `colorbar('Position', ...)`; the colorbar property `YTick`, not `Ticks`).
+- The Octave kernel shows the figures of a cell as PNG. Alt texts are given as for Python ([Naming and metadata](#naming-and-metadata)).
+
+`make -C tutorials check-matlab` runs the code cells of each MATLAB variant as a script in MATLAB, with hidden figures, and keeps no output. It finds syntax and functions that MATLAB does not have, but not a difference in behaviour such as the double quotes above. It needs MATLAB on the `PATH` (or `MATLAB_BIN=/path/to/matlab`) and a license that allows this use. A check that runs longer than 3 minutes is stopped (exit 124); MATLAB in batch mode occasionally hangs, at start or after the first output, so repeat the command once before looking for the cause.
+
 ## Running the notebooks
 
 ```bash
 make tutorials                                   # from the repository root: all notebooks
-make -C tutorials executed/<stem>.ipynb          # one notebook
+make -C tutorials python                         # only the Python notebooks
+make -C tutorials matlab                         # only the MATLAB variants, with Octave
+make -C tutorials executed/<stem>.ipynb          # one notebook (a MATLAB variant: executed/matlab/<stem>.ipynb)
+make -C tutorials check-matlab                   # run the code of the MATLAB variants in MATLAB
 make -C tutorials clean                          # delete the executed copies, clear all notebooks
 ```
 
-`make tutorials` runs every notebook that is newer than its executed copy into `executed/<stem>.ipynb`, four notebooks at a time; `JOBS=8` or `JOBS=1` changes that. It uses the `python3` of the active environment; `PYTHON=/path/to/env/bin/python` selects another one without activating it. An executed copy depends only on its notebook: after a change of Quadriga-Lib or of the environment, `make -C tutorials clean` forces a new run of all notebooks.
+`make tutorials` runs every notebook that is newer than its executed copy into `executed/<stem>.ipynb`, and the MATLAB variants into `executed/matlab/<stem>.ipynb`, four notebooks at a time; `JOBS=8` or `JOBS=1` changes that. It uses the `python3` of the active environment; `PYTHON=/path/to/env/bin/python` selects another one without activating it. Octave and MATLAB find the MEX files through `OCTAVE_PATH` and `MATLABPATH`, which the build sets to the repository root unless they are already set in the environment; set them to another folder that contains `+quadriga_lib` (e.g. `OCTAVE_PATH=/usr/share/quadriga-lib`) to use an installed library. An executed copy depends only on its notebook: after a change of Quadriga-Lib or of the environment, `make -C tutorials clean` forces a new run of all notebooks.
 
 - The notebook itself is not changed. The run records no timestamps, so two runs in the same environment give byte-identical copies, and clearing an executed copy gives back the committed notebook.
-- A cell that raises an error stops the run of its notebook with the traceback and leaves no executed copy. The other notebooks still run; `make` then exits with an error.
+- A cell that raises an error stops the run of its notebook with the traceback and leaves no executed copy. The other notebooks still run; `make` then exits with an error. The Octave kernel reports an error only as text (`error: ...`) and runs the following cells; the run then fails as well and names the cell. For the same reason, a line that the code itself prints starting with `error: ` fails the run. Warnings (`warning: ...`) do not stop the run and are shown under the cell on the page, as Python warnings are.
 - `make -C tutorials clean` deletes `executed/` and clears every notebook in the folder in place: it removes outputs, execution counts and the metadata a run adds, and keeps cell ids and the tutorial metadata. A notebook that is already clear is not rewritten. To clear only one notebook, run `python3 -m qnb.clear <stem>.ipynb` in this folder.
 - From the repository root, `make clean` keeps the executed copies; `make tidy` runs the tutorial clean.
 
@@ -173,10 +192,12 @@ Troubleshooting:
 - `ModuleNotFoundError: No module named 'quadriga_lib'` (or numpy, matplotlib) in a cell: the kernel `python3` belongs to another environment. `jupyter kernelspec list` shows which one; run `make` in the environment that has the packages, or select it with `PYTHON=`.
 - `AttributeError: module 'quadriga_lib' has no attribute ...`: the installed Quadriga-Lib is older than the tutorial needs ([Environment](#environment)).
 - `qnb.run: No module named 'nbclient'`: Jupyter is not installed in the environment that runs `make`.
+- `No such kernel named octave`: `octave_kernel` is not installed in the environment that runs `make` ([Environment](#environment)).
+- `error: '...' undefined` for a `quadriga_lib.` function in a MATLAB variant: Octave does not find the MEX files, or they are older than the tutorial needs. Build them (`make` in the repository root) or set `OCTAVE_PATH`.
 
 ## Checking the page on the website
 
-The website builder publishes one tutorial for each notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy `tutorials/executed/<stem>.ipynb`; it never runs or changes the notebooks. Each tutorial gives a page `tutorials/<stem>.html`, a Markdown version `tutorials/<stem>.md`, its figures, and the executed notebook as a download. The tutorial index `tutorials.html` lists the tutorials by series, below a common part.
+The website builder publishes one tutorial for each notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy `tutorials/executed/<stem>.ipynb`; it never runs or changes the notebooks. Each tutorial gives a page `tutorials/<stem>.html`, a Markdown version `tutorials/<stem>.md`, its figures, and the executed notebook as a download; a MATLAB variant gives the same files in `tutorials/matlab/`. The tutorial index `tutorials.html` lists the tutorials by series, below a common part.
 
 ```bash
 make website                                     # in an environment with the website tools
@@ -204,9 +225,10 @@ How the builder renders notebooks and the full list of its error messages are in
 | Path | Content |
 |------|---------|
 | `<stem>.ipynb` | The tutorials, committed without outputs |
-| `executed/` | The executed copies with their outputs, made by `make tutorials`; not in git |
+| `matlab/<stem>.ipynb` | The MATLAB variants, committed without outputs |
+| `executed/` | The executed copies with their outputs, made by `make tutorials` (the MATLAB variants in `executed/matlab/`); not in git |
 | `GNUmakefile` | Targets to run and clear the notebooks |
-| `qnb/` | Python helpers of the build: `qnb/run.py` runs one notebook into its executed copy, `qnb/clear.py` clears notebooks (standard library only) |
+| `qnb/` | Python helpers of the build: `qnb/run.py` runs one notebook into its executed copy, `qnb/clear.py` clears notebooks, `qnb/to_m.py` writes the code cells of a notebook as a MATLAB script for the check (both standard library only) |
 | `README.md` | This file |
 
-The helpers are called as `python3 -m qnb.run` and `python3 -m qnb.clear` from this folder, so that a makefile for another platform can use the same commands.
+The helpers are called as `python3 -m qnb.run`, `python3 -m qnb.clear` and `python3 -m qnb.to_m` from this folder, so that a makefile for another platform can use the same commands.

@@ -15,7 +15,7 @@
 <section class="tut-series" id="{{ g.id }}"><h2>{{ g.title }}</h2>
 {{ g.body }}
 {% if g.tutorials %}
-<ol class="tut-list">{% for t in g.tutorials %}<li><a class="tut-row" href="tutorials/{{ t.stem }}.html">{% if g.numbered %}<span class="tut-part">Part {{ t.part }}</span>{% endif %}<h3>{{ t.title }}</h3><p>{{ t.summary }}</p><span class="meta"><span class="tag lang">{{ t.language }}</span><span class="tag">{{ t.level }}</span><span class="tag">about {{ t.duration }} min</span></span></a></li>{% endfor %}</ol>
+<ol class="tut-list">{% for t in g.tutorials %}<li><div class="tut-row">{% if g.numbered %}<span class="tut-part">Part {{ t.part }}</span>{% endif %}<h3><a class="tut-link" href="{{ t.href }}">{{ t.title }}</a></h3><p>{{ t.summary }}</p><span class="meta">{% with pills = t.pills %}{% include "_tut_pills.html" %}{% endwith %}<span class="tag">{{ t.level }}</span><span class="tag">about {{ t.duration }} min</span></span></div></li>{% endfor %}</ol>
 {% endif %}
 </section>
 {% endfor %}

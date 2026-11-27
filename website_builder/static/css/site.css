@@ -313,8 +313,8 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .fn-langs .lbl { color: var(--muted); margin-right: 2px; }
 .pill { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; text-decoration: none; color: var(--fg); font-weight: 500; }
 .pill:hover { border-color: var(--link); color: var(--link); }
-.pill[aria-current="page"] { background: var(--bar); border-color: var(--bar); color: #fff; }
-@media (prefers-color-scheme: dark) { .pill[aria-current="page"] { background: var(--link); border-color: var(--link); color: var(--btn-fg); } }
+.pill[aria-current="page"], .pill.only { background: var(--bar); border-color: var(--bar); color: #fff; }
+@media (prefers-color-scheme: dark) { .pill[aria-current="page"], .pill.only { background: var(--link); border-color: var(--link); color: var(--btn-fg); } }
 .pill.none { color: var(--muted); border-style: dashed; }
 .fn-langs .md { margin-left: auto; }
 .fn-entry h4 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: var(--s5); font-weight: 600; }
@@ -366,8 +366,13 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .prose .tut-series > h2 { margin-top: var(--s7); }
 .tut-list { list-style: none; padding: 0 !important; display: grid; gap: var(--s3); }
 .prose .tut-list li + li { margin-top: 0; }
-.tut-row { display: grid; gap: 6px; padding: var(--s4) var(--s5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); text-decoration: none; color: var(--fg); transition: border-color .15s; }
-.tut-row:hover { border-color: var(--link); color: var(--fg); }
+/* the title link covers the whole row (::after); the pills and links in the summary lie above it */
+.tut-row { position: relative; display: grid; gap: 6px; padding: var(--s4) var(--s5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); color: var(--fg); transition: border-color .15s; }
+.tut-row:hover, .tut-row:focus-within { border-color: var(--link); }
+.tut-link { color: inherit; text-decoration: none; }
+.tut-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.tut-row .pill, .tut-row p a { position: relative; z-index: 1; }
+.tut-row .pill, .tut-meta .pill { min-height: 22px; padding: 0 8px; }
 .prose .tut-row h3 { margin: 0; font-size: 1.0625rem; color: var(--link); }
 .tut-row p { color: var(--muted); font-size: .9375rem; margin: 0; }
 .tut-part { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
@@ -386,7 +391,7 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .tut-pager small { color: var(--muted); font-size: var(--fs-xs); }
 .tut-pager span { color: var(--link); font-weight: 600; }
 .tag { border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px; color: var(--muted); }
-.tag.lang { border-color: var(--link); color: var(--link); }
+.idx .tag { margin-left: 4px; padding: 0 6px; font-size: var(--fs-xs); font-weight: 400; }
 .cell { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .cell .cell-label { font: 500 var(--fs-xs) var(--font-mono); color: var(--muted); padding: 6px 12px; background: var(--card); border-bottom: 1px solid var(--line); }
 .cell pre { border: 0; border-radius: 0; }

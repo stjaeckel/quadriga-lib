@@ -15,7 +15,7 @@ from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Generic, Keyword, Name, Number, String
 
 from qdocs import config, links, prose, render_md
-from . import assets, mdparse
+from . import assets, mdparse, tutorials
 
 # Span-free colouring: the first matching entry gives the class; other tokens are plain text
 TOKEN_CLASSES = ((Comment, "c"), (Keyword.Type, "kt"), (Name.Class, "kt"), (Name.Namespace, "kt"),
@@ -305,9 +305,27 @@ def _plain(html_text):
     return html.unescape(re.sub(r"<[^>]*>", "", str(html_text)))
 
 
-def _tut_item(ctx, t, n):
-    return {"stem": t.stem, "title": t.title, "summary": ctx.inline(t.summary, t.path), "language": t.language,
-            "level": t.level.capitalize(), "duration": t.duration, "part": n}
+def _tut_pills(entry, location, page=None):
+    """(label, href, state) per variant of a tutorial: state "current" (the variant of the page), "only" (the
+    only variant, on the index), "" (another variant) or "none" (missing, href None)."""
+    out = []
+    for v, (label, _) in tutorials.VARIANTS.items():
+        x = entry.variants.get(v)
+        if x is None:
+            out.append((label, None, "none"))
+        else:
+            state = "current" if x is page else "only" if page is None and len(entry.variants) == 1 else ""
+            out.append((label, x.url("html", location), state))
+    return out
+
+
+def _tut_item(ctx, entry, n, page=None):
+    """An index entry as seen from a page: on a tutorial page of one variant (page), the entry's tutorial of the
+    same variant if it exists, else the one the index links, with the label of its variant in "other"."""
+    t = tutorials.shown(entry, page.variant) if page is not None else entry
+    other = tutorials.VARIANTS[t.variant][0] if page is not None and t.variant != page.variant else None
+    return {"title": t.title, "summary": ctx.inline(t.summary, t.path), "href": t.url("html", ctx.location),
+            "current": t is page, "other": other, "level": t.level.capitalize(), "duration": t.duration, "part": n}
 
 
 def tutorial_groups(ctx, groups):
@@ -319,7 +337,8 @@ def tutorial_groups(ctx, groups):
         body = ctx.fragment(p.body, "prose", p.path, p.body_line, headings=p.headings, shift=1) \
             if p is not None and p.body else Markup("")
         out.append({"id": g.id, "title": ctx.inline(g.title, p.path) if p is not None else g.title, "body": body,
-                    "numbered": g.numbered, "tutorials": [_tut_item(ctx, t, n) for n, t in enumerate(g.tutorials, 1)]})
+                    "numbered": g.numbered, "tutorials": [dict(_tut_item(ctx, t, n), pills=_tut_pills(t, ctx.location))
+                                                          for n, t in enumerate(g.tutorials, 1)]})
     return out
 
 
@@ -341,13 +360,14 @@ def tutorial_page(ctx, t, g):
             cells.append({"md": None, "label": c.count, "lang": t.lexer,
                           "code": highlight("\n".join(c.lines), t.lexer), "outs": outs})
     summary = ctx.inline(t.summary, t.path)
-    n = g.tutorials.index(t)
-    items = [_tut_item(ctx, x, k) for k, x in enumerate(g.tutorials, 1)]
+    n = [e.stem for e in g.tutorials].index(t.stem)
+    items = [_tut_item(ctx, x, k, t) for k, x in enumerate(g.tutorials, 1)]
     rows = render_md.index_rows([h for c in t.cells for h in c.headings])  # links as their text
     heads = [(ctx.inline(text, t.path), hid) for text, hid, _ in rows]
     numbered = g.numbered
     return {"stem": t.stem, "title": t.title, "summary": summary, "description": _plain(summary),
-            "language": t.language, "level": t.level.capitalize(), "duration": t.duration, "cells": cells,
+            "pills": _tut_pills(t, ctx.location, t), "level": t.level.capitalize(), "duration": t.duration,
+            "cells": cells,
             # the series title is shown inside links (breadcrumb, sidebar), so as plain text
             "series": {"id": g.id, "title": prose.plain_text(g.title), "numbered": numbered, "tutorials": items},
             "part": n + 1, "parts": len(items),
@@ -408,11 +428,11 @@ def render_site(model, diag):
          lead=ctx.inline(idx.lead, idx.path), body=_prose(ctx, idx), intro_index=_index(ctx, idx, 1),
          groups=tutorial_groups(ctx, model["tutorial_groups"]), title=idx.title, description=idx.description)
     for g in model["tutorial_groups"]:
-        for t in g.tutorials:
-            path = "tutorials/%s.html" % t.stem
+        for t in (t for entry in g.tutorials for t in entry.variants.values()):
+            path = t.site + ".html"
             ctx.location = path
             tut = tutorial_page(ctx, t, g)
-            page(path, "tutorial.html", root="../", current="tutorials", twin="tutorials/%s.md" % t.stem,
+            page(path, "tutorial.html", root="../" * path.count("/"), current="tutorials", twin=t.site + ".md",
                  tut=tut, title=t.title, description=tut["description"])
 
     pages = formulas(ctx, pages)
