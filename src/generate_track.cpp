@@ -284,7 +284,7 @@ Positions and orientations of a node at snapshot times
 void quadriga_lib::sample_track(
     const quadriga_lib::layout_nodes &nodes,
     arma::uword i_node,
-    const arma::vec &times,
+    const double_list &times,
     arma::mat &pos,
     arma::mat &orientation,
     arma::uvec *i_row = nullptr);
@@ -334,9 +334,10 @@ quadriga_lib::sample_track(L.rx, 0, arma::linspace(0.0, 1.0, 11), pos, ori);
 - [[layout]] (the members of a node)
 MD!*/
 
-void quadriga_lib::sample_track(const layout_nodes &nodes, arma::uword i_node, const arma::vec &times, arma::mat &pos,
+void quadriga_lib::sample_track(const layout_nodes &nodes, arma::uword i_node, const double_list &times_in, arma::mat &pos,
                                 arma::mat &orientation, arma::uvec *i_row)
 {
+    const arma::vec &times = times_in.vec();
     if (i_node >= nodes.name.size())
         throw std::invalid_argument("Input 'i_node' is out of range.");
     check_structure(nodes, false, i_node);
@@ -482,7 +483,7 @@ Set the orientation of nodes from their motion, or to a given value
 ```
 void quadriga_lib::set_orientation(
     quadriga_lib::layout_nodes &nodes,
-    const arma::vec &orientation = {},
+    const double_list &orientation = {},
     const uint_list &i_node = {},
     bool force = false);
 ```
@@ -498,7 +499,7 @@ void quadriga_lib::set_orientation(
 ```
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_orientation(L.rx);                                  // The antennas look along the motion
-quadriga_lib::set_orientation(L.rx, arma::vec{0.0, 0.0, 0.5});        // The same, turned by 0.5 rad
+quadriga_lib::set_orientation(L.rx, {0.0, 0.0, 0.5});                 // The same, turned by 0.5 rad
 ```
 
 ## Notes:
@@ -518,8 +519,9 @@ quadriga_lib::set_orientation(L.rx, arma::vec{0.0, 0.0, 0.5});        // The sam
 - [[sample_track]] (applies the motion to mounted antennas)
 MD!*/
 
-void quadriga_lib::set_orientation(layout_nodes &nodes, const arma::vec &orientation, const uint_list &i_node, bool force)
+void quadriga_lib::set_orientation(layout_nodes &nodes, const double_list &orientation_in, const uint_list &i_node, bool force)
 {
+    const arma::vec &orientation = orientation_in.vec();
     check_structure(nodes);
     if (orientation.n_elem != 0 && orientation.n_elem != 3)
         throw std::invalid_argument("Input 'orientation' must be empty or have 3 elements (bank, tilt, heading).");
@@ -679,12 +681,12 @@ void quadriga_lib::generate_track(
     const std::string &type,
     double length = 0.0,
     double speed = NAN,
-    const arma::vec &direction = {},
+    const double_list &direction = {},
     double spacing = NAN,
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     arma::sword seed = -1,
     const std::string &name = "",
-    const arma::vec &start = {});
+    const double_list &start = {});
 ```
 
 ## Inputs:
@@ -751,10 +753,13 @@ quadriga_lib::generate_track(L.rx, {}, "linear", 100.0, 1.5, {0.0}, NAN, {}, 42,
 MD!*/
 
 void quadriga_lib::generate_track(layout_nodes &nodes, const uint_list &i_node, const std::string &type_in, double length, double speed,
-                                  const arma::vec &direction, double spacing,
+                                  const double_list &direction_in, double spacing,
                                   const std::unordered_map<std::string, std::vector<double>> &options, arma::sword seed,
-                                  const std::string &name, const arma::vec &start)
+                                  const std::string &name, const double_list &start_in)
 {
+    const arma::vec &direction = direction_in.vec();
+    const arma::vec &start = start_in.vec();
+    
     check_structure(nodes);
     if (!i_node.vec().is_empty() && (!name.empty() || !start.is_empty()))
         throw std::invalid_argument("Inputs 'name' and 'start' are used only when 'i_node' is empty.");

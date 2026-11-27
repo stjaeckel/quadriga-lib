@@ -570,7 +570,7 @@ void quadriga_lib::gbsm_draw(
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
     const arma::u32_vec &floor_id = arma::u32_vec(),
-    const arma::vec &center_freq = arma::vec(),
+    const double_list &center_freq = {},
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -612,10 +612,12 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
                              arma::sword set_id,
                              const std::string &preset,
                              const arma::u32_vec &floor_id,
-                             const arma::vec &center_freq,
+                             const double_list &center_freq_in,
                              bool dual_mobility,
                              bool horizontal)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
+    
     // Validation, before any output is touched; 'center_freq' is used by the shared "ray" set only
     const bool lsf = set_type == "lsf";
     if (!lsf && set_type != "cluster" && set_type != "ray")

@@ -8,70 +8,13 @@
 #include <armadillo>
 #include <cmath>
 #include <atomic>
-#include <initializer_list>
-#include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <vector>
+
+#include "quadriga_common.hpp"
 
 namespace quadriga_lib
 {
-    // List of non-negative integers for index and count arguments. Takes a uvec (used in place, no copy), a single
-    // value, a brace list, a std::vector, or an Armadillo vector or expression of any integer or floating-point type;
-    // a negative, fractional or non-finite value throws std::invalid_argument. Meant for function arguments only: it
-    // may refer to the uvec it was given.
-    class uint_list
-    {
-        template <typename T>
-        using number_only = typename std::enable_if<std::is_arithmetic<T>::value && !std::is_same<T, bool>::value, int>::type;
-
-    public:
-        uint_list() {}
-        uint_list(const arma::uvec &v) : ref(&v) {}
-        uint_list(arma::uvec &&v) : own(std::move(v)) {}
-        uint_list(const arma::uvec &&v) : own(v) {}                 // A const temporary is copied, not referenced
-        uint_list(std::initializer_list<arma::uword> l) : own(l) {} // Mixed types, e.g. {n, 2}
-        template <typename T, number_only<T> = 0>
-        uint_list(T i) : own(1) { own[0] = cast(i); }
-        template <typename T, number_only<T> = 0>
-        uint_list(std::initializer_list<T> l) { fill(l.begin(), l.size()); }
-        template <typename T, number_only<T> = 0>
-        uint_list(const std::vector<T> &v) { fill(v.begin(), v.size()); }
-        template <typename T, typename T1, number_only<T> = 0> // Armadillo vectors and expressions, e.g. find(x > 0)
-        uint_list(const arma::Base<T, T1> &x)
-        {
-            const arma::Mat<T> m(x.get_ref());
-            if (!m.is_vec() && !m.is_empty())
-                throw std::invalid_argument("Index and count arguments must be vectors.");
-            fill(m.begin(), m.n_elem);
-        }
-
-        const arma::uvec &vec() const { return ref ? *ref : own; } // The values as uvec
-
-    private:
-        arma::uvec own;
-        const arma::uvec *ref = nullptr;
-        template <typename T>
-        static arma::uword cast(T v)
-        {
-            bool ok = true;
-            if constexpr (std::is_floating_point<T>::value) // NaN fails the range test; at most 2^53
-                ok = v >= T(0) && v <= T(9007199254740992.0) && std::floor(v) == v;
-            else if constexpr (std::is_signed<T>::value)
-                ok = v >= T(0);
-            if (!ok)
-                throw std::invalid_argument("Index and count arguments must be non-negative integers.");
-            return (arma::uword)v;
-        }
-        template <typename It>
-        void fill(It it, size_t n)
-        {
-            own.set_size((arma::uword)n);
-            for (arma::uword k = 0; k < (arma::uword)n; ++k, ++it)
-                own[k] = cast(*it);
-        }
-    };
-
     // An array of antenna or acoustic elements: element patterns, positions and port weights
     template <typename dtype> // float or double
     class arrayant
@@ -165,8 +108,8 @@ namespace quadriga_lib
     template <typename dtype>
     arrayant<dtype> apply_port_weights(
         const arrayant<dtype> &ant,                                      // Valid arrayant
-        const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
-        const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(), // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
+        const double_list &azimuth_grid_new = {},                        // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+        const double_list &elevation_grid_new = {},                      // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
         double propagation_speed = 299792458.0,                          // Wave propagation speed in m/s (~343 for acoustics); positive, finite
         bool center_ports = false);                                      // Place each port at the power-weighted center of its elements instead of the origin
 
@@ -174,9 +117,9 @@ namespace quadriga_lib
     template <typename dtype>
     std::vector<arrayant<dtype>> apply_port_weights(
         const std::vector<arrayant<dtype>> &arrayant_vec,                // Non-empty vector that passes is_valid
-        const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
-        const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(), // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-        const arma::Col<dtype> &freq_new = arma::Col<dtype>(),           // Output frequency grid in Hz; defaults to input grid
+        const double_list &azimuth_grid_new = {},                        // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+        const double_list &elevation_grid_new = {},                      // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
+        const double_list &freq_new = {},                                // Output frequency grid in Hz; defaults to input grid
         double propagation_speed = 299792458.0,                          // Wave propagation speed in m/s (~343 for acoustics); positive, finite
         bool center_ports = false);                                      // Place each port at the power-weighted center of its elements instead of the origin
 
@@ -289,7 +232,7 @@ namespace quadriga_lib
         arma::Cube<dtype> &V_im,                                    // Output: e-theta field, imaginary part; [n_out, n_ang, n_freq]
         arma::Cube<dtype> &H_re,                                    // Output: e-phi field, real part; [n_out, n_ang, n_freq]
         arma::Cube<dtype> &H_im,                                    // Output: e-phi field, imaginary part; [n_out, n_ang, n_freq]
-        const arma::Col<dtype> &freq_new = arma::Col<dtype>(),      // Optional: target frequencies in Hz; default: the center frequencies of the entries; [n_freq]
+        const double_list &freq_new = {},                           // Optional: target frequencies in Hz; default: the center frequencies of the entries; [n_freq]
         const uint_list &i_element = {},                            // Optional: 0-based element indices; [n_out]
         const arma::Cube<dtype> &orientation = arma::Cube<dtype>(), // Optional: Euler angles in rad, applied at all frequencies; shapes as in the single form
         const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),   // Optional: element positions in m; default: those of entry 0; [3, n_out]
@@ -345,14 +288,14 @@ namespace quadriga_lib
         const std::string &type,                            // Antenna type
         double res = NAN,                                   // Grid resolution in degree, 0.1 to 90; NaN or <= 0 = 10 (omni, xpol) or 1
         double center_freq = 299792458.0,                   // Center frequency in Hz, positive, finite; NaN = 299792458
-        const arma::vec &element = {},                      // Element parameters per type (custom, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
+        const double_list &element = {},                    // Element parameters per type (custom, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
         const uint_list &panel = {},                        // [M, N, Mg, Ng] (ula, 3GPP, multibeam)
-        const arma::vec &spacing = {},                      // [d_V, d_H, d_gV, d_gH] in wavelengths (ula, 3GPP, multibeam)
+        const double_list &spacing = {},                    // [d_V, d_H, d_gV, d_gH] in wavelengths (ula, 3GPP, multibeam)
         const uint_list &pol = {},                          // [polarization, model] (ula, 3GPP, multibeam, 3GPP-UT, 3GPP-CPE)
         const uint_list &ports = {},                        // [M_P, N_P] (ula, 3GPP)
         const arma::mat &steer = {},                        // [tilt, pan] in degree, one row or one per panel (ula, 3GPP)
         const arma::mat &beams = {},                        // [2 or 3, n_beams] in degree; weights (multibeam)
-        const arma::vec &device_size = {},                  // [X, Y, Z] in m (3GPP-UT, 3GPP-CPE)
+        const double_list &device_size = {},                // [X, Y, Z] in m (3GPP-UT, 3GPP-CPE)
         const uint_list &locations = {},                    // TR location labels, 1-based (3GPP-UT 1 to 8, 3GPP-CPE 1 to 9)
         const arrayant<dtype> &pattern = arrayant<dtype>(), // Element pattern (ula, 3GPP, 3GPP-UT, 3GPP-CPE)
         bool separate_beams = false,                        // One port per beam (multibeam)
@@ -383,7 +326,7 @@ namespace quadriga_lib
         double horn_control_freq = NAN,                           // Horn pattern control frequency in [Hz], NaN or <= 0 = c / (2 pi radius)
         double baffle_width = 0.15,                               // Enclosure baffle width in [m], piston only
         double baffle_height = 0.25,                              // Enclosure baffle height in [m], piston only
-        const arma::Col<dtype> &center_freq = arma::Col<dtype>(), // Frequency sample points in [Hz]; empty = auto third-octave
+        const double_list &center_freq = {},                      // Frequency sample points in [Hz]; empty = auto third-octave
         double angular_resolution_deg = 5.0);                     // Angular grid resolution in [deg]
 
 }

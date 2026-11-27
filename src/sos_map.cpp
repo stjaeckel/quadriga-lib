@@ -35,10 +35,10 @@ Spatially correlated random values on a regular grid
 void quadriga_lib::sos_map(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Mat<dtype> &phase,
-    const arma::Col<dtype> &x,
+    const double_list &x,
     std::vector<arma::Cube<dtype>> &map,
-    const arma::Col<dtype> &y = arma::Col<dtype>(),
-    const arma::Col<dtype> &z = arma::Col<dtype>(),
+    const double_list &y = {},
+    const double_list &z = {},
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -65,13 +65,16 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
                            const arma::Mat<dtype> &phase,
-                           const arma::Col<dtype> &x,
+                           const double_list &x_in,
                            std::vector<arma::Cube<dtype>> &map,
-                           const arma::Col<dtype> &y,
-                           const arma::Col<dtype> &z,
+                           const double_list &y_in,
+                           const double_list &z_in,
                            bool uniform,
                            int use_kernel)
 {
+    const arma::Col<dtype> x = x_in.as<dtype>();
+    const arma::Col<dtype> y = y_in.as<dtype>();
+    const arma::Col<dtype> z = z_in.as<dtype>();
     const bool has_y = !y.is_empty();
     const bool has_z = !z.is_empty();
 
@@ -109,7 +112,7 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
             }
 
     for (const auto &cube : map)
-        qd_check_alias(&cube, "map", &spatial_freq, &phase, &x, &y, &z);
+        qd_check_alias(&cube, "map", &spatial_freq, &phase); // The grids are copies, an output cannot overwrite them
 
     if (map.size() != n_gen)
         map.resize(n_gen);
@@ -138,7 +141,7 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
     }
 }
 
-template void quadriga_lib::sos_map(const arma::Mat<float> &spatial_freq, const arma::Mat<float> &phase, const arma::Col<float> &x, std::vector<arma::Cube<float>> &map,
-                                    const arma::Col<float> &y, const arma::Col<float> &z, bool uniform, int use_kernel);
-template void quadriga_lib::sos_map(const arma::Mat<double> &spatial_freq, const arma::Mat<double> &phase, const arma::Col<double> &x, std::vector<arma::Cube<double>> &map,
-                                    const arma::Col<double> &y, const arma::Col<double> &z, bool uniform, int use_kernel);
+template void quadriga_lib::sos_map(const arma::Mat<float> &spatial_freq, const arma::Mat<float> &phase, const double_list &x, std::vector<arma::Cube<float>> &map,
+                                    const double_list &y, const double_list &z, bool uniform, int use_kernel);
+template void quadriga_lib::sos_map(const arma::Mat<double> &spatial_freq, const arma::Mat<double> &phase, const double_list &x, std::vector<arma::Cube<double>> &map,
+                                    const double_list &y, const double_list &z, bool uniform, int use_kernel);

@@ -44,7 +44,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         double horn_control_freq = NAN,
         double baffle_width = 0.15,
         double baffle_height = 0.25,
-        const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
+        const double_list &center_freq = {},
         double angular_resolution_deg = 5.0);
 ```
 
@@ -142,7 +142,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
                                                                           double sensitivity_dB_in, const std::string &radiation_type,
                                                                           double hor_coverage_deg_in, double ver_coverage_deg_in, double horn_control_freq_in,
                                                                           double baffle_width_in, double baffle_height_in,
-                                                                          const arma::Col<dtype> &center_freq_in, double angular_resolution_deg_in)
+                                                                          const double_list &center_freq_in, double angular_resolution_deg_in)
 {
     const dtype radius = dtype(radius_in);
     const dtype lower_cutoff = dtype(lower_cutoff_in);
@@ -156,7 +156,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
     const dtype baffle_width = dtype(baffle_width_in);
     const dtype baffle_height = dtype(baffle_height_in);
     dtype angular_resolution_deg = dtype(angular_resolution_deg_in);
-    arma::Col<dtype> center_freq = center_freq_in; // Local copy; filled with third-octave bands if not given
+    arma::Col<dtype> center_freq = center_freq_in.as<dtype>(); // Local copy; filled with third-octave bands if not given
 
     const double c_sound = qd_speed_of_sound; // Speed of sound in [m/s]
     const double pi = arma::datum::pi;
@@ -424,7 +424,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
 }
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::generate_speaker(
-    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const arma::Col<float> &, double);
+    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const double_list &, double);
     
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::generate_speaker(
-    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const arma::Col<double> &, double);
+    const std::string &, double, double, double, double, double, double, const std::string &, double, double, double, double, double, const double_list &, double);

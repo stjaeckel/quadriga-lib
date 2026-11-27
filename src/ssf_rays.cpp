@@ -124,7 +124,7 @@ void quadriga_lib::ssf_rays(
     const std::unordered_map<std::string, double> &scenpar,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::cube &lsp,
     const arma::cube &lsp_mu,
     const arma::cube &lsp_sigma,
@@ -180,7 +180,7 @@ MD!*/
 void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenpar,
                             const arma::mat &tx_pos,
                             const arma::mat &rx_pos,
-                            const arma::vec &center_freq,
+                            const double_list &center_freq_in,
                             const arma::cube &lsp,
                             const arma::cube &lsp_mu,
                             const arma::cube &lsp_sigma,
@@ -201,6 +201,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                             bool pol_variability,
                             bool random_phase)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
+
     // Validation, before the output is touched
     const bool m_tr = method == "38.901", m_mf = method == "38.901_MF", m_qd = method == "quadriga";
     if (!m_tr && !m_mf && !m_qd)
@@ -231,8 +233,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
 
     auto has_size = [](const arma::cube &c, arma::uword r, arma::uword n_col, arma::uword n_sl)
     { return c.n_rows == r && c.n_cols == n_col && c.n_slices == n_sl; };
-    const std::pair<const arma::cube *, const char *> stats[3] = {{&lsp, "lsp"}, {&lsp_mu, "lsp_mu"},
-                                                                  {&lsp_sigma, "lsp_sigma"}};
+    const std::pair<const arma::cube *, const char *> stats[3] = {{&lsp, "lsp"}, {&lsp_mu, "lsp_mu"}, {&lsp_sigma, "lsp_sigma"}};
     for (const auto &x : stats)
         if (!has_size(*x.first, n_link, F, 8))
             throw std::invalid_argument("Input '" + std::string(x.second) + "' must have size [n_link, n_freq, 8].");
@@ -330,7 +331,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     const arma::uword Fo = k1 - k0 + 1, r_slice = m_qd ? 0 : i_freq; // output frequencies, slice of rnd_ray
 
     // Elevation in [rad] of the zenith angle 90 deg - el_c + off (in [deg]), folded at 180 deg (used for ZOA and ZOD)
-    auto fold = [d2r](double el_c, double off) { return qd_gbsm_elev(90.0 - el_c / d2r + off); };
+    auto fold = [d2r](double el_c, double off)
+    { return qd_gbsm_elev(90.0 - el_c / d2r + off); };
 
     // Ray direction of the rotation angle model: the offset direction (azimuth a, elevation e in [rad]) rotated by
     // R = Rz(az_c)·Ry(-el_c), which maps (1, 0, 0) to the cluster direction; equal to the additive model at el_c = 0
@@ -402,7 +404,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
             const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
             if (R > 0.0)
                 r.polmat(0, 1, o) = R_par.real() / R, r.polmat(1, 1, o) = R_par.imag() / R,
-                          r.polmat(6, 1, o) = -R_perp.real() / R, r.polmat(7, 1, o) = -R_perp.imag() / R;
+                               r.polmat(6, 1, o) = -R_perp.real() / R, r.polmat(7, 1, o) = -R_perp.imag() / R;
         }
         if (N == 0)
             return;
@@ -441,7 +443,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         std::vector<double> xr(n_gen); // the values of the link, contiguous
         for (arma::uword c = 0; c < n_gen; ++c)
             xr[c] = rnd_ray.at(l, c, r_slice);
-        auto x = [&](arma::uword b, arma::uword n, arma::uword m) { return xr[b * NM + n * M + m]; };
+        auto x = [&](arma::uword b, arma::uword n, arma::uword m)
+        { return xr[b * NM + n * M + m]; };
         std::vector<arma::uword> order(M);
         std::vector<double> alpha(4 * M); // offset per rank block and ray position
 
@@ -460,7 +463,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                     for (arma::uword j = 0; j < size[i]; ++j)
                         order[j] = first[i] + j;
                     std::stable_sort(order.begin(), order.begin() + size[i],
-                                     [&](arma::uword a, arma::uword b) { return x(q, n, a) < x(q, n, b); });
+                                     [&](arma::uword a, arma::uword b)
+                                     { return x(q, n, a) < x(q, n, b); });
                     for (arma::uword j = 0; j < size[i]; ++j)
                         alpha[q * M + order[j]] = A[j];
                 }

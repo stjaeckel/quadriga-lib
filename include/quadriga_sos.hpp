@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "quadriga_common.hpp"
+
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "uword", "size_t" and "unsigned long long" interchangeably
 // This requires a 64 bit platform, but will compile on Linux, Windows and macOS
@@ -51,7 +53,7 @@ namespace quadriga_lib
     arma::Col<dtype> sos_acfi(
         const arma::Col<dtype> &acf,  // Target ACF, [n_acf]
         const arma::Col<dtype> &dist, // Sample points of the ACF in [m], [n_acf]
-        const arma::Col<dtype> &d);   // Distances in [m], must be >= 0, [n_d]
+        const double_list &d);        // Distances in [m], must be >= 0, [n_d]
 
     // Spatially correlated random values at given positions
     // - One device (pos_b omitted), two devices on the same map (pos_b given, phase_b omitted; needs acf and dist)
@@ -76,10 +78,10 @@ namespace quadriga_lib
     void sos_map(
         const arma::Mat<dtype> &spatial_freq,           // Spatial frequencies in [1/m], [n_coeff, n_dim]
         const arma::Mat<dtype> &phase,                  // Phases in [rad], [n_coeff, n_gen]
-        const arma::Col<dtype> &x,                      // Grid points on the x-axis in [m], [nx]
+        const double_list &x,                           // Grid points on the x-axis in [m], [nx]
         std::vector<arma::Cube<dtype>> &map,            // Output: Values, vector (n_gen) of cubes [ny, nx, nz]
-        const arma::Col<dtype> &y = arma::Col<dtype>(), // Optional: Grid points on the y-axis in [m], [ny], default: ny = 1
-        const arma::Col<dtype> &z = arma::Col<dtype>(), // Optional: Grid points on the z-axis in [m], [nz], default: nz = 1
+        const double_list &y = {},                      // Optional: Grid points on the y-axis in [m], [ny], default: ny = 1
+        const double_list &z = {},                      // Optional: Grid points on the z-axis in [m], [nz], default: nz = 1
         bool uniform = false,                           // Output distribution: false = Normal, true = Uniform in [0, 1]
         int use_kernel = 0);                            // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
@@ -88,32 +90,32 @@ namespace quadriga_lib
     // - With pos_b both devices share one map, unless dist_decorr_b differs for that generator (two maps)
     template <typename dtype>
     void sos_randn(
-        const arma::Col<dtype> &dist_decorr,                        // Decorrelation distances in [m], must be >= 0, [n_gen]
+        const double_list &dist_decorr,                             // Decorrelation distances in [m], must be >= 0, [n_gen]
         const arma::Mat<dtype> &pos,                                // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
         arma::Mat<dtype> &val,                                      // Output: Values, Normal(0,1), [n_pos, n_gen]
         const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),         // Optional: Positions of the second device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
-        const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(), // Optional: Decorrelation distances of the second device in [m], [n_gen]
+        const double_list &dist_decorr_b = {},                      // Optional: Decorrelation distances of the second device in [m], [n_gen]
         const std::string &preset = "Comb256",                      // Name of the preset, see sos_preset
         arma::sword seed = -1);                                     // Seed, -1 = system random device
 
     template <typename dtype>
     void sos_rand(
-        const arma::Col<dtype> &dist_decorr,                        // Decorrelation distances in [m], must be >= 0, [n_gen]
+        const double_list &dist_decorr,                             // Decorrelation distances in [m], must be >= 0, [n_gen]
         const arma::Mat<dtype> &pos,                                // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
         arma::Mat<dtype> &val,                                      // Output: Values, Uniform in [0, 1], [n_pos, n_gen]
         const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),         // Optional: Positions of the second device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
-        const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(), // Optional: Decorrelation distances of the second device in [m], [n_gen]
+        const double_list &dist_decorr_b = {},                      // Optional: Decorrelation distances of the second device in [m], [n_gen]
         const std::string &preset = "Comb256",                      // Name of the preset, see sos_preset
         arma::sword seed = -1);                                     // Seed, -1 = system random device
 
     template <typename dtype>
     void sos_randi(
-        const arma::Col<dtype> &dist_decorr,                        // Decorrelation distances in [m], must be >= 0, [n_gen]
+        const double_list &dist_decorr,                             // Decorrelation distances in [m], must be >= 0, [n_gen]
         const arma::Mat<dtype> &pos,                                // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
         arma::uword imax,                                           // Largest value, must be > 0
         arma::Mat<dtype> &val,                                      // Output: Integer values 1 ... imax, [n_pos, n_gen]
         const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),         // Optional: Positions of the second device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
-        const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(), // Optional: Decorrelation distances of the second device in [m], [n_gen]
+        const double_list &dist_decorr_b = {},                      // Optional: Decorrelation distances of the second device in [m], [n_gen]
         const std::string &preset = "Comb256",                      // Name of the preset, see sos_preset
         arma::sword seed = -1);                                     // Seed, -1 = system random device
 

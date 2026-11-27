@@ -38,10 +38,10 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 ## Declaration:
 ```
 arma::mat quadriga_lib::o2i_loss(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
-    const arma::vec &weights,
+    const double_list &weights,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -68,14 +68,17 @@ arma::mat quadriga_lib::o2i_loss(
 - [[path_loss]] (basic path loss, legacy outdoor distance from `d2d_in`)
 MD!*/
 
-arma::mat quadriga_lib::o2i_loss(const arma::vec &center_freq,
+arma::mat quadriga_lib::o2i_loss(const double_list &center_freq_in,
                                  const arma::mat &rnd,
                                  const std::vector<std::string> &models,
-                                 const arma::vec &weights,
+                                 const double_list &weights_in,
                                  double d2d_in_max,
                                  arma::vec *d2d_in,
                                  arma::uvec *model_ind)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
+    const arma::vec &weights = weights_in.vec();
+    
     // Carrier frequencies
     qd_gbsm_check_fc(center_freq);
 

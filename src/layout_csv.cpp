@@ -45,7 +45,7 @@ Read the Tx and Rx CSV files of a layout
 quadriga_lib::layout quadriga_lib::layout_csv_read(
     const std::string &fn_tx,
     const std::string &fn_rx,
-    const arma::vec &center_freq = {},
+    const double_list &center_freq = {},
     bool eval_antennas = true,
     std::vector<std::string> *extra_tx = nullptr,
     std::vector<std::string> *extra_rx = nullptr);
@@ -725,9 +725,11 @@ std::string qd_join_line(const acells &a, const std::vector<int> &cols)
 }
 } // namespace
 
-quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, const std::string &fn_rx, const arma::vec &center_freq,
+quadriga_lib::layout quadriga_lib::layout_csv_read(const std::string &fn_tx, const std::string &fn_rx, const double_list &center_freq_in,
                                                    bool eval_antennas, std::vector<std::string> *extra_tx, std::vector<std::string> *extra_rx)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
+    
     if (!center_freq.is_empty())
     {
         if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))

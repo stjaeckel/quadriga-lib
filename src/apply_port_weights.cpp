@@ -68,16 +68,16 @@ Apply the port weights of an antenna array: one pattern per port
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(
     const arrayant<dtype> &ant,
-    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
+    const double_list &azimuth_grid_new = {},
+    const double_list &elevation_grid_new = {},
     double propagation_speed = 299792458.0,
     bool center_ports = false);
 
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const double_list &azimuth_grid_new = {},
+    const double_list &elevation_grid_new = {},
+    const double_list &freq_new = {},
     double propagation_speed = 299792458.0,
     bool center_ports = false);
 ```
@@ -114,11 +114,13 @@ MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dtype> &ant,
-                                                                     const arma::Col<dtype> &azimuth_grid_new,
-                                                                     const arma::Col<dtype> &elevation_grid_new,
+                                                                     const double_list &azimuth_grid_new_in,
+                                                                     const double_list &elevation_grid_new_in,
                                                                      double propagation_speed_in,
                                                                      bool center_ports)
 {
+    const arma::Col<dtype> azimuth_grid_new = azimuth_grid_new_in.as<dtype>();
+    const arma::Col<dtype> elevation_grid_new = elevation_grid_new_in.as<dtype>();
     const dtype propagation_speed = dtype(propagation_speed_in);
     std::string error_message = qd_arrayant_check(ant);
     if (error_message.length() != 0)
@@ -238,19 +240,23 @@ quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(const arrayant<dt
     return output;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::apply_port_weights(const arrayant<float> &, const arma::Col<float> &, const arma::Col<float> &, double, bool);
-template quadriga_lib::arrayant<double> quadriga_lib::apply_port_weights(const arrayant<double> &, const arma::Col<double> &, const arma::Col<double> &, double, bool);
+template quadriga_lib::arrayant<float> quadriga_lib::apply_port_weights(const arrayant<float> &, const double_list &, const double_list &, double, bool);
+template quadriga_lib::arrayant<double> quadriga_lib::apply_port_weights(const arrayant<double> &, const double_list &, const double_list &, double, bool);
 
 template <typename dtype>
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> &azimuth_grid_new,
-    const arma::Col<dtype> &elevation_grid_new,
-    const arma::Col<dtype> &freq_new,
+    const double_list &azimuth_grid_new_in,
+    const double_list &elevation_grid_new_in,
+    const double_list &freq_new_in,
     double propagation_speed_in,
     bool center_ports)
 {
+    const arma::Col<dtype> azimuth_grid_new = azimuth_grid_new_in.as<dtype>();
+    const arma::Col<dtype> elevation_grid_new = elevation_grid_new_in.as<dtype>();
+    const arma::Col<dtype> freq_new = freq_new_in.as<dtype>();
     const dtype propagation_speed = dtype(propagation_speed_in);
+    
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
 
@@ -475,8 +481,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
 
 template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::apply_port_weights(
     const std::vector<quadriga_lib::arrayant<float>> &,
-    const arma::Col<float> &, const arma::Col<float> &, const arma::Col<float> &, double, bool);
+    const double_list &, const double_list &, const double_list &, double, bool);
 
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::apply_port_weights(
     const std::vector<quadriga_lib::arrayant<double>> &,
-    const arma::Col<double> &, const arma::Col<double> &, const arma::Col<double> &, double, bool);
+    const double_list &, const double_list &, const double_list &, double, bool);

@@ -156,7 +156,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const double_list &freq_new = {},
     const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
@@ -337,7 +337,7 @@ void quadriga_lib::interpolate_pattern(const std::vector<arrayant<dtype>> &array
                                               arma::Cube<dtype> &V_im,
                                               arma::Cube<dtype> &H_re,
                                               arma::Cube<dtype> &H_im,
-                                              const arma::Col<dtype> &freq_new,
+                                              const double_list &freq_new_in,
                                               const uint_list &i_element_in,
                                               const arma::Cube<dtype> &orientation,
                                               const arma::Mat<dtype> &element_pos,
@@ -345,7 +345,9 @@ void quadriga_lib::interpolate_pattern(const std::vector<arrayant<dtype>> &array
                                               arma::Cube<std::complex<dtype>> *H,
                                               int use_kernel)
 {
+    const arma::Col<dtype> freq_new = freq_new_in.as<dtype>();
     const arma::uvec &i_element = i_element_in.vec();
+    
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
     const std::string error_message = qd_arrayant_vec_is_valid_quick(arrayant_vec);
@@ -374,10 +376,10 @@ void quadriga_lib::interpolate_pattern(const std::vector<arrayant<dtype>> &array
 
     const arma::Cube<dtype> *outs[] = {&V_re, &V_im, &H_re, &H_im};
     const char *names[] = {"V_re", "V_im", "H_re", "H_im"};
-    qd_check_alias_list(outs, names, &azimuth, &elevation, &freq_new, &i_element, &orientation, &element_pos);
+    qd_check_alias_list(outs, names, &azimuth, &elevation, &i_element, &orientation, &element_pos);
     const arma::Cube<std::complex<dtype>> *outs_cx[] = {V, H};
     const char *names_cx[] = {"V", "H"};
-    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, &freq_new, &i_element, &orientation, &element_pos);
+    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, &i_element, &orientation, &element_pos);
     for (int i = 0; i < 2; ++i)
         for (int j = 0; j < 4; ++j)
             qd_check_alias_outputs(outs_cx[i], names_cx[i], outs[j], names[j]);
@@ -579,12 +581,12 @@ template void quadriga_lib::interpolate_pattern(const arrayant<double> &ant, con
 
 template void quadriga_lib::interpolate_pattern(const std::vector<arrayant<float>> &arrayant_vec, const arma::Mat<float> &azimuth, const arma::Mat<float> &elevation,
                                                        arma::Cube<float> &V_re, arma::Cube<float> &V_im, arma::Cube<float> &H_re, arma::Cube<float> &H_im,
-                                                       const arma::Col<float> &freq_new, const uint_list &i_element,
+                                                       const double_list &freq_new, const uint_list &i_element,
                                                        const arma::Cube<float> &orientation, const arma::Mat<float> &element_pos,
                                                        arma::Cube<std::complex<float>> *V, arma::Cube<std::complex<float>> *H, int use_kernel);
 
 template void quadriga_lib::interpolate_pattern(const std::vector<arrayant<double>> &arrayant_vec, const arma::Mat<double> &azimuth, const arma::Mat<double> &elevation,
                                                        arma::Cube<double> &V_re, arma::Cube<double> &V_im, arma::Cube<double> &H_re, arma::Cube<double> &H_im,
-                                                       const arma::Col<double> &freq_new, const uint_list &i_element,
+                                                       const double_list &freq_new, const uint_list &i_element,
                                                        const arma::Cube<double> &orientation, const arma::Mat<double> &element_pos,
                                                        arma::Cube<std::complex<double>> *V, arma::Cube<std::complex<double>> *H, int use_kernel);

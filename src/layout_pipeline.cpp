@@ -740,7 +740,7 @@ Draw the discrete state of the propagation links of a layout (stage 1 of the cha
 void quadriga_lib::init_link_states(
     layout &layout,
     const std::string &method = "38.901",
-    const arma::vec &o2i_low = {},
+    const double_list &o2i_low = {},
     bool pol_variability = false,
     double anchor_freq = 2.0e9,
     const std::string &sos_preset = "",
@@ -803,9 +803,10 @@ void quadriga_lib::init_link_states(
 - [[get_channels_layout]] (all stages in one call)
 MD!*/
 
-void quadriga_lib::init_link_states(layout &layout, const std::string &method, const arma::vec &o2i_low, bool pol_variability, double anchor_freq,
+void quadriga_lib::init_link_states(layout &layout, const std::string &method, const double_list &o2i_low_in, bool pol_variability, double anchor_freq,
                                     const std::string &sos_preset, arma::sword seed, const std::vector<std::string> &config_dirs)
 {
+    const arma::vec &o2i_low = o2i_low_in.vec();
     layout_links K;
     qd_init_links(layout, method, o2i_low, pol_variability, anchor_freq, sos_preset, seed, config_dirs, K);
     layout.seed = K.seed;
@@ -1863,7 +1864,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const layout &layout,
     const std::vector<std::vector<gbsm_rays>> &rays,
     const uint_list &i_link = {},
-    const arma::vec &times = {},
+    const double_list &times = {},
     const std::string &output = "taps",
     arma::umat *index = nullptr,
     const std::string &mobility = "auto",
@@ -1927,10 +1928,11 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
 MD!*/
 
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_from_rays(const layout &layout, const std::vector<std::vector<gbsm_rays>> &rays,
-                                                                           const uint_list &i_link, const arma::vec &times, const std::string &output,
+                                                                           const uint_list &i_link, const double_list &times_in, const std::string &output,
                                                                            arma::umat *index, const std::string &mobility, bool oxygen,
                                                                            bool use_absolute_delays, double overlap, bool link_gain)
 {
+    const arma::vec &times = times_in.vec();
     qd_check_channel_args(output, mobility, overlap);
     qd_pipe P(layout, layout.links, true);
     const std::vector<arma::uword> sel = qd_selection(i_link, layout.links.n_link());
@@ -1973,7 +1975,7 @@ Channel coefficients of a layout in one call
 ```
 std::vector<channel<double>> quadriga_lib::get_channels_layout(
     const layout &layout,
-    const arma::vec &times = {},
+    const double_list &times = {},
     const std::string &output = "taps",
     const std::string &method = "",
     arma::umat *index = nullptr,
@@ -2022,11 +2024,12 @@ auto channels = quadriga_lib::get_channels_layout(L);
 - [[generate_layout]] (layouts of the TR scenarios)
 MD!*/
 
-std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(const layout &layout, const arma::vec &times, const std::string &output,
+std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_layout(const layout &layout, const double_list &times_in, const std::string &output,
                                                                              const std::string &method, arma::umat *index, const std::string &mobility,
                                                                              double overlap, arma::sword seed, const std::vector<std::string> &config_dirs,
                                                                              bool link_gain)
 {
+    const arma::vec &times = times_in.vec();
     qd_check_channel_args(output, mobility, overlap);
     if (!method.empty())
         qd_check_method(method);
@@ -2269,7 +2272,7 @@ arma::uvec quadriga_lib::attach_terminals(const layout &layout, const std::strin
                                        const auto &y = rays[l];
                                        const bool per_freq = y.size() == n_freq; // as in stage 3
                                        const gbsm_rays &ray = per_freq ? y[i_freq] : y[0];
-                                       const channel<double> ch = gbsm_single_link_channel(*atx[i], *arx[r], ray, arma::vec{lg[l]}, "phase", "rays",
+                                       const channel<double> ch = gbsm_single_link_channel(*atx[i], *arx[r], ray, lg[l], "phase", "rays",
                                                                                            per_freq ? 0 : i_freq, T, R, otx.col(i), orx.col(r));
                                        V(r, i) = 10.0 * std::log10(qd_rsrp(ch, tx_port));
                                    }

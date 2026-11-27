@@ -125,7 +125,7 @@ Large-scale parameters of a set of links from normalized random values
 ```
 void quadriga_lib::lsp_generate(
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &rnd,
@@ -175,7 +175,7 @@ void quadriga_lib::lsp_generate(
 MD!*/
 
 void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &scenpar,
-                                const arma::vec &center_freq,
+                                const double_list &center_freq_in,
                                 const arma::mat &tx_pos,
                                 const arma::mat &rx_pos,
                                 const arma::mat &rnd,
@@ -190,6 +190,8 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                 bool cholesky,
                                 bool clip_spreads)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
+    
     // Validation, before any output is touched
     const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
     qd_gbsm_check_links(&tx, &rx);

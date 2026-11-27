@@ -318,7 +318,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acfi) Â
 arma::Col<dtype> quadriga_lib::sos_acfi(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    const arma::Col<dtype> &d);
+    const double_list &d);
 ```
 
 ### Inputs:
@@ -544,10 +544,10 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_map) Â·
 void quadriga_lib::sos_map(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Mat<dtype> &phase,
-    const arma::Col<dtype> &x,
+    const double_list &x,
     std::vector<arma::Cube<dtype>> &map,
-    const arma::Col<dtype> &y = arma::Col<dtype>(),
-    const arma::Col<dtype> &z = arma::Col<dtype>(),
+    const double_list &y = {},
+    const double_list &z = {},
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -655,11 +655,11 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_rand) Â
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_rand(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -719,12 +719,12 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_randi) 
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_randi(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::uword imax,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -783,11 +783,11 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_randn) 
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_randn(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```

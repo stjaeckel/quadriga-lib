@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "quadriga_common.hpp"
 #include "quadriga_channel.hpp"
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
@@ -108,7 +109,7 @@ namespace quadriga_lib
         arma::sword set_id = -1,                                // As in gbsm_init_phases; ignored for "lsf"
         const std::string &preset = "Comb256",                  // Must match gbsm_init_phases
         const arma::u32_vec &floor_id = arma::u32_vec(),        // Optional: Floor index per link, [n_link]; empty = all on one floor; 2D only
-        const arma::vec &center_freq = arma::vec(),             // Optional: Carrier frequencies in [Hz], [n_freq]; required by the shared "ray" set, same list as for ssf_rays
+        const double_list &center_freq = {},                    // Optional: Carrier frequencies in [Hz], [n_freq]; required by the shared "ray" set, same list as for ssf_rays
         bool dual_mobility = false,                             // Tx and Rx both move: the Tx side is a second device
         bool horizontal = true);                                // true: 2D correlation in the x-y plane (TR); false: 3D (legacy)
 
@@ -124,7 +125,7 @@ namespace quadriga_lib
         const std::string &pl_model,                                       // Path-loss model, value of 'PL_model'
         const std::unordered_map<std::string, std::vector<double>> &plpar, // Path-loss parameters
         const std::unordered_map<std::string, double> &scenpar,            // Scenario parameters (SF std, LSP_fc_min)
-        const arma::vec &center_freq,                                      // Carrier frequencies in [Hz], [n_freq]
+        const double_list &center_freq,                                    // Carrier frequencies in [Hz], [n_freq]
         const arma::mat &tx_pos,                                           // Tx positions, [3, 1] or [3, n_link]
         const arma::mat &rx_pos,                                           // Rx positions, [3, n_link]
         arma::mat *sf_sigma_dB = nullptr,                                  // Optional output: SF standard deviation in [dB], [n_link, n_freq]
@@ -137,7 +138,7 @@ namespace quadriga_lib
     // - Same random values for all frequencies (TR 7.6.5)
     void lsp_generate(
         const std::unordered_map<std::string, double> &scenpar, // Scenario parameters
-        const arma::vec &center_freq,                           // Carrier frequencies in [Hz], [n_freq]
+        const double_list &center_freq,                         // Carrier frequencies in [Hz], [n_freq]
         const arma::mat &tx_pos,                                // Tx positions, [3, 1] or [3, n_link]
         const arma::mat &rx_pos,                                // Rx positions, [3, n_link]
         const arma::mat &rnd,                                   // Random values from gbsm_draw ("lsf"), [n_link, 11]
@@ -162,13 +163,13 @@ namespace quadriga_lib
     arma::vec los_probability(
         const std::string &model,                   // Model name
         const arma::vec &d2d_out,                   // 2D outdoor distance in [m] (indoor scenarios: 2D distance), [n_link]
-        const arma::vec &h_bs,                      // BS height in [m], [n_link] or [1]
-        const arma::vec &h_ut,                      // UT height in [m], [n_link] or [1]
+        const double_list &h_bs,                    // BS height in [m], [n_link] or [1]
+        const double_list &h_ut,                    // UT height in [m], [n_link] or [1]
         double d_clutter = NAN,                     // InF, SMa: clutter size in [m]; NaN or <= 0 = TR default of the model
         double r_clutter = NAN,                     // InF: clutter density; SMa: vegetation density r_vegetation; NaN = default
         double h_clutter = NAN,                     // InF SH, DH: clutter height in [m]; NaN = default
         const arma::vec &rnd_g = arma::vec(),       // Optional: Normal(0,1) per link for the soft LOS state, [n_link]
-        const arma::vec &center_freq = arma::vec(), // Optional: Carrier frequencies in [Hz] for the soft LOS state, [n_freq]
+        const double_list &center_freq = {},        // Optional: Carrier frequencies in [Hz] for the soft LOS state, [n_freq]
         arma::mat *los_soft = nullptr);             // Optional output: Soft LOS state in [0, 1], [n_link, n_freq]
 
     // O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
@@ -176,10 +177,10 @@ namespace quadriga_lib
     // - The model of each UT is chosen by comparing column 0 of 'rnd' with the cumulative 'weights'
     // - Returns the penetration loss in [dB], [n_ut, n_freq]
     arma::mat o2i_loss(
-        const arma::vec &center_freq,           // Carrier frequencies in [Hz], [n_freq]
+        const double_list &center_freq,         // Carrier frequencies in [Hz], [n_freq]
         const arma::mat &rnd,                   // Random values per UT, [n_ut, 4]: U model, U d2D-in 1, U d2D-in 2, N deviation
         const std::vector<std::string> &models, // Models to mix, [n_model]
-        const arma::vec &weights,               // Probability of each model, sum 1, [n_model]
+        const double_list &weights,             // Probability of each model, sum 1, [n_model]
         double d2d_in_max = 25.0,               // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
         arma::vec *d2d_in = nullptr,            // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
         arma::uvec *model_ind = nullptr);       // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
@@ -263,7 +264,7 @@ namespace quadriga_lib
         const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters, NumSubPaths, PerCluster*, GR_enabled, PolVar_sigma)
         const arma::mat &tx_pos,                                // Tx positions in [m], [3, 1] or [3, n_link]
         const arma::mat &rx_pos,                                // Rx positions in [m], [3, n_link]
-        const arma::vec &center_freq,                           // Carrier frequencies in [Hz], [n_freq]
+        const double_list &center_freq,                         // Carrier frequencies in [Hz], [n_freq]
         const arma::cube &lsp,                                  // LSPs from lsp_generate, [n_link, n_freq, 8]
         const arma::cube &lsp_mu,                               // Log-domain means from lsp_generate, [n_link, n_freq, 8]
         const arma::cube &lsp_sigma,                            // Log-domain std from lsp_generate, [n_link, n_freq, 8]
@@ -292,14 +293,14 @@ namespace quadriga_lib
     //   "drift" up to about 0.2 * b_med per moving end
     void ssf_paths(
         const gbsm_rays &rays,                   // Ray data of the link
-        const arma::vec &link_gain_dB,           // Link gain -PL - O2I + 10·lg(SF) at the position in [dB], [n_freq]; 0 for data from paths
+        const double_list &link_gain_dB,         // Link gain -PL - O2I + 10·lg(SF) at the position in [dB], [n_freq]; 0 for data from paths
         arma::mat &path_gain,                    // Output: Path gains (linear), [n_path, n_freq]
         arma::vec &path_length,                  // Output: Path lengths in [m], [n_path]
         arma::cube &polmat,                      // Output: Polarization transfer matrices, [8, n_path, n_freq]
         const std::string &mobility = "auto",    // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
         const arma::mat &tx_pos = arma::mat(),   // Optional: Tx position in [m], [3, 1] or [1, 3]; empty = rays.tx_pos
         const arma::mat &rx_pos = arma::mat(),   // Optional: Rx position in [m], [3, 1] or [1, 3]; empty = rays.rx_pos
-        const arma::vec &kf_ratio = arma::vec(), // Optional: K(position) / K(drop), [n_freq]; empty = 1
+        const double_list &kf_ratio = {},        // Optional: K(position) / K(drop), [n_freq]; empty = 1
         arma::vec *aod = nullptr,                // Optional output: Azimuth of departure in [rad], [n_path]
         arma::vec *eod = nullptr,                // Optional output: Elevation of departure in [rad], [n_path]
         arma::vec *aoa = nullptr,                // Optional output: Azimuth of arrival in [rad], [n_path]
@@ -314,7 +315,7 @@ namespace quadriga_lib
     // - Delays from the path lengths, angles from the scatterer positions, power = path gain
     // - Fills a pre-initialised object; members of the right size keep their memory
     void gbsm_rays_from_paths(
-        const arma::vec &center_freq,                     // Frequencies in [Hz], [n_freq]
+        const double_list &center_freq,                   // Frequencies in [Hz], [n_freq]
         const arma::mat &tx_pos,                          // Tx position in [m], [3, 1] or [1, 3]
         const arma::mat &rx_pos,                          // Rx position in [m], [3, 1] or [1, 3]
         const arma::mat &fbs_pos,                         // First-bounce scatterer positions in [m], [3, n_path]
@@ -326,8 +327,8 @@ namespace quadriga_lib
         const std::string &method = "quadriga",           // Value of rays.method: GR power law and default mobility
         const arma::u32_vec &path_type = arma::u32_vec(), // Optional: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]; empty = LOS where FBS = LBS on the direct line, else NLOS
         const arma::u32_vec &tap = arma::u32_vec(),       // Optional: Tap index, [n_path]; empty = one tap per path
-        const arma::vec &gr_eps_re = arma::vec(),         // Optional: Ground permittivity, real part, [n_freq]; needed where a GR path is recomputed
-        const arma::vec &gr_eps_im = arma::vec());        // Optional: Ground permittivity, imaginary part, [n_freq]; needed where a GR path is recomputed
+        const double_list &gr_eps_re = {},                // Optional: Ground permittivity, real part, [n_freq]; needed where a GR path is recomputed
+        const double_list &gr_eps_im = {});               // Optional: Ground permittivity, imaginary part, [n_freq]; needed where a GR path is recomputed
 
     // Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
     // - Per snapshot get_channels_planar ("phase", arrays at the positions of 'rays', computed once per distinct
@@ -339,7 +340,7 @@ namespace quadriga_lib
         const arrayant<double> &tx_array,              // Tx antenna array, n_tx ports
         const arrayant<double> &rx_array,              // Rx antenna array, n_rx ports
         const gbsm_rays &rays,                         // Ray data of the link
-        const arma::vec &link_gain_dB,                 // Link gain -PL - O2I + 10·lg(SF) at rays.center_freq(i_freq) in [dB], [n_snap] or [1]
+        const double_list &link_gain_dB,               // Link gain -PL - O2I + 10·lg(SF) at rays.center_freq(i_freq) in [dB], [n_snap] or [1]
         const std::string &mobility = "auto",          // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
         const std::string &output = "taps",            // "taps" or "rays"
         arma::uword i_freq = 0,                        // Frequency index in rays.center_freq, 0-based; TR methods: 0 (one entry)
@@ -347,7 +348,7 @@ namespace quadriga_lib
         const arma::mat &rx_pos = arma::mat(),         // Optional: Rx positions in [m], [3, n_snap] or [3, 1]; empty = rays.rx_pos
         const arma::mat &tx_orientation = arma::mat(), // Optional: Tx Euler angles (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]; empty = 0
         const arma::mat &rx_orientation = arma::mat(), // Optional: Rx Euler angles (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]; empty = 0
-        const arma::vec &kf_ratio = arma::vec(),       // Optional: K(snapshot) / K(drop) at rays.center_freq(i_freq), [n_snap] or [1]; empty = 1
+        const double_list &kf_ratio = {},              // Optional: K(snapshot) / K(drop) at rays.center_freq(i_freq), [n_snap] or [1]; empty = 1
         bool oxygen = false,                           // TR 7.6.1 oxygen absorption from each path's own length
         bool use_absolute_delays = false);             // Include the LOS delay in all delays, as get_channels_*
 }

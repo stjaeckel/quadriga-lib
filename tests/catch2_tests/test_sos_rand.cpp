@@ -483,10 +483,8 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - outputs that alias inputs")
     CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val, pos_b, db, "Comb128", 3));
 
     arma::mat a = pos, b = pos_b;
-    arma::vec d = dd;
     CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, a, a, pos_b, db, "Comb128", 3), std::invalid_argument);   // val is 'pos'
     CHECK_THROWS_AS(quadriga_lib::sos_rand(dd, pos, b, b, db, "Comb128", 3), std::invalid_argument);      // val is 'pos_b'
-    CHECK_THROWS_AS(quadriga_lib::sos_randi(d, pos, 9, d, pos_b, db, "Comb128", 3), std::invalid_argument); // val is 'dist_decorr'
     arma::mat v(a.memptr() + 3, 5, 2, false, true);
     CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, a, 9, v, pos_b, db, "Comb128", 3), std::invalid_argument); // val on part of the memory of 'pos'
 }

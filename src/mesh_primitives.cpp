@@ -77,9 +77,9 @@ Construct a triangulated cube mesh
 ## Declaration:
 ```
 arma::Mat<dtype> quadriga_lib::cube(
-    const arma::vec &scale = {1.0},
-    const arma::vec &rotation = {0.0, 0.0, 0.0},
-    const arma::vec &location = {0.0, 0.0, 0.0},
+    const double_list &scale = {1.0},
+    const double_list &rotation = {0.0, 0.0, 0.0},
+    const double_list &location = {0.0, 0.0, 0.0},
     const arma::uword n_div = 1);
 ```
 
@@ -100,11 +100,15 @@ arma::Mat<dtype> quadriga_lib::cube(
 MD!*/
 
 template <typename dtype>
-arma::Mat<dtype> quadriga_lib::cube(const arma::vec &scale,
-                                    const arma::vec &rotation,
-                                    const arma::vec &location,
+arma::Mat<dtype> quadriga_lib::cube(const double_list &scale_in,
+                                    const double_list &rotation_in,
+                                    const double_list &location_in,
                                     const arma::uword n_div)
 {
+    const arma::vec &scale = scale_in.vec();
+    const arma::vec &rotation = rotation_in.vec();
+    const arma::vec &location = location_in.vec();
+    
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
 
@@ -140,8 +144,8 @@ arma::Mat<dtype> quadriga_lib::cube(const arma::vec &scale,
     return mesh;
 }
 
-template arma::fmat quadriga_lib::cube(const arma::vec &scale, const arma::vec &rotation, const arma::vec &location, const arma::uword n_div);
-template arma::mat quadriga_lib::cube(const arma::vec &scale, const arma::vec &rotation, const arma::vec &location, const arma::uword n_div);
+template arma::fmat quadriga_lib::cube(const double_list &scale, const double_list &rotation, const double_list &location, const arma::uword n_div);
+template arma::mat quadriga_lib::cube(const double_list &scale, const double_list &rotation, const double_list &location, const arma::uword n_div);
 
 /*!MD
 # plane
@@ -159,9 +163,9 @@ Construct a triangulated plane mesh
 ## Declaration:
 ```
 arma::Mat<dtype> quadriga_lib::plane(
-    const arma::vec &scale = {1.0},
-    const arma::vec &rotation = {0.0, 0.0, 0.0},
-    const arma::vec &location = {0.0, 0.0, 0.0},
+    const double_list &scale = {1.0},
+    const double_list &rotation = {0.0, 0.0, 0.0},
+    const double_list &location = {0.0, 0.0, 0.0},
     const arma::uword n_div = 1);
 ```
 
@@ -184,11 +188,14 @@ arma::Mat<dtype> quadriga_lib::plane(
 MD!*/
 
 template <typename dtype>
-arma::Mat<dtype> quadriga_lib::plane(const arma::vec &scale,
-                                     const arma::vec &rotation,
-                                     const arma::vec &location,
+arma::Mat<dtype> quadriga_lib::plane(const double_list &scale_in,
+                                     const double_list &rotation_in,
+                                     const double_list &location_in,
                                      const arma::uword n_div)
 {
+    const arma::vec &scale = scale_in.vec();
+    const arma::vec &rotation = rotation_in.vec();
+    const arma::vec &location = location_in.vec();
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
 
@@ -214,5 +221,5 @@ arma::Mat<dtype> quadriga_lib::plane(const arma::vec &scale,
     return mesh;
 }
 
-template arma::fmat quadriga_lib::plane(const arma::vec &scale, const arma::vec &rotation, const arma::vec &location, const arma::uword n_div);
-template arma::mat quadriga_lib::plane(const arma::vec &scale, const arma::vec &rotation, const arma::vec &location, const arma::uword n_div);
+template arma::fmat quadriga_lib::plane(const double_list &scale, const double_list &rotation, const double_list &location, const arma::uword n_div);
+template arma::mat quadriga_lib::plane(const double_list &scale, const double_list &rotation, const double_list &location, const arma::uword n_div);

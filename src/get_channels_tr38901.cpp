@@ -63,16 +63,16 @@ std::vector<channel<double>> quadriga_lib::get_channels_tr38901(
     const arrayant<double> &bs_array,
     const arrayant<double> &ut_array,
     const std::string &scenario,
-    const arma::vec &center_freq = {3.5e9},
+    const double_list &center_freq = {3.5e9},
     arma::uword n_ut = 1,
     arma::sword seed = -1,
-    const arma::vec &spacing = {},
-    const arma::vec &grid = {},
-    const arma::vec &area = {},
-    const arma::vec &bs = {},
-    const arma::vec &ut = {},
-    const arma::vec &indoor = {},
-    const arma::vec &time_grid = {},
+    const double_list &spacing = {},
+    const double_list &grid = {},
+    const double_list &area = {},
+    const double_list &bs = {},
+    const double_list &ut = {},
+    const double_list &indoor = {},
+    const double_list &time_grid = {},
     const std::string &los = "auto",
     const std::string &output = "taps",
     const std::string &attach = "large_scale",
@@ -100,21 +100,21 @@ std::vector<channel<double>> quadriga_lib::get_channels_tr38901(
 Optional changes to the scenario layout (defaults in Notes). Give only the values to change; NAN keeps a default.
 [[generate_layout]] describes all values:
 
-- **`spacing`** *(optional)* — Inter-site distance in m, e.g. `{200}`; indoor: BS spacing in x and y
-- **`grid`** *(optional)* — Rings of sites around the centre site, e.g. `{0}` = one site, `{2}` = 19 sites; the
+- **`spacing`** *(optional)* — Inter-site distance in m, e.g. `200`; indoor: BS spacing in x and y
+- **`grid`** *(optional)* — Rings of sites around the centre site, e.g. `0` = one site, `2` = 19 sites; the
   number of sectors as third value, e.g. `{0, NAN, 1}`; indoor: BSs in x and y
 - **`area`** *(optional)* — Hall size in m, length, width, height (InH, InF)
-- **`bs`** *(optional)* — BS height in m, e.g. `{30}`; then the mechanical downtilt and an offset of the sector
+- **`bs`** *(optional)* — BS height in m, e.g. `30`; then the mechanical downtilt and an offset of the sector
   headings in degrees
 - **`ut`** *(optional)* — UT height and minimum distance to the BS in m, speed in m/s, e.g. `{NAN, NAN, 30 / 3.6}` =
   all UTs at 30 km/h; then the orientation (bank, tilt, heading) in degrees
-- **`indoor`** *(optional)* — Share of the UTs in buildings, e.g. `{0.5}` (UMa, UMi, RMa, SMa); then the range of floors
+- **`indoor`** *(optional)* — Share of the UTs in buildings, e.g. `0.5` (UMa, UMi, RMa, SMa); then the range of floors
   and the floor height
 
 Simulation settings:
 
 - **`time_grid`** *(optional)* — `{T, dt}` in s: snapshots at 0, dt, 2 dt, … up to T, while the UTs move; `dt`
-  defaults to 1 ms, e.g. `{0.1}` = 101 snapshots over 100 ms; omitted = one snapshot (static channel)
+  defaults to 1 ms, e.g. `0.1` = 101 snapshots over 100 ms; omitted = one snapshot (static channel)
 - **`los`** *(optional)* — `"auto"`: LOS or NLOS as drawn from the LOS probability of the scenario; `"los"` or `"nlos"`: that state for
   all links, also of the UTs in buildings and to the other sectors, so it can change the serving sector (`"InF_HH"` is
   always LOS)
@@ -150,7 +150,7 @@ Simulation settings:
 const auto bs = quadriga_lib::generate_antenna<double>("3gpp", 10.0, 3.5e9, {}, {4, 4, 1, 1});
 const auto ut = quadriga_lib::generate_antenna<double>("xpol");
 auto chan = quadriga_lib::get_channels_tr38901(bs, ut, "UMa", {3.5e9}, 10, 1);   // 19 sites, 10 UTs per cell
-auto c2 = quadriga_lib::get_channels_tr38901(bs, ut, "UMi", {3.5e9}, 10, 1, {}, {0}, {}, {}, {}, {}, {0.1});   // one site, 100 ms
+auto c2 = quadriga_lib::get_channels_tr38901(bs, ut, "UMi", 3.5e9, 10, 1, {}, 0, {}, {}, {}, {}, 0.1);   // one site, 100 ms
 ```
 
 ## Notes:
@@ -191,12 +191,21 @@ auto c2 = quadriga_lib::get_channels_tr38901(bs, ut, "UMi", {3.5e9}, 10, 1, {}, 
 MD!*/
 
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_tr38901(
-    const arrayant<double> &bs_array, const arrayant<double> &ut_array, const std::string &scenario, const arma::vec &center_freq,
-    arma::uword n_ut, arma::sword seed, const arma::vec &spacing, const arma::vec &grid, const arma::vec &area, const arma::vec &bs,
-    const arma::vec &ut, const arma::vec &indoor, const arma::vec &time_grid, const std::string &los, const std::string &output,
+    const arrayant<double> &bs_array, const arrayant<double> &ut_array, const std::string &scenario, const double_list &center_freq_in,
+    arma::uword n_ut, arma::sword seed, const double_list &spacing_in, const double_list &grid_in, const double_list &area_in, const double_list &bs_in,
+    const double_list &ut_in, const double_list &indoor_in, const double_list &time_grid_in, const std::string &los, const std::string &output,
     const std::string &attach, const std::string &links, bool link_gain, bool uplink, double o2i_low, const std::vector<std::string> &config_dirs,
     arma::mat *gain_dB, layout *layout_out, arma::umat *index)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
+    const arma::vec &spacing = spacing_in.vec();
+    const arma::vec &grid = grid_in.vec();
+    const arma::vec &area = area_in.vec();
+    const arma::vec &bs = bs_in.vec();
+    const arma::vec &ut = ut_in.vec();
+    const arma::vec &indoor = indoor_in.vec();
+    const arma::vec &time_grid = time_grid_in.vec();
+    
     for (const auto &[a, name] : {std::make_pair(&bs_array, "bs_array"), std::make_pair(&ut_array, "ut_array")})
         if (const std::string e = a->is_valid(); !e.empty())
             throw std::invalid_argument("Input '" + std::string(name) + "': " + e);

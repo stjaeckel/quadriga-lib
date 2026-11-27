@@ -361,7 +361,7 @@ Create a new QRT file and write its metadata header
 ```
 void quadriga_lib::qrt_file_init(
     const std::string &fn,
-    const arma::Col<dtype> &center_freq,
+    const double_list &center_freq,
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
@@ -389,7 +389,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::qrt_file_init(const std::string &fn,
-                                 const arma::Col<dtype> &center_freq,
+                                 const double_list &center_freq_in,
                                  const arma::Mat<dtype> &cir_pos,
                                  const arma::Mat<dtype> &cir_orientation,
                                  const std::vector<std::string> &dest_names,
@@ -397,6 +397,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
                                  unsigned n_orig,
                                  bool scalar_mode)
 {
+    const arma::Col<dtype> center_freq = center_freq_in.as<dtype>();
     const arma::uvec &cir_offset = cir_offset_in.vec();
     if (center_freq.n_elem == 0 || center_freq.n_elem > 127)
         throw std::invalid_argument("Input 'center_freq' must have 1 to 127 elements.");
@@ -511,11 +512,11 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
         throw std::runtime_error("Cannot write file '" + fn + "'.");
 }
 
-template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const arma::Col<float> &center_freq, const arma::Mat<float> &cir_pos,
+template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const double_list &center_freq, const arma::Mat<float> &cir_pos,
                                                  const arma::Mat<float> &cir_orientation, const std::vector<std::string> &dest_names,
                                                  const uint_list &cir_offset, unsigned n_orig, bool scalar_mode);
 
-template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const arma::Col<double> &center_freq, const arma::Mat<double> &cir_pos,
+template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const double_list &center_freq, const arma::Mat<double> &cir_pos,
                                                   const arma::Mat<double> &cir_orientation, const std::vector<std::string> &dest_names,
                                                   const uint_list &cir_offset, unsigned n_orig, bool scalar_mode);
 
@@ -1956,7 +1957,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
 ## Declaration:
 ```
 std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
@@ -1986,7 +1987,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(
 - [[gbsm_rays_from_paths]] (ray data from the paths read back)
 MD!*/
 
-std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const arma::vec &center_freq,
+std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const double_list &center_freq_in,
                                                                         const arma::mat &tx_pos,
                                                                         const arma::mat &rx_pos,
                                                                         const arma::mat &fbs_pos,
@@ -1996,6 +1997,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
                                                                         const arma::u32_vec &path_type,
                                                                         arma::uword i_cir)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
     const arma::uword n_freq = center_freq.n_elem, n_path = fbs_pos.n_cols;
     if (n_freq == 0 || n_freq > 127)
         throw std::invalid_argument("Input 'center_freq' must have 1 to 127 elements.");

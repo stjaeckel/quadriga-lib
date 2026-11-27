@@ -147,7 +147,7 @@ arma::mat quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     arma::mat *sf_sigma_dB = nullptr,
@@ -181,13 +181,14 @@ MD!*/
 arma::mat quadriga_lib::path_loss(const std::string &pl_model,
                                   const std::unordered_map<std::string, std::vector<double>> &plpar,
                                   const std::unordered_map<std::string, double> &scenpar,
-                                  const arma::vec &center_freq,
+                                  const double_list &center_freq_in,
                                   const arma::mat &tx_pos,
                                   const arma::mat &rx_pos,
                                   arma::mat *sf_sigma_dB,
                                   const arma::vec &d2d_in,
                                   const arma::vec &rnd_he)
 {
+    const arma::vec &center_freq = center_freq_in.vec();
     // Validation, before any output is touched
     const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
     qd_gbsm_check_links(&tx, &rx);

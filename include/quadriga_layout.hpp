@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "quadriga_common.hpp"
 #include "quadriga_gbsm.hpp"
 
 namespace quadriga_lib
@@ -94,7 +95,7 @@ namespace quadriga_lib
         arma::umat pairing;                               // Tx site index and Rx terminal index of each linked pair, 0-based, [2, n_pair]; empty = all pairs
 
         arma::uword n_antenna() const;                    // Length of antenna_args, or of antenna if there are no arguments
-        void eval_antennas(const arma::vec &center_freq = {}); // Generates 'antenna' from 'antenna_args'; a given list in [Hz] replaces center_freq
+        void eval_antennas(const double_list &center_freq = {}); // Generates 'antenna' from 'antenna_args'; a given list in [Hz] replaces center_freq
         std::string is_valid() const;                     // Empty string if valid, else an error message
     };
 
@@ -105,7 +106,7 @@ namespace quadriga_lib
     layout layout_csv_read(
         const std::string &fn_tx,                         // Tx CSV file, "" = no Tx nodes
         const std::string &fn_rx,                         // Rx CSV file, "" = no Rx nodes
-        const arma::vec &center_freq = {},                // Simulation frequencies in [Hz]; empty = from the files
+        const double_list &center_freq = {},              // Simulation frequencies in [Hz]; empty = from the files
         bool eval_antennas = true,                        // true: generate the antennas; false: antenna stays empty
         std::vector<std::string> *extra_tx = nullptr,     // Optional output: names of unknown Tx columns
         std::vector<std::string> *extra_rx = nullptr);    // Optional output: names of unknown Rx columns
@@ -162,7 +163,7 @@ namespace quadriga_lib
     void sample_track(
         const layout_nodes &nodes,           // Nodes
         arma::uword i_node,                  // Node index, 0-based
-        const arma::vec &times,              // Snapshot times in [s], [n_snap]; empty = one snapshot per row
+        const double_list &times,            // Snapshot times in [s], [n_snap]; empty = one snapshot per row
         arma::mat &pos,                      // Output: positions in [m], [3, n_snap]
         arma::mat &orientation,              // Output: orientations (bank, tilt, heading) in [rad] in the GCS, [3, n_snap]
         arma::uvec *i_row = nullptr);        // Optional output: row (0-based, into the arrays of 'nodes') at or before each snapshot, [n_snap]
@@ -178,17 +179,17 @@ namespace quadriga_lib
         const std::string &type,             // "point", "linear", "circular" or "street"
         double length = 0.0,                 // Length in [m]; 0 = type default; "point": unused
         double speed = NAN,                  // Speed in [m/s]; NaN = keep the speed of the first row if valid
-        const arma::vec &direction = {},     // Start direction (azimuth) in [rad], [1] or one per index in i_node; empty = uniform random
+        const double_list &direction = {},   // Start direction (azimuth) in [rad], [1] or one per index in i_node; empty = uniform random
         double spacing = NAN,                // Point spacing in [m]; NaN = type default
         const std::unordered_map<std::string, std::vector<double>> &options = {}, // Options of the type, e.g. {"turn_probability", {0.3}}
         arma::sword seed = -1,               // Seed of the random draws, -1 = system random device
         const std::string &name = "",        // Empty i_node: name of the new node; "" = the next free name
-        const arma::vec &start = {});        // Empty i_node: first position [x, y, z] of the new node in [m]; empty = origin
+        const double_list &start = {});      // Empty i_node: first position [x, y, z] of the new node in [m]; empty = origin
 
     // Set the orientation of nodes from their motion, or to a given value
     void set_orientation(
         layout_nodes &nodes,                 // Nodes, updated in place
-        const arma::vec &orientation = {},   // [bank, tilt, heading] in [rad]; empty = 0
+        const double_list &orientation = {}, // [bank, tilt, heading] in [rad]; empty = 0
         const uint_list &i_node = {},        // Node indices, 0-based; empty = all nodes
         bool force = false);                 // false: from the motion of tracks plus 'orientation' as offset; true: 'orientation' on all rows
 
@@ -205,13 +206,13 @@ namespace quadriga_lib
     layout generate_layout(
         const std::string &type,                // Preset
         arma::uword n_ut = 0,                   // UTs per cell (per_cell) or in total; 0 = no UTs
-        const arma::vec &center_freq = {},      // Simulation frequencies in [Hz], stored as layout.center_freq; empty = not set
-        const arma::vec &spacing = {},          // [d_x, d_y] in [m]; hexagonal: d_x = ISD
-        const arma::vec &grid = {},             // [n_x, n_y, n_sector]; hexagonal: n_x = rings (0 = one site), n_y unused
-        const arma::vec &area = {},             // [length, width, height] of the hall, floor or road area in [m]
-        const arma::vec &bs = {},               // [height, tilt, sector azimuth offset] in [m], [deg], [deg]
-        const arma::vec &ut = {},               // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg]
-        const arma::vec &indoor = {},           // [indoor ratio, min floors, max floors, floor height in [m]]
+        const double_list &center_freq = {},    // Simulation frequencies in [Hz], stored as layout.center_freq; empty = not set
+        const double_list &spacing = {},        // [d_x, d_y] in [m]; hexagonal: d_x = ISD
+        const double_list &grid = {},           // [n_x, n_y, n_sector]; hexagonal: n_x = rings (0 = one site), n_y unused
+        const double_list &area = {},           // [length, width, height] of the hall, floor or road area in [m]
+        const double_list &bs = {},             // [height, tilt, sector azimuth offset] in [m], [deg], [deg]
+        const double_list &ut = {},             // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg]
+        const double_list &indoor = {},         // [indoor ratio, min floors, max floors, floor height in [m]]
         const std::unordered_map<std::string, std::vector<double>> &options = {}, // Scenario-specific values, e.g. {"p_residential", {0.8}}
         bool per_cell = true,                   // true: n_ut per cell; false: n_ut in total
         arma::sword seed = -1);                 // Seed of the drop, -1 = system random device; stored as layout.seed
@@ -223,9 +224,9 @@ namespace quadriga_lib
     void drop_terminals(
         layout &layout,                         // Layout, updated in place: Rx side replaced, pairing and links emptied
         arma::uword n_ut,                       // UTs per cell (per_cell) or in total
-        const arma::vec &bounds = {},           // [x_min, x_max, y_min, y_max] in [m]; required without two wrap vectors
-        const arma::vec &ut = {},               // As in generate_layout
-        const arma::vec &indoor = {},           // As in generate_layout
+        const double_list &bounds = {},         // [x_min, x_max, y_min, y_max] in [m]; required without two wrap vectors
+        const double_list &ut = {},             // As in generate_layout
+        const double_list &indoor = {},         // As in generate_layout
         const std::unordered_map<std::string, std::vector<double>> &options = {}, // As in generate_layout
         bool per_cell = true,                   // true: n_ut per cell; false: n_ut in total
         arma::sword seed = -1);                 // Seed, -1 = layout.seed if set, else the system random device
@@ -237,7 +238,7 @@ namespace quadriga_lib
     // - One channel per Tx node, Rx node and frequency of the linked pairs: Tx node fastest, then Rx node, then frequency
     std::vector<channel<double>> get_channels_layout(
         const layout &layout,                                // Layout with frequencies; antennas evaluated or the generic antenna
-        const arma::vec &times = {},                         // Snapshot times in [s], [n_snap]; empty = one snapshot per row
+        const double_list &times = {},                       // Snapshot times in [s], [n_snap]; empty = one snapshot per row
         const std::string &output = "taps",                  // "taps" or "rays"
         const std::string &method = "",                      // "38.901", "38.901_MF" or "quadriga"; "" = method of layout.links, else "38.901"
         arma::umat *index = nullptr,                         // Optional output: Tx node, Rx node and frequency index of each channel, 0-based, [3, n_channel]
@@ -252,7 +253,7 @@ namespace quadriga_lib
     void init_link_states(
         layout &layout,                                      // Layout, links and seed updated in place
         const std::string &method = "38.901",                // "38.901", "38.901_MF" or "quadriga"
-        const arma::vec &o2i_low = {},                       // Share of the low-loss building model, [1]; empty = family value
+        const double_list &o2i_low = {},                     // Share of the low-loss building model, [1]; empty = family value
         bool pol_variability = false,                        // Polarization power variability (TR 38.901 clause 7.6.16); TR methods only
         double anchor_freq = 2.0e9,                          // Anchor frequency of "38.901_MF" in [Hz]
         const std::string &sos_preset = "",                  // SOS preset of the GBSM sets; "" = Exp256 for the TR methods, Comb256 for quadriga
@@ -272,7 +273,7 @@ namespace quadriga_lib
         const layout &layout,                                // Layout with links from init_link_states
         const std::vector<std::vector<gbsm_rays>> &rays,     // Rays from generate_rays, possibly edited, [n_out][1 or n_freq]
         const uint_list &i_link = {},                        // The propagation links of 'rays', 0-based, [n_out]; empty = all
-        const arma::vec &times = {},                         // Snapshot times in [s], [n_snap]; empty = one snapshot per row
+        const double_list &times = {},                       // Snapshot times in [s], [n_snap]; empty = one snapshot per row
         const std::string &output = "taps",                  // "taps" or "rays"
         arma::umat *index = nullptr,                         // Optional output: Tx node, Rx node and frequency index of each channel, 0-based, [3, n_channel]
         const std::string &mobility = "auto",                // "phase", "drift" or "auto"; "drift" needs rays with scatterers
@@ -311,16 +312,16 @@ namespace quadriga_lib
         const arrayant<double> &bs_array,                    // BS array, used by all sectors
         const arrayant<double> &ut_array,                    // UT array
         const std::string &scenario,                         // Family "UMa", "UMi", "RMa", "SMa", "InH_Open", "InH_Mixed", "InF_SL", ...; also as preset name "38.901_UMa"
-        const arma::vec &center_freq = {3.5e9},              // Frequencies in [Hz], [n_freq]; more than one: method "38.901_MF"
+        const double_list &center_freq = {3.5e9},            // Frequencies in [Hz], [n_freq]; more than one: method "38.901_MF"
         arma::uword n_ut = 1,                                // UTs per cell
         arma::sword seed = -1,                               // Seed of the drop and the channels; -1 = system random device
-        const arma::vec &spacing = {},                       // [d_x, d_y] in [m]; hexagonal: d_x = ISD (generate_layout)
-        const arma::vec &grid = {},                          // [n_x, n_y, n_sector]; hexagonal: n_x = rings (generate_layout)
-        const arma::vec &area = {},                          // [length, width, height] of the hall in [m] (generate_layout)
-        const arma::vec &bs = {},                            // [height, tilt, sector azimuth offset] in [m], [deg], [deg] (generate_layout)
-        const arma::vec &ut = {},                            // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg] (generate_layout)
-        const arma::vec &indoor = {},                        // [indoor ratio, min floors, max floors, floor height in [m]] (generate_layout)
-        const arma::vec &time_grid = {},                     // [observation_time, update_interval] in [s]; empty = one snapshot; one entry: interval 1 ms
+        const double_list &spacing = {},                     // [d_x, d_y] in [m]; hexagonal: d_x = ISD (generate_layout)
+        const double_list &grid = {},                        // [n_x, n_y, n_sector]; hexagonal: n_x = rings (generate_layout)
+        const double_list &area = {},                        // [length, width, height] of the hall in [m] (generate_layout)
+        const double_list &bs = {},                          // [height, tilt, sector azimuth offset] in [m], [deg], [deg] (generate_layout)
+        const double_list &ut = {},                          // [height, min 2D distance, speed, bank, tilt, heading] in [m], [m], [m/s], [deg] (generate_layout)
+        const double_list &indoor = {},                      // [indoor ratio, min floors, max floors, floor height in [m]] (generate_layout)
+        const double_list &time_grid = {},                   // [observation_time, update_interval] in [s]; empty = one snapshot; one entry: interval 1 ms
         const std::string &los = "auto",                     // "auto", "los" or "nlos"
         const std::string &output = "taps",                  // "taps" or "rays"
         const std::string &attach = "large_scale",           // Serving sector by "large_scale" or "rsrp"

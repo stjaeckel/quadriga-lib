@@ -255,6 +255,11 @@ TEST_CASE("generate_track - point drops")
         CHECK(speed_of(N, 0) == 0.0);
         CHECK(std::abs(az_of(N, 0)) < 1e-15);
     }
+    SECTION("a literal 0 is a direction of 0, not an empty list")
+    {
+        quadriga_lib::generate_track(N, {0}, "point", 0.0, 1.0, 0);
+        CHECK(std::abs(az_of(N, 0)) < 1e-15);
+    }
     SECTION("random direction: the first uniform draw of the stream of the node")
     {
         quadriga_lib::generate_track(N, {0, 1}, "point", 0.0, 1.0, {}, NaN, {}, 5);

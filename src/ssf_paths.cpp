@@ -57,14 +57,14 @@ Antenna-free paths of one link at one position
 ```
 void quadriga_lib::ssf_paths(
     const gbsm_rays &rays,
-    const arma::vec &link_gain_dB,
+    const double_list &link_gain_dB,
     arma::mat &path_gain,
     arma::vec &path_length,
     arma::cube &polmat,
     const std::string &mobility = "auto",
     const arma::mat &tx_pos = arma::mat(),
     const arma::mat &rx_pos = arma::mat(),
-    const arma::vec &kf_ratio = arma::vec(),
+    const double_list &kf_ratio = {},
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
     arma::vec *aoa = nullptr,
@@ -101,14 +101,14 @@ void quadriga_lib::ssf_paths(
 MD!*/
 
 void quadriga_lib::ssf_paths(const gbsm_rays &rays,
-                             const arma::vec &link_gain_dB,
+                             const double_list &link_gain_dB_in,
                              arma::mat &path_gain,
                              arma::vec &path_length,
                              arma::cube &polmat,
                              const std::string &mobility,
                              const arma::mat &tx_pos,
                              const arma::mat &rx_pos,
-                             const arma::vec &kf_ratio,
+                             const double_list &kf_ratio_in,
                              arma::vec *aod,
                              arma::vec *eod,
                              arma::vec *aoa,
@@ -119,6 +119,8 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
                              arma::uvec *ray_ind,
                              bool oxygen)
 {
+    const arma::vec &link_gain_dB = link_gain_dB_in.vec();
+    const arma::vec &kf_ratio = kf_ratio_in.vec();
     // Validation; no output is touched before all checks passed
     const std::string err = rays.is_valid();
     if (!err.empty())

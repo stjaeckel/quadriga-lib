@@ -30,6 +30,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Counts: `n_<thing>`, e.g. `n_path`, `n_snap`, `n_interact` (interaction points per path; mesh intersections per ray in the ray-tracing functions).
 - Limits: `max_<things>` / `min_<things>` limit a count, e.g. `max_interactions`, `max_paths`, `min_segments`; a limit on a value names the quantity, e.g. `max_path_length`.
 - Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`. C++: selectors and the count and code tuples (below) are `quadriga_lib::uint_list`, which takes a `uvec`, a single value (`0` is index 0), a brace list, or a `std::vector` or Armadillo vector of any integer or floating-point type; a negative, fractional or non-finite value throws.
+- Real-valued lists (C++): parameter tuples, frequency lists and values given once or per item are `quadriga_lib::double_list`, which takes a `vec`, a single value (`3.5e9`), a brace list, or a `std::vector` or Armadillo vector of any integer or floating-point type; the values are kept as they are, NaN and Inf included; functions that compute in float round them to float.
 - Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 - Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
@@ -68,7 +69,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Antenna array generators (TR 38.901 tuples)**
 
-- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `uint_list` for counts and codes, `arma::vec` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
+- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `uint_list` for counts and codes, `double_list` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
 - `panel`: `[M, N, Mg, Ng]`: elements per column (along z), columns per panel (along y), panels per column, panels per row; default 1.
 - `spacing`: `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); defaults 0.5, `d_V`, `M d_V`, `N d_H`.
 - `ports`: `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; they divide `M` and `N`; default `[M, N]` (one port per element).

@@ -32,7 +32,7 @@ void quadriga_lib::freq_response(
     const arma::Cube<dtype> &coeff_re,
     const arma::Cube<dtype> &coeff_im,
     const arma::Cube<dtype> &delay,
-    const arma::Col<dtype> &pilot_grid,
+    const double_list &pilot_grid,
     const double bandwidth,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
@@ -43,7 +43,7 @@ void quadriga_lib::freq_response(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &pilot_grid,
+    const double_list &pilot_grid,
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
@@ -87,13 +87,14 @@ template <typename dtype>
 void quadriga_lib::freq_response(const arma::Cube<dtype> &coeff_re,     // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
                                           const arma::Cube<dtype> &coeff_im,     // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
                                           const arma::Cube<dtype> &delay,        // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                          const arma::Col<dtype> &pilot_grid,    // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+                                          const double_list &pilot_grid_in,      // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
                                           const double bandwidth,                // The baseband bandwidth in [Hz]
                                           arma::Cube<dtype> *hmat_re,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
                                           arma::Cube<dtype> *hmat_im,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
                                           arma::Cube<std::complex<dtype>> *hmat, // Output: Channel matrix (H), Size [n_rx, n_tx, n_carriers]
                                           int use_kernel)                        // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 {
+    const arma::Col<dtype> pilot_grid = pilot_grid_in.as<dtype>();
     [[maybe_unused]] const int kernel = qd_kernel_auto_avx2(use_kernel);
 
     if (pilot_grid.n_elem == 0)
@@ -192,11 +193,11 @@ void quadriga_lib::freq_response(const arma::Cube<dtype> &coeff_re,     // Chann
 }
 
 template void quadriga_lib::freq_response(const arma::Cube<float> &coeff_re, const arma::Cube<float> &coeff_im, const arma::Cube<float> &delay,
-                                                   const arma::Col<float> &pilot_grid, const double bandwidth,
+                                                   const double_list &pilot_grid, const double bandwidth,
                                                    arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im, arma::Cube<std::complex<float>> *hmat, int use_kernel);
 
 template void quadriga_lib::freq_response(const arma::Cube<double> &coeff_re, const arma::Cube<double> &coeff_im, const arma::Cube<double> &delay,
-                                                   const arma::Col<double> &pilot_grid, const double bandwidth,
+                                                   const double_list &pilot_grid, const double bandwidth,
                                                    arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat, int use_kernel);
 
 // Sets an optional output of the batch forms to n_out cubes; each cube is sized by the single-snapshot call, whose
@@ -211,11 +212,13 @@ static void qd_size_batch_output(std::vector<arma::Cube<T>> *out, size_t n_out)
 
 template <typename dtype>
 void quadriga_lib::freq_response(const std::vector<arma::Cube<dtype>> &coeff_re, const std::vector<arma::Cube<dtype>> &coeff_im,
-                                 const std::vector<arma::Cube<dtype>> &delay, const arma::Col<dtype> &pilot_grid, const double bandwidth,
+                                 const std::vector<arma::Cube<dtype>> &delay, const double_list &pilot_grid_in, const double bandwidth,
                                  std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
                                  std::vector<arma::Cube<std::complex<dtype>>> *hmat, const uint_list &i_snap_in, int use_kernel)
 {
+    const arma::vec &pilot_grid = pilot_grid_in.vec();
     const arma::uvec &i_snap = i_snap_in.vec();
+
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
     qd_kernel_auto_avx2(use_kernel);
     if (coeff_re.size() == 0)
@@ -242,18 +245,18 @@ void quadriga_lib::freq_response(const std::vector<arma::Cube<dtype>> &coeff_re,
     const arma::uword n_elem = snap.n_elem * coeff_re[snap[0]].n_rows * coeff_re[snap[0]].n_cols * pilot_grid.n_elem;
     qd_batch_loop(snap.n_elem, snap.n_elem > 1 && n_elem >= 1024, "Snapshot", [&](size_t i)
                   { const arma::uword s = snap[i];
-                    quadriga_lib::freq_response<dtype>(coeff_re[s], coeff_im[s], delay[s], pilot_grid, bandwidth,
+                    quadriga_lib::freq_response<dtype>(coeff_re[s], coeff_im[s], delay[s], pilot_grid_in, bandwidth,
                                                                 hmat_re ? &(*hmat_re)[i] : nullptr, hmat_im ? &(*hmat_im)[i] : nullptr,
                                                                 hmat ? &(*hmat)[i] : nullptr, use_kernel); }, &snap);
 }
 
 template void quadriga_lib::freq_response(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
-                                          const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &pilot_grid, const double bandwidth,
+                                          const std::vector<arma::Cube<float>> &delay, const double_list &pilot_grid, const double bandwidth,
                                           std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
                                           std::vector<arma::Cube<std::complex<float>>> *hmat, const uint_list &i_snap, int use_kernel);
 
 template void quadriga_lib::freq_response(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
-                                          const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &pilot_grid, const double bandwidth,
+                                          const std::vector<arma::Cube<double>> &delay, const double_list &pilot_grid, const double bandwidth,
                                           std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
                                           std::vector<arma::Cube<std::complex<double>>> *hmat, const uint_list &i_snap, int use_kernel);
 
@@ -277,8 +280,8 @@ void quadriga_lib::freq_response_mf(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
@@ -289,8 +292,8 @@ void quadriga_lib::freq_response_mf(
     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
     const std::vector<std::vector<arma::Cube<dtype>>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
@@ -342,14 +345,16 @@ template <typename dtype>
 void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<dtype>> &coeff_re, // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
                                                 const std::vector<arma::Cube<dtype>> &coeff_im, // Imag part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
                                                 const std::vector<arma::Cube<dtype>> &delay,    // Delays [s], length [n_freq], each [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                                const arma::Col<dtype> &freq,                   // Input sample frequencies [Hz], length [n_freq]
-                                                const arma::Col<dtype> &freq_new,               // Output carrier frequencies [Hz], length [n_carrier]
+                                                const double_list &freq_in,                     // Input sample frequencies [Hz], length [n_freq]
+                                                const double_list &freq_new_in,                 // Output carrier frequencies [Hz], length [n_carrier]
                                                 arma::Cube<dtype> *hmat_re,                     // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
                                                 arma::Cube<dtype> *hmat_im,                     // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
                                                 arma::Cube<std::complex<dtype>> *hmat,          // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
                                                 bool remove_delay_phase,                        // Remove baked-in delay phase before SLERP interpolation
                                                 int use_kernel)                                 // Kernel of the sin / cos and SLERP evaluation
 {
+    const arma::Col<dtype> freq = freq_in.as<dtype>();
+    const arma::Col<dtype> freq_new = freq_new_in.as<dtype>();
     use_kernel = qd_kernel_auto_avx2(use_kernel); // Resolved once, passed to fast_sincos and fast_slerp
 
     size_t n_freq = (size_t)freq.n_elem;
@@ -663,25 +668,28 @@ void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<dtype>> &coeff_
 }
 
 template void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
-                                                         const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &freq,
-                                                         const arma::Col<float> &freq_new, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
+                                                         const std::vector<arma::Cube<float>> &delay, const double_list &freq,
+                                                         const double_list &freq_new, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
                                                          arma::Cube<std::complex<float>> *hmat, bool remove_delay_phase, int use_kernel);
 
 template void quadriga_lib::freq_response_mf(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
-                                                         const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq,
-                                                         const arma::Col<double> &freq_new, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
+                                                         const std::vector<arma::Cube<double>> &delay, const double_list &freq,
+                                                         const double_list &freq_new, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
                                                          arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase, int use_kernel);
 
 template <typename dtype>
 void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
                                     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
                                     const std::vector<std::vector<arma::Cube<dtype>>> &delay,
-                                    const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
+                                    const double_list &freq_in, const double_list &freq_new_in,
                                     std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
                                     std::vector<arma::Cube<std::complex<dtype>>> *hmat,
                                     bool remove_delay_phase, const uint_list &i_snap_in, int use_kernel)
 {
+    const arma::Col<dtype> freq = freq_in.as<dtype>();
+    const arma::Col<dtype> freq_new = freq_new_in.as<dtype>();
     const arma::uvec &i_snap = i_snap_in.vec();
+    
     // Shared inputs are checked here, once; the snapshots by the single-snapshot call
     qd_kernel_auto_avx2(use_kernel);
     if (coeff_re.size() == 0)
@@ -712,7 +720,7 @@ void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<dty
     const arma::uword n_elem = first.empty() ? 0 : snap.n_elem * first[0].n_rows * first[0].n_cols * freq_new.n_elem;
     qd_batch_loop(snap.n_elem, snap.n_elem > 1 && n_elem >= 1024, "Snapshot", [&](size_t i)
                   { const arma::uword s = snap[i];
-                    quadriga_lib::freq_response_mf<dtype>(coeff_re[s], coeff_im[s], delay[s], freq, freq_new,
+                    quadriga_lib::freq_response_mf<dtype>(coeff_re[s], coeff_im[s], delay[s], freq_in, freq_new_in,
                                                                       hmat_re ? &(*hmat_re)[i] : nullptr, hmat_im ? &(*hmat_im)[i] : nullptr,
                                                                       hmat ? &(*hmat)[i] : nullptr, remove_delay_phase, use_kernel); }, &snap);
 }
@@ -720,7 +728,7 @@ void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<dty
 template void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<float>>> &coeff_re,
                                              const std::vector<std::vector<arma::Cube<float>>> &coeff_im,
                                              const std::vector<std::vector<arma::Cube<float>>> &delay,
-                                             const arma::Col<float> &freq, const arma::Col<float> &freq_new,
+                                             const double_list &freq, const double_list &freq_new,
                                              std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
                                              std::vector<arma::Cube<std::complex<float>>> *hmat,
                                              bool remove_delay_phase, const uint_list &i_snap, int use_kernel);
@@ -728,7 +736,7 @@ template void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma:
 template void quadriga_lib::freq_response_mf(const std::vector<std::vector<arma::Cube<double>>> &coeff_re,
                                              const std::vector<std::vector<arma::Cube<double>>> &coeff_im,
                                              const std::vector<std::vector<arma::Cube<double>>> &delay,
-                                             const arma::Col<double> &freq, const arma::Col<double> &freq_new,
+                                             const double_list &freq, const double_list &freq_new,
                                              std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
                                              std::vector<arma::Cube<std::complex<double>>> *hmat,
                                              bool remove_delay_phase, const uint_list &i_snap, int use_kernel);

@@ -528,7 +528,7 @@ void quadriga_lib::freq_response(
     const arma::Cube<dtype> &coeff_re,
     const arma::Cube<dtype> &coeff_im,
     const arma::Cube<dtype> &delay,
-    const arma::Col<dtype> &pilot_grid,
+    const double_list &pilot_grid,
     const double bandwidth,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
@@ -539,7 +539,7 @@ void quadriga_lib::freq_response(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &pilot_grid,
+    const double_list &pilot_grid,
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
@@ -601,8 +601,8 @@ void quadriga_lib::freq_response_mf(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
@@ -613,8 +613,8 @@ void quadriga_lib::freq_response_mf(
     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
     const std::vector<std::vector<arma::Cube<dtype>>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
@@ -1057,7 +1057,7 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::qrt_file_init(
     const std::string &fn,
-    const arma::Col<dtype> &center_freq,
+    const double_list &center_freq,
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
@@ -1329,7 +1329,7 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &fbs_pos,

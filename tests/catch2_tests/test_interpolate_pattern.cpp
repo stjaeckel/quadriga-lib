@@ -1853,8 +1853,6 @@ TEST_CASE("interpolate_pattern (vector) - input validation")
     {
         arma::cube on_az(const_cast<double *>(az.memptr()), 1, 3, 1, false, true);
         CHECK_THROWS_AS(quadriga_lib::interpolate_pattern<double>(vec, az, el, V_re, on_az, H_re, H_im), std::invalid_argument);
-        arma::cube on_freq(const_cast<double *>(freq.memptr()), 1, 1, 2, false, true);
-        CHECK_THROWS_AS(quadriga_lib::interpolate_pattern<double>(vec, az, el, V_re, V_im, on_freq, H_im, freq), std::invalid_argument);
     }
     SECTION("an output shares memory with a data member of an entry")
     {

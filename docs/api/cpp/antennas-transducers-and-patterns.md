@@ -133,16 +133,16 @@ Also in: [MATLAB](../mex/antennas-transducers-and-patterns.md#apply_port_weights
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(
     const arrayant<dtype> &ant,
-    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
+    const double_list &azimuth_grid_new = {},
+    const double_list &elevation_grid_new = {},
     double propagation_speed = 299792458.0,
     bool center_ports = false);
 
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const double_list &azimuth_grid_new = {},
+    const double_list &elevation_grid_new = {},
+    const double_list &freq_new = {},
     double propagation_speed = 299792458.0,
     bool center_ports = false);
 ```
@@ -402,14 +402,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
     const std::string &type,
     double res = NAN,
     double center_freq = 299792458.0,
-    const arma::vec &element = {},
+    const double_list &element = {},
     const uint_list &panel = {},
-    const arma::vec &spacing = {},
+    const double_list &spacing = {},
     const uint_list &pol = {},
     const uint_list &ports = {},
     const arma::mat &steer = {},
     const arma::mat &beams = {},
-    const arma::vec &device_size = {},
+    const double_list &device_size = {},
     const uint_list &locations = {},
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(),
     bool separate_beams = false,
@@ -555,7 +555,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         double horn_control_freq = NAN,
         double baffle_width = 0.15,
         double baffle_height = 0.25,
-        const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
+        const double_list &center_freq = {},
         double angular_resolution_deg = 5.0);
 ```
 
@@ -667,7 +667,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const double_list &freq_new = {},
     const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),

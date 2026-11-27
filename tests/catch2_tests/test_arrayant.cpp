@@ -436,3 +436,86 @@ TEST_CASE("Arrayant - Index arguments accept integers and integer vectors")
     static_assert(!std::is_convertible<std::nullptr_t, quadriga_lib::uint_list>::value, "nullptr");
     static_assert(!std::is_convertible<bool, quadriga_lib::uint_list>::value, "bool");
 }
+
+TEST_CASE("double_list - Real-valued list arguments accept scalars and vectors of any number type")
+{
+    using quadriga_lib::double_list;
+    auto v = [](const double_list &l) { return arma::vec(l.vec()); };
+    const arma::vec ref = {1.0, 2.5};
+
+    // Scalars, brace lists and vectors of any number type
+    CHECK(arma::approx_equal(v(3.5e9), arma::vec{3.5e9}, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(2), arma::vec{2.0}, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(0), arma::vec{0.0}, "absdiff", 0.0)); // Not Col(const char *)
+    CHECK(arma::approx_equal(v(2.5f), arma::vec{2.5}, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v({1, 2.5}), ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v({1.0f, 2.5f}), ref, "absdiff", 0.0));
+    int n = 3; // A variable, not a constant expression
+    CHECK(arma::approx_equal(v({n}), arma::vec{3.0}, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(std::vector<float>{1.0f, 2.5f}), ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(arma::fvec{1.0f, 2.5f}), ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(arma::rowvec{1.0, 2.5}), ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(arma::ivec{1, 3}), arma::vec{1.0, 3.0}, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(arma::linspace(1.0, 2.5, 2)), ref, "absdiff", 0.0));
+    CHECK(arma::approx_equal(v(2.0 * ref), 2.0 * ref, "absdiff", 0.0));
+    CHECK(v({}).is_empty());
+    CHECK(v(arma::mat(0, 3)).is_empty());
+    CHECK_THROWS_AS(v(arma::mat(2, 2, arma::fill::zeros)), std::invalid_argument);
+
+    // NaN and Inf are kept; a vec is used in place; as<T>() converts
+    const arma::vec x = v({arma::datum::nan, arma::datum::inf});
+    CHECK((std::isnan(x[0]) && std::isinf(x[1])));
+    CHECK(&double_list(ref).vec() == &ref);
+    const arma::uword k = 2;
+    CHECK(arma::approx_equal(v({k, 0, 3.5}), arma::vec{2.0, 0.0, 3.5}, "absdiff", 0.0)); // Mixed variables and literals
+    int neg = -1;
+    auto u = [](const quadriga_lib::uint_list &l) { return l.vec().n_elem; };
+    CHECK_THROWS_AS(u({neg, k}), std::invalid_argument); // Each entry is checked
+    const double_list from_temp(arma::vec{4.0}); // A temporary is owned, so the list outlives it
+    CHECK(from_temp.vec()[0] == 4.0);
+    const arma::fvec f = double_list(ref).as<float>();
+    CHECK(arma::approx_equal(f, arma::fvec{1.0f, 2.5f}, "absdiff", 0.0f));
+
+    // A null pointer and bool are not accepted
+    static_assert(!std::is_convertible<std::nullptr_t, double_list>::value, "nullptr");
+    static_assert(!std::is_convertible<bool, double_list>::value, "bool");
+
+    // Through the API: a scalar or a float vector where a brace list was needed
+    CHECK(arma::approx_equal(quadriga_lib::cube<double>(2.0), quadriga_lib::cube<double>({2.0}), "absdiff", 0.0));
+    CHECK(arma::approx_equal(quadriga_lib::cube<double>(1.0, arma::fvec{0.5f, 0.0f, 0.0f}), quadriga_lib::cube<double>(1.0, {0.5, 0.0, 0.0}), "absdiff", 0.0));
+    CHECK(arma::approx_equal(quadriga_lib::generate_layout("37.885_Highway", 0, 5.9e9).center_freq, arma::vec{5.9e9}, "absdiff", 0.0));
+    const auto a = quadriga_lib::generate_antenna<double>("ula", 10.0, 3.0e9, {}, 4, 0.25);
+    const auto b = quadriga_lib::generate_antenna<double>("ula", 10.0, 3.0e9, {}, 4, {0.25});
+    CHECK(arma::approx_equal(a.element_pos, b.element_pos, "absdiff", 0.0));
+    const arma::fmat pos = {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+    arma::fmat val1, val2;
+    quadriga_lib::sos_randn(10.0, pos, val1, arma::fmat(), {}, "Comb256", 1);
+    quadriga_lib::sos_randn(arma::fvec{10.0f}, pos, val2, arma::fmat(), {}, "Comb256", 1);
+    CHECK(arma::approx_equal(val1, val2, "absdiff", 0.0f));
+    const auto omni = quadriga_lib::generate_antenna<double>("omni", 10.0);
+    const auto one_dir = quadriga_lib::apply_port_weights(omni, 0.0, 0.0); // One output direction
+    CHECK((one_dir.n_azimuth() == 1 && one_dir.n_elevation() == 1));
+    const auto spk = quadriga_lib::generate_speaker<float>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
+                                                           NAN, NAN, NAN, 0.15, 0.25, 1000.0);
+    CHECK((spk.size() == 1 && spk[0].center_freq == 1000.0f));
+    const arma::cube c_re(1, 1, 1, arma::fill::ones), c_im(1, 1, 1, arma::fill::zeros), dl(1, 1, 1, arma::fill::value(1.0e-7));
+    arma::cube h_re, h_im;
+    quadriga_lib::freq_response(c_re, c_im, dl, 0.0, 1.0e8, &h_re, &h_im); // One carrier at fc: H = coefficient
+    CHECK((h_re.n_elem == 1 && std::abs(h_re[0] - 1.0) < 1e-6 && std::abs(h_im[0]) < 1e-6));
+    const arma::vec acf = {1.0, 0.5, 0.0}, dist = {0.0, 10.0, 20.0};
+    CHECK(arma::approx_equal(quadriga_lib::sos_acfi(acf, dist, 10.0), arma::vec{0.5}, "absdiff", 1e-12));
+
+    // Vector form: a scalar list is passed on to every snapshot
+    std::vector<arma::cube> v_re = {c_re, c_re}, v_im = {c_im, c_im}, v_dl = {dl, dl}, hv_re, hv_im;
+    quadriga_lib::freq_response(v_re, v_im, v_dl, 0.0, 1.0e8, &hv_re, &hv_im);
+    CHECK((hv_re.size() == 2 && hv_re[1].n_elem == 1 && std::abs(hv_re[1][0] - 1.0) < 1e-6));
+
+    // Templates copy a list before writing outputs: an output on the memory of the list gives the values of a normal call
+    const arma::mat p2 = {{0.0, 0.0, 0.0}, {3.0, 4.0, 0.0}};
+    arma::mat ref_val;
+    quadriga_lib::sos_randn(arma::vec{10.0}, p2, ref_val, arma::mat(), {}, "Comb256", 7);
+    arma::mat shared = {10.0}; // [1, 1]: the list and, after resizing, the output
+    arma::vec dd_view(shared.memptr(), 1, false, true);
+    quadriga_lib::sos_randn(dd_view, p2, shared, arma::mat(), {}, "Comb256", 7);
+    CHECK(arma::approx_equal(shared, ref_val, "absdiff", 0.0));
+}

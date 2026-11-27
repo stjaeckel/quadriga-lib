@@ -35,6 +35,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Counts: `n_<thing>`, e.g. `n_path`, `n_snap`, `n_interact` (interaction points per path; mesh intersections per ray in the ray-tracing functions).
 - Limits: `max_<things>` / `min_<things>` limit a count, e.g. `max_interactions`, `max_paths`, `min_segments`; a limit on a value names the quantity, e.g. `max_path_length`.
 - Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`. C++: selectors and the count and code tuples (below) are `quadriga_lib::uint_list`, which takes a `uvec`, a single value (`0` is index 0), a brace list, or a `std::vector` or Armadillo vector of any integer or floating-point type; a negative, fractional or non-finite value throws.
+- Real-valued lists (C++): parameter tuples, frequency lists and values given once or per item are `quadriga_lib::double_list`, which takes a `vec`, a single value (`3.5e9`), a brace list, or a `std::vector` or Armadillo vector of any integer or floating-point type; the values are kept as they are, NaN and Inf included; functions that compute in float round them to float.
 - Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 - Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
@@ -73,7 +74,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Antenna array generators (TR 38.901 tuples)**
 
-- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `uint_list` for counts and codes, `arma::vec` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
+- Tuples: the panel parameters of TR 38.901 clause 7.3 are short arrays (C++: `uint_list` for counts and codes, `double_list` / `arma::mat` for real values). Trailing entries may be omitted; 0 (counts and codes) or NaN (real values) selects the default of that entry; more entries than defined throw. Entries in degrees or dB carry no `_deg` / `_dB` suffix (a decided deviation from the unit rule); the unit is given per entry here and in each function.
 - `panel`: `[M, N, Mg, Ng]`: elements per column (along z), columns per panel (along y), panels per column, panels per row; default 1.
 - `spacing`: `[d_V, d_H, d_gV, d_gH]` in wavelengths: vertical and horizontal element spacing, vertical and horizontal panel spacing (centre to centre); defaults 0.5, `d_V`, `M d_V`, `N d_H`.
 - `ports`: `[M_P, N_P]`: ports (TXRUs) per column and per row of a panel and polarization; they divide `M` and `N`; default `[M, N]` (one port per element).
@@ -372,16 +373,16 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#apply_port_weights) · [Python](quadri
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::apply_port_weights(
     const arrayant<dtype> &ant,
-    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
+    const double_list &azimuth_grid_new = {},
+    const double_list &elevation_grid_new = {},
     double propagation_speed = 299792458.0,
     bool center_ports = false);
 
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::apply_port_weights(
     const std::vector<arrayant<dtype>> &arrayant_vec,
-    const arma::Col<dtype> &azimuth_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &elevation_grid_new = arma::Col<dtype>(),
-    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const double_list &azimuth_grid_new = {},
+    const double_list &elevation_grid_new = {},
+    const double_list &freq_new = {},
     double propagation_speed = 299792458.0,
     bool center_ports = false);
 ```
@@ -641,14 +642,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_antenna(
     const std::string &type,
     double res = NAN,
     double center_freq = 299792458.0,
-    const arma::vec &element = {},
+    const double_list &element = {},
     const uint_list &panel = {},
-    const arma::vec &spacing = {},
+    const double_list &spacing = {},
     const uint_list &pol = {},
     const uint_list &ports = {},
     const arma::mat &steer = {},
     const arma::mat &beams = {},
-    const arma::vec &device_size = {},
+    const double_list &device_size = {},
     const uint_list &locations = {},
     const quadriga_lib::arrayant<dtype> &pattern = quadriga_lib::arrayant<dtype>(),
     bool separate_beams = false,
@@ -794,7 +795,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         double horn_control_freq = NAN,
         double baffle_width = 0.15,
         double baffle_height = 0.25,
-        const arma::Col<dtype> &center_freq = arma::Col<dtype>(),
+        const double_list &center_freq = {},
         double angular_resolution_deg = 5.0);
 ```
 
@@ -906,7 +907,7 @@ void quadriga_lib::interpolate_pattern(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> &freq_new = arma::Col<dtype>(),
+    const double_list &freq_new = {},
     const uint_list &i_element = {},
     const arma::Cube<dtype> &orientation = arma::Cube<dtype>(),
     const arma::Mat<dtype> &element_pos = arma::Mat<dtype>(),
@@ -1785,7 +1786,7 @@ void quadriga_lib::freq_response(
     const arma::Cube<dtype> &coeff_re,
     const arma::Cube<dtype> &coeff_im,
     const arma::Cube<dtype> &delay,
-    const arma::Col<dtype> &pilot_grid,
+    const double_list &pilot_grid,
     const double bandwidth,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
@@ -1796,7 +1797,7 @@ void quadriga_lib::freq_response(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &pilot_grid,
+    const double_list &pilot_grid,
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
@@ -1858,8 +1859,8 @@ void quadriga_lib::freq_response_mf(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
@@ -1870,8 +1871,8 @@ void quadriga_lib::freq_response_mf(
     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
     const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
     const std::vector<std::vector<arma::Cube<dtype>>> &delay,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
     std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
@@ -2314,7 +2315,7 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::qrt_file_init(
     const std::string &fn,
-    const arma::Col<dtype> &center_freq,
+    const double_list &center_freq,
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
@@ -2586,7 +2587,7 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
@@ -2795,7 +2796,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double update_interval = 1.0e-3,
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
-    const arma::vec &dist = arma::vec(),
+    const double_list &dist = {},
     const uint_list &n_floors = {},
     bool uplink = false,
     const arma::mat &offset_angles_deg = arma::mat(),
@@ -3021,8 +3022,8 @@ void quadriga_lib::get_channels_multifreq(
     const arma::Mat<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
     const arma::Cube<dtype> &polmat,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
@@ -3344,16 +3345,16 @@ std::vector<channel<double>> quadriga_lib::get_channels_tr38901(
     const arrayant<double> &bs_array,
     const arrayant<double> &ut_array,
     const std::string &scenario,
-    const arma::vec &center_freq = {3.5e9},
+    const double_list &center_freq = {3.5e9},
     arma::uword n_ut = 1,
     arma::sword seed = -1,
-    const arma::vec &spacing = {},
-    const arma::vec &grid = {},
-    const arma::vec &area = {},
-    const arma::vec &bs = {},
-    const arma::vec &ut = {},
-    const arma::vec &indoor = {},
-    const arma::vec &time_grid = {},
+    const double_list &spacing = {},
+    const double_list &grid = {},
+    const double_list &area = {},
+    const double_list &bs = {},
+    const double_list &ut = {},
+    const double_list &indoor = {},
+    const double_list &time_grid = {},
     const std::string &los = "auto",
     const std::string &output = "taps",
     const std::string &attach = "large_scale",
@@ -3381,21 +3382,21 @@ std::vector<channel<double>> quadriga_lib::get_channels_tr38901(
 Optional changes to the scenario layout (defaults in Notes). Give only the values to change; NAN keeps a default.
 [generate_layout](#generate_layout) describes all values:
 
-- **`spacing`** *(optional)* — Inter-site distance in m, e.g. `{200}`; indoor: BS spacing in x and y
-- **`grid`** *(optional)* — Rings of sites around the centre site, e.g. `{0}` = one site, `{2}` = 19 sites; the
+- **`spacing`** *(optional)* — Inter-site distance in m, e.g. `200`; indoor: BS spacing in x and y
+- **`grid`** *(optional)* — Rings of sites around the centre site, e.g. `0` = one site, `2` = 19 sites; the
   number of sectors as third value, e.g. `{0, NAN, 1}`; indoor: BSs in x and y
 - **`area`** *(optional)* — Hall size in m, length, width, height (InH, InF)
-- **`bs`** *(optional)* — BS height in m, e.g. `{30}`; then the mechanical downtilt and an offset of the sector
+- **`bs`** *(optional)* — BS height in m, e.g. `30`; then the mechanical downtilt and an offset of the sector
   headings in degrees
 - **`ut`** *(optional)* — UT height and minimum distance to the BS in m, speed in m/s, e.g. `{NAN, NAN, 30 / 3.6}` =
   all UTs at 30 km/h; then the orientation (bank, tilt, heading) in degrees
-- **`indoor`** *(optional)* — Share of the UTs in buildings, e.g. `{0.5}` (UMa, UMi, RMa, SMa); then the range of floors
+- **`indoor`** *(optional)* — Share of the UTs in buildings, e.g. `0.5` (UMa, UMi, RMa, SMa); then the range of floors
   and the floor height
 
 Simulation settings:
 
 - **`time_grid`** *(optional)* — `{T, dt}` in s: snapshots at 0, dt, 2 dt, … up to T, while the UTs move; `dt`
-  defaults to 1 ms, e.g. `{0.1}` = 101 snapshots over 100 ms; omitted = one snapshot (static channel)
+  defaults to 1 ms, e.g. `0.1` = 101 snapshots over 100 ms; omitted = one snapshot (static channel)
 - **`los`** *(optional)* — `"auto"`: LOS or NLOS as drawn from the LOS probability of the scenario; `"los"` or `"nlos"`: that state for
   all links, also of the UTs in buildings and to the other sectors, so it can change the serving sector (`"InF_HH"` is
   always LOS)
@@ -3431,7 +3432,7 @@ Simulation settings:
 const auto bs = quadriga_lib::generate_antenna<double>("3gpp", 10.0, 3.5e9, {}, {4, 4, 1, 1});
 const auto ut = quadriga_lib::generate_antenna<double>("xpol");
 auto chan = quadriga_lib::get_channels_tr38901(bs, ut, "UMa", {3.5e9}, 10, 1);   // 19 sites, 10 UTs per cell
-auto c2 = quadriga_lib::get_channels_tr38901(bs, ut, "UMi", {3.5e9}, 10, 1, {}, {0}, {}, {}, {}, {}, {0.1});   // one site, 100 ms
+auto c2 = quadriga_lib::get_channels_tr38901(bs, ut, "UMi", 3.5e9, 10, 1, {}, 0, {}, {}, {}, {}, 0.1);   // one site, 100 ms
 ```
 
 ### Notes:
@@ -3856,7 +3857,7 @@ void quadriga_lib::gbsm_draw(
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
     const arma::u32_vec &floor_id = arma::u32_vec(),
-    const arma::vec &center_freq = arma::vec(),
+    const double_list &center_freq = {},
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -3962,7 +3963,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quad
 ### Declaration:
 ```cpp
 void quadriga_lib::gbsm_rays_from_paths(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
@@ -3974,8 +3975,8 @@ void quadriga_lib::gbsm_rays_from_paths(
     const std::string &method = "quadriga",
     const arma::u32_vec &path_type = arma::u32_vec(),
     const arma::u32_vec &tap = arma::u32_vec(),
-    const arma::vec &gr_eps_re = arma::vec(),
-    const arma::vec &gr_eps_im = arma::vec());
+    const double_list &gr_eps_re = {},
+    const double_list &gr_eps_im = {});
 ```
 
 ### Inputs:
@@ -4036,7 +4037,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const arrayant<double> &tx_array,
     const arrayant<double> &rx_array,
     const gbsm_rays &rays,
-    const arma::vec &link_gain_dB,
+    const double_list &link_gain_dB,
     const std::string &mobility = "auto",
     const std::string &output = "taps",
     arma::uword i_freq = 0,
@@ -4044,7 +4045,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const arma::mat &rx_pos = arma::mat(),
     const arma::mat &tx_orientation = arma::mat(),
     const arma::mat &rx_orientation = arma::mat(),
-    const arma::vec &kf_ratio = arma::vec(),
+    const double_list &kf_ratio = {},
     bool oxygen = false,
     bool use_absolute_delays = false);
 ```
@@ -4119,13 +4120,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#los_probability) · [Python](quadriga_
 arma::vec quadriga_lib::los_probability(
     const std::string &model,
     const arma::vec &d2d_out,
-    const arma::vec &h_bs,
-    const arma::vec &h_ut,
+    const double_list &h_bs,
+    const double_list &h_ut,
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
     const arma::vec &rnd_g = arma::vec(),
-    const arma::vec &center_freq = arma::vec(),
+    const double_list &center_freq = {},
     arma::mat *los_soft = nullptr);
 ```
 
@@ -4196,7 +4197,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#lsp_generate) · [Python](quadriga_lib
 ```cpp
 void quadriga_lib::lsp_generate(
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &rnd,
@@ -4269,10 +4270,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#o2i_loss) · [Python](quadriga_lib_api
 ### Declaration:
 ```cpp
 arma::mat quadriga_lib::o2i_loss(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
-    const arma::vec &weights,
+    const double_list &weights,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -4356,7 +4357,7 @@ arma::mat quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     arma::mat *sf_sigma_dB = nullptr,
@@ -4595,14 +4596,14 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_paths) · [Python](quadriga_lib_ap
 ```cpp
 void quadriga_lib::ssf_paths(
     const gbsm_rays &rays,
-    const arma::vec &link_gain_dB,
+    const double_list &link_gain_dB,
     arma::mat &path_gain,
     arma::vec &path_length,
     arma::cube &polmat,
     const std::string &mobility = "auto",
     const arma::mat &tx_pos = arma::mat(),
     const arma::mat &rx_pos = arma::mat(),
-    const arma::vec &kf_ratio = arma::vec(),
+    const double_list &kf_ratio = {},
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
     arma::vec *aoa = nullptr,
@@ -4686,7 +4687,7 @@ void quadriga_lib::ssf_rays(
     const std::unordered_map<std::string, double> &scenpar,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::cube &lsp,
     const arma::cube &lsp_mu,
     const arma::cube &lsp_sigma,
@@ -5576,9 +5577,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#drop_terminals) · [Python](quadriga_l
 void quadriga_lib::drop_terminals(
     quadriga_lib::layout &layout,
     arma::uword n_ut,
-    const arma::vec &bounds = {},
-    const arma::vec &ut = {},
-    const arma::vec &indoor = {},
+    const double_list &bounds = {},
+    const double_list &ut = {},
+    const double_list &indoor = {},
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     bool per_cell = true,
     arma::sword seed = -1);
@@ -5691,13 +5692,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_layout) · [Python](quadriga_
 quadriga_lib::layout quadriga_lib::generate_layout(
     const std::string &type,
     arma::uword n_ut = 0,
-    const arma::vec &center_freq = {},
-    const arma::vec &spacing = {},
-    const arma::vec &grid = {},
-    const arma::vec &area = {},
-    const arma::vec &bs = {},
-    const arma::vec &ut = {},
-    const arma::vec &indoor = {},
+    const double_list &center_freq = {},
+    const double_list &spacing = {},
+    const double_list &grid = {},
+    const double_list &area = {},
+    const double_list &bs = {},
+    const double_list &ut = {},
+    const double_list &indoor = {},
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     bool per_cell = true,
     arma::sword seed = -1);
@@ -5891,12 +5892,12 @@ void quadriga_lib::generate_track(
     const std::string &type,
     double length = 0.0,
     double speed = NAN,
-    const arma::vec &direction = {},
+    const double_list &direction = {},
     double spacing = NAN,
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     arma::sword seed = -1,
     const std::string &name = "",
-    const arma::vec &start = {});
+    const double_list &start = {});
 ```
 
 ### Inputs:
@@ -5982,7 +5983,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const layout &layout,
     const std::vector<std::vector<gbsm_rays>> &rays,
     const uint_list &i_link = {},
-    const arma::vec &times = {},
+    const double_list &times = {},
     const std::string &output = "taps",
     arma::umat *index = nullptr,
     const std::string &mobility = "auto",
@@ -6064,7 +6065,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_layout) · [Python](quadr
 ```cpp
 std::vector<channel<double>> quadriga_lib::get_channels_layout(
     const layout &layout,
-    const arma::vec &times = {},
+    const double_list &times = {},
     const std::string &output = "taps",
     const std::string &method = "",
     arma::umat *index = nullptr,
@@ -6129,7 +6130,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#init_link_states) · [Python](quadriga
 void quadriga_lib::init_link_states(
     layout &layout,
     const std::string &method = "38.901",
-    const arma::vec &o2i_low = {},
+    const double_list &o2i_low = {},
     bool pol_variability = false,
     double anchor_freq = 2.0e9,
     const std::string &sos_preset = "",
@@ -6208,7 +6209,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#layout_csv_read) · [Python](quadriga_
 quadriga_lib::layout quadriga_lib::layout_csv_read(
     const std::string &fn_tx,
     const std::string &fn_rx,
-    const arma::vec &center_freq = {},
+    const double_list &center_freq = {},
     bool eval_antennas = true,
     std::vector<std::string> *extra_tx = nullptr,
     std::vector<std::string> *extra_rx = nullptr);
@@ -6301,7 +6302,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sample_track) · [Python](quadriga_lib
 void quadriga_lib::sample_track(
     const quadriga_lib::layout_nodes &nodes,
     arma::uword i_node,
-    const arma::vec &times,
+    const double_list &times,
     arma::mat &pos,
     arma::mat &orientation,
     arma::uvec *i_row = nullptr);
@@ -6463,7 +6464,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#set_orientation) · [Python](quadriga_
 ```cpp
 void quadriga_lib::set_orientation(
     quadriga_lib::layout_nodes &nodes,
-    const arma::vec &orientation = {},
+    const double_list &orientation = {},
     const uint_list &i_node = {},
     bool force = false);
 ```
@@ -6479,7 +6480,7 @@ void quadriga_lib::set_orientation(
 ```cpp
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_orientation(L.rx);                                  // The antennas look along the motion
-quadriga_lib::set_orientation(L.rx, arma::vec{0.0, 0.0, 0.5});        // The same, turned by 0.5 rad
+quadriga_lib::set_orientation(L.rx, {0.0, 0.0, 0.5});                 // The same, turned by 0.5 rad
 ```
 
 ### Notes:
@@ -6824,9 +6825,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#cube) · [Python](quadriga_lib_api_pyt
 ### Declaration:
 ```cpp
 arma::Mat<dtype> quadriga_lib::cube(
-    const arma::vec &scale = {1.0},
-    const arma::vec &rotation = {0.0, 0.0, 0.0},
-    const arma::vec &location = {0.0, 0.0, 0.0},
+    const double_list &scale = {1.0},
+    const double_list &rotation = {0.0, 0.0, 0.0},
+    const double_list &location = {0.0, 0.0, 0.0},
     const arma::uword n_div = 1);
 ```
 
@@ -7301,9 +7302,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#plane) · [Python](quadriga_lib_api_py
 ### Declaration:
 ```cpp
 arma::Mat<dtype> quadriga_lib::plane(
-    const arma::vec &scale = {1.0},
-    const arma::vec &rotation = {0.0, 0.0, 0.0},
-    const arma::vec &location = {0.0, 0.0, 0.0},
+    const double_list &scale = {1.0},
+    const double_list &rotation = {0.0, 0.0, 0.0},
+    const double_list &location = {0.0, 0.0, 0.0},
     const arma::uword n_div = 1);
 ```
 
@@ -9059,7 +9060,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acfi) · [Python](quadriga_lib_api
 arma::Col<dtype> quadriga_lib::sos_acfi(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    const arma::Col<dtype> &d);
+    const double_list &d);
 ```
 
 ### Inputs:
@@ -9285,10 +9286,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_map) · [Python](quadriga_lib_api_
 void quadriga_lib::sos_map(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Mat<dtype> &phase,
-    const arma::Col<dtype> &x,
+    const double_list &x,
     std::vector<arma::Cube<dtype>> &map,
-    const arma::Col<dtype> &y = arma::Col<dtype>(),
-    const arma::Col<dtype> &z = arma::Col<dtype>(),
+    const double_list &y = {},
+    const double_list &z = {},
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -9396,11 +9397,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_rand) · [Python](quadriga_lib_api
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_rand(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -9460,12 +9461,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_randi) · [Python](quadriga_lib_ap
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_randi(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::uword imax,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -9524,11 +9525,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_randn) · [Python](quadriga_lib_ap
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_randn(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```

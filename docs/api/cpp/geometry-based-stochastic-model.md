@@ -403,7 +403,7 @@ void quadriga_lib::gbsm_draw(
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
     const arma::u32_vec &floor_id = arma::u32_vec(),
-    const arma::vec &center_freq = arma::vec(),
+    const double_list &center_freq = {},
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -509,7 +509,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths
 ### Declaration:
 ```cpp
 void quadriga_lib::gbsm_rays_from_paths(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
@@ -521,8 +521,8 @@ void quadriga_lib::gbsm_rays_from_paths(
     const std::string &method = "quadriga",
     const arma::u32_vec &path_type = arma::u32_vec(),
     const arma::u32_vec &tap = arma::u32_vec(),
-    const arma::vec &gr_eps_re = arma::vec(),
-    const arma::vec &gr_eps_im = arma::vec());
+    const double_list &gr_eps_re = {},
+    const double_list &gr_eps_im = {});
 ```
 
 ### Inputs:
@@ -583,7 +583,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const arrayant<double> &tx_array,
     const arrayant<double> &rx_array,
     const gbsm_rays &rays,
-    const arma::vec &link_gain_dB,
+    const double_list &link_gain_dB,
     const std::string &mobility = "auto",
     const std::string &output = "taps",
     arma::uword i_freq = 0,
@@ -591,7 +591,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const arma::mat &rx_pos = arma::mat(),
     const arma::mat &tx_orientation = arma::mat(),
     const arma::mat &rx_orientation = arma::mat(),
-    const arma::vec &kf_ratio = arma::vec(),
+    const double_list &kf_ratio = {},
     bool oxygen = false,
     bool use_absolute_delays = false);
 ```
@@ -666,13 +666,13 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#los_probability) · 
 arma::vec quadriga_lib::los_probability(
     const std::string &model,
     const arma::vec &d2d_out,
-    const arma::vec &h_bs,
-    const arma::vec &h_ut,
+    const double_list &h_bs,
+    const double_list &h_ut,
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
     const arma::vec &rnd_g = arma::vec(),
-    const arma::vec &center_freq = arma::vec(),
+    const double_list &center_freq = {},
     arma::mat *los_soft = nullptr);
 ```
 
@@ -743,7 +743,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#lsp_generate) · [Py
 ```cpp
 void quadriga_lib::lsp_generate(
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &rnd,
@@ -816,10 +816,10 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#o2i_loss) · [Python
 ### Declaration:
 ```cpp
 arma::mat quadriga_lib::o2i_loss(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
-    const arma::vec &weights,
+    const double_list &weights,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -903,7 +903,7 @@ arma::mat quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     arma::mat *sf_sigma_dB = nullptr,
@@ -1142,14 +1142,14 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_paths) · [Pytho
 ```cpp
 void quadriga_lib::ssf_paths(
     const gbsm_rays &rays,
-    const arma::vec &link_gain_dB,
+    const double_list &link_gain_dB,
     arma::mat &path_gain,
     arma::vec &path_length,
     arma::cube &polmat,
     const std::string &mobility = "auto",
     const arma::mat &tx_pos = arma::mat(),
     const arma::mat &rx_pos = arma::mat(),
-    const arma::vec &kf_ratio = arma::vec(),
+    const double_list &kf_ratio = {},
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
     arma::vec *aoa = nullptr,
@@ -1233,7 +1233,7 @@ void quadriga_lib::ssf_rays(
     const std::unordered_map<std::string, double> &scenpar,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::cube &lsp,
     const arma::cube &lsp_mu,
     const arma::cube &lsp_sigma,

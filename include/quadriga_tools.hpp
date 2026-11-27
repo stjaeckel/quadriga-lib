@@ -14,6 +14,8 @@
 #include <filesystem>
 #include <cstdint>
 
+#include "quadriga_common.hpp"
+
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "uword", "size_t" and "unsigned long long" interchangeably
 // This requires a 64 bit platform, but will compile on Linux, Windows and macOS
@@ -157,18 +159,18 @@ namespace quadriga_lib
     // Make a (default) cube
     template <typename dtype = double>
     arma::Mat<dtype> cube(
-        const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales all axes; length [3] scales {x,y,z} independently
-        const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
-        const arma::vec &location = {0.0, 0.0, 0.0}, // Location, Vector of length [3]; Empty = default
-        const arma::uword n_div = 1);                // Number of divisions
+        const double_list &scale = {1.0},              // Scale; one value scales all axes; [3] scales {x,y,z} independently
+        const double_list &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], [3]; empty = default
+        const double_list &location = {0.0, 0.0, 0.0}, // Location, [3]; empty = default
+        const arma::uword n_div = 1);                  // Number of divisions
 
     // Make a (default) plane
     template <typename dtype = double>
     arma::Mat<dtype> plane(
-        const arma::vec &scale = {1.0},              // Scale; Vector of length [1] scales x and y; length [2] or [3] scales {x,y} independently, z is ignored
-        const arma::vec &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], Vector of length [3]; Empty = default
-        const arma::vec &location = {0.0, 0.0, 0.0}, // Location, Vector of length [3]; Empty = default
-        const arma::uword n_div = 1);                // Number of divisions
+        const double_list &scale = {1.0},              // Scale; one value scales x and y; [2] or [3] scales {x,y} independently, z is ignored
+        const double_list &rotation = {0.0, 0.0, 0.0}, // Euler rotations in [rad], [3]; empty = default
+        const double_list &location = {0.0, 0.0, 0.0}, // Location, [3]; empty = default
+        const arma::uword n_div = 1);                  // Number of divisions
 
     // Generate diffraction ellipsoid
     template <typename dtype> // float or double

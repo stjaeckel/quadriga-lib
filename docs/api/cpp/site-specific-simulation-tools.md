@@ -362,9 +362,9 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#cube) · [Python](../
 ### Declaration:
 ```cpp
 arma::Mat<dtype> quadriga_lib::cube(
-    const arma::vec &scale = {1.0},
-    const arma::vec &rotation = {0.0, 0.0, 0.0},
-    const arma::vec &location = {0.0, 0.0, 0.0},
+    const double_list &scale = {1.0},
+    const double_list &rotation = {0.0, 0.0, 0.0},
+    const double_list &location = {0.0, 0.0, 0.0},
     const arma::uword n_div = 1);
 ```
 
@@ -839,9 +839,9 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#plane) · [Python](..
 ### Declaration:
 ```cpp
 arma::Mat<dtype> quadriga_lib::plane(
-    const arma::vec &scale = {1.0},
-    const arma::vec &rotation = {0.0, 0.0, 0.0},
-    const arma::vec &location = {0.0, 0.0, 0.0},
+    const double_list &scale = {1.0},
+    const double_list &rotation = {0.0, 0.0, 0.0},
+    const double_list &location = {0.0, 0.0, 0.0},
     const arma::uword n_div = 1);
 ```
 

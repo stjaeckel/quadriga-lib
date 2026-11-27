@@ -341,9 +341,9 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#drop_terminals) · [Pyt
 void quadriga_lib::drop_terminals(
     quadriga_lib::layout &layout,
     arma::uword n_ut,
-    const arma::vec &bounds = {},
-    const arma::vec &ut = {},
-    const arma::vec &indoor = {},
+    const double_list &bounds = {},
+    const double_list &ut = {},
+    const double_list &indoor = {},
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     bool per_cell = true,
     arma::sword seed = -1);
@@ -456,13 +456,13 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#generate_layout) · [Py
 quadriga_lib::layout quadriga_lib::generate_layout(
     const std::string &type,
     arma::uword n_ut = 0,
-    const arma::vec &center_freq = {},
-    const arma::vec &spacing = {},
-    const arma::vec &grid = {},
-    const arma::vec &area = {},
-    const arma::vec &bs = {},
-    const arma::vec &ut = {},
-    const arma::vec &indoor = {},
+    const double_list &center_freq = {},
+    const double_list &spacing = {},
+    const double_list &grid = {},
+    const double_list &area = {},
+    const double_list &bs = {},
+    const double_list &ut = {},
+    const double_list &indoor = {},
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     bool per_cell = true,
     arma::sword seed = -1);
@@ -656,12 +656,12 @@ void quadriga_lib::generate_track(
     const std::string &type,
     double length = 0.0,
     double speed = NAN,
-    const arma::vec &direction = {},
+    const double_list &direction = {},
     double spacing = NAN,
     const std::unordered_map<std::string, std::vector<double>> &options = {},
     arma::sword seed = -1,
     const std::string &name = "",
-    const arma::vec &start = {});
+    const double_list &start = {});
 ```
 
 ### Inputs:
@@ -747,7 +747,7 @@ std::vector<channel<double>> quadriga_lib::get_channels_from_rays(
     const layout &layout,
     const std::vector<std::vector<gbsm_rays>> &rays,
     const uint_list &i_link = {},
-    const arma::vec &times = {},
+    const double_list &times = {},
     const std::string &output = "taps",
     arma::umat *index = nullptr,
     const std::string &mobility = "auto",
@@ -829,7 +829,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#get_channels_layout) ·
 ```cpp
 std::vector<channel<double>> quadriga_lib::get_channels_layout(
     const layout &layout,
-    const arma::vec &times = {},
+    const double_list &times = {},
     const std::string &output = "taps",
     const std::string &method = "",
     arma::umat *index = nullptr,
@@ -894,7 +894,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#init_link_states) · [P
 void quadriga_lib::init_link_states(
     layout &layout,
     const std::string &method = "38.901",
-    const arma::vec &o2i_low = {},
+    const double_list &o2i_low = {},
     bool pol_variability = false,
     double anchor_freq = 2.0e9,
     const std::string &sos_preset = "",
@@ -973,7 +973,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#layout_csv_read) · [Py
 quadriga_lib::layout quadriga_lib::layout_csv_read(
     const std::string &fn_tx,
     const std::string &fn_rx,
-    const arma::vec &center_freq = {},
+    const double_list &center_freq = {},
     bool eval_antennas = true,
     std::vector<std::string> *extra_tx = nullptr,
     std::vector<std::string> *extra_rx = nullptr);
@@ -1066,7 +1066,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#sample_track) · [Pytho
 void quadriga_lib::sample_track(
     const quadriga_lib::layout_nodes &nodes,
     arma::uword i_node,
-    const arma::vec &times,
+    const double_list &times,
     arma::mat &pos,
     arma::mat &orientation,
     arma::uvec *i_row = nullptr);
@@ -1228,7 +1228,7 @@ Also in: [MATLAB](../mex/network-layouts-and-mobility.md#set_orientation) · [Py
 ```cpp
 void quadriga_lib::set_orientation(
     quadriga_lib::layout_nodes &nodes,
-    const arma::vec &orientation = {},
+    const double_list &orientation = {},
     const uint_list &i_node = {},
     bool force = false);
 ```
@@ -1244,7 +1244,7 @@ void quadriga_lib::set_orientation(
 ```cpp
 quadriga_lib::layout L = quadriga_lib::layout_csv_read("tx.csv", "rx.csv");
 quadriga_lib::set_orientation(L.rx);                                  // The antennas look along the motion
-quadriga_lib::set_orientation(L.rx, arma::vec{0.0, 0.0, 0.5});        // The same, turned by 0.5 rad
+quadriga_lib::set_orientation(L.rx, {0.0, 0.0, 0.5});                 // The same, turned by 0.5 rad
 ```
 
 ### Notes:

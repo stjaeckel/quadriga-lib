@@ -15,6 +15,7 @@
 #include <fstream>
 #include <cstdint>
 
+#include "quadriga_common.hpp"
 #include "quadriga_arrayant.hpp"
 
 namespace quadriga_lib
@@ -342,7 +343,7 @@ namespace quadriga_lib
         const arma::Cube<dtype> &coeff_re,               // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
         const arma::Cube<dtype> &coeff_im,               // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
         const arma::Cube<dtype> &delay,                  // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-        const arma::Col<dtype> &pilot_grid,              // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carrier ]
+        const double_list &pilot_grid,                   // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carrier ]
         const double bandwidth,                          // The baseband bandwidth in [Hz]
         arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
         arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
@@ -363,8 +364,8 @@ namespace quadriga_lib
         const std::vector<arma::Cube<dtype>> &coeff_re,  // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
         const std::vector<arma::Cube<dtype>> &coeff_im,  // Imag part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
         const std::vector<arma::Cube<dtype>> &delay,     // Delays [s], length [n_freq], each [n_rx, n_tx, n_path] or [1, 1, n_path]
-        const arma::Col<dtype> &freq,                    // Input sample frequencies [Hz], length [n_freq]
-        const arma::Col<dtype> &freq_new,                // Output carrier frequencies [Hz], length [n_carrier]
+        const double_list &freq,                         // Input sample frequencies [Hz], length [n_freq]
+        const double_list &freq_new,                     // Output carrier frequencies [Hz], length [n_carrier]
         arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
         arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
         arma::Cube<std::complex<dtype>> *hmat = nullptr, // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
@@ -381,7 +382,7 @@ namespace quadriga_lib
         const std::vector<arma::Cube<dtype>> &coeff_re,               // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
         const std::vector<arma::Cube<dtype>> &coeff_im,               // Imaginary part of time-domain channel coefficients, same structure as coeff_re
         const std::vector<arma::Cube<dtype>> &delay,                  // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
-        const arma::Col<dtype> &pilot_grid,                           // Sub-carrier positions relative to the bandwidth, 0.0 = fc; [n_carrier]
+        const double_list &pilot_grid,                                // Sub-carrier positions relative to the bandwidth, 0.0 = fc; [n_carrier]
         const double bandwidth,                                       // Total baseband bandwidth
         std::vector<arma::Cube<dtype>> *hmat_re = nullptr,            // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carrier]
         std::vector<arma::Cube<dtype>> *hmat_im = nullptr,            // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
@@ -398,8 +399,8 @@ namespace quadriga_lib
         const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,  // Real part, n_snap vectors of n_freq cubes [n_rx, n_tx, n_path]
         const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,  // Imaginary part, same structure as coeff_re
         const std::vector<std::vector<arma::Cube<dtype>>> &delay,     // Delays [s], n_snap vectors of n_freq cubes; only entry 0 of each snapshot is used
-        const arma::Col<dtype> &freq,                                 // Input sample frequencies [Hz], length [n_freq]
-        const arma::Col<dtype> &freq_new,                             // Output carrier frequencies [Hz], length [n_carrier]
+        const double_list &freq,                                      // Input sample frequencies [Hz], length [n_freq]
+        const double_list &freq_new,                                  // Output carrier frequencies [Hz], length [n_carrier]
         std::vector<arma::Cube<dtype>> *hmat_re = nullptr,            // Output: real part, vector of n_out cubes [n_rx, n_tx, n_carrier]
         std::vector<arma::Cube<dtype>> *hmat_im = nullptr,            // Output: imaginary part, same structure as hmat_re
         std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr, // Output: complex-valued, same structure as hmat_re
@@ -452,7 +453,7 @@ namespace quadriga_lib
     template <typename dtype>
     void qrt_file_init(
         const std::string &fn,                               // Path to the QRT file
-        const arma::Col<dtype> &center_freq,                 // Center frequencies in [Hz], length [ n_freq ]
+        const double_list &center_freq,                      // Center frequencies in [Hz], length [ n_freq ]
         const arma::Mat<dtype> &cir_pos,                     // CIR positions; [ n_cir, 3 ]
         const arma::Mat<dtype> &cir_orientation,             // CIR orientations; [ n_cir, 3 ]
         const std::vector<std::string> &dest_names = {"RX"}, // Receiver names; length [ n_rx ]
@@ -532,7 +533,7 @@ namespace quadriga_lib
     // - LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
     // - Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
     std::vector<path> qrt_paths_from_scatterers(
-        const arma::vec &center_freq,   // Frequencies in [Hz], [n_freq], 1 to 127 entries
+        const double_list &center_freq, // Frequencies in [Hz], [n_freq], 1 to 127 entries
         const arma::mat &tx_pos,        // Tx (origin) position in [m], [3, 1] or [1, 3]
         const arma::mat &rx_pos,        // Rx position of the CIR in [m], [3, 1] or [1, 3]
         const arma::mat &fbs_pos,       // First-bounce scatterer positions in [m], [3, n_path]
@@ -639,8 +640,8 @@ namespace quadriga_lib
         const arma::Mat<dtype> &path_gain,                             // Path gain (linear), [n_path, n_freq]
         const arma::Col<dtype> &path_length,                           // Absolute path length TX→RX [n_path]
         const arma::Cube<dtype> &polmat,                               // Polarization transfer matrix [8, n_path, n_freq] or [2, n_path, n_freq]
-        const arma::Col<dtype> &freq,                                  // Input sample frequencies [Hz], length [n_freq]
-        const arma::Col<dtype> &freq_new,                              // Target frequencies [Hz], length [n_freq_new]
+        const double_list &freq,                                       // Input sample frequencies [Hz], length [n_freq]
+        const double_list &freq_new,                                   // Target frequencies [Hz], length [n_freq_new]
         std::vector<arma::Cube<dtype>> &coeff_re,                      // Output: real part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
         std::vector<arma::Cube<dtype>> &coeff_im,                      // Output: imag part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
         std::vector<arma::Cube<dtype>> &delay,                         // Output: delays [s], length [n_freq_new], each [n_rx, n_tx, n_path]
@@ -778,7 +779,7 @@ namespace quadriga_lib
         double update_interval = 1.0e-3,                  // Channel update interval in seconds
         double speed_station_kmh = 0.0,                   // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
         double speed_env_kmh = 1.2,                       // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
-        const arma::vec &dist = arma::vec(),              // Distance between TX and RX in meters, [n_users] or [1]; empty = 4.99 m
+        const double_list &dist = {},                     // Distance between TX and RX in meters, [n_users] or [1]; empty = 4.99 m
         const uint_list &n_floors = {},                  // Number of floors per user (TGah / TGax), up to 4, [n_users] or [1]; empty = 0; attenuation only, no delay
         bool uplink = false,                              // Default channel direction is downlink, set uplink to true to get reverse direction (transpose, same Doppler shift)
         const arma::mat &offset_angles_deg = arma::mat(), // Offset angles in degree for MU-MIMO channels, [4, n_users], rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty = TGac auto

@@ -1209,9 +1209,9 @@ void qd_layout::eval_antennas(quadriga_lib::layout &L, const arma::vec &center_f
     qd_commit(L, S, gen, nullptr);
 }
 
-void quadriga_lib::layout::eval_antennas(const arma::vec &center_freq_new)
+void quadriga_lib::layout::eval_antennas(const double_list &center_freq_new)
 {
-    qd_layout::eval_antennas(*this, center_freq_new, nullptr, nullptr);
+    qd_layout::eval_antennas(*this, center_freq_new.vec(), nullptr, nullptr);
 }
 
 /*!MD

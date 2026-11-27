@@ -121,13 +121,13 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 arma::vec quadriga_lib::los_probability(
     const std::string &model,
     const arma::vec &d2d_out,
-    const arma::vec &h_bs,
-    const arma::vec &h_ut,
+    const double_list &h_bs,
+    const double_list &h_ut,
     double d_clutter = NAN,
     double r_clutter = NAN,
     double h_clutter = NAN,
     const arma::vec &rnd_g = arma::vec(),
-    const arma::vec &center_freq = arma::vec(),
+    const double_list &center_freq = {},
     arma::mat *los_soft = nullptr);
 ```
 
@@ -163,15 +163,18 @@ MD!*/
 
 arma::vec quadriga_lib::los_probability(const std::string &model,
                                         const arma::vec &d2d_out,
-                                        const arma::vec &h_bs,
-                                        const arma::vec &h_ut,
+                                        const double_list &h_bs_in,
+                                        const double_list &h_ut_in,
                                         double d_clutter,
                                         double r_clutter,
                                         double h_clutter,
                                         const arma::vec &rnd_g,
-                                        const arma::vec &center_freq,
+                                        const double_list &center_freq_in,
                                         arma::mat *los_soft)
 {
+    const arma::vec &h_bs = h_bs_in.vec();
+    const arma::vec &h_ut = h_ut_in.vec();
+    const arma::vec &center_freq = center_freq_in.vec();
     // Model name
     int m = -1;
     for (int i = 0; i < (int)QD_LOS_N_MODEL; ++i)

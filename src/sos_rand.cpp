@@ -17,10 +17,12 @@ static inline arma::mat *qd_sos_double_output(arma::Mat<float> &) { return nullp
 
 // Common implementation of sos_randn, sos_rand and sos_randi
 template <typename dtype>
-static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Mat<dtype> &pos, arma::Mat<dtype> &val,
-                             const arma::Mat<dtype> &pos_b, const arma::Col<dtype> &dist_decorr_b,
+static void qd_sos_rand_impl(const quadriga_lib::double_list &dist_decorr_in, const arma::Mat<dtype> &pos, arma::Mat<dtype> &val,
+                             const arma::Mat<dtype> &pos_b, const quadriga_lib::double_list &dist_decorr_b_in,
                              const std::string &preset, arma::sword seed, bool uniform, arma::uword imax)
 {
+    const arma::Col<dtype> dist_decorr = dist_decorr_in.as<dtype>();
+    const arma::Col<dtype> dist_decorr_b = dist_decorr_b_in.as<dtype>();
     const bool two_devices = !pos_b.is_empty();
     const bool has_decorr_b = !dist_decorr_b.is_empty();
 
@@ -52,7 +54,7 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
     }
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
-    qd_check_alias(&val, "val", &dist_decorr, &pos, &pos_b, &dist_decorr_b);
+    qd_check_alias(&val, "val", &pos, &pos_b); // The lists are copies, an output cannot overwrite them
     int preset_type = -1;
     arma::uword preset_n_coeff = 0;
     if (!qd_sos_preset_lookup(preset, preset_type, preset_n_coeff))
@@ -193,11 +195,11 @@ Spatially correlated Normal distributed random numbers
 ## Declaration:
 ```
 void quadriga_lib::sos_randn(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -225,11 +227,11 @@ void quadriga_lib::sos_randn(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_randn(const arma::Col<dtype> &dist_decorr,
+void quadriga_lib::sos_randn(const double_list &dist_decorr,
                              const arma::Mat<dtype> &pos,
                              arma::Mat<dtype> &val,
                              const arma::Mat<dtype> &pos_b,
-                             const arma::Col<dtype> &dist_decorr_b,
+                             const double_list &dist_decorr_b,
                              const std::string &preset,
                              arma::sword seed)
 {
@@ -266,11 +268,11 @@ Spatially correlated Uniform distributed random numbers
 ## Declaration:
 ```
 void quadriga_lib::sos_rand(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -298,11 +300,11 @@ void quadriga_lib::sos_rand(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_rand(const arma::Col<dtype> &dist_decorr,
+void quadriga_lib::sos_rand(const double_list &dist_decorr,
                             const arma::Mat<dtype> &pos,
                             arma::Mat<dtype> &val,
                             const arma::Mat<dtype> &pos_b,
-                            const arma::Col<dtype> &dist_decorr_b,
+                            const double_list &dist_decorr_b,
                             const std::string &preset,
                             arma::sword seed)
 {
@@ -340,12 +342,12 @@ Spatially correlated integer random numbers
 ## Declaration:
 ```
 void quadriga_lib::sos_randi(
-    const arma::Col<dtype> &dist_decorr,
+    const double_list &dist_decorr,
     const arma::Mat<dtype> &pos,
     arma::uword imax,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &dist_decorr_b = arma::Col<dtype>(),
+    const double_list &dist_decorr_b = {},
     const std::string &preset = "Comb256",
     arma::sword seed = -1);
 ```
@@ -374,12 +376,12 @@ void quadriga_lib::sos_randi(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_randi(const arma::Col<dtype> &dist_decorr,
+void quadriga_lib::sos_randi(const double_list &dist_decorr,
                              const arma::Mat<dtype> &pos,
                              arma::uword imax,
                              arma::Mat<dtype> &val,
                              const arma::Mat<dtype> &pos_b,
-                             const arma::Col<dtype> &dist_decorr_b,
+                             const double_list &dist_decorr_b,
                              const std::string &preset,
                              arma::sword seed)
 {
@@ -388,15 +390,20 @@ void quadriga_lib::sos_randi(const arma::Col<dtype> &dist_decorr,
     qd_sos_rand_impl(dist_decorr, pos, val, pos_b, dist_decorr_b, preset, seed, true, imax);
 }
 
-template void quadriga_lib::sos_randn(const arma::Col<float> &dist_decorr, const arma::Mat<float> &pos, arma::Mat<float> &val, const arma::Mat<float> &pos_b,
-                                      const arma::Col<float> &dist_decorr_b, const std::string &preset, arma::sword seed);
-template void quadriga_lib::sos_randn(const arma::Col<double> &dist_decorr, const arma::Mat<double> &pos, arma::Mat<double> &val, const arma::Mat<double> &pos_b,
-                                      const arma::Col<double> &dist_decorr_b, const std::string &preset, arma::sword seed);
-template void quadriga_lib::sos_rand(const arma::Col<float> &dist_decorr, const arma::Mat<float> &pos, arma::Mat<float> &val, const arma::Mat<float> &pos_b,
-                                     const arma::Col<float> &dist_decorr_b, const std::string &preset, arma::sword seed);
-template void quadriga_lib::sos_rand(const arma::Col<double> &dist_decorr, const arma::Mat<double> &pos, arma::Mat<double> &val, const arma::Mat<double> &pos_b,
-                                     const arma::Col<double> &dist_decorr_b, const std::string &preset, arma::sword seed);
-template void quadriga_lib::sos_randi(const arma::Col<float> &dist_decorr, const arma::Mat<float> &pos, arma::uword imax, arma::Mat<float> &val, const arma::Mat<float> &pos_b,
-                                      const arma::Col<float> &dist_decorr_b, const std::string &preset, arma::sword seed);
-template void quadriga_lib::sos_randi(const arma::Col<double> &dist_decorr, const arma::Mat<double> &pos, arma::uword imax, arma::Mat<double> &val, const arma::Mat<double> &pos_b,
-                                      const arma::Col<double> &dist_decorr_b, const std::string &preset, arma::sword seed);
+template void quadriga_lib::sos_randn(const double_list &dist_decorr, const arma::Mat<float> &pos, arma::Mat<float> &val, const arma::Mat<float> &pos_b,
+                                      const double_list &dist_decorr_b, const std::string &preset, arma::sword seed);
+
+template void quadriga_lib::sos_randn(const double_list &dist_decorr, const arma::Mat<double> &pos, arma::Mat<double> &val, const arma::Mat<double> &pos_b,
+                                      const double_list &dist_decorr_b, const std::string &preset, arma::sword seed);
+
+template void quadriga_lib::sos_rand(const double_list &dist_decorr, const arma::Mat<float> &pos, arma::Mat<float> &val, const arma::Mat<float> &pos_b,
+                                     const double_list &dist_decorr_b, const std::string &preset, arma::sword seed);
+
+template void quadriga_lib::sos_rand(const double_list &dist_decorr, const arma::Mat<double> &pos, arma::Mat<double> &val, const arma::Mat<double> &pos_b,
+                                     const double_list &dist_decorr_b, const std::string &preset, arma::sword seed);
+
+template void quadriga_lib::sos_randi(const double_list &dist_decorr, const arma::Mat<float> &pos, arma::uword imax, arma::Mat<float> &val, const arma::Mat<float> &pos_b,
+                                      const double_list &dist_decorr_b, const std::string &preset, arma::sword seed);
+
+template void quadriga_lib::sos_randi(const double_list &dist_decorr, const arma::Mat<double> &pos, arma::uword imax, arma::Mat<double> &val, const arma::Mat<double> &pos_b,
+                                      const double_list &dist_decorr_b, const std::string &preset, arma::sword seed);

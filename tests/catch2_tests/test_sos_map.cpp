@@ -368,22 +368,6 @@ TEST_CASE("sos_map - outputs that alias inputs")
     CHECK(message(map3) == expected);
     CHECK(arma::approx_equal(spatial_freq, freq0, "absdiff", 0.0));
 
-    // A cube on the memory of the grid vector 'x'
-    arma::vec xb(20, arma::fill::zeros);
-    xb.head(5) = x;
-    arma::vec xv(xb.memptr(), 5, false, true);
-    std::vector<arma::cube> map5;
-    map5.emplace_back(xb.memptr(), 4, 5, 1, false, true);
-    try
-    {
-        quadriga_lib::sos_map<double>(spatial_freq, phase.col(0), xv, map5, y);
-        FAIL("no error");
-    }
-    catch (const std::invalid_argument &e)
-    {
-        CHECK(std::string(e.what()) == expected);
-    }
-
     // Memory next to the inputs is accepted and gives the values of a normal call
     std::vector<arma::cube> ref, map4;
     quadriga_lib::sos_map<double>(spatial_freq, phase, x, ref, y);

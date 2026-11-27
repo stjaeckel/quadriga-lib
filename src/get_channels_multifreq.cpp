@@ -134,8 +134,8 @@ void quadriga_lib::get_channels_multifreq(
     const arma::Mat<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
     const arma::Cube<dtype> &polmat,
-    const arma::Col<dtype> &freq,
-    const arma::Col<dtype> &freq_new,
+    const double_list &freq,
+    const double_list &freq_new,
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
@@ -199,12 +199,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                           const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
                                           const arma::Mat<dtype> &path_gain, const arma::Col<dtype> &path_length,
                                           const arma::Cube<dtype> &polmat,
-                                          const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
+                                          const double_list &freq_in, const double_list &freq_new_in,
                                           std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                           std::vector<arma::Cube<dtype>> &delay,
                                           bool use_absolute_delays, bool add_fake_los_path, double propagation_speed_in,
                                           std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
+    const arma::Col<dtype> freq = freq_in.as<dtype>();
+    const arma::Col<dtype> freq_new = freq_new_in.as<dtype>();
     const dtype propagation_speed = dtype(propagation_speed_in);
     constexpr dtype zero = dtype(0.0);
     constexpr dtype one = dtype(1.0);
@@ -242,7 +244,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         {
             for (const auto &c : vec)
             {
-                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &polmat, &freq, &freq_new);
+                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &polmat);
                 if (c.n_elem != 0)
                     ranges.push_back({(std::uintptr_t)c.memptr(), (std::uintptr_t)(c.memptr() + c.n_elem), name});
             }
@@ -660,7 +662,7 @@ template void quadriga_lib::get_channels_multifreq(
     const std::vector<quadriga_lib::arrayant<float>> &, const std::vector<quadriga_lib::arrayant<float>> &,
     const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &,
     const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &,
-    const arma::Col<float> &, const arma::Cube<float> &, const arma::Col<float> &, const arma::Col<float> &,
+    const arma::Col<float> &, const arma::Cube<float> &, const double_list &, const double_list &,
     std::vector<arma::Cube<float>> &, std::vector<arma::Cube<float>> &, std::vector<arma::Cube<float>> &,
     bool, bool, double, std::vector<arma::Cube<std::complex<float>>> *, int);
 
@@ -668,6 +670,6 @@ template void quadriga_lib::get_channels_multifreq(
     const std::vector<quadriga_lib::arrayant<double>> &, const std::vector<quadriga_lib::arrayant<double>> &,
     const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &,
     const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &,
-    const arma::Col<double> &, const arma::Cube<double> &, const arma::Col<double> &, const arma::Col<double> &,
+    const arma::Col<double> &, const arma::Cube<double> &, const double_list &, const double_list &,
     std::vector<arma::Cube<double>> &, std::vector<arma::Cube<double>> &, std::vector<arma::Cube<double>> &,
     bool, bool, double, std::vector<arma::Cube<std::complex<double>>> *, int);

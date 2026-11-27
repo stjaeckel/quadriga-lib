@@ -36,7 +36,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double update_interval = 1.0e-3,
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
-    const arma::vec &dist = arma::vec(),
+    const double_list &dist = {},
     const uint_list &n_floors = {},
     bool uplink = false,
     const arma::mat &offset_angles_deg = arma::mat(),
@@ -137,7 +137,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        double update_interval,
                                        double speed_station_kmh,
                                        double speed_env_kmh,
-                                       const arma::vec &dist,
+                                       const double_list &dist_in,
                                        const uint_list &n_floors_in,
                                        bool uplink,
                                        const arma::mat &offset_angles_deg,
@@ -153,6 +153,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        double wall_loss_dB)
 
 {
+    const arma::vec &dist = dist_in.vec();
     const arma::uvec &n_floors = n_floors_in.vec();
     const arma::uvec &n_walls = n_walls_in.vec();
     auto error_message = qd_arrayant_is_valid_quick(ap_array);

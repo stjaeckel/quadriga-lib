@@ -32,7 +32,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 ## Declaration:
 ```
 void quadriga_lib::gbsm_rays_from_paths(
-    const arma::vec &center_freq,
+    const double_list &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
@@ -44,8 +44,8 @@ void quadriga_lib::gbsm_rays_from_paths(
     const std::string &method = "quadriga",
     const arma::u32_vec &path_type = arma::u32_vec(),
     const arma::u32_vec &tap = arma::u32_vec(),
-    const arma::vec &gr_eps_re = arma::vec(),
-    const arma::vec &gr_eps_im = arma::vec());
+    const double_list &gr_eps_re = {},
+    const double_list &gr_eps_im = {});
 ```
 
 ## Inputs:
@@ -71,7 +71,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 - [[gbsm_single_link_channel]] (channel of the link)
 MD!*/
 
-void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
+void quadriga_lib::gbsm_rays_from_paths(const double_list &center_freq_in,
                                         const arma::mat &tx_pos,
                                         const arma::mat &rx_pos,
                                         const arma::mat &fbs_pos,
@@ -83,9 +83,12 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
                                         const std::string &method,
                                         const arma::u32_vec &path_type,
                                         const arma::u32_vec &tap,
-                                        const arma::vec &gr_eps_re,
-                                        const arma::vec &gr_eps_im)
+                                        const double_list &gr_eps_re_in,
+                                        const double_list &gr_eps_im_in)
 {
+    const arma::vec &gr_eps_re = gr_eps_re_in.vec();
+    const arma::vec &gr_eps_im = gr_eps_im_in.vec();
+    const arma::vec &center_freq = center_freq_in.vec();
     const arma::uword n_freq = center_freq.n_elem, n_path = fbs_pos.n_cols;
     qd_gbsm_check_fc(center_freq);
     qd_xyz(tx_pos, "tx_pos"), qd_xyz(rx_pos, "rx_pos");

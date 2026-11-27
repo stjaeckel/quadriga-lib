@@ -27,7 +27,7 @@ Target ACF at given distances
 arma::Col<dtype> quadriga_lib::sos_acfi(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    const arma::Col<dtype> &d);
+    const double_list &d);
 ```
 
 ## Inputs:
@@ -45,8 +45,9 @@ MD!*/
 template <typename dtype>
 arma::Col<dtype> quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
                                         const arma::Col<dtype> &dist,
-                                        const arma::Col<dtype> &d)
+                                        const double_list &d_in)
 {
+    const arma::Col<dtype> d = d_in.as<dtype>();
     qd_sos_check_acf(acf, dist);
     for (arma::uword i = 0; i < d.n_elem; ++i)
         if (!(d.at(i) >= (dtype)0.0))
@@ -60,5 +61,5 @@ arma::Col<dtype> quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
     return val;
 }
 
-template arma::Col<float> quadriga_lib::sos_acfi(const arma::Col<float> &acf, const arma::Col<float> &dist, const arma::Col<float> &d);
-template arma::Col<double> quadriga_lib::sos_acfi(const arma::Col<double> &acf, const arma::Col<double> &dist, const arma::Col<double> &d);
+template arma::Col<float> quadriga_lib::sos_acfi(const arma::Col<float> &acf, const arma::Col<float> &dist, const double_list &d);
+template arma::Col<double> quadriga_lib::sos_acfi(const arma::Col<double> &acf, const arma::Col<double> &dist, const double_list &d);

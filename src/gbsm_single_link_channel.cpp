@@ -57,7 +57,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const arrayant<double> &tx_array,
     const arrayant<double> &rx_array,
     const gbsm_rays &rays,
-    const arma::vec &link_gain_dB,
+    const double_list &link_gain_dB,
     const std::string &mobility = "auto",
     const std::string &output = "taps",
     arma::uword i_freq = 0,
@@ -65,7 +65,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
     const arma::mat &rx_pos = arma::mat(),
     const arma::mat &tx_orientation = arma::mat(),
     const arma::mat &rx_orientation = arma::mat(),
-    const arma::vec &kf_ratio = arma::vec(),
+    const double_list &kf_ratio = {},
     bool oxygen = false,
     bool use_absolute_delays = false);
 ```
@@ -119,7 +119,7 @@ MD!*/
 quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const arrayant<double> &tx_array,
                                                                      const arrayant<double> &rx_array,
                                                                      const gbsm_rays &rays,
-                                                                     const arma::vec &link_gain_dB,
+                                                                     const double_list &link_gain_dB_in,
                                                                      const std::string &mobility,
                                                                      const std::string &output,
                                                                      arma::uword i_freq,
@@ -127,10 +127,12 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                                                                      const arma::mat &rx_pos,
                                                                      const arma::mat &tx_orientation,
                                                                      const arma::mat &rx_orientation,
-                                                                     const arma::vec &kf_ratio,
+                                                                     const double_list &kf_ratio_in,
                                                                      bool oxygen,
                                                                      bool use_absolute_delays)
 {
+    const arma::vec &link_gain_dB = link_gain_dB_in.vec();
+    const arma::vec &kf_ratio = kf_ratio_in.vec();
     // Validation; the ground-reflection checks of ssf_paths for "drift" follow in the snapshot loop
     qd_arrayant_check_tx_rx(tx_array, rx_array);
     const std::string err = rays.is_valid();
