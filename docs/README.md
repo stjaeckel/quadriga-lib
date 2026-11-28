@@ -9,7 +9,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Data formats](formats.md): index of the file formats, one Markdown file per format
 - [Questions](faq.md): FAQ, how to cite
 - [Publications](publications.md): papers and IEEE 802.11 contributions
-- [AI agents](ai_agents.md): how to use these files and the agent skill
+- [Using AI agents](faq.md#ai-agents): how to use these files and the agent skill
 - [Tutorials](http://quadriga-lib.org/tutorials.md): worked examples as Jupyter notebooks
 
 ## Data formats

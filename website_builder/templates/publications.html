@@ -13,7 +13,7 @@
 {% if g.intro %}
   <p>{{ g.intro }}</p>
 {% endif %}
-  <ul class="pubs">{% for e in g.entries %}<li><span class="year">{{ e.year }}</span><span class="ptitle">{{ e.title }}</span><span class="pmeta">{{ e.meta }}</span><div class="plinks">{% for label, href in e.links %}<a class="dl" href="{{ href }}">{{ label }}</a>{% endfor %}</div></li>{% endfor %}</ul>
+  <ul class="pubs">{% for e in g.entries %}<li><span class="year">{{ e.year }}</span><span class="ptitle">{{ e.title }}</span><span class="pmeta">{{ e.meta }}</span><div class="plinks">{% for label, href in e.links %}<a class="dl" href="{{ href }}"{% if "://" in href %} target="_blank" rel="noopener"{% endif %}>{{ label }}</a>{% endfor %}</div></li>{% endfor %}</ul>
 {% if g.outro %}
   <p>{{ g.outro }}</p>
 {% endif %}

@@ -20,7 +20,7 @@ _ESCAPE_RE = re.compile(r"(\\[!-/:-@\[-`{-~])")
 PAGE_KEYS = {"title": (str, True), "description": (str, True), "lead": (str, False)}
 # A format file of docs_builder/content/formats/: one section of the formats page and one Markdown file
 FORMAT_KEYS = {"title": (str, True), "summary": (str, True), "order": (int, True)}
-EXTRA_KEYS = {"ai_agents.md": "llms_summary"}  # allowed in one file each
+EXTRA_KEYS = {"faq.md": "llms_summary"}  # allowed in one file each
 
 _LINK = {"label": (str, True), "url": (str, True)}
 _ENTRY = {"year": (int, True), "title": (str, True), "authors": (str, True), "venue": (str, True),

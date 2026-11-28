@@ -17,7 +17,7 @@ GITHUB_URL = "https://github.com/stjaeckel/quadriga-lib"
 
 # (id, tab label or None, twin path or None), in tab order; the file of a page is <id>.html
 PAGES = (
-    ("index", "Home", None),
+    ("index", None, None),
     ("download", "Get started", "download.md"),
     ("cpp_api", "C++ API", "quadriga_lib_api_cpp.md"),
     ("mex_api", "MATLAB API", "quadriga_lib_api_mex.md"),
@@ -25,7 +25,6 @@ PAGES = (
     ("tutorials", "Tutorials", "tutorials.md"),
     ("formats", "Formats", "formats.md"),
     ("publications", "Publications", "publications.md"),
-    ("ai_agents", "AI agents", "ai_agents.md"),
     ("faq", "FAQ", "faq.md"),
     ("impressum", None, None),
     ("privacy", None, None),
@@ -37,7 +36,7 @@ TWINS = {pid: twin for pid, _, twin in PAGES if twin}
 WEBSITE_ONLY = ("tutorials.md", "tutorials/")
 
 # Prose pages of docs/ whose source is docs_builder/content/<id>.md; formats.md is the formats page's intro
-TEXT_PAGES = ("download", "formats", "faq", "ai_agents")
+TEXT_PAGES = ("download", "formats", "faq")
 FORMATS_DIR = "docs_builder/content/formats"  # one file per data format, a section of formats.html each
 
 # Ids the website templates write themselves (main content, landing sections, quick-start tabs, API intro);

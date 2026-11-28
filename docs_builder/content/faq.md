@@ -1,6 +1,7 @@
 +++
 title = "Questions"
 description = "%%GAP: meta description of the FAQ page%%"
+llms_summary = "%%GAP: Open-source library built on the 3GPP TR 38.901 and IEEE 802.11 channel models. A fast C++ core with MATLAB, Octave and Python interfaces, from the developer of QuaDRiGa.%%"
 +++
 
 %%GAP: text converted from the old page; check it against the new layout (headings for the index)%%
@@ -40,6 +41,35 @@ MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a ne
 ### Can Quadriga-Lib be used together with other C++ libraries?
 
 Yes. Quadriga-Lib uses [Armadillo](https://arma.sourceforge.net) for its matrices and cubes. To exchange data with other libraries, create Armadillo objects that use auxiliary memory, use their STL-style iterators, or get a pointer to the matrix memory with `.memptr()`.
+
+## Using AI Agents {#ai-agents}
+
+%%GAP: section text is a draft, moved from the former AI agents page%%
+
+### Which files can an AI agent read?
+
+| File | Content |
+| --- | --- |
+| [`llms.txt`](llms.txt) | Short summary of the library and links to all Markdown files |
+| `<page>.md` | Markdown version next to every content page, linked in its footer |
+| `api/cpp/<section>.md` | One API section per file, small enough to fetch on its own; also for `mex` and `python` |
+| [`quadriga_lib_api_cpp.md`](quadriga_lib_api_cpp.md) | Full API per language in one file (also `_mex` and `_python`) |
+
+### How do I point an agent at the docs?
+
+Give your agent the address of `llms.txt` and ask it to fetch only the sections it needs:
+
+```text
+Read {{ site_base_url }}/llms.txt, then use the Python API section files to write a script that generates a 3GPP antenna and prints its directivity.
+```
+
+The same Markdown files are in the `docs/` folder of the GitHub repository, so an agent working in a clone can read them without network access.
+
+### Is there an agent skill?
+
+> [!WARNING]
+> **Placeholder**
+> An agent skill with recipes and conventions for Quadriga-Lib is in preparation. Until it exists, the [skill file](skill/SKILL.md) is a placeholder that points to `llms.txt`.
 
 ## Bug Reports and Contact {#bug-reports-and-contact}
 

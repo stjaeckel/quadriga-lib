@@ -6,7 +6,19 @@
     set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   };
 
-  /* 1. Copy buttons on code blocks */
+  /* 1. Light / dark switch: the other scheme of the one shown; a choice equal to the device setting is forgotten */
+  var dark = matchMedia("(prefers-color-scheme: dark)");
+  qdScheme(store.get("theme"));  // again, for the elements in the body (landing figures)
+  document.querySelectorAll(".theme-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var now = store.get("theme") || (dark.matches ? "dark" : "light"), next = now === "dark" ? "light" : "dark";
+      if (next === (dark.matches ? "dark" : "light")) { try { localStorage.removeItem("theme"); } catch (e) {} next = null; }
+      else store.set("theme", next);
+      qdScheme(next);
+    });
+  });
+
+  /* 2. Copy buttons on code blocks */
   document.querySelectorAll("pre").forEach(function (pre) {
     if (pre.closest(".out")) return;
     var box = pre.parentElement.classList.contains("code") ? pre.parentElement : null;
@@ -22,14 +34,14 @@
     box.appendChild(b);
   });
 
-  /* 2. Remember the chosen language in code tabs (stored only after a click) */
+  /* 3. Remember the chosen language in code tabs (stored only after a click) */
   var saved = store.get("qlib-lang");
   document.querySelectorAll("[data-lang-tabs]").forEach(function (tabs) {
     if (saved) { var r = tabs.querySelector('input[value="' + saved + '"]'); if (r) r.checked = true; }
     tabs.addEventListener("change", function (e) { if (e.target.value) store.set("qlib-lang", e.target.value); });
   });
 
-  /* 3. Function filter in the API index, "/" focuses it */
+  /* 4. Function filter in the API index, "/" focuses it */
   document.querySelectorAll(".idx-filter").forEach(function (filter) {
     var nav = filter.closest(".idx");
     var groups = Array.prototype.slice.call(nav.querySelectorAll("details"));
@@ -57,7 +69,7 @@
     e.preventDefault(); var d = f.closest("details.doc-index"); if (d) d.open = true; f.focus();
   });
 
-  /* 4. Highlight the function being read and open its section in the sidebar */
+  /* 5. Highlight the function being read and open its section in the sidebar */
   var links = {};
   document.querySelectorAll(".doc-side a[href^='#']").forEach(function (a) { links[decodeURIComponent(a.getAttribute("href").slice(1))] = a; });
   var entries = document.querySelectorAll(".fn-entry, .api-section, .prose h2[id], .prose h3[id]");
@@ -71,7 +83,7 @@
         a.classList.add("current"); current = a;
         var d = a.closest("details"); if (d) d.open = true;
       });
-    }, { rootMargin: "-110px 0px -70% 0px" });
+    }, { rootMargin: "-64px 0px -70% 0px" });  // just below the bar (--header-h) and above an anchor target (scroll-padding-top)
     entries.forEach(function (el) { io.observe(el); });
   }
 })();

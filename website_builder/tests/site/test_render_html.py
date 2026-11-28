@@ -49,6 +49,25 @@ def test_tabs_and_menu(site):
     assert tut.count('<a href="../tutorials.html" aria-current="page">') == 2
 
 
+def test_header_and_external_links(site, mini_repo):
+    faq = site("faq.html")
+    assert 'id="ai-agents"' in faq and not (mini_repo / "website/ai_agents.html").exists()
+    assert ">Home</a></li>" not in faq and 'class="version"' not in faq  # the logo leads home
+    assert '<a class="hdr-icon hdr-gh" href="https://github.com/stjaeckel/quadriga-lib" target="_blank" rel="noopener"' in faq
+    for p in (mini_repo / "website").rglob("*.html"):  # every link that leaves the site opens a new tab
+        for a in re.findall(r'<a [^>]*href="https?://[^"]*"[^>]*>', p.read_text(encoding="utf-8")):
+            assert 'target="_blank" rel="noopener"' in a, (p.name, a)
+
+
+def test_colour_scheme_switch(site):
+    faq = site("faq.html")
+    # the dark rules live in their own stylesheet; the switch only rewrites media attributes
+    assert '<link rel="stylesheet" href="css/site-dark.css" media="(prefers-color-scheme: dark)">' in faq
+    assert '<button class="hdr-icon theme-btn" type="button"' in faq and 'localStorage.getItem("theme")' in faq
+    assert '? "screen" : "not all"' in faq  # a chosen dark scheme must not reach print
+    assert "prefers-color-scheme" not in site("css/site.css") and "@media" not in site("css/site-dark.css")
+
+
 def test_api_page(site):
     cpp = site("cpp_api.html")
     assert 'id="sec-array-antenna-class"' in cpp and 'id="sec-general-usage-notes"' in cpp

@@ -53,7 +53,7 @@ def test_front_matter_errors(tmp_path, text, message):
 
 
 def test_front_matter_extra_keys_and_missing_delimiters(tmp_path):
-    p, diag = page(tmp_path, '+++\ntitle = "T"\ndescription = "D"\nllms_summary = "S"\n+++\n', "ai_agents.md")
+    p, diag = page(tmp_path, '+++\ntitle = "T"\ndescription = "D"\nllms_summary = "S"\n+++\n', "faq.md")
     assert errors(diag) == [] and p.extra == {"llms_summary": "S"}
     _, diag = page(tmp_path, "# No front matter\n")
     assert len(errors(diag)) == 1 and errors(diag)[0].startswith("page.md:1: error: ")

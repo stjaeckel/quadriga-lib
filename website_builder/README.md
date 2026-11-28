@@ -60,19 +60,19 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `qsite/tutorials.py` | Notebook reading, the series and their groups, tutorial pages and their twins. | `tutorials/` |
 | `qsite/assets.py` | Static files, landing figures, the preview image, the skill copy; the constants `STATIC_DIR`, `TEMPLATES_DIR`, `LANDING_FIGURES`. | — |
 | `templates/base.html` | Page frame: head, skip link, header, `<main id="content">`, footer. | — |
-| `templates/_header.html` | Menu (grouped), logo, name, version, GitHub link, tab row from `PAGES`. | — |
+| `templates/_header.html`, `_github.svg` | One bar: menu (grouped, narrow screens), logo and name, the tabs from `PAGES` (wide screens), the GitHub mark. | — |
 | `templates/_footer.html` | Four link columns, version line, Impressum and Privacy; "This page as Markdown" on pages with a twin. | — |
 | `templates/_logo.svg` | The logo, inline (`fill="currentColor"`). | — |
 | `templates/landing.html` | The landing page with its text. | `index.html` |
 | `templates/api.html`, `_api_index.html`, `_fn_entry.html` | API page, its index (sidebar and "Sections and functions"), one function entry. The headings of the general usage notes move down one level (`##` becomes `h3`), as on the formats page. | `cpp_api.html`, `mex_api.html`, `python_api.html` |
-| `templates/text.html`, `_text_index.html` | Content page and its index (sidebar). | `download.html`, `faq.html`, `ai_agents.html` |
+| `templates/text.html`, `_text_index.html` | Content page and its index (sidebar). | `download.html`, `faq.html` |
 | `templates/formats.html`, `_formats_index.html` | The formats page: intro, one section per format file, and its index. | `formats.html` |
 | `templates/publications.html`, `_publications_index.html` | Publications and its index (one link per group). | `publications.html` |
 | `templates/legal.html` | Impressum and privacy. | `impressum.html`, `privacy.html` |
 | `templates/notfound.html` | Not-found page. | `404.html` |
 | `templates/tutorials_index.html`, `_tutorials_index.html` | Tutorial index and its sidebar (Setup, then one group per series with its tutorials). | `tutorials.html` |
 | `templates/tutorial.html`, `_tutorial_side.html` | One tutorial and its sidebar (the tutorials of its series, the sections of the current one). | `tutorials/<stem>.html` |
-| `static/css/site.css` | The one stylesheet. | `css/site.css` |
+| `static/css/site.css`, `site-dark.css` | The stylesheet and its dark theme. | `css/` |
 | `static/js/site.js` | Optional extras (see [Design and static parts](#design-and-static-parts)). | `js/site.js` |
 | `static/fonts/` | IBM Plex Sans and Mono (seven `woff2` files) and their licence `LICENSE.txt`. | `fonts/` |
 | `static/img/` | `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`, the landing figures in `img/landing/`, the preview image `og-card.png` once it exists. | `img/` |
@@ -94,7 +94,7 @@ The root `.gitignore` has unanchored patterns that would silently ignore new fil
 
 ## Editing content
 
-The content pages with twins (Get started, formats, FAQ, AI agents, API intros, publications) are sources of the docs builder: see "Content pages" in the [docs-builder README](../docs_builder/README.md#content-pages). The parts below are website only.
+The content pages with twins (Get started, formats, FAQ, API intros, publications) are sources of the docs builder: see "Content pages" in the [docs-builder README](../docs_builder/README.md#content-pages). The parts below are website only.
 
 **Landing text.** The text of the landing page is HTML in `templates/landing.html`. Drafts are marked with gap markers in the template text, as on content pages (docs-builder README, "Gap markers and going live"). The section ids `why`, `paths`, `quickstart`, `apis`, `covers` and `open` are fixed; `index.html#quickstart` is an old URL that must keep working, and the "For team leads" card points to `#covers`. The quick-start code is written raw inside `{% filter highlight("python") %}...{% endfilter %}` (also `matlab`, `cpp`, `bash`), which colours it like a code fence. The template sets title and description itself.
 
@@ -190,7 +190,7 @@ pandoc reads LaTeX math, not full LaTeX. Known to work: accents with subscripts,
 
 ## Design and static parts
 
-**Styles.** `static/css/site.css` is the only stylesheet. Every colour is a custom property on `:root`; the dark values replace them inside `@media (prefers-color-scheme: dark)`, so the site follows the device setting. Components use these tokens rather than literal colours (exceptions: white text on the green buttons, the print styles); all text pairs meet WCAG 2.2 AA contrast in both themes, so check the ratio when you change a colour. `theme-color` in `templates/base.html` repeats `--bar` of both themes (`#2e7d46`, `#24603a`). Layouts are mobile first, with breakpoints at 600 px and 960 px and a smallest supported width of 360 px; the main column of every page is at most `--main-max` (900 px) wide, about 105 characters of code, and from 960 px the API, formats, publications and tutorial pages and the text pages with at least two sections have a sidebar; wide code blocks and tables scroll inside their box. Supported browsers: current Chrome, Edge, Firefox and Safari, desktop and mobile. Print styles hide the header, footer, index and copy buttons.
+**Styles.** `static/css/site.css` holds all styles in the light theme. Every colour is a custom property on `:root`; `static/css/site-dark.css` replaces them with the dark values (plus the few rules that differ in dark). It is linked with `media="(prefers-color-scheme: dark)"`, so the site follows the device setting; the light / dark switch in the header remembers a choice that differs from it (`localStorage`) and sets the `media` of every element made for one scheme to `screen` (print stays light) or `not all`: the link and `theme-color` from a small script in the head of `base.html` before the first paint, the landing figures when `js/site.js` runs. Without JavaScript the switch is hidden and the device setting applies. Components use these tokens rather than literal colours (exceptions: white text on the green buttons, the print styles); all text pairs meet WCAG 2.2 AA contrast in both themes, so check the ratio when you change a colour. `theme-color` in `templates/base.html` repeats `--bar` of both themes (`#2e7d46`, `#24603a`). Layouts are mobile first, with breakpoints at 600 px and 960 px and a smallest supported width of 360 px; from 64 em (1024 px at the default font size) the header shows the tabs in one row instead of the menu; the main column of every page is at most `--main-max` (900 px) wide, about 105 characters of code, and from 960 px the API, formats, publications and tutorial pages and the text pages with at least two sections have a sidebar; wide code blocks and tables scroll inside their box. Supported browsers: current Chrome, Edge, Firefox and Safari, desktop and mobile. Print styles hide the header, footer, index and copy buttons.
 
 **Fonts.** IBM Plex Sans (400, 400 italic, 500, 600, 700) and IBM Plex Mono (400, 500), Latin subset, self-hosted under the SIL Open Font License 1.1; the licence file `static/fonts/LICENSE.txt` is published next to them and must stay. The Latin subset has no Greek letters and no arrows; such characters fall back to the system font.
 
@@ -205,10 +205,10 @@ pandoc reads LaTeX math, not full LaTeX. Known to work: accents with subscripts,
 The build checks the whole site in memory before it writes anything:
 
 - **Links and anchors.** Every `href`, `src` and `srcset` of every HTML page that is not absolute or `mailto:` must point to a file of the site; a fragment must be an `id` on an HTML target or an `<a id>` in a generated Markdown target. The same for every link and image in the generated Markdown (twins, API files, `llms.txt`, `docs/README.md`, tutorial twins); there, absolute links to `http://quadriga-lib.org/...` are checked against the site as well. Hand-made files (`publications/`, the material model) are checked as link targets only. External links and links below `download/` and `releases/` are not fetched. Errors: `link target missing`, `anchor missing`. A link to a tutorial that is left out because it has not been run is a warning, `link target left out` ([Tutorials](#tutorials)).
-- **Links that leave the site.** In the HTML pages, Markdown links with an absolute URL (other than `mailto:` and quadriga-lib.org, which become site paths) open in a new tab (`target="_blank" rel="noopener"`); the Markdown versions keep plain links.
+- **Links that leave the site.** In the HTML pages, Markdown links with an absolute URL (other than `mailto:` and quadriga-lib.org, which become site paths) open in a new tab (`target="_blank" rel="noopener"`), as do the absolute links of the templates (GitHub, publications); the Markdown versions keep plain links.
 - **Sidebar of text pages.** Each `##` section with `###` subsections is a closed group; its first entry "Overview" links the section itself and is shown only when the section has text before its first `###` heading.
 - **Well-formedness** of every HTML page: every element closed in order, no `id` twice, exactly one `h1`, exactly one `<main id="content">`, an `alt` on every `img`. Errors: `<x> not closed`, `</x> closes ...`, `id '...' appears twice`, `N <h1> elements`, `<img> without alt`.
-- **Size budgets** in raw bytes, since the server sends no compressed responses (warning `size`): each API page 800 kB; each other HTML page 150 kB; the landing page with `css/site.css`, `js/site.js`, the four fonts it uses (Sans 400, 600, 700 and Mono 400) and the light variant of each landing figure 480 kB; each landing figure 150 kB.
+- **Size budgets** in raw bytes, since the server sends no compressed responses (warning `size`): each API page 800 kB; each other HTML page 150 kB; the landing page with `css/site.css`, `css/site-dark.css`, `js/site.js`, the four fonts it uses (Sans 400, 600, 700 and Mono 400) and the light variant of each landing figure 480 kB; each landing figure 150 kB.
 - **Notebooks and formulas**: the errors and warnings of [Tutorials](#tutorials) and [Formulas](#formulas).
 - **Doc-block and content errors** of the docs phase: see "Errors and warnings" in the docs-builder README.
 

@@ -1,6 +1,6 @@
 # Docs builder
 
-The docs builder writes the documentation of Quadriga-Lib as Markdown files into `docs/`: the full API reference per language, one file per API section, the general usage notes, the Markdown versions of the content pages (Get started, formats, FAQ, publications, AI agents), `llms.txt` for agents and `docs/README.md` as an index on GitHub. Its sources are the documentation comments in `src/`, `api_mex/` and `api_python/` and the files in `docs_builder/content/`. The same folder holds `extract_matlab_comments.py`, which CMake runs to write the MATLAB / Octave help files.
+The docs builder writes the documentation of Quadriga-Lib as Markdown files into `docs/`: the full API reference per language, one file per API section, the general usage notes, the Markdown versions of the content pages (Get started, formats, FAQ, publications), `llms.txt` for agents and `docs/README.md` as an index on GitHub. Its sources are the documentation comments in `src/`, `api_mex/` and `api_python/` and the files in `docs_builder/content/`. The same folder holds `extract_matlab_comments.py`, which CMake runs to write the MATLAB / Octave help files.
 
 It runs everywhere the library is built: on Linux and Windows, in the release builds (the Debian containers and the Windows zip) and from an unpacked source package. It needs Python 3.10 or newer and nothing outside the standard library, except a TOML reader on Python 3.10 (see below). The website is built by a second builder, which reuses this one's parser: see [website_builder/README.md](../website_builder/README.md).
 
@@ -50,11 +50,11 @@ How the sources land in `docs/` (`<lang>` is `cpp`, `mex` or `python`; `<slug>` 
 | `quadriga_lib_api_<lang>.md` | All doc blocks of the language (`src/`, `api_mex/`, `api_python/`) and `content/api_intro_<lang>.md` |
 | `api/<lang>/general-usage-notes.md` | `content/api_intro_<lang>.md` |
 | `api/<lang>/<slug>.md` | The doc blocks of one section |
-| `download.md`, `faq.md`, `ai_agents.md` | `content/<same name>.md` |
+| `download.md`, `faq.md` | `content/<same name>.md` |
 | `formats.md` | The index of the data formats: title, lead and intro of `content/formats.md`, a table of the format files |
 | `formats/<name>.md` | `content/formats/<name>.md`, one file per data format |
 | `publications.md` | `content/publications.toml` |
-| `llms.txt` | The page list, the API sections and `llms_summary` of `content/ai_agents.md`; absolute links |
+| `llms.txt` | The page list, the API sections and `llms_summary` of `content/faq.md`; absolute links |
 | `README.md` | The same list with relative links, for GitHub; not copied to the website |
 
 Every file also takes the library version from `include/quadriga_lib.hpp` (`QUADRIGA_LIB_VERSION_STR`); the Armadillo version for the build variables comes from `CMakeLists.txt` (`set(armadillo_version "...")`). The cross-language links come from `content/api_matching.toml` and the names.
@@ -114,7 +114,6 @@ The prose sources of `docs/` live in `docs_builder/content/`:
 | `formats.md` | Title, description, lead and intro of the Data formats page (`formats.html`) | `formats.md` (with the table of formats) |
 | `formats/<name>.md` | One data format: one section of `formats.html` (see [Data formats](#data-formats)) | `formats/<name>.md` |
 | `faq.md` | Questions (`faq.html`) | `faq.md` |
-| `ai_agents.md` | AI agents (`ai_agents.html`) | `ai_agents.md` |
 | `api_intro_cpp.md`, `api_intro_mex.md`, `api_intro_python.md` | Title, lead and "General usage notes" of each API page | in the full API file and `api/<lang>/general-usage-notes.md` |
 | `publications.toml` | Publications (`publications.html`) | `publications.md` |
 | `api_matching.toml` | Cross-language buttons (see [Cross-language buttons](#cross-language-buttons)) | none |
@@ -144,7 +143,7 @@ Text ...
 | `title` | yes | Page heading (`h1`), browser title "title · Quadriga-Lib", preview title, twin heading. |
 | `description` | yes | Meta description and preview text. |
 | `lead` | no | Lead paragraph below the title (inline Markdown), also in the twin. |
-| `llms_summary` | only in `ai_agents.md` | The summary paragraph of `llms.txt` and `docs/README.md`. |
+| `llms_summary` | only in `faq.md` | The summary paragraph of `llms.txt` and `docs/README.md`. |
 
 A missing required key, an unknown key or a value that is not a string stops the build with file and key.
 

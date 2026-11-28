@@ -132,7 +132,7 @@ def sizes(mapping, diag):
     for path in figures:
         if len(mapping[path]) > FIGURE_BUDGET:
             warn(path, len(mapping[path]), FIGURE_BUDGET, "landing figure")
-    parts = ["index.html", "css/site.css", "js/site.js"] + list(LANDING_FONTS) + [p for p in figures if p.endswith("-light.webp")]
+    parts = ["index.html", "css/site.css", "css/site-dark.css", "js/site.js"] + list(LANDING_FONTS) + [p for p in figures if p.endswith("-light.webp")]
     total = sum(len(mapping.get(p, b"")) for p in parts)
     if total > LANDING_BUDGET:
         warn("index.html", total, LANDING_BUDGET, "landing page with styles, script, fonts and figures")

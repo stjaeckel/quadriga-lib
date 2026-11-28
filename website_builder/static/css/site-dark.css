@@ -1,0 +1,32 @@
+/* Quadriga-Lib website: dark theme, loaded after site.css.
+   Its <link> has media="(prefers-color-scheme: dark)", so it follows the device setting;
+   the switch in the header (base.html, js/site.js) sets that media to "screen" or "not all". */
+
+:root {
+  color-scheme: dark;
+  --bg: #0b120e;
+  --fg: #e3ece5;
+  --muted: #b0c2b5;
+  --line: #2a3a30;
+  --bar: #24603a;
+  --bar-fg: #ffffff;
+  --bar-hover: #2e7d46;
+  --pitch: #1d3a28;
+  --link: #7fd197;
+  --link-hover: #a6e3b7;
+  --surface: #16221a;
+  --card: #111b15;
+  --btn-fg: #0b120e;
+  --focus: #f2c14e;
+  --warn-bg: #3a2a12;
+  --warn-fg: #f5c98a;
+  --ph-bg: #4a3d0c;
+  --ph-fg: #ffe9a3;
+  --c-kw: #e3a6f0; --c-ty: #8cc8ff; --c-st: #a5e8b8; --c-nu: #f3b37a; --c-cm: #93a598; --c-fn: #8cc8ff;
+  --shadow: none;
+}
+.btn-primary { background: var(--link); border-color: var(--link); color: var(--btn-fg); }
+.btn-primary:hover { background: var(--link-hover); color: var(--btn-fg); }
+.pill[aria-current="page"] { background: var(--link); border-color: var(--link); color: var(--btn-fg); }
+.theme-btn .icon-moon { display: none; }
+.theme-btn .icon-sun { display: block; }

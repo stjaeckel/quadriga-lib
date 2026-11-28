@@ -5,6 +5,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/faq.html
 | Section | Topics |
 | --- | --- |
 | [About the Library](#about-the-library) | [How is Quadriga-Lib related to QuaDRiGa?](#how-is-quadriga-lib-related-to-quadriga) · [How do I cite Quadriga-Lib?](#cite) · [Is the API stable?](#is-the-api-stable) · [Which compilers are supported?](#which-compilers-are-supported) · [MATLAB reports a "GLIBCXX ... not found" error when loading the MEX files. What can I do?](#matlab-reports-a-glibcxx-not-found-error-when-loading-the-mex-files-what-can-i-do) · [Can Quadriga-Lib be used together with other C++ libraries?](#can-quadriga-lib-be-used-together-with-other-c-libraries) |
+| [Using AI Agents](#ai-agents) | [Which files can an AI agent read?](#which-files-can-an-ai-agent-read) · [How do I point an agent at the docs?](#how-do-i-point-an-agent-at-the-docs) · [Is there an agent skill?](#is-there-an-agent-skill) |
 | [Bug Reports and Contact](#bug-reports-and-contact) | [How do I report a bug?](#how-do-i-report-a-bug) · [How do I request a feature?](#how-do-i-request-a-feature) · [Where can I ask how to use the library?](#where-can-i-ask-how-to-use-the-library) · [How do I report a security problem?](#how-do-i-report-a-security-problem) · [How can I contribute code?](#how-can-i-contribute-code) · [Who develops Quadriga-Lib?](#who-develops-quadriga-lib) · [How can I contact the developers?](#how-can-i-contact-the-developers) |
 | [Distribution License](#distribution-license) | [What is the distribution license for Quadriga-Lib?](#what-is-the-distribution-license-for-quadriga-lib) · [Can I use Quadriga-Lib in commercial products without releasing the source code?](#can-i-use-quadriga-lib-in-commercial-products-without-releasing-the-source-code) · [How does the Apache License compare to the GPL, MIT and BSD licenses?](#how-does-the-apache-license-compare-to-the-gpl-mit-and-bsd-licenses) · [Is Quadriga-Lib a product of the Apache Software Foundation?](#is-quadriga-lib-a-product-of-the-apache-software-foundation) |
 | [Supporting the Project](#supporting-the-project) | [How can I support the development?](#how-can-i-support-the-development) · [Other ways to help](#other-ways-to-help) |
@@ -51,6 +52,37 @@ MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a ne
 ### Can Quadriga-Lib be used together with other C++ libraries?
 
 Yes. Quadriga-Lib uses [Armadillo](https://arma.sourceforge.net) for its matrices and cubes. To exchange data with other libraries, create Armadillo objects that use auxiliary memory, use their STL-style iterators, or get a pointer to the matrix memory with `.memptr()`.
+
+<a id="ai-agents"></a>
+## Using AI Agents
+
+<a id="which-files-can-an-ai-agent-read"></a>
+### Which files can an AI agent read?
+
+| File | Content |
+| --- | --- |
+| [`llms.txt`](llms.txt) | Short summary of the library and links to all Markdown files |
+| `<page>.md` | Markdown version next to every content page, linked in its footer |
+| `api/cpp/<section>.md` | One API section per file, small enough to fetch on its own; also for `mex` and `python` |
+| [`quadriga_lib_api_cpp.md`](quadriga_lib_api_cpp.md) | Full API per language in one file (also `_mex` and `_python`) |
+
+<a id="how-do-i-point-an-agent-at-the-docs"></a>
+### How do I point an agent at the docs?
+
+Give your agent the address of `llms.txt` and ask it to fetch only the sections it needs:
+
+```text
+Read http://quadriga-lib.org/llms.txt, then use the Python API section files to write a script that generates a 3GPP antenna and prints its directivity.
+```
+
+The same Markdown files are in the `docs/` folder of the GitHub repository, so an agent working in a clone can read them without network access.
+
+<a id="is-there-an-agent-skill"></a>
+### Is there an agent skill?
+
+> [!WARNING]
+> **Placeholder**
+> An agent skill with recipes and conventions for Quadriga-Lib is in preparation. Until it exists, the [skill file](http://quadriga-lib.org/skill/SKILL.md) is a placeholder that points to `llms.txt`.
 
 <a id="bug-reports-and-contact"></a>
 ## Bug Reports and Contact

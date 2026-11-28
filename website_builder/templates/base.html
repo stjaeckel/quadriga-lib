@@ -23,7 +23,19 @@
 {% endif %}
 <link rel="preload" href="{{ root }}fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{{ root }}css/site.css">
-<script>document.documentElement.className = "js";</script>
+<link rel="stylesheet" href="{{ root }}css/site-dark.css" media="(prefers-color-scheme: dark)">
+<script>
+document.documentElement.className = "js";
+/* colour scheme chosen with the header switch: "light", "dark" or none (device setting); sets the media of every
+   element made for one scheme (dark stylesheet, theme-color, landing figures) to "screen" or "not all" */
+function qdScheme(s) {
+  document.querySelectorAll("[data-media], [media*=prefers-color-scheme]").forEach(function (e) {
+    var m = e.dataset.media || (e.dataset.media = e.getAttribute("media"));
+    e.setAttribute("media", s ? (m.indexOf(s) >= 0 ? "screen" : "not all") : m);  // print stays light
+  });
+}
+try { qdScheme(localStorage.getItem("theme")); } catch (e) {}
+</script>
 <script src="{{ root }}js/site.js" defer></script>
 </head>
 <body>

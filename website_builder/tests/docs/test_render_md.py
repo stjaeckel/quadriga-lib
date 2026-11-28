@@ -79,12 +79,13 @@ def test_twin_header_topics_column():
 
 
 def test_expected_files(docs):
-    expected = {"README.md", "llms.txt", "download.md", "faq.md", "ai_agents.md", "publications.md", "formats.md",
+    expected = {"README.md", "llms.txt", "download.md", "faq.md", "publications.md", "formats.md",
                 "formats/qdant.md", "formats/materials.md"}
     for lang in ("cpp", "mex", "python"):
         expected |= {"quadriga_lib_api_%s.md" % lang, "api/%s/general-usage-notes.md" % lang,
                      "api/%s/miscellaneous-tools.md" % lang}
-    assert expected <= set(docs)
+    assert expected <= set(docs) and "ai_agents.md" not in docs  # the agents text is a FAQ section
+    assert "(http://quadriga-lib.org/faq.md#ai-agents)" in docs["llms.txt"]
 
 
 def test_no_source_syntax_outside_code(docs):
