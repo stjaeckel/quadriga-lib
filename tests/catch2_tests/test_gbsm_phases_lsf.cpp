@@ -17,9 +17,10 @@
 // dual mobility, 2D and 3D, Uniform generators 9 and 10 untouched, no correction below 3 positions), the replacement of
 // a decorrelation distance of 0 by 0.1 m, and the input validation.
 // gbsm_draw ("lsf") pins down: the values of the 11 generators in single mobility (each generator with its own
-// decorrelation distance, 2D and 3D mode, three presets), the Uniform map of columns 9 and 10, the two-device formulas
-// of dual mobility (self-mirrored generators on one map, the pairs ASD/ASA and ESD/ESA on two maps without further
-// mixing), also with floor IDs, unit variance and the pair correlation in dual mobility, the swap reciprocity, the
+// decorrelation distance, 2D and 3D mode, three presets), the Uniform map of columns 9 and 10, the two-device values
+// of dual mobility (self-mirrored generators reciprocal, the pairs ASD/ASA and ESD/ESA one field with Tx and Rx
+// exchanged), also with floor IDs, unit variance and the pair correlation in dual mobility, the decorrelation when one
+// end moves away, the swap reciprocity, the
 // floor phase offsets, the statistics (marginals, ACF, zero correlation of different floors at equal positions), the
 // independence of z in 2D mode, of tx_pos in single mobility and of the other links, sizes, empty input, pre-sized
 // outputs and the input validation.
@@ -27,9 +28,9 @@
 //  - the sum of sinusoids qd_ref_sos, the Uniform map and the floor offsets of qd_test_sos_oracle.hpp, with the
 //    frequencies of sos_preset at the decorrelation distance of each generator
 //  - the mirror table and the raw phases of sos_init_phases (documented contract)
-//  - dual mobility: (qd_ref_sos(F_g, P0_g, R) + qd_ref_sos(F_g, P0_g, T)) / sqrt(2 + 2·A_g(D)) for the self-mirrored
-//    generators, (qd_ref_sos(F_g, P0_g, R) + qd_ref_sos(F_m, P0_m, T)) / sqrt(2) for the pairs, A_g the ACF table of
-//    sos_preset interpolated linearly by sos_acfi, D the Tx-Rx distance (horizontal in 2D mode)
+//  - dual mobility: qd_ref_dual, the two-device value of sos_val: self-mirrored generators reciprocal at (R, T) with
+//    their own frequencies; a pair (g, m), owner o = min(g, m), the plain two-device sum of the owner with the Tx
+//    frequencies scaled by lambda_o / lambda_m, at (R, T) for g = o and at (T, R) for the partner, phases of the owner
 //  - statistics: Normal(0,1), Uniform(0,1), the ACF table of sos_preset
 // Tolerances of gbsm_draw ("lsf") values: gbsm_draw ("lsf") evaluates the sinusoids with the AVX2 kernel where
 // available (sine and cosine in single precision, accumulation in double, deviation below 4e-7·sqrt(2·n_coeff) = 9e-6
@@ -46,6 +47,7 @@
 #include "quadriga_gbsm.hpp"
 #include "quadriga_sos.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 #include <stdexcept>
@@ -265,47 +267,51 @@ TEST_CASE("gbsm_init_phases - lsf: bias removal in 3D mode uses the z coordinate
     CHECK(max_2d > 1e-6);
 }
 
-TEST_CASE("gbsm_init_phases - lsf: bias removal with dual mobility uses the Rx and Tx positions together")
+TEST_CASE("gbsm_init_phases - lsf: bias removal with dual mobility zeroes the link mean of the two-device values")
 {
     const auto sp = scen_distinct();
-    const arma::mat rx = drop(100, 100.0, 51);
-    arma::mat tx = rx;
-    tx.row(0) += 30.0, tx.row(1) -= 20.0, tx.row(2) += 5.0; // equal separation for every link
+    const arma::mat rx = drop(100, 100.0, 51), tx = drop(100, 100.0, 52);
 
     arma::cube phase, phase_sw;
     phase = quadriga_lib::gbsm_init_phases(sp, "lsf", 12, -1, "Comb256", tx, rx, true);
     phase_sw = quadriga_lib::gbsm_init_phases(sp, "lsf", 12, -1, "Comb256", rx, tx, true); // swapped roles
     REQUIRE(phase.n_rows == 256);
 
-    // Mean over the union [R; T] of the field of every Normal generator (2D: z = 0), closed form: 1e-12
-    const arma::mat U = arma::join_rows(rx, tx);
-    QD_DIAG("\n# diag: gbsm_init_phases lsf dual mobility, mean of ref_sos over the 200 Rx and Tx positions\n");
-    QD_DIAG("g,mean_union,mean_rx_only\n");
-    for (arma::uword g = 0; g < 9; ++g)
+    // Link mean of the two-device value of every owner (self-mirrored, ASD, ESD; 2D: z = 0), closed form: 1e-12
+    const std::vector<arma::uword> p = qd_perm(256);
+    const arma::uword owners[7] = {0, 1, 2, 3, 5, 7, 8};
+    QD_DIAG("\n# diag: gbsm_init_phases lsf dual mobility, link mean of the two-device values\ng,mean\n");
+    for (arma::uword g : owners)
     {
         const arma::mat F = qd_preset("Comb256", lambda_g[g]).F;
-        double m = mean_ref(F, phase.slice(0).colptr(g), U, false);
-        QD_DIAG("%llu,%.3e,%.6e\n", (unsigned long long)g, m, mean_ref(F, phase.slice(0).colptr(g), rx, false));
+        const arma::uword m = mirror_g[g];
+        double s = 0.0;
+        for (arma::uword l = 0; l < 100; ++l)
+        {
+            const double a[3] = {rx(0, l), rx(1, l), 0.0}, b[3] = {tx(0, l), tx(1, l), 0.0};
+            s += qd_ref_dual(F, phase.slice(0).colptr(g), a, b, p, lambda_g[g] / lambda_g[m], m == g) / 100.0;
+        }
+        QD_DIAG("%llu,%.3e\n", (unsigned long long)g, s);
         INFO("g " << g);
-        CHECK(std::abs(m) < 1e-12);
+        CHECK(std::abs(s) < 1e-12);
     }
 
-    // Swapped Tx and Rx: the same union, summed in another order; phases equal modulo 2·pi up to rounding
+    // Swapped Tx and Rx: the self-mirrored fields are reciprocal, so the same values are summed in another order and
+    // the phases are equal modulo 2·pi up to rounding
     double max_dphi = 0.0;
-    for (arma::uword i = 0; i < phase.n_elem; ++i)
-        max_dphi = std::max(max_dphi, std::abs(std::remainder(phase(i) - phase_sw(i), 2.0 * pi)));
-    QD_DIAG("# diag: max phase difference after swapping Tx and Rx: %.3e\n", max_dphi);
+    for (arma::uword g : {0, 1, 2, 7, 8})
+        for (arma::uword n = 0; n < 256; ++n)
+            max_dphi = std::max(max_dphi, std::abs(std::remainder(phase(n, g, 0) - phase_sw(n, g, 0), 2.0 * pi)));
+    QD_DIAG("# diag: max phase difference of the self-mirrored columns after swapping Tx and Rx: %.3e\n", max_dphi);
     CHECK(max_dphi < 1e-12);
 
-    // Supporting check through gbsm_draw ("lsf"): with equal Tx-Rx distance for all links the normalisation
-    // 1/sqrt(2 + 2·A(D)) is common, so the link mean of the self-mirrored Normal columns is 0.
+    // Supporting check through gbsm_draw ("lsf"): the link mean of the owner columns is 0
     // Tolerance 2e-5: gbsm_draw ("lsf") evaluates with the AVX2 kernel (single-precision sin/cos where available).
     arma::mat rnd;
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", {}, {}, true);
     REQUIRE(rnd.n_rows == 100);
     REQUIRE(rnd.n_cols == 11);
-    const arma::uword cols[5] = {0, 1, 2, 7, 8};
-    for (arma::uword c : cols)
+    for (arma::uword c : owners)
     {
         INFO("column " << c);
         CHECK(std::abs(arma::mean(rnd.col(c))) < 2e-5);
@@ -596,15 +602,16 @@ TEST_CASE("gbsm_draw - lsf: dual mobility values follow the two-device formulas"
     REQUIRE(rnd.n_rows == 6);
     REQUIRE(rnd.n_cols == 11);
 
-    // off: floor offsets of the link, added on both sides (both devices on the link's floor)
+    // off: floor offsets of the link, added to all phases (both devices on the link's floor)
+    const std::vector<arma::uword> p = qd_perm(256);
     auto oracle = [&](const arma::mat &R, const arma::mat &T, arma::uword l, arma::uword g, const arma::vec *off = nullptr)
     {
-        const arma::uword m = mirror_g[g];
-        const qd_preset_tab tg = qd_preset("Comb256", lambda_g[g]), tm = qd_preset("Comb256", lambda_g[m]);
-        double a = qd_ref_sos(tg.F, phase.slice(0).colptr(g), R(0, l), R(1, l), 0.0, off);
-        double b = qd_ref_sos(tm.F, phase.slice(0).colptr(m), T(0, l), T(1, l), 0.0, off);
-        double D = std::sqrt((R(0, l) - T(0, l)) * (R(0, l) - T(0, l)) + (R(1, l) - T(1, l)) * (R(1, l) - T(1, l)));
-        double x = (m == g) ? (a + b) / std::sqrt(2.0 + 2.0 * qd_acf_at(tg, D)) : (a + b) / std::sqrt(2.0);
+        const arma::uword m = mirror_g[g], o = std::min(g, m);
+        const arma::mat F = qd_preset("Comb256", lambda_g[o]).F;
+        const double r[3] = {R(0, l), R(1, l), 0.0}, t[3] = {T(0, l), T(1, l), 0.0};
+        const double scale = lambda_g[o] / lambda_g[mirror_g[o]];
+        double x = (o == g) ? qd_ref_dual(F, phase.slice(0).colptr(o), r, t, p, scale, m == g, off)
+                            : qd_ref_dual(F, phase.slice(0).colptr(o), t, r, p, scale, false, off);
         return g >= 9 ? qd_unif(x) : x;
     };
 
@@ -644,16 +651,26 @@ TEST_CASE("gbsm_draw - lsf: dual mobility values follow the two-device formulas"
         }
 }
 
-TEST_CASE("gbsm_draw - lsf: dual mobility keeps unit variance and correlates the pairs by the ACF at the Tx-Rx distance")
+TEST_CASE("gbsm_draw - lsf: dual mobility keeps unit variance and correlates the pairs as one field with Tx and Rx exchanged")
 {
     auto sp = scen_distinct();
     sp["AS_D_lambda"] = 10.0, sp["AS_A_lambda"] = 15.0, sp["ES_D_lambda"] = 10.0, sp["ES_A_lambda"] = 20.0;
     const arma::cube phase = make_phase(256, 28);
     const arma::mat rx = qd_grid(100, 100, 50.0, 1.5);
-    const qd_preset_tab t10 = qd_preset("Comb256", 10.0), t15 = qd_preset("Comb256", 15.0), t20 = qd_preset("Comb256", 20.0);
+    const arma::mat F10 = qd_preset("Comb256", 10.0).F;
+    const std::vector<arma::uword> p = qd_perm(256);
+    // Correlation of a pair member with its partner at the same link, Tx = Rx + (D, 0, 0): the owner field at (R, T)
+    // and at (T, R), (1/N) · sum_n cos( 2·pi · (f_n - b·f_p(n))·(R - T) ) with b = lambda_o / lambda_m
+    auto pair_corr = [&](double D, double b)
+    {
+        double c = 0.0;
+        for (arma::uword n = 0; n < 256; ++n)
+            c += std::cos(2.0 * pi * (F10(n, 0) - b * F10(p[n], 0)) * D) / 256.0;
+        return c;
+    };
 
     // Variance: 5 standard errors of the sample variance, sqrt(2/n) = 0.014 -> 0.07
-    // Correlation: 5 standard errors (<= 0.01) + approximation error of the SOS ACF (0.03) -> 0.08
+    // Correlation: 5 standard errors (<= 0.01) and the spread of one realisation of the phases (0.03) -> 0.08
     QD_DIAG("\n# diag: gbsm_draw lsf dual mobility, 10^4 links, Tx = Rx + (D, 0, 0)\n");
     QD_DIAG("D,var3,var4,var5,var6,corr34,ref34,corr56,ref56\n");
     const double Ds[3] = {5.0, 10.0, 20.0};
@@ -666,8 +683,7 @@ TEST_CASE("gbsm_draw - lsf: dual mobility keeps unit variance and correlates the
         REQUIRE(rnd.n_rows == rx.n_cols);
         double v[4] = {arma::var(rnd.col(3)), arma::var(rnd.col(4)), arma::var(rnd.col(5)), arma::var(rnd.col(6))};
         double c34 = qd_corr(rnd.col(3), rnd.col(4)), c56 = qd_corr(rnd.col(5), rnd.col(6));
-        double r34 = 0.5 * (qd_acf_at(t10, D) + qd_acf_at(t15, D));
-        double r56 = 0.5 * (qd_acf_at(t10, D) + qd_acf_at(t20, D));
+        double r34 = pair_corr(D, 10.0 / 15.0), r56 = pair_corr(D, 10.0 / 20.0);
         QD_DIAG("%.0f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n", D, v[0], v[1], v[2], v[3], c34, r34, c56, r56);
         INFO("D " << D);
         for (int i = 0; i < 4; ++i)
@@ -676,7 +692,7 @@ TEST_CASE("gbsm_draw - lsf: dual mobility keeps unit variance and correlates the
         CHECK(std::abs(c56 - r56) < 0.08);
     }
 
-    // D = 0: both pair members are the same sum
+    // D = 0: both pair members are the same sum at the same positions
     arma::mat rnd;
     quadriga_lib::gbsm_draw(sp, "lsf", phase, rx, rx, rnd, -1, "Comb256", {}, {}, true);
     CHECK(arma::all(rnd.col(3) == rnd.col(4)));
@@ -977,5 +993,37 @@ TEST_CASE("gbsm_draw - lsf: input validation")
         bad["XPR_lambda"] = -1.0;
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(bad, "lsf", phase, tx, rx, rnd), std::invalid_argument,
                              Message("Value of 'XPR_lambda' must be finite and >= 0."));
+    }
+}
+
+TEST_CASE("gbsm_draw - lsf: in dual mobility a link decorrelates when one end moves away")
+{
+    // 2025 independent links on a 3 km grid (decorrelation distances 11 to 20 m): Tx at a grid point, Rx 100 m away.
+    // Moving the Rx or the Tx by 1000 m must decorrelate every Normal column: all links have the same displacement, so
+    // the residual of the sinusoids is one fixed value of rms 1/sqrt(2N) = 0.044 per column (18 values up to about 4
+    // times that), plus a sampling error of 0.022, so |corr| < 0.25; the sum of two one-device fields keeps 0.5
+    const auto sp = scen_distinct();
+    const arma::cube phase = make_phase(256, 5);
+    const arma::uword n = 45, n_link = n * n;
+    arma::mat tx(3, n_link), rx(3, n_link);
+    for (arma::uword i = 0; i < n_link; ++i)
+        tx(0, i) = 3000.0 * (double)(i % n), tx(1, i) = 3000.0 * (double)(i / n), tx(2, i) = 25.0;
+    rx = tx, rx.row(0) += 100.0, rx.row(2).fill(1.5);
+    arma::mat rx_m = rx, tx_m = tx;
+    rx_m.row(0) += 1000.0, tx_m.row(1) += 1000.0;
+
+    arma::mat v0, v_rx, v_tx;
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, v0, -1, "Comb256", {}, {}, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx_m, v_rx, -1, "Comb256", {}, {}, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx_m, rx, v_tx, -1, "Comb256", {}, {}, true);
+    QD_DIAG("\n# diag: gbsm_draw lsf dual mobility, correlation after a 1000 m move\ncolumn,rx_moves,tx_moves\n");
+    for (arma::uword g = 0; g < 9; ++g)
+    {
+        const double c_rx = arma::as_scalar(arma::cor(v0.col(g), v_rx.col(g)));
+        const double c_tx = arma::as_scalar(arma::cor(v0.col(g), v_tx.col(g)));
+        QD_DIAG("%llu,%.3f,%.3f\n", (unsigned long long)g, c_rx, c_tx);
+        INFO("column " << g);
+        CHECK(std::abs(c_rx) < 0.25);
+        CHECK(std::abs(c_tx) < 0.25);
     }
 }

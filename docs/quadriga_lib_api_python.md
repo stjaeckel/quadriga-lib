@@ -2694,8 +2694,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_draw) · [MATLAB](quadriga_lib_api_m
 - Evaluates the SOS phases of [gbsm.init_phases](#gbsm.init_phases) at the links as [sos.val](#sos.val), one column per generator. The value of a
   link depends neither on the other links of the call nor on the other columns; with `dual_mobility = False` not on
   `tx_pos`
-- `dual_mobility = True`: the Tx is a second device on the same fields; its side of each generator uses the mirror
-  generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
+- `dual_mobility = True`: Tx and Rx both move; each column is the two-device generator of [sos.val](#sos.val) with the
+  decorrelation distance of the column at the Rx and that of its mirror generator at the Tx (e.g. departure and
+  arrival quantities exchange). While one end stays, a column changes as in single mobility; when one end moves far,
+  the link decorrelates. Swapping Tx and Rx exchanges the mirror columns; a self-mirrored column keeps its value,
+  except block 14 of the shared "ray" set when `PerClusterAS_D` and `PerClusterAS_A` differ. Every column keeps
+  its distribution
 - 2D mode (`horizontal = True`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
   field, fields of different floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3):
   exactly for IDs in the same group of `n_coeff` consecutive IDs (0 to `n_coeff - 1`, ...), otherwise up to a random
@@ -2712,7 +2716,7 @@ new sets), and a decorrelation distance of 0 is used as 0.1 m:
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [lsp_generate](#lsp_generate) `rnd`, [path_loss](#path_loss) `rnd_he` (column 10) |
 | `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [ssf_clusters](#ssf_clusters) `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [ssf_clusters](#ssf_clusters) `rnd_freq`, slice `k` |
-| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [ssf_rays](#ssf_rays) `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km; at the Tx in dual mobility `PerClusterAS_D` in place of `PerClusterAS_A` | [ssf_rays](#ssf_rays) `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
 
 A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
 ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
@@ -2726,8 +2730,8 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, *, set_i
 ```
 
 ### Inputs:
-- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*` and
-  `PerClusterAS_A`
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*`,
+  `PerClusterAS_A` and `PerClusterAS_D`
 - **`set_type`** — Set type of [gbsm.init_phases](#gbsm.init_phases); str
 - **`phase`** — SOS phases from [gbsm.init_phases](#gbsm.init_phases), finite; `(n_coeff, n_gen, 2)`
 - **`tx_pos`** — Tx positions in m; used in dual mobility, always validated; `(3,)` or `(3, n_link)`
@@ -2768,8 +2772,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_init_phases) · [MATLAB](quadriga_li
   again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `"lsf"`
   sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
-- `"lsf"` bias removal (`remove_bias`): [sos.remove_bias](#sos.remove_bias) sets the sample mean of columns 0 to 8 over the positions
-  (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
+- `"lsf"` bias removal (`remove_bias`): [sos.remove_bias](#sos.remove_bias) sets the sample mean of columns 0 to 8 over the links
+  (in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop; in dual mobility columns 4 (ASA)
+  and 6 (ESA), the ASD and ESD fields with Tx and Rx exchanged, are not corrected
 - `NumClusters = 1`: all sets but `"lsf"` are empty
 - TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 
@@ -5731,13 +5736,14 @@ quadriga_lib.tools.write_png("map.png", grid[:, :, 0, 0])
   38 dB for `Exp128` to `Exp1024` and 31, 35, 39 and 42 dB for `Comb128` to `Comb1024`. `"Comb256"` is a
   good default; take a larger table if the shape of the ACF matters, a smaller one if speed does.
 - **Both ends mobile:** if a value belongs to a link between two moving devices, pass both positions.
-  The value then changes smoothly when either device moves.
+  The value then changes smoothly when either device moves, keeps the correlation of one device while the
+  other stays, and does not change when the two ends swap.
 
 ```python
 # Positions of the two ends of 1000 links; one value per link and generator, shape (1000, 20)
 pos_tx = pos
 pos_rx = np.random.default_rng(1).random((1000, 3)) * 100
-val_link = quadriga_lib.sos.val(spatial_freq, phase, pos_tx, pos_rx, acf=acf, dist=dist)
+val_link = quadriga_lib.sos.val(spatial_freq, phase, pos_tx, pos_rx)
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -5754,7 +5760,7 @@ val_link = quadriga_lib.sos.val(spatial_freq, phase, pos_tx, pos_rx, acf=acf, di
   except [sos.generate](#sos.generate), which runs on one thread. No result depends on the number of threads,
   except the last digits of the errors of [sos.calc_mse](#sos.calc_mse).
   [sos.val](#sos.val) computes in its output: it needs no further memory of that size for one device and one more
-  array of that size for two devices.
+  array of that size for two reciprocal devices.
 
 **Own autocorrelation functions**\
 [sos.generate](#sos.generate) finds the frequencies for any ACF that is given as a table over the distance, and
@@ -5874,20 +5880,18 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_estimate) · [MATLAB](quadriga_li
   the midpoint between `bins[n]` and `bins[n+1]` (included). The first bin starts at 1e-5 m, the
   last bin ends half a mean bin spacing above `bins[-1]`
 - Bins with fewer than 6 pairs return NaN in all outputs
-- `acf_est_dual`: the same for two devices on the same map. The first `n_pos` positions are the
-  first device, the second `n_pos` positions the second device, and the value of a link is
-  [sos.val](#sos.val) with both positions. Two links form a pair if the distance between their first
-  devices falls into the bin and the distance between their second devices does not exceed the
-  upper limit of the bin; requires `acf` and `dist`
-- `acf_est_dual` is computed if `acf` or `dist` is given, and is `None` if both are omitted; giving
-  only one of the two is an error
+- `acf_est_dual`: the same for two devices, reciprocal as in [sos.val](#sos.val). The first `n_pos` positions are the
+  first device, the second `n_pos` positions the second device, and the value of a link is [sos.val](#sos.val) with both
+  positions. Two links form a pair if the distances between their first devices and between their second devices
+  fall into the same bin; for the two-device generator of [sos.val](#sos.val) the estimate approximates the square of
+  the ACF
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
 - Run time grows with `n_pos^2`; the result does not depend on the number of threads
 
 ### Usage:
 ```python
 acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, phase, bins, n_pos, \
-    *, acf, dist, seed )
+    *, seed )
 ```
 
 ### Inputs:
@@ -5896,18 +5900,13 @@ acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, p
 - **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
   elements; `(n_bin,)`
 - **`n_pos`** — Number of random positions per device; `int`; must be > 1
-- **`acf`** — Target ACF; required for `acf_est_dual`, must then be > -1;
-  `(n_acf,)`; default: `None`
-- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
-  default: `None`
 - **`seed`** — Seed for the positions; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
 
 ### Outputs:
 - **`acf_est`** — Estimated ACF; `(n_bin,)`
 - **`dist_est`** — Mean distance of the pairs in each bin; `(n_bin,)`
-- **`acf_est_dual`** — Estimated ACF for two devices on the same map; `(n_bin,)`; `None` if `acf`
-  and `dist` were not given
+- **`acf_est_dual`** — Estimated ACF for two devices; `(n_bin,)`
 
 ### See also:
 - [sos.acf_approx](#sos.acf_approx) (ACF of the sinusoids in closed form)
@@ -5922,7 +5921,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acfi) · [MATLAB](quadriga_lib_api_me
 
 - Linear interpolation of the autocorrelation function (ACF) given as a table
 - Distances beyond the last sample point return the last value of the table
-- The same rule is applied by [sos.val](#sos.val) and [sos.remove_bias](#sos.remove_bias) for two devices on the same map
 
 ### Usage:
 ```python
@@ -6193,19 +6191,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_rand) · [MATLAB](quadriga_lib_api_me
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
-  A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
-  flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
-  phases of a generator therefore depend neither on the number of generators nor on whether a
-  second device is given
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`,
+  with or without a second device; the phases of a generator therefore do not depend on the number of
+  generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr`
-  for that generator): both devices are on the same map, the value does not change when they
-  swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the
-  sum of both maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [sos.val](#sos.val); with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = True`, the value does
+  not change when the devices swap positions; with different ones `reciprocal = False` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Normal distributed value `s` of the generator is mapped to `0.5 · erfc( -s / sqrt(2) )`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
@@ -6255,19 +6249,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_randi) · [MATLAB](quadriga_lib_api_m
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
-  A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
-  flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
-  phases of a generator therefore depend neither on the number of generators nor on whether a
-  second device is given
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`,
+  with or without a second device; the phases of a generator therefore do not depend on the number of
+  generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr`
-  for that generator): both devices are on the same map, the value does not change when they
-  swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the
-  sum of both maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [sos.val](#sos.val); with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = True`, the value does
+  not change when the devices swap positions; with different ones `reciprocal = False` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Uniform value `u` of [sos.rand](#sos.rand) is mapped to `ceil( u · imax )`, limited to 1 ... `imax`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
@@ -6319,19 +6309,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_randn) · [MATLAB](quadriga_lib_api_m
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
-  A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
-  flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
-  phases of a generator therefore depend neither on the number of generators nor on whether a
-  second device is given
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`,
+  with or without a second device; the phases of a generator therefore do not depend on the number of
+  generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr`
-  for that generator): both devices are on the same map, the value does not change when they
-  swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the
-  sum of both maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [sos.val](#sos.val); with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = True`, the value does
+  not change when the devices swap positions; with different ones `reciprocal = False` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
   also in separate calls. The kernel is chosen automatically, so values from machines with and
@@ -6388,13 +6374,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [MATLAB](quadriga_lib
   `Z = sum_n z_n · exp( j·phi_n )`, the mean is `sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )`,
   which vanishes for `offset = pi/2 - arg(Z)` and for that value minus pi; the one with the
   smaller magnitude is applied, so the offset lies between -pi/2 and pi/2
-- One device (`pos_b` omitted): one offset per generator
-- Two devices on the same map (`pos_b` given, `phase_b_in` omitted): one offset per generator that
-  zeroes the mean of the combined, normalised value; `acf` and `dist` are required
-- Two devices on different maps (`pos_b` and `phase_b_in` given): each device is treated on its
-  own, `phase_in` with `pos` and `phase_b_in` with `pos_b` and the frequencies
-  `spatial_freq · spatial_freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
-  as well
+- One offset per generator; with two devices (`pos_b` given) it zeroes the mean of the two-device value
+  of [sos.val](#sos.val) with the same `spatial_freq_scale_b` and `reciprocal`
+- Two reciprocal devices at a position where the normalization of [sos.val](#sos.val) is singular (`c = -1`) throw
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions.
   The variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the
   sample mean and `c` the mean ACF between that position and all positions; on average over the
@@ -6409,16 +6391,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [MATLAB](quadriga_lib
 - Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose
   `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
   unchanged, also if its phases lie outside that interval
-- Two devices on the same map need an ACF above -1 at all sample points, as in [sos.val](#sos.val)
-- The C++ in/out arguments `phase` and `phase_b` are split into `phase_in` / `phase_out` and `phase_b_in` /
-  `phase_b_out`: the input arrays are not modified, the corrected phases are new arrays; C++ messages name them
-  `phase` and `phase_b`
+- The C++ in/out argument `phase` is split into `phase_in` and `phase_out`: the input array is not modified,
+  the corrected phases are a new array; C++ messages name it `phase`
 - An optional array that is `None` or empty counts as not given
 
 ### Usage:
 ```python
-phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, \
-    pos, pos_b, *, phase_b_in, acf, dist, spatial_freq_scale_b )
+phase_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, pos, pos_b, \
+    *, spatial_freq_scale_b, reciprocal )
 ```
 
 ### Inputs:
@@ -6428,28 +6408,17 @@ phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spat
   number of dimensions: `(n_pos, 1)` = `(x)`, `(n_pos, 2)` = `(x, y)` or `(n_pos, 3)` = `(x, y, z)`;
   coordinates that are not given are 0; not more columns than `spatial_freq`; a 1-D array is one column,
   i.e. one x-coordinate per position
-- **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos_b, 1)`, `(n_pos_b, 2)`
-  or `(n_pos_b, 3)` as for `pos`; `n_pos_b = n_pos` for the same map, any number for different
-  maps; default: `None`
-- **`phase_b_in`** — Phases of the second device; requires `pos_b`; `None` = same map;
-  `(n_coeff, n_gen)`; default: `None`
-- **`acf`** — Target ACF; required for two devices on the same map, must then be > -1; `(n_acf,)`;
-  default: `None`
-- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
-  default: `None`
-- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
-  first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
-  default: 1.0
+- **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
+  `(n_pos, 3)` as for `pos`; default: `None`
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device as in [sos.val](#sos.val); must be > 0;
+  other than 1 requires `pos_b` and `reciprocal = False`; default: 1.0
+- **`reciprocal`** — Two devices: the mode of [sos.val](#sos.val); default: `True`
 
 ### Outputs:
 - **`phase_out`** — Corrected phases; `(n_coeff, n_gen)`
-- **`phase_b_out`** — Corrected phases of the second device; `(n_coeff, n_gen)`; `None` if
-  `phase_b_in` was not given
-- **`offset`** — Offsets added to the phases; `(n_gen, 1)`, or `(n_gen, 2)` with
-  `phase_b_in` (column 0: `phase_in`, column 1: `phase_b_in`)
-- **`mean_before`** — Sample mean before the correction; `(n_gen, 1)`: mean of the values of
-  [sos.val](#sos.val) for the given arguments; with `phase_b_in` `(n_gen, 2)`: mean of the field of each
-  device on its own positions, the mean of the combined value being their sum divided by `sqrt(2)`
+- **`offset`** — Offsets added to the phases; `(n_gen, 1)`
+- **`mean_before`** — Sample mean of the values of [sos.val](#sos.val) for the given arguments before the
+  correction; `(n_gen, 1)`
 
 ### See also:
 - [sos.val](#sos.val) (the values whose mean is removed)
@@ -6472,25 +6441,28 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_val) · [MATLAB](quadriga_lib_api_mex
 - Positions are given as one row per position with the columns `(x, y, z)`; they may have fewer
   columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
-- Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
-  `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and
-  `pos_b` and `A` the target ACF interpolated as in [sos.acfi](#sos.acfi); `acf` and `dist` are required.
-  The value does not change when the two devices swap their positions
-- Two devices on different maps (`pos_b` and `phase_b` given):
-  `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
-- The mode follows from the arguments only; phase values are never compared. Passing the same
-  array as `phase` and `phase_b` selects the two-map formula
-- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
-  consistent ACF
-- Two devices on the same map need an ACF above -1 at all sample points, because the value is
-  divided by `sqrt( 2 + 2·A(D) )`
+- Two devices (`pos_b` given): one generator over the positions of both,
+  `s(x, y) = sqrt(2/n_coeff) · sum_n cos( 2·pi · (f_n·x + b·f_p(n)·y) + phi_n )`, with
+  `b = spatial_freq_scale_b` and `p` a fixed pseudo-random permutation of the sinusoids that depends only on
+  `n_coeff` and pairs no sinusoid with itself. The correlation of two links approximates the product of the
+  ACFs of the two moves; while one device stays at its position, it is the ACF of one device (with
+  `reciprocal = True` for devices more than about one decorrelation distance apart)
+- `reciprocal = True` (requires `b = 1`): `val = ( s(pos, pos_b) + s(pos_b, pos) ) / sqrt( 2 + 2·c )` with
+  `c = (1/n_coeff) · sum_n cos( 2·pi · (f_n - f_p(n))·(pos - pos_b) )`. The value does not change when the
+  two devices swap their positions; for devices closer than about one decorrelation distance the
+  correlation of two links contains the term this symmetry requires
+- `reciprocal = False`: `val = s(pos, pos_b)`. With `pos` and `pos_b` exchanged, the same phases give a
+  second field with the same statistics, for example the arrival value of a link whose departure value
+  is `val`
+- For large moves of both devices the correlation keeps a residual with rms `1/sqrt(2·n_coeff)`
+- With `reciprocal = True`, a position where `c = -1` (possible only for tables with few sinusoids) gives NaN
 - `uniform = True` maps the values to `0.5 · erfc( -val / sqrt(2) )`, which is uniform between 0 and
   1 as far as `val` is Normal distributed. The limits 0 and 1 are included: a value far out in the
   tail is rounded to them
 - Kernels: GENERIC computes in double precision. AVX2 evaluates sine and cosine in single
   precision; its values differ from GENERIC by less than `4e-7 · sqrt( 2·n_coeff )`, typically by
-  less than 1e-6
+  less than 1e-6; with two devices and `reciprocal = True` the difference is scaled by
+  `2 / sqrt( 2 + 2·c )`, at most about 1.7 for the presets
 - Accuracy far from the origin: the argument `f_n·x` is known to about 1e-16 of its size. The
   bound between the kernels holds up to about 1e9 periods of the sinusoids; beyond that both
   kernels lose accuracy at the same rate
@@ -6501,8 +6473,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_val) · [MATLAB](quadriga_lib_api_mex
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, *, phase_b, acf, dist, \
-    spatial_freq_scale_b, uniform, use_kernel )
+val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, *, spatial_freq_scale_b, reciprocal, \
+    uniform, use_kernel )
 ```
 
 ### Inputs:
@@ -6514,14 +6486,11 @@ val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, *, phase_b, acf, di
   i.e. one x-coordinate per position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos, 1)`, `(n_pos, 2)` or
   `(n_pos, 3)` as for `pos`; the number of columns may differ from `pos`; default: `None`
-- **`phase_b`** — Phases of the second device; requires `pos_b`; `None` = same map;
-  `(n_coeff, n_gen)`; default: `None`
-- **`acf`** — Target ACF; required for two devices on the same map, must then be > -1; `(n_acf,)`;
-  default: `None`
-- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite;
-  `(n_acf,)`; default: `None`
 - **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
-  first device divided by that of the second; must be > 0; default: 1.0
+  first device divided by that of the second; must be > 0; other than 1 requires `pos_b` and
+  `reciprocal = False`; default: 1.0
+- **`reciprocal`** — Two devices: `True` = the value does not change when the devices swap positions;
+  default: `True`
 - **`uniform`** — Output distribution: `False` = Normal(0,1), `True` = Uniform between 0 and 1;
   default: `False`
 - **`use_kernel`** — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2 (throws if

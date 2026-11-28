@@ -16,7 +16,6 @@ Target ACF at given distances
 
 - Linear interpolation of the autocorrelation function (ACF) given as a table
 - Distances beyond the last sample point return the last value of the table
-- The same rule is applied by [[sos_val]] and [[sos_remove_bias]] for two devices on the same map
 
 ## Usage:
 ```

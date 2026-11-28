@@ -62,8 +62,8 @@ static void calls_with_literals()
 
     // quadriga_sos.hpp
     m = quadriga_lib::sos_preset<T>("exponential", &col, &col, 10);
-    quadriga_lib::sos_val(m, m, m, v, m, m, col, col, 1);
-    quadriga_lib::sos_remove_bias(m, m2, m, m, &v, col, col, &m, &m, 1);
+    quadriga_lib::sos_val(m, m, m, v, m, 1);
+    quadriga_lib::sos_remove_bias(m, m2, m, m, 1, true, &m, &m);
     m = quadriga_lib::sos_generate(col, col, 256, &col, &m, 3, true, 10, true, 0, 1.0);
 
     // quadriga_tools.hpp

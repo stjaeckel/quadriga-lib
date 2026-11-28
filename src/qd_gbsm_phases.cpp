@@ -71,6 +71,7 @@ namespace
     struct qd_gbsm_gen
     {
         double lambda;      // Decorrelation distance in [m], > 0
+        double lambda_tx;   // Decorrelation distance at the Tx in dual mobility, > 0: that of the mirror generator for a pair
         bool uniform;       // false: Normal(0,1), true: Uniform(0,1)
         arma::uword mirror; // Index of the mirror generator (Tx side); equal to the own index for self-mirrored ones
         bool bias;          // Remove the sample mean in the bias removal
@@ -94,6 +95,8 @@ namespace
             gen[g].mirror = mirror[g];
             gen[g].bias = g < 9;
         }
+        for (arma::uword g = 0; g < 11; ++g)
+            gen[g].lambda_tx = gen[gen[g].mirror].lambda;
         return gen;
     }
 
@@ -111,6 +114,7 @@ namespace
         {
             const arma::uword b = c / N, n = c % N;
             gen[c].lambda = (lambda > 0.0) ? lambda : 0.1;
+            gen[c].lambda_tx = gen[c].lambda;
             gen[c].uniform = shared && b == 0;
             gen[c].mirror = shared ? mirror_b[b] * N + n : c;
             gen[c].bias = false;
@@ -122,8 +126,10 @@ namespace
     // 14·N·M + N for every set_id; blocks b <= 12 at b·N·M + n·M + m with the mirror blocks
     // (1, 0, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10, 12), block 13 at 13·N·M + n, block 14 (Uniform) at 13·N·M + N + n·M + m,
     // both self-mirrored
-    // - 'lambda_14': decorrelation distance of block 14 in [m], > 0; the other blocks use SC_lambda (0 -> 0.1 m)
-    std::vector<qd_gbsm_gen> qd_gbsm_gen_ray(const std::unordered_map<std::string, double> &sp, double lambda_14)
+    // - 'lambda_14', 'lambda_14_tx': decorrelation distance of block 14 in [m] at the Rx and at the Tx (dual mobility),
+    //   > 0; the other blocks use SC_lambda (0 -> 0.1 m)
+    std::vector<qd_gbsm_gen> qd_gbsm_gen_ray(const std::unordered_map<std::string, double> &sp, double lambda_14,
+                                             double lambda_14_tx)
     {
         const arma::uword mirror_b[13] = {1, 0, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10, 12};
         arma::uword N, M, G, n_ray, n_gen;
@@ -136,6 +142,7 @@ namespace
         {
             const bool b14 = g >= 13 * NM + N;
             gen[g].lambda = b14 ? lambda_14 : ((lambda > 0.0) ? lambda : 0.1);
+            gen[g].lambda_tx = b14 ? lambda_14_tx : gen[g].lambda;
             gen[g].uniform = b14;
             gen[g].mirror = (g < 13 * NM) ? mirror_b[g / NM] * NM + g % NM : g;
             gen[g].bias = false;
@@ -144,14 +151,13 @@ namespace
     }
 
     // Frequency tables, one per distinct decorrelation distance of 'gen' (in order of first appearance):
-    // freq[t] = sos_preset(preset, &acf[t], &dist[t], lambda_t); tab[g] = table index of generator g
+    // freq[t] = sos_preset(preset, lambda_t); tab[g] = table index of generator g
     // - 'preset' must be a known preset (checked by the caller with qd_gbsm_n_coeff)
     // - Distances are grouped by exact equality: equal input values give identical tables
     void qd_gbsm_freq(const std::string &preset, const std::vector<qd_gbsm_gen> &gen,
-                      std::vector<arma::mat> &freq, std::vector<arma::vec> &acf,
-                      std::vector<arma::vec> &dist, std::vector<arma::uword> &tab)
+                      std::vector<arma::mat> &freq, std::vector<arma::uword> &tab)
     {
-        freq.clear(), acf.clear(), dist.clear();
+        freq.clear();
         tab.assign(gen.size(), 0);
         std::vector<double> lambda;
         for (size_t g = 0; g < gen.size(); ++g)
@@ -162,8 +168,8 @@ namespace
             if (t == lambda.size())
             {
                 lambda.push_back(gen[g].lambda);
-                freq.emplace_back(), acf.emplace_back(), dist.emplace_back();
-                freq[t] = quadriga_lib::sos_preset<double>(preset, &acf[t], &dist[t], gen[g].lambda);
+                freq.emplace_back();
+                freq[t] = quadriga_lib::sos_preset<double>(preset, nullptr, nullptr, gen[g].lambda);
             }
             tab[g] = (arma::uword)t;
         }
@@ -189,34 +195,75 @@ namespace
             R.col(2).zeros(), T.col(2).zeros();
     }
 
+    // Dual mobility: the two-device generator of sos_val for each column, owner o(g) of a mirror pair the generator of
+    // lower index (self-mirrored: o(g) = g)
+    // - Owner o: sos_val(freq of o, phases of o, R, T) with the Tx frequencies scaled to the decorrelation distance of
+    //   the Tx side (the mirror partner, or lambda_tx for a self-mirrored generator); the partner g of o is the same
+    //   field with R and T exchanged, so that swapping Tx and Rx exchanges the two columns bit for bit
+    // - Self-mirrored with equal distances at both ends: reciprocal (the value does not change when Tx and Rx swap);
+    //   otherwise (block 14 with different cluster angle spreads) not reciprocal
+    struct qd_gbsm_dual
+    {
+        arma::uword owner;  // Generator whose phases and Rx table define the field
+        bool swapped;       // true: evaluated with R and T exchanged (partner of the owner)
+        double scale;       // spatial_freq_scale_b of sos_val: Rx-side over Tx-side decorrelation distance of the owner
+        bool reciprocal;    // reciprocal mode of sos_val
+    };
+
+    qd_gbsm_dual qd_gbsm_dual_of(const std::vector<qd_gbsm_gen> &gen, arma::uword g)
+    {
+        qd_gbsm_dual d;
+        const arma::uword m = gen[g].mirror;
+        d.owner = (m < g) ? m : g;
+        d.swapped = d.owner != g;
+        const qd_gbsm_gen &o = gen[d.owner];
+        d.scale = o.lambda / o.lambda_tx;
+        d.reciprocal = o.mirror == d.owner && d.scale == 1.0;
+        return d;
+    }
+
     // Normalized values of a phase set at a set of links
-    // - gen, freq, acf, dist, tab: generator table (qd_gbsm_gen_lsf, _cluster or _ray) and frequency tables
-    //   (qd_gbsm_freq)
+    // - gen, freq, tab: generator table (qd_gbsm_gen_lsf, _cluster or _ray) and frequency tables (qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
     // - floor_id: [n_link] or empty (all on floor 0)
     // - val [n_link, n_gen]: column g Normal(0,1), or Uniform(0,1) (map 0.5·erfc(-x/sqrt(2))) if gen[g].uniform
-    // - Rx side of generator g: field of g at R (phases slice0.col(g), table tab[g]); Tx side (dual mobility): field
-    //   of the mirror generator m(g) at T (phases slice1.col(g) = slice0.col(m(g)), table tab[m(g)])
-    // - Dual mobility: self-mirrored generators (a + b) / sqrt(2 + 2·A_g(D)), pairs (a + b) / sqrt(2), with the
-    //   Tx-Rx distance D and the ACF A_g of the table of g
-    // - Floors: the phase offsets of the link's floor are added to all phases of both slices, so in dual mobility
-    //   both devices of a link are evaluated on the link's floor
-    // - One sos_val call per floor, frequency table and side, with all phase columns that use the table
+    // - Single mobility: field of g at R (phases slice0.col(g), table tab[g])
+    // - Dual mobility (qd_gbsm_dual_of): the phases of the owner are slice0.col(g) for the owner, slice1.col(g) for its
+    //   partner
+    // - Floors: the phase offsets of the link's floor are added to all phases, so in dual mobility both devices of a
+    //   link are evaluated on the link's floor
+    // - One sos_val call per floor and group of columns with the same table and mode
     void qd_gbsm_eval(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
-                      const std::vector<arma::vec> &acf, const std::vector<arma::vec> &dist,
                       const std::vector<arma::uword> &tab, const arma::cube &phase,
                       const arma::mat &R, const arma::mat &T, const arma::u32_vec &floor_id,
                       bool dual_mobility, arma::mat &val)
     {
         const arma::uword n_link = R.n_rows, n_gen = (arma::uword)gen.size(), n_coeff = phase.n_rows;
-        const arma::uword n_tab = (arma::uword)freq.size();
 
-        // Fields of the Rx side (written to 'val') and of the Tx side ('b'), all evaluated as Normal
         val.set_size(n_link, n_gen);
-        arma::mat b;
-        if (dual_mobility)
-            b.set_size(n_link, n_gen);
+
+        // Column groups: same table, scale, orientation and mode; single mobility: same table
+        std::vector<qd_gbsm_dual> mode(n_gen);
+        std::vector<arma::uword> group_of(n_gen);
+        std::vector<arma::uword> group_first; // first column of each group
+        for (arma::uword g = 0; g < n_gen; ++g)
+        {
+            if (dual_mobility)
+                mode[g] = qd_gbsm_dual_of(gen, g);
+            else
+                mode[g].owner = g, mode[g].swapped = false, mode[g].scale = 1.0, mode[g].reciprocal = true;
+            arma::uword k = 0;
+            for (; k < (arma::uword)group_first.size(); ++k)
+            {
+                const qd_gbsm_dual &a = mode[group_first[k]], &b = mode[g];
+                if (tab[a.owner] == tab[b.owner] && a.scale == b.scale && a.swapped == b.swapped && a.reciprocal == b.reciprocal)
+                    break;
+            }
+            if (k == (arma::uword)group_first.size())
+                group_first.push_back(g);
+            group_of[g] = k;
+        }
 
         // Links grouped by floor ID (ordered map: the groups are processed in increasing order of the ID)
         std::map<arma::uword, std::vector<arma::uword>> floors;
@@ -268,75 +315,48 @@ namespace
                     TL = T.rows(L);
             }
             const arma::uword n_fl = one_group ? n_link : L.n_elem;
+            const arma::mat &Rf = one_group ? R : RL, &Tf = one_group ? T : TL;
 
             arma::vec offset;
             if (fl.first != 0)
                 offset = floor_offset(fl.first);
 
-            for (int side = 0; side < (dual_mobility ? 2 : 1); ++side)
-                for (arma::uword t = 0; t < n_tab; ++t)
-                {
-                    // Columns whose field on this side uses table t
-                    std::vector<arma::uword> cols;
-                    for (arma::uword g = 0; g < n_gen; ++g)
-                        if ((side == 0 ? tab[g] : tab[gen[g].mirror]) == t)
-                            cols.push_back(g);
-                    if (cols.empty())
-                        continue;
-
-                    arma::mat ph(n_coeff, cols.size());
-                    for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
-                    {
-                        ph.col(i) = phase.slice((arma::uword)side).col(cols[i]);
-                        if (fl.first != 0)
-                            ph.col(i) += offset;
-                    }
-
-                    const arma::mat &pos = one_group ? (side == 0 ? R : T) : (side == 0 ? RL : TL);
-                    arma::mat v;
-                    quadriga_lib::sos_val<double>(freq[t], ph, pos, v, {}, {}, {}, {}, 1.0, false, 0);
-
-                    arma::mat &out = (side == 0) ? val : b;
-                    for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
-                    {
-                        const double *pv = v.colptr(i);
-                        double *po = out.colptr(cols[i]);
-                        for (arma::uword j = 0; j < n_fl; ++j)
-                            po[one_group ? j : L.at(j)] = pv[j];
-                    }
-                }
-        }
-
-        // Combination of the two devices
-        // - Each side is evaluated with the table of its own field (instead of the two-device modes of sos_val), so
-        //   swapping Tx and Rx repeats the same sos_val calls in swapped roles: swap reciprocity holds bit for bit,
-        //   also for unequal decorrelation distances and with bias-removed phases
-        // - The pairs need no further coupling: (f_g(R) + f_m(T))/sqrt(2) and (f_m(R) + f_g(T))/sqrt(2) already have
-        //   the correlation (A_g(D) + A_m(D))/2. QuaDRiGa's gen_lsf_parameters multiplied the pair once more by
-        //   sqrtm([1, A_g; A_m, 1]), which raises the variances above 1 (up to 2 at small D); that coupling is not
-        //   taken, so that columns 3 to 6 stay Normal(0,1)
-        const double rsqrt2 = std::sqrt(0.5);
-        if (dual_mobility)
-            for (arma::uword g = 0; g < n_gen; ++g)
+            for (arma::uword k = 0; k < (arma::uword)group_first.size(); ++k)
             {
-                const double *pb = b.colptr(g);
-                double *pv = val.colptr(g);
-                if (gen[g].mirror != g)
-                    for (arma::uword l = 0; l < n_link; ++l)
-                        pv[l] = (pv[l] + pb[l]) * rsqrt2;
-                else
+                std::vector<arma::uword> cols;
+                for (arma::uword g = 0; g < n_gen; ++g)
+                    if (group_of[g] == k)
+                        cols.push_back(g);
+                const qd_gbsm_dual &md = mode[group_first[k]];
+
+                arma::mat ph(n_coeff, cols.size());
+                for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
                 {
-                    const arma::vec &A = acf[tab[g]], &D = dist[tab[g]];
-                    for (arma::uword l = 0; l < n_link; ++l)
-                    {
-                        const double dx = R.at(l, 0) - T.at(l, 0), dy = R.at(l, 1) - T.at(l, 1), dz = R.at(l, 2) - T.at(l, 2);
-                        const double c = qd_interp_linear(A.memptr(), D.memptr(), A.n_elem, std::sqrt(dx * dx + dy * dy + dz * dz));
-                        pv[l] = (pv[l] + pb[l]) / std::sqrt(2.0 + 2.0 * c);
-                    }
+                    ph.col(i) = phase.slice(md.swapped ? 1 : 0).col(cols[i]);
+                    if (fl.first != 0)
+                        ph.col(i) += offset;
+                }
+
+                arma::mat v;
+                if (!dual_mobility)
+                    quadriga_lib::sos_val<double>(freq[tab[md.owner]], ph, Rf, v, {}, 1.0, true, false, 0);
+                else if (md.swapped)
+                    quadriga_lib::sos_val<double>(freq[tab[md.owner]], ph, Tf, v, Rf, md.scale, md.reciprocal, false, 0);
+                else
+                    quadriga_lib::sos_val<double>(freq[tab[md.owner]], ph, Rf, v, Tf, md.scale, md.reciprocal, false, 0);
+
+                for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
+                {
+                    const double *pv = v.colptr(i);
+                    double *po = val.colptr(cols[i]);
+                    for (arma::uword j = 0; j < n_fl; ++j)
+                        po[one_group ? j : L.at(j)] = pv[j];
                 }
             }
+        }
 
         // Uniform generators
+        const double rsqrt2 = std::sqrt(0.5);
         for (arma::uword g = 0; g < n_gen; ++g)
             if (gen[g].uniform)
             {
@@ -347,25 +367,45 @@ namespace
     }
 
     // Bias removal of the generators with gen[g].bias (Normal fields), in place
-    // - P0 [n_coeff, n_gen]: Rx-side phases; U [n_pos, 3], n_pos > 2: all positions where the fields are evaluated
-    // - One sos_remove_bias call per frequency table with all corrected columns that use it; the offset is computed
-    //   per column, so the result equals one call per generator
+    // - P0 [n_coeff, n_gen]: Rx-side phases; R, T [n_pos, 3], n_pos > 2: the links where the fields are evaluated
+    // - Single mobility: each field over R. Dual mobility: each owner (qd_gbsm_dual_of) over the links with its
+    //   two-device mode, so that its link mean is zero; its partner, the same field with Tx and Rx exchanged, is not
+    //   corrected
+    // - One sos_remove_bias call per group of columns with the same table and mode; the offset is computed per column,
+    //   so the result equals one call per generator
     void qd_gbsm_remove_bias(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
-                             const std::vector<arma::uword> &tab, arma::mat &P0, const arma::mat &U)
+                             const std::vector<arma::uword> &tab, arma::mat &P0, const arma::mat &R,
+                             const arma::mat &T, bool dual_mobility)
     {
-        for (arma::uword t = 0; t < (arma::uword)freq.size(); ++t)
+        const arma::uword n_gen = (arma::uword)gen.size();
+        std::vector<bool> done(n_gen, false);
+        for (arma::uword g0 = 0; g0 < n_gen; ++g0)
         {
-            std::vector<arma::uword> cols;
-            for (arma::uword g = 0; g < (arma::uword)gen.size(); ++g)
-                if (gen[g].bias && tab[g] == t)
-                    cols.push_back(g);
-            if (cols.empty())
+            const qd_gbsm_dual m0 = qd_gbsm_dual_of(gen, g0);
+            if (!gen[g0].bias || done[g0] || (dual_mobility && m0.swapped))
                 continue;
+
+            std::vector<arma::uword> cols;
+            for (arma::uword g = g0; g < n_gen; ++g)
+            {
+                if (!gen[g].bias || done[g] || tab[g] != tab[g0])
+                    continue;
+                if (dual_mobility)
+                {
+                    const qd_gbsm_dual m = qd_gbsm_dual_of(gen, g);
+                    if (m.swapped || m.scale != m0.scale || m.reciprocal != m0.reciprocal)
+                        continue;
+                }
+                cols.push_back(g), done[g] = true;
+            }
 
             arma::mat ph(P0.n_rows, cols.size());
             for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
                 ph.col(i) = P0.col(cols[i]);
-            quadriga_lib::sos_remove_bias<double>(freq[t], ph, U);
+            if (dual_mobility)
+                quadriga_lib::sos_remove_bias<double>(freq[tab[g0]], ph, R, T, m0.scale, m0.reciprocal);
+            else
+                quadriga_lib::sos_remove_bias<double>(freq[tab[g0]], ph, R);
             for (arma::uword i = 0; i < (arma::uword)cols.size(); ++i)
                 P0.col(cols[i]) = ph.col(i);
         }
@@ -386,8 +426,9 @@ SOS phases of one random set of a BS site and scenario
   again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
   `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
-- `"lsf"` bias removal (`remove_bias`): [[sos_remove_bias]] sets the sample mean of columns 0 to 8 over the positions
-  (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
+- `"lsf"` bias removal (`remove_bias`): [[sos_remove_bias]] sets the sample mean of columns 0 to 8 over the links
+  (in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop; in dual mobility columns 4 (ASA)
+  and 6 (ESA), the ASD and ESD fields with Tx and Rx exchanged, are not corrected
 - `NumClusters = 1`: all sets but `"lsf"` are empty
 - TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 
@@ -468,7 +509,7 @@ arma::cube quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, 
     // The decorrelation distances of the "ray" generators are not used here (no bias removal)
     const bool ray = set_type == "ray";
     const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp)
-                                             : (ray ? qd_gbsm_gen_ray(sp, 0.1) : qd_gbsm_gen_cluster(sp, set_id));
+                                             : (ray ? qd_gbsm_gen_ray(sp, 0.1, 0.1) : qd_gbsm_gen_cluster(sp, set_id));
     const arma::uword n_gen = qd_gbsm_n_gen(sp, set_type, set_id);
     arma::cube phase(n_coeff, n_gen, 2, arma::fill::none);
     if (n_gen == 0) // N = 0: empty "cluster" or "ray" set, sos_init_phases rejects zero generators
@@ -494,27 +535,25 @@ arma::cube quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, 
     // Raw phases of the Rx side
     arma::mat P0 = quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, lsf ? seed : derive_seed(seed, set_id));
 
-    // "lsf" bias removal over all positions where the fields are evaluated, before the mirroring
-    // - Each Normal field is corrected once, with its own frequencies, over the union of the positions where it is
-    //   evaluated; the Tx side is then copied from the corrected phases. QuaDRiGa's init_sos corrected before the
-    //   mirroring, so the ASD/ASA and ESD/ESA phases carried a correction computed with the partner's frequencies,
-    //   which left a non-zero drop mean whenever the two decorrelation distances differ (also in single mobility)
+    // "lsf" bias removal over the links where the fields are evaluated, before the mirroring
+    // - Each Normal field is corrected once, with its own frequencies; the Tx side is then copied from the corrected
+    //   phases. QuaDRiGa's init_sos corrected before the mirroring, so the ASD/ASA and ESD/ESA phases carried a
+    //   correction computed with the partner's frequencies, which left a non-zero drop mean whenever the two
+    //   decorrelation distances differ (also in single mobility)
     // - Consequences for gbsm_draw at the same positions: in single mobility the link mean of columns 0 to 8 is 0; in
-    //   dual mobility the link mean of DS, KF, SF, XPR and TOA is 0 when all links have the same Tx-Rx distance (the
-    //   normalization is then the same for all links), while ASD/ASA and ESD/ESA have a zero link mean only
-    //   approximately (their two devices see different fields, each corrected over the union of the positions)
+    //   dual mobility the link mean of DS, KF, SF, ASD, ESD, XPR and TOA is 0, while ASA and ESA (the ASD and ESD
+    //   fields with Tx and Rx exchanged) are not corrected: one phase offset cannot zero both means
     // - 2D mode: one offset per generator cannot zero the means of several floor fields at once, so all positions
     //   are corrected as floor 0; in 3D mode the correction covers all positions as one 3D field
     if (do_bias)
     {
         std::vector<arma::mat> freq;
-        std::vector<arma::vec> acf, dist;
         std::vector<arma::uword> tab;
-        qd_gbsm_freq(preset, gen, freq, acf, dist, tab);
+        qd_gbsm_freq(preset, gen, freq, tab);
 
         arma::mat R, T;
         qd_gbsm_positions(rx, !tx_pos.empty() ? tx : rx, horizontal, R, T);
-        qd_gbsm_remove_bias(gen, freq, tab, P0, dual_mobility ? arma::mat(arma::join_cols(R, T)) : R);
+        qd_gbsm_remove_bias(gen, freq, tab, P0, R, T, dual_mobility);
     }
 
     // Output: slice 0 = Rx side, slice 1 = mirror of the Rx side
@@ -532,15 +571,20 @@ Spatially correlated normalized random values of one random set at a set of link
 
 - Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a
   link depends neither on the other links nor on the other columns; with `dual_mobility = false` not on `tx_pos`
-- `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
-  generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
+- `dual_mobility = true`: Tx and Rx both move; each column is the two-device generator of [[sos_val]] with the
+  decorrelation distance of the column at the Rx and that of its mirror generator at the Tx (e.g. departure and
+  arrival quantities exchange). While one end stays, a column changes as in single mobility; when one end moves far,
+  the link decorrelates. Swapping Tx and Rx exchanges the mirror columns; a self-mirrored column keeps its value,
+  except block 14 of the shared `"ray"` set when `PerClusterAS_D` and `PerClusterAS_A` differ. Every column keeps
+  its distribution
 - 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
   field, fields of different floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3):
   exactly for IDs in the same group of `n_coeff` consecutive IDs (0 to `n_coeff - 1`, ...), otherwise up to a random
   residual of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
 - 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
   their height difference. The per-link statistics are the same in both modes
-- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
+- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation, the self-mirrored columns in dual
+  mobility within about 1.7 times that
 - An empty set (`NumClusters = 1`) accepts any empty `phase`
 
 Random sets, with `N = NumClusters - 1` and `M = NumSubPaths`; a set never changes size (new random quantities come in
@@ -551,7 +595,7 @@ new sets), and a decorrelation distance of 0 is used as 0.1 m:
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 10) |
 | `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [[ssf_clusters]] `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd_freq`, slice `k` |
-| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km; at the Tx in dual mobility `PerClusterAS_D` in place of `PerClusterAS_A` | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
 
 A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
 ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
@@ -576,8 +620,8 @@ void quadriga_lib::gbsm_draw(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*` and
-  `PerClusterAS_A`
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*`,
+  `PerClusterAS_A` and `PerClusterAS_D`
 - **`set_type`** — Set type of [[gbsm_init_phases]]
 - **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[3, 1]` or `[3, n_link]`
@@ -662,31 +706,35 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     // - lambda_tau = 1.6·c·cDS/cASA, limited to 0.1 m ... 10 km; cDS the mean cluster delay spread over the
     //   frequencies, cASA the cluster ASA in rad; cDS = 0 gives 0.1 m, cASA = 0 < cDS gives 10 km
     // - Block 14 of the per-frequency sets uses SC_lambda (0 -> 0.1 m), as all other "ray" generators
-    double lambda_14 = sp.at("SC_lambda") > 0.0 ? sp.at("SC_lambda") : 0.1;
+    // - Dual mobility: the Tx side uses the cluster ASD in place of the ASA (the rays at the Tx have the departure spread)
+    double lambda_14 = sp.at("SC_lambda") > 0.0 ? sp.at("SC_lambda") : 0.1, lambda_14_tx = lambda_14;
     if (shared_ray)
     {
         double cds = 0.0;
         for (arma::uword k = 0; k < center_freq.n_elem; ++k)
             cds += qd_gbsm_cds(sp, center_freq.at(k));
         cds /= (double)center_freq.n_elem;
-        const double casa = sp.at("PerClusterAS_A") * 0.017453292519943295;
-        if (cds <= 0.0)
-            lambda_14 = 0.1;
-        else
-            lambda_14 = (casa > 0.0) ? std::min(std::max(1.6 * qd_speed_of_light * cds / casa, 0.1), 1.0e4) : 1.0e4;
+        auto lambda_tau = [cds](double cas_deg)
+        {
+            const double cas = cas_deg * 0.017453292519943295;
+            if (cds <= 0.0)
+                return 0.1;
+            return (cas > 0.0) ? std::min(std::max(1.6 * qd_speed_of_light * cds / cas, 0.1), 1.0e4) : 1.0e4;
+        };
+        lambda_14 = lambda_tau(sp.at("PerClusterAS_A"));
+        lambda_14_tx = lambda_tau(sp.at("PerClusterAS_D"));
     }
 
     const bool ray = set_type == "ray";
     const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp)
-                                             : (ray ? qd_gbsm_gen_ray(sp, lambda_14) : qd_gbsm_gen_cluster(sp, set_id));
+                                             : (ray ? qd_gbsm_gen_ray(sp, lambda_14, lambda_14_tx) : qd_gbsm_gen_cluster(sp, set_id));
 
     std::vector<arma::mat> freq;
-    std::vector<arma::vec> acf, dist;
     std::vector<arma::uword> tab;
-    qd_gbsm_freq(preset, gen, freq, acf, dist, tab);
+    qd_gbsm_freq(preset, gen, freq, tab);
 
     arma::mat R, T;
     qd_gbsm_positions(rx, tx, horizontal, R, T);
 
-    qd_gbsm_eval(gen, freq, acf, dist, tab, phase, R, T, floor_id, dual_mobility, rnd);
+    qd_gbsm_eval(gen, freq, tab, phase, R, T, floor_id, dual_mobility, rnd);
 }

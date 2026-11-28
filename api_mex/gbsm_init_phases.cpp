@@ -20,8 +20,9 @@ SOS phases of one random set of a BS site and scenario
   again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `'lsf'`
   sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
-- `'lsf'` bias removal (`remove_bias`): [[sos_remove_bias]] sets the sample mean of columns 1 to 9 over the positions
-  (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
+- `'lsf'` bias removal (`remove_bias`): [[sos_remove_bias]] sets the sample mean of columns 1 to 9 over the links
+  (in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop; in dual mobility columns 5 (ASA)
+  and 7 (ESA), the ASD and ESD fields with Tx and Rx exchanged, are not corrected
 - `NumClusters = 1`: all sets but `'lsf'` are empty
 - TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 

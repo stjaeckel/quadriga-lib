@@ -212,9 +212,7 @@ of the desired ACF over all position pairs of the cube (`v = 0.063`).
   0.19 to 0.40 in the paper). The exact field has a standard deviation of 0.075 at 11 m over 40
   realisations, the preset 0.056, so the spread is a property of the field. The tables of the paper put
   part of the slow variation into sinusoids of almost zero frequency, which the Pearson coefficient removes.
-- The 6-D estimate with two maps follows the paper's equation (19). The library also offers one map for
-  both devices, normalised with the ACF of their distance; it is shown as the dotted curve and lies
-  slightly higher.
+- The 6-D estimate with two maps follows the paper's equation (19), computed from two one-device fields. The last column and the dotted curve are the library's two-device mode; the values shown are those of its former same-map mode (one field per device, normalised with the ACF of their distance). The library now evaluates one field over both devices, whose correlation is the product of the per-device ACFs (GitHub issue #21); a new run of the script gives its values.
 
 ## Fig. 5: CDF of the output values
 
@@ -334,7 +332,7 @@ generator on one thread, 36 ns on 16 threads, and 3.9 ns per value for 400 gener
 | Stop criterion | no further improvement | additionally a gain below a factor of 1e-6 per pass, and at most 1000 passes |
 | Precision | single | double; the AVX2 evaluation kernel uses single-precision sine and cosine after a range reduction in double |
 | Table sizes | 150, 300, 500, 1000 | 128, 256, 512, 1024 |
-| Two devices (19) | two independent processes, divided by sqrt(2) | the same as "two maps"; in addition "same map": one process for both devices, divided by `sqrt(2 + 2·R(D))`, symmetric under a swap of the devices |
+| Two devices (19) | two independent processes, divided by sqrt(2) | one process over both positions (a 6-D sum of sinusoids with permuted preset frequencies), with a correlation of about the product of the per-device ACFs; reciprocal (symmetric under a swap of the devices) or not; equation (19) is computed in the scripts from two one-device fields |
 | Uniform distribution | `0.5·erfc(-k/sqrt(2))` | the same |
 | Sample mean over an area | not discussed | `sos_remove_bias` removes it in closed form; documented as conditioning the field |
 | Random numbers | MATLAB `rand` | seeded stream, identical on all platforms |

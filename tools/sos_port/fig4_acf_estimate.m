@@ -14,14 +14,14 @@ E3 = zeros(n_bin, n_rep); E6s = E3; E6t = E3; P3 = E3; P6t = E3; V = zeros(1, n_
 for r = 1:n_rep
     phase = quadriga_lib.sos_init_phases(256, 2, 100 + r);
 
-    % One device, and two devices on the same map: library function
-    [E3(:, r), ~, E6s(:, r)] = quadriga_lib.sos_acf_estimate(freq, phase(:, 1), bins, n_pos, acf, dist, r);
+    % One device, and two devices as the library evaluates them (one field over both positions)
+    [E3(:, r), ~, E6s(:, r)] = quadriga_lib.sos_acf_estimate(freq, phase(:, 1), bins, n_pos, r);
 
     % Two devices on two maps, equation (19) of the paper. The positions are those of sos_acf_estimate:
     % its documented stream is the one of sos_init_phases, with (2u - 1) = phase / pi.
     pos = reshape(quadriga_lib.sos_init_phases(6 * n_pos, 1, r) / pi, [], 3) * 0.4 * bins(end);
     pt = pos(1:n_pos, :); pr = pos(n_pos+1:end, :);
-    v = quadriga_lib.sos_val(freq, phase(:, 1), pt, pr, phase(:, 2));
+    v = (quadriga_lib.sos_val(freq, phase(:, 1), pt) + quadriga_lib.sos_val(freq, phase(:, 2), pr)) / sqrt(2);
     dt = sqrt(max(sum(pt.^2, 2) + sum(pt.^2, 2).' - 2 * (pt * pt.'), 0));
     dr = sqrt(max(sum(pr.^2, 2) + sum(pr.^2, 2).' - 2 * (pr * pr.'), 0));
     up = triu(true(n_pos), 1);
@@ -46,7 +46,7 @@ end
 
 target = sos_port_acf('Comb', bins, 10);
 fid = fopen(fullfile(res_dir, 'fig4_acf_estimate.csv'), 'w');
-fprintf(fid, 'bin_center_m,target,est3d_mean,est3d_min,est3d_max,expected3d_finite_cube,est6d_two_maps_mean,est6d_two_maps_min,est6d_two_maps_max,expected6d_two_maps,est6d_same_map_mean,est6d_same_map_min,est6d_same_map_max\n');
+fprintf(fid, 'bin_center_m,target,est3d_mean,est3d_min,est3d_max,expected3d_finite_cube,est6d_two_maps_mean,est6d_two_maps_min,est6d_two_maps_max,expected6d_two_maps,est6d_library_mean,est6d_library_min,est6d_library_max\n');
 for b = 1:n_bin
     fprintf(fid, '%g,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n', bins(b), target(b), mean(E3(b, :)), min(E3(b, :)), max(E3(b, :)), ...
         mean(P3(b, :)), mean(E6t(b, :), 'omitnan'), min(E6t(b, :)), max(E6t(b, :)), mean(P6t(b, :), 'omitnan'), mean(E6s(b, :), 'omitnan'), min(E6s(b, :)), max(E6s(b, :)));
@@ -69,5 +69,5 @@ errorbar(bins, m6, m6 - min(E6t, [], 2), max(E6t, [], 2) - m6, 'rs-');
 plot(bins, mean(P6t, 2, 'omitnan'), 'g-', 'LineWidth', 1.5);
 plot(bins, mean(E6s, 2, 'omitnan'), 'm.:', 'LineWidth', 1.2); hold off; grid on; xlim([0 70]); ylim([-0.3 1.05]);
 xlabel('Distance d [m]'); ylabel('Pearson corr. coeff.');
-legend('Desired ACF', '6-D approx., two maps (19), mean and range of 10', 'Expected for two maps, cube mean removed', '6-D, same map (library)');
+legend('Desired ACF', '6-D approx., two maps (19), mean and range of 10', 'Expected for two maps, cube mean removed', '6-D, library (one field over both devices)');
 print(f, fullfile(res_dir, 'fig4_acf_estimate.png'), '-dpng', '-r100'); close(f);

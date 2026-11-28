@@ -10,7 +10,8 @@
 //
 // Pins down: the value of the sum of sinusoids, the batching over phase columns, the two kernels and
 // their agreement far from the origin, the independence of a value from the rest of the call, the
-// three device modes, the Uniform mapping, sizes, float and double, input validation.
+// two-device generator (reciprocal and not; swap symmetry, unit variance, decorrelation when one device
+// moves away), the Uniform mapping, sizes, float and double, input validation.
 // It leaves to other suites: the frequency tables and how well they reproduce a target ACF
 // (test_sos_preset), the phase stream (test_sos_init_phases).
 //
@@ -40,6 +41,7 @@
 #endif
 
 #include "qd_test_diag.hpp"
+#include "qd_test_sos_oracle.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_SOS")
 
 namespace
@@ -70,15 +72,12 @@ namespace
         return std::sqrt(2.0 / (double)spatial_freq.n_rows) * acc;
     }
 
-    // Oracle: linear interpolation of the ACF table, last value beyond the last sample point
-    double ref_acf(const arma::vec &acf, const arma::vec &dist, double d)
+    // Oracle: s(a, b) of qd_test_sos_oracle.hpp at row q of pa and pb, generator g (3-column inputs)
+    double ref_s2(const arma::mat &spatial_freq, const arma::mat &phase, arma::uword g, const arma::mat &pa, const arma::mat &pb,
+                  arma::uword q, const std::vector<arma::uword> &p, double scale)
     {
-        if (d >= dist(dist.n_elem - 1))
-            return acf(acf.n_elem - 1);
-        arma::uword i = 0;
-        while (dist(i + 1) <= d)
-            ++i;
-        return acf(i) + (d - dist(i)) / (dist(i + 1) - dist(i)) * (acf(i + 1) - acf(i));
+        const double a[3] = {pa(q, 0), pa(q, 1), pa(q, 2)}, b[3] = {pb(q, 0), pb(q, 1), pb(q, 2)};
+        return qd_ref_sos2(spatial_freq, phase.colptr(g), a, b, p, scale);
     }
 
     // Worst-case deviation of the AVX2 kernel from double precision, see the header comment
@@ -108,8 +107,7 @@ TEST_CASE("sos_val - a single sinusoid on the axis gives the hand-computed value
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat val;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {},
-                              {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, kernel);
         REQUIRE(val.n_rows == 5);
         REQUIRE(val.n_cols == 2);
 
@@ -131,8 +129,7 @@ TEST_CASE("sos_val - values match the brute-force sum for several generators")
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat val;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {},
-                              {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, kernel);
         REQUIRE(val.n_rows == 11);
         REQUIRE(val.n_cols == 6);
 
@@ -166,8 +163,7 @@ TEST_CASE("sos_val - a shift by one wavelength leaves a single sinusoid unchange
     pos.row(3) = pos.row(0) + 0.5 * spatial_freq / f2;  // Half a wavelength: sign flip
 
     arma::mat val;
-    quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {},
-                          {}, {}, 1.0, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, 1);
     REQUIRE(val.n_rows == 4);
     CHECK(std::abs(val(0, 0)) > 0.1);
     CHECK(std::abs(val(1, 0) - val(0, 0)) < 1e-12);
@@ -182,15 +178,13 @@ TEST_CASE("sos_val - a column of a batched call equals the call with that phase 
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat all;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, all, {}, {},
-                              {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, all, {}, 1.0, true, false, kernel);
         REQUIRE(all.n_cols == 9);
         CHECK(arma::abs(all).max() > 0.5);
         for (arma::uword g = 0; g < 9; ++g)
         {
             arma::mat one, ph = phase.col(g);
-            quadriga_lib::sos_val(spatial_freq, ph, pos, one, {}, {},
-                                  {}, {}, 1.0, false, kernel);
+            quadriga_lib::sos_val(spatial_freq, ph, pos, one, {}, 1.0, true, false, kernel);
             INFO("kernel " << kernel << ", generator " << g);
             const double tol = kernel == 1 ? 0.0 : 5e-7 * arma::abs(all).max(); // GENERIC: bit-identical
             CHECK(arma::approx_equal(one, all.col(g), "absdiff", tol));
@@ -208,8 +202,7 @@ TEST_CASE("sos_val - the value at a position does not depend on the other positi
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat ref;
-        quadriga_lib::sos_val(spatial_freq, phase, probe, ref, {}, {},
-                              {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, probe, ref, {}, 1.0, true, false, kernel);
         REQUIRE(ref.n_cols == 5);
         CHECK(arma::abs(ref).max() > 0.1);
 
@@ -219,8 +212,7 @@ TEST_CASE("sos_val - the value at a position does not depend on the other positi
             {
                 arma::mat pos = rnd(n_pos, 3, -200.0, 200.0, 100 + (unsigned)(n_pos * 31 + slot)), val;
                 pos.row(slot) = probe;
-                quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {},
-                                      {}, {}, 1.0, false, kernel);
+                quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, kernel);
                 ++n_checked;
                 if (val.n_rows == n_pos && arma::approx_equal(val.row(slot), ref, "absdiff", 0.0))
                     ++n_equal;
@@ -248,10 +240,8 @@ TEST_CASE("sos_val - the AVX2 kernel agrees with GENERIC at any distance from th
     for (arma::uword i = 0; i < offset.n_elem; ++i)
     {
         arma::mat pos = rnd(64, 3, -5.0, 5.0, 11 + (unsigned)i) + offset(i), a, b;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, {},
-                              {}, {}, 1.0, false, 1);
-        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, {},
-                              {}, {}, 1.0, false, 2);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, 1.0, true, false, 1);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, 1.0, true, false, 2);
         REQUIRE(a.n_elem == 256);
         REQUIRE(b.n_elem == 256);
         double mx = arma::abs(a - b).max(), rms = 0.0;
@@ -282,10 +272,10 @@ TEST_CASE("sos_val - missing position columns count as zero")
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat v3, v2, v1, v1z;
-        quadriga_lib::sos_val(spatial_freq, phase, pos3, v3, {}, {}, {}, {}, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, pos2, v2, {}, {}, {}, {}, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, pos1, v1, {}, {}, {}, {}, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, pos1z, v1z, {}, {}, {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos3, v3, {}, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos2, v2, {}, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos1, v1, {}, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos1z, v1z, {}, 1.0, true, false, kernel);
         INFO("kernel " << kernel);
         REQUIRE(v2.n_rows == 9);
         CHECK(arma::abs(v3).max() > 0.5);
@@ -296,9 +286,9 @@ TEST_CASE("sos_val - missing position columns count as zero")
 
     // Frequencies with one and two columns
     arma::mat f1 = spatial_freq.col(0), f2 = spatial_freq.cols(0, 1), val;
-    quadriga_lib::sos_val(f1, phase, pos1, val, {}, {}, {}, {}, 1.0, false, 1);
+    quadriga_lib::sos_val(f1, phase, pos1, val, {}, 1.0, true, false, 1);
     CHECK(std::abs(val(3, 1) - ref_s(f1, phase, 1, pos1, 3)) < 1e-12);
-    quadriga_lib::sos_val(f2, phase, pos2, val, {}, {}, {}, {}, 1.0, false, 1);
+    quadriga_lib::sos_val(f2, phase, pos2, val, {}, 1.0, true, false, 1);
     CHECK(std::abs(val(3, 1) - ref_s(f2, phase, 1, pos2, 3)) < 1e-12);
 }
 
@@ -344,125 +334,131 @@ TEST_CASE("sos_val - over random phases the values have zero mean, unit variance
     }
 }
 
-TEST_CASE("sos_val - two devices on the same map follow the normalised sum and are symmetric")
+TEST_CASE("sos_val - two devices follow the sum over both positions with the permuted, scaled frequencies")
 {
-    arma::mat spatial_freq = rnd(20, 3, -0.2, 0.2, 17), phase = rnd(20, 3, -pi, pi, 18);
-    arma::mat pa = rnd(10, 3, -30.0, 30.0, 19), pb = rnd(10, 3, -30.0, 30.0, 20);
-    pb.row(0) = pa.row(0);                               // Devices at the same place
-    pb.row(1) = pa.row(1) + arma::rowvec({0.3, 0.0, 0.0}); // Close together
-    pb.row(2) = pa.row(2) + arma::rowvec({500.0, 0.0, 0.0}); // Beyond the ACF table
-    arma::vec acf = {1.0, 0.6, 0.3, 0.1}, dist = {0.0, 2.0, 5.0, 20.0};
-
-    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
-    {
-        arma::mat val, swp, single;
-        quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, {}, acf, dist, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, pb, swp, pa, {}, acf, dist, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, pa, single, {}, {}, {}, {}, 1.0, false, kernel);
-        REQUIRE(val.n_rows == 10);
-        REQUIRE(val.n_cols == 3);
-
-        double tol = kernel == 1 ? 1e-12 : tol_avx2(20);
-        double max_err = 0.0;
-        QD_DIAG("\n# diag: sos_val two devices, same map, kernel %d\n", kernel);
-        QD_DIAG("pos,D,A,val,ref,diff\n");
-        for (arma::uword p = 0; p < 10; ++p)
-            for (arma::uword g = 0; g < 3; ++g)
-            {
-                double D = arma::norm(pa.row(p) - pb.row(p)), A = ref_acf(acf, dist, D);
-                double ref = (ref_s(spatial_freq, phase, g, pa, p) + ref_s(spatial_freq, phase, g, pb, p)) / std::sqrt(2.0 + 2.0 * A);
-                if (g == 0 && p < 4)
-                    QD_DIAG("%llu,%.3f,%.4f,%.9f,%.9f,%.3e\n", (unsigned long long)p, D, A, val(p, g), ref, val(p, g) - ref);
-                max_err = std::max(max_err, std::abs(val(p, g) - ref));
-            }
-        INFO("kernel " << kernel);
-        CHECK(max_err < tol);
-        CHECK(arma::abs(val).max() > 0.3);
-
-        // Swapping the devices gives the same value: the sum is commutative and D is unchanged
-        CHECK(arma::approx_equal(val, swp, "absdiff", 1e-14));
-
-        // Devices at the same place: ( s + s ) / sqrt( 2 + 2·1 ) = s
-        CHECK(arma::approx_equal(val.row(0), single.row(0), "absdiff", 1e-14));
-    }
-}
-
-TEST_CASE("sos_val - two devices on the same map keep unit variance for small and large distances")
-{
-    // The variance of s(a) + s(b) over the phases is 2 + 2·R(a - b) with R the ACF of the sinusoids.
-    // The table handed to the function is that ACF sampled along the x-axis, and the devices are
-    // displaced along x, so the normalised value must have unit variance for every displacement.
-    const arma::uword n_coeff = 64, n_gen = 20000;
-    arma::mat spatial_freq = rnd(n_coeff, 3, -0.05, 0.05, 21), phase = rnd(n_coeff, n_gen, -pi, pi, 22);
-    arma::vec dist = arma::regspace(0.0, 0.5, 40.0), acf(dist.n_elem);
-    for (arma::uword i = 0; i < dist.n_elem; ++i)
-    {
-        double r = 0.0;
-        for (arma::uword n = 0; n < n_coeff; ++n)
-            r += std::cos(2.0 * pi * spatial_freq(n, 0) * dist(i)) / (double)n_coeff;
-        acf(i) = r;
-    }
-
-    arma::vec dx = {0.0, 0.5, 3.0, 10.0, 25.0, 40.0};
-    arma::mat pa(dx.n_elem, 3), pb;
-    for (arma::uword p = 0; p < dx.n_elem; ++p)
-        pa.row(p) = arma::rowvec({5.0 + 7.0 * (double)p, -3.0, 2.0});
-    pb = pa;
-    pb.col(0) += dx;
-
-    arma::mat val;
-    quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, {}, acf, dist);
-    REQUIRE(val.n_rows == dx.n_elem);
-    REQUIRE(val.n_cols == n_gen);
-
-    // Standard deviation of the sample variance: sqrt(2/n) = 0.01, limit 5 sigma
-    QD_DIAG("\n# diag: sos_val same map, variance over %llu phase sets\n", (unsigned long long)n_gen);
-    QD_DIAG("dx,acf,variance\n");
-    for (arma::uword p = 0; p < dx.n_elem; ++p)
-    {
-        double var = mean_prod(val, p, p);
-        QD_DIAG("%.1f,%.4f,%.5f\n", dx(p), acf(arma::uword(dx(p) / 0.5)), var);
-        INFO("displacement " << dx(p));
-        CHECK(std::abs(var - 1.0) < 5.0 * 0.01);
-    }
-}
-
-TEST_CASE("sos_val - two devices on different maps use the second phases, the frequency scale and 1/sqrt(2)")
-{
-    arma::mat spatial_freq = rnd(20, 3, -0.2, 0.2, 23), phase = rnd(20, 3, -pi, pi, 24), phase_b = rnd(20, 3, -pi, pi, 25);
+    arma::mat spatial_freq = rnd(20, 3, -0.2, 0.2, 23), phase = rnd(20, 3, -pi, pi, 24);
     arma::mat pa = rnd(10, 3, -30.0, 30.0, 26), pb = rnd(10, 3, -30.0, 30.0, 27);
-    arma::vec acf = {1.0, 0.6, 0.3, 0.1}, dist = {0.0, 2.0, 5.0, 20.0};
+    const std::vector<arma::uword> p = qd_perm(20);
 
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
         for (double scale : {1.0, 2.5})
         {
-            arma::mat val, with_acf;
-            quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, phase_b, {}, {}, scale, false, kernel);
-            quadriga_lib::sos_val(spatial_freq, phase, pa, with_acf, pb, phase_b, acf, dist, scale, false, kernel);
+            arma::mat val;
+            quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, scale, false, false, kernel);
             REQUIRE(val.n_rows == 10);
             REQUIRE(val.n_cols == 3);
 
             double max_err = 0.0;
-            for (arma::uword p = 0; p < 10; ++p)
+            for (arma::uword q = 0; q < 10; ++q)
                 for (arma::uword g = 0; g < 3; ++g)
-                {
-                    double ref = (ref_s(spatial_freq, phase, g, pa, p) + ref_s(spatial_freq, phase_b, g, pb, p, scale)) / std::sqrt(2.0);
-                    max_err = std::max(max_err, std::abs(val(p, g) - ref));
-                }
-            QD_DIAG("\n# diag: sos_val two maps, kernel %d, scale %.1f: max_abs_err %.3e\n", kernel, scale, max_err);
+                    max_err = std::max(max_err, std::abs(val(q, g) - ref_s2(spatial_freq, phase, g, pa, pb, q, p, scale)));
+            QD_DIAG("\n# diag: sos_val two devices, kernel %d, scale %.1f: max_abs_err %.3e\n", kernel, scale, max_err);
             INFO("kernel " << kernel << ", scale " << scale);
             CHECK(max_err < (kernel == 1 ? 1e-12 : tol_avx2(20)));
             CHECK(arma::abs(val).max() > 0.3);
-            CHECK(arma::approx_equal(val, with_acf, "absdiff", 0.0)); // The ACF table is not used
         }
 
-    // The scale changes the result, and the second device does not use the first phases
-    arma::mat v1, v2, v3;
-    quadriga_lib::sos_val(spatial_freq, phase, pa, v1, pb, phase_b, {}, {}, 1.0, false, 1);
-    quadriga_lib::sos_val(spatial_freq, phase, pa, v2, pb, phase_b, {}, {}, 2.5, false, 1);
-    quadriga_lib::sos_val(spatial_freq, phase, pa, v3, pb, phase, {}, {}, 1.0, false, 1);
+    // A fixed second device is the one-device generator with the phases phi_n + 2·pi·b·f_p(n)·y (exact limit of one
+    // device staying; GENERIC, rounding of the phase sum only)
+    {
+        const arma::rowvec y = {7.0, -3.0, 2.5};
+        const arma::mat pby = arma::repmat(y, 10, 1);
+        arma::mat ph_y = phase, v_two, v_one;
+        for (arma::uword n = 0; n < 20; ++n)
+            for (arma::uword g = 0; g < 3; ++g)
+                ph_y(n, g) += 2.0 * pi * 2.5 * arma::dot(spatial_freq.row(p[n]), y);
+        quadriga_lib::sos_val(spatial_freq, phase, pa, v_two, pby, 2.5, false, false, 1);
+        quadriga_lib::sos_val(spatial_freq, ph_y, pa, v_one, {}, 1.0, true, false, 1);
+        CHECK(arma::abs(v_two - v_one).max() < 1e-12);
+    }
+
+    // The second device at the origin gives the one-device value; the scale changes the result
+    arma::mat v0, single, v1, v2;
+    quadriga_lib::sos_val(spatial_freq, phase, pa, v0, arma::mat(10, 3, arma::fill::zeros), 1.0, false, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pa, single, {}, 1.0, true, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pa, v1, pb, 1.0, false, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pa, v2, pb, 2.5, false, false, 1);
+    CHECK(arma::approx_equal(v0, single, "absdiff", 1e-14));
     CHECK(arma::abs(v1 - v2).max() > 0.05);
-    CHECK(arma::abs(v1 - v3).max() > 0.05);
+}
+
+TEST_CASE("sos_val - reciprocal two devices follow the normalised sum and are symmetric")
+{
+    arma::mat spatial_freq = rnd(20, 3, -0.2, 0.2, 17), phase = rnd(20, 3, -pi, pi, 18);
+    arma::mat pa = rnd(10, 3, -30.0, 30.0, 19), pb = rnd(10, 3, -30.0, 30.0, 20);
+    pb.row(0) = pa.row(0);                                   // Devices at the same place
+    pb.row(1) = pa.row(1) + arma::rowvec({0.3, 0.0, 0.0});   // Close together
+    pb.row(2) = pa.row(2) + arma::rowvec({500.0, 0.0, 0.0}); // Far apart
+    const std::vector<arma::uword> p = qd_perm(20);
+
+    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
+    {
+        arma::mat val, swp, dflt;
+        quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pb, swp, pa, 1.0, true, false, kernel);
+        REQUIRE(val.n_rows == 10);
+        REQUIRE(val.n_cols == 3);
+
+        double tol = kernel == 1 ? 1e-12 : 2.0 * tol_avx2(20);
+        double max_err = 0.0;
+        QD_DIAG("\n# diag: sos_val reciprocal two devices, kernel %d\npos,c,val,ref,diff\n", kernel);
+        for (arma::uword q = 0; q < 10; ++q)
+        {
+            double c = 0.0;
+            for (arma::uword n = 0; n < 20; ++n)
+            {
+                double arg = 0.0;
+                for (arma::uword k = 0; k < 3; ++k)
+                    arg += (spatial_freq(n, k) - spatial_freq(p[n], k)) * (pa(q, k) - pb(q, k));
+                c += std::cos(2.0 * pi * arg) / 20.0;
+            }
+            for (arma::uword g = 0; g < 3; ++g)
+            {
+                double ref = (ref_s2(spatial_freq, phase, g, pa, pb, q, p, 1.0) + ref_s2(spatial_freq, phase, g, pb, pa, q, p, 1.0)) / std::sqrt(2.0 + 2.0 * c);
+                if (g == 0 && q < 4)
+                    QD_DIAG("%llu,%.4f,%.9f,%.9f,%.3e\n", (unsigned long long)q, c, val(q, g), ref, val(q, g) - ref);
+                max_err = std::max(max_err, std::abs(val(q, g) - ref));
+            }
+        }
+        INFO("kernel " << kernel);
+        CHECK(max_err < tol);
+        CHECK(arma::abs(val).max() > 0.3);
+
+        // Swapping the devices gives the same value bit for bit; reciprocal is the default
+        CHECK(arma::all(arma::vectorise(val == swp)));
+        quadriga_lib::sos_val(spatial_freq, phase, pa, dflt, pb, 1.0, true, false, kernel);
+        CHECK(arma::all(arma::vectorise(val == dflt)));
+    }
+}
+
+TEST_CASE("sos_val - reciprocal two devices keep unit variance for small and large distances")
+{
+    // The variance of s(a, b) + s(b, a) over the phases is 2 + 2·c with c the correlation of the two terms, which the
+    // function computes from the frequencies, so the normalised value must have unit variance for every displacement
+    const arma::uword n_coeff = 64, n_gen = 20000;
+    arma::mat spatial_freq = rnd(n_coeff, 3, -0.05, 0.05, 21), phase = rnd(n_coeff, n_gen, -pi, pi, 22);
+
+    arma::vec dx = {0.0, 0.5, 3.0, 10.0, 25.0, 40.0};
+    arma::mat pa(dx.n_elem, 3), pb;
+    for (arma::uword q = 0; q < dx.n_elem; ++q)
+        pa.row(q) = arma::rowvec({5.0 + 7.0 * (double)q, -3.0, 2.0});
+    pb = pa;
+    pb.col(0) += dx;
+
+    arma::mat val;
+    quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb);
+    REQUIRE(val.n_rows == dx.n_elem);
+    REQUIRE(val.n_cols == n_gen);
+
+    // Standard deviation of the sample variance: sqrt(2/n) = 0.01, limit 5 sigma
+    QD_DIAG("\n# diag: sos_val reciprocal two devices, variance over %llu phase sets\ndx,variance\n", (unsigned long long)n_gen);
+    for (arma::uword q = 0; q < dx.n_elem; ++q)
+    {
+        double var = mean_prod(val, q, q);
+        QD_DIAG("%.1f,%.5f\n", dx(q), var);
+        INFO("displacement " << dx(q));
+        CHECK(std::abs(var - 1.0) < 5.0 * 0.01);
+    }
 }
 
 TEST_CASE("sos_val - the Uniform output is the Normal output mapped through the Normal CDF")
@@ -472,8 +468,8 @@ TEST_CASE("sos_val - the Uniform output is the Normal output mapped through the 
     arma::mat pos = {{7.0, -4.0, 1.5}};
 
     arma::mat nrm, uni;
-    quadriga_lib::sos_val(spatial_freq, phase, pos, nrm, {}, {}, {}, {}, 1.0, false, 1);
-    quadriga_lib::sos_val(spatial_freq, phase, pos, uni, {}, {}, {}, {}, 1.0, true, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, nrm, {}, 1.0, true, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, uni, {}, 1.0, true, true, 1);
     REQUIRE(uni.n_cols == n_gen);
 
     double max_err = 0.0;
@@ -502,9 +498,9 @@ TEST_CASE("sos_val - the Uniform output is the Normal output mapped through the 
     }
 
     // The mapping is applied after the combination of two devices
-    arma::mat pb = {{9.0, -4.0, 1.5}}, ph2 = phase.cols(0, 4), ph2b = phase.cols(5, 9), n2, u2;
-    quadriga_lib::sos_val(spatial_freq, ph2, pos, n2, pb, ph2b, {}, {}, 1.0, false, 1);
-    quadriga_lib::sos_val(spatial_freq, ph2, pos, u2, pb, ph2b, {}, {}, 1.0, true, 1);
+    arma::mat pb = {{9.0, -4.0, 1.5}}, ph2 = phase.cols(0, 4), n2, u2;
+    quadriga_lib::sos_val(spatial_freq, ph2, pos, n2, pb, 1.0, true, false, 1);
+    quadriga_lib::sos_val(spatial_freq, ph2, pos, u2, pb, 1.0, true, true, 1);
     for (arma::uword g = 0; g < 5; ++g)
         CHECK(std::abs(u2(0, g) - 0.5 * std::erfc(-n2(0, g) / std::sqrt(2.0))) < 1e-14);
 }
@@ -513,7 +509,6 @@ TEST_CASE("sos_val - empty optional matrices mean omitted, outputs are sized and
 {
     arma::mat spatial_freq = rnd(10, 3, -0.3, 0.3, 30), phase = rnd(10, 2, -pi, pi, 31), pos = rnd(5, 3, -20.0, 20.0, 32);
     arma::mat empty;
-    arma::vec vempty;
 
     arma::mat ref, val;
     quadriga_lib::sos_val(spatial_freq, phase, pos, ref);
@@ -521,7 +516,7 @@ TEST_CASE("sos_val - empty optional matrices mean omitted, outputs are sized and
     REQUIRE(ref.n_cols == 2);
     CHECK(arma::abs(ref).max() > 0.3);
 
-    quadriga_lib::sos_val(spatial_freq, phase, pos, val, empty, empty, vempty, vempty);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, val, empty);
     CHECK(arma::approx_equal(val, ref, "absdiff", 0.0));
 
     arma::mat sized(5, 2);
@@ -543,10 +538,8 @@ TEST_CASE("sos_val - float agrees with double within single precision")
 {
     arma::mat spatial_freq = rnd(50, 3, -0.3, 0.3, 33), phase = rnd(50, 4, -pi, pi, 34);
     arma::mat pa = rnd(21, 3, -100.0, 100.0, 35), pb = rnd(21, 3, -100.0, 100.0, 36);
-    arma::vec acf = {1.0, 0.6, 0.3, 0.1}, dist = {0.0, 2.0, 5.0, 20.0};
     arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq), pf = arma::conv_to<arma::fmat>::from(phase);
     arma::fmat paf = arma::conv_to<arma::fmat>::from(pa), pbf = arma::conv_to<arma::fmat>::from(pb);
-    arma::fvec af = arma::conv_to<arma::fvec>::from(acf), df = arma::conv_to<arma::fvec>::from(dist);
 
     // Inputs rounded to float: the argument 2·pi·f·x of magnitude up to about 300 rad carries a relative
     // error of 1.2e-7 from each of f and x, i.e. up to 7e-5 rad per term. The sum of 50 terms with
@@ -555,8 +548,8 @@ TEST_CASE("sos_val - float agrees with double within single precision")
     {
         arma::mat vd;
         arma::fmat vf;
-        quadriga_lib::sos_val(spatial_freq, phase, pa, vd, pb, {}, acf, dist, 1.0, false, kernel);
-        quadriga_lib::sos_val(ff, pf, paf, vf, pbf, {}, af, df, 1.0f, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pa, vd, pb, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(ff, pf, paf, vf, pbf, 1.0, true, false, kernel);
         REQUIRE(vf.n_rows == 21);
         REQUIRE(vf.n_cols == 4);
         double mx = arma::abs(arma::conv_to<arma::mat>::from(vf) - vd).max();
@@ -575,13 +568,13 @@ TEST_CASE("sos_val - results are repeatable and do not depend on the number of t
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat a, b, c;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, {}, {}, {}, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, {}, {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, 1.0, true, false, kernel);
 #ifdef _OPENMP
         int n_threads = omp_get_max_threads();
         omp_set_num_threads(1);
 #endif
-        quadriga_lib::sos_val(spatial_freq, phase, pos, c, {}, {}, {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, c, {}, 1.0, true, false, kernel);
 #ifdef _OPENMP
         omp_set_num_threads(n_threads);
 #endif
@@ -591,20 +584,18 @@ TEST_CASE("sos_val - results are repeatable and do not depend on the number of t
         CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
         CHECK(arma::approx_equal(a, c, "absdiff", 0.0));
 
-        // Two devices, on the same map and on two maps, Normal and Uniform: the combination, the
-        // normalisation and the mapping run in parallel loops as well
-        arma::mat pos_b = rnd(1000, 3, -500.0, 500.0, 139), phase_b = rnd(100, 7, -pi, pi, 140);
-        arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
+        // Two devices, reciprocal and not, Normal and Uniform: the combination, the normalisation and the mapping run in
+        // parallel loops as well
+        arma::mat pos_b = rnd(1000, 3, -500.0, 500.0, 139);
         for (int mode = 1; mode <= 2; ++mode)
             for (bool uniform : {false, true})
             {
                 arma::mat all, one;
-                const arma::mat pb = (mode == 2) ? phase_b : arma::mat();
-                quadriga_lib::sos_val(spatial_freq, phase, pos, all, pos_b, pb, acf, dist, mode == 2 ? 1.5 : 1.0, uniform, kernel);
+                quadriga_lib::sos_val(spatial_freq, phase, pos, all, pos_b, mode == 2 ? 1.5 : 1.0, mode == 1, uniform, kernel);
 #ifdef _OPENMP
                 omp_set_num_threads(1);
 #endif
-                quadriga_lib::sos_val(spatial_freq, phase, pos, one, pos_b, pb, acf, dist, mode == 2 ? 1.5 : 1.0, uniform, kernel);
+                quadriga_lib::sos_val(spatial_freq, phase, pos, one, pos_b, mode == 2 ? 1.5 : 1.0, mode == 1, uniform, kernel);
 #ifdef _OPENMP
                 omp_set_num_threads(n_threads);
 #endif
@@ -621,7 +612,7 @@ TEST_CASE("sos_val - the automatic kernel is AVX2 when available")
     arma::mat spatial_freq = rnd(100, 3, -0.3, 0.3, 40), phase = rnd(100, 2, -pi, pi, 41), pos = rnd(30, 3, -50.0, 50.0, 42);
     arma::mat v0, vk;
     quadriga_lib::sos_val(spatial_freq, phase, pos, v0);
-    quadriga_lib::sos_val(spatial_freq, phase, pos, vk, {}, {}, {}, {}, 1.0, false, has_avx2() ? 2 : 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, vk, {}, 1.0, true, false, has_avx2() ? 2 : 1);
     REQUIRE(v0.n_rows == 30);
     CHECK(arma::abs(v0).max() > 0.5);
     CHECK(arma::approx_equal(v0, vk, "absdiff", 0.0));
@@ -629,18 +620,16 @@ TEST_CASE("sos_val - the automatic kernel is AVX2 when available")
 
 TEST_CASE("sos_val - input validation")
 {
-    arma::mat spatial_freq = rnd(10, 3, -0.3, 0.3, 43), phase = rnd(10, 2, -pi, pi, 44), phase_b = rnd(10, 2, -pi, pi, 45);
+    arma::mat spatial_freq = rnd(10, 3, -0.3, 0.3, 43), phase = rnd(10, 2, -pi, pi, 44);
     arma::mat pos = rnd(5, 3, -20.0, 20.0, 46), pos_b = rnd(5, 3, -20.0, 20.0, 47), val;
-    arma::vec acf = {1.0, 0.5, 0.2}, dist = {0.0, 1.0, 3.0};
-    arma::mat *no_mat = nullptr;
 
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val));
-        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, acf, dist));
-        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b));
-        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b, {}, {}, 2.0));
-        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {}, {}, {}, 1.0, true, 1));
+        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b));
+        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, 1.0, false));
+        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, 2.0, false));
+        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, true, 1));
     }
     SECTION("spatial_freq")
     {
@@ -663,60 +652,32 @@ TEST_CASE("sos_val - input validation")
     SECTION("pos_b")
     {
         arma::mat rows(4, 3, arma::fill::ones), f2 = spatial_freq.cols(0, 1), p2 = pos.cols(0, 1);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, rows, {}, acf, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(f2, phase, p2, val, pos_b, {}, acf, dist), std::invalid_argument);
-    }
-    SECTION("phase_b")
-    {
-        arma::mat cols(10, 3, arma::fill::ones);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, cols), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, phase_b), std::invalid_argument); // Needs pos_b
-    }
-    SECTION("acf and dist")
-    {
-        arma::vec bad_dist = {0.0, 2.0, 1.0}, short_dist = {0.0, 1.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b), std::invalid_argument); // Same map needs the table
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, acf), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, acf, bad_dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, acf, short_dist), std::invalid_argument);
-        // Non-finite table
-        arma::vec inf_dist = {0.0, 1.0, arma::datum::inf}, nan_acf = {1.0, std::nan(""), 0.2};
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, acf, inf_dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, nan_acf, dist), std::invalid_argument);
-    }
-    SECTION("acf values of -1 or below on the same map")
-    {
-        // The normalisation 1 / sqrt( 2 + 2·A ) is singular at A = -1 and undefined below
-        arma::vec minus_one = {1.0, -1.0, -1.0}, below = {1.0, 0.0, -1.5}, near = {1.0, -0.999, -0.999};
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, minus_one, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, below, dist), std::invalid_argument);
-        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, near, dist));
-        CHECK(val.is_finite());
-        // On two maps the table is not used and not checked
-        CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b, minus_one, dist));
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, rows), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(f2, phase, p2, val, pos_b), std::invalid_argument);
     }
     SECTION("spatial_freq_scale_b")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b, {}, {}, 0.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b, {}, {}, -1.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b, {}, {}, std::nan("")), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, phase_b, {}, {}, arma::datum::inf), std::invalid_argument);
-        // A scale other than 1 on one map is rejected
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, {}, acf, dist, 2.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {}, {}, {}, 2.0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, 0.0, false), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, -1.0, false), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, std::nan(""), false), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, arma::datum::inf, false), std::invalid_argument);
+        // A scale other than 1 needs a second device and the non-reciprocal mode
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 2.0, false), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, 2.0, true), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, pos_b, 2.0), std::invalid_argument);
     }
     SECTION("use_kernel")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {}, {}, {}, 1.0, false, 3), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {}, {}, {}, 1.0, false, -1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, 3), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, -1), std::invalid_argument);
     }
     SECTION("a kernel that is not available")
     {
         // Runs in a build without AVX2 or on a CPU without it; with AVX2 the same call must work
         if (!has_avx2())
-            CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {}, {}, {}, 1.0, false, 2), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, 2), std::invalid_argument);
         else
-            CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, {}, {}, {}, 1.0, false, 2));
+            CHECK_NOTHROW(quadriga_lib::sos_val(spatial_freq, phase, pos, val, {}, 1.0, true, false, 2));
     }
     SECTION("a failed call leaves the output untouched")
     {
@@ -731,24 +692,15 @@ TEST_CASE("sos_val - input validation")
     {
         // 'val' is resized and written while the inputs are read. Each input in turn is passed as output;
         // the call must throw and leave that matrix as it was. A copy with the same values is accepted.
-        arma::mat f = spatial_freq, ph = phase, p = pos, pb = pos_b, phb = phase_b;
+        arma::mat f = spatial_freq, ph = phase, p = pos, pb = pos_b;
         CHECK_THROWS_AS(quadriga_lib::sos_val(f, phase, pos, f), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, ph, pos, ph), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, p, p), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, pb, pb, phase_b), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, phb, pos_b, phb), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val(spatial_freq, phase, pos, pb, pb), std::invalid_argument);
         CHECK(arma::approx_equal(f, spatial_freq, "absdiff", 0.0));
         CHECK(arma::approx_equal(ph, phase, "absdiff", 0.0));
         CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
         CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
-        CHECK(arma::approx_equal(phb, phase_b, "absdiff", 0.0));
-
-        // The ACF table: a column vector is a matrix and can be passed as output
-        arma::vec a = acf, d = dist;
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, a, pos_b, {}, a, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, d, pos_b, {}, acf, d), std::invalid_argument);
-        CHECK(arma::approx_equal(a, acf, "absdiff", 0.0));
-        CHECK(arma::approx_equal(d, dist, "absdiff", 0.0));
 
         // Another matrix object on the memory of the positions
         arma::mat view(p.memptr(), p.n_rows, p.n_cols, false, true);
@@ -765,23 +717,22 @@ TEST_CASE("sos_val - input validation")
 TEST_CASE("sos_val - an output that shares only part of the memory of an input throws")
 {
     // 'val' as a matrix on foreign memory that starts inside an input, or ends inside one. With two devices
-    // the first kernel writes 'val' before the normalisation reads the input again, so an overlap gives wrong values.
-    // Every such call must throw before anything is written; memory that only touches an input is accepted.
-    arma::mat spatial_freq = rnd(10, 3, -0.3, 0.3, 60), phase = rnd(10, 1, -pi, pi, 61), phase_b = rnd(10, 1, -pi, pi, 62);
+    // the first kernel writes 'val' before the second kernel and the normalisation read the inputs again, so an
+    // overlap gives wrong values. Every such call must throw before anything is written; memory that only touches an
+    // input is accepted.
+    arma::mat spatial_freq = rnd(10, 3, -0.3, 0.3, 60), phase = rnd(10, 1, -pi, pi, 61);
     arma::mat pos = rnd(40, 3, -20.0, 20.0, 63), pos_b = pos + 1.0;
-    arma::vec acf = {1.0, 0.5, 0.2}, dist = {0.0, 1.0, 3.0};
-    arma::mat *no_mat = nullptr;
 
-    arma::mat ref_same, ref_maps;
-    quadriga_lib::sos_val<double>(spatial_freq, phase, pos, ref_same, pos_b, {}, acf, dist);
-    quadriga_lib::sos_val<double>(spatial_freq, phase, pos, ref_maps, pos_b, phase_b);
+    arma::mat ref_recip, ref_plain;
+    quadriga_lib::sos_val<double>(spatial_freq, phase, pos, ref_recip, pos_b);
+    quadriga_lib::sos_val<double>(spatial_freq, phase, pos, ref_plain, pos_b, 1.5, false);
 
     SECTION("val on column 1 of pos, every device mode")
     {
         arma::mat p = pos;
         arma::mat v(p.colptr(1), 40, 1, false, true);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pos_b, {}, acf, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pos_b, phase_b), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pos_b), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pos_b, 1.5, false), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v), std::invalid_argument);
         CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
     }
@@ -791,29 +742,20 @@ TEST_CASE("sos_val - an output that shares only part of the memory of an input t
         arma::vec block(165);
         std::copy(pos_b.begin(), pos_b.end(), block.begin() + 45);
         arma::mat pb(block.memptr() + 45, 40, 3, false, true), v(block.memptr() + 10, 40, 1, false, true);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, v, pb, {}, acf, dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, v, pb), std::invalid_argument);
         CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
     }
     SECTION("each input in turn")
     {
         // A one-element output on the last element of each input (one position: 'val' is [1, 1])
-        arma::mat f = spatial_freq, ph = phase, pb = pos_b, phb = phase_b, p1 = pos.row(0), pb1 = pos_b.row(0);
-        arma::vec a = acf, d = dist;
+        arma::mat f = spatial_freq, ph = phase, pb = pos_b, p1 = pos.row(0), pb1 = pos_b.row(0);
         arma::mat vf(f.memptr() + f.n_elem - 1, 1, 1, false, true), vph(ph.memptr() + ph.n_elem - 1, 1, 1, false, true);
-        arma::mat vphb(phb.memptr() + phb.n_elem - 1, 1, 1, false, true);
-        arma::mat va(a.memptr() + a.n_elem - 1, 1, 1, false, true), vd(d.memptr() + d.n_elem - 1, 1, 1, false, true);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(f, phase, p1, vf), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, ph, p1, vph), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p1, vphb, pb1, phb), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p1, va, pb1, {}, a, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, p1, vd, pb1, {}, acf, d), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(f, phase, p1, vf, pb1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, ph, p1, vph, pb1), std::invalid_argument);
         arma::mat vpb(pb.memptr() + 70, 40, 1, false, true);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, vpb, pb, phase_b), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, vpb, pb), std::invalid_argument);
         CHECK(arma::approx_equal(f, spatial_freq, "absdiff", 0.0));
         CHECK(arma::approx_equal(ph, phase, "absdiff", 0.0));
-        CHECK(arma::approx_equal(phb, phase_b, "absdiff", 0.0));
-        CHECK(arma::approx_equal(a, acf, "absdiff", 0.0));
-        CHECK(arma::approx_equal(d, dist, "absdiff", 0.0));
         CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
     }
     SECTION("the error names the output")
@@ -823,7 +765,7 @@ TEST_CASE("sos_val - an output that shares only part of the memory of an input t
         std::string msg;
         try
         {
-            quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pos_b, {}, acf, dist);
+            quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pos_b);
         }
         catch (const std::invalid_argument &e)
         {
@@ -835,9 +777,8 @@ TEST_CASE("sos_val - an output that shares only part of the memory of an input t
     {
         arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq), phf = arma::conv_to<arma::fmat>::from(phase);
         arma::fmat pf = arma::conv_to<arma::fmat>::from(pos), pbf = arma::conv_to<arma::fmat>::from(pos_b), keep = pf;
-        arma::fvec af = arma::conv_to<arma::fvec>::from(acf), df = arma::conv_to<arma::fvec>::from(dist);
         arma::fmat v(pf.colptr(1), 40, 1, false, true);
-        CHECK_THROWS_AS(quadriga_lib::sos_val<float>(ff, phf, pf, v, pbf, {}, af, df), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_val<float>(ff, phf, pf, v, pbf), std::invalid_argument);
         CHECK(arma::approx_equal(pf, keep, "absdiff", 0.0f));
     }
     SECTION("memory next to an input is accepted")
@@ -848,10 +789,10 @@ TEST_CASE("sos_val - an output that shares only part of the memory of an input t
         std::copy(pos_b.begin(), pos_b.end(), block.begin() + 160);
         arma::mat p(block.memptr(), 40, 3, false, true), pb(block.memptr() + 160, 40, 3, false, true);
         arma::mat v(block.memptr() + 120, 40, 1, false, true);
-        REQUIRE_NOTHROW(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pb, {}, acf, dist));
-        CHECK(arma::approx_equal(v, ref_same, "absdiff", 0.0));
-        REQUIRE_NOTHROW(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pb, phase_b));
-        CHECK(arma::approx_equal(v, ref_maps, "absdiff", 0.0));
+        REQUIRE_NOTHROW(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pb));
+        CHECK(arma::approx_equal(v, ref_recip, "absdiff", 0.0));
+        REQUIRE_NOTHROW(quadriga_lib::sos_val<double>(spatial_freq, phase, p, v, pb, 1.5, false));
+        CHECK(arma::approx_equal(v, ref_plain, "absdiff", 0.0));
         CHECK(arma::approx_equal(p, pos, "absdiff", 0.0));
         CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
     }
@@ -866,8 +807,8 @@ TEST_CASE("sos_val - a NaN or Inf coordinate gives NaN at that position only")
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
     {
         arma::mat ref, val;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, ref, {}, {}, {}, {}, 1.0, false, kernel);
-        quadriga_lib::sos_val(spatial_freq, phase, bad, val, {}, {}, {}, {}, 1.0, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, ref, {}, 1.0, true, false, kernel);
+        quadriga_lib::sos_val(spatial_freq, phase, bad, val, {}, 1.0, true, false, kernel);
         REQUIRE(val.n_rows == 19);
         REQUIRE(val.n_cols == 5);
         arma::uword n_nan = 0, n_same = 0;
@@ -904,8 +845,8 @@ TEST_CASE("sos_val - the AVX2 kernel stays within its bound up to 1e9 periods fr
     for (double offset : {1e8, 1e9, 1e10})
     {
         arma::mat pos = rnd(64, 3, -50.0, 50.0, 55) + offset, a, b;
-        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, {}, {}, {}, 1.0, false, 1);
-        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, {}, {}, {}, 1.0, false, 2);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, 1.0, true, false, 1);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, 1.0, true, false, 2);
         REQUIRE(a.n_elem == 256);
         double mx = arma::abs(a - b).max();
         QD_DIAG("%.0e,%.0e,%.3e\n", offset, 0.1 * offset, mx);
@@ -927,8 +868,8 @@ TEST_CASE("sos_val - the AVX2 kernel stays within its bound for the largest pres
     {
         arma::mat spatial_freq, phase = rnd(1024, 6, -pi, pi, 56), pos = rnd(200, 3, -500.0, 500.0, 57), a, b;
         spatial_freq = quadriga_lib::sos_preset("Comb1024", (arma::vec *)nullptr, (arma::vec *)nullptr, d);
-        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, {}, {}, {}, 1.0, false, 1);
-        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, {}, {}, {}, 1.0, false, 2);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, a, {}, 1.0, true, false, 1);
+        quadriga_lib::sos_val(spatial_freq, phase, pos, b, {}, 1.0, true, false, 2);
         REQUIRE(a.n_elem == 1200);
         double mx = arma::abs(a - b).max();
         QD_DIAG("%.0f,%.3e\n", d, mx);
@@ -940,9 +881,8 @@ TEST_CASE("sos_val - the AVX2 kernel stays within its bound for the largest pres
 
 TEST_CASE("sos_val - two devices with different numbers of position columns equal zero-padded positions")
 {
-    arma::mat spatial_freq = rnd(30, 3, -0.2, 0.2, 58), phase = rnd(30, 5, -pi, pi, 59), phase_b = rnd(30, 5, -pi, pi, 60);
+    arma::mat spatial_freq = rnd(30, 3, -0.2, 0.2, 58), phase = rnd(30, 5, -pi, pi, 59);
     arma::mat pa3 = rnd(13, 3, -30.0, 30.0, 61), pb3 = rnd(13, 3, -30.0, 30.0, 62);
-    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
 
     for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
         for (int mode = 1; mode <= 2; ++mode)
@@ -956,9 +896,8 @@ TEST_CASE("sos_val - two devices with different numbers of position columns equa
                     for (arma::uword c = cb; c < 3; ++c)
                         pb_pad.col(c).zeros();
                     arma::mat pa = pa3.cols(0, ca - 1), pb = pb3.cols(0, cb - 1), val, ref;
-                    const arma::mat ph_b = (mode == 2) ? phase_b : arma::mat();
-                    quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, ph_b, acf, dist, mode == 2 ? 0.7 : 1.0, false, kernel);
-                    quadriga_lib::sos_val(spatial_freq, phase, pa_pad, ref, pb_pad, ph_b, acf, dist, mode == 2 ? 0.7 : 1.0, false, kernel);
+                    quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, mode == 2 ? 0.7 : 1.0, mode == 1, false, kernel);
+                    quadriga_lib::sos_val(spatial_freq, phase, pa_pad, ref, pb_pad, mode == 2 ? 0.7 : 1.0, mode == 1, false, kernel);
                     INFO("kernel " << kernel << ", mode " << mode << ", columns " << ca << " and " << cb);
                     REQUIRE(val.n_rows == 13);
                     CHECK(arma::abs(ref).max() > 0.3);
@@ -973,12 +912,9 @@ TEST_CASE("sos_val - the float instantiation is the double computation on the fl
     // output remains: half a float spacing of a value up to 4, i.e. 2.4e-7. This separates the computation
     // from the rounding of the inputs, which the case "float agrees with double" has to allow for.
     arma::fmat ff = arma::conv_to<arma::fmat>::from(rnd(50, 3, -0.3, 0.3, 63)), pf = arma::conv_to<arma::fmat>::from(rnd(50, 4, -pi, pi, 64));
-    arma::fmat pbf = arma::conv_to<arma::fmat>::from(rnd(50, 4, -pi, pi, 65));
     arma::fmat paf = arma::conv_to<arma::fmat>::from(rnd(21, 3, -100.0, 100.0, 66)), pbpf = arma::conv_to<arma::fmat>::from(rnd(21, 3, -100.0, 100.0, 67));
-    arma::fvec af = {1.0f, 0.6f, 0.3f, 0.1f}, df = {0.0f, 2.0f, 5.0f, 20.0f};
-    arma::mat fd = arma::conv_to<arma::mat>::from(ff), pd = arma::conv_to<arma::mat>::from(pf), pbd = arma::conv_to<arma::mat>::from(pbf);
+    arma::mat fd = arma::conv_to<arma::mat>::from(ff), pd = arma::conv_to<arma::mat>::from(pf);
     arma::mat pad = arma::conv_to<arma::mat>::from(paf), pbpd = arma::conv_to<arma::mat>::from(pbpf);
-    arma::vec ad = arma::conv_to<arma::vec>::from(af), dd = arma::conv_to<arma::vec>::from(df);
     const float scale_f = 0.7f;
 
     QD_DIAG("\n# diag: sos_val float against the double call on the float inputs\nkernel,mode,uniform,max_abs_diff\n");
@@ -990,18 +926,18 @@ TEST_CASE("sos_val - the float instantiation is the double computation on the fl
                 arma::mat vd;
                 if (mode == 0)
                 {
-                    quadriga_lib::sos_val(ff, pf, paf, vf, {}, {}, {}, {}, 1.0f, uniform, kernel);
-                    quadriga_lib::sos_val(fd, pd, pad, vd, {}, {}, {}, {}, 1.0, uniform, kernel);
+                    quadriga_lib::sos_val(ff, pf, paf, vf, {}, 1.0f, true, uniform, kernel);
+                    quadriga_lib::sos_val(fd, pd, pad, vd, {}, 1.0, true, uniform, kernel);
                 }
                 else if (mode == 1)
                 {
-                    quadriga_lib::sos_val(ff, pf, paf, vf, pbpf, {}, af, df, 1.0f, uniform, kernel);
-                    quadriga_lib::sos_val(fd, pd, pad, vd, pbpd, {}, ad, dd, 1.0, uniform, kernel);
+                    quadriga_lib::sos_val(ff, pf, paf, vf, pbpf, 1.0, true, uniform, kernel);
+                    quadriga_lib::sos_val(fd, pd, pad, vd, pbpd, 1.0, true, uniform, kernel);
                 }
                 else
                 {
-                    quadriga_lib::sos_val(ff, pf, paf, vf, pbpf, pbf, {}, {}, scale_f, uniform, kernel);
-                    quadriga_lib::sos_val(fd, pd, pad, vd, pbpd, pbd, {}, {}, (double)scale_f, uniform, kernel);
+                    quadriga_lib::sos_val(ff, pf, paf, vf, pbpf, scale_f, false, uniform, kernel);
+                    quadriga_lib::sos_val(fd, pd, pad, vd, pbpd, (double)scale_f, false, uniform, kernel);
                 }
                 REQUIRE(vf.n_rows == 21);
                 REQUIRE(vf.n_cols == 4);
@@ -1027,7 +963,7 @@ TEST_CASE("sos_val - the value of a generator does not depend on the number of g
         for (arma::uword g = 0; g < 18; ++g)
         {
             arma::mat one, ph = phase.col(g);
-            quadriga_lib::sos_val(spatial_freq, ph, pos, one, {}, {}, {}, {}, 1.0, false, kernel);
+            quadriga_lib::sos_val(spatial_freq, ph, pos, one, {}, 1.0, true, false, kernel);
             REQUIRE(one.n_rows == 300);
             single.col(g) = one;
         }
@@ -1037,11 +973,53 @@ TEST_CASE("sos_val - the value of a generator does not depend on the number of g
         for (arma::uword n_gen = 1; n_gen <= 18; ++n_gen)
         {
             arma::mat val, ph = phase.cols(0, n_gen - 1);
-            quadriga_lib::sos_val(spatial_freq, ph, pos, val, {}, {}, {}, {}, 1.0, false, kernel);
+            quadriga_lib::sos_val(spatial_freq, ph, pos, val, {}, 1.0, true, false, kernel);
             REQUIRE(val.n_cols == n_gen);
             n_equal += arma::approx_equal(val, single.cols(0, n_gen - 1), "absdiff", 0.0) ? 1 : 0;
         }
         INFO("kernel " << kernel);
         CHECK(n_equal == 18);
     }
+}
+
+TEST_CASE("sos_val - two devices: a link decorrelates when one device moves away")
+{
+    // 2000 generators, Exp256 at 20 m. Links (Rx = pos, Tx = pos_b along x): L0 Rx 500 m, Tx 0; L1 Rx moved 20 m;
+    // L2 Rx moved 1000 m; L3 Tx moved 1000 m; L4 both moved 1000 m. Correlation over the generators against L0:
+    // L1 the one-device ACF at 20 m (exp(-1); the preset reaches it within 0.05 along an axis), L2 to L4 about 0: at
+    // one displacement the residual of the sinusoids is a fixed value of rms 1/sqrt(2N) = 0.044 (up to about 4 times
+    // that), plus a sampling error of 0.022, so |corr| < 0.2. The sum of two one-device fields gives (1 + 0.37)/2 =
+    // 0.68 for L1 and 0.5 for L2 and L3. L5: both devices moved 20 m, the product of the two ACFs exp(-2) = 0.135
+    // (within 0.1); the sum gives 0.37.
+    const arma::mat F = quadriga_lib::sos_preset<double>("Exp256", nullptr, nullptr, 20.0);
+    const arma::mat P = quadriga_lib::sos_init_phases<double>(F.n_rows, 2000, 3);
+    const arma::mat rx = {{500.0, 0.0, 0.0}, {520.0, 0.0, 0.0}, {1500.0, 0.0, 0.0}, {500.0, 0.0, 0.0}, {1500.0, 0.0, 0.0}, {520.0, 0.0, 0.0}};
+    const arma::mat tx = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1000.0, 0.0, 0.0}, {1000.0, 0.0, 0.0}, {0.0, 20.0, 0.0}};
+    arma::mat val;
+    quadriga_lib::sos_val(F, P, rx, val, tx);
+    auto corr = [&](arma::uword k)
+    { return arma::as_scalar(arma::cor(arma::vec(val.row(0).t()), arma::vec(val.row(k).t()))); };
+    QD_DIAG("\n# diag: sos_val two devices, correlation with L0: L1 %.3f, L2 %.3f, L3 %.3f, L4 %.3f, L5 %.3f\n", corr(1), corr(2), corr(3), corr(4), corr(5));
+    CHECK(std::abs(corr(1) - std::exp(-1.0)) < 0.1);
+    CHECK(std::abs(corr(2)) < 0.2);
+    CHECK(std::abs(corr(3)) < 0.2);
+    CHECK(std::abs(corr(4)) < 0.2);
+    CHECK(std::abs(corr(5) - std::exp(-2.0)) < 0.1);
+}
+
+TEST_CASE("sos_val - reciprocal two devices give NaN where the normalisation is singular")
+{
+    // Two sinusoids: the permutation swaps them, c = cos( 2·pi · (f_0 - f_1)·d ) = -1 at d = 2.5 m for f = 0.1, 0.3 / m
+    const arma::mat spatial_freq = {{0.1, 0.0, 0.0}, {0.3, 0.0, 0.0}}, phase = {{0.4, -1.1}, {2.0, 0.3}};
+    const arma::mat pa = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, pb = {{2.5, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+    for (int kernel = 1; kernel <= (has_avx2() ? 2 : 1); ++kernel)
+    {
+        arma::mat val;
+        quadriga_lib::sos_val(spatial_freq, phase, pa, val, pb, 1.0, true, false, kernel);
+        INFO("kernel " << kernel);
+        CHECK(val.row(0).has_nan());
+        CHECK(val.row(1).is_finite());
+    }
+    arma::mat ph = phase;
+    CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, ph, pa, pb), std::invalid_argument);
 }

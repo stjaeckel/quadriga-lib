@@ -25,13 +25,9 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   `Z = sum_n z_n · exp( j·phi_n )`, the mean is `sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )`,
   which vanishes for `offset = pi/2 - arg(Z)` and for that value minus pi; the one with the
   smaller magnitude is applied, so the offset lies between -pi/2 and pi/2
-- One device (`pos_b` omitted): one offset per generator
-- Two devices on the same map (`pos_b` given, `phase_b_in` omitted): one offset per generator that
-  zeroes the mean of the combined, normalised value; `acf` and `dist` are required
-- Two devices on different maps (`pos_b` and `phase_b_in` given): each device is treated on its
-  own, `phase_in` with `pos` and `phase_b_in` with `pos_b` and the frequencies
-  `spatial_freq · spatial_freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
-  as well
+- One offset per generator; with two devices (`pos_b` given) it zeroes the mean of the two-device value
+  of [[sos_val]] with the same `spatial_freq_scale_b` and `reciprocal`
+- Two reciprocal devices at a position where the normalization of [[sos_val]] is singular (`c = -1`) throw
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions.
   The variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the
   sample mean and `c` the mean ACF between that position and all positions; on average over the
@@ -46,14 +42,13 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 - Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose
   `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
   unchanged, also if its phases lie outside that interval
-- Two devices on the same map need an ACF above -1 at all sample points, as in [[sos_val]]
-- The C++ in/out arguments `phase` and `phase_b` are split into `phase_in` / `phase_out` and `phase_b_in` /
-  `phase_b_out`, so that the inputs stay unchanged; C++ messages name them `phase` and `phase_b`
+- The C++ in/out argument `phase` is split into `phase_in` and `phase_out`, so that the input stays
+  unchanged; C++ messages name it `phase`
 
 ## Usage:
 ```
-[ phase_out, phase_b_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( spatial_freq, phase_in, ...
-    pos, pos_b, phase_b_in, acf, dist, spatial_freq_scale_b );
+[ phase_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( spatial_freq, phase_in, pos, pos_b, ...
+    spatial_freq_scale_b, reciprocal );
 ```
 
 ## Inputs:
@@ -63,27 +58,16 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
   coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
-  `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map,
-  any number for different maps
-- **`phase_b_in`** *(optional)* — Phases of the second device; requires `pos_b`; omitted
-  or empty = same map; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then
-  be > -1; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
-  finite; `[n_acf]`
-- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
-  first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
-  default: 1
+  `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device as in [[sos_val]]; must be > 0;
+  other than 1 requires `pos_b` and `reciprocal = false`; default: 1
+- **`reciprocal`** — Two devices: the mode of [[sos_val]]; default: true
 
 ## Outputs:
 - **`phase_out`** — Corrected phases; `[n_coeff, n_gen]`
-- **`phase_b_out`** — Corrected phases of the second device; `[n_coeff, n_gen]`; empty if
-  `phase_b_in` was not given
-- **`offset`** — Offsets added to the phases; `[n_gen, 1]`, or `[n_gen, 2]` with
-  `phase_b_in` (column 1: `phase_in`, column 2: `phase_b_in`)
-- **`mean_before`** — Sample mean before the correction; `[n_gen, 1]`: mean of the values of
-  [[sos_val]] for the given arguments; with `phase_b_in` `[n_gen, 2]`: mean of the field of each
-  device on its own positions, the mean of the combined value being their sum divided by `sqrt(2)`
+- **`offset`** — Offsets added to the phases; `[n_gen, 1]`
+- **`mean_before`** — Sample mean of the values of [[sos_val]] for the given arguments before the
+  correction; `[n_gen, 1]`
 
 ## See also:
 - [[sos_val]] (the values whose mean is removed)
@@ -91,9 +75,9 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 3 || nrhs > 8)
+    if (nrhs < 3 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 4)
+    if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs; the phases are modified by the library and therefore copied
@@ -101,23 +85,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat phase = qd_mex_get_Mat<double>(prhs[1], true, "phase_in");
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[2], false, "pos");
     const arma::mat pos_b = (nrhs < 4) ? arma::mat() : qd_mex_get_Mat<double>(prhs[3], false, "pos_b");
-    arma::mat phase_b = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4], true, "phase_b_in");
-    const arma::vec acf = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "acf");
-    const arma::vec dist = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "dist");
-    const double spatial_freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_scale_b", 1.0);
+    const double spatial_freq_scale_b = (nrhs < 5) ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "spatial_freq_scale_b", 1.0);
+    const bool reciprocal = (nrhs < 6) ? true : qd_mex_get_scalar<bool>(prhs[5], "reciprocal", true);
 
     arma::mat offset, mean_before;
-    arma::mat *p_phase_b = phase_b.empty() ? nullptr : &phase_b;
-    arma::mat *p_offset = (nlhs > 2) ? &offset : nullptr;
-    arma::mat *p_mean_before = (nlhs > 3) ? &mean_before : nullptr;
+    arma::mat *p_offset = (nlhs > 1) ? &offset : nullptr;
+    arma::mat *p_mean_before = (nlhs > 2) ? &mean_before : nullptr;
 
-    CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, pos_b, p_phase_b, acf, dist, p_offset, p_mean_before, spatial_freq_scale_b));
+    CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, pos_b, spatial_freq_scale_b, reciprocal, p_offset, p_mean_before));
 
     plhs[0] = qd_mex_copy2matlab(&phase);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&phase_b);
+        plhs[1] = qd_mex_copy2matlab(&offset);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&offset);
-    if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&mean_before);
+        plhs[2] = qd_mex_copy2matlab(&mean_before);
 }

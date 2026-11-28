@@ -13,6 +13,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 // Validate an ACF table given as (acf, dist), throws std::invalid_argument
 template <typename dtype>
@@ -35,15 +36,46 @@ static inline void qd_sos_check_acf(const arma::Col<dtype> &acf, const arma::Col
             throw std::invalid_argument("Input 'acf' must be finite.");
 }
 
-// Validate an ACF table for two devices on the same map, throws std::invalid_argument
-// The combined value is divided by sqrt( 2 + 2·A ), so the ACF must stay above -1
+// Frequencies as separate x, y, z vectors in double, scaled; missing dimensions are 0; with 'perm', row perm[n] goes
+// to element n
 template <typename dtype>
-static inline void qd_sos_check_acf_same_map(const arma::Col<dtype> &acf, const arma::Col<dtype> &dist)
+static inline void qd_sos_split_freq(const arma::Mat<dtype> &spatial_freq, double scale,
+                              std::vector<double> &fx, std::vector<double> &fy, std::vector<double> &fz,
+                              const std::vector<arma::uword> *perm = nullptr)
 {
-    qd_sos_check_acf(acf, dist);
-    for (arma::uword i = 0; i < acf.n_elem; ++i)
-        if (!(acf.at(i) > (dtype)-1.0))
-            throw std::invalid_argument("Input 'acf' must be > -1 for two devices on the same map.");
+    arma::uword n_coeff = spatial_freq.n_rows;
+    fx.assign(n_coeff, 0.0), fy.assign(n_coeff, 0.0), fz.assign(n_coeff, 0.0);
+    for (arma::uword n = 0; n < n_coeff; ++n)
+    {
+        const arma::uword r = perm ? (*perm)[n] : n;
+        fx[n] = scale * (double)spatial_freq.at(r, 0);
+        if (spatial_freq.n_cols > 1)
+            fy[n] = scale * (double)spatial_freq.at(r, 1);
+        if (spatial_freq.n_cols > 2)
+            fz[n] = scale * (double)spatial_freq.at(r, 2);
+    }
+}
+
+// Fixed permutation p of the sinusoids for two devices of sos_val, sos_remove_bias and gbsm_draw: the second device uses
+// frequency p(n) in sinusoid n; one cycle through all sinusoids (no fixed point for n_coeff >= 2), a function of n_coeff
+// only (defined in sos_val.cpp)
+std::vector<arma::uword> qd_sos_permutation(arma::uword n_coeff);
+
+// Normalization of the reciprocal two-device value in double precision, as used by sos_remove_bias (sos_val computes c
+// with its kernel): 1 / sqrt( 2 + 2·c ), c = (1/N) · sum_n cos( 2·pi·df_n·d ), df_n = f_n - f_p(n), d = (dx, dy, dz) =
+// first minus second position; exactly even in d; NaN where 2 + 2·c <= 1e-6 (c = -1, tables with few sinusoids), as
+// in sos_val
+static inline double qd_sos_pair_weight(const double *dfx, const double *dfy, const double *dfz, size_t n_coeff,
+                                        double dx, double dy, double dz)
+{
+    double c = 0.0;
+    for (size_t n = 0; n < n_coeff; ++n)
+    {
+        const double t = std::remainder(dfx[n] * dx + dfy[n] * dy + dfz[n] * dz, 1.0);
+        c += std::cos(6.283185307179586 * std::abs(t));
+    }
+    const double v = 2.0 + 2.0 * c / (double)n_coeff;
+    return (v > 1.0e-6) ? 1.0 / std::sqrt(v) : std::numeric_limits<double>::quiet_NaN();
 }
 
 // Type and number of sinusoids of a preset of sos_preset (defined in sos_preset.cpp)

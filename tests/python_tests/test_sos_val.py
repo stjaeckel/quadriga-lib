@@ -31,10 +31,9 @@ class test_case(unittest.TestCase):
         self.pos = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 2.0, 0.0]])
         self.ref = np.array([[2.0, 1.0], [1.0, 0.0], [0.0, -1.0]])
 
-        # ACF table for two devices on the same map; second device at the origin: distances 0, 1, 2
-        self.acf = np.array([1.0, 0.5, 0.0])
-        self.dist = np.array([0.0, 1.0, 2.0])
-        self.pos_b = np.zeros((3, 3))
+        # Second device; with two sinusoids the permutation of the two-device generator swaps them, so for
+        # reciprocal=False s(a, b) = cos( pi/2 (a_x + b_y) + phi_0 ) + cos( pi/2 (a_y + b_x) + phi_1 )
+        self.pos_b = np.array([[0.5, 1.0, 0.0], [2.0, 0.0, 0.0], [1.0, 3.0, 0.0]])
 
     def test_basic_call(self):
         val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos)
@@ -47,24 +46,22 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(val, self.ref, atol=1e-14, rtol=0)
 
     def test_keyword_arguments(self):
-        phase_b = self.phase[:, ::-1]
-        ref = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b, phase_b=phase_b,
-                                   acf=self.acf, dist=self.dist,
-                                   spatial_freq_scale_b=2.0, uniform=True, use_kernel=1)
+        ref = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, spatial_freq_scale_b=2.0,
+                                   reciprocal=False, uniform=True, use_kernel=1)
         val = quadriga_lib.sos.val(spatial_freq=self.spatial_freq, phase=self.phase, pos=self.pos, pos_b=self.pos_b,
-                                   phase_b=phase_b, acf=self.acf, dist=self.dist, spatial_freq_scale_b=2.0,
-                                   uniform=True, use_kernel=1)
+                                   spatial_freq_scale_b=2.0, reciprocal=False, uniform=True, use_kernel=1)
         npt.assert_array_equal(val, ref)
 
     def test_optional_inputs(self):
         ref = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, use_kernel=1)
 
-        # None and empty arrays are the same as omitted
-        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=None, phase_b=None, acf=None,
-                                   dist=None, spatial_freq_scale_b=1.0, uniform=False, use_kernel=1)
+        # None and empty arrays are the same as omitted; reciprocal has no effect for one device
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=None, spatial_freq_scale_b=1.0,
+                                   reciprocal=True, uniform=False, use_kernel=1)
         npt.assert_array_equal(val, ref)
-        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=np.zeros((0, 3)), phase_b=[], acf=[],
-                                   dist=[], use_kernel=1)
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=np.zeros((0, 3)), use_kernel=1)
+        npt.assert_array_equal(val, ref)
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, reciprocal=False, use_kernel=1)
         npt.assert_array_equal(val, ref)
 
         # uniform
@@ -72,26 +69,34 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(val, [[0.9772498680518208, 0.8413447460685429], [0.8413447460685429, 0.5],
                                   [0.5, 0.15865525393145707]], atol=1e-14, rtol=0)
 
-        # Two devices on the same map: ( s(a) + s(b) ) / sqrt( 2 + 2 A(D) ), A = 1, 0.5, 0
-        s3, s2 = np.sqrt(3.0), np.sqrt(2.0)
-        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b, acf=self.acf,
-                                   dist=self.dist,
-                                   use_kernel=1)
-        npt.assert_allclose(val, [[2.0, 1.0], [3.0 / s3, 1.0 / s3], [2.0 / s2, 0.0]], atol=1e-14, rtol=0)
+        # Two devices, reciprocal (default): the value does not change when the devices swap positions
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, use_kernel=1)
+        self.assertEqual(val.shape, (3, 2))
+        npt.assert_array_equal(val, quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos_b, self.pos,
+                                                         use_kernel=1))
 
-        # Two devices on different maps: the second device uses phase_b, here the two generators swapped
-        phase_b = self.phase[:, ::-1]
-        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b, phase_b=phase_b,
-                                   use_kernel=1)
-        npt.assert_allclose(val, np.array([[3.0, 3.0], [2.0, 2.0], [1.0, 1.0]]) / s2, atol=1e-14, rtol=0)
+        # Two devices, not reciprocal: the formula of setUp, other values than the reciprocal ones
+        p, q, phi = self.pos, self.pos_b, self.phase
+        ref2 = np.column_stack([np.cos(np.pi / 2 * (p[:, 0] + q[:, 1]) + phi[0, g]) +
+                                np.cos(np.pi / 2 * (p[:, 1] + q[:, 0]) + phi[1, g]) for g in range(2)])
+        val2 = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, reciprocal=False,
+                                    use_kernel=1)
+        npt.assert_allclose(val2, ref2, atol=1e-14, rtol=0)
+        self.assertGreater(np.max(np.abs(val2 - val)), 0.1)
 
-        # Frequency scale of the second device: at x = 1 m a scale of 2 turns the quarter wave into a half wave,
-        # s_b = cos(pi) + 1 = 0 and -sin(pi) + 1 = 1
-        pos_b = np.tile([1.0, 0.0, 0.0], (3, 1))
-        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=pos_b, phase_b=self.phase,
-                                   spatial_freq_scale_b=2.0,
-                                   use_kernel=1)
-        npt.assert_allclose(val, (self.ref + [0.0, 1.0]) / s2, atol=1e-14, rtol=0)
+        # Second device at the origin, not reciprocal: the value of one device, with any frequency scale
+        origin = np.zeros((3, 3))
+        for scale in (1.0, 2.0):
+            val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, origin, spatial_freq_scale_b=scale,
+                                       reciprocal=False, use_kernel=1)
+            npt.assert_allclose(val, ref, atol=1e-14, rtol=0)
+
+        # Frequency scale of the second device: a scale of 2 equals doubled positions of the second device
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, origin, self.pos_b, spatial_freq_scale_b=2.0,
+                                   reciprocal=False, use_kernel=1)
+        val2 = quadriga_lib.sos.val(self.spatial_freq, self.phase, origin, 2.0 * self.pos_b, reciprocal=False,
+                                    use_kernel=1)
+        npt.assert_allclose(val, val2, atol=1e-14, rtol=0)
 
     def test_kernels(self):
         val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, use_kernel=0)
@@ -116,12 +121,8 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(val[:, 0], np.sqrt(2.0) * np.array([1.0, 0.0, -1.0]), atol=1e-14, rtol=0)
 
     def test_array_layout_and_dtype(self):
-        phase_b = self.phase[:, ::-1]
-        args = [self.spatial_freq, self.phase, self.pos, self.pos_b, phase_b]
-
-        def val_b(spatial_freq, phase, pos, pos_b, phase_b, **kw):
-            return quadriga_lib.sos.val(spatial_freq, phase, pos, pos_b=pos_b, phase_b=phase_b, **kw)
-        ref = val_b(*args, use_kernel=1)
+        args = [self.spatial_freq, self.phase, self.pos, self.pos_b]
+        ref = quadriga_lib.sos.val(*args, use_kernel=1)
 
         variants = [
             lambda a: np.ascontiguousarray(a),            # C order
@@ -131,21 +132,25 @@ class test_case(unittest.TestCase):
             lambda a: a.tolist(),                         # plain lists
         ]
         for fn in variants:
-            val = val_b(*[fn(a) for a in args], use_kernel=1)
+            val = quadriga_lib.sos.val(*[fn(a) for a in args], use_kernel=1)
             self.assertEqual(val.dtype, np.float64)
             npt.assert_allclose(val, ref, atol=1e-6, rtol=0)  # float32 input
 
         # Integer and bool scalars
-        val = val_b(*args, spatial_freq_scale_b=1, uniform=np.bool_(False), use_kernel=np.int32(1))
+        val = quadriga_lib.sos.val(*args, spatial_freq_scale_b=1, reciprocal=np.bool_(True), uniform=np.bool_(False),
+                                   use_kernel=np.int32(1))
         npt.assert_array_equal(val, ref)
-        val = val_b(*args, uniform=np.bool_(True), use_kernel=1)
-        npt.assert_array_equal(val, val_b(*args, uniform=True, use_kernel=1))
+        val = quadriga_lib.sos.val(*args, uniform=np.bool_(True), use_kernel=1)
+        npt.assert_array_equal(val, quadriga_lib.sos.val(*args, uniform=True, use_kernel=1))
+        val = quadriga_lib.sos.val(*args, spatial_freq_scale_b=np.int32(2), reciprocal=np.bool_(False), use_kernel=1)
+        npt.assert_array_equal(val, quadriga_lib.sos.val(*args, spatial_freq_scale_b=2.0, reciprocal=False,
+                                                         use_kernel=1))
 
     def test_inputs_not_modified(self):
-        phase_b = self.phase[:, ::-1].copy()
-        args = [self.spatial_freq, self.phase, self.pos, self.pos_b, phase_b, self.acf, self.dist]
+        args = [self.spatial_freq, self.phase, self.pos, self.pos_b]
         copies = [a.copy() for a in args]
-        quadriga_lib.sos.val(*args[:3], pos_b=args[3], phase_b=args[4], acf=args[5], dist=args[6])
+        quadriga_lib.sos.val(*args)
+        quadriga_lib.sos.val(*args, spatial_freq_scale_b=2.0, reciprocal=False)
         for a, c in zip(args, copies):
             npt.assert_array_equal(a, c)
 
@@ -156,13 +161,17 @@ class test_case(unittest.TestCase):
         self.assertIn("phase", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b)
-        self.assertIn("acf", str(ctx.exception))
+            quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b[:2, :])
+        self.assertIn("pos_b", str(ctx.exception))
+
+        # A frequency scale other than 1 needs a second device and reciprocal=False
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, spatial_freq_scale_b=2.0, reciprocal=False)
+        self.assertEqual(str(ctx.exception), "Input 'spatial_freq_scale_b' other than 1 requires 'pos_b'.")
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b, phase_b=None, acf=self.acf,
-                                 dist=self.dist, spatial_freq_scale_b=2.0)
-        self.assertIn("spatial_freq_scale_b", str(ctx.exception))
+            quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b, spatial_freq_scale_b=2.0)
+        self.assertEqual(str(ctx.exception), "Input 'spatial_freq_scale_b' other than 1 requires 'reciprocal = false'.")
 
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, use_kernel=3)
@@ -177,6 +186,9 @@ class test_case(unittest.TestCase):
             quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, uniform="yes")
         with self.assertRaises(TypeError):
             quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, use_kernel=1.0)
+        for removed in ("phase_b", "acf", "dist"):  # inputs of the former two-map model
+            with self.assertRaises(TypeError):
+                quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, **{removed: [0.0]})
 
     def test_none_for_mandatory_arrays(self):
         # None for a mandatory array is rejected by pybind11; it must not be read as one value of NaN
@@ -190,14 +202,16 @@ class test_case(unittest.TestCase):
 
 
     def test_none_and_flag_types(self):
-        # uniform: None selects the default (False), other types than bool raise TypeError
-        ref = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, use_kernel=1)
-        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, uniform=None, use_kernel=1)
+        # uniform and reciprocal: None selects the default (False, True), other types than bool raise TypeError
+        ref = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, use_kernel=1)
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, uniform=None, reciprocal=None,
+                                   use_kernel=1)
         npt.assert_array_equal(val, ref)
-        for bad in (2.5, 1):
-            with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, uniform=bad)
-            self.assertIn("'uniform'", str(ctx.exception))
+        for flag in ("uniform", "reciprocal"):
+            for bad in (2.5, 1):
+                with self.assertRaises(TypeError) as ctx:
+                    quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, self.pos_b, **{flag: bad})
+                self.assertIn(f"'{flag}'", str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

@@ -128,12 +128,12 @@ void quadriga_lib::sos_map(const arma::Mat<dtype> &spatial_freq,
     if (one_block)
     {
         arma::Mat<dtype> val(map[0].memptr(), n_pos, n_gen, false, true);
-        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, {}, {}, {}, {}, (dtype)1.0, uniform, use_kernel);
+        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, {}, 1.0, true, uniform, use_kernel);
     }
     else
     {
         arma::Mat<dtype> val;
-        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, {}, {}, {}, {}, (dtype)1.0, uniform, use_kernel);
+        quadriga_lib::sos_val<dtype>(spatial_freq, phase, pos, val, {}, 1.0, true, uniform, use_kernel);
         const long long n_gen_ll = (long long)n_gen;
 #pragma omp parallel for if (n_pos * n_gen > 65536)
         for (long long g = 0; g < n_gen_ll; ++g)

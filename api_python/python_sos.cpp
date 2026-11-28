@@ -37,10 +37,8 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
           py::kw_only(),
-          py::arg("phase_b") = py::none(),
-          py::arg("acf") = py::none(),
-          py::arg("dist") = py::none(),
           py::arg("spatial_freq_scale_b") = 1.0,
+          py::arg("reciprocal") = true,
           py::arg("uniform") = false,
           py::arg("use_kernel") = 0);
 
@@ -88,10 +86,8 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
           py::kw_only(),
-          py::arg("phase_b_in") = py::none(),
-          py::arg("acf") = py::none(),
-          py::arg("dist") = py::none(),
-          py::arg("spatial_freq_scale_b") = 1.0);
+          py::arg("spatial_freq_scale_b") = 1.0,
+          py::arg("reciprocal") = true);
 
     m.def("acf_2d", &sos_acf_2d,
           py::arg("acf").none(false),
@@ -114,8 +110,6 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("bins").none(false),
           py::arg("n_pos"),
           py::kw_only(),
-          py::arg("acf") = py::none(),
-          py::arg("dist") = py::none(),
           py::arg("seed") = -1);
 
     m.def("generate", &sos_generate,

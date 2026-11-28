@@ -18,8 +18,11 @@ void qd_SOS_GENERIC(const double *fx, const double *fy, const double *fz,
                     const size_t n_gen,
                     const double *px, const double *py, const double *pz,
                     const size_t n_pos,
-                    double *val)
+                    double *val,
+                    const double *gx, const double *gy, const double *gz,
+                    const double *qx, const double *qy, const double *qz)
 {
+    const bool two = gx != nullptr;
     const double two_pi = 6.283185307179586;
     const long long n_pos_ll = (long long)n_pos;
 
@@ -46,12 +49,24 @@ void qd_SOS_GENERIC(const double *fx, const double *fy, const double *fz,
             const size_t ip = (size_t)i_pos;
             const double x = px[ip], y = py[ip], z = pz[ip];
 
-            for (size_t n = 0; n < n_coeff; ++n)
+            if (two) // Second device: t = (f·x) + (g·y), the two parts computed alike, so that swapping them gives the same sum
             {
-                double t = fx[n] * x + fy[n] * y + fz[n] * z; // Phase in cycles
-                t -= std::floor(t + 0.5);                     // Reduced to [-0.5, 0.5)
-                c[n] = std::cos(two_pi * t), s[n] = std::sin(two_pi * t);
+                const double xb = qx[ip], yb = qy[ip], zb = qz[ip];
+                for (size_t n = 0; n < n_coeff; ++n)
+                {
+                    const double ta = fx[n] * x + fy[n] * y + fz[n] * z, tb = gx[n] * xb + gy[n] * yb + gz[n] * zb;
+                    double t = ta + tb;
+                    t -= std::floor(t + 0.5);
+                    c[n] = std::cos(two_pi * t), s[n] = std::sin(two_pi * t);
+                }
             }
+            else
+                for (size_t n = 0; n < n_coeff; ++n)
+                {
+                    double t = fx[n] * x + fy[n] * y + fz[n] * z; // Phase in cycles
+                    t -= std::floor(t + 0.5);                     // Reduced to [-0.5, 0.5)
+                    c[n] = std::cos(two_pi * t), s[n] = std::sin(two_pi * t);
+                }
 
             // Four generators per pass over the sinusoids; each sum is still added in the order of the sinusoids
             size_t g = 0;

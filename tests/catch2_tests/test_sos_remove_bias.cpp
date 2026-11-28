@@ -8,12 +8,15 @@
 
 // Verification suite for quadriga_lib::sos_remove_bias.
 //
-// Pins down: that the sample mean is zero after the call in all three device modes, the closed form of
-// the offset, that one common offset is applied per generator, the phase range, the two diagnostic
-// outputs, the documented effect on the variance, float and double, input validation.
+// Pins down: that the sample mean is zero after the call for one device and for two devices (reciprocal, and
+// not reciprocal with a frequency scale), the closed form of the offset, that one common offset is applied
+// per generator, the phase range, the two diagnostic outputs, the documented effect on the variance, float
+// and double, input validation.
 // Oracles, independent of the function:
-//  - the mean of the values of sos_val (GENERIC kernel, own suite) over the positions, before and after
-//  - the closed form offset = pi/2 - arg(Z), with Z accumulated here in scalar complex arithmetic
+//  - the mean of the values of sos_val (GENERIC kernel, own suite) over the positions, before and after,
+//    with the same two-device arguments
+//  - the closed form offset = pi/2 - arg(Z), with Z accumulated here in scalar complex arithmetic, for two
+//    devices with the permutation of the sinusoids typed from its definition (as in the sos_val suite)
 //  - a brute-force scan: the mean as a function of a common phase offset, sampled on 3600 points, has
 //    its zero where the function put it
 //  - the variance after the correction, 1 - mean(c^2)/v, with c and v computed here from the ACF of
@@ -29,6 +32,8 @@
 #include <complex>
 #include <random>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -60,30 +65,68 @@ namespace
 
     // Mean over the positions of the values of sos_val for generator g (GENERIC kernel)
     double mean_val(const arma::mat &spatial_freq, const arma::mat &phase, arma::uword g, const arma::mat &pos, const arma::mat &pos_b = arma::mat(),
-                    const arma::mat &phase_b = arma::mat(), const arma::vec &acf = arma::vec(), const arma::vec &dist = arma::vec(), double scale = 1.0)
+                    double scale = 1.0, bool reciprocal = true)
     {
-        arma::mat ph = phase.col(g), phb, val;
-        if (!phase_b.is_empty())
-            phb = phase_b.col(g);
-        quadriga_lib::sos_val(spatial_freq, ph, pos, val, pos_b, phb, acf, dist, scale, false, 1);
+        arma::mat ph = phase.col(g), val;
+        quadriga_lib::sos_val(spatial_freq, ph, pos, val, pos_b, scale, reciprocal, false, 1);
         return arma::mean(val.col(0));
     }
 
-    // Oracle: Z = sum_n exp( j·phi_n ) · mean_p exp( j·2·pi · f_n·x_p ) for one device
-    std::complex<double> ref_Z(const arma::mat &spatial_freq, const arma::mat &phase, arma::uword g, const arma::mat &pos, double scale = 1.0)
+    // Oracle: the fixed permutation of the sinusoids for two devices, typed from its definition: Sattolo's algorithm with
+    // the upper 53 bits of std::mt19937_64(2021) as uniform numbers in [0, 1)
+    std::vector<arma::uword> ref_perm(arma::uword n)
     {
-        std::complex<double> Z(0.0, 0.0);
-        for (arma::uword n = 0; n < spatial_freq.n_rows; ++n)
+        std::vector<arma::uword> p(n);
+        for (arma::uword i = 0; i < n; ++i)
+            p[i] = i;
+        std::mt19937_64 rng(2021);
+        for (arma::uword i = n; i > 1; --i)
         {
-            std::complex<double> z(0.0, 0.0);
-            for (arma::uword p = 0; p < pos.n_rows; ++p)
+            const double u = (double)(rng() >> 11) * (1.0 / 9007199254740992.0);
+            std::swap(p[i - 1], p[(arma::uword)(u * (double)(i - 1))]);
+        }
+        return p;
+    }
+
+    // Oracle: Z = sum_n exp( j·phi_n ) · z_n, with the mean of the values = sqrt(2/N) · Re( Z )
+    // - One device (pos_b empty): z_n = mean_p exp( j·2·pi · f_n·a_p )
+    // - Two devices: z_n = mean_p exp( j·2·pi · (f_n·a_p + scale·f_p(n)·b_p) ); reciprocal adds the exchanged term
+    //   exp( j·2·pi · (f_p(n)·a_p + f_n·b_p) ) and weights both with 1 / sqrt( 2 + 2·c_p ),
+    //   c_p = (1/N) · sum_n cos( 2·pi · (f_n - f_p(n))·(a_p - b_p) )
+    std::complex<double> ref_Z(const arma::mat &spatial_freq, const arma::mat &phase, arma::uword g, const arma::mat &pos,
+                               const arma::mat &pos_b = arma::mat(), double scale = 1.0, bool reciprocal = true)
+    {
+        const arma::uword N = spatial_freq.n_rows;
+        const std::vector<arma::uword> p = ref_perm(N);
+        auto dot = [&](arma::uword n, const arma::mat &x, arma::uword q)
+        {
+            double arg = 0.0;
+            for (arma::uword c = 0; c < x.n_cols; ++c)
+                arg += spatial_freq(n, c) * x(q, c);
+            return arg;
+        };
+        std::complex<double> Z(0.0, 0.0);
+        for (arma::uword q = 0; q < pos.n_rows; ++q)
+        {
+            double w = 1.0;
+            if (!pos_b.is_empty() && reciprocal)
             {
-                double arg = 0.0;
-                for (arma::uword c = 0; c < pos.n_cols; ++c)
-                    arg += scale * spatial_freq(n, c) * pos(p, c);
-                z += std::polar(1.0, 2.0 * pi * arg);
+                double c = 0.0;
+                for (arma::uword n = 0; n < N; ++n)
+                    c += std::cos(2.0 * pi * (dot(n, pos, q) - dot(p[n], pos, q) - dot(n, pos_b, q) + dot(p[n], pos_b, q))) / (double)N;
+                w = 1.0 / std::sqrt(2.0 + 2.0 * c);
             }
-            Z += z / (double)pos.n_rows * std::polar(1.0, phase(n, g));
+            for (arma::uword n = 0; n < N; ++n)
+            {
+                std::complex<double> z = std::polar(1.0, 2.0 * pi * dot(n, pos, q));
+                if (!pos_b.is_empty())
+                {
+                    z = std::polar(1.0, 2.0 * pi * (dot(n, pos, q) + scale * dot(p[n], pos_b, q)));
+                    if (reciprocal)
+                        z += std::polar(1.0, 2.0 * pi * (dot(p[n], pos, q) + dot(n, pos_b, q)));
+                }
+                Z += w * z * std::polar(1.0, phase(n, g)) / (double)pos.n_rows;
+            }
         }
         return Z;
     }
@@ -100,7 +143,7 @@ TEST_CASE("sos_remove_bias - one device: the mean vanishes and the offset is the
 {
     arma::mat spatial_freq = rnd(48, 3, -0.05, 0.05, 1), phase0 = rnd(48, 5, -pi, pi, 2), pos = positions(40, 60.0, 3);
     arma::mat phase = phase0, offset, before;
-    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, {}, (arma::mat *)nullptr, {}, {}, &offset, &before);
+    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, {}, 1.0, true, &offset, &before);
     REQUIRE(phase.n_rows == 48);
     REQUIRE(phase.n_cols == 5);
     REQUIRE(offset.n_rows == 5);
@@ -136,7 +179,7 @@ TEST_CASE("sos_remove_bias - a brute-force scan over the offset finds the same z
 {
     arma::mat spatial_freq = rnd(32, 3, -0.05, 0.05, 4), phase0 = rnd(32, 1, -pi, pi, 5), pos = positions(25, 40.0, 6);
     arma::mat phase = phase0, offset;
-    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, {}, (arma::mat *)nullptr, {}, {}, &offset);
+    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, {}, 1.0, true, &offset);
     REQUIRE(offset.n_elem == 1);
 
     // The mean as a function of the offset is a sinusoid with period 2·pi and two zeros half a period apart
@@ -158,82 +201,96 @@ TEST_CASE("sos_remove_bias - a brute-force scan over the offset finds the same z
     CHECK(std::abs(mean_val(spatial_freq, phase, 0, pos)) < best + 1e-13);              // At least as good as the scan
 }
 
-TEST_CASE("sos_remove_bias - two devices on the same map: the mean of the combined value vanishes")
+TEST_CASE("sos_remove_bias - two devices, reciprocal: the mean of the two-device value vanishes")
 {
     arma::mat spatial_freq = rnd(48, 3, -0.05, 0.05, 7), phase0 = rnd(48, 4, -pi, pi, 8);
     arma::mat pa = positions(40, 60.0, 9), pb = positions(40, 60.0, 10);
     pb.row(0) = pa.row(0); // One pair at the same place
-    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
 
     arma::mat phase = phase0, offset, before;
-    quadriga_lib::sos_remove_bias(spatial_freq, phase, pa, pb, (arma::mat *)nullptr, acf, dist, &offset, &before);
+    quadriga_lib::sos_remove_bias(spatial_freq, phase, pa, pb, 1.0, true, &offset, &before);
     REQUIRE(offset.n_rows == 4);
     REQUIRE(offset.n_cols == 1);
+    REQUIRE(before.n_rows == 4);
     REQUIRE(before.n_cols == 1);
 
-    QD_DIAG("\n# diag: sos_remove_bias same map\ngen,mean_before,reported,mean_after,offset\n");
+    // Swapping the devices gives the same value of sos_val, so the same correction
+    arma::mat phase_sw = phase0, offset_sw;
+    quadriga_lib::sos_remove_bias(spatial_freq, phase_sw, pb, pa, 1.0, true, &offset_sw);
+
+    QD_DIAG("\n# diag: sos_remove_bias two devices, reciprocal\ngen,mean_before,reported,mean_after,offset,closed_form\n");
     for (arma::uword g = 0; g < 4; ++g)
     {
-        double m0 = mean_val(spatial_freq, phase0, g, pa, pb, {}, acf, dist), m1 = mean_val(spatial_freq, phase, g, pa, pb, {}, acf, dist);
-        QD_DIAG("%llu,%.6f,%.6f,%.2e,%.6f\n", (unsigned long long)g, m0, before(g, 0), m1, offset(g, 0));
+        double m0 = mean_val(spatial_freq, phase0, g, pa, pb), m1 = mean_val(spatial_freq, phase, g, pa, pb);
+        std::complex<double> Z = ref_Z(spatial_freq, phase0, g, pa, pb);
+        double closed = pi / 2.0 - std::arg(Z);
+        QD_DIAG("%llu,%.6f,%.6f,%.2e,%.6f,%.6f\n", (unsigned long long)g, m0, before(g, 0), m1, offset(g, 0), std::remainder(closed, pi));
         INFO("generator " << g);
         CHECK(std::abs(m0) > 1e-3);
         CHECK(std::abs(m1) < 1e-13);
         CHECK(std::abs(before(g, 0) - m0) < 1e-13);
+        CHECK(std::abs(before(g, 0) - std::sqrt(2.0 / 48.0) * Z.real()) < 1e-13);
+        CHECK(diff_mod_pi(offset(g, 0), closed) < 1e-12);
         CHECK(std::abs(offset(g, 0)) <= pi / 2.0 + 1e-12);
+        CHECK(std::abs(offset_sw(g, 0) - offset(g, 0)) < 1e-12);
         double max_dev = 0.0;
         for (arma::uword n = 0; n < 48; ++n)
             max_dev = std::max(max_dev, std::abs(std::remainder(phase(n, g) - phase0(n, g) - offset(g, 0), 2.0 * pi)));
         CHECK(max_dev < 1e-13);
     }
+    CHECK(phase.min() >= -pi);
+    CHECK(phase.max() < pi);
 
-    // The single-device mean is not zero in this mode: the correction belongs to the combined value
+    // The correction belongs to the reciprocal two-device value: the single-device mean and the mean of the
+    // non-reciprocal value are not zero
     CHECK(std::abs(mean_val(spatial_freq, phase, 0, pa)) > 1e-6);
+    CHECK(std::abs(mean_val(spatial_freq, phase, 0, pa, pb, 1.0, false)) > 1e-6);
 }
 
-TEST_CASE("sos_remove_bias - two devices on different maps: each device has zero mean on its own positions")
+TEST_CASE("sos_remove_bias - two devices, not reciprocal: the mean vanishes for any frequency scale")
 {
-    arma::mat spatial_freq = rnd(48, 3, -0.05, 0.05, 11), pa0 = rnd(48, 3, -pi, pi, 12), pb0 = rnd(48, 3, -pi, pi, 13);
-    arma::mat pos_a = positions(40, 60.0, 14), pos_b = positions(40, 60.0, 15), pos_b25 = positions(25, 60.0, 16);
+    arma::mat spatial_freq = rnd(48, 3, -0.05, 0.05, 11), phase0 = rnd(48, 3, -pi, pi, 12);
+    arma::mat pos_a = positions(40, 60.0, 14), pos_b = positions(40, 60.0, 15);
 
     for (double scale : {1.0, 2.5})
     {
-        arma::mat ph_a = pa0, ph_b = pb0, offset, before;
-        quadriga_lib::sos_remove_bias(spatial_freq, ph_a, pos_a, pos_b, &ph_b, {}, {}, &offset, &before, scale);
+        arma::mat phase = phase0, offset, before;
+        quadriga_lib::sos_remove_bias(spatial_freq, phase, pos_a, pos_b, scale, false, &offset, &before);
         REQUIRE(offset.n_rows == 3);
-        REQUIRE(offset.n_cols == 2);
+        REQUIRE(offset.n_cols == 1);
         REQUIRE(before.n_rows == 3);
-        REQUIRE(before.n_cols == 2);
+        REQUIRE(before.n_cols == 1);
 
-        arma::mat freq_b = spatial_freq * scale;
-        QD_DIAG("\n# diag: sos_remove_bias two maps, frequency scale %.1f\ngen,before_a,before_b,after_a,after_b,after_combined,offset_a,offset_b\n", scale);
+        QD_DIAG("\n# diag: sos_remove_bias two devices, not reciprocal, frequency scale %.1f\ngen,mean_before,reported,mean_after,mean_exchanged,offset,closed_form\n", scale);
         for (arma::uword g = 0; g < 3; ++g)
         {
-            double a0 = mean_val(spatial_freq, pa0, g, pos_a), b0 = mean_val(freq_b, pb0, g, pos_b);
-            double a1 = mean_val(spatial_freq, ph_a, g, pos_a), b1 = mean_val(freq_b, ph_b, g, pos_b);
-            double comb = mean_val(spatial_freq, ph_a, g, pos_a, pos_b, ph_b, {}, {}, scale);
-            QD_DIAG("%llu,%.6f,%.6f,%.2e,%.2e,%.2e,%.5f,%.5f\n", (unsigned long long)g, a0, b0, a1, b1, comb, offset(g, 0), offset(g, 1));
+            double m0 = mean_val(spatial_freq, phase0, g, pos_a, pos_b, scale, false), m1 = mean_val(spatial_freq, phase, g, pos_a, pos_b, scale, false);
+            double m_ex = mean_val(spatial_freq, phase, g, pos_b, pos_a, scale, false);
+            std::complex<double> Z = ref_Z(spatial_freq, phase0, g, pos_a, pos_b, scale, false);
+            double closed = pi / 2.0 - std::arg(Z);
+            QD_DIAG("%llu,%.6f,%.6f,%.2e,%.2e,%.5f,%.5f\n", (unsigned long long)g, m0, before(g, 0), m1, m_ex, offset(g, 0), std::remainder(closed, pi));
             INFO("scale " << scale << ", generator " << g);
-            CHECK(std::abs(a0) > 1e-3);
-            CHECK(std::abs(b0) > 1e-3);
-            CHECK(std::abs(a1) < 1e-13);
-            CHECK(std::abs(b1) < 1e-13);
-            CHECK(std::abs(comb) < 1e-13);
-            CHECK(std::abs(before(g, 0) - a0) < 1e-13);
-            CHECK(std::abs(before(g, 1) - b0) < 1e-13);
-            CHECK(diff_mod_pi(offset(g, 0), pi / 2.0 - std::arg(ref_Z(spatial_freq, pa0, g, pos_a))) < 1e-12);
-            CHECK(diff_mod_pi(offset(g, 1), pi / 2.0 - std::arg(ref_Z(spatial_freq, pb0, g, pos_b, scale))) < 1e-12);
+            CHECK(std::abs(m0) > 1e-3);
+            CHECK(std::abs(m1) < 1e-13);
+            CHECK(std::abs(before(g, 0) - m0) < 1e-13);
+            CHECK(std::abs(before(g, 0) - std::sqrt(2.0 / 48.0) * Z.real()) < 1e-13);
+            CHECK(diff_mod_pi(offset(g, 0), closed) < 1e-12);
+            CHECK(std::abs(offset(g, 0)) <= pi / 2.0 + 1e-12);
+            CHECK(std::abs(m_ex) > 1e-6); // The exchanged devices are another field, its mean is not removed
+            double max_dev = 0.0;
+            for (arma::uword n = 0; n < 48; ++n)
+                max_dev = std::max(max_dev, std::abs(std::remainder(phase(n, g) - phase0(n, g) - offset(g, 0), 2.0 * pi)));
+            CHECK(max_dev < 1e-13);
         }
-        CHECK(ph_b.min() >= -pi);
-        CHECK(ph_b.max() < pi);
-        CHECK(arma::abs(ph_b - pb0).max() > 1e-3);
+        CHECK(phase.min() >= -pi);
+        CHECK(phase.max() < pi);
     }
 
-    // The two devices may have different numbers of positions in this mode
-    arma::mat ph_a = pa0, ph_b = pb0;
-    quadriga_lib::sos_remove_bias(spatial_freq, ph_a, pos_a, pos_b25, &ph_b);
-    CHECK(std::abs(mean_val(spatial_freq, ph_a, 1, pos_a)) < 1e-13);
-    CHECK(std::abs(mean_val(spatial_freq, ph_b, 1, pos_b25)) < 1e-13);
+    // The correction belongs to the scale it was computed for
+    arma::mat phase = phase0;
+    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos_a, pos_b, 2.5, false);
+    CHECK(std::abs(mean_val(spatial_freq, phase, 1, pos_a, pos_b, 2.5, false)) < 1e-13);
+    CHECK(std::abs(mean_val(spatial_freq, phase, 1, pos_a, pos_b, 1.0, false)) > 1e-6);
 }
 
 TEST_CASE("sos_remove_bias - the variance after the correction is that of a field with zero sample mean")
@@ -247,9 +304,9 @@ TEST_CASE("sos_remove_bias - the variance after the correction is that of a fiel
     REQUIRE(spatial_freq.n_rows == n_coeff);
     arma::mat phase = rnd(n_coeff, n_gen, -pi, pi, 17), pos = positions(n_pos, 20.0, 18), val0, val1;
 
-    quadriga_lib::sos_val(spatial_freq, phase, pos, val0, {}, {}, {}, {}, 1.0, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, val0, {}, 1.0, true, false, 1);
     quadriga_lib::sos_remove_bias(spatial_freq, phase, pos);
-    quadriga_lib::sos_val(spatial_freq, phase, pos, val1, {}, {}, {}, {}, 1.0, false, 1);
+    quadriga_lib::sos_val(spatial_freq, phase, pos, val1, {}, 1.0, true, false, 1);
     REQUIRE(val1.n_rows == n_pos);
     REQUIRE(val1.n_cols == n_gen);
 
@@ -297,7 +354,7 @@ TEST_CASE("sos_remove_bias - a second call changes nothing, outputs are optional
     arma::mat once = phase0, twice, offset(7, 7), before;
     quadriga_lib::sos_remove_bias(spatial_freq, once, pos);
     twice = once;
-    quadriga_lib::sos_remove_bias(spatial_freq, twice, pos, {}, (arma::mat *)nullptr, {}, {}, &offset, &before);
+    quadriga_lib::sos_remove_bias(spatial_freq, twice, pos, {}, 1.0, true, &offset, &before);
     REQUIRE(offset.n_rows == 3);
     REQUIRE(offset.n_cols == 1);
     CHECK(arma::abs(once - phase0).max() > 1e-3);
@@ -315,7 +372,7 @@ TEST_CASE("sos_remove_bias - a second call changes nothing, outputs are optional
     // Float: the phases are rounded to single precision, which limits the remaining mean. A phase error of
     // 2.4e-7 rad on 48 terms of amplitude 0.2 gives at most 2.3e-6.
     arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq), pf = arma::conv_to<arma::fmat>::from(phase0), posf = arma::conv_to<arma::fmat>::from(pos), of, bf;
-    quadriga_lib::sos_remove_bias(ff, pf, posf, {}, (arma::fmat *)nullptr, {}, {}, &of, &bf);
+    quadriga_lib::sos_remove_bias(ff, pf, posf, {}, 1.0, true, &of, &bf);
     REQUIRE(of.n_rows == 3);
     REQUIRE(bf.n_rows == 3);
     arma::mat ffd = arma::conv_to<arma::mat>::from(ff), pfd = arma::conv_to<arma::mat>::from(pf), posd = arma::conv_to<arma::mat>::from(posf);
@@ -328,18 +385,31 @@ TEST_CASE("sos_remove_bias - a second call changes nothing, outputs are optional
 
 TEST_CASE("sos_remove_bias - input validation")
 {
-    arma::mat spatial_freq = rnd(10, 3, -0.05, 0.05, 22), phase = rnd(10, 2, -pi, pi, 23), phase_b = rnd(10, 2, -pi, pi, 24);
+    arma::mat spatial_freq = rnd(10, 3, -0.05, 0.05, 22), phase = rnd(10, 2, -pi, pi, 23);
     arma::mat pos = positions(8, 60.0, 25), pos_b = positions(8, 60.0, 26);
-    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
     arma::mat *no_mat = nullptr;
-    arma::vec *no_vec = nullptr;
+
+    // Message of the invalid_argument a call throws, empty if it does not throw
+    auto message = [](auto &&call)
+    {
+        try
+        {
+            call();
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return std::string(e.what());
+        }
+        return std::string();
+    };
 
     SECTION("valid baseline")
     {
-        arma::mat p = phase, pb = phase_b;
+        arma::mat p = phase;
         CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos));
-        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, no_mat, acf, dist));
-        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb, {}, {}, no_mat, no_mat, 2.0));
+        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b));
+        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, 1.0, false));
+        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, 2.0, false));
     }
     SECTION("spatial_freq")
     {
@@ -358,53 +428,33 @@ TEST_CASE("sos_remove_bias - input validation")
         arma::mat empty, f2 = spatial_freq.cols(0, 1), rows = positions(7, 60.0, 27), p = phase;
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, empty), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, pos), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, rows, no_mat, acf, dist), std::invalid_argument); // Same map needs pairs
-        // pos_b with more columns than spatial_freq, on the same map and on two maps
-        arma::mat p2 = pos.cols(0, 1), pb = phase_b;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, p2, pos_b, no_mat, acf, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, p2, pos_b, &pb), std::invalid_argument);
-        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(f2, p, p2, p2, &pb));
-    }
-    SECTION("phase_b")
-    {
-        arma::mat cols(10, 3, arma::fill::ones), p = phase, pb = phase_b;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &cols), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, &pb), std::invalid_argument);
-    }
-    SECTION("acf and dist")
-    {
-        arma::vec bad = dist + 1.0;
-        arma::mat p = phase;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, no_mat, acf, bad), std::invalid_argument);
-        // Non-finite table
-        arma::vec inf_dist = dist;
-        inf_dist(50) = arma::datum::inf;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, no_mat, acf, inf_dist), std::invalid_argument);
-        // An ACF value of -1 or below makes the normalisation of the pair singular
-        arma::vec minus_one = acf, below = acf;
-        minus_one(7) = -1.0, below(7) = -1.2;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, no_mat, minus_one, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, no_mat, below, dist), std::invalid_argument);
-        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
-    }
-    SECTION("phase_b is the same object as phase")
-    {
-        // One matrix for both devices would be corrected twice, and the second correction undoes the first
-        arma::mat p = phase, pb = phase;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &p), std::invalid_argument);
-        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
-        // Two matrices with equal values are two maps with the same phases and are accepted
-        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb));
+        // pos_b needs one row per row of pos in both two-device modes
+        CHECK(message([&] { quadriga_lib::sos_remove_bias(spatial_freq, p, pos, rows); }) == "Number of rows in 'pos_b' does not match number of rows in 'pos'.");
+        CHECK(message([&] { quadriga_lib::sos_remove_bias(spatial_freq, p, pos, rows, 2.0, false); }) == "Number of rows in 'pos_b' does not match number of rows in 'pos'.");
+        // pos_b with more columns than spatial_freq
+        arma::mat p2 = pos.cols(0, 1);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, p2, pos_b), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(f2, p, p2, pos_b, 2.0, false), std::invalid_argument);
+        CHECK_NOTHROW(quadriga_lib::sos_remove_bias(f2, p, p2, p2));
     }
     SECTION("spatial_freq_scale_b")
     {
-        arma::mat p = phase, pb = phase_b;
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb, {}, {}, no_mat, no_mat, 0.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, no_mat, acf, dist, no_mat, no_mat, 2.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, no_mat, {}, {}, no_mat, no_mat, 2.0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb, {}, {}, no_mat, no_mat, std::nan("")), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb, {}, {}, no_mat, no_mat, arma::datum::inf), std::invalid_argument);
+        arma::mat p = phase;
+        for (double bad : {0.0, -1.0, std::nan(""), arma::datum::inf})
+        {
+            INFO("scale " << bad);
+            CHECK(message([&] { quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, bad, false); }) == "Input 'spatial_freq_scale_b' must be finite and > 0.");
+        }
+        // A scale other than 1 needs a second device and the non-reciprocal mode
+        CHECK(message([&] { quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, 2.0, false); }) == "Input 'spatial_freq_scale_b' other than 1 requires 'pos_b'.");
+        CHECK(message([&] { quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, 2.0); }) == "Input 'spatial_freq_scale_b' other than 1 requires 'reciprocal = false'.");
+        CHECK(message([&] { quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, 2.0, true); }) == "Input 'spatial_freq_scale_b' other than 1 requires 'reciprocal = false'.");
+        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
+        // The reciprocal flag alone is accepted with one device: it has no effect there
+        arma::mat q = phase, r = phase;
+        quadriga_lib::sos_remove_bias(spatial_freq, q, pos, {}, 1.0, false);
+        quadriga_lib::sos_remove_bias(spatial_freq, r, pos);
+        CHECK(arma::approx_equal(q, r, "absdiff", 0.0));
     }
     SECTION("a failed call leaves the phases untouched")
     {
@@ -416,37 +466,30 @@ TEST_CASE("sos_remove_bias - input validation")
 
 TEST_CASE("sos_remove_bias - an argument that is written cannot share memory with another argument")
 {
-    // 'phase' and 'phase_b' are updated in place, 'offset' and 'mean_before' are written. A second matrix
-    // object on the same memory, or on part of it, is rejected like the same object: the call throws before
-    // anything is written. Memory that only touches another argument is accepted.
-    arma::mat spatial_freq = rnd(10, 3, -0.05, 0.05, 22), phase = rnd(10, 2, -pi, pi, 23), phase_b = rnd(10, 2, -pi, pi, 24);
+    // 'phase' is updated in place, 'offset' and 'mean_before' are written. A second matrix object on the same
+    // memory, or on part of it, is rejected like the same object: the call throws before anything is written.
+    // Memory that only touches another argument is accepted.
+    arma::mat spatial_freq = rnd(10, 3, -0.05, 0.05, 22), phase = rnd(10, 2, -pi, pi, 23);
     arma::mat pos = positions(8, 60.0, 25), pos_b = positions(8, 60.0, 26);
     arma::mat *no_mat = nullptr;
-    arma::vec *no_vec = nullptr;
 
-    SECTION("phase_b on the memory of phase")
+    SECTION("phase on the memory of pos_b")
     {
-        arma::mat p = phase;
-        arma::mat pb(p.memptr(), p.n_rows, p.n_cols, false, true);
+        // pos_b [8, 3] as a view on a block that also holds phase [10, 2] on elements 4 to 23
+        arma::vec block(24);
+        std::copy(pos_b.begin(), pos_b.end(), block.begin());
+        arma::vec keep = block;
+        arma::mat pb(block.memptr(), 8, 3, false, true), p(block.memptr() + 4, 10, 2, false, true);
         std::string msg;
         try
         {
-            quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb);
+            quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pb);
         }
         catch (const std::invalid_argument &e)
         {
             msg = e.what();
         }
-        CHECK(msg.find("'phase_b'") != std::string::npos);
-        CHECK(msg.find("'phase'") != std::string::npos);
-        CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
-    }
-    SECTION("phase_b on part of the memory of phase")
-    {
-        // One block of three columns: phase on columns 0 and 1, phase_b on columns 1 and 2
-        arma::mat block = arma::join_rows(phase, phase_b.col(1)), keep = block;
-        arma::mat p(block.colptr(0), 10, 2, false, true), pb(block.colptr(1), 10, 2, false, true);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb), std::invalid_argument);
+        CHECK(msg == "Output 'phase' cannot be an input or share memory with one.");
         CHECK(arma::approx_equal(block, keep, "absdiff", 0.0));
     }
     SECTION("phase on part of the memory of an input")
@@ -465,31 +508,32 @@ TEST_CASE("sos_remove_bias - an argument that is written cannot share memory wit
     }
     SECTION("offset and mean_before on the memory of another argument")
     {
-        arma::mat p = phase, ps = pos, pb = phase_b;
+        arma::mat p = phase, ps = pos, pbs = pos_b;
         arma::mat off_p(p.memptr() + 5, 2, 1, false, true), mean_ps(ps.memptr() + 3, 2, 1, false, true);
-        arma::mat off_pb(pb.memptr() + 16, 2, 2, false, true), off(2, 1), mean(2, 1);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, no_mat, {}, {}, &off_p), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, ps, {}, no_mat, {}, {}, &off, &mean_ps), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb, {}, {}, &off_pb), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, no_mat, {}, {}, &off, &off), std::invalid_argument);
+        arma::mat off_pb(pbs.memptr() + 16, 2, 1, false, true), off(2, 1), mean(2, 1);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, 1.0, true, &off_p), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, ps, {}, 1.0, true, &off, &mean_ps), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pbs, 1.0, true, &off_pb), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pbs, 2.0, false, no_mat, &off_pb), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, {}, 1.0, true, &off, &off), std::invalid_argument);
         CHECK(arma::approx_equal(p, phase, "absdiff", 0.0));
         CHECK(arma::approx_equal(ps, pos, "absdiff", 0.0));
-        CHECK(arma::approx_equal(pb, phase_b, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pbs, pos_b, "absdiff", 0.0));
     }
     SECTION("memory next to another argument is accepted")
     {
-        arma::mat p_ref = phase, pb_ref = phase_b, off_ref, mean_ref;
-        quadriga_lib::sos_remove_bias(spatial_freq, p_ref, pos, pos_b, &pb_ref, {}, {}, &off_ref, &mean_ref);
+        arma::mat p_ref = phase, off_ref, mean_ref;
+        quadriga_lib::sos_remove_bias(spatial_freq, p_ref, pos, pos_b, 1.0, true, &off_ref, &mean_ref);
 
-        // One block: phase on elements 0 to 19, phase_b on 20 to 39, offset on 40 to 43, mean_before on 44 to 47
+        // One block: phase on elements 0 to 19, pos_b on 20 to 43, offset on 44 to 45, mean_before on 46 to 47
         arma::vec block(48);
         std::copy(phase.begin(), phase.end(), block.begin());
-        std::copy(phase_b.begin(), phase_b.end(), block.begin() + 20);
-        arma::mat p(block.memptr(), 10, 2, false, true), pb(block.memptr() + 20, 10, 2, false, true);
-        arma::mat off(block.memptr() + 40, 2, 2, false, true), mean(block.memptr() + 44, 2, 2, false, true);
-        REQUIRE_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pos_b, &pb, {}, {}, &off, &mean));
+        std::copy(pos_b.begin(), pos_b.end(), block.begin() + 20);
+        arma::mat p(block.memptr(), 10, 2, false, true), pb(block.memptr() + 20, 8, 3, false, true);
+        arma::mat off(block.memptr() + 44, 2, 1, false, true), mean(block.memptr() + 46, 2, 1, false, true);
+        REQUIRE_NOTHROW(quadriga_lib::sos_remove_bias(spatial_freq, p, pos, pb, 1.0, true, &off, &mean));
         CHECK(arma::approx_equal(p, p_ref, "absdiff", 0.0));
-        CHECK(arma::approx_equal(pb, pb_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(pb, pos_b, "absdiff", 0.0));
         CHECK(arma::approx_equal(off, off_ref, "absdiff", 0.0));
         CHECK(arma::approx_equal(mean, mean_ref, "absdiff", 0.0));
     }
@@ -504,7 +548,7 @@ TEST_CASE("sos_remove_bias - a generator whose mean is zero for every offset is 
     arma::mat phase = {{5.0, -0.3, 0.0}}, given = phase, offset(1, 1), before;
     offset.fill(9.0);
 
-    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, {}, (arma::mat *)nullptr, {}, {}, &offset, &before);
+    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, {}, 1.0, true, &offset, &before);
     REQUIRE(offset.n_rows == 3);
     REQUIRE(offset.n_cols == 1);
     REQUIRE(before.n_rows == 3);
@@ -520,7 +564,7 @@ TEST_CASE("sos_remove_bias - a generator whose mean is zero for every offset is 
     // One position more and the mean is no longer zero for every offset: the generator is corrected
     arma::mat pos3 = {{0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {0.7, 0.0, 0.0}};
     phase = given;
-    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos3, {}, (arma::mat *)nullptr, {}, {}, &offset);
+    quadriga_lib::sos_remove_bias(spatial_freq, phase, pos3, {}, 1.0, true, &offset);
     CHECK(std::abs(offset(0, 0)) > 1e-3);
     CHECK(phase(0, 0) != given(0, 0));
     CHECK(std::abs(mean_val(spatial_freq, phase, 0, pos3)) < 1e-14);
@@ -534,8 +578,8 @@ TEST_CASE("sos_remove_bias - phases outside the interval come back inside it")
     // corrected phases are wrapped into [-pi, pi).
     arma::mat spatial_freq = rnd(48, 3, -0.05, 0.05, 30), phase0 = rnd(48, 4, -pi, pi, 31), pos = positions(40, 60.0, 32);
     arma::mat inside = phase0, shifted = phase0 + 20.0, off_in, off_sh;
-    quadriga_lib::sos_remove_bias(spatial_freq, inside, pos, {}, (arma::mat *)nullptr, {}, {}, &off_in);
-    quadriga_lib::sos_remove_bias(spatial_freq, shifted, pos, {}, (arma::mat *)nullptr, {}, {}, &off_sh);
+    quadriga_lib::sos_remove_bias(spatial_freq, inside, pos, {}, 1.0, true, &off_in);
+    quadriga_lib::sos_remove_bias(spatial_freq, shifted, pos, {}, 1.0, true, &off_sh);
     REQUIRE(off_sh.n_rows == 4);
     QD_DIAG("\n# diag: sos_remove_bias input shifted by 20 rad: output %.4f to %.4f\n", shifted.min(), shifted.max());
     CHECK(shifted.min() >= -pi);
@@ -554,10 +598,10 @@ TEST_CASE("sos_remove_bias - phases outside the interval come back inside it")
 
 TEST_CASE("sos_remove_bias - devices with different numbers of position columns equal zero-padded positions")
 {
-    arma::mat spatial_freq = rnd(30, 3, -0.05, 0.05, 33), phase0 = rnd(30, 3, -pi, pi, 34), phase_b0 = rnd(30, 3, -pi, pi, 35);
+    arma::mat spatial_freq = rnd(30, 3, -0.05, 0.05, 33), phase0 = rnd(30, 3, -pi, pi, 34);
     arma::mat pa3 = rnd(25, 3, -30.0, 30.0, 36), pb3 = rnd(25, 3, -30.0, 30.0, 37);
-    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
 
+    // Mode 1: reciprocal; mode 2: not reciprocal with a frequency scale
     for (int mode = 1; mode <= 2; ++mode)
         for (arma::uword ca = 1; ca <= 3; ++ca)
             for (arma::uword cb = 1; cb <= 3; ++cb)
@@ -568,14 +612,15 @@ TEST_CASE("sos_remove_bias - devices with different numbers of position columns 
                 for (arma::uword c = cb; c < 3; ++c)
                     pb_pad.col(c).zeros();
                 arma::mat pa = pa3.cols(0, ca - 1), pb = pb3.cols(0, cb - 1);
-                arma::mat ph = phase0, phb = phase_b0, ph_ref = phase0, phb_ref = phase_b0, off, off_ref, mean, mean_ref;
-                quadriga_lib::sos_remove_bias(spatial_freq, ph, pa, pb, mode == 2 ? &phb : (arma::mat *)nullptr, acf, dist, &off, &mean, mode == 2 ? 0.7 : 1.0);
-                quadriga_lib::sos_remove_bias(spatial_freq, ph_ref, pa_pad, pb_pad, mode == 2 ? &phb_ref : (arma::mat *)nullptr, acf, dist, &off_ref, &mean_ref, mode == 2 ? 0.7 : 1.0);
+                arma::mat ph = phase0, ph_ref = phase0, off, off_ref, mean, mean_ref;
+                const double scale = mode == 2 ? 0.7 : 1.0;
+                quadriga_lib::sos_remove_bias(spatial_freq, ph, pa, pb, scale, mode == 1, &off, &mean);
+                quadriga_lib::sos_remove_bias(spatial_freq, ph_ref, pa_pad, pb_pad, scale, mode == 1, &off_ref, &mean_ref);
                 INFO("mode " << mode << ", columns " << ca << " and " << cb);
-                REQUIRE(off.n_cols == (arma::uword)mode);
+                REQUIRE(off.n_rows == 3);
+                REQUIRE(off.n_cols == 1);
                 CHECK(arma::abs(ph - phase0).max() > 1e-3);
                 CHECK(arma::approx_equal(ph, ph_ref, "absdiff", 1e-14)); // as for two columns above
-                CHECK(arma::approx_equal(phb, phb_ref, "absdiff", 1e-14));
                 CHECK(arma::approx_equal(off, off_ref, "absdiff", 1e-14));
                 CHECK(arma::approx_equal(mean, mean_ref, "absdiff", 1e-14));
             }
@@ -584,23 +629,23 @@ TEST_CASE("sos_remove_bias - devices with different numbers of position columns 
 TEST_CASE("sos_remove_bias - results do not depend on the number of threads")
 {
     // 1000 positions and 100 sinusoids: the sums over the positions run in a parallel loop over the sinusoids
-    arma::mat spatial_freq = rnd(100, 3, -0.05, 0.05, 38), phase0 = rnd(100, 7, -pi, pi, 39), phase_b0 = rnd(100, 7, -pi, pi, 40);
+    arma::mat spatial_freq = rnd(100, 3, -0.05, 0.05, 38), phase0 = rnd(100, 7, -pi, pi, 39);
     arma::mat pos = positions(1000, 300.0, 41), pos_b = positions(1000, 300.0, 42);
-    arma::vec dist = arma::regspace(0.0, 1.0, 50.0), acf = arma::exp(-dist / 10.0);
 
+    // Mode 0: one device; mode 1: two devices, reciprocal; mode 2: not reciprocal with a frequency scale
     for (int mode = 0; mode <= 2; ++mode)
     {
-        arma::mat ph[2], phb[2], off[2], mean[2];
+        arma::mat ph[2], off[2], mean[2];
         for (int run = 0; run < 2; ++run)
         {
-            ph[run] = phase0, phb[run] = phase_b0;
+            ph[run] = phase0;
 #ifdef _OPENMP
             int n_threads = omp_get_max_threads();
             if (run == 1)
                 omp_set_num_threads(1);
 #endif
-            quadriga_lib::sos_remove_bias(spatial_freq, ph[run], pos, mode == 0 ? arma::mat() : pos_b, mode == 2 ? &phb[run] : nullptr,
-                                          acf, dist, &off[run], &mean[run], mode == 2 ? 0.7 : 1.0);
+            quadriga_lib::sos_remove_bias(spatial_freq, ph[run], pos, mode == 0 ? arma::mat() : pos_b,
+                                          mode == 2 ? 0.7 : 1.0, mode != 2, &off[run], &mean[run]);
 #ifdef _OPENMP
             omp_set_num_threads(n_threads);
 #endif
@@ -608,7 +653,6 @@ TEST_CASE("sos_remove_bias - results do not depend on the number of threads")
         INFO("mode " << mode);
         CHECK(arma::abs(ph[0] - phase0).max() > 1e-3);
         CHECK(arma::approx_equal(ph[0], ph[1], "absdiff", 0.0));
-        CHECK(arma::approx_equal(phb[0], phb[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(off[0], off[1], "absdiff", 0.0));
         CHECK(arma::approx_equal(mean[0], mean[1], "absdiff", 0.0));
     }

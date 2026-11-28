@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -127,6 +128,21 @@ namespace
                 m = std::max(m, std::abs(rnd(l, g) - (uniform ? qd_unif(v) : v)));
             }
         return m;
+    }
+
+
+    // Random positions [3, n]: x, y uniform in [0, edge), z uniform in [1.5, 30); own generator
+    arma::mat drop5(arma::uword n, double edge, unsigned seed)
+    {
+        std::mt19937_64 rng(seed);
+        arma::mat p(3, n);
+        for (arma::uword i = 0; i < n; ++i)
+            for (arma::uword c = 0; c < 3; ++c)
+            {
+                const double u = (double)(rng() >> 11) / 9007199254740992.0;
+                p(c, i) = (c < 2) ? edge * u : 1.5 + 28.5 * u;
+            }
+        return p;
     }
 
     arma::mat rx5()
@@ -353,8 +369,11 @@ TEST_CASE("gbsm_draw - ray: block 14 of the shared set uses lambda_tau")
 
 TEST_CASE("gbsm_draw - ray: swapping Tx and Rx exchanges the mirror blocks")
 {
+    // Block 14 of the shared set is swap-reciprocal for equal cluster angle spreads at both ends only (its
+    // decorrelation distance at the Tx follows PerClusterAS_D in dual mobility)
     const arma::uword N = 2, M = 3;
-    const auto sp = scen(2.0, 3.0, 12.0);
+    auto sp = scen(2.0, 3.0, 12.0);
+    sp["PerClusterAS_D"] = sp.at("PerClusterAS_A");
     const arma::vec fc = {3.5e9};
     const arma::mat A = rx5();
     arma::mat B = rx5() * 0.7 + 20.0;
@@ -525,4 +544,37 @@ TEST_CASE("gbsm_draw - ray: input validation")
                              std::invalid_argument, Message("Input 'center_freq' must be finite and > 0."));
     CHECK(keep.n_rows == 2);
     CHECK(arma::all(arma::vectorise(keep) == 1.0));
+}
+
+TEST_CASE("gbsm_draw - ray: block 14 of the shared set changes at each end with the lambda_tau of that end")
+{
+    // Cluster ASA 22 deg, ASD 2.75 deg: lambda_tau 13.7 m at the Rx, 8 times longer at the Tx. 300 links of random
+    // Tx and Rx in a 600 m square, N = 1, M = 20 (6000 samples). Rate of change of block 14 (rms change per metre for a
+    // 5 cm move): with dual mobility the Rx rate equals the single-mobility rate (within 20 %), the Tx rate is the Rx
+    // rate times ASD/ASA = 1/8 (within 30 %). The sum of two one-device fields gives 1/sqrt(2) and 1.
+    const arma::uword N = 1, M = 20, b14 = 13 * N * M + N;
+    auto sp = scen(1.0, 20.0, 12.0);
+    sp["PerClusterAS_D"] = 2.75;
+    const arma::vec fc = {3.5e9};
+    const arma::mat tx = drop5(300, 600.0, 21), rx = drop5(300, 600.0, 22);
+    arma::mat mv(3, 300, arma::fill::zeros);
+    mv.row(0).fill(0.05);
+    const arma::cube phase = quadriga_lib::gbsm_init_phases(sp, "ray", 9);
+    auto blk = [&](const arma::mat &t, const arma::mat &r, bool dual)
+    {
+        arma::mat rnd;
+        quadriga_lib::gbsm_draw(sp, "ray", phase, t, r, rnd, -1, "Comb256", {}, fc, dual);
+        return arma::mat(rnd.cols(b14, b14 + N * M - 1));
+    };
+    auto rate = [](const arma::mat &a, const arma::mat &b)
+    { return std::sqrt(arma::accu(arma::square(b - a)) / (double)a.n_elem) / 0.05; };
+    const double r_single = rate(blk(tx, rx, false), blk(tx, rx + mv, false));
+    const arma::mat d0 = blk(tx, rx, true);
+    const double r_rx = rate(d0, blk(tx, rx + mv, true)), r_tx = rate(d0, blk(tx + mv, rx, true));
+    QD_DIAG("\n# diag: block 14 rates per m: single %.4f, dual Rx %.4f, dual Tx %.4f\n", r_single, r_rx, r_tx);
+    CHECK(std::abs(r_rx / r_single - 1.0) < 0.2);
+    CHECK(std::abs(r_tx / r_rx * 8.0 - 1.0) < 0.3);
+
+    // Different spreads at the two ends: block 14 is not swap-reciprocal (documented); equal spreads: see the swap case
+    CHECK(arma::abs(blk(rx, tx, true) - d0).max() > 0.1);
 }

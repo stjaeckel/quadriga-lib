@@ -39,10 +39,11 @@ Monte-Carlo estimate of the ACF of one generator
   between `bins(n)` and `bins(n+1)` (included). The first bin starts at 1e-5 m, the last bin ends half a mean
   bin spacing above `bins(end)`
 - Bins with fewer than 6 pairs return NaN in all outputs
-- `acf_est_dual`: the same for two devices on the same map. The first `n_pos` positions are the first device,
-  the second `n_pos` positions the second device, and the value of a link is [[sos_val]] with both positions.
-  Two links form a pair if the distance between their first devices falls into the bin and the distance
-  between their second devices does not exceed the upper limit of the bin; requires `acf` and `dist`
+- `acf_est_dual`: the same for two devices, reciprocal as in [[sos_val]]. The first `n_pos` positions are the
+  first device, the second `n_pos` positions the second device, and the value of a link is [[sos_val]] with both
+  positions. Two links form a pair if the distances between their first devices and between their second devices
+  fall into the same bin; for the two-device generator of [[sos_val]] the estimate approximates the square of
+  the ACF
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
 - The pairs are searched in parallel and added in a fixed order; the result does not depend on the number
   of threads. Run time and memory: `2·n_pos^2` pairs for one device, at most 36 MB for the pairs of a block
@@ -57,8 +58,6 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(
     arma::uword n_pos,
     arma::Col<dtype> *dist_est = nullptr,
     arma::Col<dtype> *acf_est_dual = nullptr,
-    const arma::Col<dtype> &acf = arma::Col<dtype>(),
-    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::sword seed = -1);
 ```
 
@@ -68,14 +67,11 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(
 - **`bins`** — Bin centers in [m]; must be >= 0, increase strictly and be finite; at least 2 elements;
   `[n_bin]`
 - **`n_pos`** — Number of random positions per device; must be > 1
-- **`acf`** *(optional)* — Target ACF; required for `acf_est_dual`, must then be > -1; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
-  finite; `[n_acf]`
 - **`seed`** *(optional)* — Seed for the positions; must be >= -1; `-1` seeds from the system random device
 
 ## Outputs:
 - **`dist_est`** *(optional)* — Mean distance of the pairs in each bin in [m]; `[n_bin]`
-- **`acf_est_dual`** *(optional)* — Estimated ACF for two devices on the same map; `[n_bin]`
+- **`acf_est_dual`** *(optional)* — Estimated ACF for two devices; `[n_bin]`
 
 ## Returns:
 - Estimated ACF `acf_est`; `[n_bin]`
@@ -92,8 +88,6 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
                                                 arma::uword n_pos,
                                                 arma::Col<dtype> *dist_est,
                                                 arma::Col<dtype> *acf_est_dual,
-                                                const arma::Col<dtype> &acf,
-                                                const arma::Col<dtype> &dist,
                                                 arma::sword seed)
 {
     if (spatial_freq.n_elem == 0)
@@ -115,14 +109,8 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
         throw std::invalid_argument("Input 'n_pos' must be > 1.");
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
-    if (acf_est_dual != nullptr)
-    {
-        if (acf.is_empty() || dist.is_empty())
-            throw std::invalid_argument("Inputs 'acf' and 'dist' are required for output 'acf_est_dual'.");
-        qd_sos_check_acf_same_map(acf, dist);
-    }
-    qd_check_alias(dist_est, "dist_est", &spatial_freq, &phase, &bins, &acf, &dist);
-    qd_check_alias(acf_est_dual, "acf_est_dual", &spatial_freq, &phase, &bins, &acf, &dist);
+    qd_check_alias(dist_est, "dist_est", &spatial_freq, &phase, &bins);
+    qd_check_alias(acf_est_dual, "acf_est_dual", &spatial_freq, &phase, &bins);
     qd_check_alias_outputs(dist_est, "dist_est", acf_est_dual, "acf_est_dual");
 
     const arma::uword n_bin = bins.n_elem;
@@ -181,11 +169,8 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
 
     // The GENERIC kernel is used: this is an offline tool and its result should not depend on the CPU
     const arma::mat freq_d = arma::conv_to<arma::mat>::from(spatial_freq), phase_d = arma::conv_to<arma::mat>::from(phase);
-    arma::vec acf_d, dist_d;
-    if (acf_est_dual != nullptr)
-        acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
     arma::mat val;
-    quadriga_lib::sos_val<double>(freq_d, phase_d, pos, val, {}, {}, {}, {}, 1.0, false, 1);
+    quadriga_lib::sos_val<double>(freq_d, phase_d, pos, val, {}, 1.0, true, false, 1);
 
     // Sums over all pairs (i, j > i) of the first n_rows positions. Finding the pairs of a row (distance and
     // bin) is the expensive part and runs in parallel for a block of rows, each row writing its pairs to its
@@ -211,7 +196,7 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
                 {
                     double d = distance(i, j);
                     arma::uword b = find_bin(d);
-                    if (b < n_bin && (!dual || distance(n_pos + i, n_pos + j) <= upper[b]))
+                    if (b < n_bin && (!dual || find_bin(distance(n_pos + i, n_pos + j)) == b))
                         p[n].j = j, p[n].bin = b, p[n].dist = d, ++n;
                 }
                 n_pairs[i - r0] = n;
@@ -248,7 +233,7 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
     if (acf_est_dual != nullptr)
     {
         const arma::mat pos_a = pos.rows(0, n_pos - 1), pos_b = pos.rows(n_pos, n_all - 1);
-        quadriga_lib::sos_val<double>(freq_d, phase_d, pos_a, val, pos_b, {}, acf_d, dist_d, 1.0, false, 1);
+        quadriga_lib::sos_val<double>(freq_d, phase_d, pos_a, val, pos_b, 1.0, true, false, 1);
 
         pv = val.memptr();
         pair_sums(n_pos, true, acc);
@@ -265,8 +250,6 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_
 }
 
 template arma::Col<float> quadriga_lib::sos_acf_estimate(const arma::Mat<float> &spatial_freq, const arma::Col<float> &phase, const arma::Col<float> &bins, arma::uword n_pos,
-                                                         arma::Col<float> *dist_est, arma::Col<float> *acf_est_dual,
-                                                         const arma::Col<float> &acf, const arma::Col<float> &dist, arma::sword seed);
+                                                         arma::Col<float> *dist_est, arma::Col<float> *acf_est_dual, arma::sword seed);
 template arma::Col<double> quadriga_lib::sos_acf_estimate(const arma::Mat<double> &spatial_freq, const arma::Col<double> &phase, const arma::Col<double> &bins, arma::uword n_pos,
-                                                          arma::Col<double> *dist_est, arma::Col<double> *acf_est_dual,
-                                                          const arma::Col<double> &acf, const arma::Col<double> &dist, arma::sword seed);
+                                                          arma::Col<double> *dist_est, arma::Col<double> *acf_est_dual, arma::sword seed);

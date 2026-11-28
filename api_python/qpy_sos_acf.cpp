@@ -124,20 +124,18 @@ Monte-Carlo estimate of the ACF of one generator
   the midpoint between `bins[n]` and `bins[n+1]` (included). The first bin starts at 1e-5 m, the
   last bin ends half a mean bin spacing above `bins[-1]`
 - Bins with fewer than 6 pairs return NaN in all outputs
-- `acf_est_dual`: the same for two devices on the same map. The first `n_pos` positions are the
-  first device, the second `n_pos` positions the second device, and the value of a link is
-  [[sos.val]] with both positions. Two links form a pair if the distance between their first
-  devices falls into the bin and the distance between their second devices does not exceed the
-  upper limit of the bin; requires `acf` and `dist`
-- `acf_est_dual` is computed if `acf` or `dist` is given, and is `None` if both are omitted; giving
-  only one of the two is an error
+- `acf_est_dual`: the same for two devices, reciprocal as in [[sos.val]]. The first `n_pos` positions are the
+  first device, the second `n_pos` positions the second device, and the value of a link is [[sos.val]] with both
+  positions. Two links form a pair if the distances between their first devices and between their second devices
+  fall into the same bin; for the two-device generator of [[sos.val]] the estimate approximates the square of
+  the ACF
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
 - Run time grows with `n_pos^2`; the result does not depend on the number of threads
 
 ## Usage:
 ```
 acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, phase, bins, n_pos, \
-    *, acf, dist, seed )
+    *, seed )
 ```
 
 ## Inputs:
@@ -146,18 +144,13 @@ acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, p
 - **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
   elements; `(n_bin,)`
 - **`n_pos`** — Number of random positions per device; `int`; must be > 1
-- **`acf`** — Target ACF; required for `acf_est_dual`, must then be > -1;
-  `(n_acf,)`; default: `None`
-- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
-  default: `None`
 - **`seed`** — Seed for the positions; `int`; must be >= -1; -1 seeds from the system random device;
   default: -1
 
 ## Outputs:
 - **`acf_est`** — Estimated ACF; `(n_bin,)`
 - **`dist_est`** — Mean distance of the pairs in each bin; `(n_bin,)`
-- **`acf_est_dual`** — Estimated ACF for two devices on the same map; `(n_bin,)`; `None` if `acf`
-  and `dist` were not given
+- **`acf_est_dual`** — Estimated ACF for two devices; `(n_bin,)`
 
 ## See also:
 - [[sos.acf_approx]] (ACF of the sinusoids in closed form)
@@ -168,30 +161,17 @@ py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
                            const py::array_t<double> &phase,
                            const py::array_t<double> &bins,
                            arma::uword n_pos,
-                           py::handle acf,
-                           py::handle dist,
                            arma::sword seed)
 {
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Col<double>(phase, true);
     const auto bins_a = qd_python_numpy2arma_Col<double>(bins, true);
-    const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
-    const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
-    // Output allocation; the two-device estimate is requested only with an ACF table
     arma::vec dist_est, acf_est_dual;
     auto dist_est_py = qd_python_init_output(bins_a.n_elem, &dist_est);
+    auto acf_est_dual_py = qd_python_init_output(bins_a.n_elem, &acf_est_dual);
 
-    py::object acf_est_dual_py = py::none();
-    arma::vec *p_acf_est_dual = nullptr;
-    if (!acf_a.is_empty() || !dist_a.is_empty())
-    {
-        acf_est_dual_py = qd_python_init_output(bins_a.n_elem, &acf_est_dual);
-        p_acf_est_dual = &acf_est_dual;
-    }
-
-    const arma::vec acf_est = quadriga_lib::sos_acf_estimate<double>(freq_a, phase_a, bins_a, n_pos, &dist_est, p_acf_est_dual,
-                                                                     acf_a, dist_a, seed);
+    const arma::vec acf_est = quadriga_lib::sos_acf_estimate<double>(freq_a, phase_a, bins_a, n_pos, &dist_est, &acf_est_dual, seed);
 
     return py::make_tuple(qd_python_copy2numpy(&acf_est), dist_est_py, acf_est_dual_py);
 }
@@ -202,7 +182,6 @@ Target ACF at given distances
 
 - Linear interpolation of the autocorrelation function (ACF) given as a table
 - Distances beyond the last sample point return the last value of the table
-- The same rule is applied by [[sos.val]] and [[sos.remove_bias]] for two devices on the same map
 
 ## Usage:
 ```

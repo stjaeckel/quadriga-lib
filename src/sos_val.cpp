@@ -9,26 +9,12 @@
 #include "quadriga_lib_avx2_functions.hpp"
 
 #include <cmath>
+#include <limits>
+#include <random>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <vector>
-
-// Frequencies as separate x, y, z vectors in double, scaled; missing dimensions are 0
-template <typename dtype>
-static void qd_sos_split_freq(const arma::Mat<dtype> &spatial_freq, double scale,
-                              std::vector<double> &fx, std::vector<double> &fy, std::vector<double> &fz)
-{
-    arma::uword n_coeff = spatial_freq.n_rows;
-    fx.assign(n_coeff, 0.0), fy.assign(n_coeff, 0.0), fz.assign(n_coeff, 0.0);
-    for (arma::uword n = 0; n < n_coeff; ++n)
-    {
-        fx[n] = scale * (double)spatial_freq.at(n, 0);
-        if (spatial_freq.n_cols > 1)
-            fy[n] = scale * (double)spatial_freq.at(n, 1);
-        if (spatial_freq.n_cols > 2)
-            fz[n] = scale * (double)spatial_freq.at(n, 2);
-    }
-}
 
 // Positions as separate x, y, z arrays in double; missing dimensions are 0
 // For dtype = double the columns of 'pos' are used in place and 'store' only holds the zeros of the missing
@@ -80,20 +66,47 @@ static void qd_sos_weights(const arma::Mat<dtype> &phase, std::vector<double> &w
         pc[i] = a * std::cos((double)p[i]), ps[i] = a * std::sin((double)p[i]);
 }
 
+// Second device of a kernel call: frequencies g and positions q, or none (g == nullptr)
+struct qd_sos_second
+{
+    const std::vector<double> *gx = nullptr, *gy = nullptr, *gz = nullptr;
+    const double *qx = nullptr, *qy = nullptr, *qz = nullptr;
+};
+
 static void qd_sos_run_kernel([[maybe_unused]] int kernel, const std::vector<double> &fx, const std::vector<double> &fy, const std::vector<double> &fz,
                               const std::vector<double> &wc, const std::vector<double> &ws, size_t n_gen,
                               const double *px, const double *py, const double *pz, size_t n_pos,
-                              double *val)
+                              double *val, const qd_sos_second &b = qd_sos_second())
 {
+    const double *gx = b.gx ? b.gx->data() : nullptr, *gy = b.gy ? b.gy->data() : nullptr, *gz = b.gz ? b.gz->data() : nullptr;
     // Without BUILD_WITH_AVX2, qd_kernel_auto_avx2 never returns 2
 #if BUILD_WITH_AVX2
     if (kernel == 2)
     {
-        qd_SOS_AVX2(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val);
+        qd_SOS_AVX2(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val,
+                    gx, gy, gz, b.qx, b.qy, b.qz);
         return;
     }
 #endif
-    qd_SOS_GENERIC(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val);
+    qd_SOS_GENERIC(fx.data(), fy.data(), fz.data(), wc.data(), ws.data(), fx.size(), n_gen, px, py, pz, n_pos, val,
+                   gx, gy, gz, b.qx, b.qy, b.qz);
+}
+
+// Fixed permutation of the sinusoids for two devices (declared in qd_helpers_sos.hpp)
+// - Sattolo's algorithm with the uniform stream of qd_rng(2021): one cycle through all sinusoids, so that no sinusoid
+//   is paired with itself (n_coeff >= 2); the same on all platforms, a function of n_coeff only
+std::vector<arma::uword> qd_sos_permutation(arma::uword n_coeff)
+{
+    std::vector<arma::uword> p(n_coeff);
+    for (arma::uword n = 0; n < n_coeff; ++n)
+        p[n] = n;
+    std::mt19937_64 rng = qd_rng(2021);
+    for (arma::uword i = n_coeff; i > 1; --i)
+    {
+        const arma::uword j = (arma::uword)(qd_rng_uniform(rng) * (double)(i - 1)); // 0 ... i - 2
+        std::swap(p[i - 1], p[j]);
+    }
+    return p;
 }
 
 // Calls fn(i0, i1) for consecutive index ranges that cover 0 ... n-1, in parallel for large n.
@@ -184,7 +197,7 @@ quadriga_lib::sos_val(spatial_freq, phase, pos_new, val_new);
 
 // Uniform distributed output
 arma::mat val_uni;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, {}, {}, {}, 1.0, true);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, 1.0, true, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
@@ -199,13 +212,14 @@ quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, y);
   38 dB for `Exp128` to `Exp1024` and 31, 35, 39 and 42 dB for `Comb128` to `Comb1024`. `"Comb256"` is a
   good default; take a larger table if the shape of the ACF matters, a smaller one if speed does.
 - **Both ends mobile:** if a value belongs to a link between two moving devices, pass both positions.
-  The value then changes smoothly when either device moves.
+  The value then changes smoothly when either device moves, keeps the correlation of one device while the
+  other stays, and does not change when the two ends swap.
 
 ```
 // Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
 pos_rx *= 100.0;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx, {}, acf, dist);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -269,25 +283,27 @@ Spatially correlated random values at given positions
   cosines of the positions are computed once and reused for all generators
 - Positions may have fewer columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
-- Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
-  `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and `pos_b`
-  and `A` the target ACF interpolated as in [[sos_acfi]]; `acf` and `dist` are required. The value does
-  not change when the two devices swap their positions
-- Two devices on different maps (`pos_b` and `phase_b` given):
-  `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
-- The mode follows from the arguments only; phase values are never compared. Passing the same matrix as
-  `phase` and `phase_b` selects the two-map formula
-- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
-  consistent ACF
-- Two devices on the same map need an ACF above -1 at all sample points, because the value is divided by
-  `sqrt( 2 + 2·A(D) )`
+- Two devices (`pos_b` given): one generator over the positions of both,
+  `s(x, y) = sqrt(2/n_coeff) · sum_n cos( 2·pi · (f_n·x + b·f_p(n)·y) + phi_n )`, with `b = spatial_freq_scale_b` and
+  `p` a fixed pseudo-random permutation of the sinusoids that depends only on `n_coeff` and pairs no sinusoid with
+  itself. The correlation of two links approximates the product of the ACFs of the two moves; while one device
+  stays at its position, it is the ACF of one device (with `reciprocal = true` for devices more than about one
+  decorrelation distance apart)
+- `reciprocal = true` (requires `b = 1`): `val = ( s(pos, pos_b) + s(pos_b, pos) ) / sqrt( 2 + 2·c )` with
+  `c = (1/n_coeff) · sum_n cos( 2·pi · (f_n - f_p(n))·(pos - pos_b) )`. The value does not change when the two
+  devices swap their positions; for devices closer than about one decorrelation distance the correlation of two
+  links contains the term this symmetry requires
+- `reciprocal = false`: `val = s(pos, pos_b)`. With `pos` and `pos_b` exchanged, the same phases give a second
+  field with the same statistics, for example the arrival value of a link whose departure value is `val`
+- For large moves of both devices the correlation keeps a residual with rms `1/sqrt(2·n_coeff)`
+- With `reciprocal = true`, a position where `c = -1` (possible only for tables with few sinusoids) gives NaN
 - `uniform = true` maps the values to `0.5 · erfc( -val / sqrt(2) )`, which is uniform between 0 and 1
   as far as `val` is Normal distributed. The limits 0 and 1 are included: a value far out in the tail is
   rounded to them, for `dtype = float` every value above 5.4 gives 1
 - Kernels: GENERIC computes in double precision. AVX2 reduces the argument `f_n·x` to one period in
   double precision, evaluates sine and cosine in single precision and accumulates in double precision;
-  its values differ from GENERIC by less than `4e-7 · sqrt( 2·n_coeff )`, typically by less than 1e-6
+  its values differ from GENERIC by less than `4e-7 · sqrt( 2·n_coeff )`, typically by less than 1e-6; with two
+  devices and `reciprocal = true` the difference is scaled by `2 / sqrt( 2 + 2·c )`, at most about 1.7 for the presets
 - Accuracy far from the origin: the argument `f_n·x` is known to about 1e-16 of its size. The bound
   between the kernels holds up to about 1e9 periods of the sinusoids; beyond that both kernels lose
   accuracy at the same rate, and from 2^53 periods on every position returns the value at the origin
@@ -296,8 +312,8 @@ Spatially correlated random values at given positions
   number of threads
 - For `dtype = float` the inputs are converted to double, the computation is the same and the result is
   rounded to single precision
-- Memory: for `dtype = double` the values are computed in `val`; two devices need one more array of the
-  size of `val`, and `dtype = float` one array of that size in double precision
+- Memory: for `dtype = double` the values are computed in `val`; two devices with `reciprocal = true` need one
+  more array of the size of `val`, and `dtype = float` one array of that size in double precision
 
 ## Declaration:
 ```
@@ -307,10 +323,8 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &acf = arma::Col<dtype>(),
-    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     double spatial_freq_scale_b = 1.0,
+    bool reciprocal = true,
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -323,14 +337,9 @@ void quadriga_lib::sos_val(
   coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device in [m]; omitted or empty = one device;
   `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from `pos`
-- **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
-  `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
-  finite; `[n_acf]`
 - **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device, i.e. decorrelation distance of
-  the first device divided by that of the second; must be > 0
+  the first device divided by that of the second; must be > 0; other than 1 requires `pos_b` and `reciprocal = false`
+- **`reciprocal`** *(optional)* — Two devices: `true` = the value does not change when the devices swap positions
 - **`uniform`** *(optional)* — Output distribution: `false` = Normal(0,1), `true` = Uniform between 0 and 1
 - **`use_kernel`** *(optional)* — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2;
   throws if the requested kernel is unavailable
@@ -351,16 +360,13 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
                            const arma::Mat<dtype> &pos,
                            arma::Mat<dtype> &val,
                            const arma::Mat<dtype> &pos_b,
-                           const arma::Mat<dtype> &phase_b,
-                           const arma::Col<dtype> &acf,
-                           const arma::Col<dtype> &dist,
                            double spatial_freq_scale_b_in,
+                           bool reciprocal,
                            bool uniform,
                            int use_kernel)
 {
     const dtype spatial_freq_scale_b = dtype(spatial_freq_scale_b_in);
     const bool two_devices = !pos_b.is_empty();
-    const bool two_maps = !phase_b.is_empty();
 
     if (spatial_freq.n_elem == 0)
         throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
@@ -381,29 +387,18 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
         if (pos_b.n_cols > spatial_freq.n_cols)
             throw std::invalid_argument("Input 'pos_b' cannot have more columns than 'spatial_freq'.");
     }
-    if (two_maps)
-    {
-        if (!two_devices)
-            throw std::invalid_argument("Input 'phase_b' requires 'pos_b'.");
-        if (phase_b.n_rows != phase.n_rows || phase_b.n_cols != phase.n_cols)
-            throw std::invalid_argument("Input 'phase_b' must have the same size as 'phase'.");
-    }
     if (!(spatial_freq_scale_b > (dtype)0.0) || !std::isfinite((double)spatial_freq_scale_b))
         throw std::invalid_argument("Input 'spatial_freq_scale_b' must be finite and > 0.");
-    if (spatial_freq_scale_b != (dtype)1.0 && !two_maps)
-        throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'phase_b'.");
-    if (two_devices && !two_maps)
-    {
-        if (acf.is_empty() || dist.is_empty())
-            throw std::invalid_argument("Inputs 'acf' and 'dist' are required for two devices on the same map.");
-        qd_sos_check_acf_same_map(acf, dist);
-    }
+    if (spatial_freq_scale_b != (dtype)1.0 && !two_devices)
+        throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'pos_b'.");
+    if (spatial_freq_scale_b != (dtype)1.0 && reciprocal)
+        throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'reciprocal = false'.");
 
-    qd_check_alias(&val, "val", &spatial_freq, &phase, &pos, &pos_b, &phase_b, &acf, &dist);
+    qd_check_alias(&val, "val", &spatial_freq, &phase, &pos, &pos_b);
 
     const int kernel = qd_kernel_auto_avx2(use_kernel); // 1 = GENERIC, 2 = AVX2
 
-    const arma::uword n_pos = pos.n_rows, n_gen = phase.n_cols, n_elem = n_pos * n_gen;
+    const arma::uword n_pos = pos.n_rows, n_gen = phase.n_cols, n_elem = n_pos * n_gen, n_coeff = spatial_freq.n_rows;
     const bool is_double = std::is_same<dtype, double>::value;
 
     // First device
@@ -426,46 +421,59 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
         tmp.set_size(n_pos, n_gen);
         sa = tmp.memptr();
     }
-    qd_sos_run_kernel(kernel, fx, fy, fz, wc, ws, n_gen, px, py, pz, n_pos, sa);
 
-    if (two_devices)
+    if (!two_devices)
+        qd_sos_run_kernel(kernel, fx, fy, fz, wc, ws, n_gen, px, py, pz, n_pos, sa);
+    else
     {
-        std::vector<double> pos_b_store;
+        // Second device: frequencies b·f_p(n) at pos_b; s(pos, pos_b) in sa
+        std::vector<double> pos_b_store, gx, gy, gz;
         const double *qx = nullptr, *qy = nullptr, *qz = nullptr;
         qd_sos_split_pos(pos_b, pos_b_store, qx, qy, qz);
-        if (two_maps)
-        {
-            qd_sos_split_freq(spatial_freq, (double)spatial_freq_scale_b, fx, fy, fz);
-            qd_sos_weights(phase_b, wc, ws);
-        }
+        const std::vector<arma::uword> perm = qd_sos_permutation(n_coeff);
+        qd_sos_split_freq(spatial_freq, (double)spatial_freq_scale_b, gx, gy, gz, &perm);
 
-        arma::mat sb_mat(n_pos, n_gen, arma::fill::none);
-        const double *sb = sb_mat.memptr();
-        qd_sos_run_kernel(kernel, fx, fy, fz, wc, ws, n_gen, qx, qy, qz, n_pos, sb_mat.memptr());
+        qd_sos_second sec;
+        sec.gx = &gx, sec.gy = &gy, sec.gz = &gz, sec.qx = qx, sec.qy = qy, sec.qz = qz;
+        qd_sos_run_kernel(kernel, fx, fy, fz, wc, ws, n_gen, px, py, pz, n_pos, sa, sec);
 
-        if (two_maps)
+        if (reciprocal)
         {
-            const double w = std::sqrt(0.5);
-            qd_sos_parallel_ranges(n_elem, [=](arma::uword i0, arma::uword i1)
-                                   {
-                for (arma::uword i = i0; i < i1; ++i)
-                    sa[i] = (sa[i] + sb[i]) * w; });
-        }
-        else
-        {
-            // Normalization per position
-            const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
-            const double *pa = acf_d.memptr(), *pd = dist_d.memptr();
-            const arma::uword n_acf = acf_d.n_elem;
-            std::vector<double> w_vec(n_pos);
+            // s(pos_b, pos) = f_p(n) at pos and f_n at pos_b (b = 1); the kernel adds the two parts as in the first
+            // call with the parts exchanged, so that swapping the devices exchanges the two calls bit for bit
+            arma::mat sb_mat(n_pos, n_gen, arma::fill::none);
+            const double *sb = sb_mat.memptr();
+            qd_sos_second sec2;
+            sec2.gx = &fx, sec2.gy = &fy, sec2.gz = &fz, sec2.qx = qx, sec2.qy = qy, sec2.qz = qz;
+            qd_sos_run_kernel(kernel, gx, gy, gz, wc, ws, n_gen, px, py, pz, n_pos, sb_mat.memptr(), sec2);
+
+            // Normalization per position, 1 / sqrt( 2 + 2·c ): c is one more generator of the same kernel with the
+            // frequencies f_n - f_p(n), weights 1/N and the displacement d = pos - pos_b. c is even in d; the sign of d
+            // is fixed (first non-zero coordinate positive), so that swapping the devices gives the same c bit for bit
+            std::vector<double> dfx(n_coeff), dfy(n_coeff), dfz(n_coeff), w1(n_coeff, 1.0 / (double)n_coeff), w0(n_coeff, 0.0);
+            for (arma::uword n = 0; n < n_coeff; ++n)
+                dfx[n] = fx[n] - gx[n], dfy[n] = fy[n] - gy[n], dfz[n] = fz[n] - gz[n];
+            std::vector<double> dx(n_pos), dy(n_pos), dz(n_pos), w_vec(n_pos);
+            {
+                double *pdx = dx.data(), *pdy = dy.data(), *pdz = dz.data();
+                qd_sos_parallel_ranges(n_pos, [=](arma::uword i0, arma::uword i1)
+                                       {
+                    for (arma::uword p = i0; p < i1; ++p)
+                    {
+                        double a = px[p] - qx[p], b = py[p] - qy[p], c = pz[p] - qz[p];
+                        if (a < 0.0 || (a == 0.0 && (b < 0.0 || (b == 0.0 && c < 0.0))))
+                            a = -a, b = -b, c = -c;
+                        pdx[p] = a, pdy[p] = b, pdz[p] = c;
+                    } });
+            }
             double *w = w_vec.data();
+            qd_sos_run_kernel(kernel, dfx, dfy, dfz, w1, w0, 1, dx.data(), dy.data(), dz.data(), n_pos, w);
             qd_sos_parallel_ranges(n_pos, [=](arma::uword i0, arma::uword i1)
                                    {
                 for (arma::uword p = i0; p < i1; ++p)
                 {
-                    double dx = px[p] - qx[p], dy = py[p] - qy[p], dz = pz[p] - qz[p];
-                    double A = qd_interp_linear(pa, pd, n_acf, std::sqrt(dx * dx + dy * dy + dz * dz));
-                    w[p] = 1.0 / std::sqrt(2.0 + 2.0 * A);
+                    const double v = 2.0 + 2.0 * w[p]; // 0 where c = -1 (tables with few sinusoids): NaN there
+                    w[p] = (v > 1.0e-6) ? 1.0 / std::sqrt(v) : std::numeric_limits<double>::quiet_NaN();
                 } });
             qd_sos_parallel_ranges(n_elem, [=](arma::uword i0, arma::uword i1)
                                    {
@@ -499,8 +507,6 @@ void quadriga_lib::sos_val(const arma::Mat<dtype> &spatial_freq,
 }
 
 template void quadriga_lib::sos_val(const arma::Mat<float> &spatial_freq, const arma::Mat<float> &phase, const arma::Mat<float> &pos, arma::Mat<float> &val,
-                                    const arma::Mat<float> &pos_b, const arma::Mat<float> &phase_b, const arma::Col<float> &acf, const arma::Col<float> &dist,
-                                    double spatial_freq_scale_b, bool uniform, int use_kernel);
+                                    const arma::Mat<float> &pos_b, double spatial_freq_scale_b, bool reciprocal, bool uniform, int use_kernel);
 template void quadriga_lib::sos_val(const arma::Mat<double> &spatial_freq, const arma::Mat<double> &phase, const arma::Mat<double> &pos, arma::Mat<double> &val,
-                                    const arma::Mat<double> &pos_b, const arma::Mat<double> &phase_b, const arma::Col<double> &acf, const arma::Col<double> &dist,
-                                    double spatial_freq_scale_b, bool uniform, int use_kernel);
+                                    const arma::Mat<double> &pos_b, double spatial_freq_scale_b, bool reciprocal, bool uniform, int use_kernel);

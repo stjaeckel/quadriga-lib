@@ -122,6 +122,8 @@ bool runtime_AVX2_Check();
 
 // AVX2 accelerated sum-of-sinusoids evaluation
 // val(p, g) = sum_n wc(n, g) · cos( 2·pi · t ) - ws(n, g) · sin( 2·pi · t ), t = fx(n)·px(p) + fy(n)·py(p) + fz(n)·pz(p)
+// With a second device (gx != nullptr): t = (f(n)·p(p)) + (g(n)·q(p)), both parts computed alike, so that exchanging
+// (f, p) with (g, q) gives the same value bit for bit
 // The argument t is computed and reduced to one period in double precision, sine and cosine are evaluated in
 // single precision, the sum is accumulated in double precision; no alignment requirements
 void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz, // Frequencies in [1/m], length n_coeff
@@ -130,7 +132,9 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz, // Freque
                  const size_t n_gen,                                   // Number of generators
                  const double *px, const double *py, const double *pz, // Positions in [m], length n_pos
                  const size_t n_pos,                                   // Number of positions
-                 double *val);                                         // Output: Values, Size [n_pos, n_gen], uninitialized
+                 double *val,                                          // Output: Values, Size [n_pos, n_gen], uninitialized
+                 const double *gx = nullptr, const double *gy = nullptr, const double *gz = nullptr,  // Second device: frequencies, length n_coeff
+                 const double *qx = nullptr, const double *qy = nullptr, const double *qz = nullptr); // Second device: positions, length n_pos
 
 // Interpolation of antenna array patterns (interpolate_pattern), AVX2 kernel; computes in single precision for
 // float and double. Arguments and preconditions as qd_interpolate_pattern_GENERIC, and the pattern of all elements

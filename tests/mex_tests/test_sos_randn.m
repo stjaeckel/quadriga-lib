@@ -19,12 +19,12 @@ assertTrue( isa(val, 'double') );
 assertTrue( max(abs(val(:))) > 0.1 && max(abs(val(:))) < 6 );
 
 %% The result is the documented composition of preset, phases and evaluation
-[ spatial_freq, acf, dist ] = quadriga_lib.sos_preset( 'Comb256', 20 );
-phase = quadriga_lib.sos_init_phases( 256, 6, 7 );
-ref = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, [], [], [], [], [], false );
+spatial_freq = quadriga_lib.sos_preset( 'Comb256', 20 );
+phase = quadriga_lib.sos_init_phases( 256, 6, 7 );                             % column g: generator g, for any n_gen
+ref = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, [], [], [], false );
 assertElementsAlmostEqual( val(:, 2), ref, 'absolute', 1e-12 );
 freq0 = quadriga_lib.sos_preset( 'Comb256', 0.1 );                             % 0 is replaced by 0.1 m
-ref0 = quadriga_lib.sos_val( freq0, phase(:, 3), pos, [], [], [], [], [], false );
+ref0 = quadriga_lib.sos_val( freq0, phase(:, 3), pos, [], [], [], false );
 assertElementsAlmostEqual( val(:, 3), ref0, 'absolute', 1e-12 );
 
 %% Optional inputs: omitted, empty, explicit
@@ -37,18 +37,17 @@ assertEqual( size(r1), [4, 3] );
 r2 = quadriga_lib.sos_randn( dd, pos );
 assertTrue( max(abs(r1(:) - r2(:))) > 0.01 );
 
-% Two devices, same map
+% Two devices with the same decorrelation distance: reciprocal, unchanged when the devices swap
 val4 = quadriga_lib.sos_randn( dd, pos, pos_b, [], [], 7 );
-ref4 = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, pos_b, [], acf, dist, [], false );
+ref4 = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, pos_b, [], [], false );
 assertElementsAlmostEqual( val4(:, 2), ref4, 'absolute', 1e-12 );
-val5 = quadriga_lib.sos_randn( dd, pos, pos_b, dd, [], 7 );                         % equal distances: same map
+assertEqual( quadriga_lib.sos_randn( dd, pos_b, pos, [], [], 7 ), val4 );
+val5 = quadriga_lib.sos_randn( dd, pos, pos_b, dd, [], 7 );                          % equal distances given: the same values
 assertEqual( val5, val4 );
 
-% Two devices, different decorrelation distance for generator 2: two maps; the phases of the second device
-% come from a second stream with the seed + 2^62, which is exact only as int64
-phase_b = quadriga_lib.sos_init_phases( 256, 3, int64(7) + int64(4611686018427387904) );
+% Another decorrelation distance for generator 2: not reciprocal, frequency scale dist_decorr / dist_decorr_b
 val6 = quadriga_lib.sos_randn( dd, pos, pos_b, [5, 8, 0], [], 7 );
-ref6 = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, pos_b, phase_b(:, 2), [], [], 20/8, false );
+ref6 = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, pos_b, 20/8, false, false );
 assertElementsAlmostEqual( val6(:, 2), ref6, 'absolute', 1e-12 );
 assertEqual( val6(:, [1, 3]), val4(:, [1, 3]) );
 

@@ -62,10 +62,8 @@ static void qd_sos_rand_impl(const quadriga_lib::double_list &dist_decorr_in, co
 
     const arma::uword n_gen = dist_decorr.n_elem, n_pos = pos.n_rows;
 
-    // Preset for 10 m and the phases of the first device
-    arma::mat phase_b;
-    arma::vec acf, dist10;
-    const arma::mat freq10 = quadriga_lib::sos_preset<double>(preset, &acf, &dist10, 10.0);
+    // Preset for 10 m and the phases
+    const arma::mat freq10 = quadriga_lib::sos_preset<double>(preset, nullptr, nullptr, 10.0);
     const arma::mat phase = quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, seed);
 
     const arma::mat pos_d = arma::conv_to<arma::mat>::from(pos);
@@ -80,18 +78,6 @@ static void qd_sos_rand_impl(const quadriga_lib::double_list &dist_decorr_in, co
         da[g] = (double)dist_decorr.at(g);
         db[g] = has_decorr_b ? (double)dist_decorr_b.at(g) : da[g];
         da[g] = (da[g] == 0.0) ? 0.1 : da[g], db[g] = (db[g] == 0.0) ? 0.1 : db[g];
-    }
-
-    // Phases of a second device on its own map: a second random stream, so that column g does not depend on
-    // the number of generators for either device. Its seed is the seed with bit 62 flipped (seed + 2^62 for
-    // seeds below 2^62), which is never negative and never equal to the seed.
-    bool any_two_maps = false;
-    for (arma::uword g = 0; g < n_gen; ++g)
-        any_two_maps = any_two_maps || (two_devices && da[g] != db[g]);
-    if (any_two_maps)
-    {
-        const arma::sword seed_b = (seed < 0) ? -1 : (arma::sword)((unsigned long long)seed ^ (1ULL << 62));
-        phase_b = quadriga_lib::sos_init_phases<double>(freq10.n_rows, n_gen, seed_b);
     }
 
     val.set_size(n_pos, n_gen);
@@ -109,16 +95,9 @@ static void qd_sos_rand_impl(const quadriga_lib::double_list &dist_decorr_in, co
                 group.push_back(g), done[g] = true;
 
         const arma::uword n_grp = group.size();
-        const bool two_maps = two_devices && da[g0] != db[g0];
-        arma::mat ph_a(freq10.n_rows, n_grp), ph_b;
+        arma::mat ph_a(freq10.n_rows, n_grp);
         for (arma::uword k = 0; k < n_grp; ++k)
             ph_a.col(k) = phase.col(group[k]);
-        if (two_maps)
-        {
-            ph_b.set_size(freq10.n_rows, n_grp);
-            for (arma::uword k = 0; k < n_grp; ++k)
-                ph_b.col(k) = phase_b.col(group[k]);
-        }
 
         // A group that holds all generators is evaluated into the output if that is a double matrix
         arma::mat v_local, *v_out = (n_grp == n_gen) ? qd_sos_double_output(val) : nullptr;
@@ -126,14 +105,11 @@ static void qd_sos_rand_impl(const quadriga_lib::double_list &dist_decorr_in, co
 
         const arma::mat spatial_freq = freq10 * (10.0 / da[g0]);
         if (!two_devices)
-            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, {}, {}, {}, {}, 1.0, uniform, 0);
-        else if (!two_maps)
-        {
-            const arma::vec dist = dist10 * (da[g0] / 10.0);
-            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, pos_b_d, {}, acf, dist, 1.0, uniform, 0);
-        }
+            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, {}, 1.0, true, uniform, 0);
+        else if (da[g0] == db[g0])
+            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, pos_b_d, 1.0, true, uniform, 0);
         else
-            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, pos_b_d, ph_b, {}, {}, da[g0] / db[g0], uniform, 0);
+            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, pos_b_d, da[g0] / db[g0], false, uniform, 0);
 
         if (v_out != nullptr && imax == 0)
             continue;
@@ -173,17 +149,14 @@ Spatially correlated Normal distributed random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a preset,
   draws its phases and evaluates it at the given positions; see [[sos_val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`. A second device on
-  its own map uses column `g` of a second stream, `sos_init_phases( n_coeff, n_gen, seed_b )`, where
-  `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both
-  streams are random. The phases of a generator therefore depend neither on the number of generators nor
-  on whether a second device is given
+- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`, with or without a second
+  device; the phases of a generator therefore do not depend on the number of generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr` for that
-  generator): both devices are on the same map, the value does not change when they swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the sum of both
-  maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [[sos_val]]; with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = true`, the value does not
+  change when the devices swap positions; with different ones `reciprocal = false` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on all
   platforms: the same positions give the same values and nearby positions similar values, also in
   separate calls. The kernel is chosen automatically, so values from machines with and without AVX2
@@ -245,17 +218,14 @@ Spatially correlated Uniform distributed random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a preset,
   draws its phases and evaluates it at the given positions; see [[sos_val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`. A second device on
-  its own map uses column `g` of a second stream, `sos_init_phases( n_coeff, n_gen, seed_b )`, where
-  `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both
-  streams are random. The phases of a generator therefore depend neither on the number of generators nor
-  on whether a second device is given
+- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`, with or without a second
+  device; the phases of a generator therefore do not depend on the number of generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr` for that
-  generator): both devices are on the same map, the value does not change when they swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the sum of both
-  maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [[sos_val]]; with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = true`, the value does not
+  change when the devices swap positions; with different ones `reciprocal = false` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Normal distributed value `s` of the generator is mapped to `0.5 · erfc( -s / sqrt(2) )`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on all
   platforms: the same positions give the same values and nearby positions similar values, also in
@@ -318,17 +288,14 @@ Spatially correlated integer random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a preset,
   draws its phases and evaluates it at the given positions; see [[sos_val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`. A second device on
-  its own map uses column `g` of a second stream, `sos_init_phases( n_coeff, n_gen, seed_b )`, where
-  `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both
-  streams are random. The phases of a generator therefore depend neither on the number of generators nor
-  on whether a second device is given
+- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`, with or without a second
+  device; the phases of a generator therefore do not depend on the number of generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr` for that
-  generator): both devices are on the same map, the value does not change when they swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the sum of both
-  maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [[sos_val]]; with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = true`, the value does not
+  change when the devices swap positions; with different ones `reciprocal = false` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Uniform value `u` of [[sos_rand]] is mapped to `ceil( u · imax )`, limited to 1 ... `imax`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on all
   platforms: the same positions give the same values and nearby positions similar values, also in

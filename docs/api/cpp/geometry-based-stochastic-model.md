@@ -365,15 +365,20 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_draw) · [Pytho
 
 - Evaluates the SOS phases of [gbsm_init_phases](#gbsm_init_phases) at the links as [sos_val](sum-of-sinusoids-random-number-generator.md#sos_val), one column per generator. The value of a
   link depends neither on the other links nor on the other columns; with `dual_mobility = false` not on `tx_pos`
-- `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
-  generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
+- `dual_mobility = true`: Tx and Rx both move; each column is the two-device generator of [sos_val](sum-of-sinusoids-random-number-generator.md#sos_val) with the
+  decorrelation distance of the column at the Rx and that of its mirror generator at the Tx (e.g. departure and
+  arrival quantities exchange). While one end stays, a column changes as in single mobility; when one end moves far,
+  the link decorrelates. Swapping Tx and Rx exchanges the mirror columns; a self-mirrored column keeps its value,
+  except block 14 of the shared `"ray"` set when `PerClusterAS_D` and `PerClusterAS_A` differ. Every column keeps
+  its distribution
 - 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
   field, fields of different floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3):
   exactly for IDs in the same group of `n_coeff` consecutive IDs (0 to `n_coeff - 1`, ...), otherwise up to a random
   residual of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
 - 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
   their height difference. The per-link statistics are the same in both modes
-- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
+- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation, the self-mirrored columns in dual
+  mobility within about 1.7 times that
 - An empty set (`NumClusters = 1`) accepts any empty `phase`
 
 Random sets, with `N = NumClusters - 1` and `M = NumSubPaths`; a set never changes size (new random quantities come in
@@ -384,7 +389,7 @@ new sets), and a decorrelation distance of 0 is used as 0.1 m:
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [lsp_generate](#lsp_generate) `rnd`, [path_loss](#path_loss) `rnd_he` (column 10) |
 | `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [ssf_clusters](#ssf_clusters) `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [ssf_clusters](#ssf_clusters) `rnd_freq`, slice `k` |
-| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [ssf_rays](#ssf_rays) `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km; at the Tx in dual mobility `PerClusterAS_D` in place of `PerClusterAS_A` | [ssf_rays](#ssf_rays) `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
 
 A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
 ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
@@ -409,8 +414,8 @@ void quadriga_lib::gbsm_draw(
 ```
 
 ### Inputs:
-- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*` and
-  `PerClusterAS_A`
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*`,
+  `PerClusterAS_A` and `PerClusterAS_D`
 - **`set_type`** — Set type of [gbsm_init_phases](#gbsm_init_phases)
 - **`phase`** — SOS phases from [gbsm_init_phases](#gbsm_init_phases), finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[3, 1]` or `[3, n_link]`
@@ -448,8 +453,9 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_init_phases) ·
   again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
   `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
-- `"lsf"` bias removal (`remove_bias`): [sos_remove_bias](sum-of-sinusoids-random-number-generator.md#sos_remove_bias) sets the sample mean of columns 0 to 8 over the positions
-  (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
+- `"lsf"` bias removal (`remove_bias`): [sos_remove_bias](sum-of-sinusoids-random-number-generator.md#sos_remove_bias) sets the sample mean of columns 0 to 8 over the links
+  (in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop; in dual mobility columns 4 (ASA)
+  and 6 (ESA), the ASD and ESD fields with Tx and Rx exchanged, are not corrected
 - `NumClusters = 1`: all sets but `"lsf"` are empty
 - TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 

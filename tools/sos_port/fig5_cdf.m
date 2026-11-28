@@ -14,7 +14,7 @@ for r = 1:n_rep
     u = reshape(quadriga_lib.sos_init_phases(6 * n, 1, 1000 + r) / (2*pi) + 0.5, [], 3);    % uniform in [0, 1)
     pos = u .* repmat([1000, 1000, 50], 2 * n, 1);
     v3 = quadriga_lib.sos_val(freq, phase(:, 1), pos(1:n, :));
-    v6 = quadriga_lib.sos_val(freq, phase(:, 1), pos(1:n, :), pos(n+1:end, :), phase(:, 2));
+    v6 = (quadriga_lib.sos_val(freq, phase(:, 1), pos(1:n, :)) + quadriga_lib.sos_val(freq, phase(:, 2), pos(n+1:end, :))) / sqrt(2);   % (19)
     C3(r, :) = mean(v3 <= k, 1); C6(r, :) = mean(v6 <= k, 1);
     z3 = (v3 - mean(v3)) / std(v3); z6 = (v6 - mean(v6)) / std(v6);
     S(r, :) = [mean(v3), std(v3), mean(z3.^3), mean(z3.^4), mean(v6), std(v6), mean(z6.^3), mean(z6.^4)];

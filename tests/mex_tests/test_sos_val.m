@@ -21,44 +21,50 @@ assertTrue( isa(val, 'double') );
 assertElementsAlmostEqual( val, ref, 'absolute', 1e-6 );                       % AVX2 kernel by default
 
 %% Optional inputs: omitted, empty, explicit
-val2 = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], [] );
+val2 = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [] );
 assertEqual( val2, val );
 
-val3 = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1 );     % use_kernel = GENERIC
+val3 = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1 );             % use_kernel = GENERIC
 assertElementsAlmostEqual( val3, ref, 'absolute', 1e-14 );
+assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], false, [], 1 ), val3 );  % reciprocal: no effect for one device
 
-val4 = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], true, 1 );   % uniform
+val4 = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], true, 1 );           % uniform
 assertElementsAlmostEqual( val4, 0.5 * erfc( -ref / sqrt(2) ), 'absolute', 1e-14 );
 
-% Two devices on the same map: ( s(a) + s(b) ) / sqrt( 2 + 2 A(D) )
-acf = [1; 0.5; 0]; dist = [0; 1; 2];
-pos_b = [0, 0, 0; 0, 0, 0; 0, 0, 0];                                           % distances 0, 1, 2 -> A = 1, 0.5, 0
-ref5 = [ (2+2)/2, (1+1)/2; (1+2)/sqrt(3), (0+1)/sqrt(3); (0+2)/sqrt(2), (-1+1)/sqrt(2) ];
-val5 = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], acf, dist, [], [], 1 );
-assertElementsAlmostEqual( val5, ref5, 'absolute', 1e-14 );
+% Two devices, reciprocal (default): the value does not change when the devices swap positions
+pos_b = [0.5, 1, 0; 2, 0, 0; 1, 3, 0];
+val5 = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], [], [], 1 );
+assertEqual( size(val5), [3, 2] );
+assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos_b, pos, [], [], [], 1 ), val5 );
 
-% Two devices on different maps: the second device uses phase_b, here the two generators swapped
-phase_b = phase(:, [2, 1]);
-ref6 = [ (2+1)/sqrt(2), (1+2)/sqrt(2); (1+1)/sqrt(2), (0+2)/sqrt(2); (0+1)/sqrt(2), (-1+2)/sqrt(2) ];
-val6 = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase_b, [], [], [], [], 1 );
+% Two devices, not reciprocal: with two sinusoids the permutation swaps them,
+% s(a, b) = cos( pi/2 (a_x + b_y) + phi_1 ) + cos( pi/2 (a_y + b_x) + phi_2 )
+ref6 = cos( pi/2 * ( pos(:, 1) + pos_b(:, 2) ) + phase(1, :) ) + cos( pi/2 * ( pos(:, 2) + pos_b(:, 1) ) + phase(2, :) );
+val6 = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], false, [], 1 );
 assertElementsAlmostEqual( val6, ref6, 'absolute', 1e-14 );
+assertTrue( max(abs(val6(:) - val5(:))) > 0.1 );
 
-% Frequency scale of the second device: at x = 1 m a scale of 2 turns the quarter wave into a half wave
-pos_b7 = [1, 0, 0; 1, 0, 0; 1, 0, 0];
-val7 = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b7, phase, [], [], 2, [], 1 );
-ref7 = ( ref + repmat( [0, 1], 3, 1 ) ) / sqrt(2);                             % s_b = cos(pi)+1 = 0 and -sin(pi)+1 = 1
+% Second device at the origin, not reciprocal: the value of one device, with any frequency scale
+val7 = quadriga_lib.sos_val( spatial_freq, phase, pos, zeros(3, 3), [], false, [], 1 );
+assertElementsAlmostEqual( val7, val3, 'absolute', 1e-14 );
+val7 = quadriga_lib.sos_val( spatial_freq, phase, pos, zeros(3, 3), 2, false, [], 1 );
+assertElementsAlmostEqual( val7, val3, 'absolute', 1e-14 );
+
+% Frequency scale of the second device: a scale of 2 equals doubled positions of the second device
+val7 = quadriga_lib.sos_val( spatial_freq, phase, zeros(3, 3), pos_b, 2, false, [], 1 );
+ref7 = quadriga_lib.sos_val( spatial_freq, phase, zeros(3, 3), 2 * pos_b, [], false, [], 1 );
 assertElementsAlmostEqual( val7, ref7, 'absolute', 1e-14 );
 
 %% Outputs: none
 quadriga_lib.sos_val( spatial_freq, phase, pos );
 
 %% Type handling
-val8 = quadriga_lib.sos_val( single(spatial_freq), single(phase), single(pos), [], [], [], [], single(1), false, int32(1) );
+val8 = quadriga_lib.sos_val( single(spatial_freq), single(phase), single(pos), [], single(1), true, false, int32(1) );
 assertTrue( isa(val8, 'double') );
 assertElementsAlmostEqual( val8, ref, 'absolute', 1e-6 );
 
 %% Orientation and shape: positions with fewer columns, frequencies with fewer columns
-val9 = quadriga_lib.sos_val( spatial_freq, phase, pos(:, 1:2), [], [], [], [], [], [], 1 );
+val9 = quadriga_lib.sos_val( spatial_freq, phase, pos(:, 1:2), [], [], [], [], 1 );
 assertElementsAlmostEqual( val9, ref, 'absolute', 1e-14 );
 val10 = quadriga_lib.sos_val( spatial_freq(1, 1), 0, [0; 1; 2] );                       % 1-D: sqrt(2) cos( pi/2 x )
 assertEqual( size(val10), [3, 1] );
@@ -66,13 +72,15 @@ assertElementsAlmostEqual( val10, sqrt(2) * [1; 0; -1], 'absolute', 1e-6 );
 
 %% Errors
 assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase ), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1, 0, 0, 0 ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], 1, true, false, 0, 0 ), 'Wrong number of input arguments.' );
 assert_throws( @() out2( spatial_freq, phase, pos ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase(1, :), pos ), 'phase' );                          % thrown by C++
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b ), 'acf' );                           % thrown by C++
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], acf, dist, 2 ), 'spatial_freq_scale_b' ); % thrown by C++
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 3 ), 'use_kernel' ); % thrown by C++
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, [], [1, -1, -1], dist ), 'acf' );           % thrown by C++
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b(1:2, :) ), 'pos_b' );                  % thrown by C++
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], 2, false ), ...
+    'Input ''spatial_freq_scale_b'' other than 1 requires ''pos_b''.' );                                         % thrown by C++
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, 2 ), ...
+    'Input ''spatial_freq_scale_b'' other than 1 requires ''reciprocal = false''.' );                            % thrown by C++
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 3 ), 'use_kernel' );         % thrown by C++
 
 %% Type handling of the shared MEX helpers, pinned so that a change is noticed
 % Complex arrays are rejected, also when their class matches the type the wrapper reads in place
@@ -83,18 +91,18 @@ assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, complex(single(pos
 assertEqual( quadriga_lib.sos_val( spatial_freq, phase, uint8(pos) ), quadriga_lib.sos_val( spatial_freq, phase, double(uint8(pos)) ) );
 assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos > 0 ), quadriga_lib.sos_val( spatial_freq, phase, double(pos > 0) ) );
 assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, @sin ), 'Input ''pos'' has an unsupported data type.' );  % no data pointer
-assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], @sin ), ...
+assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], @sin ), ...
     'Input ''use_kernel'' has an unsupported data type.' );
-vi = quadriga_lib.sos_val( spatial_freq, phase, int32(pos), [], [], [], [], [], [], 1 );
-assertEqual( vi, quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1 ) );
+vi = quadriga_lib.sos_val( spatial_freq, phase, int32(pos), [], [], [], [], 1 );
+assertEqual( vi, quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1 ) );
 % Scalars: complex and non-integer values for integer arguments are rejected, uint8 is read
-assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase, [], [], complex(1, 1) ), 'is complex; complex inputs are not supported.' );
-assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], uint8(1) ), ...
-    quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1 ) );
-assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1.7 ), ...
+assert_throws( @() quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, complex(1, 1), false ), 'is complex; complex inputs are not supported.' );
+assertEqual( quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], uint8(1) ), ...
+    quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1 ) );
+assert_cpp_error( @() quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1.7 ), ...
     'Input ''use_kernel'' must be an integer from -2147483648 to 2147483647.' );
-vk = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1.0 );    % use_kernel = 1
-assertEqual( vk, quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], [], [], 1 ) );
+vk = quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1.0 );    % use_kernel = 1
+assertEqual( vk, quadriga_lib.sos_val( spatial_freq, phase, pos, [], [], [], [], 1 ) );
 
 end
 

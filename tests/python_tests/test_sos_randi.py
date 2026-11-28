@@ -28,9 +28,9 @@ class test_case(unittest.TestCase):
         self.pos = np.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [0.0, 4.0, 1.5], [100.0, -50.0, 2.0]])
         self.pos_b = self.pos[:, [1, 0, 2]] + 1.0
 
-        # The documented composition: preset, phases, evaluation; here for generator 1 (20 m). A second device
-        # on its own map draws its phases from a second stream with the seed + 2^62.
-        self.spatial_freq, self.acf, self.dist = quadriga_lib.sos.preset("Comb256", 20.0)
+        # The documented composition: preset, phases, evaluation; here for generator 1 (20 m). Generator g uses
+        # column g of the phases, with or without a second device, independent of the number of generators.
+        self.spatial_freq, _, _ = quadriga_lib.sos.preset("Comb256", 20.0)
         self.phase = quadriga_lib.sos.init_phases(256, 6, seed=7)
 
     def oracle(self, col, spatial_freq=None, **kwargs):
@@ -83,19 +83,18 @@ class test_case(unittest.TestCase):
         r3 = quadriga_lib.sos.randi(self.dd, self.pos, 1000000)
         self.assertGreater(np.max(np.abs(r2 - r3)), 0.5)
 
-        # Two devices on the same map
+        # Two devices with the same decorrelation distance: reciprocal, unchanged when the devices swap
         val4 = quadriga_lib.sos.randi(self.dd, self.pos, 6, pos_b=self.pos_b, seed=7)
-        npt.assert_allclose(val4[:, 1], self.oracle(1, pos_b=self.pos_b, acf=self.acf, dist=self.dist),
-                            atol=1e-12, rtol=0)
+        npt.assert_allclose(val4[:, 1], self.oracle(1, pos_b=self.pos_b), atol=1e-12, rtol=0)
+        npt.assert_array_equal(quadriga_lib.sos.randi(self.dd, self.pos_b, 6, pos_b=self.pos, seed=7), val4)
 
-        # Equal decorrelation distances of the second device: still the same map
+        # Equal decorrelation distances given for the second device: the same values
         val5 = quadriga_lib.sos.randi(self.dd, self.pos, 6, pos_b=self.pos_b, dist_decorr_b=self.dd, seed=7)
         npt.assert_array_equal(val5, val4)
 
-        # Another distance for generator 1: two maps, phases of the second device from the second stream
-        phase_b = quadriga_lib.sos.init_phases(256, 3, seed=7 + 2**62)
+        # Another distance for generator 1: not reciprocal, frequency scale dist_decorr / dist_decorr_b
         val6 = quadriga_lib.sos.randi(self.dd, self.pos, 6, pos_b=self.pos_b, dist_decorr_b=[5.0, 8.0, 0.0], seed=7)
-        npt.assert_allclose(val6[:, 1], self.oracle(1, pos_b=self.pos_b, phase_b=phase_b[:, 1],
+        npt.assert_allclose(val6[:, 1], self.oracle(1, pos_b=self.pos_b, reciprocal=False,
                                                     spatial_freq_scale_b=20.0 / 8.0), atol=1e-12, rtol=0)
         npt.assert_array_equal(val6[:, [0, 2]], val4[:, [0, 2]])
 

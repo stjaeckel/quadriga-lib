@@ -87,7 +87,7 @@ quadriga_lib::sos_val(spatial_freq, phase, pos_new, val_new);
 
 // Uniform distributed output
 arma::mat val_uni;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, {}, {}, {}, 1.0, true);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, {}, 1.0, true, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
@@ -102,13 +102,14 @@ quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, y);
   38 dB for `Exp128` to `Exp1024` and 31, 35, 39 and 42 dB for `Comb128` to `Comb1024`. `"Comb256"` is a
   good default; take a larger table if the shape of the ACF matters, a smaller one if speed does.
 - **Both ends mobile:** if a value belongs to a link between two moving devices, pass both positions.
-  The value then changes smoothly when either device moves.
+  The value then changes smoothly when either device moves, keeps the correlation of one device while the
+  other stays, and does not change when the two ends swap.
 
 ```cpp
 // Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
 pos_rx *= 100.0;
-quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx, {}, acf, dist);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, pos_rx);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -256,10 +257,11 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acf_est
   between `bins(n)` and `bins(n+1)` (included). The first bin starts at 1e-5 m, the last bin ends half a mean
   bin spacing above `bins(end)`
 - Bins with fewer than 6 pairs return NaN in all outputs
-- `acf_est_dual`: the same for two devices on the same map. The first `n_pos` positions are the first device,
-  the second `n_pos` positions the second device, and the value of a link is [sos_val](#sos_val) with both positions.
-  Two links form a pair if the distance between their first devices falls into the bin and the distance
-  between their second devices does not exceed the upper limit of the bin; requires `acf` and `dist`
+- `acf_est_dual`: the same for two devices, reciprocal as in [sos_val](#sos_val). The first `n_pos` positions are the
+  first device, the second `n_pos` positions the second device, and the value of a link is [sos_val](#sos_val) with both
+  positions. Two links form a pair if the distances between their first devices and between their second devices
+  fall into the same bin; for the two-device generator of [sos_val](#sos_val) the estimate approximates the square of
+  the ACF
 - The estimate describes one realisation; it scatters around the ACF of the sinusoids
 - The pairs are searched in parallel and added in a fixed order; the result does not depend on the number
   of threads. Run time and memory: `2·n_pos^2` pairs for one device, at most 36 MB for the pairs of a block
@@ -274,8 +276,6 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(
     arma::uword n_pos,
     arma::Col<dtype> *dist_est = nullptr,
     arma::Col<dtype> *acf_est_dual = nullptr,
-    const arma::Col<dtype> &acf = arma::Col<dtype>(),
-    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     arma::sword seed = -1);
 ```
 
@@ -285,14 +285,11 @@ arma::Col<dtype> quadriga_lib::sos_acf_estimate(
 - **`bins`** — Bin centers in [m]; must be >= 0, increase strictly and be finite; at least 2 elements;
   `[n_bin]`
 - **`n_pos`** — Number of random positions per device; must be > 1
-- **`acf`** *(optional)* — Target ACF; required for `acf_est_dual`, must then be > -1; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
-  finite; `[n_acf]`
 - **`seed`** *(optional)* — Seed for the positions; must be >= -1; `-1` seeds from the system random device
 
 ### Outputs:
 - **`dist_est`** *(optional)* — Mean distance of the pairs in each bin in [m]; `[n_bin]`
-- **`acf_est_dual`** *(optional)* — Estimated ACF for two devices on the same map; `[n_bin]`
+- **`acf_est_dual`** *(optional)* — Estimated ACF for two devices; `[n_bin]`
 
 ### Returns:
 - Estimated ACF `acf_est`; `[n_bin]`
@@ -310,7 +307,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acfi) �
 
 - Linear interpolation of the autocorrelation function (ACF) given as a table
 - Distances beyond the last sample point return the last value of the table
-- The same rule is applied by [sos_val](#sos_val) and [sos_remove_bias](#sos_remove_bias) for two devices on the same map
 - An empty `d` returns an empty `val`
 
 ### Declaration:
@@ -632,17 +628,14 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_rand) �
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a preset,
   draws its phases and evaluates it at the given positions; see [sos_val](#sos_val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`. A second device on
-  its own map uses column `g` of a second stream, `sos_init_phases( n_coeff, n_gen, seed_b )`, where
-  `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both
-  streams are random. The phases of a generator therefore depend neither on the number of generators nor
-  on whether a second device is given
+- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`, with or without a second
+  device; the phases of a generator therefore do not depend on the number of generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr` for that
-  generator): both devices are on the same map, the value does not change when they swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the sum of both
-  maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [sos_val](#sos_val); with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = true`, the value does not
+  change when the devices swap positions; with different ones `reciprocal = false` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Normal distributed value `s` of the generator is mapped to `0.5 · erfc( -s / sqrt(2) )`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on all
   platforms: the same positions give the same values and nearby positions similar values, also in
@@ -695,17 +688,14 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_randi) 
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a preset,
   draws its phases and evaluates it at the given positions; see [sos_val](#sos_val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`. A second device on
-  its own map uses column `g` of a second stream, `sos_init_phases( n_coeff, n_gen, seed_b )`, where
-  `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both
-  streams are random. The phases of a generator therefore depend neither on the number of generators nor
-  on whether a second device is given
+- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`, with or without a second
+  device; the phases of a generator therefore do not depend on the number of generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr` for that
-  generator): both devices are on the same map, the value does not change when they swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the sum of both
-  maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [sos_val](#sos_val); with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = true`, the value does not
+  change when the devices swap positions; with different ones `reciprocal = false` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Uniform value `u` of [sos_rand](#sos_rand) is mapped to `ceil( u · imax )`, limited to 1 ... `imax`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on all
   platforms: the same positions give the same values and nearby positions similar values, also in
@@ -761,17 +751,14 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_randn) 
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a preset,
   draws its phases and evaluates it at the given positions; see [sos_val](#sos_val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`. A second device on
-  its own map uses column `g` of a second stream, `sos_init_phases( n_coeff, n_gen, seed_b )`, where
-  `seed_b` is the seed with bit 62 flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both
-  streams are random. The phases of a generator therefore depend neither on the number of generators nor
-  on whether a second device is given
+- Phases: generator `g` uses column `g` of `sos_init_phases( n_coeff, n_gen, seed )`, with or without a second
+  device; the phases of a generator therefore do not depend on the number of generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr` for that
-  generator): both devices are on the same map, the value does not change when they swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the sum of both
-  maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [sos_val](#sos_val); with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = true`, the value does not
+  change when the devices swap positions; with different ones `reciprocal = false` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on all
   platforms: the same positions give the same values and nearby positions similar values, also in
   separate calls. The kernel is chosen automatically, so values from machines with and without AVX2
@@ -831,12 +818,9 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_remove_
   `Z = sum_n z_n · exp( j·phi_n )`, the mean is `sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )`, which
   vanishes for `offset = pi/2 - arg(Z)` and for that value minus pi; the one with the smaller magnitude is
   applied, so the offset lies between -pi/2 and pi/2
-- One device (`pos_b` omitted): one offset per generator
-- Two devices on the same map (`pos_b` given, `phase_b` omitted): one offset per generator that zeroes the
-  mean of the combined, normalised value; `acf` and `dist` are required
-- Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
-  with `pos` and `phase_b` with `pos_b` and the frequencies `spatial_freq · spatial_freq_scale_b`; two offsets per generator.
-  The mean of the combined value is then zero as well
+- One offset per generator; with two devices (`pos_b` given) it zeroes the mean of the two-device value of
+  [sos_val](#sos_val) with the same `spatial_freq_scale_b` and `reciprocal`
+- Two reciprocal devices at a position where the normalization of [sos_val](#sos_val) is singular (`c = -1`) throw
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
   `c` the mean ACF between that position and all positions; on average over the positions the loss is at
@@ -851,7 +835,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_remove_
 - Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose `abs(Z)` is
   below `1e-14 · n_coeff` already has a zero mean for every offset and is left unchanged, also if its
   phases lie outside that interval
-- Two devices on the same map need an ACF above -1 at all sample points, as in [sos_val](#sos_val)
 - The sums over the positions are computed in parallel over the sinusoids; the result does not depend
   on the number of threads
 
@@ -862,12 +845,10 @@ void quadriga_lib::sos_remove_bias(
     arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    arma::Mat<dtype> *phase_b = nullptr,
-    const arma::Col<dtype> &acf = arma::Col<dtype>(),
-    const arma::Col<dtype> &dist = arma::Col<dtype>(),
+    double spatial_freq_scale_b = 1.0,
+    bool reciprocal = true,
     arma::Mat<dtype> *offset = nullptr,
-    arma::Mat<dtype> *mean_before = nullptr,
-    double spatial_freq_scale_b = 1.0);
+    arma::Mat<dtype> *mean_before = nullptr);
 ```
 
 ### Inputs:
@@ -877,23 +858,15 @@ void quadriga_lib::sos_remove_bias(
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
   coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device in [m]; omitted or empty = one device;
-  `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
-  number for different maps
-- **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; updated in-place; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
-  `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
-  finite; `[n_acf]`
-- **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device, i.e. decorrelation distance of
-  the first device divided by that of the second; must be > 0; other than 1 requires `phase_b`
+  `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`
+- **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device as in [sos_val](#sos_val); must be > 0;
+  other than 1 requires `pos_b` and `reciprocal = false`
+- **`reciprocal`** *(optional)* — Two devices: the mode of [sos_val](#sos_val)
 
 ### Outputs:
-- **`offset`** *(optional)* — Offsets added to the phases in [rad]; `[n_gen, 1]`, or `[n_gen, 2]` with
-  `phase_b` (column 0: `phase`, column 1: `phase_b`)
-- **`mean_before`** *(optional)* — Sample mean before the correction; `[n_gen, 1]`: mean of the values of
-  [sos_val](#sos_val) for the given arguments; with `phase_b` `[n_gen, 2]`: mean of the field of each device on its
-  own positions, the mean of the combined value being their sum divided by `sqrt(2)`
+- **`offset`** *(optional)* — Offsets added to the phases in [rad]; `[n_gen, 1]`
+- **`mean_before`** *(optional)* — Sample mean of the values of [sos_val](#sos_val) for the given arguments before the
+  correction; `[n_gen, 1]`
 
 ### See also:
 - [sos_val](#sos_val) (the values whose mean is removed)
@@ -915,25 +888,27 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_val) ·
   cosines of the positions are computed once and reused for all generators
 - Positions may have fewer columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
-- Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
-  `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and `pos_b`
-  and `A` the target ACF interpolated as in [sos_acfi](#sos_acfi); `acf` and `dist` are required. The value does
-  not change when the two devices swap their positions
-- Two devices on different maps (`pos_b` and `phase_b` given):
-  `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
-- The mode follows from the arguments only; phase values are never compared. Passing the same matrix as
-  `phase` and `phase_b` selects the two-map formula
-- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
-  consistent ACF
-- Two devices on the same map need an ACF above -1 at all sample points, because the value is divided by
-  `sqrt( 2 + 2·A(D) )`
+- Two devices (`pos_b` given): one generator over the positions of both,
+  `s(x, y) = sqrt(2/n_coeff) · sum_n cos( 2·pi · (f_n·x + b·f_p(n)·y) + phi_n )`, with `b = spatial_freq_scale_b` and
+  `p` a fixed pseudo-random permutation of the sinusoids that depends only on `n_coeff` and pairs no sinusoid with
+  itself. The correlation of two links approximates the product of the ACFs of the two moves; while one device
+  stays at its position, it is the ACF of one device (with `reciprocal = true` for devices more than about one
+  decorrelation distance apart)
+- `reciprocal = true` (requires `b = 1`): `val = ( s(pos, pos_b) + s(pos_b, pos) ) / sqrt( 2 + 2·c )` with
+  `c = (1/n_coeff) · sum_n cos( 2·pi · (f_n - f_p(n))·(pos - pos_b) )`. The value does not change when the two
+  devices swap their positions; for devices closer than about one decorrelation distance the correlation of two
+  links contains the term this symmetry requires
+- `reciprocal = false`: `val = s(pos, pos_b)`. With `pos` and `pos_b` exchanged, the same phases give a second
+  field with the same statistics, for example the arrival value of a link whose departure value is `val`
+- For large moves of both devices the correlation keeps a residual with rms `1/sqrt(2·n_coeff)`
+- With `reciprocal = true`, a position where `c = -1` (possible only for tables with few sinusoids) gives NaN
 - `uniform = true` maps the values to `0.5 · erfc( -val / sqrt(2) )`, which is uniform between 0 and 1
   as far as `val` is Normal distributed. The limits 0 and 1 are included: a value far out in the tail is
   rounded to them, for `dtype = float` every value above 5.4 gives 1
 - Kernels: GENERIC computes in double precision. AVX2 reduces the argument `f_n·x` to one period in
   double precision, evaluates sine and cosine in single precision and accumulates in double precision;
-  its values differ from GENERIC by less than `4e-7 · sqrt( 2·n_coeff )`, typically by less than 1e-6
+  its values differ from GENERIC by less than `4e-7 · sqrt( 2·n_coeff )`, typically by less than 1e-6; with two
+  devices and `reciprocal = true` the difference is scaled by `2 / sqrt( 2 + 2·c )`, at most about 1.7 for the presets
 - Accuracy far from the origin: the argument `f_n·x` is known to about 1e-16 of its size. The bound
   between the kernels holds up to about 1e9 periods of the sinusoids; beyond that both kernels lose
   accuracy at the same rate, and from 2^53 periods on every position returns the value at the origin
@@ -942,8 +917,8 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_val) ·
   number of threads
 - For `dtype = float` the inputs are converted to double, the computation is the same and the result is
   rounded to single precision
-- Memory: for `dtype = double` the values are computed in `val`; two devices need one more array of the
-  size of `val`, and `dtype = float` one array of that size in double precision
+- Memory: for `dtype = double` the values are computed in `val`; two devices with `reciprocal = true` need one
+  more array of the size of `val`, and `dtype = float` one array of that size in double precision
 
 ### Declaration:
 ```cpp
@@ -953,10 +928,8 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
     const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),
-    const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(),
-    const arma::Col<dtype> &acf = arma::Col<dtype>(),
-    const arma::Col<dtype> &dist = arma::Col<dtype>(),
     double spatial_freq_scale_b = 1.0,
+    bool reciprocal = true,
     bool uniform = false,
     int use_kernel = 0);
 ```
@@ -969,14 +942,9 @@ void quadriga_lib::sos_val(
   coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device in [m]; omitted or empty = one device;
   `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from `pos`
-- **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
-  `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
-  finite; `[n_acf]`
 - **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device, i.e. decorrelation distance of
-  the first device divided by that of the second; must be > 0
+  the first device divided by that of the second; must be > 0; other than 1 requires `pos_b` and `reciprocal = false`
+- **`reciprocal`** *(optional)* — Two devices: `true` = the value does not change when the devices swap positions
 - **`uniform`** *(optional)* — Output distribution: `false` = Normal(0,1), `true` = Uniform between 0 and 1
 - **`use_kernel`** *(optional)* — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2;
   throws if the requested kernel is unavailable

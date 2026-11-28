@@ -29,8 +29,9 @@
 //  - the column layout c = b·N + n and the mirror table of the blocks: 0 -> 0, 1 <-> 2, 3 <-> 4, 5 <-> 6, 7 <-> 8
 //  - the sum of sinusoids qd_ref_sos, the Uniform map and the floor offsets of qd_test_sos_oracle.hpp, with the
 //    frequencies of sos_preset at the decorrelation distance SC_lambda
-//  - dual mobility: (qd_ref_sos(F, P0_c, R) + qd_ref_sos(F, P0_c, T)) / sqrt(2 + 2·A(D)) for self-mirrored columns,
-//    (qd_ref_sos(F, P0_c, R) + qd_ref_sos(F, P0_m, T)) / sqrt(2) for the pairs, A the ACF table of sos_preset
+//  - dual mobility: qd_ref_dual, the two-device value of sos_val: self-mirrored columns reciprocal at (R, T); a pair
+//    (c, m), owner o = min(c, m), the plain two-device sum of the owner at (R, T) for c = o and at (T, R) for the
+//    partner, phases of the owner (all columns share SC_lambda, so the scale is 1)
 //    interpolated linearly by sos_acfi, D the horizontal Tx-Rx distance
 //  - statistics: Normal(0,1), Uniform(0,1), the ACF table of sos_preset; for Uniform columns the Pearson
 //    correlation (6/pi)·asin(rho/2) of two Uniform values whose Normal values have the correlation rho
@@ -46,6 +47,7 @@
 #include "quadriga_gbsm.hpp"
 #include "quadriga_sos.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <random>
@@ -365,6 +367,7 @@ TEST_CASE("gbsm_draw - cluster: dual mobility values follow the two-device formu
     const auto sp = scen(3.0, 15.0); // N = 2
     const arma::uword N = 2;
     const qd_preset_tab t = qd_preset("Comb256", 15.0);
+    const std::vector<arma::uword> p = qd_perm(256);
     // 5 links, Tx per link; link 2 has Tx = Rx, link 4 a distance of more than 5 decorrelation distances
     const arma::mat rx = arma::mat({{10.0, -20.0, 1.5}, {-55.0, 30.0, 3.0}, {100.0, 100.0, 1.5}, {-5.0, -5.0, 12.0}, {0.3, 0.7, 1.5}}).t();
     const arma::mat tx = arma::mat({{12.0, -15.0, 25.0}, {-40.0, 10.0, 30.0}, {100.0, 100.0, 1.5}, {-25.0, 3.0, 12.0}, {150.0, -80.0, 10.0}}).t();
@@ -392,11 +395,10 @@ TEST_CASE("gbsm_draw - cluster: dual mobility values follow the two-device formu
                         off = &off3;
                     if (f && fl(l) == 259)
                         off = &off259;
-                    const arma::uword m = mirror_col(c, N, shared);
-                    const double a = qd_ref_sos(t.F, phase.slice(0).colptr(c), rx(0, l), rx(1, l), 0.0, off);
-                    const double b = qd_ref_sos(t.F, phase.slice(0).colptr(m), tx(0, l), tx(1, l), 0.0, off);
-                    const double D = std::sqrt((rx(0, l) - tx(0, l)) * (rx(0, l) - tx(0, l)) + (rx(1, l) - tx(1, l)) * (rx(1, l) - tx(1, l)));
-                    double v = (m == c) ? (a + b) / std::sqrt(2.0 + 2.0 * qd_acf_at(t, D)) : (a + b) / std::sqrt(2.0);
+                    const arma::uword m = mirror_col(c, N, shared), o = std::min(c, m);
+                    const double r[3] = {rx(0, l), rx(1, l), 0.0}, x[3] = {tx(0, l), tx(1, l), 0.0};
+                    double v = (o == c) ? qd_ref_dual(t.F, phase.slice(0).colptr(o), r, x, p, 1.0, m == c, off)
+                                        : qd_ref_dual(t.F, phase.slice(0).colptr(o), x, r, p, 1.0, false, off);
                     const bool u = is_uniform(c, N, shared);
                     if (u)
                         v = qd_unif(v);
@@ -452,8 +454,8 @@ TEST_CASE("gbsm_draw - cluster: a column does not depend on the phases of the ot
     quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref2, -1, "Comb256", {}, {}, true);
     for (arma::uword c : cols)
     {
-        // New raw phases for all columns except c and its mirror (both enter the dual-mobility value of c), slice 1
-        // mirrored again
+        // New raw phases for all columns except c and its mirror (the owner of a pair enters the dual-mobility value of
+        // both), slice 1 mirrored again
         const arma::uword m = mirror_col(c, N, true);
         arma::mat P0;
         P0 = quadriga_lib::sos_init_phases<double>(256, n_gen, 1000 + (arma::sword)c);

@@ -151,8 +151,11 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz,
                  const size_t n_gen,
                  const double *px, const double *py, const double *pz,
                  const size_t n_pos,
-                 double *val)
+                 double *val,
+                 const double *gx, const double *gy, const double *gz,
+                 const double *qx, const double *qy, const double *qz)
 {
+    const bool two = gx != nullptr;
     if (n_coeff == 0 || n_gen == 0 || n_pos == 0)
         return;
 
@@ -217,21 +220,35 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz,
                 const size_t n_valid = (n_pos - i_start < QD_SOS_VEC) ? n_pos - i_start : QD_SOS_VEC;
 
                 double bx[QD_SOS_VEC] = {0.0}, by[QD_SOS_VEC] = {0.0}, bz[QD_SOS_VEC] = {0.0};
+                double cx[QD_SOS_VEC] = {0.0}, cy[QD_SOS_VEC] = {0.0}, cz[QD_SOS_VEC] = {0.0};
                 for (size_t k = 0; k < n_valid; ++k)
                     bx[k] = px[i_start + k], by[k] = py[i_start + k], bz[k] = pz[i_start + k];
+                if (two)
+                    for (size_t k = 0; k < n_valid; ++k)
+                        cx[k] = qx[i_start + k], cy[k] = qy[i_start + k], cz[k] = qz[i_start + k];
 
                 const __m256d xl = _mm256_loadu_pd(bx), xh = _mm256_loadu_pd(bx + 4);
                 const __m256d yl = _mm256_loadu_pd(by), yh = _mm256_loadu_pd(by + 4);
                 const __m256d zl = _mm256_loadu_pd(bz), zh = _mm256_loadu_pd(bz + 4);
+                const __m256d ql_x = _mm256_loadu_pd(cx), qh_x = _mm256_loadu_pd(cx + 4);
+                const __m256d ql_y = _mm256_loadu_pd(cy), qh_y = _mm256_loadu_pd(cy + 4);
+                const __m256d ql_z = _mm256_loadu_pd(cz), qh_z = _mm256_loadu_pd(cz + 4);
 
                 float *Cb = C + b * n_slice, *Sb = S + b * n_slice;
                 for (size_t n = 0; n < n_coeff; ++n)
                 {
                     const __m256d vx = _mm256_set1_pd(fx[n]), vy = _mm256_set1_pd(fy[n]), vz = _mm256_set1_pd(fz[n]);
 
-                    // Phase in cycles, reduced to [-0.5, 0.5] in double precision
+                    // Phase in cycles, reduced to [-0.5, 0.5] in double precision; with a second device the two parts
+                    // are computed alike and added, so that exchanging them gives the same sum
                     __m256d tl = _mm256_fmadd_pd(vx, xl, _mm256_fmadd_pd(vy, yl, _mm256_mul_pd(vz, zl)));
                     __m256d th = _mm256_fmadd_pd(vx, xh, _mm256_fmadd_pd(vy, yh, _mm256_mul_pd(vz, zh)));
+                    if (two)
+                    {
+                        const __m256d wx = _mm256_set1_pd(gx[n]), wy = _mm256_set1_pd(gy[n]), wz = _mm256_set1_pd(gz[n]);
+                        tl = _mm256_add_pd(tl, _mm256_fmadd_pd(wx, ql_x, _mm256_fmadd_pd(wy, ql_y, _mm256_mul_pd(wz, ql_z))));
+                        th = _mm256_add_pd(th, _mm256_fmadd_pd(wx, qh_x, _mm256_fmadd_pd(wy, qh_y, _mm256_mul_pd(wz, qh_z))));
+                    }
                     tl = _mm256_sub_pd(tl, _mm256_round_pd(tl, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
                     th = _mm256_sub_pd(th, _mm256_round_pd(th, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
 

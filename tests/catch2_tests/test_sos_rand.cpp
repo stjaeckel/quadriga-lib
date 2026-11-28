@@ -9,10 +9,11 @@
 // Verification suite for quadriga_lib::sos_randn, sos_rand and sos_randi.
 //
 // Pins down: the documented composition (preset, phases, evaluation) including the assignment of phase
-// columns and the second phase stream of a device on its own map, the replacement of a zero
-// decorrelation distance, the choice between one map and two maps, the mapping to Uniform and integer
-// values, the distributions, seeds and what a seed does and does not fix, sizes, float and double, input
-// validation.
+// columns (one phase stream, with or without a second device), the replacement of a zero decorrelation
+// distance, the choice of the two-device mode (reciprocal for equal decorrelation distances, not reciprocal
+// with the frequency scale dist_decorr / dist_decorr_b for different ones), the mapping to Uniform and
+// integer values, the distributions, seeds and what a seed does and does not fix, sizes, float and double,
+// input validation.
 // It leaves the values of the generator, the tables and the phase stream to their own suites.
 // Oracles:
 //  - composition: the same result built step by step from sos_preset, sos_init_phases and sos_val, as the
@@ -54,19 +55,16 @@ namespace
     {
         d_a = d_a == 0.0 ? 0.1 : d_a, d_b = d_b == 0.0 ? 0.1 : d_b;
         arma::mat spatial_freq, phase, val;
-        arma::vec acf, dist;
-        spatial_freq = quadriga_lib::sos_preset(preset, &acf, &dist, d_a);
-        // Phases: one stream per device, the second one seeded with seed + 2^62 (bit 62 flipped)
-        arma::mat phase_b;
+        spatial_freq = quadriga_lib::sos_preset<double>(preset, nullptr, nullptr, d_a);
+        // Phases: one stream, with or without a second device
         phase = quadriga_lib::sos_init_phases(spatial_freq.n_rows, n_gen, seed);
-        phase_b = quadriga_lib::sos_init_phases(spatial_freq.n_rows, n_gen, seed + ((arma::sword)1 << 62));
-        arma::mat ph_a = phase.col(g), ph_b = phase_b.col(g);
+        arma::mat ph_a = phase.col(g);
         if (pos_b.is_empty())
-            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, {}, {}, {}, {}, 1.0, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, {}, 1.0, true, uniform);
         else if (d_a == d_b)
-            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, {}, acf, dist, 1.0, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, 1.0, true, uniform);
         else
-            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, ph_b, {}, {}, d_a / d_b, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, d_a / d_b, false, uniform);
         return val.col(0);
     }
 }
@@ -103,12 +101,12 @@ TEST_CASE("sos_randn - one device: each generator is the documented composition"
     CHECK(arma::abs(other - val).max() > 0.05);
 }
 
-TEST_CASE("sos_randn - two devices: same map for equal distances, two maps for different distances")
+TEST_CASE("sos_randn - two devices: reciprocal for equal distances, scaled and not reciprocal for different distances")
 {
     arma::vec dd = {5.0, 20.0, 12.0, 0.0}, db = {5.0, 8.0, 0.0, 0.0};
     arma::mat pa = rnd(9, 3, -60.0, 60.0, 2), pb = rnd(9, 3, -60.0, 60.0, 3);
 
-    // Without dist_decorr_b: all generators on one map
+    // Without dist_decorr_b: all generators reciprocal
     arma::mat same, swapped;
     quadriga_lib::sos_randn(dd, pa, same, pb, {}, "Comb256", 4);
     quadriga_lib::sos_randn(dd, pb, swapped, pa, {}, "Comb256", 4);
@@ -116,13 +114,13 @@ TEST_CASE("sos_randn - two devices: same map for equal distances, two maps for d
     REQUIRE(same.n_cols == 4);
     for (arma::uword g = 0; g < 4; ++g)
     {
-        INFO("same map, generator " << g);
+        INFO("reciprocal, generator " << g);
         CHECK(arma::abs(same.col(g) - ref_randn(dd(g), dd(g), pa, pb, "Comb256", 4, g, 4)).max() < 1e-12);
     }
     CHECK(arma::abs(same).max() > 0.3);
     CHECK(arma::approx_equal(same, swapped, "absdiff", 1e-12)); // Symmetric under a swap of the devices
 
-    // With dist_decorr_b: generators 0 and 3 have equal distances (one map), 1 and 2 differ (two maps)
+    // With dist_decorr_b: generators 0 and 3 have equal distances (reciprocal), 1 and 2 differ (not reciprocal)
     arma::mat mixed;
     quadriga_lib::sos_randn(dd, pa, mixed, pb, db, "Comb256", 4);
     REQUIRE(mixed.n_cols == 4);
@@ -137,6 +135,20 @@ TEST_CASE("sos_randn - two devices: same map for equal distances, two maps for d
     CHECK(arma::approx_equal(mixed.col(0), same.col(0), "absdiff", 1e-12));
     CHECK(arma::approx_equal(mixed.col(3), same.col(3), "absdiff", 1e-12));
     CHECK(arma::abs(mixed.col(1) - same.col(1)).max() > 0.05);
+
+    // Devices and distances exchanged: the reciprocal generators keep their values, the others give another
+    // field (the value of the other end of the link)
+    arma::mat mixed_sw;
+    quadriga_lib::sos_randn(db, pb, mixed_sw, pa, dd, "Comb256", 4);
+    for (arma::uword g = 0; g < 4; ++g)
+    {
+        INFO("exchanged, generator " << g);
+        CHECK(arma::abs(mixed_sw.col(g) - ref_randn(db(g), dd(g), pb, pa, "Comb256", 4, g, 4)).max() < 1e-12);
+    }
+    CHECK(arma::approx_equal(mixed_sw.col(0), mixed.col(0), "absdiff", 1e-12));
+    CHECK(arma::approx_equal(mixed_sw.col(3), mixed.col(3), "absdiff", 1e-12));
+    CHECK(arma::abs(mixed_sw.col(1) - mixed.col(1)).max() > 0.05);
+    CHECK(arma::abs(mixed_sw.col(2) - mixed.col(2)).max() > 0.05);
 }
 
 TEST_CASE("sos_rand and sos_randi - mappings of the Normal values")
@@ -189,28 +201,28 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - distributions over widely spread pos
     const arma::uword n = 10000;
     arma::mat pos = rnd(n, 3, 0.0, 10000.0, 7), pos_b = rnd(n, 3, 0.0, 10000.0, 8);
     arma::vec dd = {10.0}, db = {25.0};
-    arma::mat nrm, uni, itg, dual_same, dual_two;
+    arma::mat nrm, uni, itg, dual_recip, dual_scaled;
     quadriga_lib::sos_randn(dd, pos, nrm, {}, {}, "Comb256", 1);
     quadriga_lib::sos_rand(dd, pos, uni, {}, {}, "Comb256", 1);
     quadriga_lib::sos_randi(dd, pos, 10, itg, {}, {}, "Comb256", 1);
-    quadriga_lib::sos_randn(dd, pos, dual_same, pos, {}, "Comb256", 1); // As the MATLAB test: both devices at the same place
-    quadriga_lib::sos_randn(dd, pos, dual_two, pos_b, db, "Comb256", 1);
+    quadriga_lib::sos_randn(dd, pos, dual_recip, pos, {}, "Comb256", 1); // As the MATLAB test: both devices at the same place
+    quadriga_lib::sos_randn(dd, pos, dual_scaled, pos_b, db, "Comb256", 1);    // Not reciprocal, frequency scale 0.4
     REQUIRE(nrm.n_elem == n);
     REQUIRE(uni.n_elem == n);
     REQUIRE(itg.n_elem == n);
-    REQUIRE(dual_same.n_elem == n);
-    REQUIRE(dual_two.n_elem == n);
+    REQUIRE(dual_recip.n_elem == n);
+    REQUIRE(dual_scaled.n_elem == n);
 
     QD_DIAG("\n# diag: sos_randn / sos_rand empirical CDF against the ideal CDF, 10000 positions\n");
-    QD_DIAG("x,cdf_randn,cdf_same_map,cdf_two_maps,normal_cdf,u,cdf_rand\n");
+    QD_DIAG("x,cdf_randn,cdf_reciprocal,cdf_scaled,normal_cdf,u,cdf_rand\n");
     double worst_n = 0.0, worst_u = 0.0, worst_s = 0.0, worst_t = 0.0;
     for (int k = -6; k <= 6; ++k)
     {
         double x = 0.5 * (double)k, u = 0.5 + (double)k / 13.0, cn = 0.0, cs = 0.0, ct = 0.0, cu = 0.0;
         for (arma::uword i = 0; i < n; ++i)
         {
-            cn += nrm(i) <= x ? 1.0 / (double)n : 0.0, cs += dual_same(i) <= x ? 1.0 / (double)n : 0.0;
-            ct += dual_two(i) <= x ? 1.0 / (double)n : 0.0, cu += uni(i) <= u ? 1.0 / (double)n : 0.0;
+            cn += nrm(i) <= x ? 1.0 / (double)n : 0.0, cs += dual_recip(i) <= x ? 1.0 / (double)n : 0.0;
+            ct += dual_scaled(i) <= x ? 1.0 / (double)n : 0.0, cu += uni(i) <= u ? 1.0 / (double)n : 0.0;
         }
         double ideal = 0.5 * std::erfc(-x / std::sqrt(2.0));
         QD_DIAG("%.1f,%.4f,%.4f,%.4f,%.4f,%.3f,%.4f\n", x, cn, cs, ct, ideal, u, cu);
@@ -430,12 +442,11 @@ TEST_CASE("sos_randn, sos_rand - nearby positions get similar values in separate
     CHECK(arma::abs(a).max() > 1.0);
 }
 
-
-TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator does not depend on the number of generators")
+TEST_CASE("sos_randn, sos_rand, sos_randi - with two devices the value of a generator does not depend on the number of generators")
 {
-    // The second device draws its phases from its own stream, sos_init_phases( n_coeff, n_gen, seed + 2^62 ),
-    // so generator g has the same phases for both devices whatever follows it in the call
-    arma::vec dd4 = {5.0, 20.0, 12.0, 7.0}, db4 = {9.0, 8.0, 12.0, 30.0}; // Generator 2 stays on one map
+    // Generator g uses column g of sos_init_phases( n_coeff, n_gen, seed ) with or without a second device, so
+    // its phases are the same whatever follows it in the call
+    arma::vec dd4 = {5.0, 20.0, 12.0, 7.0}, db4 = {9.0, 8.0, 12.0, 30.0}; // Generator 2 has equal distances: reciprocal
     arma::mat pa = rnd(40, 3, -60.0, 60.0, 40), pb = rnd(40, 3, -60.0, 60.0, 41);
 
     arma::mat n4, u4, i4;
@@ -461,15 +472,17 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator
         CHECK(arma::approx_equal(i, i4.cols(0, n_gen - 1), "absdiff", 0.0));
     }
 
-    // The two streams differ: a generator on two maps with equal positions is not twice the same field.
-    // With the same phases for both devices the value would be sqrt(2) times the single-device value.
+    // The second device enters through its own (permuted) frequencies, not as a second copy of the field of the
+    // first device: with both devices at the same positions the value is neither the single-device value nor
+    // sqrt(2) times it
     arma::vec d1 = {10.0}, d1b = {10.5};
     arma::mat one, two;
     quadriga_lib::sos_randn(d1, pa, one, {}, {}, "Comb256", 9);
     quadriga_lib::sos_randn(d1, pa, two, pa, d1b, "Comb256", 9);
+    CHECK(arma::abs(two - one).max() > 0.5);
     CHECK(arma::abs(two - std::sqrt(2.0) * one).max() > 0.5);
 
-    // Without a seed both streams are random
+    // Without a seed the phases are random
     arma::mat r1, r2;
     quadriga_lib::sos_randn(dd4, pa, r1, pb, db4);
     quadriga_lib::sos_randn(dd4, pa, r2, pb, db4);

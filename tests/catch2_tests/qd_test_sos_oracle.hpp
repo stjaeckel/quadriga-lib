@@ -8,6 +8,9 @@
 //  - qd_preset / qd_acf_at: frequencies and ACF table of sos_preset, the ACF interpolated linearly by sos_acfi
 //  - qd_floor_offset: floor offsets 2·pi·k·n/N + psi_b(n), k = q mod N, b = q div N, psi_0 = 0, psi_b(n) = 2·pi·u_n
 //    with u_n from the raw outputs x_n of std::mt19937_64 seeded with b: u_n = (x_n >> 11)·2^-53
+//  - qd_perm / qd_ref_sos2 / qd_ref_dual: the fixed permutation of the two-device generator of sos_val (Sattolo's
+//    algorithm with u = (x >> 11)·2^-53 from std::mt19937_64 seeded with 2021), the two-device sum and the reciprocal
+//    or plain two-device value, typed here
 //  - qd_grid, qd_corr, qd_equal: positions on a regular grid, Pearson correlation, bitwise equality with size
 
 #ifndef QD_TEST_SOS_ORACLE_HPP
@@ -18,6 +21,8 @@
 #include <cmath>
 #include <random>
 #include <string>
+#include <utility>
+#include <vector>
 
 static inline double qd_ref_sos(const arma::mat &F, const double *phi, double x, double y, double z,
                                 const arma::vec *off = nullptr)
@@ -27,6 +32,55 @@ static inline double qd_ref_sos(const arma::mat &F, const double *phi, double x,
     for (arma::uword n = 0; n < F.n_rows; ++n)
         s += std::cos(2.0 * pi * (F(n, 0) * x + F(n, 1) * y + F(n, 2) * z) + phi[n] + (off ? (*off)(n) : 0.0));
     return std::sqrt(2.0 / (double)F.n_rows) * s;
+}
+
+static inline std::vector<arma::uword> qd_perm(arma::uword N)
+{
+    std::vector<arma::uword> p(N);
+    for (arma::uword n = 0; n < N; ++n)
+        p[n] = n;
+    std::mt19937_64 gen(2021);
+    for (arma::uword i = N; i > 1; --i)
+    {
+        const double u = (double)(gen() >> 11) / 9007199254740992.0;
+        std::swap(p[i - 1], p[(arma::uword)(u * (double)(i - 1))]);
+    }
+    return p;
+}
+
+// sqrt(2/N) · sum_n cos( 2·pi · (F(n,:)·a + scale·F(p(n),:)·b) + phi(n) + off(n) ), a and b {x, y, z}
+static inline double qd_ref_sos2(const arma::mat &F, const double *phi, const double *a, const double *b,
+                                 const std::vector<arma::uword> &p, double scale, const arma::vec *off = nullptr)
+{
+    const double pi = arma::datum::pi;
+    double s = 0.0;
+    for (arma::uword n = 0; n < F.n_rows; ++n)
+    {
+        double t = 0.0;
+        for (arma::uword c = 0; c < 3; ++c)
+            t += F(n, c) * a[c] + scale * F(p[n], c) * b[c];
+        s += std::cos(2.0 * pi * t + phi[n] + (off ? (*off)(n) : 0.0));
+    }
+    return std::sqrt(2.0 / (double)F.n_rows) * s;
+}
+
+// Two-device value of sos_val: reciprocal ( s(a, b) + s(b, a) ) / sqrt( 2 + 2·c ), else s(a, b)
+static inline double qd_ref_dual(const arma::mat &F, const double *phi, const double *a, const double *b,
+                                 const std::vector<arma::uword> &p, double scale, bool reciprocal,
+                                 const arma::vec *off = nullptr)
+{
+    if (!reciprocal)
+        return qd_ref_sos2(F, phi, a, b, p, scale, off);
+    const double pi = arma::datum::pi;
+    double c = 0.0;
+    for (arma::uword n = 0; n < F.n_rows; ++n)
+    {
+        double t = 0.0;
+        for (arma::uword k = 0; k < 3; ++k)
+            t += (F(n, k) - F(p[n], k)) * (a[k] - b[k]);
+        c += std::cos(2.0 * pi * t) / (double)F.n_rows;
+    }
+    return (qd_ref_sos2(F, phi, a, b, p, 1.0, off) + qd_ref_sos2(F, phi, b, a, p, 1.0, off)) / std::sqrt(2.0 + 2.0 * c);
 }
 
 static inline double qd_unif(double v) { return 0.5 * std::erfc(-v / std::sqrt(2.0)); }

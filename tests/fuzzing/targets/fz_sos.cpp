@@ -5,6 +5,7 @@
 // Sum-of-sinusoids generators with fuzzed frequencies, phases, ACF tables and positions (also with outputs that
 // alias inputs): sos_preset, sos_init_phases, sos_acfi, sos_val, sos_map, sos_randn / sos_rand / sos_randi,
 // sos_remove_bias, sos_acf_2d, sos_acf_approx, sos_calc_mse, sos_acf_estimate, sos_generate
+// Two devices in sos_val and sos_remove_bias: both values of 'reciprocal', with scale 1 or a fuzzed scale
 
 #include "fuzz_target.hpp"
 
@@ -54,24 +55,24 @@ static void run(fz::input &in)
         acf.resize(in.size(16)), dist.resize(acf.n_elem);
 
     // Phases: drawn or fuzzed
-    arma::Mat<T> phase, phase_b;
+    arma::Mat<T> phase;
     const arma::uword n_gen = in.size(4);
     if (in.ConsumeBool())
         fz::clean([&] { phase = quadriga_lib::sos_init_phases<T>(spatial_freq.n_rows, n_gen, seed(in)); });
     else
         phase = in.mat<T>(in.ConsumeBool() ? spatial_freq.n_rows : in.size(17), n_gen);
-    phase_b = in.ConsumeBool() ? phase : in.mat<T>(phase.n_rows, in.ConsumeBool() ? phase.n_cols : in.size(4));
 
-    // Positions with 1 to 3 columns (sometimes 0 or 4), up to 16 rows
-    auto positions = [&]
+    // Positions with 1 to 3 columns (sometimes 0 or 4), up to 16 rows; pos_b mostly with the rows of pos
+    auto positions = [&](arma::uword n_rows)
     {
-        arma::Mat<T> p = in.mat<T>(in.size(16), in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.size(4) : in.ConsumeIntegralInRange<arma::uword>(1, 3));
+        arma::Mat<T> p = in.mat<T>(n_rows, in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.size(4) : in.ConsumeIntegralInRange<arma::uword>(1, 3));
         if (in.ConsumeBool())
             p /= T(10);
         return p;
     };
-    arma::Mat<T> pos = positions(), pos_b = positions(), val;
-    const bool use_b = in.ConsumeBool(), use_phase_b = in.ConsumeBool(), use_acf = in.ConsumeBool(), uniform = in.ConsumeBool();
+    arma::Mat<T> pos = positions(in.size(16)), val;
+    arma::Mat<T> pos_b = positions(in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.size(16) : pos.n_rows);
+    const bool use_b = in.ConsumeBool(), use_decorr_b = in.ConsumeBool(), reciprocal = in.ConsumeBool(), uniform = in.ConsumeBool();
     const int kernel = in.ConsumeIntegralInRange<int>(-1, 3);
     const T scale_b = in.ConsumeBool() ? T(1) : in.value<T>();
 
@@ -88,10 +89,9 @@ static void run(fz::input &in)
     case 1:
     {
         // val is a fresh matrix or one of the inputs
-        arma::Mat<T> *out[] = {&val, &pos, &pos_b, &phase, &phase_b};
-        arma::Mat<T> *v = out[in.ConsumeIntegralInRange<int>(0, 7) < 5 ? 0 : in.ConsumeIntegralInRange<int>(0, 4)];
-        fz::clean([&] { quadriga_lib::sos_val(spatial_freq, phase, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, phase_b),
-                                              fz::opt(use_acf, acf), fz::opt(use_acf, dist), scale_b, uniform, kernel); });
+        arma::Mat<T> *out[] = {&val, &pos, &pos_b, &phase};
+        arma::Mat<T> *v = out[in.ConsumeIntegralInRange<int>(0, 7) < 5 ? 0 : in.ConsumeIntegralInRange<int>(0, 3)];
+        fz::clean([&] { quadriga_lib::sos_val(spatial_freq, phase, pos, *v, fz::opt(use_b, pos_b), scale_b, reciprocal, uniform, kernel); });
         break;
     }
     case 2:
@@ -115,21 +115,20 @@ static void run(fz::input &in)
         const int which = in.ConsumeIntegralInRange<int>(0, 2);
         const arma::uword imax = in.ConsumeIntegralInRange<int>(0, 3) == 0 ? in.ConsumeIntegral<arma::uword>() : in.size(10);
         if (which == 0)
-            fz::clean([&] { quadriga_lib::sos_randn(dd, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, dd_b), preset, s); });
+            fz::clean([&] { quadriga_lib::sos_randn(dd, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_decorr_b, dd_b), preset, s); });
         else if (which == 1)
-            fz::clean([&] { quadriga_lib::sos_rand(dd, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, dd_b), preset, s); });
+            fz::clean([&] { quadriga_lib::sos_rand(dd, pos, *v, fz::opt(use_b, pos_b), fz::opt(use_decorr_b, dd_b), preset, s); });
         else
-            fz::clean([&] { quadriga_lib::sos_randi(dd, pos, imax, *v, fz::opt(use_b, pos_b), fz::opt(use_phase_b, dd_b), preset, s); });
+            fz::clean([&] { quadriga_lib::sos_randi(dd, pos, imax, *v, fz::opt(use_b, pos_b), fz::opt(use_decorr_b, dd_b), preset, s); });
         break;
     }
     case 4:
     {
         arma::Mat<T> offset, mean_before;
         const int outs = in.ConsumeIntegralInRange<int>(0, 3);
-        arma::Mat<T> *off = outs & 1 ? (in.ConsumeBool() ? &offset : &phase_b) : nullptr; // phase_b as output may clash
-        fz::clean([&] { quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, fz::opt(use_b, pos_b), use_phase_b ? &phase_b : nullptr,
-                                                      fz::opt(use_acf, acf), fz::opt(use_acf, dist), off,
-                                                      outs & 2 ? &mean_before : nullptr, scale_b); });
+        arma::Mat<T> *off = outs & 1 ? (in.ConsumeBool() ? &offset : &pos_b) : nullptr; // pos_b as output may clash
+        fz::clean([&] { quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, fz::opt(use_b, pos_b), scale_b, reciprocal, off,
+                                                      outs & 2 ? &mean_before : nullptr); });
         break;
     }
     case 5:
@@ -166,8 +165,7 @@ static void run(fz::input &in)
         const arma::uword n_pos = in.size(32);
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
         fz::clean([&] { est = quadriga_lib::sos_acf_estimate(spatial_freq, ph, bins, n_pos, outs & 1 ? &d_est : nullptr,
-                                                             outs & 2 ? &dual : nullptr, fz::opt(outs & 4, acf),
-                                                             fz::opt(outs & 4, dist), seed(in)); });
+                                                             outs & 2 ? &dual : nullptr, seed(in)); });
         break;
     }
     case 9:

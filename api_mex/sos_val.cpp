@@ -72,7 +72,7 @@ pos_new = pos + 2.5;
 val_new = quadriga_lib.sos_val(spatial_freq, phase, pos_new);
 
 % Uniform distributed output
-val_uni = quadriga_lib.sos_val(spatial_freq, phase, pos, [], [], [], [], [], true);
+val_uni = quadriga_lib.sos_val(spatial_freq, phase, pos, [], [], [], true);
 
 % Map on a regular grid, size [n_y, n_x, 1, 20]
 x = 0:0.5:250;  y = 0:0.5:100;
@@ -89,13 +89,14 @@ imagesc(x, y, grid(:, :, 1, 1));  axis xy;
   38 dB for `Exp128` to `Exp1024` and 31, 35, 39 and 42 dB for `Comb128` to `Comb1024`. `'Comb256'` is a
   good default; take a larger table if the shape of the ACF matters, a smaller one if speed does.
 - **Both ends mobile:** if a value belongs to a link between two moving devices, pass both positions.
-  The value then changes smoothly when either device moves.
+  The value then changes smoothly when either device moves, keeps the correlation of one device while the
+  other stays, and does not change when the two ends swap.
 
 ```
 % Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 pos_tx = pos;
 pos_rx = rand(1000, 3) * 100;
-val_link = quadriga_lib.sos_val(spatial_freq, phase, pos_tx, pos_rx, [], acf, dist);
+val_link = quadriga_lib.sos_val(spatial_freq, phase, pos_tx, pos_rx);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -158,25 +159,28 @@ Spatially correlated random values at given positions
 - Positions are given as one row per position with the columns `{x, y, z}`; they may have fewer
   columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
-- Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
-  `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and
-  `pos_b` and `A` the target ACF interpolated as in [[sos_acfi]]; `acf` and `dist` are required.
-  The value does not change when the two devices swap their positions
-- Two devices on different maps (`pos_b` and `phase_b` given):
-  `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
-- The mode follows from the arguments only; phase values are never compared. Passing the same
-  matrix as `phase` and `phase_b` selects the two-map formula
-- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
-  consistent ACF
-- Two devices on the same map need an ACF above -1 at all sample points, because the value is
-  divided by `sqrt( 2 + 2·A(D) )`
+- Two devices (`pos_b` given): one generator over the positions of both,
+  `s(x, y) = sqrt(2/n_coeff) · sum_n cos( 2·pi · (f_n·x + b·f_p(n)·y) + phi_n )`, with
+  `b = spatial_freq_scale_b` and `p` a fixed pseudo-random permutation of the sinusoids that depends only on
+  `n_coeff` and pairs no sinusoid with itself. The correlation of two links approximates the product of the
+  ACFs of the two moves; while one device stays at its position, it is the ACF of one device (with
+  `reciprocal = true` for devices more than about one decorrelation distance apart)
+- `reciprocal = true` (requires `b = 1`): `val = ( s(pos, pos_b) + s(pos_b, pos) ) / sqrt( 2 + 2·c )` with
+  `c = (1/n_coeff) · sum_n cos( 2·pi · (f_n - f_p(n))·(pos - pos_b) )`. The value does not change when the
+  two devices swap their positions; for devices closer than about one decorrelation distance the
+  correlation of two links contains the term this symmetry requires
+- `reciprocal = false`: `val = s(pos, pos_b)`. With `pos` and `pos_b` exchanged, the same phases give a
+  second field with the same statistics, for example the arrival value of a link whose departure value
+  is `val`
+- For large moves of both devices the correlation keeps a residual with rms `1/sqrt(2·n_coeff)`
+- With `reciprocal = true`, a position where `c = -1` (possible only for tables with few sinusoids) gives NaN
 - `uniform = true` maps the values to `0.5 · erfc( -val / sqrt(2) )`, which is uniform between 0 and
   1 as far as `val` is Normal distributed. The limits 0 and 1 are included: a value far out in the
   tail is rounded to them
 - Kernels: GENERIC computes in double precision. AVX2 evaluates sine and cosine in single
   precision; its values differ from GENERIC by less than `4e-7 · sqrt( 2·n_coeff )`, typically by
-  less than 1e-6
+  less than 1e-6; with two devices and `reciprocal = true` the difference is scaled by
+  `2 / sqrt( 2 + 2·c )`, at most about 1.7 for the presets
 - Accuracy far from the origin: the argument `f_n·x` is known to about 1e-16 of its size. The
   bound between the kernels holds up to about 1e9 periods of the sinusoids; beyond that both
   kernels lose accuracy at the same rate
@@ -186,7 +190,7 @@ Spatially correlated random values at given positions
 
 ## Usage:
 ```
-val = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist, spatial_freq_scale_b, ...
+val = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, spatial_freq_scale_b, reciprocal, ...
     uniform, use_kernel );
 ```
 
@@ -199,14 +203,11 @@ val = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist,
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
   `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
   `pos`
-- **`phase_b`** *(optional)* — Phases of the second device; requires `pos_b`; omitted or
-  empty = same map; `[n_coeff, n_gen]`
-- **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then
-  be > -1; `[n_acf]`
-- **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
-  finite; `[n_acf]`
 - **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
-  first device divided by that of the second; must be > 0; default: 1
+  first device divided by that of the second; must be > 0; other than 1 requires `pos_b` and
+  `reciprocal = false`; default: 1
+- **`reciprocal`** — Two devices: true = the value does not change when the devices swap positions;
+  default: true
 - **`uniform`** — Output distribution: false = Normal(0,1), true = Uniform between 0 and 1;
   default: false
 - **`use_kernel`** — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2 (error if
@@ -224,7 +225,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 3 || nrhs > 10)
+    if (nrhs < 3 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -233,15 +234,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat phase = qd_mex_get_Mat<double>(prhs[1], false, "phase");
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[2], false, "pos");
     const arma::mat pos_b = (nrhs < 4) ? arma::mat() : qd_mex_get_Mat<double>(prhs[3], false, "pos_b");
-    const arma::mat phase_b = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4], false, "phase_b");
-    const arma::vec acf = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "acf");
-    const arma::vec dist = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "dist");
-    const double spatial_freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_scale_b", 1.0);
-    const bool uniform = (nrhs < 9) ? false : qd_mex_get_scalar<bool>(prhs[8], "uniform", false);
-    const int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
+    const double spatial_freq_scale_b = (nrhs < 5) ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "spatial_freq_scale_b", 1.0);
+    const bool reciprocal = (nrhs < 6) ? true : qd_mex_get_scalar<bool>(prhs[5], "reciprocal", true);
+    const bool uniform = (nrhs < 7) ? false : qd_mex_get_scalar<bool>(prhs[6], "uniform", false);
+    const int use_kernel = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "use_kernel", 0);
 
     arma::mat val;
     plhs[0] = qd_mex_init_output(&val, pos.n_rows, phase.n_cols);
 
-    CALL_QD(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val, pos_b, phase_b, acf, dist, spatial_freq_scale_b, uniform, use_kernel));
+    CALL_QD(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val, pos_b, spatial_freq_scale_b, reciprocal, uniform, use_kernel));
 }

@@ -18,8 +18,12 @@ Spatially correlated normalized random values of one random set at a set of link
 - Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a
   link depends neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on
   `tx_pos`
-- `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
-  generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
+- `dual_mobility = true`: Tx and Rx both move; each column is the two-device generator of [[sos_val]] with the
+  decorrelation distance of the column at the Rx and that of its mirror generator at the Tx (e.g. departure and
+  arrival quantities exchange). While one end stays, a column changes as in single mobility; when one end moves far,
+  the link decorrelates. Swapping Tx and Rx exchanges the mirror columns; a self-mirrored column keeps its value,
+  except block 14 of the shared 'ray' set when `PerClusterAS_D` and `PerClusterAS_A` differ. Every column keeps
+  its distribution
 - 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
   field, fields of different floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3):
   exactly for IDs in the same group of `n_coeff` consecutive IDs (0 to `n_coeff - 1`, ...), otherwise up to a random
@@ -36,7 +40,7 @@ Random sets, with `N = NumClusters - 1`, `M = NumSubPaths`, columns from 1 and b
 | `'lsf'` | 11 | 1 to 8 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 9 absolute TOA, Normal(0,1); 10 ground permittivity and 11 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (1 to 8), `absTOA_lambda` (9), `SC_lambda` (10), `SF_lambda` (11) | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 11) |
 | `'cluster'`, 0 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n` (from 1): block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [[ssf_clusters]] `rnd` |
 | `'cluster'`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd_freq`, slice `k` |
-| `'ray'`, 0 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set 0: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [[ssf_rays]] `rnd_ray`: 0 for `'quadriga'`, `k` as slice `k` for the TR methods |
+| `'ray'`, 0 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set 0: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km; at the Tx in dual mobility `PerClusterAS_D` in place of `PerClusterAS_A` | [[ssf_rays]] `rnd_ray`: 0 for `'quadriga'`, `k` as slice `k` for the TR methods |
 
 A `'ray'` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` (both from 1) in column
 `b·N·M + (n - 1)·M + m`: 0 to 3 coupling ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to
@@ -51,8 +55,8 @@ rnd = quadriga_lib.gbsm_draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*` and
-  `PerClusterAS_A`
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*`,
+  `PerClusterAS_A` and `PerClusterAS_D`
 - **`set_type`** — Set type of [[gbsm_init_phases]]; string
 - **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[3, 1]` or `[3, n_link]`

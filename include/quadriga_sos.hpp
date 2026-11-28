@@ -56,8 +56,8 @@ namespace quadriga_lib
         const double_list &d);        // Distances in [m], must be >= 0, [n_d]
 
     // Spatially correlated random values at given positions
-    // - One device (pos_b omitted), two devices on the same map (pos_b given, phase_b omitted; needs acf and dist)
-    //   or two devices on different maps (pos_b and phase_b given)
+    // - One device (pos_b omitted) or two devices (pos_b given): one generator over the positions of both devices,
+    //   reciprocal (value unchanged when the devices swap) or not
     template <typename dtype>
     void sos_val(
         const arma::Mat<dtype> &spatial_freq,                 // Spatial frequencies in [1/m], [n_coeff, n_dim]
@@ -65,10 +65,8 @@ namespace quadriga_lib
         const arma::Mat<dtype> &pos,                          // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
         arma::Mat<dtype> &val,                                // Output: Values, [n_pos, n_gen]
         const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(),   // Optional: Positions of the second device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
-        const arma::Mat<dtype> &phase_b = arma::Mat<dtype>(), // Optional: Phases of the second device in [rad], [n_coeff, n_gen]
-        const arma::Col<dtype> &acf = arma::Col<dtype>(),     // Optional: Target ACF, [n_acf]
-        const arma::Col<dtype> &dist = arma::Col<dtype>(),    // Optional: Sample points of the ACF in [m], [n_acf]
         double spatial_freq_scale_b = 1.0,                    // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
+        bool reciprocal = true,                               // Two devices: true = value unchanged when the devices swap (requires scale 1)
         bool uniform = false,                                 // Output distribution: false = Normal, true = Uniform in [0, 1]
         int use_kernel = 0);                                  // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
@@ -87,7 +85,7 @@ namespace quadriga_lib
 
     // Spatially correlated random numbers: Normal (sos_randn), Uniform (sos_rand), integer (sos_randi)
     // - One independent generator per entry of dist_decorr, built from the preset with phases drawn from the seed
-    // - With pos_b both devices share one map, unless dist_decorr_b differs for that generator (two maps)
+    // - With pos_b one generator over both devices: reciprocal for equal decorrelation distances, else not
     template <typename dtype>
     void sos_randn(
         const double_list &dist_decorr,                             // Decorrelation distances in [m], must be >= 0, [n_gen]
@@ -120,19 +118,17 @@ namespace quadriga_lib
         arma::sword seed = -1);                                     // Seed, -1 = system random device
 
     // Remove the sample mean of the generators over a set of positions by a phase offset
-    // - Closed form, one offset per generator (two with phase_b); same device modes as sos_val
+    // - Closed form, one offset per generator; same device modes as sos_val
     template <typename dtype>
     void sos_remove_bias(
         const arma::Mat<dtype> &spatial_freq,               // Spatial frequencies in [1/m], [n_coeff, n_dim]
         arma::Mat<dtype> &phase,                            // Phases in [rad], updated in-place, [n_coeff, n_gen]
         const arma::Mat<dtype> &pos,                        // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
-        const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(), // Optional: Positions of the second device in [m], [n_pos_b, 1], [n_pos_b, 2] or [n_pos_b, 3]
-        arma::Mat<dtype> *phase_b = nullptr,                // Optional: Phases of the second device in [rad], updated in-place, [n_coeff, n_gen]
-        const arma::Col<dtype> &acf = arma::Col<dtype>(),   // Optional: Target ACF, [n_acf]
-        const arma::Col<dtype> &dist = arma::Col<dtype>(),  // Optional: Sample points of the ACF in [m], [n_acf]
-        arma::Mat<dtype> *offset = nullptr,                 // Optional output: Applied offsets in [rad], [n_gen, 1], or [n_gen, 2] with phase_b
-        arma::Mat<dtype> *mean_before = nullptr,            // Optional output: Sample mean before the correction, [n_gen, 1]; with phase_b the mean of each device's own field, [n_gen, 2]
-        double spatial_freq_scale_b = 1.0);                 // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
+        const arma::Mat<dtype> &pos_b = arma::Mat<dtype>(), // Optional: Positions of the second device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
+        double spatial_freq_scale_b = 1.0,                  // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
+        bool reciprocal = true,                             // Two devices: as in sos_val
+        arma::Mat<dtype> *offset = nullptr,                 // Optional output: Applied offsets in [rad], [n_gen, 1]
+        arma::Mat<dtype> *mean_before = nullptr);           // Optional output: Sample mean before the correction, [n_gen, 1]
 
     // Target ACF on a 2-D grid
     // - Grid axis from -2·Dmax to 2·Dmax with the spacing of 'dist', Dmax = last sample point, n_grid = 4·n_acf - 3
@@ -177,8 +173,6 @@ namespace quadriga_lib
         arma::uword n_pos,                                 // Number of random positions per device, must be > 1
         arma::Col<dtype> *dist_est = nullptr,              // Optional output: Mean distance of the pairs in each bin in [m], [n_bin]
         arma::Col<dtype> *acf_est_dual = nullptr,          // Optional output: Estimated ACF for two devices, [n_bin]
-        const arma::Col<dtype> &acf = arma::Col<dtype>(),  // Optional: Target ACF, required for acf_est_dual, [n_acf]
-        const arma::Col<dtype> &dist = arma::Col<dtype>(), // Optional: Sample points of the ACF in [m], [n_acf]
         arma::sword seed = -1);                            // Seed for the positions, -1 = system random device
 
     // Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF

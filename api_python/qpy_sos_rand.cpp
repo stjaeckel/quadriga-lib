@@ -16,19 +16,15 @@ Spatially correlated Uniform distributed random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [[sos.val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
-  A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
-  flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
-  phases of a generator therefore depend neither on the number of generators nor on whether a
-  second device is given
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`,
+  with or without a second device; the phases of a generator therefore do not depend on the number of
+  generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr`
-  for that generator): both devices are on the same map, the value does not change when they
-  swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the
-  sum of both maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [[sos.val]]; with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = True`, the value does
+  not change when the devices swap positions; with different ones `reciprocal = False` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Normal distributed value `s` of the generator is mapped to `0.5 · erfc( -s / sqrt(2) )`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
@@ -96,19 +92,15 @@ Spatially correlated integer random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [[sos.val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
-  A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
-  flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
-  phases of a generator therefore depend neither on the number of generators nor on whether a
-  second device is given
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`,
+  with or without a second device; the phases of a generator therefore do not depend on the number of
+  generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr`
-  for that generator): both devices are on the same map, the value does not change when they
-  swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the
-  sum of both maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [[sos.val]]; with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = True`, the value does
+  not change when the devices swap positions; with different ones `reciprocal = False` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - The Uniform value `u` of [[sos.rand]] is mapped to `ceil( u · imax )`, limited to 1 ... `imax`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
@@ -179,19 +171,15 @@ Spatially correlated Normal distributed random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [[sos.val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
-  A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
-  flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
-  phases of a generator therefore depend neither on the number of generators nor on whether a
-  second device is given
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`,
+  with or without a second device; the phases of a generator therefore do not depend on the number of
+  generators
 - A decorrelation distance of 0 is replaced by 0.1 m
 - One device (`pos_b` omitted): values of the generator at `pos`
-- Two devices, same decorrelation distance (`dist_decorr_b` omitted, or equal to `dist_decorr`
-  for that generator): both devices are on the same map, the value does not change when they
-  swap positions
-- Two devices, different decorrelation distances: each device has its own map; the value is the
-  sum of both maps divided by `sqrt(2)`
+- Two devices (`pos_b` given): the two-device generator of [[sos.val]]; with the same decorrelation distance
+  (`dist_decorr_b` omitted, or equal to `dist_decorr` for that generator) `reciprocal = True`, the value does
+  not change when the devices swap positions; with different ones `reciprocal = False` and
+  `spatial_freq_scale_b = dist_decorr / dist_decorr_b`
 - Each call with `seed = -1` gives a new realisation. With a seed >= 0 the phases are the same on
   all platforms: the same positions give the same values and nearby positions similar values,
   also in separate calls. The kernel is chosen automatically, so values from machines with and
