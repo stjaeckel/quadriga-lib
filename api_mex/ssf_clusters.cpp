@@ -55,8 +55,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 ## Usage:
 ```
 [ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, ...
-    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, ...
-    o2i, n_cluster );
+    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster );
 ```
 
 ## Inputs:
@@ -77,8 +76,8 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   scenarios; `[n_link, n_freq]`; default: 0
 - **`abs_toa`** — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; required by `'quadriga'` in NLOS scenarios
   with `absTOA_mu > -30`; `[n_link]`; default: no offset
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im` from [[lsp_generate]],
-  real part >= 1, imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
+- **`gr_eps`** *(optional)* — Complex ground permittivity from [[lsp_generate]], used as `conj(gr_eps)`, real part >= 1,
+  imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
 - **`o2i`** — O2I flag per link (mean arrival elevation 0), logical or numeric; used by `'38.901'` in NLOS scenarios;
   `[n_link]`; default: no O2I link
 - **`n_cluster`** — Active NLOS clusters per link (a count) in `[min(max(1, NumClusters_min - 1), N), N]`; `[n_link]`;
@@ -100,7 +99,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 5 || nrhs > 14)
+    if (nrhs < 5 || nrhs > 13)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -115,11 +114,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::cube lsp_anchor = (nrhs < 8) ? arma::cube() : qd_mex_get_Cube<double>(prhs[7], false, "lsp_anchor");
     const arma::mat eod_offset_deg = (nrhs < 9) ? arma::mat() : qd_mex_get_Mat<double>(prhs[8], false, "eod_offset_deg");
     const arma::vec abs_toa = (nrhs < 10) ? arma::vec() : qd_mex_get_Col<double>(prhs[9], false, "abs_toa");
-    const arma::mat gr_eps_re = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10], false, "gr_eps_re");
-    const arma::mat gr_eps_im = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11], false, "gr_eps_im");
-    const std::vector<bool> o2i = (nrhs < 13) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[12], "o2i");
+    arma::mat gr_eps_re, gr_eps_im;
+    if (nrhs > 10)
+        qd_mex_get_complex_Mat<double>(prhs[10], "gr_eps", gr_eps_re, gr_eps_im);
+    const std::vector<bool> o2i = (nrhs < 12) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[11], "o2i");
     const arma::u32_vec n_cluster =
-        (nrhs < 14) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[13], false, "n_cluster");
+        (nrhs < 13) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[12], false, "n_cluster");
 
     // Output allocation in MATLAB memory, sizes from a completed copy of 'scenpar'; an invalid 'scenpar' allocates
     // nothing, the library call then throws its message

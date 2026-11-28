@@ -31,30 +31,29 @@ M_m  = reshape(M_s, [8, 2, 1]);                          % Cube [8, n_path, n_fr
 fc = 2997924580.0;
 
 %% One input frequency matches get_channels_spherical; output [n_rx, n_tx, n_path, n_freq_new]
-[cr_ref, ci_ref, dl_ref] = quadriga_lib.get_channels_spherical( ant, ant, ...
+[c_ref, dl_ref] = quadriga_lib.get_channels_spherical( ant, ant, ...
     [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, ...
     fbs_pos, pg_s, path_length, M_s, fc, 1, 0 );
 
-[cr, ci, dl] = quadriga_lib.get_channels_multifreq( ant, ant, ...
+[c, dl] = quadriga_lib.get_channels_multifreq( ant, ant, ...
     [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, ...
     fbs_pos, pg_m, path_length, M_m, fc, fc, 1, 0 );
 
-assertEqual( size(cr,1), 2 );   % n_rx
-assertEqual( size(cr,2), 2 );   % n_tx
-assertEqual( size(cr,3), 2 );   % n_path
-assertEqual( size(cr,4), 1 );   % n_freq_new
+assertEqual( size(c,1), 2 );   % n_rx
+assertEqual( size(c,2), 2 );   % n_tx
+assertEqual( size(c,3), 2 );   % n_path
+assertEqual( size(c,4), 1 );   % n_freq_new
 assertEqual( size(dl,4), 1 );
 
-assertElementsAlmostEqual( cr(:,:,:,1), cr_ref, 'absolute', 5e-6 );
-assertElementsAlmostEqual( ci(:,:,:,1), ci_ref, 'absolute', 5e-6 );
+assertElementsAlmostEqual( c(:,:,:,1), c_ref, 'absolute', 5e-6 );
 assertElementsAlmostEqual( dl(:,:,:,1), dl_ref, 'absolute', 1e-12 );
 
 %% Multiple output frequencies in the 4th dimension; delays are identical across them
 fo3 = [1e9; 2e9; 3e9];
-[cr3, ~, dl3] = quadriga_lib.get_channels_multifreq( ant, ant, ...
+[c3, dl3] = quadriga_lib.get_channels_multifreq( ant, ant, ...
     [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, ...
     fbs_pos, pg_m, path_length, M_m, fc, fo3, 1, 0 );
-assertEqual( size(cr3), [2,2,2,3] );
+assertEqual( size(c3), [2,2,2,3] );
 assertEqual( size(dl3), [2,2,2,3] );
 assertElementsAlmostEqual( dl3(:,:,:,1), dl3(:,:,:,2), 'absolute', 1e-14 );
 assertElementsAlmostEqual( dl3(:,:,:,2), dl3(:,:,:,3), 'absolute', 1e-14 );
@@ -66,41 +65,40 @@ ant_o.center_freq = 1e9;
 fbs1 = [10;0;0];
 pg2  = [1.0, 4.0];                                  % [n_path=1, n_freq=2]
 M2   = zeros(2,1,2); M2(1,1,1) = 1; M2(1,1,2) = 1;
-[crp, cip, ~] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
+cp = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     [0;0;0], [0,0,0], [10;0;0], [0,0,0], fbs1, fbs1, pg2, 10, M2, ...
     [1e9; 2e9], 1.5e9, 1, 0 );
-amp = sqrt(crp.^2 + cip.^2);
+amp = abs(cp);
 assertElementsAlmostEqual( amp, sqrt(2.5), 'absolute', 0.01 );
 
 %% Scalar M (2 rows) matches full M (8 rows) when only VV is set
 M_full = zeros(8,1,1); M_full(1,1,1) = 0.8; M_full(2,1,1) = 0.3;
 M_sca  = zeros(2,1,1); M_sca(1,1,1)  = 0.8; M_sca(2,1,1)  = 0.3;
-[cr_f, ci_f] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
+c_f = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     [0;0;0], [0,0,0], [10;0;0], [0,0,0], fbs1, fbs1, 1, 10, M_full, 1e9, 1e9 );
-[cr_s, ci_s] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
+c_s = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     [0;0;0], [0,0,0], [10;0;0], [0,0,0], fbs1,  fbs1, 1, 10, M_sca, 1e9, 1e9 );
-assertElementsAlmostEqual( cr_f, cr_s, 'absolute', 1e-12 );
-assertElementsAlmostEqual( ci_f, ci_s, 'absolute', 1e-12 );
+assertElementsAlmostEqual( c_f, c_s, 'absolute', 1e-12 );
 
 %% Acoustic propagation_speed (= 343 m/s) for d = 5 m → delay = 5/343
 c_s = 343.0;
 M1   = zeros(2,1,1); M1(1,1,1) = 1;
 fbs5 = [5;0;0];
-[~, ~, dl_a] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
+[~, dl_a] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     [0;0;0], [0,0,0], [5;0;0], [0,0,0], fbs5, fbs5, 1, 5, M1, ...
     1000, 1000, 1, 0, c_s );
 assertElementsAlmostEqual( dl_a(1,1,1,1), 5/c_s, 'absolute', 1e-12 );
 
 %% add_fake_los_path adds one extra path slice
 fbs_n = [5;5;0];
-[cr_l, ~, dl_l] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
+[c_l, dl_l] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     [0;0;0], [0,0,0], [10;0;0], [0,0,0], fbs_n, fbs_n, 1, 15, M1, ...
     1e9, 1e9, 0, 1 );             % add_fake_los_path = true
-assertEqual( size(cr_l,3), 2 );   % 1 real + 1 fake LOS
+assertEqual( size(c_l,3), 2 );   % 1 real + 1 fake LOS
 assertEqual( size(dl_l,3), 2 );
 
 %% Empty [] for optional propagation_speed → default speed of light
-[~, ~, dl_d] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
+[~, dl_d] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     [0;0;0], [0,0,0], [10;0;0], [0,0,0], fbs1, fbs1, 1, 10, M1, ...
     1e9, 1e9, 1, 0, [] );
 assertElementsAlmostEqual( dl_d(1,1,1,1), 10/299792458, 'absolute', 1e-15 );
@@ -110,10 +108,10 @@ ant_mf = repmat(ant_o, 1, 2);
 ant_mf(2).center_freq = 2e9;
 pgm = [1.0, 1.0];
 Mm  = zeros(2,1,2); Mm(1,1,:) = 1;
-[cr_mf, ~, ~] = quadriga_lib.get_channels_multifreq( ant_mf, ant_mf, ...
+c_mf = quadriga_lib.get_channels_multifreq( ant_mf, ant_mf, ...
     [0;0;0], [0,0,0], [10;0;0], [0,0,0], fbs1, fbs1, pgm, 10, Mm, ...
     [1e9; 2e9], [1e9; 2e9], 1, 0 );
-assertEqual( size(cr_mf), [1,1,1,2] );
+assertEqual( size(c_mf), [1,1,1,2] );
 
 %% Errors
 
@@ -178,30 +176,30 @@ end
 % 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
 C = 299792458.0;
 a1 = quadriga_lib.generate_antenna('omni'); a1.center_freq = fc;
-[cr, ci, dl] = quadriga_lib.get_channels_multifreq(a1, a1, [0;0;0], [0,0,0], [10;0;0], [0,0,0], zeros(3,0), ...
+[c, dl] = quadriga_lib.get_channels_multifreq(a1, a1, [0;0;0], [0,0,0], [10;0;0], [0,0,0], zeros(3,0), ...
     zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), fc, [fc, 2*fc], true, true);
 assertEqual( size(dl), [1, 1, 1, 2] );
-assertEqual( [cr(:); ci(:)], zeros(4, 1) );
+assertEqual( c(:), zeros(2, 1) );
 assertElementsAlmostEqual( dl(:), [10; 10] / C, 'absolute', 1e-18 );
-[~, ~, dl] = quadriga_lib.get_channels_multifreq(a1, a1, [0;0;0], [0,0,0], [10;0;0], [0,0,0], zeros(3,0), ...
+[~, dl] = quadriga_lib.get_channels_multifreq(a1, a1, [0;0;0], [0,0,0], [10;0;0], [0,0,0], zeros(3,0), ...
     zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), fc, fc, false, true);
 assertEqual( dl, 0 );
 % Per antenna pair: the delays of a real LOS path (moved to slot 0) with the same geometry
 tx = [1;2;3]; rx = [11;-3;5];
 for abs_dl = [true, false]
-    [cr0, ci0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, tx, [0;0;0.3], rx, [0;0;-0.2], zeros(3,0), ...
+    [c0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, tx, [0;0;0.3], rx, [0;0;-0.2], zeros(3,0), ...
         zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), fc, fc, abs_dl, true);
-    [~, ~, dlL] = quadriga_lib.get_channels_multifreq(ant, ant, tx, [0;0;0.3], rx, [0;0;-0.2], (tx+rx)/2, ...
+    [~, dlL] = quadriga_lib.get_channels_multifreq(ant, ant, tx, [0;0;0.3], rx, [0;0;-0.2], (tx+rx)/2, ...
         (tx+rx)/2, 1, norm(rx-tx), [1;0;0;0;0;0;-1;0], fc, fc, abs_dl, true);
     assertEqual( size(dl0), [2, 2] );
-    assertEqual( [cr0, ci0], zeros(2, 4) );
+    assertEqual( c0, zeros(2, 2) );
     assertElementsAlmostEqual( dl0, dlL(:,:,1), 'absolute', 1e-17 );
 end
 
 % 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0, n_freq_new] (as in C++ and Python)
-[cr0, ci0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, tx, [0;0;0.3], rx, [0;0;-0.2], zeros(3,0), ...
+[c0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, tx, [0;0;0.3], rx, [0;0;-0.2], zeros(3,0), ...
     zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), fc, [fc, 2*fc], true, false);
-for x = {cr0, ci0, dl0}
+for x = {c0, dl0}
     assertEqual( [size(x{1}, 1), size(x{1}, 2), size(x{1}, 3), size(x{1}, 4)], [2, 2, 0, 2] );
 end
 

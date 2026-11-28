@@ -55,7 +55,7 @@ messages pass through, also for fields the function does not use. A field `Subpa
 
 | Method | Random sets (`set_id`) | Calls in step 5 |
 | --- | --- | --- |
-| `'38.901'` | `'lsf'`; `'cluster'` 0 and one per frequency; `'ray'` one per frequency | per frequency `k`: [[ssf_clusters]] and [[ssf_rays]] (`i_freq = 1`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
+| `'38.901'` | `'lsf'`; `'cluster'` 0 and one per frequency; `'ray'` one per frequency | per frequency `k`: [[ssf_clusters]] and [[ssf_rays]] (`i_freq = 1`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps`) |
 | `'38.901_MF'` | as `'38.901'` | [[lsp_generate]] at the anchor frequency with the same `rnd` gives `lsp_anchor`; [[ssf_clusters]] once; [[ssf_rays]] per frequency `k` with `i_freq = k` |
 | `'quadriga'` | `'lsf'`; `'cluster'` 0; `'ray'` 0 | [[ssf_clusters]] and [[ssf_rays]] once for all frequencies |
 

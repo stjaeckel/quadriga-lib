@@ -15,15 +15,15 @@ tx_pos = [ 0; 0; 10 ];
 rx_pos = [ 60; 10; 1.5 ];
 fc = 60e9;
 phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', 5 );
-[ lsp, ~, gre, gim, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
+[ lsp, ~, gre, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
     quadriga_lib.gbsm_draw( sp, 'lsf', phase, tx_pos, rx_pos ) );
 rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 5 ), tx_pos, rx_pos );
 rf = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 5, 1 ), tx_pos, rx_pos, 1 );
 rr = quadriga_lib.gbsm_draw( sp, 'ray', quadriga_lib.gbsm_init_phases( sp, 'ray', 5, 1 ), tx_pos, rx_pos, 1 );
 [ d, p, aod, eod, aoa, eoa ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, '38.901', rf, [], [], [], ...
-    gre, gim );
+    gre );
 rays = quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rr, '38.901', 1, ...
-    [], [], gre, gim );
+    [], [], gre );
 rays = quadriga_lib.ssf_scatterers( rays );
 kept = find( any( rays.power > 0, 2 ) | rays.path_type < 2 );                 % LOS, GR and NLOS rays with power
 n_path = numel( kept );
@@ -85,7 +85,7 @@ assertEqual( l8, pl );
 assertEqual( p8, pt );
 
 %% Type handling: single link gain, struct with a double 'path_type' and without optional fields
-s = rmfield( rays, { 'gr_eps_re', 'gr_eps_im', 'fallback' } );
+s = rmfield( rays, { 'gr_eps', 'fallback' } );
 s.path_type = double( s.path_type );
 g9 = quadriga_lib.ssf_paths( s, single(-90) );
 assertEqual( g9, pg );
@@ -104,8 +104,7 @@ end
 s.center_freq = [ fc; 2 * fc ];
 s.power = zeros( 0, 2 );
 s.polmat = zeros( 8, 0, 2 );
-s.gr_eps_re = [ gre; gre ];
-s.gr_eps_im = [ gim; gim ];
+s.gr_eps = [ gre; gre ];
 s.fbs_pos = zeros( 3, 0 );
 s.lbs_pos = zeros( 3, 0 );
 for mob = { 'phase', 'drift' }

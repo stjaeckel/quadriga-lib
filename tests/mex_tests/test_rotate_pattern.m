@@ -34,11 +34,11 @@ assertEqual(s0, 81);
 o = [0.2; 0.3; -0.4];
 out = quadriga_lib.rotate_pattern(ant, o, 3);
 [az, el] = meshgrid(ant.azimuth_grid, ant.elevation_grid);
-[V_re, V_im, H_re, H_im] = quadriga_lib.interpolate_pattern(ant, az(:).', el(:).', 1, o);
-assertElementsAlmostEqual( out.e_theta_re(:), V_re(:), 'absolute', 1e-12 );
-assertElementsAlmostEqual( out.e_theta_im(:), V_im(:), 'absolute', 1e-12 );
-assertElementsAlmostEqual( out.e_phi_re(:), H_re(:), 'absolute', 1e-12 );
-assertElementsAlmostEqual( out.e_phi_im(:), H_im(:), 'absolute', 1e-12 );
+[V, H] = quadriga_lib.interpolate_pattern(ant, az(:).', el(:).', 1, o);
+assertElementsAlmostEqual( out.e_theta_re(:), real(V(:)), 'absolute', 1e-12 );
+assertElementsAlmostEqual( out.e_theta_im(:), imag(V(:)), 'absolute', 1e-12 );
+assertElementsAlmostEqual( out.e_phi_re(:), real(H(:)), 'absolute', 1e-12 );
+assertElementsAlmostEqual( out.e_phi_im(:), imag(H(:)), 'absolute', 1e-12 );
 
 v = ant.e_theta_re(91,181);
 out = quadriga_lib.rotate_pattern(ant, [pi/4; 0; 0]);

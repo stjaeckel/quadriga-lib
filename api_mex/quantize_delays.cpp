@@ -30,13 +30,12 @@ Map the path delays to a tap grid by two-tap interpolation
 
 ## Usage:
 ```
-[ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
-    tap_spacing, max_taps, power_exponent, fix_taps );
+[ coeff_q, delay_q ] = quadriga_lib.quantize_delays( coeff, delay, tap_spacing, max_taps, ...
+    power_exponent, fix_taps );
 ```
 
 ## Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients, the paths of a snapshot zero-padded to
-  `n_path`; `[n_rx, n_tx, n_path, n_snap]`
+- **`coeff`** — Complex coefficients, the paths of a snapshot zero-padded to `n_path`; `[n_rx, n_tx, n_path, n_snap]`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; finite, above
   `-tap_spacing / 2` and below `2^31` · `tap_spacing`
 - **`tap_spacing`** — Tap spacing in s, > 0 and finite; 5 ns is a sampling rate of 200 MHz; default: 5e-9
@@ -52,8 +51,7 @@ Map the path delays to a tap grid by two-tap interpolation
   | 3 | One grid per antenna pair for all snapshots |
 
 ## Outputs:
-- **`coeff_re_q`** / **`coeff_im_q`** — Real and imaginary part of the coefficients per tap;
-  `[n_rx, n_tx, n_taps, n_snap]`
+- **`coeff_q`** — Complex coefficients per tap; `[n_rx, n_tx, n_taps, n_snap]`
 - **`delay_q`** — Tap delays in s; `[n_rx, n_tx, n_taps, n_snap]`, or `[1, 1, n_taps, n_snap]` for delays
   `[1, 1, n_path, n_snap]` with `fix_taps` 1 or 2
 
@@ -76,21 +74,21 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
 
-    if (nrhs < 3 || nrhs > 7)
+    if (nrhs < 2 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 3)
+    if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // 4D arrays are split along the 4th dimension
-    const auto coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[0], 3, "coeff_re");
-    const auto coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[1], 3, "coeff_im");
-    const auto delay = qd_mex_matlab2vector_Cube<double>(prhs[2], 3, "delay");
+    // 4D arrays are split along the 4th dimension; the coefficients into real and imaginary part
+    std::vector<arma::cube> coeff_re, coeff_im;
+    qd_mex_get_complex_CubeVec<double>(prhs[0], "coeff", coeff_re, coeff_im);
+    const auto delay = qd_mex_matlab2vector_Cube<double>(prhs[1], 3, "delay");
 
-    double tap_spacing = (nrhs < 4) ? 5.0e-9 : qd_mex_get_scalar<double>(prhs[3], "tap_spacing", 5.0e-9);
-    arma::uword max_taps = (nrhs < 5) ? 48 : qd_mex_get_scalar<arma::uword>(prhs[4], "max_taps", 48);
-    double power_exponent = (nrhs < 6) ? 1.0 : qd_mex_get_scalar<double>(prhs[5], "power_exponent", 1.0);
-    int fix_taps = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "fix_taps", 0);
+    double tap_spacing = (nrhs < 3) ? 5.0e-9 : qd_mex_get_scalar<double>(prhs[2], "tap_spacing", 5.0e-9);
+    arma::uword max_taps = (nrhs < 4) ? 48 : qd_mex_get_scalar<arma::uword>(prhs[3], "max_taps", 48);
+    double power_exponent = (nrhs < 5) ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "power_exponent", 1.0);
+    int fix_taps = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "fix_taps", 0);
 
     std::vector<arma::Cube<double>> coeff_re_q, coeff_im_q, delay_q;
 
@@ -99,9 +97,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         coeff_re_q, coeff_im_q, delay_q,
         tap_spacing, max_taps, power_exponent, fix_taps));
 
-    plhs[0] = qd_mex_vector2matlab(&coeff_re_q);
+    plhs[0] = qd_mex_vector2matlab(&coeff_re_q, &coeff_im_q);
     if (nlhs > 1)
-        plhs[1] = qd_mex_vector2matlab(&coeff_im_q);
-    if (nlhs > 2)
-        plhs[2] = qd_mex_vector2matlab(&delay_q);
+        plhs[1] = qd_mex_vector2matlab(&delay_q);
 }

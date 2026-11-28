@@ -22,7 +22,7 @@ chan = quadriga_lib.get_channels_ieee_indoor(ant, ant, 'A');
 
 assertEqual(numel(chan), 1);
 
-sz = size(chan(1).coeff_re);
+sz = size(chan(1).coeff);
 assertEqual(sz(1), 2);   % n_rx
 assertEqual(sz(2), 2);   % n_tx
 assertEqual(sz(3), 2);   % n_path
@@ -41,12 +41,12 @@ assertEqual(numel(pg), 2);
 assertElementsAlmostEqual(pg(1), pg(2), 'absolute', 1e-14);
 
 % Path gain reconstructed from coefficients (sum |H|^2 over rx*tx, * 0.5)
-H_pow = chan(1).coeff_re(:, :, :, 1).^2 + chan(1).coeff_im(:, :, :, 1).^2;
+H_pow = abs(chan(1).coeff(:, :, :, 1)).^2;
 pg_from_coeff = squeeze(sum(sum(H_pow, 1), 2)) * 0.5;
 assertElementsAlmostEqual(pg, pg_from_coeff(:), 'absolute', 1e-12);
 
 % Field names are the C++ member names
-assertEqual(fieldnames(chan)', {'name', 'tx_pos', 'rx_pos', 'tx_orientation', 'rx_orientation', 'coeff_re', 'coeff_im', ...
+assertEqual(fieldnames(chan)', {'name', 'tx_pos', 'rx_pos', 'tx_orientation', 'rx_orientation', 'coeff', ...
     'delay', 'path_gain', 'center_freq'});
 
 % TX at origin facing east; RX 4.99 m east facing west (yaw = pi)
@@ -56,8 +56,8 @@ assertElementsAlmostEqual(chan(1).rx_pos(:, 1),         [4.99; 0; 0],  'absolute
 assertElementsAlmostEqual(chan(1).rx_orientation(:, 1), [0; 0; pi],    'absolute', 1e-12);
 
 % Off-diagonal LOS coefficients should be zero (perfect Xpol isolation)
-H0_re = chan(1).coeff_re(:, :, 1, 1);
-H0_im = chan(1).coeff_im(:, :, 1, 1);
+H0_re = real(chan(1).coeff(:, :, 1, 1));
+H0_im = imag(chan(1).coeff(:, :, 1, 1));
 assertElementsAlmostEqual(H0_re(1, 2), 0, 'absolute', 0);
 assertElementsAlmostEqual(H0_re(2, 1), 0, 'absolute', 0);
 assertElementsAlmostEqual(H0_im(1, 2), 0, 'absolute', 0);
@@ -133,11 +133,11 @@ chan = call_ieee(ant, ant, 'B', ...
 assertEqual(numel(chan), 3);
 
 % User 1: dist 4 < dBP=5, no floor → LOS exists, 13 paths
-assertEqual(size(chan(1).coeff_re, 3), 13);
+assertEqual(size(chan(1).coeff, 3), 13);
 % User 2: dist 8 > dBP=5 → NLOS only, 12 paths
-assertEqual(size(chan(2).coeff_re, 3), 12);
+assertEqual(size(chan(2).coeff, 3), 12);
 % User 3: n_floors=1 → NLOS only, 12 paths
-assertEqual(size(chan(3).coeff_re, 3), 12);
+assertEqual(size(chan(3).coeff, 3), 12);
 
 % Floor indicator on rx_pos(3)
 assertElementsAlmostEqual(chan(1).rx_pos(3, 1), 0, 'absolute', 0);
@@ -178,8 +178,7 @@ chan_a = call_ieee(ant, ant, 'B', 'center_freq', 2.4e9, ...
 chan_b = call_ieee(ant, ant, 'B', 'center_freq', 2.4e9, ...
                    'dist', 3, 'seed', 1234);
 
-assertElementsAlmostEqual(chan_a(1).coeff_re,  chan_b(1).coeff_re,  'absolute', 0);
-assertElementsAlmostEqual(chan_a(1).coeff_im,  chan_b(1).coeff_im,  'absolute', 0);
+assertElementsAlmostEqual(chan_a(1).coeff,  chan_b(1).coeff,  'absolute', 0);
 assertElementsAlmostEqual(chan_a(1).delay,     chan_b(1).delay,     'absolute', 0);
 assertElementsAlmostEqual(chan_a(1).path_gain, chan_b(1).path_gain, 'absolute', 0);
 
@@ -209,7 +208,7 @@ chan_w3 = call_ieee(ant, ant, 'B', ...
     'center_freq', 5.25e9, 'dist', 3, 'seed', seed, ...
     'n_walls', uint64(3), 'wall_loss_dB', 5.0);
 
-assertEqual(size(chan_ref(1).coeff_re, 3), size(chan_w3(1).coeff_re, 3));
+assertEqual(size(chan_ref(1).coeff, 3), size(chan_w3(1).coeff, 3));
 P_ref = sum(chan_ref(1).path_gain(:));
 P_w3  = sum(chan_w3(1).path_gain(:));
 assertElementsAlmostEqual(10*log10(P_w3 / P_ref), -15.0, 'absolute', 1e-9);
@@ -219,7 +218,7 @@ chan_w2_7 = call_ieee(ant, ant, 'B', ...
     'center_freq', 5.25e9, 'dist', 3, 'seed', seed, ...
     'n_walls', uint64(2), 'wall_loss_dB', 7.0);
 
-assertEqual(size(chan_ref(1).coeff_re, 3), size(chan_w2_7(1).coeff_re, 3));
+assertEqual(size(chan_ref(1).coeff, 3), size(chan_w2_7(1).coeff, 3));
 P_w2_7 = sum(chan_w2_7(1).path_gain(:));
 assertElementsAlmostEqual(10*log10(P_w2_7 / P_ref), -14.0, 'absolute', 1e-9);
 
@@ -237,7 +236,7 @@ chan3_w = call_ieee(ant, ant, 'B', ...
 assertEqual(numel(chan3_ref), 3);
 assertEqual(numel(chan3_w),   3);
 for u = 1:3
-    assertEqual(size(chan3_ref(u).coeff_re, 3), size(chan3_w(u).coeff_re, 3));
+    assertEqual(size(chan3_ref(u).coeff, 3), size(chan3_w(u).coeff, 3));
     pr = sum(chan3_ref(u).path_gain(:, 1));
     pw = sum(chan3_w(u).path_gain(:, 1));
     expected = -double(u) * 5.0;   % users 1,2,3 with 1,2,3 walls @ 5 dB
@@ -262,7 +261,7 @@ for nf = [2, 3, 4]
     chan_n = call_ieee(ant, ant, 'B', ...
         'center_freq', 5.25e9, 'dist', 3, ...
         'n_floors', uint64(nf), 'seed', seed);
-    assertEqual(size(chan_n(1).coeff_re, 3), size(chan1(1).coeff_re, 3));
+    assertEqual(size(chan_n(1).coeff, 3), size(chan1(1).coeff, 3));
     Pn = sum(chan_n(1).path_gain(:));
     expected = -(FL(nf) - FL(1));
     assertElementsAlmostEqual(10*log10(Pn / P1), expected, 'absolute', 1e-9);
@@ -283,7 +282,7 @@ chan = call_ieee(ant, ant, 'A', ...
     'speed_env_kmh', 0.0, ...
     'seed', 1234);
 
-sz = size(chan(1).coeff_re);
+sz = size(chan(1).coeff);
 if numel(sz) >= 4
     n_snap = sz(4);
 else
@@ -292,9 +291,8 @@ end
 assert(n_snap > 100, 'Doppler test needs many snapshots');
 
 % LOS path coefficient over snapshots (omni: n_rx = n_tx = 1)
-h_los_re = squeeze(chan(1).coeff_re(1, 1, 1, :));
-h_los_im = squeeze(chan(1).coeff_im(1, 1, 1, :));
-h_los    = h_los_re(:) + 1i * h_los_im(:);
+h_los    = squeeze(chan(1).coeff(1, 1, 1, :));
+h_los    = h_los(:);
 
 H  = fftshift(fft(h_los));
 df = 1 / (n_snap * update_interval_s);
@@ -327,23 +325,23 @@ chan_ul = call_ieee(ant, ant, 'F', 'uplink', true,  common{:});
 assertEqual(numel(chan_dl), 2);
 assertEqual(numel(chan_ul), 2);
 
-sz_dl = size(chan_dl(1).coeff_re);
-sz_ul = size(chan_ul(1).coeff_re);
+sz_dl = size(chan_dl(1).coeff);
+sz_ul = size(chan_ul(1).coeff);
 assertEqual(sz_dl(3), sz_ul(3));   % same n_path
 assertEqual(sz_dl(1), sz_ul(2));   % n_rx_DL = n_tx_UL
 assertEqual(sz_dl(2), sz_ul(1));   % n_tx_DL = n_rx_UL
 
-assertEqual(size(chan_dl(1).coeff_re, 4), 6);
-assertEqual(size(chan_ul(1).coeff_re, 4), 6);
+assertEqual(size(chan_dl(1).coeff, 4), 6);
+assertEqual(size(chan_ul(1).coeff, 4), 6);
 
 n_path = sz_dl(3);
 max_err = 0;
 for s = 1:6
     for k = 1:n_path
-        Hdl_re = chan_dl(1).coeff_re(:, :, k, s);
-        Hdl_im = chan_dl(1).coeff_im(:, :, k, s);
-        Hul_re = chan_ul(1).coeff_re(:, :, k, s);
-        Hul_im = chan_ul(1).coeff_im(:, :, k, s);
+        Hdl_re = real(chan_dl(1).coeff(:, :, k, s));
+        Hdl_im = imag(chan_dl(1).coeff(:, :, k, s));
+        Hul_re = real(chan_ul(1).coeff(:, :, k, s));
+        Hul_im = imag(chan_ul(1).coeff(:, :, k, s));
 
         % Reciprocity: H_ul = H_dl.' (plain transpose of real and imaginary parts)
         e_re = max(max(abs(Hul_re - Hdl_re.')));
@@ -364,7 +362,7 @@ assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'kf', -1), 'quadriga_lib:CPPe
 assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'xpr_nlos', 0), 'quadriga_lib:CPPerror');
 c0 = call_ieee(ant, ant, 'B', 'dist', 8, 'seed', 4);
 c1 = call_ieee(ant, ant, 'B', 'dist', 8, 'seed', 4, 'xpr_nlos', 2, 'dist_breakpoint', 5);
-assertEqual(c1.coeff_re, c0.coeff_re);
+assertEqual(c1.coeff, c0.coeff);
 assertEqual(c1.path_gain, c0.path_gain);
 msg = '';
 try

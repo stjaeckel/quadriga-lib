@@ -20,8 +20,8 @@ assertEqual( index(2, :), uint64( 1 : 6 ) );
 assertEqual( index(3, :), uint64( ones( 1, 6 ) ) );
 [ ~, best ] = max( gain_dB, [], 2 );
 assertEqual( index(1, :), uint64( best' ) );
-assertEqual( size( chan(1).coeff_re, 1 ), 2 );                                  % 2 UT ports (xpol)
-assertEqual( size( chan(1).coeff_re, 2 ), 2 );                                  % 2 BS ports
+assertEqual( size( chan(1).coeff, 1 ), 2 );                                  % 2 UT ports (xpol)
+assertEqual( size( chan(1).coeff, 2 ), 2 );                                  % 2 BS ports
 assertEqual( layout.links.method, '38.901' );
 assertEqual( size( layout.pairing ), [ 2, 6 ] );
 
@@ -31,7 +31,7 @@ keep = idx2(1, :) == index(1, idx2(2, :));
 assertEqual( sum( keep ), 6 );
 c2 = ch2(keep);
 for n = 1 : 6
-    assertEqual( chan(n).coeff_re, c2(n).coeff_re );
+    assertEqual( chan(n).coeff, c2(n).coeff );
 end
 
 %% The layout tuples reach generate_layout: ISD 200 m, one sector, BS at 30 m, UTs outdoors at 1.8 m
@@ -46,13 +46,13 @@ a = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', [ 3.5e9, 28e9 ], 1, 5, [],
 assertEqual( size( a ), [ 1, 6 ] );
 assertEqual( a(4).center_freq, 28e9 );
 b = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0, [], [], [NaN, NaN, 10], [], [ 0.01, 5e-3 ] );
-assertEqual( size( b(1).coeff_re, 4 ), 3 );
+assertEqual( size( b(1).coeff, 4 ), 3 );
 assertElementsAlmostEqual( norm( b(1).rx_pos(:, 3) - b(1).rx_pos(:, 1) ), 0.1, 'absolute', 1e-9 );
 [ c, ~, Lc ] = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0, [], [], [], [], [], 'nlos', 'rays', [], [], false );
 assertTrue( all( Lc.links.los == 0 ) );
 assertTrue( isfield( c, 'path_gain' ) );
 c_on = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0, [], [], [], [], [], 'nlos', 'rays' );
-assertTrue( sum( c(1).coeff_re(:).^2 + c(1).coeff_im(:).^2 ) > 1e4 * sum( c_on(1).coeff_re(:).^2 + c_on(1).coeff_im(:).^2 ) );   % no path loss
+assertTrue( sum( abs( c(1).coeff(:) ).^2 ) > 1e4 * sum( abs( c_on(1).coeff(:) ).^2 ) );   % no path loss
 [ ~, gd, Ld ] = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0, [], [], [], 0, [], [], [], 'rsrp' );
 assertTrue( all( Ld.rx.indoor == 0 ) );
 [ ~, gl ] = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0, [], [], [], 0 );
@@ -68,7 +68,7 @@ s = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0, [], []
 assertEqual( size( s ), [ 1, 9 ] );                                             % one site: all = site
 g = quadriga_lib.get_channels_tr38901( bs, ut, 'UMi', 3.5e9, 1, 5, [], 0 );
 assertEqual( f(1).tx_pos, g(1).rx_pos );
-assertElementsAlmostEqual( f(1).coeff_re(:, :, 1), g(1).coeff_re(:, :, 1).', 'absolute', 0 );
+assertElementsAlmostEqual( f(1).coeff(:, :, 1), g(1).coeff(:, :, 1).', 'absolute', 0 );
 
 %% Defaults: 3.5 GHz, one UT per cell of the 12 InH cells
 h = quadriga_lib.get_channels_tr38901( bs, ut, 'InH_Open', [], [], 1 );

@@ -18,51 +18,50 @@ c = cos([0, 1, 2] * pi/8);
 s = sin([0, 1, 2] * pi/8);
 
 %% Basic call and values
-[ V_re, V_im, H_re, H_im, dist, az_loc, el_loc, gamma ] = quadriga_lib.interpolate_pattern( ant, az, el );
-assertEqual( size(V_re), [2, 3] );
-assertTrue( isa(V_re, 'double') && isa(gamma, 'double') );
-assertElementsAlmostEqual( V_re, [ -2, -1, 0; c ], 'absolute', 1e-14 );
-assertElementsAlmostEqual( V_im, [ -1, -0.5, 0; s ], 'absolute', 1e-14 );
-assertElementsAlmostEqual( H_re, [ 3, 2.5, 2; 0, 0, 0 ], 'absolute', 1e-14 );
-assertElementsAlmostEqual( H_im, [ 6, 5, 4; 0, 0, 0 ], 'absolute', 1e-14 );
+[ V, H, dist, az_loc, el_loc, gamma ] = quadriga_lib.interpolate_pattern( ant, az, el );
+assertEqual( size(V), [2, 3] );
+assertEqual( size(H), [2, 3] );
+assertTrue( isa(V, 'double') && isa(gamma, 'double') );
+assertElementsAlmostEqual( V, [ -2, -1, 0; c ] + 1j * [ -1, -0.5, 0; s ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( H, [ 3, 2.5, 2; 0, 0, 0 ] + 1j * [ 6, 5, 4; 0, 0, 0 ], 'absolute', 1e-14 );
 assertElementsAlmostEqual( dist, zeros(2, 3), 'absolute', 1e-14 );
 assertElementsAlmostEqual( az_loc, [ az; az ], 'absolute', 1e-14 );
 assertElementsAlmostEqual( el_loc, [ el; el ], 'absolute', 1e-14 );
 assertElementsAlmostEqual( gamma, zeros(2, 3), 'absolute', 1e-14 );
 
 %% Optional inputs: element (1-based, permuted, repeated), [] and omitted give all elements
-[ V_e, ~, ~, H_e ] = quadriga_lib.interpolate_pattern( ant, az, el, [2, 1, 2] );
-assertEqual( V_e, V_re([2, 1, 2], :) );
-assertEqual( H_e, H_im([2, 1, 2], :) );
-assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [] ), V_re );
+[ V_e, H_e ] = quadriga_lib.interpolate_pattern( ant, az, el, [2, 1, 2] );
+assertEqual( V_e, V([2, 1, 2], :) );
+assertEqual( H_e, H([2, 1, 2], :) );
+assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [] ), V );
 assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [2; 1; 2] ), V_e );        % Column vector
 assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, uint32([2, 1, 2]) ), V_e ); % Integer class
 
 %% Optional inputs: orientation (heading -pi/8 adds pi/8 to the local azimuth)
-[ V_o, ~, ~, ~, ~, az_o ] = quadriga_lib.interpolate_pattern( ant, az, el, [], [0; 0; -pi/8] );
+[ V_o, ~, ~, az_o ] = quadriga_lib.interpolate_pattern( ant, az, el, [], [0; 0; -pi/8] );
 assertElementsAlmostEqual( az_o, [ az; az ] + pi/8, 'absolute', 1e-14 );
-assertElementsAlmostEqual( V_o(2, :), cos([0, 1, 2] * pi/8 + pi/16), 'absolute', 1e-14 );
-assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [] ), V_re );
+assertElementsAlmostEqual( real(V_o(2, :)), cos([0, 1, 2] * pi/8 + pi/16), 'absolute', 1e-14 );
+assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [] ), V );
 ori = zeros(3, 2, 3);
 ori(3, 2, :) = -pi/8;                                                                    % Per output and angle
-[ ~, ~, ~, ~, ~, az_o2 ] = quadriga_lib.interpolate_pattern( ant, az, el, [], ori );
+[ ~, ~, ~, az_o2 ] = quadriga_lib.interpolate_pattern( ant, az, el, [], ori );
 assertElementsAlmostEqual( az_o2, [ az; az + pi/8 ], 'absolute', 1e-14 );
 
 %% Optional inputs: element_pos (distance from the wavefront plane, minus the projection onto the direction)
 pos = [ 1, 0; 0, 2; 0, 0 ];
-[ ~, ~, ~, ~, dist_p ] = quadriga_lib.interpolate_pattern( ant, [0, pi/2], [0, 0], [], [], pos );
+[ ~, ~, dist_p ] = quadriga_lib.interpolate_pattern( ant, [0, pi/2], [0, 0], [], [], pos );
 assertElementsAlmostEqual( dist_p, [ -1, 0; 0, -2 ], 'absolute', 1e-14 );
 ant_p = ant;
 ant_p.element_pos = pos;
-[ ~, ~, ~, ~, dist_a ] = quadriga_lib.interpolate_pattern( ant_p, [0, pi/2], [0, 0] );  % Positions of the arrayant
+[ ~, ~, dist_a ] = quadriga_lib.interpolate_pattern( ant_p, [0, pi/2], [0, 0] );  % Positions of the arrayant
 assertEqual( dist_a, dist_p );
-[ ~, ~, ~, ~, dist_e ] = quadriga_lib.interpolate_pattern( ant_p, [0, pi/2], [0, 0], [], [], [] );
+[ ~, ~, dist_e ] = quadriga_lib.interpolate_pattern( ant_p, [0, pi/2], [0, 0], [], [], [] );
 assertEqual( dist_e, dist_p );
 
 %% Optional inputs: use_kernel
-assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], [] ), V_re );
-assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], 1 ), V_re );
-assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], true ), V_re ); % Logical 1 = GENERIC
+assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], [] ), V );
+assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], 1 ), V );
+assertEqual( quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], true ), V ); % Logical 1 = GENERIC
 has_avx2 = true;
 try
     V_k = quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [], 2 );
@@ -71,7 +70,7 @@ catch ME
     assertTrue( ~isempty(strfind(ME.message, '''use_kernel'' cannot be 2')) ); %#ok<STREMP>
 end
 if has_avx2
-    assertElementsAlmostEqual( V_k, V_re, 'absolute', 1e-6 );                           % Single precision
+    assertElementsAlmostEqual( V_k, V, 'absolute', 1e-6 );                           % Single precision
 end
 
 %% Multi-frequency mode: struct array with two entries (the second one is twice the first)
@@ -83,37 +82,36 @@ ant_m(2).e_theta_im = 2 * ant.e_theta_im;
 ant_m(2).e_phi_re = 2 * ant.e_phi_re;
 ant_m(2).e_phi_im = 2 * ant.e_phi_im;
 ant_m(2).center_freq = 2e9;
-[ MV_re, MV_im, MH_re, MH_im ] = quadriga_lib.interpolate_pattern( ant_m, az, el, [], [], [], [1e9, 1.5e9, 2e9] );
-assertEqual( size(MV_re), [2, 3, 3] );
-assertElementsAlmostEqual( MV_re, cat(3, V_re, 1.5 * V_re, 2 * V_re), 'absolute', 1e-12 ); % In phase: linear
-assertElementsAlmostEqual( MV_im, cat(3, V_im, 1.5 * V_im, 2 * V_im), 'absolute', 1e-12 );
-assertElementsAlmostEqual( MH_re, cat(3, H_re, 1.5 * H_re, 2 * H_re), 'absolute', 1e-12 );
-assertElementsAlmostEqual( MH_im, cat(3, H_im, 1.5 * H_im, 2 * H_im), 'absolute', 1e-12 );
+[ MV, MH ] = quadriga_lib.interpolate_pattern( ant_m, az, el, [], [], [], [1e9, 1.5e9, 2e9] );
+assertEqual( size(MV), [2, 3, 3] );
+assertEqual( size(MH), [2, 3, 3] );
+assertElementsAlmostEqual( MV, cat(3, V, 1.5 * V, 2 * V), 'absolute', 1e-12 ); % In phase: linear
+assertElementsAlmostEqual( MH, cat(3, H, 1.5 * H, 2 * H), 'absolute', 1e-12 );
 MV_d = quadriga_lib.interpolate_pattern( ant_m, az, el );                              % Default: center frequencies
-assertEqual( MV_d, MV_re(:, :, [1, 3]) );
+assertEqual( MV_d, MV(:, :, [1, 3]) );
 assertEqual( quadriga_lib.interpolate_pattern( ant_m, az, el, [], [], [], [] ), MV_d );
 MV_e = quadriga_lib.interpolate_pattern( ant_m, az, el, [2, 1, 2], [], [], 1.5e9 );     % Element indices
-assertEqual( MV_e, MV_re([2, 1, 2], :, 2) );
+assertEqual( MV_e, MV([2, 1, 2], :, 2) );
 MV_1 = quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], [1e9, 2e9] );        % 1x1 struct with frequency
-assertEqual( MV_1, cat(3, V_re, V_re) );
+assertEqual( MV_1, cat(3, V, V) );
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.interpolate_pattern( ant, az, el );
-assertElementsAlmostEqual( ans, V_re, 'absolute', 1e-12 );
-[ V_2, V_i2 ] = quadriga_lib.interpolate_pattern( ant, az, el );
-assertElementsAlmostEqual( V_2, V_re, 'absolute', 1e-12 );
-assertElementsAlmostEqual( V_i2, V_im, 'absolute', 1e-12 );
-[ ~, ~, ~, ~, dist_5 ] = quadriga_lib.interpolate_pattern( ant_p, az, el );
-[ ~, ~, ~, ~, dist_8, ~, ~, gamma_8 ] = quadriga_lib.interpolate_pattern( ant_p, az, el );
-assertElementsAlmostEqual( dist_5, dist_8, 'absolute', 1e-12 );
-assertElementsAlmostEqual( gamma_8, gamma, 'absolute', 1e-12 );
+assertElementsAlmostEqual( ans, V, 'absolute', 1e-12 );
+[ V_2, H_2 ] = quadriga_lib.interpolate_pattern( ant, az, el );
+assertElementsAlmostEqual( V_2, V, 'absolute', 1e-12 );
+assertElementsAlmostEqual( H_2, H, 'absolute', 1e-12 );
+[ ~, ~, dist_3 ] = quadriga_lib.interpolate_pattern( ant_p, az, el );
+[ ~, ~, dist_6, ~, ~, gamma_6 ] = quadriga_lib.interpolate_pattern( ant_p, az, el );
+assertElementsAlmostEqual( dist_3, dist_6, 'absolute', 1e-12 );
+assertElementsAlmostEqual( gamma_6, gamma, 'absolute', 1e-12 );
 
 %% Type handling and shapes: single precision inputs, empty angle input
-[ V_s, ~, ~, H_s ] = quadriga_lib.interpolate_pattern( ant, single(az), single(el) );
+[ V_s, H_s ] = quadriga_lib.interpolate_pattern( ant, single(az), single(el) );
 assertTrue( isa(V_s, 'double') );
-assertElementsAlmostEqual( V_s, V_re, 'absolute', 1e-6 );                               % Angles rounded to single
-assertElementsAlmostEqual( H_s, H_im, 'absolute', 1e-6 );
-[ V_0, ~, ~, ~, dist_0 ] = quadriga_lib.interpolate_pattern( ant, zeros(1, 0), zeros(1, 0) );
+assertElementsAlmostEqual( V_s, V, 'absolute', 1e-6 );                                  % Angles rounded to single
+assertElementsAlmostEqual( H_s, H, 'absolute', 1e-6 );
+[ V_0, ~, dist_0 ] = quadriga_lib.interpolate_pattern( ant, zeros(1, 0), zeros(1, 0) );
 assertEqual( size(V_0), [2, 0] );
 assertEqual( size(dist_0), [2, 0] );
 MV_0 = quadriga_lib.interpolate_pattern( ant_m, zeros(2, 0), zeros(2, 0) );
@@ -125,8 +123,8 @@ assert_throws( @() quadriga_lib.interpolate_pattern( ant, az, el, [], [], [], []
     'Wrong number of input arguments.' );
 assert_throws( @() quadriga_lib.interpolate_pattern( [], az, el, [], [], [], [], [-2, 2], [-1, 1], [3, 1], ...
     [6, 2], [0, pi], 0 ), 'Wrong number of input arguments.' );                          % Separate fields are not accepted
-assert_throws( @() out9( ant, az, el ), 'Wrong number of output arguments.' );
-assert_throws( @() out5( ant_m, az, el ), 'Multi-frequency mode supports at most 4 outputs' );
+assert_throws( @() out7( ant, az, el ), 'Wrong number of output arguments.' );
+assert_throws( @() out3( ant_m, az, el ), 'Multi-frequency mode supports at most 2 outputs' );
 assert_throws( @() quadriga_lib.interpolate_pattern( ant, az, el, [0, 1] ), 'cannot be 0 (1-based index)' );
 assert_throws( @() quadriga_lib.interpolate_pattern( ant_m([]), az, el ), 'Input ''arrayant'' cannot be empty.' );
 assert_throws( @() quadriga_lib.interpolate_pattern( 1, az, el ), 'Input ''arrayant'' must be a struct.' );
@@ -150,13 +148,13 @@ quadriga_lib.interpolate_pattern( varargin{:} );
 end
 
 % Request one output more than the wrapper allows
-function out9(varargin)
-[~, ~, ~, ~, ~, ~, ~, ~, ~] = quadriga_lib.interpolate_pattern( varargin{:} ); %#ok<ASGLU>
+function out7(varargin)
+[~, ~, ~, ~, ~, ~, ~] = quadriga_lib.interpolate_pattern( varargin{:} ); %#ok<ASGLU>
 end
 
-% Request 5 outputs in the multi-frequency mode
-function out5(varargin)
-[~, ~, ~, ~, ~] = quadriga_lib.interpolate_pattern( varargin{:} ); %#ok<ASGLU>
+% Request 3 outputs in the multi-frequency mode
+function out3(varargin)
+[~, ~, ~] = quadriga_lib.interpolate_pattern( varargin{:} ); %#ok<ASGLU>
 end
 
 % Assert that fn() raises an error whose message contains expected (substring).

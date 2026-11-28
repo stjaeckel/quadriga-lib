@@ -17,6 +17,7 @@
 #include <cmath>
 #include <unordered_map>
 #include <vector>
+#include <complex>
 
 // Raises a C++ error message in MATLAB / Octave. A C++ message names an entry of a vector input only by the prefix
 // "Entry <i>: " or "Snapshot <i>: " with a 0-based <i>; every such prefix is rewritten to <i> + 1, so that MATLAB
@@ -52,6 +53,23 @@ inline void qd_mex_cpp_error(std::string msg)
         }                                \
     } while (0)
 
+// Complex data uses the interleaved complex API (MATLAB R2018a, Octave 8.4 and later): the data of a complex array is
+// one block of std::complex values. Output helpers take std::complex<float> or std::complex<double> as dtype.
+template <typename T>
+struct qd_mex_is_complex : std::false_type
+{
+};
+template <typename T>
+struct qd_mex_is_complex<std::complex<T>> : std::true_type
+{
+};
+
+template <typename dtype>
+constexpr mxComplexity qd_mex_complexity()
+{
+    return qd_mex_is_complex<dtype>::value ? mxCOMPLEX : mxREAL;
+}
+
 // Check if MATLAB array type matches the requested C++ dtype
 template <typename dtype>
 inline bool qd_mex_type_matches(const mxArray *input)
@@ -76,7 +94,9 @@ inline bool qd_mex_type_matches(const mxArray *input)
 template <typename dtype>
 inline mxClassID qd_mex_class_id()
 {
-    if constexpr (std::is_same_v<dtype, double>)
+    if constexpr (qd_mex_is_complex<dtype>::value)
+        return qd_mex_class_id<typename dtype::value_type>();
+    else if constexpr (std::is_same_v<dtype, double>)
         return mxDOUBLE_CLASS;
     else if constexpr (std::is_same_v<dtype, float>)
         return mxSINGLE_CLASS;
@@ -191,11 +211,12 @@ inline void qd_mex_integer_error(const std::string &var_name, bool scalar, bool 
     mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
 }
 
-// Reject complex and sparse input, and input with more than max_dims dimensions
+// Reject complex (unless complex_ok) and sparse input, and input with more than max_dims dimensions
 // (mxGetData of a sparse array holds only the non-zero values, so it cannot be read as a dense array)
-inline void qd_mex_check_input(const mxArray *input, const std::string &var_name = "", size_t max_dims = 4)
+inline void qd_mex_check_input(const mxArray *input, const std::string &var_name = "", size_t max_dims = 4,
+                               bool complex_ok = false)
 {
-    if (mxIsComplex(input))
+    if (!complex_ok && mxIsComplex(input))
     {
         if (var_name.empty())
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Complex inputs are not supported.");
@@ -219,10 +240,11 @@ inline void qd_mex_check_input(const mxArray *input, const std::string &var_name
 }
 
 // Read up to 4 dimensions from a MATLAB array. Missing dims default to 1.
-// Returns {d1, d2, d3, d4, n_data}. Rejects complex and sparse input and input with more than 4 dimensions.
-inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input, const std::string &var_name = "")
+// Returns {d1, d2, d3, d4, n_data}. Rejects complex (unless complex_ok) and sparse input and input with more than
+// 4 dimensions.
+inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input, const std::string &var_name = "", bool complex_ok = false)
 {
-    qd_mex_check_input(input, var_name, 4);
+    qd_mex_check_input(input, var_name, 4, complex_ok);
     size_t n_dim = (size_t)mxGetNumberOfDimensions(input);
     const mwSize *dims = mxGetDimensions(input);
     size_t d1 = (size_t)dims[0];
@@ -364,9 +386,9 @@ inline std::string qd_mex_get_string_or_empty(const mxArray *input, std::string 
     return qd_mex_get_string(input, default_value, var_name);
 }
 
-// The reinterpret functions use the MATLAB data in place. Complex arrays are rejected (qd_mex_get_dims): their
-// data is stored interleaved or in two blocks, depending on the host, and cannot be read as a real array. Sparse
-// arrays store only their non-zero values and are rejected as well.
+// The reinterpret functions use the MATLAB data in place. Complex arrays are rejected (qd_mex_get_dims): their data
+// holds interleaved real and imaginary parts and cannot be read as a real array; they are read with
+// qd_mex_get_complex_Cube. Sparse arrays store only their non-zero values and are rejected as well.
 
 // Reinterpret MATLAB Array to Armadillo Column Vector
 template <typename dtype>
@@ -604,6 +626,95 @@ inline std::vector<arma::Cube<dtype>> qd_mex_get_CubeVec(const mxArray *input, b
                : qd_mex_typecast_CubeVec<dtype>(input, var_name);
 }
 
+// Complex input split into real and imaginary part, as a copy; for C++ functions that take _re / _im
+// - Real input of any numeric class is read as complex with imaginary part 0 (MATLAB and Octave store a complex value
+//   with imaginary part 0 as a real array, e.g. 3+0i); complex input must be single or double
+// - Rejects sparse input and input with more than 4 dimensions; empty input gives empty objects with the dimensions
+//   of the input; the Mat folds dimensions 2 to 4 into its columns, the Cube dimensions 3 and 4 into its slices
+// Calls f with a typed pointer to the data of a complex single or double array; other classes raise "Input 'x' has an
+// unsupported data type."
+template <typename F>
+inline void qd_mex_visit_complex(const mxArray *input, const std::string &var_name, F &&f)
+{
+    if (mxIsDouble(input))
+        return f((const std::complex<double> *)mxGetData(input));
+    if (mxIsSingle(input))
+        return f((const std::complex<float> *)mxGetData(input));
+    const std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
+    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+}
+
+template <typename dtype>
+inline void qd_mex_split_complex(const mxArray *input, const std::string &var_name, size_t n_data, dtype *re, dtype *im)
+{
+    if (n_data == 0)
+        return;
+    if (!mxIsComplex(input))
+    {
+        qd_mex_copy_convert<dtype>(input, re, n_data, var_name);
+        std::memset(im, 0, sizeof(dtype) * n_data);
+        return;
+    }
+    qd_mex_visit_complex(input, var_name, [&](const auto *src)
+                         {
+        for (size_t i = 0; i < n_data; ++i)
+            re[i] = (dtype)src[i].real(), im[i] = (dtype)src[i].imag(); });
+}
+
+template <typename dtype>
+inline void qd_mex_get_complex_Col(const mxArray *input, const std::string &var_name, arma::Col<dtype> &re, arma::Col<dtype> &im)
+{
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name, true);
+    re.set_size(n_data), im.set_size(n_data);
+    qd_mex_split_complex<dtype>(input, var_name, n_data, re.memptr(), im.memptr());
+}
+
+template <typename dtype>
+inline void qd_mex_get_complex_Mat(const mxArray *input, const std::string &var_name, arma::Mat<dtype> &re, arma::Mat<dtype> &im)
+{
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name, true);
+    re.set_size(d1, d2 * d3 * d4), im.set_size(d1, d2 * d3 * d4);
+    qd_mex_split_complex<dtype>(input, var_name, n_data, re.memptr(), im.memptr());
+}
+
+template <typename dtype>
+inline void qd_mex_get_complex_Cube(const mxArray *input, const std::string &var_name, arma::Cube<dtype> &re, arma::Cube<dtype> &im)
+{
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name, true);
+    re.set_size(d1, d2, d3 * d4), im.set_size(d1, d2, d3 * d4);
+    qd_mex_split_complex<dtype>(input, var_name, n_data, re.memptr(), im.memptr());
+}
+
+// One cube per index of the 4th dimension, as qd_mex_get_CubeVec; empty input gives empty vectors
+template <typename dtype>
+inline void qd_mex_get_complex_CubeVec(const mxArray *input, const std::string &var_name,
+                                       std::vector<arma::Cube<dtype>> &re, std::vector<arma::Cube<dtype>> &im)
+{
+    const std::array<size_t, 5> dims = qd_mex_get_dims(input, var_name, true); // Not structured bindings: C++17 lambdas cannot capture those
+    const size_t d1 = dims[0], d2 = dims[1], d3 = dims[2], d4 = dims[3], stride = d1 * d2 * d3;
+    re.clear(), im.clear();
+    if (dims[4] == 0)
+        return;
+    if (!mxIsComplex(input))
+    {
+        re = qd_mex_typecast_CubeVec<dtype>(input, var_name);
+        for (const auto &r : re)
+            im.emplace_back(arma::size(r), arma::fill::zeros);
+        return;
+    }
+    re.reserve(d4), im.reserve(d4);
+    for (size_t i = 0; i < d4; ++i)
+        re.emplace_back(d1, d2, d3, arma::fill::none), im.emplace_back(d1, d2, d3, arma::fill::none);
+    qd_mex_visit_complex(input, var_name, [&](const auto *src)
+                         {
+        for (size_t i = 0; i < d4; ++i)
+        {
+            dtype *pr = re[i].memptr(), *pi = im[i].memptr();
+            for (size_t m = 0; m < stride; ++m)
+                pr[m] = (dtype)src[i * stride + m].real(), pi[m] = (dtype)src[i * stride + m].imag();
+        } });
+}
+
 // Read a vector of 1-based indices (MATLAB) and return them 0-based (C++), as a copy
 // - Returns an empty vector for empty input
 // - A 0 raises "Entries in 'x' cannot be 0 (1-based index)."; NaN, Inf, fractional, negative or too large values
@@ -681,7 +792,7 @@ inline mxArray *qd_mex_copy2matlab(const dtype *input) // Scalar
 {
     const mxClassID classID = qd_mex_class_id<dtype>();
 
-    mxArray *output = mxCreateNumericMatrix(1, 1, classID, mxREAL);
+    mxArray *output = mxCreateNumericMatrix(1, 1, classID, qd_mex_complexity<dtype>());
     std::memcpy((dtype *)mxGetData(output), input, sizeof(dtype));
     return output;
 }
@@ -691,7 +802,7 @@ inline mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input) // Row Vector
 {
     const mxClassID classID = qd_mex_class_id<dtype>();
 
-    mxArray *output = mxCreateNumericMatrix(1, (mwSize)input->n_elem, classID, mxREAL);
+    mxArray *output = mxCreateNumericMatrix(1, (mwSize)input->n_elem, classID, qd_mex_complexity<dtype>());
     std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
 }
@@ -703,10 +814,10 @@ inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input, // Column Vect
     const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
-        return mxCreateNumericMatrix(0, 0, classID, mxREAL);
+        return mxCreateNumericMatrix(0, 0, classID, qd_mex_complexity<dtype>());
 
     const mwSize n = (mwSize)input->n_elem;
-    mxArray *output = transpose ? mxCreateNumericMatrix(1, n, classID, mxREAL) : mxCreateNumericMatrix(n, 1, classID, mxREAL);
+    mxArray *output = transpose ? mxCreateNumericMatrix(1, n, classID, qd_mex_complexity<dtype>()) : mxCreateNumericMatrix(n, 1, classID, qd_mex_complexity<dtype>());
     std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
 }
@@ -717,9 +828,9 @@ inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input) // Matrix
     const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
-        return mxCreateNumericMatrix(0, 0, classID, mxREAL);
+        return mxCreateNumericMatrix(0, 0, classID, qd_mex_complexity<dtype>());
 
-    mxArray *output = mxCreateNumericMatrix((mwSize)input->n_rows, (mwSize)input->n_cols, classID, mxREAL);
+    mxArray *output = mxCreateNumericMatrix((mwSize)input->n_rows, (mwSize)input->n_cols, classID, qd_mex_complexity<dtype>());
     std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
 }
@@ -730,10 +841,10 @@ inline mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input) // Cube
     const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
-        return mxCreateNumericMatrix(0, 0, classID, mxREAL);
+        return mxCreateNumericMatrix(0, 0, classID, qd_mex_complexity<dtype>());
 
     mwSize dims[3] = {(mwSize)input->n_rows, (mwSize)input->n_cols, (mwSize)input->n_slices};
-    mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
+    mxArray *output = mxCreateNumericArray(3, dims, classID, qd_mex_complexity<dtype>());
     std::memcpy((dtype *)mxGetData(output), input->memptr(), sizeof(dtype) * input->n_elem);
     return output;
 }
@@ -749,10 +860,10 @@ inline mxArray *qd_mex_copy2matlab_keep_shape(const T &x)
     if constexpr (std::is_same_v<T, arma::Cube<dtype>>)
     {
         mwSize dims[3] = {(mwSize)x.n_rows, (mwSize)x.n_cols, (mwSize)x.n_slices};
-        return mxCreateNumericArray(3, dims, qd_mex_class_id<dtype>(), mxREAL);
+        return mxCreateNumericArray(3, dims, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     }
     else
-        return mxCreateNumericMatrix((mwSize)x.n_rows, (mwSize)x.n_cols, qd_mex_class_id<dtype>(), mxREAL);
+        return mxCreateNumericMatrix((mwSize)x.n_rows, (mwSize)x.n_cols, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
 }
 
 inline mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings)
@@ -794,14 +905,14 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input)
     const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
-        return mxCreateNumericMatrix(0, 0, classID, mxREAL);
+        return mxCreateNumericMatrix(0, 0, classID, qd_mex_complexity<dtype>());
 
     size_t m = 0ULL;
     for (auto &v : *input)
         m = v.n_rows > m ? v.n_rows : m;
     const size_t ns = input->size();
 
-    mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, mxREAL);
+    mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, qd_mex_complexity<dtype>());
     dtype *ptr = (dtype *)mxGetData(output);
     for (size_t i = 0ULL; i < ns; ++i)
         std::memcpy(&ptr[i * m], input->at(i).memptr(), sizeof(dtype) * input->at(i).n_rows);
@@ -815,7 +926,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input)
     const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
-        return mxCreateNumericMatrix(0, 0, classID, mxREAL);
+        return mxCreateNumericMatrix(0, 0, classID, qd_mex_complexity<dtype>());
 
     size_t n_rows = 0ULL, n_cols = 0ULL;
     for (auto &v : *input)
@@ -824,7 +935,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input)
     const size_t m = n_rows * n_cols, ns = input->size();
 
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)ns};
-    mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
+    mxArray *output = mxCreateNumericArray(3, dims, classID, qd_mex_complexity<dtype>());
     dtype *ptr = (dtype *)mxGetData(output);
 
     for (size_t i = 0ULL; i < ns; ++i)
@@ -846,7 +957,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     const mxClassID classID = qd_mex_class_id<dtype>();
 
     if (input->empty())
-        return mxCreateNumericMatrix(0, 0, classID, mxREAL);
+        return mxCreateNumericMatrix(0, 0, classID, qd_mex_complexity<dtype>());
 
     size_t n_rows = 0ULL, n_cols = 0ULL, n_slices = 0ULL;
     for (auto &v : *input)
@@ -856,7 +967,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     const size_t m = n_rows * n_cols * n_slices, ns = input->size();
 
     mwSize dims[4] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices, (mwSize)ns};
-    mxArray *output = mxCreateNumericArray(4, dims, classID, mxREAL);
+    mxArray *output = mxCreateNumericArray(4, dims, classID, qd_mex_complexity<dtype>());
     dtype *ptr = (dtype *)mxGetData(output);
 
     for (size_t i = 0ULL; i < ns; ++i)
@@ -870,6 +981,62 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
                     std::memcpy(&ptr[i * m + is * n_rows * n_cols + ic * n_rows], v.slice_colptr(is, ic), sizeof(dtype) * v.n_rows);
     }
 
+    return output;
+}
+
+// Complex output from the real and imaginary part of a C++ result (copy), with the shape of 're' (a Col gives
+// [n, 1]); an empty 'im' gives imaginary part 0; an empty 're' gives a 0x0 array, or with keep_shape its dimensions.
+// The output helpers above also take complex objects directly (e.g. arma::cx_mat, std::vector<arma::cx_cube>); with
+// an optional std::complex output of the C++ function, qd_mex_init_output lets C++ write the complex result in place.
+template <typename T>
+inline mxArray *qd_mex_copy2matlab(const T *re, const T *im, bool keep_shape = false)
+{
+    using dtype = typename T::elem_type;
+    if (!im->is_empty() && im->n_elem != re->n_elem)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Real and imaginary part of a complex output differ in size.");
+    mwSize dims[3] = {(mwSize)re->n_rows, (mwSize)re->n_cols, 1}, n_dims = 2;
+    if constexpr (arma::is_Cube<T>::value)
+        dims[2] = (mwSize)re->n_slices, n_dims = 3;
+    if (re->is_empty() && !keep_shape)
+        dims[0] = dims[1] = 0, n_dims = 2;
+    mxArray *output = mxCreateNumericArray(n_dims, dims, qd_mex_class_id<dtype>(), mxCOMPLEX);
+    std::complex<dtype> *ptr = (std::complex<dtype> *)mxGetData(output);
+    const dtype *pr = re->memptr(), *pi = im->is_empty() ? nullptr : im->memptr();
+    for (size_t i = 0; i < re->n_elem; ++i)
+        ptr[i] = std::complex<dtype>(pr[i], pi ? pi[i] : dtype(0));
+    return output;
+}
+
+// Complex 4D output from a vector of real and imaginary cubes, zero-padded as qd_mex_vector2matlab; an empty 'im'
+// vector or entry gives imaginary part 0
+template <typename dtype>
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *re, const std::vector<arma::Cube<dtype>> *im)
+{
+    if (!im->empty() && im->size() != re->size())
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Real and imaginary part of a complex output differ in size.");
+    if (re->empty())
+        return mxCreateNumericMatrix(0, 0, qd_mex_class_id<dtype>(), mxCOMPLEX);
+
+    size_t n_rows = 0, n_cols = 0, n_slices = 0;
+    for (const auto &v : *re)
+        n_rows = std::max(n_rows, (size_t)v.n_rows), n_cols = std::max(n_cols, (size_t)v.n_cols),
+        n_slices = std::max(n_slices, (size_t)v.n_slices);
+    const size_t m = n_rows * n_cols * n_slices, ns = re->size();
+
+    mwSize dims[4] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices, (mwSize)ns};
+    mxArray *output = mxCreateNumericArray(4, dims, qd_mex_class_id<dtype>(), mxCOMPLEX); // Zero-initialized padding
+    std::complex<dtype> *ptr = (std::complex<dtype> *)mxGetData(output);
+    for (size_t i = 0; i < ns; ++i)
+    {
+        const arma::Cube<dtype> &r = re->at(i);
+        const dtype *pi = (im->empty() || im->at(i).is_empty()) ? nullptr : im->at(i).memptr();
+        if (pi && im->at(i).n_elem != r.n_elem)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Real and imaginary part of a complex output differ in size.");
+        for (size_t s = 0, k = 0; s < r.n_slices; ++s)
+            for (size_t c = 0; c < r.n_cols; ++c)
+                for (size_t row = 0; row < r.n_rows; ++row, ++k)
+                    ptr[i * m + (s * n_cols + c) * n_rows + row] = std::complex<dtype>(r[k], pi ? pi[k] : dtype(0));
+    }
     return output;
 }
 
@@ -959,7 +1126,7 @@ inline std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const s
 template <typename dtype>
 inline mxArray *qd_mex_init_output(arma::Row<dtype> *input, size_t n_elem) // 1D Row Vector
 {
-    mxArray *output = mxCreateNumericMatrix(1, n_elem, qd_mex_class_id<dtype>(), mxREAL);
+    mxArray *output = mxCreateNumericMatrix(1, n_elem, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     input->~Row();
     ::new (input) arma::Row<dtype>((dtype *)mxGetData(output), n_elem, false, true);
     return output;
@@ -968,8 +1135,8 @@ inline mxArray *qd_mex_init_output(arma::Row<dtype> *input, size_t n_elem) // 1D
 template <typename dtype>
 inline mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool transpose = false) // 1D Column Vector
 {
-    mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, qd_mex_class_id<dtype>(), mxREAL)
-                                : mxCreateNumericMatrix(n_elem, 1, qd_mex_class_id<dtype>(), mxREAL);
+    mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>())
+                                : mxCreateNumericMatrix(n_elem, 1, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     input->~Col();
     ::new (input) arma::Col<dtype>((dtype *)mxGetData(output), n_elem, false, true);
     return output;
@@ -979,7 +1146,7 @@ inline mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool 
 template <typename dtype>
 inline mxArray *qd_mex_init_output_like(arma::Col<dtype> *input, const mxArray *like)
 {
-    mxArray *output = mxCreateNumericArray(mxGetNumberOfDimensions(like), mxGetDimensions(like), qd_mex_class_id<dtype>(), mxREAL);
+    mxArray *output = mxCreateNumericArray(mxGetNumberOfDimensions(like), mxGetDimensions(like), qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     input->~Col();
     ::new (input) arma::Col<dtype>((dtype *)mxGetData(output), mxGetNumberOfElements(like), false, true);
     return output;
@@ -1001,7 +1168,7 @@ inline bool qd_mex_same_dims(const mxArray *a, const mxArray *b)
 template <typename dtype>
 inline mxArray *qd_mex_init_output(arma::Mat<dtype> *input, size_t n_rows, size_t n_cols) // 2D
 {
-    mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, qd_mex_class_id<dtype>(), mxREAL);
+    mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     input->~Mat();
     ::new (input) arma::Mat<dtype>((dtype *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
@@ -1011,7 +1178,7 @@ template <typename dtype>
 inline mxArray *qd_mex_init_output(arma::Cube<dtype> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
-    mxArray *output = mxCreateNumericArray(3, dims, qd_mex_class_id<dtype>(), mxREAL);
+    mxArray *output = mxCreateNumericArray(3, dims, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     input->~Cube();
     ::new (input) arma::Cube<dtype>((dtype *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
@@ -1022,7 +1189,7 @@ inline mxArray *qd_mex_init_output(std::vector<arma::Cube<dtype>> *input,
                                    size_t n_rows, size_t n_cols, size_t n_slices, size_t n_cubes) // 4D
 {
     mwSize dims[4] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices, (mwSize)n_cubes};
-    mxArray *output = mxCreateNumericArray(4, dims, qd_mex_class_id<dtype>(), mxREAL);
+    mxArray *output = mxCreateNumericArray(4, dims, qd_mex_class_id<dtype>(), qd_mex_complexity<dtype>());
     dtype *data = (dtype *)mxGetData(output);
     const size_t stride = n_rows * n_cols * n_slices;
 
@@ -1119,7 +1286,7 @@ inline mxArray *qd_mex_map2struct(const std::unordered_map<std::string, std::vec
     for (const auto &key : fields)
     {
         const std::vector<dtype> &vec = map.at(key);
-        mxArray *col = mxCreateNumericMatrix((mwSize)vec.size(), vec.empty() ? 0 : 1, classID, mxREAL);
+        mxArray *col = mxCreateNumericMatrix((mwSize)vec.size(), vec.empty() ? 0 : 1, classID, qd_mex_complexity<dtype>());
         if (!vec.empty())
             std::memcpy((dtype *)mxGetData(col), vec.data(), sizeof(dtype) * vec.size());
         qd_mex_set_field(output, key, col);

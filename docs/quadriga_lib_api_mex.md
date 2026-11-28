@@ -16,6 +16,8 @@ lang: en-US
 - Inputs with a stated default, or marked *(optional)*, can be omitted or passed as `[]`; all others are required. Output arguments are optional via `nargout`; a call without assignment returns the first output as `ans`, and outputs after the first are returned only when requested.
 - Invalid inputs (shape/domain) and problems with a file's access or content raise a MATLAB error with the identifier `quadriga_lib:CPPerror`.
 - Index conventions: 1-based unless the field is explicitly called 0-based.
+- Complex data (coefficients, frequency responses, fields, `gr_eps`) is one complex array, also in structs (`coeff` of a channel); a real input is read as imaginary part 0. Octave returns a complex result whose imaginary parts are all zero as a real array. The arrayant struct keeps its split fields `e_theta_re/im`, `e_phi_re/im` and `port_weights_re/im`.
+- Octave 8.4 or later is required; older versions lack a working interleaved complex MEX interface, and the build then leaves the Octave interface out.
 - The canonical arrayant struct is defined in [generate_antenna](#generate_antenna). Mandatory fields: `e_theta_re/im`, `e_phi_re/im`, `azimuth_grid`, `elevation_grid`. Optional field defaults: `element_pos = zeros(3, n_elements)`, identity port weights, `center_freq = 299792458`, empty `name`. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency. Each call builds a new arrayant from the struct, so its data is checked in full on every call.
 
 # Function Index
@@ -617,11 +619,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#interpolate_pattern) · [Python](quadriga
 ### Usage:
 ```matlab
 % Single-frequency mode
-[ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
+[ V, H, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
     arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
 
 % Multi-frequency mode
-[ V_re, V_im, H_re, H_im ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
+[ V, H ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
     i_element, orientation, element_pos, freq_new, use_kernel );
 ```
 
@@ -644,9 +646,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#interpolate_pattern) · [Python](quadriga
   2^31 - 1 samples); other values raise an error; default: 0
 
 ### Outputs:
-- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`, multi-frequency mode
-  `[n_out, n_ang, n_freq]`
-- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
+- **`V`** — Complex e-theta (vertical) field; `[n_out, n_ang]`, multi-frequency mode `[n_out, n_ang, n_freq]`
+- **`H`** — Complex e-phi (horizontal) field; same size as `V`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the array; negative for elements
   closer to the source; `[n_out, n_ang]`; single-frequency mode only
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;
@@ -860,7 +861,7 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 **What a channel holds** (a struct, fields in [hdf5_read_channel](#hdf5_read_channel)):
 
 - The positions and orientations of the transmitter and the receiver, per snapshot or fixed
-- The **coefficients** `coeff_re` / `coeff_im` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
+- The complex **coefficients** `coeff` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
 - Optionally, antenna-independent path data: path gain, path length, polarization transfer matrix, angles, scatterer
   positions and the interaction points of ray-traced paths
 - Unstructured metadata: named values of any type
@@ -1199,7 +1200,7 @@ quadriga_lib.export_channel_obj( fn, chan, max_paths, gain_max_dB, gain_min_dB, 
 ### Inputs:
 - **`fn`** — Path of the OBJ file, ending in `.obj`
 - **`chan`** — Channel; 1x1 struct with the fields of [hdf5_read_channel](#hdf5_read_channel); needs `rx_pos`, `tx_pos`,
-  `center_freq`, `n_interact`, `interact_coord` and `coeff_re` / `coeff_im` with `delay`, or `polmat`; columns of
+  `center_freq`, `n_interact`, `interact_coord` and `coeff` with `delay`, or `polmat`; columns of
   `interact_coord` beyond `sum(n_interact)` are ignored
 - **`max_paths`** — Number of the strongest paths per snapshot to export; 0 = all; default: 0
 - **`gain_max_dB`** — Gain in dB of the largest radius and the last color, finite; default: -60
@@ -1222,25 +1223,24 @@ Also in: [C++](quadriga_lib_api_cpp.md#freq_response) · [Python](quadriga_lib_a
 
 - The frequency response of one snapshot at the subcarriers $k$: $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$ with the
   offset $f_k$ = `bandwidth` · `pilot_grid(k)` from the carrier
-- One snapshot is a 3D array; several snapshots are cell arrays with one array per snapshot (`coeff_re`,
-  `coeff_im` and `delay` of the same length), computed in parallel; the number of paths may differ between them
+- One snapshot is a 3D array; several snapshots are cell arrays with one array per snapshot (`coeff` and `delay`
+  of the same length), computed in parallel; the number of paths may differ between them
 - A channel struct of [hdf5_read_channel](#hdf5_read_channel) holds the snapshots on the 4th dimension, zero-padded;
-  `num2cell(ch.coeff_re, [1 2 3])`, and the same for `coeff_im` and `delay`, gives the cell arrays (the zero-padded
-  paths do not change the result)
+  `num2cell(ch.coeff, [1 2 3])`, and the same for `delay`, gives the cell arrays (the zero-padded paths do not change
+  the result)
 - For a multi-frequency channel and absolute carrier frequencies, use [freq_response_mf](#freq_response_mf)
 - Precision: the phase is reduced to one period in double precision; sin / cos, coefficients and sums are single
   precision
 
 ### Usage:
 ```matlab
-[ hmat_re, hmat_im ] = quadriga_lib.freq_response( coeff_re, coeff_im, delay, pilot_grid, bandwidth, ...
-    i_snap, use_kernel );
+hmat = quadriga_lib.freq_response( coeff, delay, pilot_grid, bandwidth, i_snap, use_kernel );
 ```
 
 ### Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path]`, or cell arrays
-  of length `n_snap` with one such array per snapshot
-- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`, or a cell array as `coeff_re`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path]`, or a cell array of length `n_snap` with one such array
+  per snapshot
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`, or a cell array as `coeff`
 - **`pilot_grid`** — Subcarrier positions relative to the bandwidth, finite: 0 = carrier, 1 = carrier + `bandwidth`;
   `[n_carrier, 1]`
 - **`bandwidth`** — Bandwidth in Hz, finite and >= 0
@@ -1249,8 +1249,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#freq_response) · [Python](quadriga_lib_a
   default: 0
 
 ### Outputs:
-- **`hmat_re`** / **`hmat_im`** — Real and imaginary part of the frequency response; `[n_rx, n_tx, n_carrier, n_out]`;
-  the selected snapshots must have equal `n_rx` and `n_tx`
+- **`hmat`** — Complex frequency response; `[n_rx, n_tx, n_carrier, n_out]`; the selected snapshots must have equal
+  `n_rx` and `n_tx`
 
 ### See also:
 - [freq_response_mf](#freq_response_mf) (multi-frequency channel, absolute carrier frequencies)
@@ -1272,20 +1272,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#freq_response_mf) · [Python](quadriga_li
 - `remove_delay_phase = true` interpolates the envelope $a_l(f_i) \, e^{j 2\pi f_i \tau_l}$ instead of $a_l(f_i)$, so
   that the delay phase the channel generators include is not interpolated
 - One snapshot is a 4D array `[n_rx, n_tx, n_path, n_freq]`; several snapshots are cell arrays with one array per
-  snapshot (`coeff_re`, `coeff_im` and `delay` of the same length), computed in parallel; the number of paths may
-  differ between them
+  snapshot (`coeff` and `delay` of the same length), computed in parallel; the number of paths may differ
+  between them
 
 ### Usage:
 ```matlab
-[ hmat_re, hmat_im ] = quadriga_lib.freq_response_mf( coeff_re, coeff_im, delay, freq, freq_new, ...
-    remove_delay_phase, i_snap, use_kernel );
+hmat = quadriga_lib.freq_response_mf( coeff, delay, freq, freq_new, remove_delay_phase, i_snap, use_kernel );
 ```
 
 ### Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path, n_freq]`, or
-  cell arrays of length `n_snap` with one such array per snapshot
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path, n_freq]`, or a cell array of length `n_snap` with one
+  such array per snapshot
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` (a 4th dimension of length `n_freq` is
-  allowed, only the first frequency is used), or a cell array as `coeff_re`
+  allowed, only the first frequency is used), or a cell array as `coeff`
 - **`freq`** — Input frequencies in Hz, finite, strictly ascending; `[n_freq, 1]`
 - **`freq_new`** — Output carrier frequencies in Hz, finite; `[n_carrier, 1]`
 - **`remove_delay_phase`** — Remove the delay phase from the coefficients before the interpolation: `true` for the
@@ -1296,8 +1295,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#freq_response_mf) · [Python](quadriga_li
   1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`hmat_re`** / **`hmat_im`** — Real and imaginary part of the frequency response; `[n_rx, n_tx, n_carrier, n_out]`;
-  the selected snapshots must have equal `n_rx` and `n_tx`
+- **`hmat`** — Complex frequency response; `[n_rx, n_tx, n_carrier, n_out]`; the selected snapshots must have equal
+  `n_rx` and `n_tx`
 
 ### Notes:
 - With `remove_delay_phase = true`, generate the channels with `use_absolute_delays = true`: their coefficients carry
@@ -1376,7 +1375,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [Python](quadriga_l
   | `name` | Channel name | char |
   | `tx_pos`, `rx_pos` | Tx and Rx positions in m | `[3, 1]` (fixed) or `[3, n_snap]` |
   | `tx_orientation`, `rx_orientation` | Tx and Rx orientations (bank, tilt, heading) in rad | `[3, 1]` (fixed) or `[3, n_snap]` |
-  | `coeff_re`, `coeff_im` | Coefficients, real and imaginary part | `[n_rx, n_tx, n_path, n_snap]` |
+  | `coeff` | Complex coefficients | `[n_rx, n_tx, n_path, n_snap]` |
   | `delay` | Delays in s | `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]` |
   | `path_gain` | Path gain without antennas, linear | `[n_path, n_snap]` |
   | `path_length` | Path length in m | `[n_path, n_snap]` |
@@ -1740,13 +1739,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
 
 ### Usage:
 ```matlab
-[ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
-    tap_spacing, max_taps, power_exponent, fix_taps );
+[ coeff_q, delay_q ] = quadriga_lib.quantize_delays( coeff, delay, tap_spacing, max_taps, ...
+    power_exponent, fix_taps );
 ```
 
 ### Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients, the paths of a snapshot zero-padded to
-  `n_path`; `[n_rx, n_tx, n_path, n_snap]`
+- **`coeff`** — Complex coefficients, the paths of a snapshot zero-padded to `n_path`; `[n_rx, n_tx, n_path, n_snap]`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; finite, above
   `-tap_spacing / 2` and below `2^31` · `tap_spacing`
 - **`tap_spacing`** — Tap spacing in s, > 0 and finite; 5 ns is a sampling rate of 200 MHz; default: 5e-9
@@ -1762,8 +1760,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
   | 3 | One grid per antenna pair for all snapshots |
 
 ### Outputs:
-- **`coeff_re_q`** / **`coeff_im_q`** — Real and imaginary part of the coefficients per tap;
-  `[n_rx, n_tx, n_taps, n_snap]`
+- **`coeff_q`** — Complex coefficients per tap; `[n_rx, n_tx, n_taps, n_snap]`
 - **`delay_q`** — Tap delays in s; `[n_rx, n_tx, n_taps, n_snap]`, or `[1, 1, n_taps, n_snap]` for delays
   `[1, 1, n_path, n_snap]` with `fix_taps` 1 or 2
 
@@ -1874,7 +1871,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 
 ### Output:
 - **`chan`** — Channels, struct array `[1, n_users]`, fields in [hdf5_read_channel](#hdf5_read_channel): `name` (`'user_<i>'`, 0-based),
-  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff_re`, `coeff_im`, `delay`
+  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff`, `delay`
   `[n_rx, n_tx, n_path, n_snap]` (downlink `[n_sta, n_ap, n_path, n_snap]`) and `path_gain` `[n_path, n_snap]`: the
   path powers without antennas, with path loss and shadow fading, whose mean over the snapshots is the power of the
   model
@@ -1941,7 +1938,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
+[ coeff, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
     tx_array, rx_array, irs_array, tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, ...
@@ -1977,8 +1974,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path_irs]` with the
-  number of kept path pairs `n_path_irs`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path_irs]` with the number of kept path pairs `n_path_irs`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path_irs]`
 - **`active_path_out`** — Kept path pairs, for `active_path` of a later call; logical; `[n_path_1 * n_path_2, 1]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
@@ -2012,7 +2008,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
+[ coeff, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, ...
     freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
@@ -2039,8 +2035,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
   (single-precision arithmetic; error if unavailable); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out, n_freq_new]`,
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out, n_freq_new]`, `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out, n_freq_new]`
 
 ### Notes:
@@ -2083,7 +2079,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
+[ coeff, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, ...
     center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
@@ -2111,8 +2107,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
   (single-precision arithmetic; error if unavailable); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out]` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
 - **`rx_Doppler`** — Doppler weight of each path for an Rx moving along its local x-axis: the cosine of the angle
   between this axis and the arrival direction; the Doppler shift at the speed $v$ is $v f_c / c$ times this weight,
@@ -2161,7 +2157,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
+[ coeff, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
     path_length, polmat, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
@@ -2188,8 +2184,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
   version), 1 = GENERIC, 2 = AVX2 (single-precision arithmetic; error if unavailable); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out]` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
   `[n_rx, n_tx, n_out]`
@@ -2393,7 +2389,7 @@ messages pass through, also for fields the function does not use. A field `Subpa
 
 | Method | Random sets (`set_id`) | Calls in step 5 |
 | --- | --- | --- |
-| `'38.901'` | `'lsf'`; `'cluster'` 0 and one per frequency; `'ray'` one per frequency | per frequency `k`: [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) (`i_freq = 1`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
+| `'38.901'` | `'lsf'`; `'cluster'` 0 and one per frequency; `'ray'` one per frequency | per frequency `k`: [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) (`i_freq = 1`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps`) |
 | `'38.901_MF'` | as `'38.901'` | [lsp_generate](#lsp_generate) at the anchor frequency with the same `rnd` gives `lsp_anchor`; [ssf_clusters](#ssf_clusters) once; [ssf_rays](#ssf_rays) per frequency `k` with `i_freq = k` |
 | `'quadriga'` | `'lsf'`; `'cluster'` 0; `'ray'` 0 | [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) once for all frequencies |
 
@@ -2760,7 +2756,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [Python](quadrig
 ### Usage:
 ```matlab
 rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, ...
-    path_length, polmat, method, path_type, tap, gr_eps_re, gr_eps_im );
+    path_length, polmat, method, path_type, tap, gr_eps );
 ```
 
 ### Inputs:
@@ -2774,7 +2770,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
   without a GR path)
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; needed only where a GR ray is
+- **`gr_eps`** *(optional)* — Complex ground permittivity, used as `conj(gr_eps)`; needed only where a GR ray is
   recomputed, i.e. in the mobility `drift` at moved ends; `[n_freq]`
 
 ### Output:
@@ -2844,7 +2840,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 ### Outputs:
 - **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_freq` scalar;
   `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
-  `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
+  `coeff`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
   (`'rays'`); `'rays'` also `path_gain`, `path_length`, `polmat`, `path_angles` and in `'drift'`
   `fbs_pos`, `lbs_pos`
 - **`par`** — Struct with the fields below
@@ -2972,7 +2968,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 
 ### Usage:
 ```matlab
-[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
+[ lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
     quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, ...
     clip_spreads );
 ```
@@ -2996,8 +2992,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 - **`lsp`** — Large-scale parameters; slices: 1 DS in [s]; 2 KF, 3 SF and 8 XPR linear; 4 ASD, 5 ASA, 6 ESD,
   7 ESA in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** — Absolute TOA offset in [s], 0 if not active; `[n_link, 1]`
-- **`gr_eps_re`**, **`gr_eps_im`** — Relative permittivity of the ground, real part and imaginary part >= 0; the
-  complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
+- **`gr_eps`** — Complex relative permittivity of the ground, imaginary part >= 0; the complex value of TR 38.901
+  eq. (7.6-40) is `conj(gr_eps)`; `[n_link, n_freq]`
 - **`eod_offset_deg`** — EoD offset in [deg], positive = up; `[n_link, n_freq]`
 - **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the angular
   spreads, [dB] for KF, SF and XPR; required by [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
@@ -3240,8 +3236,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
 ### Usage:
 ```matlab
 [ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, ...
-    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, ...
-    o2i, n_cluster );
+    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster );
 ```
 
 ### Inputs:
@@ -3262,8 +3257,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
   scenarios; `[n_link, n_freq]`; default: 0
 - **`abs_toa`** — Absolute TOA offset in [s] from [lsp_generate](#lsp_generate), >= 0; required by `'quadriga'` in NLOS scenarios
   with `absTOA_mu > -30`; `[n_link]`; default: no offset
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im` from [lsp_generate](#lsp_generate),
-  real part >= 1, imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
+- **`gr_eps`** *(optional)* — Complex ground permittivity from [lsp_generate](#lsp_generate), used as `conj(gr_eps)`, real part >= 1,
+  imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
 - **`o2i`** — O2I flag per link (mean arrival elevation 0), logical or numeric; used by `'38.901'` in NLOS scenarios;
   `[n_link]`; default: no O2I link
 - **`n_cluster`** — Active NLOS clusters per link (a count) in `[min(max(1, NumClusters_min - 1), N), N]`; `[n_link]`;
@@ -3411,15 +3406,15 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | `polmat` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | yes |
 | `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
 | `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
-| `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |
+| `gr_eps` | `[n_freq, 1]` or empty | complex double | Ground permittivity, used as `conj(gr_eps)`; needed where a GR ray is recomputed | no |
 | `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | double | First- and last-bounce scatterer positions in [m] | no |
 | `fallback` | `[n_ray, 1]` or empty | uint32 | 1 = ray lengthened by the solver fallback | no |
 
 ### Usage:
 ```matlab
 rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, ...
-    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, ...
-    gr_eps_im, pol_variability, random_phase );
+    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, ...
+    pol_variability, random_phase );
 ```
 
 ### Inputs:
@@ -3438,8 +3433,8 @@ rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu,
 - **`method`** — Method of [ssf_clusters](#ssf_clusters): `'38.901'`, `'38.901_MF'` or `'quadriga'`; default: `'38.901'`
 - **`i_freq`** — TR methods: index into `center_freq`, 1-based; `'quadriga'`: must be 1; default: 1
 - **`angle_model`**, **`pol_model`** — See the option table; default: `'additive'`, `'38.901'`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [lsp_generate](#lsp_generate); required if
-  `GR_enabled`, else ignored; `[n_link, n_freq]`
+- **`gr_eps`** *(optional)* — Complex ground permittivity from [lsp_generate](#lsp_generate); required if `GR_enabled`, else
+  ignored; `[n_link, n_freq]`
 - **`pol_variability`** — TR 7.6.16 polarization power variability, see the option table; default: `false`
 - **`random_phase`** — `false`: all initial phases 0; default: `true`
 

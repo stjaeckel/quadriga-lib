@@ -18,7 +18,7 @@ How to get Quadriga-Lib running: the downloads, then the installation for each p
 
 - Source code: [quadriga_lib_0.12.5.zip](http://quadriga-lib.org/download/quadriga_lib_0.12.5.zip)
 - Windows package (MATLAB interface, library, headers, Python wheels): [quadriga_lib_0.12.5_win64.zip](http://quadriga-lib.org/download/quadriga_lib_0.12.5_win64.zip)
-- Ubuntu packages (MATLAB and Octave interface, library, headers): [22.04 Jammy](http://quadriga-lib.org/download/quadriga-lib_0.12.5-1+jammy_amd64.deb) · [24.04 Noble](http://quadriga-lib.org/download/quadriga-lib_0.12.5-1+noble_amd64.deb) · [26.04 Resolute](http://quadriga-lib.org/download/quadriga-lib_0.12.5-1+resolute_amd64.deb)
+- Ubuntu packages (MATLAB and Octave interface, library, headers): [24.04 Noble](http://quadriga-lib.org/download/quadriga-lib_0.12.5-1+noble_amd64.deb) · [26.04 Resolute](http://quadriga-lib.org/download/quadriga-lib_0.12.5-1+resolute_amd64.deb)
 - Python: `pip install quadriga-lib`
 - [Older versions](http://quadriga-lib.org/releases/)
 
@@ -104,7 +104,7 @@ make
 make python_install
 ```
 
-- `make` builds the library, the Octave interface, the Python module and, if MATLAB is on the `PATH`, the MATLAB interface (with GCC 12, `sudo apt install g++-12`). `make python_install` copies the module into the active virtual environment.
+- `make` builds the library, the Octave interface (Octave 8.4 or later, so not on Ubuntu 22.04), the Python module and, if MATLAB is on the `PATH`, the MATLAB interface (with GCC 12, `sudo apt install g++-12`). `make python_install` copies the module into the active virtual environment.
 - MATLAB / Octave: `addpath('/path/to/quadriga-lib')`.
 
 <a id="linux-conda"></a>

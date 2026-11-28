@@ -86,7 +86,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             {
                 a = mxIsLogical(in) ? mxCreateLogicalArray(mxGetNumberOfDimensions(in), mxGetDimensions(in))
                                     : mxCreateNumericArray(mxGetNumberOfDimensions(in), mxGetDimensions(in),
-                                                           mxIsNumeric(in) ? mxGetClassID(in) : mxDOUBLE_CLASS, mxREAL);
+                                                           mxIsNumeric(in) ? mxGetClassID(in) : mxDOUBLE_CLASS,
+                                                           mxIsComplex(in) ? mxCOMPLEX : mxREAL); // 'gr_eps'
                 if (mxGetNumberOfElements(in) > 0)
                     std::memcpy(mxGetData(a), mxGetData(in), mxGetNumberOfElements(in) * mxGetElementSize(in));
             }

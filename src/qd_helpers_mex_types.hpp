@@ -152,8 +152,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     }
 
     // A field exists when any channel fills it; channels without that member get an empty field
-    bool h_txp = false, h_rxp = false, h_txo = false, h_rxo = false, h_cre = false, h_cim = false,
-         h_del = false, h_pg = false, h_pl = false, h_pp = false, h_pa = false, h_fbs = false,
+    bool h_txp = false, h_rxp = false, h_txo = false, h_rxo = false, h_co = false, h_del = false, h_pg = false, h_pl = false, h_pp = false, h_pa = false, h_fbs = false,
          h_lbs = false, h_ni = false, h_ic = false, h_cf = false, h_ini = false;
     for (const auto &c : chan)
     {
@@ -161,8 +160,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         h_rxp = h_rxp || !c.rx_pos.is_empty();
         h_txo = h_txo || !c.tx_orientation.is_empty();
         h_rxo = h_rxo || !c.rx_orientation.is_empty();
-        h_cre = h_cre || !c.coeff_re.empty();
-        h_cim = h_cim || !c.coeff_im.empty();
+        h_co = h_co || !c.coeff_re.empty() || !c.coeff_im.empty();
         h_del = h_del || !c.delay.empty();
         h_pg = h_pg || !c.path_gain.empty();
         h_pl = h_pl || !c.path_length.empty();
@@ -187,10 +185,8 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         fields.push_back("tx_orientation");
     if (h_rxo)
         fields.push_back("rx_orientation");
-    if (h_cre)
-        fields.push_back("coeff_re");
-    if (h_cim)
-        fields.push_back("coeff_im");
+    if (h_co)
+        fields.push_back("coeff");
     if (h_del)
         fields.push_back("delay");
     if (h_pg)
@@ -236,10 +232,8 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
             qd_mex_set_field(output, "tx_orientation", qd_mex_copy2matlab(&c.tx_orientation), n);
         if (h_rxo)
             qd_mex_set_field(output, "rx_orientation", qd_mex_copy2matlab(&c.rx_orientation), n);
-        if (h_cre)
-            qd_mex_set_field(output, "coeff_re", qd_mex_vector2matlab(&c.coeff_re), n);
-        if (h_cim)
-            qd_mex_set_field(output, "coeff_im", qd_mex_vector2matlab(&c.coeff_im), n);
+        if (h_co) // Complex, from coeff_re and coeff_im
+            qd_mex_set_field(output, "coeff", qd_mex_vector2matlab(&c.coeff_re, &c.coeff_im), n);
         if (h_del)
             qd_mex_set_field(output, "delay", qd_mex_vector2matlab(&c.delay), n);
         if (h_pg)
@@ -280,6 +274,14 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
     if (n_chan == 0)
         return chan;
 
+    // The coefficients were split into coeff_re / coeff_im; ignoring the old fields would drop them
+    for (const char *f : {"coeff_re", "coeff_im"})
+        if (mxGetFieldNumber(input, f) >= 0)
+        {
+            const std::string msg = "Field '" + fld(f) + "' was replaced by the complex field 'coeff'.";
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+        }
+
     chan.reserve(n_chan);
 
     for (size_t i = 0; i < n_chan; ++i)
@@ -298,10 +300,8 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_orientation"))
             c.rx_orientation = qd_mex_get_Mat<double>(fp, copy, fld("rx_orientation"));
 
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff_re"))
-            c.coeff_re = qd_mex_matlab2vector_Cube<double>(fp, 3, fld("coeff_re"));
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff_im"))
-            c.coeff_im = qd_mex_matlab2vector_Cube<double>(fp, 3, fld("coeff_im"));
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff")) // Complex, split into coeff_re and coeff_im (copy)
+            qd_mex_get_complex_CubeVec<double>(fp, fld("coeff"), c.coeff_re, c.coeff_im);
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "delay"))
             c.delay = qd_mex_matlab2vector_Cube<double>(fp, 3, fld("delay"));
 
@@ -570,7 +570,7 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
 // the others optional (missing = empty), also any field appended later
 inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
     "method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa",
-    "eoa", "polmat", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
+    "eoa", "polmat", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
 inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
 // Element 'n' of a gbsm_rays struct array -> gbsm_rays; the rules of qd_mex_struct2gbsm_rays apply (the struct array
@@ -621,8 +621,9 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays_at(const mxArray *s, size
     };
     col("tx_pos", r.tx_pos), col("rx_pos", r.rx_pos), col("center_freq", r.center_freq);
     col("delay", r.delay), col("aod", r.aod), col("eod", r.eod), col("aoa", r.aoa), col("eoa", r.eoa);
-    col("path_type", r.path_type), col("tap", r.tap), col("gr_eps_re", r.gr_eps_re), col("gr_eps_im", r.gr_eps_im);
-    col("fallback", r.fallback);
+    col("path_type", r.path_type), col("tap", r.tap), col("fallback", r.fallback);
+    if ((a = get("gr_eps")) != nullptr && !mxIsEmpty(a)) // Complex, split into gr_eps_re and gr_eps_im (copy)
+        qd_mex_get_complex_Col<double>(a, var_name + ".gr_eps", r.gr_eps_re, r.gr_eps_im);
     mat("power", r.power), mat("fbs_pos", r.fbs_pos), mat("lbs_pos", r.lbs_pos);
     if ((a = get("polmat")) != nullptr)
         r.polmat = qd_mex_get_Cube<double>(a, false, var_name + ".polmat");
@@ -641,8 +642,10 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, const s
 
 // Creates the 1 x n_link gbsm_rays struct array with all fields and aliases the attributes of 'rays' (resized to
 // n_link) whose size is known: positions [3, 1], 'center_freq', 'delay', 'power', angles, 'polmat', 'path_type',
-// 'tap', 'gr_eps_re' and 'gr_eps_im' if 'has_gr', 'fbs_pos' and 'lbs_pos' [3, n_ray] if 'has_scatterers'
+// 'tap', 'fbs_pos' and 'lbs_pos' [3, n_ray] if 'has_scatterers'
 // - The other fields are empty ('fallback' uint32); 'method' is left unset for the caller to fill after the call
+// - With 'has_gr', 'gr_eps_re' and 'gr_eps_im' [n_freq, 1] are allocated in C++ memory: the complex field 'gr_eps'
+//   cannot alias them; the caller sets it after the call with qd_mex_set_gbsm_rays_gr_eps
 inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
                                       bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
 {
@@ -668,13 +671,28 @@ inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arm
         set("polmat", qd_mex_init_output(&r.polmat, 8, n_ray, n_freq));
         set("path_type", qd_mex_init_output(&r.path_type, n_ray));
         set("tap", qd_mex_init_output(&r.tap, n_ray));
-        set("gr_eps_re", has_gr ? qd_mex_init_output(&r.gr_eps_re, n_freq) : empty());
-        set("gr_eps_im", has_gr ? qd_mex_init_output(&r.gr_eps_im, n_freq) : empty());
+        if (has_gr)
+            r.gr_eps_re.set_size(n_freq), r.gr_eps_im.set_size(n_freq);
+        set("gr_eps", empty());
         set("fbs_pos", has_scatterers ? qd_mex_init_output(&r.fbs_pos, 3, n_ray) : empty());
         set("lbs_pos", has_scatterers ? qd_mex_init_output(&r.lbs_pos, 3, n_ray) : empty());
         set("fallback", mxCreateNumericMatrix(0, 0, mxUINT32_CLASS, mxREAL));
     }
     return s;
+}
+
+// Sets the field 'gr_eps' of the struct array of qd_mex_init_gbsm_rays from 'gr_eps_re' and 'gr_eps_im' of 'rays'
+// (complex [n_freq, 1], or empty if the ray set has no ground permittivity)
+inline void qd_mex_set_gbsm_rays_gr_eps(mxArray *s, const std::vector<quadriga_lib::gbsm_rays> &rays)
+{
+    for (size_t l = 0; l < rays.size(); ++l)
+    {
+        if (mxArray *old = mxGetField(s, (mwIndex)l, "gr_eps"))
+            mxDestroyArray(old);
+        const auto &r = rays[l];
+        mxSetField(s, (mwIndex)l, "gr_eps", r.gr_eps_re.is_empty() ? mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL)
+                                                                   : qd_mex_copy2matlab(&r.gr_eps_re, &r.gr_eps_im));
+    }
 }
 
 // -------------------------------- Shipped conf folder --------------------------------
@@ -1039,8 +1057,7 @@ inline mxArray *qd_mex_rays2cell(const std::vector<std::vector<quadriga_lib::gbs
             set("polmat", qd_mex_copy2matlab_keep_shape(r.polmat));
             set("path_type", qd_mex_copy2matlab_keep_shape(r.path_type));
             set("tap", qd_mex_copy2matlab_keep_shape(r.tap));
-            set("gr_eps_re", qd_mex_copy2matlab_keep_shape(r.gr_eps_re));
-            set("gr_eps_im", qd_mex_copy2matlab_keep_shape(r.gr_eps_im));
+            set("gr_eps", qd_mex_copy2matlab(&r.gr_eps_re, &r.gr_eps_im, true));
             set("fbs_pos", qd_mex_copy2matlab_keep_shape(r.fbs_pos));
             set("lbs_pos", qd_mex_copy2matlab_keep_shape(r.lbs_pos));
             set("fallback", qd_mex_copy2matlab_keep_shape(r.fallback));

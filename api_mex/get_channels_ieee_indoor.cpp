@@ -60,7 +60,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 
 ## Output:
 - **`chan`** — Channels, struct array `[1, n_users]`, fields in [[hdf5_read_channel]]: `name` (`'user_<i>'`, 0-based),
-  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff_re`, `coeff_im`, `delay`
+  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff`, `delay`
   `[n_rx, n_tx, n_path, n_snap]` (downlink `[n_sta, n_ap, n_path, n_snap]`) and `path_gain` `[n_path, n_snap]`: the
   path powers without antennas, with path loss and shadow fading, whose mean over the snapshots is the power of the
   model

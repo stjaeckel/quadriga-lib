@@ -28,7 +28,7 @@ Calculate MIMO channel coefficients and delays for planar wave propagation
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
+[ coeff, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, ...
     center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
@@ -56,8 +56,8 @@ Calculate MIMO channel coefficients and delays for planar wave propagation
   (single-precision arithmetic; error if unavailable); default: 0
 
 ## Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out]` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
 - **`rx_Doppler`** — Doppler weight of each path for an Rx moving along its local x-axis: the cosine of the angle
   between this axis and the arrival direction; the Doppler shift at the speed $v$ is $v f_c / c$ times this weight,
@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 13 || nrhs > 17)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 4)
+    if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
@@ -122,29 +122,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         const auto rx_pos = qd_mex_get_xyz_batch(prhs[4], "rx_pos");
         const auto rx_orientation = qd_mex_get_xyz_batch(prhs[5], "rx_orientation");
 
-        // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries
+        // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries (coeff: complex)
         const size_t n_snap = aod.size();
-        std::vector<arma::cube> out[3];
-        std::vector<arma::vec> rx_Doppler;
+        std::vector<arma::cx_cube> coeff(n_snap);
+        std::vector<arma::cube> coeff_re, coeff_im, delay(n_snap);
+        std::vector<arma::vec> rx_Doppler(n_snap);
         for (int k = 0; k < std::max(nlhs, 1); ++k)
         {
             plhs[k] = mxCreateCellMatrix((mwSize)n_snap, 1);
-            if (k < 3)
-                out[k].resize(n_snap);
-            else
-                rx_Doppler.resize(n_snap);
             for (size_t s = 0; s < n_snap; ++s)
             {
                 const arma::uword n_path = add_fake_los_path ? aod[s].n_elem + 1 : aod[s].n_elem;
-                mxSetCell(plhs[k], (mwIndex)s, (k < 3) ? qd_mex_init_output(&out[k][s], n_ports_rx, n_ports_tx, n_path)
-                                                       : qd_mex_init_output(&rx_Doppler[s], n_path, true));
+                mxSetCell(plhs[k], (mwIndex)s, (k == 0)   ? qd_mex_init_output(&coeff[s], n_ports_rx, n_ports_tx, n_path)
+                                               : (k == 1) ? qd_mex_init_output(&delay[s], n_ports_rx, n_ports_tx, n_path)
+                                                          : qd_mex_init_output(&rx_Doppler[s], n_path, true));
             }
         }
 
         CALL_QD(quadriga_lib::get_channels_planar<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                           aod, eod, aoa, eoa, path_gain, path_length, polmat,
-                                                          out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
-                                                          (nlhs > 3) ? &rx_Doppler : nullptr, nullptr, use_kernel));
+                                                          coeff_re, coeff_im, delay, center_freq, use_absolute_delays, add_fake_los_path,
+                                                          (nlhs > 2) ? &rx_Doppler : nullptr, &coeff, use_kernel));
         return;
     }
 
@@ -165,13 +163,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube coeff_re, coeff_im, delay;
     arma::vec rx_Doppler;
 
-    plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&coeff_im, n_ports_rx, n_ports_tx, n_path);
+        plhs[1] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path);
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path);
-    if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&rx_Doppler, n_path, true);
+        plhs[2] = qd_mex_init_output(&rx_Doppler, n_path, true);
 
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_planar<double>(ant_tx, ant_rx,
@@ -179,5 +174,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                       aod, eod, aoa, eoa, path_gain, path_length, polmat,
                                                       coeff_re, coeff_im, delay,
                                                       center_freq, use_absolute_delays, add_fake_los_path,
-                                                      (nlhs > 3) ? &rx_Doppler : nullptr, use_kernel));
+                                                      (nlhs > 2) ? &rx_Doppler : nullptr, use_kernel));
+
+    // The single-snapshot form has split outputs only: copy them into one complex array
+    plhs[0] = qd_mex_copy2matlab(&coeff_re, &coeff_im, true);
 }

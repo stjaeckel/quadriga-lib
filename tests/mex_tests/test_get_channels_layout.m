@@ -22,8 +22,8 @@ assertEqual( index, uint64( [ 1, 2, 1, 2, 1, 2, 1, 2; 1, 1, 2, 2, 1, 1, 2, 2; 1,
 assertEqual( ch(1).center_freq, 2e9 );
 assertEqual( ch(5).center_freq, 3.5e9 );
 assertEqual( ch(2).tx_pos, [ 1000; 0; 25 ] );
-assertEqual( size( ch(1).coeff_re, 1 ), 2 );                                    % generic antennas: two ports each
-assertEqual( size( ch(1).coeff_re, 2 ), 2 );
+assertEqual( size( ch(1).coeff, 1 ), 2 );                                    % generic antennas: two ports each
+assertEqual( size( ch(1).coeff, 2 ), 2 );
 assertFalse( isfield( ch, 'path_gain' ) );
 assertTrue( isempty( L.links.i_tx ) );                                          % the layout is unchanged
 L2 = quadriga_lib.init_link_states( L, '38.901', [], false, 2e9, '', 5 );
@@ -32,16 +32,16 @@ assertTrue( isequaln( ch2, ch ) );
 
 %% Optional inputs: times, output, method, mobility, overlap, seed, config_dirs
 ch = quadriga_lib.get_channels_layout( L2, [ 0, 1, 2 ] );
-assertEqual( size( ch(1).coeff_re, 4 ), 3 );
+assertEqual( size( ch(1).coeff, 4 ), 3 );
 assertElementsAlmostEqual( ch(1).rx_pos, [ 100, 100, 100; 0, 2, 4; 1.5, 1.5, 1.5 ], 'absolute', 1e-12 );   % U1 moves 2 m/s north
 ch = quadriga_lib.get_channels_layout( L2, [], 'rays' );
 assertTrue( isfield( ch, 'path_gain' ) );
 chp = quadriga_lib.get_channels_layout( L2, [ 0, 1 ], 'taps', '38.901', 'phase', 0.2 );
-assertEqual( size( chp(1).coeff_re, 4 ), 2 );
+assertEqual( size( chp(1).coeff, 4 ), 2 );
 chq = quadriga_lib.get_channels_layout( L, [], 'taps', 'quadriga', 'auto', 0.5, 5 );   % another method needs empty links
 assertEqual( size( chq ), [ 1, 8 ] );
 chs = quadriga_lib.get_channels_layout( L, [], 'taps', '', 'auto', 0.5, 6 );
-assertFalse( isequal( chs(1).coeff_re, ch2(1).coeff_re ) );                     % another seed, other channels
+assertFalse( isequal( chs(1).coeff, ch2(1).coeff ) );                     % another seed, other channels
 chd = quadriga_lib.get_channels_layout( L, [], 'taps', '', 'auto', 0.5, 5, {} );
 assertTrue( isequaln( chd, ch2 ) );
 folder = [ tempname(), '_conf' ];
@@ -56,8 +56,8 @@ assertEqual( size( chc ), [ 1, 8 ] );
 %% Antennas of the layout: an omni-directional Tx antenna has one port
 Lo = quadriga_lib.set_antenna( L, 'omni', [], false );
 ch = quadriga_lib.get_channels_layout( Lo, [], 'taps', '', 'auto', 0.5, 5 );
-assertEqual( size( ch(1).coeff_re, 2 ), 1 );
-assertEqual( size( ch(1).coeff_re, 1 ), 2 );
+assertEqual( size( ch(1).coeff, 2 ), 1 );
+assertEqual( size( ch(1).coeff, 1 ), 2 );
 
 %% Pairing: 1-based (site, terminal) pairs select the channels of the output
 Lp = L2;
@@ -74,7 +74,7 @@ assertEqual( index2, uint64( [ 1, 2, 1, 2, 1, 2, 1, 2; 1, 1, 2, 2, 1, 1, 2, 2; 1
 
 %% Type handling: single times as a column, int8 seed
 ch = quadriga_lib.get_channels_layout( L, single( [ 0; 1; 2 ] ), 'taps', '', 'auto', 0.5, int8( 5 ) );
-assertEqual( size( ch(1).coeff_re, 4 ), 3 );
+assertEqual( size( ch(1).coeff, 4 ), 3 );
 
 %% Errors
 assert_throws( @() quadriga_lib.get_channels_layout(), 'Wrong number of input arguments.' );

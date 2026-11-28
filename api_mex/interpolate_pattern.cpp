@@ -21,11 +21,11 @@ Interpolate the polarimetric field pattern of an antenna array at given azimuth 
 ## Usage:
 ```
 % Single-frequency mode
-[ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
+[ V, H, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
     arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
 
 % Multi-frequency mode
-[ V_re, V_im, H_re, H_im ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
+[ V, H ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
     i_element, orientation, element_pos, freq_new, use_kernel );
 ```
 
@@ -48,9 +48,8 @@ Interpolate the polarimetric field pattern of an antenna array at given azimuth 
   2^31 - 1 samples); other values raise an error; default: 0
 
 ## Outputs:
-- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`, multi-frequency mode
-  `[n_out, n_ang, n_freq]`
-- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
+- **`V`** — Complex e-theta (vertical) field; `[n_out, n_ang]`, multi-frequency mode `[n_out, n_ang, n_freq]`
+- **`H`** — Complex e-phi (horizontal) field; same size as `V`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the array; negative for elements
   closer to the source; `[n_out, n_ang]`; single-frequency mode only
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;
@@ -86,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 3 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 8)
+    if (nlhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     const auto ant = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant");
@@ -108,44 +107,39 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (ant.size() > 1 || !freq_new.is_empty()) // Multi-frequency mode
     {
-        if (nlhs > 4)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode supports at most 4 outputs (V_re, V_im, H_re, H_im).");
+        if (nlhs > 2)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode supports at most 2 outputs (V, H).");
 
+        // C++ writes the complex fields into the MATLAB arrays
         const arma::uword n_freq = freq_new.is_empty() ? (arma::uword)ant.size() : freq_new.n_elem;
         arma::cube V_re, V_im, H_re, H_im;
-        plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang, n_freq);
+        arma::cx_cube V, H;
+        plhs[0] = qd_mex_init_output(&V, n_out, n_ang, n_freq);
         if (nlhs > 1)
-            plhs[1] = qd_mex_init_output(&V_im, n_out, n_ang, n_freq);
-        if (nlhs > 2)
-            plhs[2] = qd_mex_init_output(&H_re, n_out, n_ang, n_freq);
-        if (nlhs > 3)
-            plhs[3] = qd_mex_init_output(&H_im, n_out, n_ang, n_freq);
+            plhs[1] = qd_mex_init_output(&H, n_out, n_ang, n_freq);
 
         CALL_QD(quadriga_lib::interpolate_pattern<double>(ant, az, el, V_re, V_im, H_re, H_im,
-                                                                 freq_new,
-                                                                 i_element, orientation, element_pos, nullptr, nullptr, use_kernel));
+                                                                 freq_new, i_element, orientation, element_pos,
+                                                                 &V, (nlhs > 1) ? &H : nullptr, use_kernel));
         return;
     }
 
     arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
-    plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang);
+    arma::cx_mat V, H;
+    plhs[0] = qd_mex_init_output(&V, n_out, n_ang);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&V_im, n_out, n_ang);
+        plhs[1] = qd_mex_init_output(&H, n_out, n_ang);
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&H_re, n_out, n_ang);
+        plhs[2] = qd_mex_init_output(&dist, n_out, n_ang);
     if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&H_im, n_out, n_ang);
+        plhs[3] = qd_mex_init_output(&azimuth_loc, n_out, n_ang);
     if (nlhs > 4)
-        plhs[4] = qd_mex_init_output(&dist, n_out, n_ang);
+        plhs[4] = qd_mex_init_output(&elevation_loc, n_out, n_ang);
     if (nlhs > 5)
-        plhs[5] = qd_mex_init_output(&azimuth_loc, n_out, n_ang);
-    if (nlhs > 6)
-        plhs[6] = qd_mex_init_output(&elevation_loc, n_out, n_ang);
-    if (nlhs > 7)
-        plhs[7] = qd_mex_init_output(&gamma, n_out, n_ang);
+        plhs[5] = qd_mex_init_output(&gamma, n_out, n_ang);
 
     CALL_QD(quadriga_lib::interpolate_pattern<double>(ant[0], az, el, V_re, V_im, H_re, H_im, i_element, orientation, element_pos,
-                                                       (nlhs > 4) ? &dist : nullptr, (nlhs > 5) ? &azimuth_loc : nullptr,
-                                                       (nlhs > 6) ? &elevation_loc : nullptr, (nlhs > 7) ? &gamma : nullptr,
-                                                       nullptr, nullptr, use_kernel));
+                                                       (nlhs > 2) ? &dist : nullptr, (nlhs > 3) ? &azimuth_loc : nullptr,
+                                                       (nlhs > 4) ? &elevation_loc : nullptr, (nlhs > 5) ? &gamma : nullptr,
+                                                       &V, (nlhs > 1) ? &H : nullptr, use_kernel));
 }

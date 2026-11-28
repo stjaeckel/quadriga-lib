@@ -33,7 +33,7 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 **What a channel holds** (a struct, fields in [hdf5_read_channel](#hdf5_read_channel)):
 
 - The positions and orientations of the transmitter and the receiver, per snapshot or fixed
-- The **coefficients** `coeff_re` / `coeff_im` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
+- The complex **coefficients** `coeff` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
 - Optionally, antenna-independent path data: path gain, path length, polarization transfer matrix, angles, scatterer
   positions and the interaction points of ray-traced paths
 - Unstructured metadata: named values of any type
@@ -372,7 +372,7 @@ quadriga_lib.export_channel_obj( fn, chan, max_paths, gain_max_dB, gain_min_dB, 
 ### Inputs:
 - **`fn`** — Path of the OBJ file, ending in `.obj`
 - **`chan`** — Channel; 1x1 struct with the fields of [hdf5_read_channel](#hdf5_read_channel); needs `rx_pos`, `tx_pos`,
-  `center_freq`, `n_interact`, `interact_coord` and `coeff_re` / `coeff_im` with `delay`, or `polmat`; columns of
+  `center_freq`, `n_interact`, `interact_coord` and `coeff` with `delay`, or `polmat`; columns of
   `interact_coord` beyond `sum(n_interact)` are ignored
 - **`max_paths`** — Number of the strongest paths per snapshot to export; 0 = all; default: 0
 - **`gain_max_dB`** — Gain in dB of the largest radius and the last color, finite; default: -60
@@ -395,25 +395,24 @@ Also in: [C++](../cpp/channel-data-and-processing.md#freq_response) · [Python](
 
 - The frequency response of one snapshot at the subcarriers $k$: $H_k = \sum_l a_l \, e^{-j 2\pi f_k \tau_l}$ with the
   offset $f_k$ = `bandwidth` · `pilot_grid(k)` from the carrier
-- One snapshot is a 3D array; several snapshots are cell arrays with one array per snapshot (`coeff_re`,
-  `coeff_im` and `delay` of the same length), computed in parallel; the number of paths may differ between them
+- One snapshot is a 3D array; several snapshots are cell arrays with one array per snapshot (`coeff` and `delay`
+  of the same length), computed in parallel; the number of paths may differ between them
 - A channel struct of [hdf5_read_channel](#hdf5_read_channel) holds the snapshots on the 4th dimension, zero-padded;
-  `num2cell(ch.coeff_re, [1 2 3])`, and the same for `coeff_im` and `delay`, gives the cell arrays (the zero-padded
-  paths do not change the result)
+  `num2cell(ch.coeff, [1 2 3])`, and the same for `delay`, gives the cell arrays (the zero-padded paths do not change
+  the result)
 - For a multi-frequency channel and absolute carrier frequencies, use [freq_response_mf](#freq_response_mf)
 - Precision: the phase is reduced to one period in double precision; sin / cos, coefficients and sums are single
   precision
 
 ### Usage:
 ```matlab
-[ hmat_re, hmat_im ] = quadriga_lib.freq_response( coeff_re, coeff_im, delay, pilot_grid, bandwidth, ...
-    i_snap, use_kernel );
+hmat = quadriga_lib.freq_response( coeff, delay, pilot_grid, bandwidth, i_snap, use_kernel );
 ```
 
 ### Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path]`, or cell arrays
-  of length `n_snap` with one such array per snapshot
-- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`, or a cell array as `coeff_re`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path]`, or a cell array of length `n_snap` with one such array
+  per snapshot
+- **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`, or a cell array as `coeff`
 - **`pilot_grid`** — Subcarrier positions relative to the bandwidth, finite: 0 = carrier, 1 = carrier + `bandwidth`;
   `[n_carrier, 1]`
 - **`bandwidth`** — Bandwidth in Hz, finite and >= 0
@@ -422,8 +421,8 @@ Also in: [C++](../cpp/channel-data-and-processing.md#freq_response) · [Python](
   default: 0
 
 ### Outputs:
-- **`hmat_re`** / **`hmat_im`** — Real and imaginary part of the frequency response; `[n_rx, n_tx, n_carrier, n_out]`;
-  the selected snapshots must have equal `n_rx` and `n_tx`
+- **`hmat`** — Complex frequency response; `[n_rx, n_tx, n_carrier, n_out]`; the selected snapshots must have equal
+  `n_rx` and `n_tx`
 
 ### See also:
 - [freq_response_mf](#freq_response_mf) (multi-frequency channel, absolute carrier frequencies)
@@ -445,20 +444,19 @@ Also in: [C++](../cpp/channel-data-and-processing.md#freq_response_mf) · [Pytho
 - `remove_delay_phase = true` interpolates the envelope $a_l(f_i) \, e^{j 2\pi f_i \tau_l}$ instead of $a_l(f_i)$, so
   that the delay phase the channel generators include is not interpolated
 - One snapshot is a 4D array `[n_rx, n_tx, n_path, n_freq]`; several snapshots are cell arrays with one array per
-  snapshot (`coeff_re`, `coeff_im` and `delay` of the same length), computed in parallel; the number of paths may
-  differ between them
+  snapshot (`coeff` and `delay` of the same length), computed in parallel; the number of paths may differ
+  between them
 
 ### Usage:
 ```matlab
-[ hmat_re, hmat_im ] = quadriga_lib.freq_response_mf( coeff_re, coeff_im, delay, freq, freq_new, ...
-    remove_delay_phase, i_snap, use_kernel );
+hmat = quadriga_lib.freq_response_mf( coeff, delay, freq, freq_new, remove_delay_phase, i_snap, use_kernel );
 ```
 
 ### Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path, n_freq]`, or
-  cell arrays of length `n_snap` with one such array per snapshot
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path, n_freq]`, or a cell array of length `n_snap` with one
+  such array per snapshot
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` (a 4th dimension of length `n_freq` is
-  allowed, only the first frequency is used), or a cell array as `coeff_re`
+  allowed, only the first frequency is used), or a cell array as `coeff`
 - **`freq`** — Input frequencies in Hz, finite, strictly ascending; `[n_freq, 1]`
 - **`freq_new`** — Output carrier frequencies in Hz, finite; `[n_carrier, 1]`
 - **`remove_delay_phase`** — Remove the delay phase from the coefficients before the interpolation: `true` for the
@@ -469,8 +467,8 @@ Also in: [C++](../cpp/channel-data-and-processing.md#freq_response_mf) · [Pytho
   1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`hmat_re`** / **`hmat_im`** — Real and imaginary part of the frequency response; `[n_rx, n_tx, n_carrier, n_out]`;
-  the selected snapshots must have equal `n_rx` and `n_tx`
+- **`hmat`** — Complex frequency response; `[n_rx, n_tx, n_carrier, n_out]`; the selected snapshots must have equal
+  `n_rx` and `n_tx`
 
 ### Notes:
 - With `remove_delay_phase = true`, generate the channels with `use_absolute_delays = true`: their coefficients carry
@@ -549,7 +547,7 @@ Also in: [C++](../cpp/channel-data-and-processing.md#hdf5_read_channel) · [Pyth
   | `name` | Channel name | char |
   | `tx_pos`, `rx_pos` | Tx and Rx positions in m | `[3, 1]` (fixed) or `[3, n_snap]` |
   | `tx_orientation`, `rx_orientation` | Tx and Rx orientations (bank, tilt, heading) in rad | `[3, 1]` (fixed) or `[3, n_snap]` |
-  | `coeff_re`, `coeff_im` | Coefficients, real and imaginary part | `[n_rx, n_tx, n_path, n_snap]` |
+  | `coeff` | Complex coefficients | `[n_rx, n_tx, n_path, n_snap]` |
   | `delay` | Delays in s | `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]` |
   | `path_gain` | Path gain without antennas, linear | `[n_path, n_snap]` |
   | `path_length` | Path length in m | `[n_path, n_snap]` |
@@ -913,13 +911,12 @@ Also in: [C++](../cpp/channel-data-and-processing.md#quantize_delays) · [Python
 
 ### Usage:
 ```matlab
-[ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
-    tap_spacing, max_taps, power_exponent, fix_taps );
+[ coeff_q, delay_q ] = quadriga_lib.quantize_delays( coeff, delay, tap_spacing, max_taps, ...
+    power_exponent, fix_taps );
 ```
 
 ### Inputs:
-- **`coeff_re`** / **`coeff_im`** — Real and imaginary part of the coefficients, the paths of a snapshot zero-padded to
-  `n_path`; `[n_rx, n_tx, n_path, n_snap]`
+- **`coeff`** — Complex coefficients, the paths of a snapshot zero-padded to `n_path`; `[n_rx, n_tx, n_path, n_snap]`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; finite, above
   `-tap_spacing / 2` and below `2^31` · `tap_spacing`
 - **`tap_spacing`** — Tap spacing in s, > 0 and finite; 5 ns is a sampling rate of 200 MHz; default: 5e-9
@@ -935,8 +932,7 @@ Also in: [C++](../cpp/channel-data-and-processing.md#quantize_delays) · [Python
   | 3 | One grid per antenna pair for all snapshots |
 
 ### Outputs:
-- **`coeff_re_q`** / **`coeff_im_q`** — Real and imaginary part of the coefficients per tap;
-  `[n_rx, n_tx, n_taps, n_snap]`
+- **`coeff_q`** — Complex coefficients per tap; `[n_rx, n_tx, n_taps, n_snap]`
 - **`delay_q`** — Tap delays in s; `[n_rx, n_tx, n_taps, n_snap]`, or `[1, 1, n_taps, n_snap]` for delays
   `[1, 1, n_path, n_snap]` with `fix_taps` 1 or 2
 

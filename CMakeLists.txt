@@ -266,7 +266,23 @@ endif()
 if (BUILD_OCTAVE) # Detect Octave
     find_program(MKOCTFILE_EXECUTABLE mkoctfile)
     if(MKOCTFILE_EXECUTABLE)
-        message(STATUS "Found mkoctfile: ${MKOCTFILE_EXECUTABLE}")
+        # The MEX files use the interleaved complex API, which works from Octave 8.4 on
+        execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} --version OUTPUT_VARIABLE OCTAVE_VERSION_TEXT ERROR_VARIABLE OCTAVE_VERSION_TEXT)
+        string(REGEX MATCH "version ([0-9]+\\.[0-9]+\\.[0-9]+)" OCTAVE_VERSION_MATCH "${OCTAVE_VERSION_TEXT}")
+        set(OCTAVE_VERSION_FOUND "${CMAKE_MATCH_1}")
+        if(NOT OCTAVE_VERSION_FOUND)
+            message(STATUS "Octave version not readable from 'mkoctfile --version'. Octave API disabled!")
+            set(BUILD_OCTAVE OFF)
+        elseif(OCTAVE_VERSION_FOUND VERSION_LESS 8.4)
+            message(STATUS "Octave ${OCTAVE_VERSION_FOUND} found, 8.4 or later needed. Octave API disabled!")
+            set(BUILD_OCTAVE OFF)
+            file(GLOB OCTAVE_STALE_MEX "${CMAKE_INSTALL_PREFIX}/+quadriga_lib/*.mex")
+            if(OCTAVE_STALE_MEX)
+                message(WARNING "Octave MEX files of an earlier build are in ${CMAKE_INSTALL_PREFIX}/+quadriga_lib and are not updated; delete them.")
+            endif()
+        else()
+            message(STATUS "Found mkoctfile: ${MKOCTFILE_EXECUTABLE} (Octave ${OCTAVE_VERSION_FOUND})")
+        endif()
     else()
         message(STATUS "Octave not found. Octave API disabled!")
         set(BUILD_OCTAVE OFF)
@@ -550,7 +566,7 @@ if(BUILD_MATLAB)
     # regardless of QUADRIGA_LINK_TARGET, so the MEX files do not need a libquadriga.so at run time. The library is
     # linked as a file, so that its OpenMP compile flag does not reach the MEX files.
     set(MEX_INCLUDE_DIRS ${MATLAB_MEX_INCLUDE_DIR})
-    set(MEX_DEFINITIONS MATLAB_MEX_FILE)
+    set(MEX_DEFINITIONS MATLAB_MEX_FILE MATLAB_DEFAULT_RELEASE=R2018a) # Interleaved complex API
     list(APPEND MEX_OBJECT_DEPENDENCIES matlab_mex_unzip)
     if(MSVC)
         # /EHs without "c": MATLAB's error functions throw through extern "C" code. CMake's default /EHsc in
@@ -597,7 +613,7 @@ if(BUILD_OCTAVE)
     separate_arguments(OCTAVE_INCFLAGS UNIX_COMMAND "${OCTAVE_INCFLAGS}")
     list(TRANSFORM OCTAVE_INCFLAGS REPLACE "^-I" "")
     set(MEX_INCLUDE_DIRS ${OCTAVE_INCFLAGS})
-    set(MEX_DEFINITIONS MEX_DEBUG)
+    set(MEX_DEFINITIONS MEX_DEBUG MX_HAS_INTERLEAVED_COMPLEX=1)
     set(MEX_COMPILE_OPTIONS ${OPT_FLAGS_API} -fPIC -pthread -fopenmp -U_FORTIFY_SOURCE -Wall -Wpedantic -Wextra -Wfloat-conversion)
     qd_add_mex_objects(mexo)
 
@@ -616,9 +632,10 @@ if(BUILD_OCTAVE)
         qd_mex_objects(octave_objects mexo ${mex_basename})
         add_custom_command(
             OUTPUT ${octave_output}
-            # mkoctfile links with the compiler of this build, not the one recorded when Octave was built (conda)
+            # mkoctfile links with the compiler of this build, not the one recorded when Octave was built (conda); with
+            # -R2018a its version stub marks the file as using interleaved complex data
             COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}" "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER}"
-                    ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output} "${octave_objects}"
+                    ${MKOCTFILE_EXECUTABLE} --mex -R2018a -o ${octave_output} "${octave_objects}"
                     -L$<TARGET_FILE_DIR:${QUADRIGA_LINK_TARGET}> -lquadriga
                     ${QD_MEX_EXTRA_LIBS} ${QD_MEX_EXTRA_LDFLAGS} -s
             DEPENDS mexo ${octave_objects} ${QUADRIGA_LINK_TARGET}

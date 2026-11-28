@@ -15,15 +15,15 @@ tx_pos = [ 0; 0; 10 ];
 rx_pos = [ 60; 10; 1.5 ];
 fc = [ 3.5e9; 28e9 ];
 phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', 9 );
-[ lsp, ~, gre, gim, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
+[ lsp, ~, gre, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
     quadriga_lib.gbsm_draw( sp, 'lsf', phase, tx_pos, rx_pos ) );
 rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 9 ), tx_pos, rx_pos );
 [ d, p, aod, eod, aoa, eoa ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], ...
-    [], gre, gim );
+    [], gre );
 rr = quadriga_lib.gbsm_draw( sp, 'ray', quadriga_lib.gbsm_init_phases( sp, 'ray', 9 ), tx_pos, rx_pos, 0, ...
     [], [], fc );
 rays = quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rr, 'quadriga', ...
-    [], [], [], gre, gim );
+    [], [], [], gre );
 rays = quadriga_lib.ssf_scatterers( rays );
 tx = quadriga_lib.generate_antenna( 'omni' );
 rx = quadriga_lib.generate_antenna( 'xpol' );
@@ -34,7 +34,7 @@ n_path = sum( any( rays.power > 0, 2 ) | rays.path_type < 2 );
 %% Basic call and values ('drift', the default of 'quadriga'; 'taps')
 [ chan, par ] = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90 );
 assertEqual( size(chan), [1, 1] );
-assertEqual( size(chan.coeff_re), [2, 1, n_tap] );
+assertEqual( size(chan.coeff), [2, 1, n_tap] );
 assertEqual( size(chan.delay), [2, 1, n_tap] );
 assertEqual( chan.center_freq, fc(1) );
 assertEqual( chan.tx_pos, tx_pos );
@@ -57,24 +57,24 @@ assertTrue( isa(par.gr_pos, 'single') && isequal( size(par.gr_pos), [3, 1] ) );
 
 %% Optional inputs: mobility, output, i_freq (1-based), positions, orientations, kf_ratio, flags
 [ c2, p2 ] = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], [], [], [], [], [], [], [], [] );
-assertEqual( c2.coeff_re, chan.coeff_re );
+assertEqual( c2.coeff, chan.coeff );
 assertEqual( p2, par );
 [ c2, p2 ] = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, 'phase' );
 assertTrue( ~isfield( p2, 'fbs_pos' ) );
-assertEqual( size(c2.coeff_re), size(chan.coeff_re) );
+assertEqual( size(c2.coeff), size(chan.coeff) );
 [ c3, p3 ] = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, 'drift', 'rays' );
-assertEqual( size(c3.coeff_re), [2, 1, n_path] );
+assertEqual( size(c3.coeff), [2, 1, n_path] );
 assertEqual( size(c3.path_gain), [n_path, 1] );
 assertEqual( size(c3.fbs_pos), [3, n_path] );
 assertEqual( numel(p3.tap), n_path );
 assertTrue( ~isfield( p3, 'n_ray_tap' ) );
 c4 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 2 );
 assertEqual( c4.center_freq, fc(2) );
-assertTrue( max( abs( c4.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );
+assertTrue( max( abs( c4.coeff(:) - chan.coeff(:) ) ) > 1e-9 );
 c6 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 1, tx_pos, [ rx_pos, rx_pos + [ 1; 0; 0 ] ] );
-assertEqual( size(c6.coeff_re), [2, 1, n_tap, 2] );
+assertEqual( size(c6.coeff), [2, 1, n_tap, 2] );
 assertEqual( c6.rx_pos, [ rx_pos, rx_pos + [ 1; 0; 0 ] ] );
-assertElementsAlmostEqual( c6.coeff_re(:, :, :, 1), chan.coeff_re, 'absolute', 1e-12 );
+assertElementsAlmostEqual( c6.coeff(:, :, :, 1), chan.coeff, 'absolute', 1e-12 );
 [ c7, p7 ] = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, [ -90; -80 ], [], [], 1, [], ...
     [ rx_pos, rx_pos + [ 1; 0; 0 ] ] );
 assertEqual( p7.link_gain_dB, [ -90; -80 ] );
@@ -82,9 +82,9 @@ assertTrue( p7.ratio(2) > 0 && p7.ratio(1) == 0 );
 c8 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], [], [], [], [ 0, 0, 1 ], [ 0, 0.5, 0 ] );
 assertEqual( c8.tx_orientation, [ 0; 0; 1 ] );
 assertEqual( c8.rx_orientation, [ 0; 0.5; 0 ] );
-assertTrue( max( abs( c8.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );
+assertTrue( max( abs( c8.coeff(:) - chan.coeff(:) ) ) > 1e-9 );
 c9 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], [], [], [], [], [], 0 );
-assertTrue( max( abs( c9.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );        % kf_ratio 0
+assertTrue( max( abs( c9.coeff(:) - chan.coeff(:) ) ) > 1e-9 );        % kf_ratio 0
 s = rays;
 s.center_freq(2) = 60e9;                                                 % oxygen absorption needs > 52 GHz
 c9 = quadriga_lib.gbsm_single_link_channel( tx, rx, s, -90, [], 'rays', 2 );
@@ -96,14 +96,14 @@ assertElementsAlmostEqual( c9.delay - chan.delay, norm( rx_pos - tx_pos ) / 2997
 
 %% Outputs: 0 to 2
 quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90 );
-assertEqual( ans.coeff_re, chan.coeff_re );
+assertEqual( ans.coeff, chan.coeff );
 c1 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90 );
-assertEqual( c1.coeff_im, chan.coeff_im );
+assertEqual( c1.coeff, chan.coeff );
 
 %% Type handling: integer classes for the 1-based index i_freq
 c5 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], int32(2) );
 assertEqual( quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], uint8(2) ), c5 );
-assertEqual( c5.coeff_re, c4.coeff_re );
+assertEqual( c5.coeff, c4.coeff );
 
 %% Errors
 assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays ), 'Wrong number of input arguments.' );
@@ -117,7 +117,7 @@ assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays, 0, [], [
 assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays, 0, [], [], 3 ), ...
     'Input ''i_freq'' is out of range for 2 frequencies.' );
 c1 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], [], tx_pos', rx_pos' );     % [1, 3] rows
-assertEqual( c1.coeff_re, chan.coeff_re );
+assertEqual( c1.coeff, chan.coeff );
 assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays, 0, [], [], [], [], rx_pos(1:2) ), ...
     'Input ''rx_pos'' must have 3 rows.' );
 assert_throws( @() quadriga_lib.gbsm_single_link_channel( tx, rx, rays, 0, [], 'foo' ), ...

@@ -39,7 +39,7 @@ Calculate MIMO channel coefficients and delays for paths over an intelligent ref
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
+[ coeff, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
     tx_array, rx_array, irs_array, tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, ...
@@ -75,8 +75,7 @@ Calculate MIMO channel coefficients and delays for paths over an intelligent ref
 - **`use_kernel`** — Kernel of both segments, as in [[get_channels_spherical]]; default: 0
 
 ## Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path_irs]` with the
-  number of kept path pairs `n_path_irs`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path_irs]` with the number of kept path pairs `n_path_irs`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path_irs]`
 - **`active_path_out`** — Kept path pairs, for `active_path` of a later call; logical; `[n_path_1 * n_path_2, 1]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
@@ -99,7 +98,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 19 || nrhs > 26)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 8)
+    if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     const auto tx_array = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
@@ -142,13 +141,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output sizes depend on threshold_dB and active_path and are set by C++
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
-    arma::cube *p_aod = (nlhs > 4) ? &aod : nullptr;
-    arma::cube *p_eod = (nlhs > 5) ? &eod : nullptr;
-    arma::cube *p_aoa = (nlhs > 6) ? &aoa : nullptr;
-    arma::cube *p_eoa = (nlhs > 7) ? &eoa : nullptr;
+    arma::cube *p_aod = (nlhs > 3) ? &aod : nullptr;
+    arma::cube *p_eod = (nlhs > 4) ? &eod : nullptr;
+    arma::cube *p_aoa = (nlhs > 5) ? &aoa : nullptr;
+    arma::cube *p_eoa = (nlhs > 6) ? &eoa : nullptr;
 
     std::vector<bool> active_path_out;
-    std::vector<bool> *p_active_path_out = (nlhs > 3) ? &active_path_out : nullptr;
+    std::vector<bool> *p_active_path_out = (nlhs > 2) ? &active_path_out : nullptr;
     CALL_QD(quadriga_lib::get_channels_irs<double>(tx_array, rx_array, irs_array,
                                                    tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                    irs_pos, irs_orientation,
@@ -160,19 +159,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                    p_active_path_out, use_kernel));
 
     // Write to MATLAB; empty results keep their [n_rx, n_tx, 0] shape
-    plhs[0] = qd_mex_copy2matlab_keep_shape(coeff_re);
+    plhs[0] = qd_mex_copy2matlab(&coeff_re, &coeff_im, true);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab_keep_shape(coeff_im);
+        plhs[1] = qd_mex_copy2matlab_keep_shape(delay);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab_keep_shape(delay);
+        plhs[2] = qd_mex_copy2matlab(&active_path_out);
     if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&active_path_out);
+        plhs[3] = qd_mex_copy2matlab_keep_shape(aod);
     if (nlhs > 4)
-        plhs[4] = qd_mex_copy2matlab_keep_shape(aod);
+        plhs[4] = qd_mex_copy2matlab_keep_shape(eod);
     if (nlhs > 5)
-        plhs[5] = qd_mex_copy2matlab_keep_shape(eod);
+        plhs[5] = qd_mex_copy2matlab_keep_shape(aoa);
     if (nlhs > 6)
-        plhs[6] = qd_mex_copy2matlab_keep_shape(aoa);
-    if (nlhs > 7)
-        plhs[7] = qd_mex_copy2matlab_keep_shape(eoa);
+        plhs[6] = qd_mex_copy2matlab_keep_shape(eoa);
 }

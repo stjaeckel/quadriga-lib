@@ -28,7 +28,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 ## Usage:
 ```
 rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, ...
-    path_length, polmat, method, path_type, tap, gr_eps_re, gr_eps_im );
+    path_length, polmat, method, path_type, tap, gr_eps );
 ```
 
 ## Inputs:
@@ -42,7 +42,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
   without a GR path)
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; needed only where a GR ray is
+- **`gr_eps`** *(optional)* — Complex ground permittivity, used as `conj(gr_eps)`; needed only where a GR ray is
   recomputed, i.e. in the mobility `drift` at moved ends; `[n_freq]`
 
 ## Output:
@@ -56,7 +56,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 8 || nrhs > 13)
+    if (nrhs < 8 || nrhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -72,13 +72,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::string method = (nrhs < 9) ? std::string("quadriga") : qd_mex_get_string(prhs[8], "quadriga", "method");
     const arma::u32_vec path_type = (nrhs < 10) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[9], false, "path_type");
     const arma::u32_vec tap = (nrhs < 11) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[10], false, "tap");
-    const arma::vec gr_eps_re = (nrhs < 12) ? arma::vec() : qd_mex_get_Col<double>(prhs[11], false, "gr_eps_re");
-    const arma::vec gr_eps_im = (nrhs < 13) ? arma::vec() : qd_mex_get_Col<double>(prhs[12], false, "gr_eps_im");
+    arma::vec gr_eps_re, gr_eps_im;
+    if (nrhs > 11)
+        qd_mex_get_complex_Col<double>(prhs[11], "gr_eps", gr_eps_re, gr_eps_im);
 
     // Output struct in MATLAB memory (n_path from 'fbs_pos'; wrong sizes throw in the library call before any write);
     // codes 'path_type' and 'tap' are not shifted
     std::vector<quadriga_lib::gbsm_rays> rays;
-    const bool has_gr = !gr_eps_re.empty() && !gr_eps_im.empty();
+    const bool has_gr = !gr_eps_re.empty();
     plhs[0] = qd_mex_init_gbsm_rays(1, fbs_pos.n_cols, center_freq.n_elem, has_gr, true, rays);
 
     CALL_QD(quadriga_lib::gbsm_rays_from_paths(center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, path_length,
@@ -87,4 +88,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                gr_eps_im));
 
     mxSetField(plhs[0], 0, "method", mxCreateString(rays[0].method.c_str()));
+    qd_mex_set_gbsm_rays_gr_eps(plhs[0], rays);
 }

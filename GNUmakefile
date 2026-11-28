@@ -116,7 +116,9 @@ test:   all moxunit-lib
 	OMP_WAIT_POLICY=$${OMP_WAIT_POLICY:-passive} time $(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
-	time octave --eval "cd tests; quadriga_lib_mex_tests;"
+	@# CMake leaves the Octave interface out for Octave older than 8.4
+	if [ -f +quadriga_lib/version.mex ]; then time octave --eval "cd tests; quadriga_lib_mex_tests;"; \
+	else echo "No Octave MEX files (Octave 8.4 or later needed): Octave tests skipped"; fi
 endif
 endif
 ifeq ($(matlab),ON)
@@ -256,13 +258,6 @@ pip: pip-sdist
 	$(MAKE) -j pip-x86 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313 pip-aarch64-cp314
 
 # Ubuntu targets:
-DEB_JAMMY := quadriga-lib_$(QUADRIGA_VERSION)-1+jammy_amd64.deb
-release/$(DEB_JAMMY):
-	mkdir -p release
-	docker build --build-arg UBUNTU_VERSION=22.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-jammy . 2>&1 | tee build_jammy.log
-	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-jammy
-	cp /tmp/quadriga_docker_out/$(DEB_JAMMY) release/
-
 DEB_NOBLE := quadriga-lib_$(QUADRIGA_VERSION)-1+noble_amd64.deb
 release/$(DEB_NOBLE):
 	mkdir -p release
@@ -277,12 +272,11 @@ release/$(DEB_RECOLUTE):
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-resolute
 	cp /tmp/quadriga_docker_out/$(DEB_RECOLUTE) release/
 
-deb-jammy:  release/$(DEB_JAMMY)
 deb-noble:  release/$(DEB_NOBLE)
 deb-resolute: release/$(DEB_RECOLUTE)
 
 deb: 
-	$(MAKE) -j deb-jammy deb-noble deb-resolute
+	$(MAKE) -j deb-noble deb-resolute
 
 # Release
 release:

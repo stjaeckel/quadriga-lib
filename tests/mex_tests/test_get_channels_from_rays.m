@@ -24,12 +24,12 @@ assertEqual( ch(1).center_freq, 2e9 );
 assertEqual( ch(5).center_freq, 3.5e9 );
 assertEqual( ch(2).tx_pos, [ 1000; 0; 25 ] );
 assertEqual( ch(3).rx_pos, [ 900; 0; 1.5 ] );
-n_path = size( ch(1).coeff_re, 3 );
-assertEqual( size( ch(1).coeff_re ), [ 2, 2, n_path ] );                        % the generic antenna has two ports; 1 snapshot
+n_path = size( ch(1).coeff, 3 );
+assertEqual( size( ch(1).coeff ), [ 2, 2, n_path ] );                        % the generic antenna has two ports; 1 snapshot
 assertEqual( size( ch(1).delay ), [ 2, 2, n_path ] );
 assertFalse( isfield( ch, 'path_gain' ) );                                      % taps
 assertEqual( ch(1).delay(1, 1, 1), 0 );                                         % the LOS tap is the delay reference
-assertTrue( any( ch(1).delay(:) > 0 ) && all( isfinite( ch(1).coeff_re(:) ) ) );
+assertTrue( any( ch(1).delay(:) > 0 ) && all( isfinite( ch(1).coeff(:) ) ) );
 
 %% Rays and taps of one call are those of the single call of all stages
 [ ch2, index2 ] = quadriga_lib.get_channels_layout( L2 );
@@ -43,26 +43,26 @@ assertEqual( index, uint64( [ 1, 2, 1, 2; 1, 1, 1, 1; 1, 1, 2, 2 ] ) );
 ch = quadriga_lib.get_channels_from_rays( L2, rays([ 3, 1 ]), [ 3, 1 ] );              % links in another order: the channels follow the nodes
 assertEqual( { ch.name }, { 'A_U1', 'A_U2', 'A_U1', 'A_U2' } );
 ch = quadriga_lib.get_channels_from_rays( L2, rays, [], [ 0, 1, 2 ] );                % U1 moves 2 m/s north: positions at 0, 1, 2 s
-assertEqual( size( ch(1).coeff_re, 4 ), 3 );
+assertEqual( size( ch(1).coeff, 4 ), 3 );
 assertElementsAlmostEqual( ch(1).rx_pos, [ 100, 100, 100; 0, 2, 4; 1.5, 1.5, 1.5 ], 'absolute', 1e-12 );
 assertEqual( ch(3).rx_pos, repmat( [ 900; 0; 1.5 ], 1, 3 ) );                    % a static terminal is repeated
 ch = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'rays' );
 assertTrue( isfield( ch, 'path_gain' ) );
-assertEqual( size( ch(1).path_gain, 1 ), size( ch(1).coeff_re, 3 ) );
+assertEqual( size( ch(1).path_gain, 1 ), size( ch(1).coeff, 3 ) );
 rs = quadriga_lib.generate_rays( L2, [], true );
 chd = quadriga_lib.get_channels_from_rays( L2, rs, [], [ 0, 1, 2 ], 'taps', 'drift' );  % needs the scatterers
-assertEqual( size( chd(1).coeff_re, 4 ), 3 );
+assertEqual( size( chd(1).coeff, 4 ), 3 );
 chp = quadriga_lib.get_channels_from_rays( L2, rs, [], [ 0, 1, 2 ], 'taps', 'phase' );
-assertEqual( size( chp(1).coeff_re ), size( chd(1).coeff_re ) );
+assertEqual( size( chp(1).coeff ), size( chd(1).coeff ) );
 cho = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', true );   % oxygen absorption
-assertEqual( size( cho(1).coeff_re ), [ 2, 2, n_path ] );
+assertEqual( size( cho(1).coeff ), [ 2, 2, n_path ] );
 cha = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, true );   % LOS delay in all delays
 dist = sqrt( 100^2 + 23.5^2 );
 assertElementsAlmostEqual( cha(1).delay(1, 1, 1), dist / 299792458, 'absolute', 1e-15 );
 chv = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, false, 0.2 );   % overlap
 assertEqual( size( chv ), [ 1, 8 ] );
 chg = quadriga_lib.get_channels_from_rays( L2, rays, [], [], 'taps', 'auto', false, false, 0.5, false );   % without link gain: far more power
-assertTrue( sum( chg(1).coeff_re(:).^2 + chg(1).coeff_im(:).^2 ) > 1e4 * sum( ch2(1).coeff_re(:).^2 + ch2(1).coeff_im(:).^2 ) );
+assertTrue( sum( abs( chg(1).coeff(:) ).^2 ) > 1e4 * sum( abs( ch2(1).coeff(:) ).^2 ) );
 assertTrue( isequaln( quadriga_lib.get_channels_layout( L2, [], 'taps', '', 'auto', 0.5, -1, {}, false ), chg ) );
 L2p = L2;
 L2p.pairing = [ 2; 1 ];                                                         % only the pair (site B, terminal U1): 1-based
@@ -86,7 +86,7 @@ assertTrue( isequaln( chn, ch2 ) );
 %% Type handling: int32 links, single times as a column, rays with single entries
 ch = quadriga_lib.get_channels_from_rays( L2, rays(1:2), int32( [ 1; 2 ] ), single( [ 0; 1; 2 ] ) );
 assertEqual( size( ch ), [ 1, 4 ] );
-assertEqual( size( ch(1).coeff_re, 4 ), 3 );
+assertEqual( size( ch(1).coeff, 4 ), 3 );
 rsg = rays;
 rsg{1}(1).power = single( rsg{1}(1).power );
 rsg{1}(1).path_type = int8( rsg{1}(1).path_type );

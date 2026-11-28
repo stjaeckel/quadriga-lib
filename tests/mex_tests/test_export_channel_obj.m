@@ -10,7 +10,7 @@ fn = 'test.obj';
 if exist( fn,'file' ), delete(fn); end
 if exist( 'test.mtl','file' ), delete('test.mtl'); end
 
-chan = struct( 'rx_pos', rand(3,1), 'tx_pos', rand(3,1), 'coeff_re', rand(3,2,5,3), 'coeff_im', rand(3,2,5,3), ...
+chan = struct( 'rx_pos', rand(3,1), 'tx_pos', rand(3,1), 'coeff', complex(rand(3,2,5,3), rand(3,2,5,3)), ...
     'delay', zeros(3,2,5,3), 'n_interact', ones(5,3), 'interact_coord', rand(3,5,3), 'center_freq', 3.0e9 );
 
 quadriga_lib.export_channel_obj( fn, chan );
@@ -80,7 +80,7 @@ c = chan; c.n_interact = -c.n_interact;
 assert_cpp_error( @() quadriga_lib.export_channel_obj( fn, c ), 'must be integers from 0 to 4294967295.' );
 c = chan; c.n_interact = sparse(c.n_interact);
 assert_cpp_error( @() quadriga_lib.export_channel_obj( fn, c ), 'is sparse' );
-c = chan; c.coeff_re = ones(3,2,5,1,3);
+c = chan; c.coeff = ones(3,2,5,1,3);
 assert_cpp_error( @() quadriga_lib.export_channel_obj( fn, c ), 'has more than 4 dimensions' );
 
 if exist( fn,'file' ), delete(fn); end

@@ -13,7 +13,7 @@ dl = rand(2, 2, 3, 1) * 100e-9;
 
 % Invalid tap_spacing
 try
-    quadriga_lib.quantize_delays(cre, cim, dl, 0.0);
+    quadriga_lib.quantize_delays(complex(cre, cim), dl, 0.0);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'tap_spacing';
@@ -24,7 +24,7 @@ end
 
 % Invalid fix_taps
 try
-    quadriga_lib.quantize_delays(cre, cim, dl, 5e-9, 48, 1.0, -1);
+    quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9, 48, 1.0, -1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'fix_taps';
@@ -37,7 +37,7 @@ end
 dl_nan = dl;
 dl_nan(1,2,2,1) = NaN;
 try
-    quadriga_lib.quantize_delays(cre, cim, dl_nan, 5e-9);
+    quadriga_lib.quantize_delays(complex(cre, cim), dl_nan, 5e-9);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'NaN or Inf';
@@ -54,7 +54,8 @@ cre(1,1,1,1) = 2.0;
 cim(1,1,1,1) = 3.0;
 dl(1,1,1,1) = 15e-9;
 
-[cre_q, cim_q, dl_q] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9);
+[c_q, dl_q] = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9);
+cre_q = real(c_q); cim_q = imag(c_q);
 
 found = false;
 for k = 1:size(cre_q, 3)
@@ -74,7 +75,8 @@ dl = zeros(1, 1, 1, 1);
 cre(1,1,1,1) = 4.0;
 dl(1,1,1,1) = 12.5e-9;
 
-[cre_q, ~, ~] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9, 48, 1.0);
+c_q = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9, 48, 1.0);
+cre_q = real(c_q);
 
 n_nonzero = 0;
 sum_re = 0;
@@ -96,7 +98,8 @@ dl = zeros(1, 1, 1, 1);
 cre(1,1,1,1) = 4.0;
 dl(1,1,1,1) = 12.5e-9;
 
-[cre_q, ~, ~] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9, 48, 0.5);
+c_q = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9, 48, 0.5);
+cre_q = real(c_q);
 
 expected_coeff = sqrt(0.5) * 4.0;
 sum_power = 0;
@@ -120,7 +123,8 @@ cre(1,1,1,1) = 1.0; cim(1,1,1,1) = 0.5; dl(1,1,1,1) = 0.0;
 cre(1,1,2,1) = 2.0; cim(1,1,2,1) = 1.0; dl(1,1,2,1) = 5e-9;
 cre(1,1,3,1) = 0.5; cim(1,1,3,1) = 0.3; dl(1,1,3,1) = 20e-9;
 
-[cre_q, cim_q, dl_q] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9);
+[c_q, dl_q] = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9);
+cre_q = real(c_q); cim_q = imag(c_q);
 
 for k = 1:size(cre_q, 3)
     d = dl_q(1,1,k,1);
@@ -148,7 +152,8 @@ cre(1,1,3,1) = 3.0; dl(1,1,3,1) = 10e-9;
 cre(1,1,4,1) = 0.5; dl(1,1,4,1) = 15e-9;
 cre(1,1,5,1) = 4.0; dl(1,1,5,1) = 20e-9;
 
-[cre_q, ~, ~] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9, 3);
+c_q = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9, 3);
+cre_q = real(c_q);
 
 n_nonzero = 0;
 for k = 1:size(cre_q, 3)
@@ -167,7 +172,7 @@ dl4(1,1,1,:) = 0.0;
 dl4(1,1,2,:) = 12.5e-9;
 dl4(1,1,3,:) = 30e-9;
 
-[~, ~, dl_q] = quadriga_lib.quantize_delays(cre4, cim4, dl4, 5e-9, 48, 1.0, 2);
+[~, dl_q] = quadriga_lib.quantize_delays(complex(cre4, cim4), dl4, 5e-9, 48, 1.0, 2);
 
 assertEqual(size(dl_q, 1), 1);
 assertEqual(size(dl_q, 2), 1);
@@ -179,7 +184,7 @@ dl4 = zeros(1, 1, 2, 1);
 dl4(1,1,1,1) = 0.0;
 dl4(1,1,2,1) = 17.5e-9;
 
-[~, ~, dl_q] = quadriga_lib.quantize_delays(cre4, cim4, dl4, 5e-9, 48, 1.0, 0);
+[~, dl_q] = quadriga_lib.quantize_delays(complex(cre4, cim4), dl4, 5e-9, 48, 1.0, 0);
 
 assertEqual(size(dl_q, 1), 2);
 assertEqual(size(dl_q, 2), 2);
@@ -193,7 +198,7 @@ dl4(1,1,2,:) = 12.5e-9;
 dl4(2,1,1,:) = 5e-9;
 dl4(2,1,2,:) = 27.5e-9;
 
-[~, ~, dl_q] = quadriga_lib.quantize_delays(cre4, cim4, dl4, 5e-9, 48, 1.0, 1);
+[~, dl_q] = quadriga_lib.quantize_delays(complex(cre4, cim4), dl4, 5e-9, 48, 1.0, 1);
 
 assertEqual(size(dl_q, 4), 2);
 n_taps = size(dl_q, 3);
@@ -208,7 +213,8 @@ dl = zeros(1, 1, 2, 1);
 cre(1,1,1,1) = 1.0; dl(1,1,1,1) = 10e-9;
 cre(1,1,2,1) = 2.0; dl(1,1,2,1) = 10e-9;
 
-[cre_q, ~, dl_q] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9);
+[c_q, dl_q] = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9);
+cre_q = real(c_q);
 
 found = false;
 for k = 1:size(cre_q, 3)
@@ -226,7 +232,8 @@ dl = zeros(1, 1, 1, 1);
 cre(1,1,1,1) = 1.0;
 cim(1,1,1,1) = -1.0;
 
-[cre_q, cim_q, dl_q] = quadriga_lib.quantize_delays(cre, cim, dl, 5e-9);
+[c_q, dl_q] = quadriga_lib.quantize_delays(complex(cre, cim), dl, 5e-9);
+cre_q = real(c_q); cim_q = imag(c_q);
 
 assertElementsAlmostEqual(cre_q(1,1,1,1), 1.0, 'absolute', 1e-12);
 assertElementsAlmostEqual(cim_q(1,1,1,1), -1.0, 'absolute', 1e-12);

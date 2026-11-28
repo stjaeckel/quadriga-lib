@@ -19,12 +19,11 @@ rnd = zeros( 3, 11 );
 rnd(:, 10) = 0.5;                                                              % medium ground
 
 %% Basic call, all outputs
-[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ...
+[ lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma ] = ...
     quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd );
 assertEqual( size(lsp), [3, 2, 8] );
 assertEqual( size(abs_toa), [3, 1] );
-assertEqual( size(gr_eps_re), [3, 2] );
-assertEqual( size(gr_eps_im), [3, 2] );
+assertEqual( size(gr_eps), [3, 2] );
 assertEqual( size(eod_offset_deg), [3, 2] );
 assertEqual( size(lsp_mu), [3, 2, 8] );
 assertEqual( size(lsp_sigma), [3, 2, 8] );
@@ -39,8 +38,8 @@ assertTrue( abs( lsp_sigma(1, 1, 3) - 4 ) < 1e-12 );                           %
 
 % Column 10 of rnd (0.5) is the medium ground: 30.4·f^-0.47 + j·0.18·f^1.05, f in GHz
 f = repmat( fc / 1e9, 3, 1 );
-assertElementsAlmostEqual( gr_eps_re, 30.4 * f.^-0.47, 'relative', 1e-12 );
-assertElementsAlmostEqual( gr_eps_im, 0.18 * f.^1.05, 'relative', 1e-12 );
+assertElementsAlmostEqual( real(gr_eps), 30.4 * f.^-0.47, 'relative', 1e-12 );
+assertElementsAlmostEqual( imag(gr_eps), 0.18 * f.^1.05, 'relative', 1e-12 );
 
 % Column 9 of rnd is the absolute TOA (UMa NLOS: absTOA_mu = -7.4, no bound); LOS: disabled
 assertEqual( abs_toa, zeros(3, 1) );
@@ -51,13 +50,13 @@ absTOA_sigma = sp_nlos.absTOA_sigma;
 assertElementsAlmostEqual( toa, 10.^( -7.4 + absTOA_sigma * [ 0; 1; -1 ] ), 'relative', 1e-12 );
 
 %% Optional inputs: sf_sigma_dB
-[ lsp2, ~, ~, ~, ~, ~, sig2 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, [] );
+[ lsp2, ~, ~, ~, ~, sig2 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, [] );
 assertEqual( lsp2, lsp );
 assertEqual( sig2, lsp_sigma );
 sf_in = [ 1, 2; 3, 4; 5, 6 ];
 rnd_s = rnd;
 rnd_s(:, 3) = 1;                                                               % SF value passed through
-[ lsp3, ~, ~, ~, ~, ~, sig3 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd_s, sf_in );
+[ lsp3, ~, ~, ~, ~, sig3 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd_s, sf_in );
 assertEqual( sig3(:, :, 3), sf_in );                                           % replaces slice 3
 assertEqual( sig3(:, :, [1, 2, 4:8]), lsp_sigma(:, :, [1, 2, 4:8]) );
 assertElementsAlmostEqual( lsp3(:, :, 3), 10.^(0.1 * sf_in), 'relative', 1e-12 );
@@ -83,9 +82,9 @@ lsp_u = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd_a, [], [], false 
 assertTrue( max(max(lsp_u(:, :, 4))) > 104 );
 
 %% scenpar: DS_VS changes the InF delay spread by lg(a·V/S + b); [] = defaults
-[ ~, ~, ~, ~, ~, mu_4 ] = quadriga_lib.lsp_generate( sp_inf, fc, tx_pos, rx_pos, rnd );
+[ ~, ~, ~, ~, mu_4 ] = quadriga_lib.lsp_generate( sp_inf, fc, tx_pos, rx_pos, rnd );
 sp_inf.DS_VS = 10;
-[ lsp_10, ~, ~, ~, ~, mu_10 ] = quadriga_lib.lsp_generate( sp_inf, fc, tx_pos, rx_pos, rnd );
+[ lsp_10, ~, ~, ~, mu_10 ] = quadriga_lib.lsp_generate( sp_inf, fc, tx_pos, rx_pos, rnd );
 assertElementsAlmostEqual( mu_10(:, :, 1) - mu_4(:, :, 1), log10( (30 * 10 + 32) / (30 * 4 + 32) ) * ones(3, 2), ...
     'absolute', 1e-12 );
 assertElementsAlmostEqual( lsp_10(:, :, 1), 10.^mu_10(:, :, 1), 'relative', 1e-12 );
@@ -94,7 +93,7 @@ assertEqual( size( quadriga_lib.lsp_generate( [], fc, tx_pos, rx_pos, rnd ) ), [
 %% Outputs: none and fewer; column 10 of rnd is checked only when the permittivity is requested
 quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd );
 assertEqual( quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd ), lsp );
-[ ~, ~, ~, ~, eod5 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd );
+[ ~, ~, ~, eod5 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd );
 assertEqual( eod5, eod_offset_deg );
 rnd_b = rnd;
 rnd_b(:, 10) = 1.5;
@@ -119,7 +118,7 @@ assertEqual( quadriga_lib.lsp_generate( sp, fc, repmat(tx_pos, 1, 3), rx_pos, rn
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos ), 'Wrong number of input arguments.' );
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, [], true, true, 1 ), ...
     'Wrong number of input arguments.' );
-assert_throws( @() out8( sp, fc, tx_pos, rx_pos, rnd ), 'Wrong number of output arguments.' );
+assert_throws( @() out7( sp, fc, tx_pos, rx_pos, rnd ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd(:, 1:10) ), ...
     'Input ''rnd'' must have size [n_link, 11].' );                                                 % C++
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, -sf_in ), ...
@@ -135,9 +134,9 @@ function out3(varargin)
 [~, ~, ~] = quadriga_lib.lsp_generate( varargin{:} ); %#ok<ASGLU>
 end
 
-% Request 8 outputs so that the output-count guard fires
-function out8(varargin)
-[~, ~, ~, ~, ~, ~, ~, ~] = quadriga_lib.lsp_generate( varargin{:} ); %#ok<ASGLU>
+% Request 7 outputs so that the output-count guard fires
+function out7(varargin)
+[~, ~, ~, ~, ~, ~, ~] = quadriga_lib.lsp_generate( varargin{:} ); %#ok<ASGLU>
 end
 
 % Assert that fn() raises an error whose message contains expected (substring).

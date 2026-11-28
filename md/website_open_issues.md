@@ -17,7 +17,6 @@ The new site is built but not yet deployed; the server still serves the old site
 ## After the merge into `main`
 
 - **Windows.** With the first `nmake release-win` on the `main` checkout: `python docs_builder\build.py docs --check` and `python -m pytest website_builder\tests\docs` must pass, and the zip must contain `docs\quadriga_lib_api_cpp.md`. The docs builder was tested on Linux and on Python 3.10 (Ubuntu 22.04 image) only.
-- **Ubuntu 22.04 package.** The 22.04 deb build fails while linking the test binary (GitHub issue #17); it fails on `main` before the documentation changes too.
 
 ## Follow-ups
 

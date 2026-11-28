@@ -498,11 +498,11 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#interpolate_pattern) 
 ### Usage:
 ```matlab
 % Single-frequency mode
-[ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
+[ V, H, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.interpolate_pattern( ...
     arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
 
 % Multi-frequency mode
-[ V_re, V_im, H_re, H_im ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
+[ V, H ] = quadriga_lib.interpolate_pattern( arrayant, azimuth, elevation, ...
     i_element, orientation, element_pos, freq_new, use_kernel );
 ```
 
@@ -525,9 +525,8 @@ Also in: [C++](../cpp/antennas-transducers-and-patterns.md#interpolate_pattern) 
   2^31 - 1 samples); other values raise an error; default: 0
 
 ### Outputs:
-- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`, multi-frequency mode
-  `[n_out, n_ang, n_freq]`
-- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
+- **`V`** — Complex e-theta (vertical) field; `[n_out, n_ang]`, multi-frequency mode `[n_out, n_ang, n_freq]`
+- **`H`** — Complex e-phi (horizontal) field; same size as `V`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the array; negative for elements
   closer to the source; `[n_out, n_ang]`; single-frequency mode only
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;

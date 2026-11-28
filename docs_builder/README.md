@@ -102,7 +102,7 @@ docs: <N> errors, <M> warnings, <K> gaps
 python3 docs_builder/extract_matlab_comments.py api_mex/<name>.cpp <build folder>/+quadriga_lib/<name>.m
 ```
 
-CMake calls it once per MEX source in the target `mex_documentation` (`CMakeLists.txt`, section "MEX Documentation"; the target exists with `ENABLE_MEX_DOC=ON` and `ENABLE_PYTHON=ON`, because the MATLAB help needs Python). It takes the first `/*!MD` block of the file and prefixes each line with `%`. On every line it replaces `[[name]]` by `name` and `[text](url)` by `text (url)`. The first two lines (name and summary) stay otherwise as written. Fence lines are left out. In headings it removes the `#` characters and `<br>`; in table rows it replaces `*` and backticks by spaces; in all other lines it removes `<br>`, `*` and backticks and replaces a raw `<a href="...">text</a>` by its text. Then it appends the licence text. The result is the MATLAB / Octave `help` text. The script uses only the standard library, runs on Python 3.10 (the Ubuntu 22.04 Debian build) and on Windows, and does not import `qdocs`. Keep it that way.
+CMake calls it once per MEX source in the target `mex_documentation` (`CMakeLists.txt`, section "MEX Documentation"; the target exists with `ENABLE_MEX_DOC=ON` and `ENABLE_PYTHON=ON`, because the MATLAB help needs Python). It takes the first `/*!MD` block of the file and prefixes each line with `%`. On every line it replaces `[[name]]` by `name` and `[text](url)` by `text (url)`. The first two lines (name and summary) stay otherwise as written. Fence lines are left out. In headings it removes the `#` characters and `<br>`; in table rows it replaces `*` and backticks by spaces; in all other lines it removes `<br>`, `*` and backticks and replaces a raw `<a href="...">text</a>` by its text. Then it appends the licence text. The result is the MATLAB / Octave `help` text. The script uses only the standard library, runs on Python 3.10 and on Windows, and does not import `qdocs`. Keep it that way.
 
 ## Content pages
 
@@ -400,7 +400,7 @@ A gap marker marks content that is still missing or a draft that waits for appro
 | Release path | Check |
 |--------------|-------|
 | `make release` | First refuses any uncommitted change to a tracked file and any new file in `docs/`, then runs `python3 docs_builder/build.py docs --check`, then makes the source zip, the Debian packages and the pip packages. |
-| Debian build (`Dockerfile.ubuntu`, also `make deb-jammy` and the others on their own) | `RUN python3 docs_builder/build.py docs --check` right after copying the tree, before the long compile. |
+| Debian build (`Dockerfile.ubuntu`, also `make deb-noble` and the others on their own) | `RUN python3 docs_builder/build.py docs --check` right after copying the tree, before the long compile. |
 | `nmake release-win` (`Makefile`) | First command: `python docs_builder\build.py docs --check`. The Windows build machine needs Python on `PATH`. |
 
 The packages carry `docs/`: the system install (`cmake --install` with a prefix) puts it into `share/doc/quadriga-lib/`, the Debian package keeps the `.md` files and `llms.txt` uncompressed (`dh_compress -X.md -Xllms.txt` in `debian/rules`, so the relative links work), and the Windows zip has a `docs\` folder. The source zip (`git archive`) contains `docs/` and `docs_builder/` (what it leaves out is described in the [website README](../website_builder/README.md)).

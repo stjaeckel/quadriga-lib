@@ -25,7 +25,7 @@ assertEqual( size(r.fbs_pos), [3, n_ray] );
 assertEqual( size(r.lbs_pos), [3, n_ray] );
 assertEqual( size(r.fallback), [n_ray, 1] );
 assertTrue( isa(r.fallback, 'uint32') && all( r.fallback <= 1 ) && any( r.fallback == 0 ) );
-for f = fields( 1 : 15 )
+for f = fields( 1 : 14 )
     assertEqual( r.(f{1}), rays(1).(f{1}) );
 end
 assertElementsAlmostEqual( r.fbs_pos(:, 1), ( rays(1).tx_pos + rays(1).rx_pos ) / 2, 'absolute', 1e-12 ); % LOS
@@ -73,12 +73,12 @@ assertEqual( m1, b_med );
 assertEqual( e2, b_eff );
 
 %% Type handling: optional fields missing, integer fields of another class
-s = rmfield( rays(1), { 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' } );
+s = rmfield( rays(1), { 'gr_eps', 'fbs_pos', 'lbs_pos', 'fallback' } );
 s.path_type = double( s.path_type );
 s.tap = int32( s.tap );
 rs = quadriga_lib.ssf_scatterers( s, single(2) );
 assertEqual( fieldnames(rs)', fields );                                       % all fields on output
-assertTrue( isempty(rs.gr_eps_re) && isempty(rs.gr_eps_im) );
+assertTrue( isempty(rs.gr_eps) );
 assertEqual( rs.fbs_pos, r.fbs_pos );
 assertEqual( rs.path_type, double( r.path_type ) );                           % copied as given
 s = r;
@@ -94,12 +94,16 @@ rs = quadriga_lib.ssf_scatterers( s );
 assertTrue( islogical(rs.tap) );
 assertEqual( rs.tap, s.tap );
 s = rays(1);                                                                  % empty cell or struct: empty
-s.gr_eps_re = cell( 0, 1 );
-s.gr_eps_im = struct( [] );
+s.gr_eps = cell( 0, 1 );
 rs = quadriga_lib.ssf_scatterers( s );
 assertEqual( rs.fbs_pos, r.fbs_pos );
-assertEqual( { class(rs.gr_eps_re), size(rs.gr_eps_re), class(rs.gr_eps_im), size(rs.gr_eps_im) }, ...
-    { 'double', [0, 1], 'double', [0, 0] } );
+assertEqual( { class(rs.gr_eps), size(rs.gr_eps) }, { 'double', [0, 1] } );
+s.gr_eps = struct( [] );
+rs = quadriga_lib.ssf_scatterers( s );
+assertEqual( { class(rs.gr_eps), size(rs.gr_eps) }, { 'double', [0, 0] } );
+s.gr_eps = complex( 5 + (1 : numel(s.center_freq))', 0.5 * ones(numel(s.center_freq), 1) );     % complex: copied
+rs = quadriga_lib.ssf_scatterers( s );
+assertEqual( rs.gr_eps, s.gr_eps );
 
 %% Errors
 assert_throws( @() quadriga_lib.ssf_scatterers(), 'Wrong number of input arguments.' );
@@ -112,6 +116,9 @@ assert_throws( @() quadriga_lib.ssf_scatterers( rmfield( rays(1), 'delay' ) ), .
 s = rays(1);
 s.foo = 1;
 assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Unknown field ''foo'' in ''rays''.' );
+s = rays(1);
+s.gr_eps_re = 1; % The split fields of earlier versions are refused
+assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Unknown field ''gr_eps_re'' in ''rays''.' );
 s = rays(1);
 s.method = 1;
 assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Field ''method'' of ''rays'' must be a string.' );
@@ -129,7 +136,7 @@ end
 % 'quadriga' rays of a set of links
 function rays = make_rays( sp, tx_pos, rx_pos, fc )
 phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', 3 );
-[ lsp, abs_toa, ~, ~, eod_off, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
+[ lsp, abs_toa, ~, eod_off, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
     quadriga_lib.gbsm_draw( sp, 'lsf', phase, tx_pos, rx_pos ) );
 rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 3 ), tx_pos, rx_pos );
 [ d, p, aod, eod, aoa, eoa ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], ...

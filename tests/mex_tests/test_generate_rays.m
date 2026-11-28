@@ -14,7 +14,7 @@ cleanup = onCleanup( @() delete_files( { fn_tx, fn_rx } ) ); %#ok<NASGU>
 L = make_layout( fn_tx, fn_rx, [ 2e9, 3.5e9 ] );
 L2 = quadriga_lib.init_link_states( L, '38.901', [], false, 2e9, '', 5 );
 fields = { 'method', 'tx_pos', 'rx_pos', 'center_freq', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', 'polmat', 'path_type', 'tap', ...
-    'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
+    'gr_eps', 'fbs_pos', 'lbs_pos', 'fallback' };
 
 %% Basic call: a cell per link with a struct array of one entry per band (TR methods)
 rays = quadriga_lib.generate_rays( L2 );

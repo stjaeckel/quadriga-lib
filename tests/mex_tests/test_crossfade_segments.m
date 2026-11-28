@@ -17,8 +17,8 @@ par = struct( 'tap', { uint32( 0 ), uint32( 0 ) } );                           %
 %% Basic call: one LOS path with |h|^2 = 4^w in the ramp
 out = quadriga_lib.crossfade_segments( seg, n_overlap, 'rays', par );
 assertEqual( numel( out ), 1 );
-assertEqual( size( out.coeff_re ), [ 1, 1, 1, 6 ] );                            % 4 + (4 - 2) snapshots
-amp = squeeze( abs( out.coeff_re + 1i * out.coeff_im ) )';
+assertEqual( size( out.coeff ), [ 1, 1, 1, 6 ] );                            % 4 + (4 - 2) snapshots
+amp = squeeze( abs( out.coeff ) )';
 assertElementsAlmostEqual( amp, [ 1, 1, 4^0.125, 4^0.375, 2, 2 ], 'absolute', 1e-12 );
 assertElementsAlmostEqual( out.path_gain, [ 1, 1, 4^0.25, 4^0.75, 4, 4 ], 'absolute', 1e-12 );
 assertEqual( size( out.rx_pos ), [ 3, 6 ] );
@@ -28,32 +28,32 @@ assertEqual( out.center_freq, 3.5e9 );
 %% Optional inputs: output (default 'taps') and par (without it both paths are NLOS clusters, side by side in the ramp)
 out = quadriga_lib.crossfade_segments( seg, n_overlap, [], par );
 assertTrue( ~isfield( out, 'path_gain' ) || isempty( out.path_gain ) );
-amp = squeeze( abs( out.coeff_re + 1i * out.coeff_im ) )';
+amp = squeeze( abs( out.coeff ) )';
 assertElementsAlmostEqual( amp, [ 1, 1, 4^0.125, 4^0.375, 2, 2 ], 'absolute', 1e-12 );
 assertEqual( quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', par ), out );
 out = quadriga_lib.crossfade_segments( seg, n_overlap );
-assertEqual( size( out.coeff_re ), [ 1, 1, 2, 6 ] );
-power = squeeze( abs( out.coeff_re + 1i * out.coeff_im ).^2 );               % [path, snapshot]
+assertEqual( size( out.coeff ), [ 1, 1, 2, 6 ] );
+power = squeeze( abs( out.coeff ).^2 );               % [path, snapshot]
 assertElementsAlmostEqual( sum( power, 1 ), [ 1, 1, 4^0.25, 4^0.75, 4, 4 ], 'absolute', 1e-12 );   % the same total power as one path
 out = quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', [] );
-assertEqual( size( out.coeff_re, 3 ), 2 );
+assertEqual( size( out.coeff, 3 ), 2 );
 
 %% path_type: a single path of tap index 3 is a GR path for the tap rule (merged); path_type 2 makes it NLOS
 out = quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', struct( 'tap', { uint32( 3 ), uint32( 3 ) } ) );
-assertEqual( size( out.coeff_re, 3 ), 1 );
+assertEqual( size( out.coeff, 3 ), 1 );
 out = quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', struct( 'tap', { uint32( 3 ), uint32( 3 ) }, 'path_type', { uint32( 2 ), uint32( 2 ) } ) );
-assertEqual( size( out.coeff_re, 3 ), 2 );
+assertEqual( size( out.coeff, 3 ), 2 );
 out = quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', struct( 'path_type', { 0, 0 } ) );   % path_type alone: both LOS
-assertEqual( size( out.coeff_re, 3 ), 1 );
+assertEqual( size( out.coeff, 3 ), 1 );
 assert_throws( @() quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', struct( 'tap', { 0, 0 }, 'path_type', { 5, 2 } ) ), 'path_type' );   % C++
 
 %% Outputs: none
 quadriga_lib.crossfade_segments( seg, n_overlap, 'taps', par );
-assertEqual( size( ans.coeff_re ), [ 1, 1, 1, 6 ] );
+assertEqual( size( ans.coeff ), [ 1, 1, 1, 6 ] );
 
 %% Type handling: uint8 and column n_overlap, tap indices as double, a cluster field
 out = quadriga_lib.crossfade_segments( seg, uint8( [ 0; 2 ] ), 'rays', struct( 'tap', { 0, 0 }, 'cluster', { 0, 0 } ) );
-amp = squeeze( abs( out.coeff_re + 1i * out.coeff_im ) )';
+amp = squeeze( abs( out.coeff ) )';
 assertElementsAlmostEqual( amp, [ 1, 1, 4^0.125, 4^0.375, 2, 2 ], 'absolute', 1e-12 );
 
 %% n_overlap omitted: the 2 shared snapshots follow from the Rx positions; ends that do not move need n_overlap
@@ -83,8 +83,7 @@ function s = segment(amp, n_snap, x0)
 s.name = 'seg';
 s.tx_pos = [ 0; 0; 10 ];
 s.rx_pos = [ x0 + ( 0 : n_snap - 1 ); zeros( 1, n_snap ); 1.5 * ones( 1, n_snap ) ];
-s.coeff_re = reshape( amp * ones( 1, n_snap ), 1, 1, 1, n_snap );
-s.coeff_im = zeros( 1, 1, 1, n_snap );
+s.coeff = reshape( amp * ones( 1, n_snap ), 1, 1, 1, n_snap );            % real: imaginary part 0
 s.delay = 1e-7 * ones( 1, 1, 1, n_snap );
 s.path_gain = amp^2 * ones( 1, n_snap );
 s.center_freq = 3.5e9;

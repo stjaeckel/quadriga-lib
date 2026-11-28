@@ -70,15 +70,15 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | `polmat` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | yes |
 | `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
 | `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
-| `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |
+| `gr_eps` | `[n_freq, 1]` or empty | complex double | Ground permittivity, used as `conj(gr_eps)`; needed where a GR ray is recomputed | no |
 | `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | double | First- and last-bounce scatterer positions in [m] | no |
 | `fallback` | `[n_ray, 1]` or empty | uint32 | 1 = ray lengthened by the solver fallback | no |
 
 ## Usage:
 ```
 rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, ...
-    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, ...
-    gr_eps_im, pol_variability, random_phase );
+    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, ...
+    pol_variability, random_phase );
 ```
 
 ## Inputs:
@@ -97,8 +97,8 @@ rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu,
 - **`method`** — Method of [[ssf_clusters]]: `'38.901'`, `'38.901_MF'` or `'quadriga'`; default: `'38.901'`
 - **`i_freq`** — TR methods: index into `center_freq`, 1-based; `'quadriga'`: must be 1; default: 1
 - **`angle_model`**, **`pol_model`** — See the option table; default: `'additive'`, `'38.901'`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [[lsp_generate]]; required if
-  `GR_enabled`, else ignored; `[n_link, n_freq]`
+- **`gr_eps`** *(optional)* — Complex ground permittivity from [[lsp_generate]]; required if `GR_enabled`, else
+  ignored; `[n_link, n_freq]`
 - **`pol_variability`** — TR 7.6.16 polarization power variability, see the option table; default: `false`
 - **`random_phase`** — `false`: all initial phases 0; default: `true`
 
@@ -115,7 +115,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 14 || nrhs > 22)
+    if (nrhs < 14 || nrhs > 21)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -138,10 +138,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword i_freq = (nrhs < 16) ? 0 : qd_mex_get_index(prhs[15], "i_freq"); // 1-based -> 0-based
     const std::string angle_model = (nrhs < 17) ? std::string("additive") : qd_mex_get_string(prhs[16], "additive", "angle_model");
     const std::string pol_model = (nrhs < 18) ? std::string("38.901") : qd_mex_get_string(prhs[17], "38.901", "pol_model");
-    const arma::mat gr_eps_re = (nrhs < 19) ? arma::mat() : qd_mex_get_Mat<double>(prhs[18], false, "gr_eps_re");
-    const arma::mat gr_eps_im = (nrhs < 20) ? arma::mat() : qd_mex_get_Mat<double>(prhs[19], false, "gr_eps_im");
-    const bool pol_variability = (nrhs < 21) ? false : qd_mex_get_scalar<bool>(prhs[20], "pol_variability", false);
-    const bool random_phase = (nrhs < 22) ? true : qd_mex_get_scalar<bool>(prhs[21], "random_phase", true);
+    arma::mat gr_eps_re, gr_eps_im;
+    if (nrhs > 18)
+        qd_mex_get_complex_Mat<double>(prhs[18], "gr_eps", gr_eps_re, gr_eps_im);
+    const bool pol_variability = (nrhs < 20) ? false : qd_mex_get_scalar<bool>(prhs[19], "pol_variability", false);
+    const bool random_phase = (nrhs < 21) ? true : qd_mex_get_scalar<bool>(prhs[20], "random_phase", true);
 
 
     // Output struct array in MATLAB memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the
@@ -169,7 +170,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                    eod, aoa, eoa, rnd_ray, rays, method, i_freq, angle_model, pol_model, gr_eps_re,
                                    gr_eps_im, pol_variability, random_phase));
 
-    // The method string cannot be aliased
+    // The method string and the complex 'gr_eps' cannot be aliased
     for (size_t l = 0; l < rays.size(); ++l)
         mxSetField(plhs[0], (mwIndex)l, "method", mxCreateString(rays[l].method.c_str()));
+    qd_mex_set_gbsm_rays_gr_eps(plhs[0], rays);
 }

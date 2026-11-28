@@ -19,7 +19,7 @@ and show the paths in 3D. The channels themselves come from the functions of sec
 **What a channel holds** (a struct, fields in [[hdf5_read_channel]]):
 
 - The positions and orientations of the transmitter and the receiver, per snapshot or fixed
-- The **coefficients** `coeff_re` / `coeff_im` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
+- The complex **coefficients** `coeff` and the **delays** `delay`, `[n_rx, n_tx, n_path, n_snap]`
 - Optionally, antenna-independent path data: path gain, path length, polarization transfer matrix, angles, scatterer
   positions and the interaction points of ray-traced paths
 - Unstructured metadata: named values of any type
@@ -112,7 +112,7 @@ Read channel objects from one or several slots of an HDF5 channel file
   | `name` | Channel name | char |
   | `tx_pos`, `rx_pos` | Tx and Rx positions in m | `[3, 1]` (fixed) or `[3, n_snap]` |
   | `tx_orientation`, `rx_orientation` | Tx and Rx orientations (bank, tilt, heading) in rad | `[3, 1]` (fixed) or `[3, n_snap]` |
-  | `coeff_re`, `coeff_im` | Coefficients, real and imaginary part | `[n_rx, n_tx, n_path, n_snap]` |
+  | `coeff` | Complex coefficients | `[n_rx, n_tx, n_path, n_snap]` |
   | `delay` | Delays in s | `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]` |
   | `path_gain` | Path gain without antennas, linear | `[n_path, n_snap]` |
   | `path_length` | Path length in m | `[n_path, n_snap]` |

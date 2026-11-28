@@ -64,7 +64,7 @@ messages pass through, also for fields the function does not use. A field `Subpa
 
 | Method | Random sets (`set_id`) | Calls in step 5 |
 | --- | --- | --- |
-| `'38.901'` | `'lsf'`; `'cluster'` 0 and one per frequency; `'ray'` one per frequency | per frequency `k`: [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) (`i_freq = 1`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
+| `'38.901'` | `'lsf'`; `'cluster'` 0 and one per frequency; `'ray'` one per frequency | per frequency `k`: [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) (`i_freq = 1`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps`) |
 | `'38.901_MF'` | as `'38.901'` | [lsp_generate](#lsp_generate) at the anchor frequency with the same `rnd` gives `lsp_anchor`; [ssf_clusters](#ssf_clusters) once; [ssf_rays](#ssf_rays) per frequency `k` with `i_freq = k` |
 | `'quadriga'` | `'lsf'`; `'cluster'` 0; `'ray'` 0 | [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) once for all frequencies |
 
@@ -431,7 +431,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_rays_from_paths) �
 ### Usage:
 ```matlab
 rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, ...
-    path_length, polmat, method, path_type, tap, gr_eps_re, gr_eps_im );
+    path_length, polmat, method, path_type, tap, gr_eps );
 ```
 
 ### Inputs:
@@ -445,7 +445,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
   without a GR path)
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; needed only where a GR ray is
+- **`gr_eps`** *(optional)* — Complex ground permittivity, used as `conj(gr_eps)`; needed only where a GR ray is
   recomputed, i.e. in the mobility `drift` at moved ends; `[n_freq]`
 
 ### Output:
@@ -515,7 +515,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 ### Outputs:
 - **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel): `center_freq` scalar;
   `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
-  `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
+  `coeff`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
   (`'rays'`); `'rays'` also `path_gain`, `path_length`, `polmat`, `path_angles` and in `'drift'`
   `fbs_pos`, `lbs_pos`
 - **`par`** — Struct with the fields below
@@ -643,7 +643,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [Pytho
 
 ### Usage:
 ```matlab
-[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
+[ lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
     quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, ...
     clip_spreads );
 ```
@@ -667,8 +667,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [Pytho
 - **`lsp`** — Large-scale parameters; slices: 1 DS in [s]; 2 KF, 3 SF and 8 XPR linear; 4 ASD, 5 ASA, 6 ESD,
   7 ESA in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** — Absolute TOA offset in [s], 0 if not active; `[n_link, 1]`
-- **`gr_eps_re`**, **`gr_eps_im`** — Relative permittivity of the ground, real part and imaginary part >= 0; the
-  complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
+- **`gr_eps`** — Complex relative permittivity of the ground, imaginary part >= 0; the complex value of TR 38.901
+  eq. (7.6-40) is `conj(gr_eps)`; `[n_link, n_freq]`
 - **`eod_offset_deg`** — EoD offset in [deg], positive = up; `[n_link, n_freq]`
 - **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the angular
   spreads, [dB] for KF, SF and XPR; required by [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
@@ -911,8 +911,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_clusters) · [Pytho
 ### Usage:
 ```matlab
 [ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, ...
-    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, ...
-    o2i, n_cluster );
+    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster );
 ```
 
 ### Inputs:
@@ -933,8 +932,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_clusters) · [Pytho
   scenarios; `[n_link, n_freq]`; default: 0
 - **`abs_toa`** — Absolute TOA offset in [s] from [lsp_generate](#lsp_generate), >= 0; required by `'quadriga'` in NLOS scenarios
   with `absTOA_mu > -30`; `[n_link]`; default: no offset
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im` from [lsp_generate](#lsp_generate),
-  real part >= 1, imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
+- **`gr_eps`** *(optional)* — Complex ground permittivity from [lsp_generate](#lsp_generate), used as `conj(gr_eps)`, real part >= 1,
+  imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
 - **`o2i`** — O2I flag per link (mean arrival elevation 0), logical or numeric; used by `'38.901'` in NLOS scenarios;
   `[n_link]`; default: no O2I link
 - **`n_cluster`** — Active NLOS clusters per link (a count) in `[min(max(1, NumClusters_min - 1), N), N]`; `[n_link]`;
@@ -1082,15 +1081,15 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | `polmat` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generators.md#get_channels_planar) | yes |
 | `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
 | `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
-| `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |
+| `gr_eps` | `[n_freq, 1]` or empty | complex double | Ground permittivity, used as `conj(gr_eps)`; needed where a GR ray is recomputed | no |
 | `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | double | First- and last-bounce scatterer positions in [m] | no |
 | `fallback` | `[n_ray, 1]` or empty | uint32 | 1 = ray lengthened by the solver fallback | no |
 
 ### Usage:
 ```matlab
 rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, ...
-    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, ...
-    gr_eps_im, pol_variability, random_phase );
+    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, ...
+    pol_variability, random_phase );
 ```
 
 ### Inputs:
@@ -1109,8 +1108,8 @@ rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu,
 - **`method`** — Method of [ssf_clusters](#ssf_clusters): `'38.901'`, `'38.901_MF'` or `'quadriga'`; default: `'38.901'`
 - **`i_freq`** — TR methods: index into `center_freq`, 1-based; `'quadriga'`: must be 1; default: 1
 - **`angle_model`**, **`pol_model`** — See the option table; default: `'additive'`, `'38.901'`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [lsp_generate](#lsp_generate); required if
-  `GR_enabled`, else ignored; `[n_link, n_freq]`
+- **`gr_eps`** *(optional)* — Complex ground permittivity from [lsp_generate](#lsp_generate); required if `GR_enabled`, else
+  ignored; `[n_link, n_freq]`
 - **`pol_variability`** — TR 7.6.16 polarization power variability, see the option table; default: `false`
 - **`random_phase`** — `false`: all initial phases 0; default: `true`
 

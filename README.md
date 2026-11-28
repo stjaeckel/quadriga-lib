@@ -97,7 +97,7 @@ More examples are in the usage sections of the [API documentation](http://quadri
 ### Requirements
 
 - C++17 compiler (GCC 11 or newer, or MSVC 2022) and CMake 3.18 or newer
-- Optional: MATLAB (with a supported compiler, see [MATLAB and GCC](#matlab-and-gcc)), Octave with `octave-dev`, Python 3 with `numpy` and `pytest`
+- Optional: MATLAB (with a supported compiler, see [MATLAB and GCC](#matlab-and-gcc)), Octave 8.4 or later with `octave-dev`, Python 3 with `numpy` and `pytest`
 - Bundled in `external/` (no install needed): Armadillo, pybind11, Catch2, MOxUnit, pugixml
 - Optional, tests only: HDF5 C library 1.12 or newer, for an interoperability test of the HDF5 channel files
 - Optional, faster builds: Ninja, ccache and mold (see [Faster builds](#faster-builds))
@@ -232,6 +232,8 @@ python tools/hdf5_convert_v2.py old.hdf5 new.hdf5
 ```
 
 This needs `numpy`, `h5py` and the `quadriga_lib` Python module, also for MATLAB and Octave users.
+
+The MATLAB / Octave functions take and return complex data as one complex array instead of `_re` / `_im` pairs (`coeff` instead of `coeff_re` and `coeff_im`, also in channel structs); the arrayant structs keep their split fields. Changed signatures: `freq_response`, `freq_response_mf`, `gbsm_rays_from_paths`, `get_channels_irs`, `get_channels_multifreq`, `get_channels_planar`, `get_channels_spherical`, `interpolate_pattern`, `lsp_generate`, `quantize_delays`, `ssf_clusters` and `ssf_rays` have one complex argument or output where they had two; calls written for the old signatures can run without an error and give wrong results (e.g. `ssf_clusters` with separate `gr_eps_re` and `gr_eps_im`). The Octave interface needs Octave 8.4 or later; there is no Ubuntu 22.04 package.
 
 ## Repository layout
 

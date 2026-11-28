@@ -88,15 +88,12 @@ class test_export_channel_obj(unittest.TestCase):
         # the companion material file is written next to the OBJ file
         self.assertTrue(os.path.isfile(self._path('basic.mtl')))
 
-    def test_layouts_and_split_coeff_match(self):
-        # list layout, stacked layout, split real coefficients and a mix give the same file
+    def test_layouts_match(self):
+        # list layout, stacked layout and a mix give the same file
         chan = _make_chan()
         ref = _significant_lines(self._export('ref.obj', chan))
         lst = _to_lists(chan)
         self.assertEqual(_significant_lines(self._export('list.obj', lst)), ref)
-        split = {k: v for k, v in chan.items() if k != 'coeff'}
-        split['coeff_re'], split['coeff_im'] = chan['coeff'].real, chan['coeff'].imag
-        self.assertEqual(_significant_lines(self._export('split.obj', split)), ref)
         mix = dict(chan, n_interact=lst['n_interact'], delay=lst['delay'])
         self.assertEqual(_significant_lines(self._export('mix.obj', mix)), ref)
 
@@ -176,7 +173,7 @@ class test_export_channel_obj(unittest.TestCase):
         cases = [
             ({k: v for k, v in chan.items() if k != 'delay'}, 'Delays are missing or incomplete.'),
             (dict(_to_lists(chan), interact_coord=[np.zeros((3, 6))] * 3), "must match the sum of 'n_interact'."),
-            (dict(chan, coeff_re=chan['coeff'].real), "provide either 'coeff'"),
+            (dict(chan, coeff_re=chan['coeff'].real), "'coeff_re' / 'coeff_im' are not read"),
         ]
         for c, msg in cases:
             with self.assertRaisesRegex(ValueError, msg):

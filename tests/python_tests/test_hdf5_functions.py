@@ -379,7 +379,7 @@ class test_case(unittest.TestCase):
             ([], {}, "Input 'chan' must contain at least one channel."),
             ('abc', {}, 'Channel input must be a dict or a list of dicts.'),
             (['abc'], {}, 'Each channel list entry must be a dict.'),
-            (dict(c, coeff_re=[np.ones((1, 1, 1))]), {}, "provide either 'coeff' (complex) or 'coeff_re'/'coeff_im'"),
+            (dict(c, coeff_re=[np.ones((1, 1, 1))]), {}, "'coeff_re' / 'coeff_im' are not read"),
             (dict(c, tx_pos=np.zeros((2, 1))), {}, "'tx_pos' is missing or ill-formatted"),  # from C++
             (dict(c, name='x' * 256), {}, 'Name can have at most 255 characters.'),
             (c, {'par': 'abc'}, "Input 'par' must be a dict, a list of dicts, or None."),
@@ -465,8 +465,6 @@ class test_case(unittest.TestCase):
             {k: np.repeat(v, 2, axis=-1)[..., ::2] if isinstance(v, np.ndarray) else v  # non-contiguous views
              for k, v in stack_model(ref).items()},
             f32,                                                                      # single precision
-            dict({k: v for k, v in ref.items() if k != 'coeff'},                      # split coefficients
-                 coeff_re=[x.real for x in ref['coeff']], coeff_im=[x.imag for x in ref['coeff']]),
             dict(ref, n_interact=[x.astype(np.uint32) for x in ref['n_interact']],  # other integer types
                  initial_position=np.int32(2)),
         ]

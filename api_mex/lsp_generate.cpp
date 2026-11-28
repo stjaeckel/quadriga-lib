@@ -50,7 +50,7 @@ Large-scale parameters of a set of links from normalized random values
 
 ## Usage:
 ```
-[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
+[ lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
     quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, ...
     clip_spreads );
 ```
@@ -74,8 +74,8 @@ Large-scale parameters of a set of links from normalized random values
 - **`lsp`** — Large-scale parameters; slices: 1 DS in [s]; 2 KF, 3 SF and 8 XPR linear; 4 ASD, 5 ASA, 6 ESD,
   7 ESA in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** — Absolute TOA offset in [s], 0 if not active; `[n_link, 1]`
-- **`gr_eps_re`**, **`gr_eps_im`** — Relative permittivity of the ground, real part and imaginary part >= 0; the
-  complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
+- **`gr_eps`** — Complex relative permittivity of the ground, imaginary part >= 0; the complex value of TR 38.901
+  eq. (7.6-40) is `conj(gr_eps)`; `[n_link, n_freq]`
 - **`eod_offset_deg`** — EoD offset in [deg], positive = up; `[n_link, n_freq]`
 - **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the angular
   spreads, [dB] for KF, SF and XPR; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
@@ -93,7 +93,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 5 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 7)
+    if (nlhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
@@ -114,24 +114,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     plhs[0] = qd_mex_init_output(&lsp, n_link, n_freq, 8);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&abs_toa, n_link);
-    if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&gr_eps_re, n_link, n_freq);
     if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&gr_eps_im, n_link, n_freq);
+        plhs[3] = qd_mex_init_output(&eod_offset_deg, n_link, n_freq);
     if (nlhs > 4)
-        plhs[4] = qd_mex_init_output(&eod_offset_deg, n_link, n_freq);
+        plhs[4] = qd_mex_init_output(&lsp_mu, n_link, n_freq, 8);
     if (nlhs > 5)
-        plhs[5] = qd_mex_init_output(&lsp_mu, n_link, n_freq, 8);
-    if (nlhs > 6)
-        plhs[6] = qd_mex_init_output(&lsp_sigma, n_link, n_freq, 8);
+        plhs[5] = qd_mex_init_output(&lsp_sigma, n_link, n_freq, 8);
 
     arma::vec *p_abs_toa = (nlhs > 1) ? &abs_toa : nullptr;
     arma::mat *p_gr_eps_re = (nlhs > 2) ? &gr_eps_re : nullptr;
-    arma::mat *p_gr_eps_im = (nlhs > 3) ? &gr_eps_im : nullptr;
-    arma::mat *p_eod_offset_deg = (nlhs > 4) ? &eod_offset_deg : nullptr;
-    arma::cube *p_lsp_mu = (nlhs > 5) ? &lsp_mu : nullptr;
-    arma::cube *p_lsp_sigma = (nlhs > 6) ? &lsp_sigma : nullptr;
+    arma::mat *p_gr_eps_im = (nlhs > 2) ? &gr_eps_im : nullptr;
+    arma::mat *p_eod_offset_deg = (nlhs > 3) ? &eod_offset_deg : nullptr;
+    arma::cube *p_lsp_mu = (nlhs > 4) ? &lsp_mu : nullptr;
+    arma::cube *p_lsp_sigma = (nlhs > 5) ? &lsp_sigma : nullptr;
 
     CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, sf_sigma_dB, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_eod_offset_deg, p_lsp_mu, p_lsp_sigma, cholesky, clip_spreads));
+
+    // The C++ function has split outputs only: copy them into one complex array
+    if (nlhs > 2)
+        plhs[2] = qd_mex_copy2matlab(&gr_eps_re, &gr_eps_im, true);
 }

@@ -22,7 +22,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation at
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
+[ coeff, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, ...
     freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
@@ -49,8 +49,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation at
   (single-precision arithmetic; error if unavailable); default: 0
 
 ## Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out, n_freq_new]`,
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out, n_freq_new]`, `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out, n_freq_new]`
 
 ## Notes:
@@ -76,7 +76,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 13 || nrhs > 17)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 3)
+    if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     auto ant_tx = qd_mex_struct2arrayant_multi(prhs[0], false, false, "tx_array");
@@ -108,14 +108,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_path = add_fake_los_path ? fbs_pos.n_cols + 1 : fbs_pos.n_cols;
     arma::uword n_freq_new = freq_new.n_elem;
 
-    // 4D outputs, one cube per entry of freq_new
+    // 4D outputs, one cube per entry of freq_new; C++ writes the complex coefficients into the MATLAB array
+    std::vector<arma::cx_cube> coeff;
     std::vector<arma::cube> coeff_re, coeff_im, delay;
 
-    plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path, n_freq_new);
+    plhs[0] = qd_mex_init_output(&coeff, n_ports_rx, n_ports_tx, n_path, n_freq_new);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&coeff_im, n_ports_rx, n_ports_tx, n_path, n_freq_new);
-    if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path, n_freq_new);
+        plhs[1] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path, n_freq_new);
 
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_multifreq<double>(ant_tx, ant_rx,
@@ -124,5 +123,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          freq, freq_new,
                                                          coeff_re, coeff_im, delay,
                                                          use_absolute_delays, add_fake_los_path,
-                                                         propagation_speed, nullptr, use_kernel));
+                                                         propagation_speed, &coeff, use_kernel));
 }

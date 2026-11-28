@@ -6,10 +6,6 @@
 #   docker build --build-arg UBUNTU_VERSION=24.04 -t quadriga-deb .
 #   docker run --rm -v $(pwd)/out:/out quadriga-deb
 #
-#   # Ubuntu 22.04:
-#   docker build --build-arg UBUNTU_VERSION=22.04 -t quadriga-deb .
-#   docker run --rm -v $(pwd)/out:/out quadriga-deb
-#
 # The .deb (and related files) will appear in ./out/
 # =============================================================================
 
@@ -23,7 +19,6 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Derive the Ubuntu codename from the version number.
 # Extend this list as new LTS releases are supported.
 RUN case "${UBUNTU_VERSION}" in \
-        22.04) echo "jammy"  > /etc/build-codename ;; \
         24.04) echo "noble"  > /etc/build-codename ;; \
         25.10) echo "plucky" > /etc/build-codename ;; \
         26.04) echo "resolute" > /etc/build-codename ;; \
@@ -51,8 +46,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     python3-numpy \
     python3-pytest \
-    # TOML reader for the docs check on 22.04 (Python 3.10)
-    python3-tomli \
     # Octave
     octave-dev \
     octave \

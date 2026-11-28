@@ -405,8 +405,7 @@ code = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 - **`fn`** — File name, str or path-like
 - **`chan`** — Channels to write, valid; a channel dict or a non-empty list of `n_chan` dicts, keys in
   [[hdf5_read_channel]]. Members with one entry per snapshot as a list of arrays or as one array with the snapshot on
-  the last axis (`stack = True` of [[hdf5_read_channel]]), detected per key; the coefficients as complex `coeff` or as
-  real `coeff_re` and `coeff_im`, not both
+  the last axis (`stack = True` of [[hdf5_read_channel]]), detected per key; the coefficients as complex `coeff`
 - **`par`** — Unstructured data; a dict or a list of `n_chan` dicts: a key is a dataset name (stored with the prefix
   `par_`), the values follow the type rules of [[hdf5_write_dset]], `None` values are skipped; default: `None`
   (none)

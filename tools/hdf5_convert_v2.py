@@ -103,6 +103,11 @@ def read_slot(group):
         return obj.attrs[name]
 
     f32 = lambda x: np.asarray(x, dtype=np.float32)
+
+    def complex_of(re, im):  # exact also for Inf and NaN parts, unlike re + 1j * im
+        c = re.astype(np.complex64)
+        c.imag = im
+        return c
     is_dset = lambda name: isinstance(group.get(name), h5py.Dataset)
 
     name = group.attrs.get('Name', b'')  # h5py stops at the first NUL (older writers left bytes after it)
@@ -207,6 +212,8 @@ def read_slot(group):
     empty['delay'] = np.zeros((n_rx, n_tx, 0) if 'coeff_re' in lists else (1, 1, 0), np.float32)
     for key, entries in lists.items():
         chan[key] = entries + [empty[key]] * (n_snap - len(entries))
+    if 'coeff_re' in chan:  # the Python API takes the coefficients as one complex 'coeff'
+        chan['coeff'] = [complex_of(re, im) for re, im in zip(chan.pop('coeff_re'), chan.pop('coeff_im'))]
     return chan, par, extra, warnings
 
 

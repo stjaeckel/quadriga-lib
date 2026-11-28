@@ -490,9 +490,9 @@ static inline quadriga_lib::channel<double> qd_python_dict2channel(const py::dic
     load("rx_orientation", c.rx_orientation);
     load("center_freq", c.center_freq);
 
-    // Coefficients: one complex key "coeff", or the two real keys "coeff_re" / "coeff_im", not both
-    if (has("coeff") && (has("coeff_re") || has("coeff_im")))
-        throw std::invalid_argument("Channel dict: provide either 'coeff' (complex) or 'coeff_re'/'coeff_im' (real), not both.");
+    // Coefficients: one complex key "coeff"; the split keys of the C++ class are refused, so that they are not ignored
+    if (has("coeff_re") || has("coeff_im"))
+        throw std::invalid_argument("Channel dict: the coefficients are one complex key 'coeff'; 'coeff_re' / 'coeff_im' are not read.");
     if (has("coeff"))
     {
         py::object v = dict["coeff"];
@@ -501,8 +501,6 @@ static inline quadriga_lib::channel<double> qd_python_dict2channel(const py::dic
         else
             qd_python_numpy2arma_vecCube_Cplx<double>(v, c.coeff_re, c.coeff_im);
     }
-    load("coeff_re", c.coeff_re);
-    load("coeff_im", c.coeff_im);
 
     load("delay", c.delay);
     load("path_gain", c.path_gain);

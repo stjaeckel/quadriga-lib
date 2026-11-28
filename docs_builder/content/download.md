@@ -5,13 +5,13 @@ description = "Download and install Quadriga-Lib on Windows, Ubuntu and other Li
 
 How to get Quadriga-Lib running: the downloads, then the installation for each platform, from the packages or built from the source code, and a first example in each language. Pick your platform in the menu; each section is complete on its own.
 
-%%GAP: before the 1.0 release: update the downloads (current version, Ubuntu 22.04 package still needed?, Windows package), build and upload the wheels to PyPI, including Python 3.15 (and 3.16 if released), then drop the python=3.14 pin here and in the Setup section of the tutorials page, and check every install route on this page with the released packages.%%
+%%GAP: before the 1.0 release: update the downloads (current version, Windows package), build and upload the wheels to PyPI, including Python 3.15 (and 3.16 if released), then drop the python=3.14 pin here and in the Setup section of the tutorials page, and check every install route on this page with the released packages.%%
 
 ## Download {#download}
 
 - Source code: [quadriga_lib_{{ version }}.zip]({{ download_base_url }}/quadriga_lib_{{ version }}.zip)
 - Windows package (MATLAB interface, library, headers, Python wheels): [quadriga_lib_{{ version }}_win64.zip]({{ download_base_url }}/quadriga_lib_{{ version }}_win64.zip)
-- Ubuntu packages (MATLAB and Octave interface, library, headers): [22.04 Jammy]({{ download_base_url }}/quadriga-lib_{{ version }}-1+jammy_amd64.deb) · [24.04 Noble]({{ download_base_url }}/quadriga-lib_{{ version }}-1+noble_amd64.deb) · [26.04 Resolute]({{ download_base_url }}/quadriga-lib_{{ version }}-1+resolute_amd64.deb)
+- Ubuntu packages (MATLAB and Octave interface, library, headers): [24.04 Noble]({{ download_base_url }}/quadriga-lib_{{ version }}-1+noble_amd64.deb) · [26.04 Resolute]({{ download_base_url }}/quadriga-lib_{{ version }}-1+resolute_amd64.deb)
 - Python: `pip install quadriga-lib`
 - [Older versions]({{ releases_url }})
 
@@ -88,7 +88,7 @@ make
 make python_install
 ```
 
-- `make` builds the library, the Octave interface, the Python module and, if MATLAB is on the `PATH`, the MATLAB interface (with GCC 12, `sudo apt install g++-12`). `make python_install` copies the module into the active virtual environment.
+- `make` builds the library, the Octave interface (Octave 8.4 or later, so not on Ubuntu 22.04), the Python module and, if MATLAB is on the `PATH`, the MATLAB interface (with GCC 12, `sudo apt install g++-12`). `make python_install` copies the module into the active virtual environment.
 - MATLAB / Octave: `addpath('/path/to/quadriga-lib')`.
 
 ## Linux with conda {#linux-conda}

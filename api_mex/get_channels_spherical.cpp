@@ -62,7 +62,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
+[ coeff, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
     path_length, polmat, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
@@ -89,8 +89,8 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   version), 1 = GENERIC, 2 = AVX2 (single-precision arithmetic; error if unavailable); default: 0
 
 ## Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out]` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
   `[n_rx, n_tx, n_out]`
@@ -128,7 +128,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 11 || nrhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 7)
+    if (nlhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
@@ -159,9 +159,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         const auto rx_pos = qd_mex_get_xyz_batch(prhs[4], "rx_pos");
         const auto rx_orientation = qd_mex_get_xyz_batch(prhs[5], "rx_orientation");
 
-        // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries
+        // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries (coeff: complex)
         const size_t n_snap = fbs_pos.size();
-        std::vector<arma::cube> out[7];
+        std::vector<arma::cx_cube> coeff(n_snap);
+        std::vector<arma::cube> coeff_re, coeff_im, out[6]; // out[0] stays unused
         for (int k = 0; k < std::max(nlhs, 1); ++k)
         {
             plhs[k] = mxCreateCellMatrix((mwSize)n_snap, 1);
@@ -169,15 +170,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             for (size_t s = 0; s < n_snap; ++s)
             {
                 const arma::uword n_path = add_fake_los_path ? fbs_pos[s].n_cols + 1 : fbs_pos[s].n_cols;
-                mxSetCell(plhs[k], (mwIndex)s, qd_mex_init_output(&out[k][s], n_ports_rx, n_ports_tx, n_path));
+                mxSetCell(plhs[k], (mwIndex)s, (k == 0) ? qd_mex_init_output(&coeff[s], n_ports_rx, n_ports_tx, n_path)
+                                                        : qd_mex_init_output(&out[k][s], n_ports_rx, n_ports_tx, n_path));
             }
         }
 
         CALL_QD(quadriga_lib::get_channels_spherical<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                              fbs_pos, lbs_pos, path_gain, path_length, polmat,
-                                                             out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
-                                                             (nlhs > 3) ? &out[3] : nullptr, (nlhs > 4) ? &out[4] : nullptr,
-                                                             (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr, nullptr, use_kernel));
+                                                             coeff_re, coeff_im, out[1], center_freq, use_absolute_delays, add_fake_los_path,
+                                                             (nlhs > 2) ? &out[2] : nullptr, (nlhs > 3) ? &out[3] : nullptr,
+                                                             (nlhs > 4) ? &out[4] : nullptr, (nlhs > 5) ? &out[5] : nullptr, &coeff, use_kernel));
         return;
     }
 
@@ -196,19 +198,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
     arma::cube *p_aod = nullptr, *p_eod = nullptr, *p_aoa = nullptr, *p_eoa = nullptr;
 
-    plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&coeff_im, n_ports_rx, n_ports_tx, n_path);
+        plhs[1] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path);
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&delay, n_ports_rx, n_ports_tx, n_path);
+        plhs[2] = qd_mex_init_output(&aod, n_ports_rx, n_ports_tx, n_path), p_aod = &aod;
     if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&aod, n_ports_rx, n_ports_tx, n_path), p_aod = &aod;
+        plhs[3] = qd_mex_init_output(&eod, n_ports_rx, n_ports_tx, n_path), p_eod = &eod;
     if (nlhs > 4)
-        plhs[4] = qd_mex_init_output(&eod, n_ports_rx, n_ports_tx, n_path), p_eod = &eod;
+        plhs[4] = qd_mex_init_output(&aoa, n_ports_rx, n_ports_tx, n_path), p_aoa = &aoa;
     if (nlhs > 5)
-        plhs[5] = qd_mex_init_output(&aoa, n_ports_rx, n_ports_tx, n_path), p_aoa = &aoa;
-    if (nlhs > 6)
-        plhs[6] = qd_mex_init_output(&eoa, n_ports_rx, n_ports_tx, n_path), p_eoa = &eoa;
+        plhs[5] = qd_mex_init_output(&eoa, n_ports_rx, n_ports_tx, n_path), p_eoa = &eoa;
 
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_spherical<double>(ant_tx, ant_rx,
@@ -217,4 +216,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          coeff_re, coeff_im, delay,
                                                          center_freq, use_absolute_delays, add_fake_los_path,
                                                          p_aod, p_eod, p_aoa, p_eoa, use_kernel));
+
+    // The single-snapshot form has split outputs only: copy them into one complex array
+    plhs[0] = qd_mex_copy2matlab(&coeff_re, &coeff_im, true);
 }

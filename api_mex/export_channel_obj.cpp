@@ -30,7 +30,7 @@ quadriga_lib.export_channel_obj( fn, chan, max_paths, gain_max_dB, gain_min_dB, 
 ## Inputs:
 - **`fn`** — Path of the OBJ file, ending in `.obj`
 - **`chan`** — Channel; 1x1 struct with the fields of [[hdf5_read_channel]]; needs `rx_pos`, `tx_pos`,
-  `center_freq`, `n_interact`, `interact_coord` and `coeff_re` / `coeff_im` with `delay`, or `polmat`; columns of
+  `center_freq`, `n_interact`, `interact_coord` and `coeff` with `delay`, or `polmat`; columns of
   `interact_coord` beyond `sum(n_interact)` are ignored
 - **`max_paths`** — Number of the strongest paths per snapshot to export; 0 = all; default: 0
 - **`gain_max_dB`** — Gain in dB of the largest radius and the last color, finite; default: -60

@@ -98,7 +98,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 
 ### Output:
 - **`chan`** — Channels, struct array `[1, n_users]`, fields in [hdf5_read_channel](channel-data-and-processing.md#hdf5_read_channel): `name` (`'user_<i>'`, 0-based),
-  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff_re`, `coeff_im`, `delay`
+  `center_freq`, the positions and orientations (station positions `[3, n_snap]`), `coeff`, `delay`
   `[n_rx, n_tx, n_path, n_snap]` (downlink `[n_sta, n_ap, n_path, n_snap]`) and `path_gain` `[n_path, n_snap]`: the
   path powers without antennas, with path loss and shadow fading, whose mean over the snapshots is the power of the
   model
@@ -165,7 +165,7 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_irs) · [Python](../pyt
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
+[ coeff, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
     tx_array, rx_array, irs_array, tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, ...
@@ -201,8 +201,7 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_irs) · [Python](../pyt
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_path_irs]` with the
-  number of kept path pairs `n_path_irs`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_path_irs]` with the number of kept path pairs `n_path_irs`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_path_irs]`
 - **`active_path_out`** — Kept path pairs, for `active_path` of a later call; logical; `[n_path_1 * n_path_2, 1]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
@@ -236,7 +235,7 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_multifreq) · [Python](
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
+[ coeff, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, ...
     freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
@@ -263,8 +262,8 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_multifreq) · [Python](
   (single-precision arithmetic; error if unavailable); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out, n_freq_new]`,
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out, n_freq_new]`, `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out, n_freq_new]`
 
 ### Notes:
@@ -307,7 +306,7 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_planar) · [Python](../
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
+[ coeff, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, ...
     center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
@@ -335,8 +334,8 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_planar) · [Python](../
   (single-precision arithmetic; error if unavailable); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out]` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
 - **`rx_Doppler`** — Doppler weight of each path for an Rx moving along its local x-axis: the cosine of the angle
   between this axis and the arrival direction; the Doppler shift at the speed $v$ is $v f_c / c$ times this weight,
@@ -385,7 +384,7 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_spherical) · [Python](
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
+[ coeff, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
     path_length, polmat, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
@@ -412,8 +411,8 @@ Also in: [C++](../cpp/channel-generators.md#get_channels_spherical) · [Python](
   version), 1 = GENERIC, 2 = AVX2 (single-precision arithmetic; error if unavailable); default: 0
 
 ### Outputs:
-- **`coeff_re`**, **`coeff_im`** — Real and imaginary part of the coefficients; `[n_rx, n_tx, n_out]` with
-  `n_out = n_path`, or `n_path + 1` with `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
+- **`coeff`** — Complex coefficients; `[n_rx, n_tx, n_out]` with `n_out = n_path`, or `n_path + 1` with
+  `add_fake_los_path`; vector form: cell arrays `[n_snap, 1]` of such arrays
 - **`delay`** — Delays in s; `[n_rx, n_tx, n_out]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Azimuth and elevation of departure and arrival in rad, GCS;
   `[n_rx, n_tx, n_out]`

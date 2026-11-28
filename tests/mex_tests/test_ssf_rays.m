@@ -14,17 +14,17 @@ sp.GR_enabled = 1;
 tx_pos = [ 0; 0; 10 ];
 rx_pos = [ 60, 10, 1.5; -30, 80, 1.5; 120, -40, 7.5 ]';
 fc = [ 6e9; 30e9 ];
-[ lsp, mu, sig, gre, gim ] = lsps( sp, fc, tx_pos, rx_pos );
+[ lsp, mu, sig, gr ] = lsps( sp, fc, tx_pos, rx_pos );
 rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 7 ), tx_pos, rx_pos );
 N = sp.NumClusters - 1;
 M = sp.NumSubPaths;
 n_ray = 2 + N * M;                                                            % LOS, GR, N clusters of M rays
 fields = { 'method', 'tx_pos', 'rx_pos', 'center_freq', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
-    'polmat', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
+    'polmat', 'path_type', 'tap', 'gr_eps', 'fbs_pos', 'lbs_pos', 'fallback' };
 
 % 'quadriga': clusters of all frequencies, the shared "ray" set
 [ d, p, aod, eod, aoa, eoa ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], ...
-    [], gre, gim );
+    [], gr );
 rq = quadriga_lib.gbsm_draw( sp, 'ray', quadriga_lib.gbsm_init_phases( sp, 'ray', 7 ), tx_pos, rx_pos, 0, ...
     [], [], fc );
 
@@ -33,13 +33,13 @@ rf = cat( 3, cset( sp, 'cluster', 1, tx_pos, rx_pos ), cset( sp, 'cluster', 2, t
 rr = cat( 3, cset( sp, 'ray', 1, tx_pos, rx_pos ), cset( sp, 'ray', 2, tx_pos, rx_pos ) );
 la = lsps( sp, 2e9, tx_pos, rx_pos );
 [ dm, pm, aodm, eodm, aoam, eoam ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, '38.901_MF', rf, la, ...
-    [], [], gre, gim );
+    [], [], gr );
 mf = @( varargin ) quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, dm, pm, aodm, eodm, aoam, eoam, ...
     rr, '38.901_MF', varargin{:} );
 
 %% Basic call and values: all fields, sizes and classes ('quadriga')
 rays = quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq, 'quadriga', ...
-    [], [], [], gre, gim );
+    [], [], [], gr );
 assertEqual( size(rays), [1, 3] );
 assertEqual( fieldnames(rays)', fields );
 for l = 1 : 3
@@ -55,8 +55,7 @@ for l = 1 : 3
     assertTrue( isa(r.path_type, 'uint32') && isa(r.tap, 'uint32') && isa(r.fallback, 'uint32') );
     assertEqual( r.path_type(1:3), uint32( [0; 1; 2] ) );                     % codes, not shifted
     assertEqual( r.tap(1:3), uint32( [0; 3; 6] ) );
-    assertEqual( r.gr_eps_re, gre(l, :)' );
-    assertEqual( r.gr_eps_im, gim(l, :)' );
+    assertEqual( r.gr_eps, gr(l, :).' );
     assertTrue( isempty(r.fbs_pos) && isempty(r.lbs_pos) && isempty(r.fallback) );
     assertElementsAlmostEqual( r.power(1, :), reshape( p(l, 1, :), 1, [] ), 'absolute', 1e-14 );
 end
@@ -68,66 +67,66 @@ sn.GR_enabled = 0;
 r0 = quadriga_lib.ssf_rays( sn, tx_pos, rx_pos, fc, lsp, mu, sig, d0, p0, a0, e0, b0, f0, rq, 'quadriga' );
 assertEqual( size(r0(1).delay), [n_ray - 1, 1] );
 assertEqual( fieldnames(r0)', fields );
-assertTrue( isempty(r0(1).gr_eps_re) && isempty(r0(1).gr_eps_im) );
+assertTrue( isempty(r0(1).gr_eps) );
 assertEqual( r0(1).tap(1:2), uint32( [0; 3] ) );
 
 % Links: empty permittivities select the default (unused without, missing with ground reflection)
 re = quadriga_lib.ssf_rays( sn, tx_pos, rx_pos, fc, lsp, mu, sig, d0, p0, a0, e0, b0, f0, rq, 'quadriga', [], [], ...
-    [], zeros(0, 1), zeros(0, 2) );
+    [], zeros(0, 2) );
 assertEqual( re, r0 );
 assert_throws( @() quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq, ...
-    'quadriga', [], [], [], zeros(0, 2), zeros(0, 2) ), 'are required when ''GR_enabled'' is set.' );
+    'quadriga', [], [], [], zeros(0, 2) ), 'are required when ''GR_enabled'' is set.' );
 
 %% Optional inputs: method, i_freq (1-based), angle_model, pol_model, pol_variability, random_phase
-r2 = mf( 1, [], [], gre, gim );
+r2 = mf( 1, [], [], gr );
 assertEqual( r2(1).center_freq, fc(1) );
-r3 = mf( 2, [], [], gre, gim );
+r3 = mf( 2, [], [], gr );
 assertEqual( r3(1).center_freq, fc(2) );                                 % rays(1).center_freq == fc(i_freq)
-assertEqual( r3(2).gr_eps_re, gre(2, 2) );
+assertEqual( r3(2).gr_eps, gr(2, 2) );
 assertEqual( size(r3(1).power), [n_ray, 1] );
 assertTrue( max(abs(r3(1).delay - r2(1).delay)) > 0 );
-r4 = mf( int32(2), [], [], gre, gim );                                        % integer class for the index
+r4 = mf( int32(2), [], [], gr );                                        % integer class for the index
 assertEqual( r4(1).delay, r3(1).delay );
 assertEqual( r4(1).method, '38.901_MF' );
-rt = mf( 1, 'additive', '38.901', gre, gim, false, true );
+rt = mf( 1, 'additive', '38.901', gr, false, true );
 assertEqual( rt(3).polmat, r2(3).polmat );
 assertEqual( rt(3).aod, r2(3).aod );
-rt = mf( 1, 'rotation', [], gre, gim );
+rt = mf( 1, 'rotation', [], gr );
 assertTrue( max(abs(rt(3).eod - r2(3).eod)) > 1e-6 );
-rt = mf( 1, [], 'quadriga', gre, gim );
+rt = mf( 1, [], 'quadriga', gr );
 assertTrue( max(abs(rt(3).polmat(:) - r2(3).polmat(:))) > 1e-6 );
-rt = mf( 1, [], [], gre, gim, true );
+rt = mf( 1, [], [], gr, true );
 assertTrue( max(abs(rt(3).polmat(:) - r2(3).polmat(:))) > 1e-6 );
 assertEqual( rt(3).delay, r2(3).delay );
-rt = mf( 1, [], [], gre, gim, [], false );
+rt = mf( 1, [], [], gr, [], false );
 assertEqual( rt(3).polmat(2 : 2 : 8, 3 : end), zeros(4, n_ray - 2) );              % initial phases 0: real matrices
-r5 = mf( [], [], [], gre, gim, [], [] );
+r5 = mf( [], [], [], gr, [], [] );
 assertEqual( r5(2).polmat, r2(2).polmat );
 
 % Default method '38.901' at one frequency; 'rnd_ray' as [n_link, n_gen]
 [ d1, p1, a1, e1, b1, f1 ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp(:, 1, :), rnd, '38.901', ...
-    rf(:, :, 1), [], [], [], gre(:, 1), gim(:, 1) );
+    rf(:, :, 1), [], [], [], gr(:, 1) );
 rd = quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc(1), lsp(:, 1, :), mu(:, 1, :), sig(:, 1, :), d1, p1, a1, e1, ...
-    b1, f1, rr(:, :, 1), [], [], [], [], gre(:, 1), gim(:, 1) );
+    b1, f1, rr(:, :, 1), [], [], [], [], gr(:, 1) );
 assertEqual( rd(1).method, '38.901' );
 assertEqual( rd(1).center_freq, fc(1) );
 
 %% Outputs and type handling
 quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq, 'quadriga', [], [], [], ...
-    gre, gim );                                                               % zero outputs
+    gr );                                                               % zero outputs
 rs = quadriga_lib.ssf_rays( sp, single(tx_pos), rx_pos, fc', lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq, ...
-    'quadriga', [], [], [], gre, gim );
+    'quadriga', [], [], [], gr );
 assertEqual( rs(2).delay, rays(2).delay );                                    % single 'tx_pos', row 'center_freq'
 
 %% Errors
 args = { sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq };
 assert_throws( @() quadriga_lib.ssf_rays( args{1:13} ), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.ssf_rays( args{:}, 'quadriga', 1, 'additive', '38.901', gre, gim, false, true, 1 ), ...
+assert_throws( @() quadriga_lib.ssf_rays( args{:}, 'quadriga', 1, 'additive', '38.901', gr, false, true, 1 ), ...
     'Wrong number of input arguments.' );
-assert_throws( @() out2( args{:}, 'quadriga', 1, [], [], gre, gim ), 'Wrong number of output arguments.' );
-assert_throws( @() mf( 0, [], [], gre, gim ), 'Input ''i_freq'' cannot be 0 (1-based index).' );
-assert_throws( @() mf( 3, [], [], gre, gim ), 'Input ''i_freq'' is out of range for 2 frequencies.' );
-assert_throws( @() quadriga_lib.ssf_rays( args{1:4}, lsp(:, :, 1:7), args{6:end}, 'quadriga', [], [], [], gre, gim ), ...
+assert_throws( @() out2( args{:}, 'quadriga', 1, [], [], gr ), 'Wrong number of output arguments.' );
+assert_throws( @() mf( 0, [], [], gr ), 'Input ''i_freq'' cannot be 0 (1-based index).' );
+assert_throws( @() mf( 3, [], [], gr ), 'Input ''i_freq'' is out of range for 2 frequencies.' );
+assert_throws( @() quadriga_lib.ssf_rays( args{1:4}, lsp(:, :, 1:7), args{6:end}, 'quadriga', [], [], [], gr ), ...
     'Input ''lsp'' must have size [n_link, n_freq, 8].' );
 assert_throws( @() quadriga_lib.ssf_rays( args{:}, 'quadriga' ), 'are required when ''GR_enabled'' is set.' );
 assert_throws( @() quadriga_lib.ssf_rays( args{:}, 'foo' ), 'Input ''method'' must be' );
@@ -135,9 +134,9 @@ assert_throws( @() quadriga_lib.ssf_rays( args{:}, 'foo' ), 'Input ''method'' mu
 end
 
 % LSPs, means, std and ground permittivity at the links
-function [ lsp, mu, sig, gre, gim ] = lsps( sp, fc, tx_pos, rx_pos )
+function [ lsp, mu, sig, gr ] = lsps( sp, fc, tx_pos, rx_pos )
 phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', 7 );
-[ lsp, ~, gre, gim, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
+[ lsp, ~, gr, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
     quadriga_lib.gbsm_draw( sp, 'lsf', phase, tx_pos, rx_pos ) );
 end
 
