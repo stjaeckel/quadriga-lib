@@ -2,7 +2,7 @@
 
 This folder holds the tutorials of Quadriga-Lib: Jupyter notebooks that teach a topic with working code and are published on the website, [quadriga-lib.org/tutorials.html](http://quadriga-lib.org/tutorials.html). This README describes how a tutorial is written, run, checked and submitted. It applies to all tutorials.
 
-Contributions are welcome. For anything beyond a small fix, please open an issue first so that the topic and scope can be agreed; how to contribute is described in [CONTRIBUTING.md](../CONTRIBUTING.md). The build described here runs with GNU make on Linux; a route for Windows does not exist yet.
+Contributions are welcome. For anything beyond a small fix, please open an issue first so that the topic and scope can be agreed; how to contribute is described in [CONTRIBUTING.md](../CONTRIBUTING.md). The build described here runs with GNU make on Linux and with nmake on Windows ([Running the notebooks](#running-the-notebooks)).
 
 - [Adding a tutorial](#adding-a-tutorial)
 - [Environment](#environment)
@@ -35,8 +35,8 @@ A tutorial runs in an ordinary Python environment with Quadriga-Lib, numpy, matp
 With conda (the Miniforge installer uses the conda-forge channel only):
 
 ```bash
-conda create -n quadriga-tutorials -c conda-forge python=<version> numpy matplotlib jupyter
-conda activate quadriga-tutorials
+conda create -n quadriga -c conda-forge python=<version> numpy matplotlib jupyter
+conda activate quadriga
 pip install quadriga-lib
 ```
 
@@ -50,7 +50,7 @@ pip install quadriga-lib numpy matplotlib jupyter
 
 Tutorials are written against the next release, so they may use functions that are not on PyPI yet; an existing tutorial can then fail with a released package (e.g. `AttributeError: module 'quadriga_lib' has no attribute ...`). In that case, build the library from the source tree and install its Python module into the active environment with `make python_install` from the repository root. This needs a C++ compiler and CMake; the steps and requirements are in [Building from source](../README.md#building-from-source) in the repository README.
 
-A MATLAB variant of a tutorial ([MATLAB variants](#matlab-variants)) is run with Octave and its Jupyter kernel `octave`: install Octave (on Ubuntu `sudo apt install octave`) and the package `octave_kernel` in the same environment (`conda install -c conda-forge octave_kernel` or `pip install octave_kernel`). The kernel needs the MEX files of Quadriga-Lib, the folder `+quadriga_lib`: the build from the source tree (`make` in the repository root) puts it into the repository root, where the tutorial build looks for it ([Running the notebooks](#running-the-notebooks)).
+The Get started page (`docs_builder/content/download.md`) describes the tested environments per platform (Windows, Ubuntu, Linux with conda) with the build from source, and the Setup section of the tutorial index (`website_builder/content/tutorials.md`) adds Jupyter and the kernels; such an environment runs `make tutorials`, and `make website` once the website tools below are added. A MATLAB variant of a tutorial ([MATLAB variants](#matlab-variants)) is run with Octave and its Jupyter kernel `octave`: install Octave (on Ubuntu `sudo apt install octave`) and the package `octave_kernel` in the same environment (`conda install -c conda-forge octave_kernel` or `pip install octave_kernel`). The kernel needs the MEX files of Quadriga-Lib, the folder `+quadriga_lib`: the build from the source tree (`make` in the repository root) puts it into the repository root, where the tutorial build looks for it ([Running the notebooks](#running-the-notebooks)).
 
 Building the website needs further tools: pandoc and a few Python packages, listed in [Set up a build machine](../website_builder/README.md#set-up-a-build-machine) in the website README. `make website` uses the `python3` found first on the `PATH`, so activate the environment that has these packages before building; it can be the same environment as for the tutorials or another one.
 
@@ -179,6 +179,8 @@ make -C tutorials check-matlab                   # run the code of the MATLAB va
 make -C tutorials clean                          # delete the executed copies, clear all notebooks
 ```
 
+On Windows, `nmake tutorials` in the repository root (in the "x64 Native Tools Command Prompt", with the environment activated) runs every notebook that is newer than its executed copy, one after another, and `nmake website` builds the website. The environment needs Jupyter, numpy, matplotlib and the MATLAB kernel `jupyter-matlab-proxy` (Setup section of the tutorial index, Get started page for Windows), and for `nmake website` the website tools; the library comes from the repository folder, so build it first with `nmake`. Windows has no Octave, so the MATLAB variants run with MATLAB instead; their executed copies are a test of the code in MATLAB, while the published outputs come from Octave.
+
 `make tutorials` runs every notebook that is newer than its executed copy into `executed/<stem>.ipynb`, and the MATLAB variants into `executed/matlab/<stem>.ipynb`, four notebooks at a time; `JOBS=8` or `JOBS=1` changes that. It uses the `python3` of the active environment; `PYTHON=/path/to/env/bin/python` selects another one without activating it. Octave and MATLAB find the MEX files through `OCTAVE_PATH` and `MATLABPATH`, which the build sets to the repository root unless they are already set in the environment; set them to another folder that contains `+quadriga_lib` (e.g. `OCTAVE_PATH=/usr/share/quadriga-lib`) to use an installed library. An executed copy depends only on its notebook: after a change of Quadriga-Lib or of the environment, `make -C tutorials clean` forces a new run of all notebooks.
 
 - The notebook itself is not changed. The run records no timestamps, so two runs in the same environment give byte-identical copies, and clearing an executed copy gives back the committed notebook.
@@ -192,6 +194,7 @@ Troubleshooting:
 - `ModuleNotFoundError: No module named 'quadriga_lib'` (or numpy, matplotlib) in a cell: the kernel `python3` belongs to another environment. `jupyter kernelspec list` shows which one; run `make` in the environment that has the packages, or select it with `PYTHON=`.
 - `AttributeError: module 'quadriga_lib' has no attribute ...`: the installed Quadriga-Lib is older than the tutorial needs ([Environment](#environment)).
 - `qnb.run: No module named 'nbclient'`: Jupyter is not installed in the environment that runs `make`.
+- `warning: using the gnuplot graphics toolkit is discouraged` in the output of a MATLAB variant: Octave runs without a display (over SSH, in a container) and falls back to gnuplot; the warning would be published. Run the build with a virtual display, `xvfb-run -a make tutorials` (package `xvfb`).
 - `No such kernel named octave`: `octave_kernel` is not installed in the environment that runs `make` ([Environment](#environment)).
 - `error: '...' undefined` for a `quadriga_lib.` function in a MATLAB variant: Octave does not find the MEX files, or they are older than the tutorial needs. Build them (`make` in the repository root) or set `OCTAVE_PATH`.
 
@@ -228,7 +231,7 @@ How the builder renders notebooks and the full list of its error messages are in
 | `matlab/<stem>.ipynb` | The MATLAB variants, committed without outputs |
 | `executed/` | The executed copies with their outputs, made by `make tutorials` (the MATLAB variants in `executed/matlab/`); not in git |
 | `GNUmakefile` | Targets to run and clear the notebooks |
-| `qnb/` | Python helpers of the build: `qnb/run.py` runs one notebook into its executed copy, `qnb/clear.py` clears notebooks, `qnb/to_m.py` writes the code cells of a notebook as a MATLAB script for the check (both standard library only) |
+| `qnb/` | Python helpers of the build: `qnb/run.py` runs one notebook into its executed copy, `qnb/clear.py` clears notebooks, `qnb/to_m.py` writes the code cells of a notebook as a MATLAB script for the check, `qnb/runall.py` runs all notebooks newer than their executed copies for `nmake tutorials` (the last two standard library only) |
 | `README.md` | This file |
 
-The helpers are called as `python3 -m qnb.run`, `python3 -m qnb.clear` and `python3 -m qnb.to_m` from this folder, so that a makefile for another platform can use the same commands.
+The helpers are called as `python3 -m qnb.run`, `python3 -m qnb.clear`, `python3 -m qnb.to_m` and `python3 -m qnb.runall` from this folder, so that a makefile for another platform can use the same commands.

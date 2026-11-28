@@ -158,6 +158,8 @@ def _site_url(state):
         for c in tok.children:
             if c.type == "link_open":
                 c.attrs["href"] = links.url(c.attrs["href"], loc)
+                if links.ABSOLUTE_URL_RE.match(c.attrs["href"]) and not c.attrs["href"].startswith("mailto:"):
+                    c.attrs["target"], c.attrs["rel"] = "_blank", "noopener"  # leaves the site: a new tab
             elif c.type == "image":
                 c.attrs["src"] = links.url(c.attrs["src"], loc)
             elif c.type in MATH:

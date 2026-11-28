@@ -381,7 +381,7 @@ def test_variants_python_only(mini_repo, run_site):
             'href="mini_demo.html">Python</a><span class="pill none" title="No MATLAB variant">MATLAB –</span>'
             '<span class="tag">Beginner</span>') in page
     index = site(mini_repo, "tutorials.html")
-    assert ('<a class="pill only" href="tutorials/mini_demo.html">Python</a><span class="pill none" '
+    assert ('<a class="pill" href="tutorials/mini_demo.html">Python</a><span class="pill none" '
             'title="No MATLAB variant">MATLAB –</span>') in index
     assert "\n\nNot in: MATLAB\n" in site(mini_repo, "tutorials/mini_demo.md")
     assert "· Python · beginner · about 5 min · A *small* notebook for the tests. · Not in: MATLAB\n" in \
@@ -432,7 +432,7 @@ def test_variants_matlab_only(mini_repo, run_site):
     index = site(mini_repo, "tutorials.html")
     assert '<a class="tut-link" href="tutorials/matlab/mini_demo.html">Mini demo</a>' in index
     assert ('<span class="pill none" title="No Python variant">Python –</span>'
-            '<a class="pill only" href="tutorials/matlab/mini_demo.html">MATLAB</a>') in index
+            '<a class="pill" href="tutorials/matlab/mini_demo.html">MATLAB</a>') in index
     assert '<li class="sub"><a href="tutorials/matlab/mini_demo.html">Mini demo</a></li>' in index  # sidebar
     m = site(mini_repo, "tutorials/matlab/mini_demo.html")
     assert '<span class="pill none" title="No Python variant">Python –</span>' in m
@@ -500,6 +500,12 @@ def test_consecutive_printed_outputs_share_one_box(mini_repo, run_site):
     page = site(mini_repo, "tutorials/mini_demo.html")  # another stream starts a new box
     assert '<pre>9.9.9\nsecond</pre></div><div class="out"><pre>warning: w</pre>' in page
 
+    def parts(nb):  # as the MATLAB kernel prints fprintf('x = %d m\n', 5): in pieces, joined without breaks
+        nb["cells"][1]["outputs"] = [{"output_type": "stream", "name": "stdout", "text": t} for t in ("x =", " 5", " m", "\n")]
+    edit(mini_repo, parts)
+    assert run_site(mini_repo)[0] == 0
+    assert '<div class="out"><pre>x = 5 m</pre></div>' in site(mini_repo, "tutorials/mini_demo.html")
+
 
 def test_variant_fallback_to_matlab(mini_repo, run_site):
     second(mini_repo, order=0, title="Zero")
@@ -511,3 +517,4 @@ def test_variant_fallback_to_matlab(mini_repo, run_site):
     assert '<li><a href="matlab/mini_zero.html">Zero <span class="tag">MATLAB</span></a></li>' in page
     assert '<a class="prev" href="matlab/mini_zero.html"><small>← Previous (MATLAB)</small>' in page
     assert "Previous: [Zero](matlab/mini_zero.md) (MATLAB)" in site(mini_repo, "tutorials/mini_demo.md")
+

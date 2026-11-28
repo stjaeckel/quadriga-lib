@@ -154,3 +154,17 @@ def test_landing_figures_and_size_warning(mini_repo, run_site, static_copy):
     assert "website/%s-light.webp: warning: " % base in out and "[size]" in out
     index = (mini_repo / "website/index.html").read_text(encoding="utf-8")
     assert '<source media="(prefers-color-scheme: dark)" srcset="%s-dark.webp"><img src="%s-light.webp"' % (base, base) in index
+
+
+def test_external_links_open_in_a_new_tab_and_overview_only_with_intro(mini_repo, run_site):
+    faq = mini_repo / "docs_builder/content/faq.md"
+    faq.write_text(faq.read_text(encoding="utf-8") + "\n## Platforms\n\n### Windows\n\nSee [Miniforge](https://conda-forge.org/download/).\n\n"
+                   "### Linux\n\nText.\n\n## Notes\n\nIntro text.\n\n### First\n\nText.\n", encoding="utf-8")
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    page = (mini_repo / "website/faq.html").read_text(encoding="utf-8")
+    assert '<a href="https://conda-forge.org/download/" target="_blank" rel="noopener">Miniforge</a>' in page
+    assert '<summary><span>Platforms</span></summary><ul><li class="sub"><a href="#windows">' in page  # no intro
+    assert '<summary><span>Notes</span></summary><ul><li><a href="#notes">Overview</a></li>' in page
+    twin = (mini_repo / "website/faq.md").read_text(encoding="utf-8")
+    assert "[Miniforge](https://conda-forge.org/download/)" in twin and "_blank" not in twin

@@ -311,11 +311,12 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .fn-brief { font-size: var(--fs-lg); }
 .fn-langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-xs); }
 .fn-langs .lbl { color: var(--muted); margin-right: 2px; }
-.pill { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; text-decoration: none; color: var(--fg); font-weight: 500; }
+/* pills: dark green the variant shown, light green the others that exist, dashed the missing ones */
+.pill { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--pitch); border-radius: 14px; background: var(--pitch); text-decoration: none; color: var(--link); font-weight: 500; }
 .pill:hover { border-color: var(--link); color: var(--link); }
-.pill[aria-current="page"], .pill.only { background: var(--bar); border-color: var(--bar); color: #fff; }
-@media (prefers-color-scheme: dark) { .pill[aria-current="page"], .pill.only { background: var(--link); border-color: var(--link); color: var(--btn-fg); } }
-.pill.none { color: var(--muted); border-style: dashed; }
+.pill[aria-current="page"] { background: var(--bar); border-color: var(--bar); color: #fff; }
+@media (prefers-color-scheme: dark) { .pill[aria-current="page"] { background: var(--link); border-color: var(--link); color: var(--btn-fg); } }
+.pill.none { background: var(--card); border-color: var(--line); border-style: dashed; color: var(--muted); }
 .fn-langs .md { margin-left: auto; }
 .fn-entry h4 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: var(--s5); font-weight: 600; }
 .fn-entry ul { padding-left: 1.25em; margin: 0; }

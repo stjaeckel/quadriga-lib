@@ -37,6 +37,23 @@ all:
 # Requires pytest and numpy:
 #	pip install pytest numpy
 # Builds and installs as "all" does, with Catch2 and the test binary in the same build, then runs the C++, MATLAB and
+# Tutorial notebooks (tutorials\README.md): runs every notebook that is newer than its executed copy into
+# tutorials\executed\, in the active Python environment, which needs Jupyter, numpy, matplotlib and, for the MATLAB
+# variants, the MATLAB kernel (pip install jupyter-matlab-proxy). The MATLAB variants run with the installed MATLAB
+# instead of Octave. The library comes from this folder, so build it first with "nmake".
+tutorials: FORCE
+	set PYTHONPATH=$(MAKEDIR)\lib
+	set MATLABPATH=$(MAKEDIR)
+	set MWI_USE_EXISTING_LICENSE=True
+	cd tutorials && python -m qnb.runall --matlab-kernel jupyter_matlab_kernel
+
+# Website (website_builder\README.md): needs pandoc and the Python packages listed there
+website: FORCE
+	python website_builder\build.py website
+
+# Always out of date, so that targets named like a folder (tutorials, website) run
+FORCE:
+
 # Python tests
 test: moxunit-lib
 	$(MAKE) /nologo CMAKE_BUILD_DIR=$(CMAKE_BUILD_DIR) USE_NINJA=$(USE_NINJA) matlab=$(matlab) python=$(python) avx2=$(avx2) tests=ON all

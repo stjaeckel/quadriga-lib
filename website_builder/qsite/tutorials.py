@@ -305,15 +305,17 @@ class _CellDiag:
 
 def _outputs(t, c, n, rel, diag):
     alt = (c.get("metadata", {}).get("quadriga_tutorial") or {}).get("alt")
-    out, stream = [], None  # stream: name of the stream that made the last output, None after other outputs
+    out, stream, raw = [], None, ""  # stream: name of the stream that made the last output; raw: its text so far
     for k, o in enumerate(c.get("outputs", []), 1):
         kind = o.get("output_type")
-        if kind == "stream":  # the Octave kernel ends lines with CRLF and sends each disp() as its own output
-            text = ANSI_RE.sub("", _text(o.get("text")).replace("\r\n", "\n")).rstrip("\n")
+        if kind == "stream":  # Octave sends each disp() as an output of its own, MATLAB even parts of a line
+            text = ANSI_RE.sub("", _text(o.get("text")).replace("\r\n", "\n"))
             if o.get("name") == stream:
-                out[-1].text += "\n" + text  # one box for consecutive text of one stream, as Jupyter shows it
+                raw += text  # consecutive text of one stream is one box, joined as Jupyter shows it
+                out[-1].text = raw.rstrip("\n")
             else:
-                out.append(Output("text", text))
+                raw = text
+                out.append(Output("text", raw.rstrip("\n")))
             stream = o.get("name")
             continue
         stream = None

@@ -22,7 +22,8 @@ TOKEN_CLASSES = ((Comment, "c"), (Keyword.Type, "kt"), (Name.Class, "kt"), (Name
                  (Keyword, "k"), (Name.Function, "nf"), (Name.Builtin, "nf"), (String, "s"),
                  (Number, "m"), (Generic.Prompt, "gp"))
 LEXERS = {"cpp": "cpp", "c++": "cpp", "matlab": "matlab", "octave": "matlab", "python": "python",
-          "py": "python", "bash": "bash", "sh": "bash", "shell": "bash", "console": "console"}
+          "py": "python", "bash": "bash", "sh": "bash", "shell": "bash", "console": "console",
+          "bat": "batch", "batch": "batch"}
 PLAIN = ("text", "none")
 MATH_RE = re.compile("\x02M(\\d+)\x03")
 
@@ -212,10 +213,22 @@ def environment():
     return env
 
 
+def _intro(page):
+    """{id of a ## heading: True if text follows it before the next heading}; the sidebar links such a section
+    as "Overview" in its group, a section that starts with a ### heading has no overview."""
+    out, heads = {}, [h for h in page.headings if h.level >= 2]
+    for n, h in enumerate(heads):
+        if h.level == 2 and h.id:
+            end = heads[n + 1].index if n + 1 < len(heads) else len(page.body)
+            out[h.id] = any(ln.strip() for ln in page.body[h.index + 1:end])
+    return out
+
+
 def _index(ctx, page, least=2):
-    """Text-page index (at least `least` h2 headings): [(text, id, [(text, id)])], texts as inline HTML."""
-    rows = render_md.index_rows(page.headings)
-    return [(ctx.inline(t, page.path), i, [(ctx.inline(st, page.path), si) for st, si in sub])
+    """Text-page index (at least `least` h2 headings): [(text, id, [(text, id)], intro)], texts as inline HTML;
+    intro: the section has text of its own before its first ### heading."""
+    rows, intro = render_md.index_rows(page.headings), _intro(page)
+    return [(ctx.inline(t, page.path), i, [(ctx.inline(st, page.path), si) for st, si in sub], intro.get(i, False))
             for t, i, sub in rows] if len(rows) >= least else []
 
 
@@ -306,16 +319,15 @@ def _plain(html_text):
 
 
 def _tut_pills(entry, location, page=None):
-    """(label, href, state) per variant of a tutorial: state "current" (the variant of the page), "only" (the
-    only variant, on the index), "" (another variant) or "none" (missing, href None)."""
+    """(label, href, state) per variant of a tutorial: state "current" (the variant of the page), "" (another
+    variant that exists) or "none" (missing, href None)."""
     out = []
     for v, (label, _) in tutorials.VARIANTS.items():
         x = entry.variants.get(v)
         if x is None:
             out.append((label, None, "none"))
         else:
-            state = "current" if x is page else "only" if page is None and len(entry.variants) == 1 else ""
-            out.append((label, x.url("html", location), state))
+            out.append((label, x.url("html", location), "current" if x is page else ""))
     return out
 
 
