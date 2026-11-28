@@ -106,7 +106,7 @@ cd quadriga-lib
 make
 ```
 
-- Without MATLAB, or with the system compiler instead of GCC 12: `make gcc_version= matlab=OFF`
+- The MATLAB interface is built when MATLAB is on the `PATH`, with GCC 12 (`g++-12`); without MATLAB, `make` uses the system compiler, or that of an active conda environment.
 - MATLAB / Octave: `addpath('/path/to/quadriga-lib')`
 - Python: `export PYTHONPATH=/path/to/quadriga-lib/lib`, or `make python_install` to copy the module into the active environment.
 

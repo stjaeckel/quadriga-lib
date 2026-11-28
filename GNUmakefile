@@ -15,8 +15,19 @@ avx2 = ON
 cuda = OFF
 tests = OFF
 
-# GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12
-gcc_version = 12
+# MATLAB interface: switched off when MATLAB is not on the PATH; matlab=ON on the command line keeps it on
+ifeq ($(origin matlab),file)
+  ifeq ($(shell command -v matlab 2>/dev/null),)
+    matlab = OFF
+  endif
+endif
+
+# Compiler: MATLAB loads only MEX files built with GCC 12 or older (it ships an older libstdc++), so GCC 12 when the
+# MATLAB interface is built; otherwise the compiler of an active conda environment, or the system default.
+# gcc_version=<n> selects gcc-<n>, gcc_version= the default compiler. Note: NVCC max is 13
+ifeq ($(matlab),ON)
+  gcc_version ?= 12
+endif
 
 CMAKE_BUILD_DIR = build_linux
 ASAN_BUILD_DIR = build_linux_asan
@@ -41,8 +52,6 @@ endif
 # Location where pip-installable packages live
 PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig, pathlib, json; print(sysconfig.get_paths()['purelib'])")
 
-# The compiled extension that CMake puts into ./lib
-PYTHON_SHARED_OBJ := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 
 # Autodetect Octave
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
@@ -55,6 +64,11 @@ MATLAB_BIN = matlab
 
 ifneq ($(gcc_version),)
   CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=gcc-$(gcc_version) -D CMAKE_CXX_COMPILER=g++-$(gcc_version)
+  ifeq ($(shell command -v g++-$(gcc_version) 2>/dev/null),)
+    $(warning g++-$(gcc_version) not found: install it, build without MATLAB (matlab=OFF) or select another compiler (gcc_version=))
+  endif
+else ifneq ($(and $(CONDA_PREFIX),$(wildcard $(CONDA_PREFIX)/bin/g++)),)
+  CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=$(CONDA_PREFIX)/bin/gcc -D CMAKE_CXX_COMPILER=$(CONDA_PREFIX)/bin/g++
 endif
 
 all:
@@ -88,12 +102,10 @@ python:
 	cmake --install $(CMAKE_BUILD_DIR)
 
 python_install: python
-	@if [ -z "$(PYTHON_SHARED_OBJ)" ]; then \
-		echo "Error: quadriga_lib python package not found in lib/"; \
-		exit 1; \
-	fi
-	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
-	cp  $(PYTHON_SHARED_OBJ)  $(PYTHON_SITE_PACKAGES)/
+	@so=$$(ls lib/quadriga_lib.cpython*linux-gnu.so 2>/dev/null | head -1); \
+	if [ -z "$$so" ]; then echo "Error: quadriga_lib python package not found in lib/"; exit 1; fi; \
+	echo "Installing $$(basename $$so) into $(PYTHON_SITE_PACKAGES)"; \
+	cp "$$so" "$(PYTHON_SITE_PACKAGES)/"
 
 # Tests: builds and installs as "make" does, with Catch2 and the test binary in the same build, then runs the tests
 test: tests = ON

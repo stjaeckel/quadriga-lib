@@ -136,8 +136,8 @@ Options are variables at the top of `GNUmakefile` and can be overridden on the c
 
 | Variable      | Default | Meaning                                                        |
 | :------------ | :------ | :------------------------------------------------------------- |
-| `gcc_version` | `12`    | Uses `gcc-12`/`g++-12`; set empty (`gcc_version=`) for the system compiler |
-| `matlab`      | `ON`    | MATLAB MEX interface                                           |
+| `matlab`      | `ON`    | MATLAB MEX interface; switched off when `matlab` is not on the `PATH`, unless `matlab=ON` is given |
+| `gcc_version` | `12` if `matlab=ON`, else empty | Uses `gcc-12`/`g++-12`; empty: the compiler of an active conda environment, else the system compiler |
 | `octave`      | `ON`    | Octave MEX interface                                           |
 | `python`      | `ON`    | Python interface                                               |
 | `avx2`        | `ON`    | AVX2 acceleration (turn off on CPUs without AVX2)              |
@@ -145,10 +145,10 @@ Options are variables at the top of `GNUmakefile` and can be overridden on the c
 | `shared_lib`  | `OFF`   | Also build a shared library                                    |
 | `MATLAB_BIN`  | `matlab` | MATLAB command used by `make test`                            |
 
-Example without MATLAB, with the system compiler:
+Example: the MATLAB interface on a machine without MATLAB (e.g. to build it for others), with GCC 12:
 
 ```bash
-make gcc_version= matlab=OFF
+make matlab=ON
 ```
 
 The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly. `ENABLE_SANITIZERS` (CMake only, default `OFF`) builds with AddressSanitizer and UndefinedBehaviorSanitizer for testing; it turns MATLAB, Octave and CUDA off. `ENABLE_FUZZING` (CMake only, default `OFF`, Clang) builds the fuzz targets of [tests/fuzzing](tests/fuzzing/README.md) instead of the interfaces.
@@ -215,13 +215,13 @@ A conda environment provides compilers, CMake, Octave and Python in one place:
 ```bash
 conda create --name quadriga-lib -c conda-forge python numpy pytest h5py compilers make cmake octave
 conda activate quadriga-lib
-make gcc_version= matlab=OFF
+make
 make python_install
 ```
 
 ### MATLAB and GCC
 
-MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a newer GCC than your MATLAB release supports fail to load with a `GLIBCXX_... not found` error. The `GNUmakefile` therefore uses GCC 12 by default. If your MATLAB release needs a different version, install it (e.g. `sudo apt install g++-11`) and build with `make gcc_version=11`. The compilers supported by each MATLAB release are listed by MathWorks.
+MATLAB ships its own, older C++ runtime (`libstdc++`). MEX files built with a newer GCC than your MATLAB release supports fail to load with a `GLIBCXX_... not found` error. The `GNUmakefile` therefore uses GCC 12 whenever it builds the MATLAB interface. If your MATLAB release needs a different version, install it (e.g. `sudo apt install g++-11`) and build with `make gcc_version=11`. The compilers supported by each MATLAB release are listed by MathWorks.
 
 ## Changes on main
 

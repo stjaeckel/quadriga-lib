@@ -170,6 +170,18 @@ if (ARMA_EXT)
     set(ARMADILLO_FOUND OFF)
 else()
     find_package(Armadillo) # Sets ARMADILLO_INCLUDE_DIRS and ARMADILLO_FOUND
+    if (ARMADILLO_FOUND)
+        # find_package only searches for the files. A compiler with its own system folders (e.g. from conda) does
+        # not see /usr/include, which CMake leaves out of the compile commands, so check that the header compiles.
+        include(CheckIncludeFileCXX)
+        set(CMAKE_REQUIRED_INCLUDES ${ARMADILLO_INCLUDE_DIRS})
+        check_include_file_cxx(armadillo QD_ARMADILLO_USABLE)
+        unset(CMAKE_REQUIRED_INCLUDES)
+        if (NOT QD_ARMADILLO_USABLE)
+            message(STATUS "Armadillo in ${ARMADILLO_INCLUDE_DIRS} is not usable with ${CMAKE_CXX_COMPILER}: using the bundled headers")
+            set(ARMADILLO_FOUND OFF)
+        endif()
+    endif()
     if (NOT ARMADILLO_FOUND)
         add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
         set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
@@ -604,7 +616,8 @@ if(BUILD_OCTAVE)
         qd_mex_objects(octave_objects mexo ${mex_basename})
         add_custom_command(
             OUTPUT ${octave_output}
-            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}"
+            # mkoctfile links with the compiler of this build, not the one recorded when Octave was built (conda)
+            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}" "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER}"
                     ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output} "${octave_objects}"
                     -L$<TARGET_FILE_DIR:${QUADRIGA_LINK_TARGET}> -lquadriga
                     ${QD_MEX_EXTRA_LIBS} ${QD_MEX_EXTRA_LDFLAGS} -s

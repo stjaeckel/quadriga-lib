@@ -63,10 +63,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends g++-12 ninja-build unzip
 
-      # MEX files are built with g++-12 (GNUmakefile default), whose libstdc++ the MATLAB-bundled one can load
+      # MEX files are built with g++-12 (the GNUmakefile default with matlab=ON), whose libstdc++ the MATLAB-bundled
+      # one can load; matlab=ON because MATLAB is not on the PATH yet, which would turn the interface off
       - name: Build MATLAB MEX files
         run: |
-          make all octave=OFF python=OFF
+          make all matlab=ON octave=OFF python=OFF
           make moxunit-lib
 
       # The MEX files must not need libstdc++ or libgcc_s symbol versions that MATLAB R2024a does not bundle
